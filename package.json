@@ -1,0 +1,109 @@
+{
+  "name": "twinny",
+  "displayName": "twinny",
+  "description": "Locally hosted AI code completion plugin for vscode",
+  "version": "0.0.1",
+  "icon": "assets/icon.png",
+  "keywords": [
+    "code-inference",
+    "code-suggestion",
+    "copilot",
+    "localhost",
+    "no-leaks",
+    "private",
+    "twinny"
+  ],
+  "repository": {
+    "url": "https://github.com/rjmacarthy/twinny"
+  },
+  "license": "MIT",
+  "publisher": "rjmacarthy",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "bugs": {
+    "url": "https://github.com/rjmacarthy/twinny/issues"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "author": {
+    "name": "rjmacarthy"
+  },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "twinny.enable",
+        "shortTitle": "Enable twinny",
+        "title": "Enable twinny"
+      },
+      {
+        "command": "twinny.disable",
+        "title": "Disable twinny",
+        "shortTitle": "Disable twinny"
+      }
+    ],
+    "configuration": {
+      "title": "twinny",
+      "properties": {
+        "twinny.server": {
+          "type": "string",
+          "default": "http://localhost:5000/v1/engines"
+        },
+        "twinny.engine": {
+          "type": "string",
+          "default": "codegen"
+        },
+        "twinny.maxTokens": {
+          "type": "number",
+          "default": 200
+        },
+        "twinny.temperature": {
+          "type": "number",
+          "default": 0.1
+        },
+        "twinny.enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "twinny.debounceWait": {
+          "type": "number",
+          "default": 200
+        },
+        "twinny.contextLength": {
+          "type": "number",
+          "default": 500
+        }
+      }
+    }
+  },
+  "scripts": {
+    "watch": "webpack --watch",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/glob": "^7.2.0",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.70.0",
+    "@typescript-eslint/eslint-plugin": "^5.31.0",
+    "@typescript-eslint/parser": "^5.31.0",
+    "@vscode/test-electron": "^2.1.5",
+    "@vscode/vsce": "^2.18.0",
+    "eslint": "^8.20.0",
+    "glob": "^8.0.3",
+    "mocha": "^10.0.0",
+    "ts-loader": "^9.3.1",
+    "typescript": "^4.7.4",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0"
+  },
+  "dependencies": {
+    "openai": "^3.0.0"
+  }
+}
