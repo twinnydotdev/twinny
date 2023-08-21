@@ -1,6 +1,8 @@
-# Twinny
+# twinny
 
-**Twinny** is a locally hosted AI code completion plugin for Visual Studio Code, designed to work seamlessly with the [twinny-api](https://github.com/rjmacarthy/twinny-api).
+**twinny** is a locally hosted AI code completion plugin for Visual Studio Code, designed to work seamlessly with the [twinny-api](https://github.com/rjmacarthy/twinny-api).
+
+twinny is aptly named as your "twin" pair programmer, assisting you in writing code more efficiently and intelligently.
 
 ## 🚀 Getting Started
 
@@ -31,7 +33,7 @@ npm install
 
 ## 📦 Packaging and Installation
 
-For a more permanent solution, you can package Twinny into a `.vsix` file and then install it as a Visual Studio Code extension.
+For a more permanent solution, you can package twinny into a `.vsix` file and then install it as a Visual Studio Code extension.
 
 1. Package the plugin:
 
@@ -46,4 +48,4 @@ npm run package
 - Click on the `...` (More Actions) button in the upper-right corner.
 - Choose `Install from VSIX...` and select the generated `.vsix` file.
 
-Enjoy enhanced code completions with **Twinny**! 🎉
+Enjoy enhanced code completions with **twinny**! 🎉
