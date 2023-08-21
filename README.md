@@ -12,7 +12,7 @@
 1. Clone this repository:
 
 ```
-git clone https://github.com/your-username/twinny.git
+git clone https://github.com/rjmacarthy/twinny.git
 ```
 
 2. Navigate to the cloned directory:
