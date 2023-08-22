@@ -18,7 +18,7 @@ import {
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private statusBar: StatusBarItem
-  private _debouncer: NodeJS.Timeout | undefined;
+  private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = workspace
     .getConfiguration('twinny')
     .get('debounceWait') as number
@@ -40,6 +40,21 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     document: TextDocument,
     position: Position
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
+    const editor = window.activeTextEditor
+    if (!editor) {
+      return
+    }
+
+    const line = editor.document.lineAt(position.line)
+
+    const charsAfterRange = new Range(editor.selection.start, line.range.end)
+
+    const textAfterCursor = editor.document.getText(charsAfterRange)
+
+    if (textAfterCursor.trim()) {
+      return
+    }
+
     return new Promise((resolve) => {
       if (this._debouncer) {
         clearTimeout(this._debouncer)
@@ -65,22 +80,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         try {
           const { data } = await this._openai.createCompletion({
             model:
-              workspace.getConfiguration('twinny').get('model') ??
-              '<<UNSET>>',
+              workspace.getConfiguration('twinny').get('model') ?? '<<UNSET>>',
             prompt: prompt as CreateCompletionRequestPrompt,
             /* eslint-disable-next-line @typescript-eslint/naming-convention */
-            max_tokens: workspace
-              .getConfiguration('twinny')
-              .get('maxTokens'),
+            max_tokens: workspace.getConfiguration('twinny').get('maxTokens'),
             temperature: workspace
               .getConfiguration('twinny')
               .get('temperature'),
             stop: ['\n']
           })
           this.statusBar.text = '$(light-bulb)'
-          return resolve(
-            this.getInlineCompletions(data, position, document)
-          )
+          return resolve(this.getInlineCompletions(data, position, document))
         } catch (error) {
           this.statusBar.text = '$(alert)'
           return resolve([] as InlineCompletionItem[])
