@@ -4,7 +4,7 @@
 
 twinny is aptly named as your "twin" pair programmer, assisting you in writing code more efficiently and intelligently.
 
-![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/92f7dacf-d6e0-4be1-93bd-48fe2b2b2893)
+![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
 
 ## 🚀 Getting Started
 
