@@ -58,6 +58,10 @@
           "type": "string",
           "default": "codegen"
         },
+        "twinny.oneLine": {
+          "type": "bool",
+          "default": true
+        },
         "twinny.maxTokens": {
           "type": "number",
           "default": 200

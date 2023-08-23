@@ -15,6 +15,8 @@ import {
   StatusBarItem,
   window
 } from 'vscode'
+import { CompletionRequest } from './types'
+
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private statusBar: StatusBarItem
@@ -77,18 +79,22 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this.statusBar.tooltip = 'twinny - thinking...'
         this.statusBar.text = '$(loading~spin)'
 
+        const options : CompletionRequest = {
+          model:
+            workspace.getConfiguration('twinny').get('model') ?? '<<UNSET>>',
+          prompt: prompt as CreateCompletionRequestPrompt,
+          max_tokens: workspace.getConfiguration('twinny').get('maxTokens'),
+          temperature: workspace
+            .getConfiguration('twinny')
+            .get('temperature'),
+          stop: ['\n'],
+          one_line: workspace
+          .getConfiguration('twinny')
+          .get('oneLine')
+        }
+
         try {
-          const { data } = await this._openai.createCompletion({
-            model:
-              workspace.getConfiguration('twinny').get('model') ?? '<<UNSET>>',
-            prompt: prompt as CreateCompletionRequestPrompt,
-            /* eslint-disable-next-line @typescript-eslint/naming-convention */
-            max_tokens: workspace.getConfiguration('twinny').get('maxTokens'),
-            temperature: workspace
-              .getConfiguration('twinny')
-              .get('temperature'),
-            stop: ['\n']
-          })
+          const { data } = await this._openai.createCompletion(options)
           this.statusBar.text = '$(light-bulb)'
           return resolve(this.getInlineCompletions(data, position, document))
         } catch (error) {
@@ -104,7 +110,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     position: Position
   ): { prefix: string; suffix: string } {
     const start = Math.max(0, position.line - this._contextLength)
-
     const prefix = document.getText(
       new Range(start, 0, position.line, this._contextLength)
     )
@@ -116,7 +121,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         0
       )
     )
-
     return { prefix, suffix }
   }
 
