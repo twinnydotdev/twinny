@@ -17,26 +17,21 @@ import {
 } from 'vscode'
 import { CompletionRequest } from './types'
 
-
 export class CompletionProvider implements InlineCompletionItemProvider {
-  private statusBar: StatusBarItem
+  private _statusBar: StatusBarItem
   private _debouncer: NodeJS.Timeout | undefined
-  private _debounceWait = workspace
-    .getConfiguration('twinny')
-    .get('debounceWait') as number
-  private _contextLength = workspace
-    .getConfiguration('twinny')
-    .get('contextLength') as number
+  private _config = workspace.getConfiguration('twinny')
+  private _debounceWait = this._config.get('debounceWait') as number
+  private _contextLength = this._config.get('contextLength') as number
+  private _openaiConfig = new Configuration()
+  private _serverPath = this._config.get('server')
+  private _engine = this._config.get('engine')
+  private _basePath = `${this._serverPath}/${this._engine}`
+  private _openai: OpenAIApi = new OpenAIApi(this._openaiConfig, this._basePath)
 
   constructor(statusBar: StatusBarItem) {
-    this.statusBar = statusBar
+    this._statusBar = statusBar
   }
-  private _openai: OpenAIApi = new OpenAIApi(
-    new Configuration(),
-    `${workspace.getConfiguration('twinny').get('server')}/${workspace
-      .getConfiguration('twinny')
-      .get('engine')}`
-  )
 
   public async provideInlineCompletionItems(
     document: TextDocument,
@@ -63,42 +58,32 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       }
 
       this._debouncer = setTimeout(async () => {
-        if (!workspace.getConfiguration('twinny').get('enabled')) {
-          console.debug('Extension not enabled, skipping.')
-          return resolve([] as InlineCompletionItem[])
-        }
+        if (!this._config.get('enabled')) return resolve([] as InlineCompletionItem[])
 
         const { prefix, suffix } = this.getContext(document, position)
 
         const prompt = `${prefix}<FILL_HERE>${suffix}`
 
-        if (!prompt) {
-          return resolve([] as InlineCompletionItem[])
-        }
+        if (!prompt) return resolve([] as InlineCompletionItem[])
 
-        this.statusBar.tooltip = 'twinny - thinking...'
-        this.statusBar.text = '$(loading~spin)'
+        this._statusBar.tooltip = 'twinny - thinking...'
+        this._statusBar.text = '$(loading~spin)'
 
-        const options : CompletionRequest = {
-          model:
-            workspace.getConfiguration('twinny').get('model') ?? '<<UNSET>>',
+        const options: CompletionRequest = {
+          model: '',
           prompt: prompt as CreateCompletionRequestPrompt,
-          max_tokens: workspace.getConfiguration('twinny').get('maxTokens'),
-          temperature: workspace
-            .getConfiguration('twinny')
-            .get('temperature'),
-          stop: ['\n'],
-          one_line: workspace
-          .getConfiguration('twinny')
-          .get('oneLine')
+          max_tokens: this._config.get('maxTokens'),
+          temperature: this._config.get('temperature'),
+          one_line: this._config.get('oneLine')
         }
 
         try {
           const { data } = await this._openai.createCompletion(options)
-          this.statusBar.text = '$(light-bulb)'
+          this._statusBar.text = '$(code)'
+          this._statusBar.tooltip = 'twinny - Ready'
           return resolve(this.getInlineCompletions(data, position, document))
         } catch (error) {
-          this.statusBar.text = '$(alert)'
+          this._statusBar.text = '$(alert)'
           return resolve([] as InlineCompletionItem[])
         }
       }, this._debounceWait as number)
@@ -130,9 +115,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     document: TextDocument
   ): InlineCompletionItem[] {
     const editor = window.activeTextEditor
-    if (!editor) {
-      return []
-    }
+    if (!editor) return []
     return (
       completionResponse.choices?.map((choice) => {
         if (position.character === 0) {
@@ -149,7 +132,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const charBefore = document.getText(charBeforeRange)
 
-        if (choice.charAt(0) === ' ' && charBefore === ' ') {
+        if (choice[0] === ' ' && charBefore === ' ') {
           choice = choice.slice(1, choice.length)
         }
 

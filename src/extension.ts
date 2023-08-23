@@ -1,5 +1,3 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import {
   commands,
   ExtensionContext,
@@ -8,13 +6,13 @@ import {
   window,
   workspace
 } from 'vscode'
-import { CompletionProvider } from './CompletionProvider'
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+import { CompletionProvider } from './completion'
+
 export function activate(context: ExtensionContext) {
+  const config = workspace.getConfiguration('twinny')
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
-  statusBar.text = '$(light-bulb)'
+  statusBar.text = '$(code)'
   statusBar.tooltip = 'twinny - Ready'
 
   context.subscriptions.push(
@@ -22,7 +20,6 @@ export function activate(context: ExtensionContext) {
       { pattern: '**' },
       new CompletionProvider(statusBar)
     ),
-
     commands.registerCommand('twinny.enable', () => {
       statusBar.show()
     }),
@@ -32,12 +29,7 @@ export function activate(context: ExtensionContext) {
     statusBar
   )
 
-  if (workspace.getConfiguration('twinny').get('enabled')) {
+  if (config.get('enabled')) {
     statusBar.show()
   }
-}
-
-// this method is called when your extension is deactivated
-export function deactivate() {
-  console.debug('Deactivating twinny provider', new Date())
 }
