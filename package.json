@@ -59,7 +59,7 @@
           "default": "codegen"
         },
         "twinny.oneLine": {
-          "type": "bool",
+          "type": "boolean",
           "default": true
         },
         "twinny.maxTokens": {
