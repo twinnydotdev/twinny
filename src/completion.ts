@@ -118,6 +118,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (!editor) return []
     return (
       completionResponse.choices?.map((choice) => {
+
         if (position.character === 0) {
           return new InlineCompletionItem(
             choice as string,
@@ -132,12 +133,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const charBefore = document.getText(charBeforeRange)
 
-        if (choice[0] === ' ' && charBefore === ' ') {
-          choice = choice.slice(1, choice.length)
+        if (choice.text === ' ' && charBefore === ' ') {
+          choice.text = choice.text.slice(1, choice.text.length)
         }
 
         return new InlineCompletionItem(
-          choice as string,
+          choice.text as string,
           new Range(position, position)
         )
       }) || []
