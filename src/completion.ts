@@ -121,7 +121,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (position.character === 0) {
           return new InlineCompletionItem(
-            choice as string,
+            choice.text as string,
             new Range(position, position)
           )
         }
