@@ -13,6 +13,16 @@ twinny is aptly named as your "twin" pair programmer, assisting you in writing c
 
 ### Installation & Setup
 
+twinny is now verified and available on the vs-code extension marketplace.
+
+Install through vs code or visit this link.
+
+https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny
+
+
+### Installing manually:
+
+
 1. Clone this repository:
 
 ```
