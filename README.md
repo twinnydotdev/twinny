@@ -6,22 +6,31 @@ twinny is aptly named as your "twin" pair programmer, assisting you in writing c
 
 ![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
 
+The aim of twinny is to democratise the development of AI code completion tools, join me on this journey!
+
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Ensure you have the `twinny-api` running on your machine. If not, follow the instructions [here](https://github.com/rjmacarthy/twinny-api).
+
+To make use of twinny properly, you will need to run [here](https://github.com/rjmacarthy/twinny-api).
+
+This is the server which serves the extention with compltions.
+
+Follow the instructions [here](https://github.com/rjmacarthy/twinny-api) on how to install and run the server.
 
 ### Installation & Setup
 
-twinny is now verified and available on the vs-code extension marketplace.
+Once you have the server up and running you will need to install the extension.
 
-Install through vs code or visit this link.
+twinny is now verified and available on the vscode extension marketplace.
+
+You can install it through vscode or visit this link for more information.
 
 https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny
 
+Enjoy enhanced code completions with **twinny**! 🎉
 
-### Installing manually:
-
+### Development and contributions
 
 1. Clone this repository:
 
@@ -43,21 +52,6 @@ npm install
 
 4. Start the plugin in development mode by pressing `F5` within Visual Studio Code.
 
-## 📦 Packaging and Installation
+Contributions are welcome for both the extention and the API please open an issue describing your changes and open a pull request when ready.
 
-For a more permanent solution, you can package twinny into a `.vsix` file and then install it as a Visual Studio Code extension.
-
-1. Package the plugin:
-
-```
-npm run package
-```
-
-2. This process will generate a `.vsix` file in the root directory. 
-3. To install the `.vsix` file in Visual Studio Code:
-- Open Visual Studio Code.
-- Navigate to Extensions view by clicking on the square icon on the sidebar or pressing `Ctrl+Shift+X`.
-- Click on the `...` (More Actions) button in the upper-right corner.
-- Choose `Install from VSIX...` and select the generated `.vsix` file.
-
-Enjoy enhanced code completions with **twinny**! 🎉
+This project is under MIT licence, please read the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) file for more information.
