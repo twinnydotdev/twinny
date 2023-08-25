@@ -12,19 +12,15 @@ The aim of twinny is to democratise the development of AI code completion tools,
 
 ### Prerequisites
 
-To make use of twinny properly, you will need to run the [twinny-api](https://github.com/rjmacarthy/twinny-api). This is the server which serves the extension with compltions.
+To make use of twinny properly, you will need to run the [twinny-api](https://github.com/rjmacarthy/twinny-api). This is the server which serves the extension with code completion suggestions.
 
-Follow the instructions [here](https://github.com/rjmacarthy/twinny-api) on how to install and run the server.
+Follow the instructions [here](https://github.com/rjmacarthy/twinny-api) on how to install and run the server on your computer first.
 
 ### Installation & Setup
 
-Once you have the server up and running you will need to install the extension.
+Once you have [twinny-api](https://github.com/rjmacarthy/twinny-api) up and running you will need to install the extension.
 
-twinny is now verified and available on the vscode extension marketplace.
-
-You can install it through vscode or visit this link for more information.
-
-https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny
+You can install the verified extension using vscode or visit [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) for more information on how to install it.
 
 Enjoy enhanced code completions with **twinny**! 🎉
 
