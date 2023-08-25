@@ -12,9 +12,7 @@ The aim of twinny is to democratise the development of AI code completion tools,
 
 ### Prerequisites
 
-To make use of twinny properly, you will need to run [here](https://github.com/rjmacarthy/twinny-api).
-
-This is the server which serves the extention with compltions.
+To make use of twinny properly, you will need to run the [twinny-api](https://github.com/rjmacarthy/twinny-api). This is the server which serves the extention with compltions.
 
 Follow the instructions [here](https://github.com/rjmacarthy/twinny-api) on how to install and run the server.
 
