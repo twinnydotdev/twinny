@@ -70,6 +70,14 @@
           "type": "number",
           "default": 0.1
         },
+        "twinny.topK": {
+          "type": "number",
+          "default": 10
+        },
+        "twinny.topP": {
+          "type": "number",
+          "default": 0.95
+        },
         "twinny.enabled": {
           "type": "boolean",
           "default": true
