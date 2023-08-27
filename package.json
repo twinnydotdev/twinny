@@ -78,6 +78,10 @@
           "type": "number",
           "default": 0.95
         },
+        "twinny.numReturnSequences": {
+          "type": "number",
+          "default": 1
+        },
         "twinny.enabled": {
           "type": "boolean",
           "default": true
