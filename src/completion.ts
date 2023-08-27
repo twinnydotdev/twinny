@@ -74,7 +74,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           prompt: prompt as CreateCompletionRequestPrompt,
           max_tokens: this._config.get('maxTokens'),
           temperature: this._config.get('temperature'),
-          one_line: this._config.get('oneLine')
+          one_line: this._config.get('oneLine'),
+          top_p: this._config.get('oneLine'),
+          top_k: this._config.get('oneLine'),
+          num_return_sequences: this._config.get('oneLine')
         }
 
         try {
