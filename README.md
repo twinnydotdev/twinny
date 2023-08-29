@@ -4,6 +4,8 @@
 
 twinny is aptly named as your "twin" pair programmer, assisting you in writing code more efficiently and intelligently.
 
+**🎉 Attention: twinny now supports [CodeLlama](https://huggingface.co/codellama)! 🎉**
+
 ![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
 
 The aim of twinny is to democratise the development of AI code completion tools, join me on this journey!
