@@ -52,7 +52,7 @@
       "properties": {
         "twinny.server": {
           "type": "string",
-          "default": "http://localhost:5000/v1/engines"
+          "default": "http://localhost:7000/v1/engines"
         },
         "twinny.engine": {
           "type": "string",
