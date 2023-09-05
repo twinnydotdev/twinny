@@ -74,9 +74,17 @@
           "type": "boolean",
           "default": true
         },
+        "twinny.maxTime": {
+          "type": "number",
+          "default": 5
+        },
         "twinny.maxTokens": {
           "type": "number",
           "default": 200
+        },
+        "twinny.repetitionPenalty": {
+          "type": "number",
+          "default": 1.02
         },
         "twinny.server": {
           "type": "string",
