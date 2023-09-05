@@ -15,10 +15,12 @@ export function activate(context: ExtensionContext) {
   statusBar.text = '$(code)'
   statusBar.tooltip = 'twinny - Ready'
 
+  const completionProvider = new CompletionProvider(statusBar);
+
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
       { pattern: '**' },
-      new CompletionProvider(statusBar)
+      completionProvider
     ),
     commands.registerCommand('twinny.enable', () => {
       statusBar.show()
@@ -32,4 +34,13 @@ export function activate(context: ExtensionContext) {
   if (config.get('enabled')) {
     statusBar.show()
   }
+
+	context.subscriptions.push(
+    workspace.onDidChangeConfiguration(event => {
+      if (!event.affectsConfiguration('twinny')) {
+        return
+      }
+
+      completionProvider.updateConfig()
+	}));
 }
