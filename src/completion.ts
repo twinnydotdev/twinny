@@ -151,13 +151,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   public updateConfig() {
-    this._config = workspace.getConfiguration('twinny');
-    this._debounceWait = this._config.get('debounceWait') as number;
-    this._contextLength = this._config.get('contextLength') as number;
-    this._serverPath = this._config.get('server');
-    this._engine = this._config.get('engine');
+    this._config = workspace.getConfiguration('twinny')
+    this._debounceWait = this._config.get('debounceWait') as number
+    this._contextLength = this._config.get('contextLength') as number
+    this._serverPath = this._config.get('server')
+    this._engine = this._config.get('engine')
 
-    this._basePath = `${this._serverPath}/${this._engine}`;
-    this._openai = new OpenAIApi(this._openaiConfig, this._basePath);
+    this._basePath = `${this._serverPath}/${this._engine}`
+    this._openai = new OpenAIApi(this._openaiConfig, this._basePath)
   }
 }
