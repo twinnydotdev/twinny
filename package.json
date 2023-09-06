@@ -50,21 +50,45 @@
     "configuration": {
       "title": "twinny",
       "properties": {
-        "twinny.server": {
-          "type": "string",
-          "default": "http://localhost:7000/v1/engines"
+        "twinny.contextLength": {
+          "type": "number",
+          "default": 500
+        },
+        "twinny.debounceWait": {
+          "type": "number",
+          "default": 200
+        },
+        "twinny.enabled": {
+          "type": "boolean",
+          "default": true
         },
         "twinny.engine": {
           "type": "string",
           "default": "codegen"
         },
+        "twinny.numReturnSequences": {
+          "type": "number",
+          "default": 1
+        },
         "twinny.oneLine": {
           "type": "boolean",
           "default": true
         },
+        "twinny.maxTime": {
+          "type": "number",
+          "default": 5
+        },
         "twinny.maxTokens": {
           "type": "number",
           "default": 200
+        },
+        "twinny.repetitionPenalty": {
+          "type": "number",
+          "default": 1.02
+        },
+        "twinny.server": {
+          "type": "string",
+          "default": "http://localhost:7000/v1/engines"
         },
         "twinny.temperature": {
           "type": "number",
@@ -77,22 +101,6 @@
         "twinny.topP": {
           "type": "number",
           "default": 0.95
-        },
-        "twinny.numReturnSequences": {
-          "type": "number",
-          "default": 1
-        },
-        "twinny.enabled": {
-          "type": "boolean",
-          "default": true
-        },
-        "twinny.debounceWait": {
-          "type": "number",
-          "default": 200
-        },
-        "twinny.contextLength": {
-          "type": "number",
-          "default": 500
         }
       }
     }

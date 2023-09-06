@@ -72,12 +72,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const options: CompletionRequest = {
           model: '',
           prompt: prompt as CreateCompletionRequestPrompt,
+          max_time: this._config.get('maxTime'),
           max_tokens: this._config.get('maxTokens'),
+          num_return_sequences: this._config.get('numReturnSequences'),
           temperature: this._config.get('temperature'),
           one_line: this._config.get('oneLine'),
           top_p: this._config.get('topP'),
           top_k: this._config.get('topK'),
-          num_return_sequences: this._config.get('numReturnSequences')
+          repetition_penalty: this._config.get('repetitionPenalty')
         }
 
         try {
@@ -146,5 +148,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         )
       }) || []
     )
+  }
+
+  public updateConfig() {
+    this._config = workspace.getConfiguration('twinny')
+    this._debounceWait = this._config.get('debounceWait') as number
+    this._contextLength = this._config.get('contextLength') as number
+    this._serverPath = this._config.get('server')
+    this._engine = this._config.get('engine')
+
+    this._basePath = `${this._serverPath}/${this._engine}`
+    this._openai = new OpenAIApi(this._openaiConfig, this._basePath)
   }
 }
