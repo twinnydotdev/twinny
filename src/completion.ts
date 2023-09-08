@@ -105,8 +105,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       \n
       ${prefix}<FILL_HERE>${suffix}
     `
-    console.debug(prompt)
-
     return prompt
   }
 
