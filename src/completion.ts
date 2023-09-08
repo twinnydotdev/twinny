@@ -105,7 +105,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       ${this._usePreviousContext ? `${this._lineContexts.join('\n')}\n` : ''}
       ${prefix}<FILL_HERE>${suffix}
     `
-    console.log(prompt)
     return prompt
   }
 
