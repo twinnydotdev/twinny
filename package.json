@@ -101,6 +101,10 @@
         "twinny.topP": {
           "type": "number",
           "default": 0.95
+        },
+        "twinny.useContext": {
+          "type": "boolean",
+          "default": true
         }
       }
     }

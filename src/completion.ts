@@ -29,6 +29,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _openaiConfig = new Configuration()
   private _serverPath = this._config.get('server')
   private _engine = this._config.get('engine')
+  private _useContext = this._config.get('useContext')
   private _basePath = `${this._serverPath}/${this._engine}`
   private _openai: OpenAIApi = new OpenAIApi(this._openaiConfig, this._basePath)
 
@@ -101,22 +102,25 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private getPrompt(document: TextDocument, position: Position) {
     const { prefix, suffix } = this.getContext(document, position)
     const prompt = `
-      ${this._lineContexts.join('\n')}
-      \n
+      ${this._useContext ? `${this._lineContexts.join('\n')}\n` : ''}
       ${prefix}<FILL_HERE>${suffix}
     `
+    console.log(prompt)
     return prompt
   }
 
   private registerOnChangeContextListener() {
     let timeout: NodeJS.Timer | undefined
     window.onDidChangeTextEditorSelection((e) => {
+      if (!this._useContext) {
+        return
+      }
       if (timeout) clearTimeout(timeout)
       timeout = setTimeout(() => {
         const editor = window.activeTextEditor
         if (!editor) return
-        const fileUri = editor.document.uri;
-        const fileName = workspace.asRelativePath(fileUri);
+        const fileUri = editor.document.uri
+        const fileName = workspace.asRelativePath(fileUri)
         const document = editor.document
         const line = editor.document.lineAt(e.selections[0].anchor.line)
         const lineText = document.getText(
@@ -131,7 +135,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         if (this._lineContexts.length === this._lineContextLength) {
           this._lineContexts.pop()
         }
-        this._lineContexts.unshift(`filename: ${fileName} - code: ${lineText.trim()}`)
+        this._lineContexts.unshift(
+          `filename: ${fileName} - code: ${lineText.trim()}`
+        )
         this._lineContexts = [...new Set(this._lineContexts)]
       }, this._lineContextTimeout)
     })
@@ -197,6 +203,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._contextLength = this._config.get('contextLength') as number
     this._serverPath = this._config.get('server')
     this._engine = this._config.get('engine')
+    this._useContext = this._config.get('useContext')
 
     this._basePath = `${this._serverPath}/${this._engine}`
     this._openai = new OpenAIApi(this._openaiConfig, this._basePath)
