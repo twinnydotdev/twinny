@@ -29,7 +29,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _openaiConfig = new Configuration()
   private _serverPath = this._config.get('server')
   private _engine = this._config.get('engine')
-  private _useContext = this._config.get('useContext')
+  private _usePreviousContext = this._config.get('usePreviousContext')
   private _basePath = `${this._serverPath}/${this._engine}`
   private _openai: OpenAIApi = new OpenAIApi(this._openaiConfig, this._basePath)
 
@@ -102,7 +102,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private getPrompt(document: TextDocument, position: Position) {
     const { prefix, suffix } = this.getContext(document, position)
     const prompt = `
-      ${this._useContext ? `${this._lineContexts.join('\n')}\n` : ''}
+      ${this._usePreviousContext ? `${this._lineContexts.join('\n')}\n` : ''}
       ${prefix}<FILL_HERE>${suffix}
     `
     console.log(prompt)
@@ -112,7 +112,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private registerOnChangeContextListener() {
     let timeout: NodeJS.Timer | undefined
     window.onDidChangeTextEditorSelection((e) => {
-      if (!this._useContext) {
+      if (!this._usePreviousContext) {
         return
       }
       if (timeout) clearTimeout(timeout)
@@ -203,7 +203,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._contextLength = this._config.get('contextLength') as number
     this._serverPath = this._config.get('server')
     this._engine = this._config.get('engine')
-    this._useContext = this._config.get('useContext')
+    this._usePreviousContext = this._config.get('_usePreviousContext')
 
     this._basePath = `${this._serverPath}/${this._engine}`
     this._openai = new OpenAIApi(this._openaiConfig, this._basePath)
