@@ -19,6 +19,9 @@ import { CompletionRequest } from './types'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
+  private _lineContexts: string[] = []
+  private _lineContextLength = 10
+  private _lineContextTimeout = 200
   private _debouncer: NodeJS.Timeout | undefined
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
@@ -31,6 +34,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
+    this.registerOnChangeContextListener()
   }
 
   public async provideInlineCompletionItems(
@@ -58,11 +62,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       }
 
       this._debouncer = setTimeout(async () => {
-        if (!this._config.get('enabled')) return resolve([] as InlineCompletionItem[])
+        if (!this._config.get('enabled'))
+          return resolve([] as InlineCompletionItem[])
 
-        const { prefix, suffix } = this.getContext(document, position)
-
-        const prompt = `${prefix}<FILL_HERE>${suffix}`
+        const prompt = this.getPrompt(document, position)
 
         if (!prompt) return resolve([] as InlineCompletionItem[])
 
@@ -95,6 +98,47 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
+  private getPrompt(document: TextDocument, position: Position) {
+    const { prefix, suffix } = this.getContext(document, position)
+    const prompt = `
+      ${this._lineContexts.join('\n')}
+      \n
+      ${prefix}<FILL_HERE>${suffix}
+    `
+    console.debug(prompt)
+
+    return prompt
+  }
+
+  private registerOnChangeContextListener() {
+    let timeout: NodeJS.Timer | undefined
+    window.onDidChangeTextEditorSelection((e) => {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        const editor = window.activeTextEditor
+        if (!editor) return
+        const fileUri = editor.document.uri;
+        const fileName = workspace.asRelativePath(fileUri);
+        const document = editor.document
+        const line = editor.document.lineAt(e.selections[0].anchor.line)
+        const lineText = document.getText(
+          new Range(
+            line.lineNumber,
+            0,
+            line.lineNumber,
+            line.range.end.character
+          )
+        )
+        if (lineText.trim().length < 2) return // most likely a bracket or un-interesting
+        if (this._lineContexts.length === this._lineContextLength) {
+          this._lineContexts.pop()
+        }
+        this._lineContexts.unshift(`filename: ${fileName} - code: ${lineText.trim()}`)
+        this._lineContexts = [...new Set(this._lineContexts)]
+      }, this._lineContextTimeout)
+    })
+  }
+
   private getContext(
     document: TextDocument,
     position: Position
@@ -123,7 +167,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (!editor) return []
     return (
       completionResponse.choices?.map((choice) => {
-
         if (position.character === 0) {
           return new InlineCompletionItem(
             choice.text as string,
@@ -143,7 +186,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         }
 
         return new InlineCompletionItem(
-          choice.text as string,
+          choice.text?.trim() as string,
           new Range(position, position)
         )
       }) || []
