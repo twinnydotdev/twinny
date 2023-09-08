@@ -189,7 +189,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         }
 
         return new InlineCompletionItem(
-          choice.text?.trim() as string,
+          choice.text as string,
           new Range(position, position)
         )
       }) || []
