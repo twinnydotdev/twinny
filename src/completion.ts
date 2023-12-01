@@ -92,7 +92,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                       this.getInlineCompletions(completion, position, document)
                     )
                   }
-                  // Handle other statuses or end of response
                 } catch (error) {
                   console.error('Error parsing JSON:', error)
                   return
