@@ -81,12 +81,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 try {
                   const json = JSON.parse(chunk)
                   completion = completion + json.response
-                  if (json.response === '\n') {
+                  if (json.response === '\n' || json.response.match('<EOT>')) {
                     onComplete()
                     resolveStream(null)
                     this._statusBar.text = '$(code)'
                     resolve(
-                      this.getInlineCompletions(completion, position, document)
+                      this.getInlineCompletions(completion.replace('<EOT>', ''), position, document)
                     )
                   }
                 } catch (error) {
