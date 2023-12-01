@@ -62,49 +62,9 @@
           "type": "boolean",
           "default": true
         },
-        "twinny.engine": {
+        "twinny.ollamaModelName": {
           "type": "string",
-          "default": "codegen"
-        },
-        "twinny.numReturnSequences": {
-          "type": "number",
-          "default": 1
-        },
-        "twinny.oneLine": {
-          "type": "boolean",
-          "default": true
-        },
-        "twinny.maxTime": {
-          "type": "number",
-          "default": 5
-        },
-        "twinny.maxTokens": {
-          "type": "number",
-          "default": 200
-        },
-        "twinny.repetitionPenalty": {
-          "type": "number",
-          "default": 1.02
-        },
-        "twinny.server": {
-          "type": "string",
-          "default": "http://localhost:7000/v1/engines"
-        },
-        "twinny.temperature": {
-          "type": "number",
-          "default": 0.1
-        },
-        "twinny.topK": {
-          "type": "number",
-          "default": 10
-        },
-        "twinny.topP": {
-          "type": "number",
-          "default": 0.95
-        },
-        "twinny.usePreviousContext": {
-          "type": "boolean",
-          "default": true
+          "default": "codellama:7b-code"
         }
       }
     }
@@ -134,12 +94,10 @@
     "eslint": "^8.20.0",
     "glob": "^8.0.3",
     "mocha": "^10.0.0",
+    "stylelint-config-standard-scss": "^11.0.0",
     "ts-loader": "^9.3.1",
     "typescript": "^4.7.4",
     "webpack": "^5.74.0",
     "webpack-cli": "^4.10.0"
-  },
-  "dependencies": {
-    "openai": "^3.0.0"
   }
 }
