@@ -20,7 +20,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
-  private _model = this._config.get('ollamaModelName')
+  private _model = this._config.get('ollamaModelName') as string
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
