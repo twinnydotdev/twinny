@@ -58,16 +58,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (!prompt) return resolve([] as InlineCompletionItem[])
 
-        this._statusBar.tooltip = 'twinny - thinking...'
-        this._statusBar.text = '$(loading~spin)'
+
+        let completion = ''
 
         try {
           this._statusBar.text = '$(code)'
 
-
-
           await new Promise((resolveStream) => {
-            this._statusBar.text = '$(loading)'
+            this._statusBar.text = '$(loading~spin)'
             streamResponse(
               {
                 hostname: 'localhost',
@@ -81,7 +79,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               },
               (chunk, onComplete) => {
                 try {
-                  let completion = ''
                   const json = JSON.parse(chunk)
                   completion = completion + json.response
                   if (json.response === '\n') {
