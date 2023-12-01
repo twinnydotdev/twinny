@@ -1,9 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { request } from 'http'
 import { RequestOptions } from 'https'
+
+interface StreamBody {
+  model: string
+  prompt: string
+}
+
 export async function streamResponse(
   options: RequestOptions,
-  body: any,
+  body: StreamBody,
   cb: (chunk: string, resolve: () => void) => void
 ) {
   const req = request(options, (res) => {
