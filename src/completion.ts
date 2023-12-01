@@ -64,7 +64,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         try {
           this._statusBar.text = '$(code)'
 
-          let completion = ''
+
 
           await new Promise((resolveStream) => {
             this._statusBar.text = '$(loading)'
@@ -81,9 +81,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               },
               (chunk, onComplete) => {
                 try {
+                  let completion = ''
                   const json = JSON.parse(chunk)
                   completion = completion + json.response
-
                   if (json.response === '\n') {
                     onComplete()
                     resolveStream(null)
