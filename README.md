@@ -14,7 +14,7 @@ The aim of twinny is to democratise the development of AI code completion tools,
 
 ### Prerequisites
 
-To make use of twinny properly, you will need to run ans server the [ollama](https://github.com/jmorganca/ollama) API.
+To make use of twinny properly, you will need to run the [ollama](https://github.com/jmorganca/ollama) API.
 
 ### Installation & Setup
 
