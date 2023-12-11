@@ -65,6 +65,14 @@
         "twinny.ollamaModelName": {
           "type": "string",
           "default": "codellama:7b-code"
+        },
+        "twinny.ollamaBaseUrl": {
+          "type": "string",
+          "default": "localhost"
+        },
+        "twinny.ollamaApiPort": {
+          "type": "number",
+          "default": 11434
         }
       }
     }
