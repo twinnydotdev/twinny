@@ -1,5 +1,7 @@
 # twinny
 
+### [Install the vscode extension](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny#review-details)
+
 **twinny** is a locally hosted AI code completion plugin for Visual Studio Code, designed to work seamlessly with [ollama](https://github.com/jmorganca/ollama).
 
 twinny is aptly named as your "twin" pair programmer, assisting you in writing code more efficiently and intelligently.
