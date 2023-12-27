@@ -60,7 +60,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (!prompt) return resolve([] as InlineCompletionItem[])
 
-
         let completion = ''
 
         try {
@@ -152,7 +151,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const endLine = line + this._contextLength
 
     const prefixRange = new Range(startLine, 0, line, position.character)
-    const suffixRange = new Range(line + 1, 0, endLine, 0)
+    const suffixRange = new Range(line, position.character, endLine, 0)
 
     const prefix = document.getText(prefixRange)
     const suffix = document.getText(suffixRange)
