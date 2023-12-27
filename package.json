@@ -52,7 +52,7 @@
       "properties": {
         "twinny.contextLength": {
           "type": "number",
-          "default": 500
+          "default": 10
         },
         "twinny.debounceWait": {
           "type": "number",

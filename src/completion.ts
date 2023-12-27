@@ -58,8 +58,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const prompt = this.getPrompt(document, position)
 
-        if (!prompt) return resolve([] as InlineCompletionItem[])
+        console.log(prompt)
 
+        if (!prompt) return resolve([] as InlineCompletionItem[])
 
         let completion = ''
 
@@ -83,12 +84,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 try {
                   const json = JSON.parse(chunk)
                   completion = completion + json.response
+                  console.log(completion)
                   if (json.response === '\n' || json.response.match('<EOT>')) {
                     onComplete()
                     resolveStream(null)
                     this._statusBar.text = '$(code)'
                     resolve(
-                      this.getInlineCompletions(completion.replace('<EOT>', ''), position, document)
+                      this.getInlineCompletions(
+                        completion.replace('<EOT>', ''),
+                        position,
+                        document
+                      )
                     )
                   }
                 } catch (error) {
@@ -139,22 +145,20 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private getContext(
+  getContext(
     document: TextDocument,
     position: Position
   ): { prefix: string; suffix: string } {
-    const start = Math.max(0, position.line - this._contextLength)
-    const prefix = document.getText(
-      new Range(start, 0, position.line, this._contextLength)
-    )
-    const suffix = document.getText(
-      new Range(
-        position.line,
-        position.character,
-        position.line + this._contextLength,
-        0
-      )
-    )
+    const line = position.line
+    const startLine = Math.max(0, line - this._contextLength)
+    const endLine = line + this._contextLength
+
+    const prefixRange = new Range(startLine, 0, line, 0)
+    const suffixRange = new Range(line + 1, 0, endLine, 0)
+
+    const prefix = document.getText(prefixRange)
+    const suffix = document.getText(suffixRange)
+
     return { prefix, suffix }
   }
 
