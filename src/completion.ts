@@ -21,6 +21,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
   private _model = this._config.get('ollamaModelName') as string
+  private _baseurl = this._config.get('ollamaBaseUrl') as string
+  private _apiport = this._config.get('ollamaApiPort') as number
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
@@ -68,8 +70,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             this._statusBar.text = '$(loading~spin)'
             streamResponse(
               {
-                hostname: 'localhost',
-                port: 11434,
+                hostname: this._baseurl,
+                port: this._apiport,
                 method: 'POST',
                 path: '/api/generate'
               },
