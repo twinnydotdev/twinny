@@ -58,8 +58,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const prompt = this.getPrompt(document, position)
 
-        console.log(prompt)
-
         if (!prompt) return resolve([] as InlineCompletionItem[])
 
         let completion = ''
