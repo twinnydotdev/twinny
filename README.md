@@ -8,8 +8,6 @@
 
 twinny is aptly named as your "twin" pair programmer, assisting you in writing code more efficiently and intelligently.
 
-**🎉 Attention: twinny now works only with [ollama](https://github.com/jmorganca/ollama) API and the legacy API [twinny-api](https://github.com/rjmacarthy/twinny-api) will no longer be supported.**
-
 ![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
 
 The aim of twinny is to democratise the development of AI code completion tools, join me on this journey!
@@ -19,6 +17,14 @@ The aim of twinny is to democratise the development of AI code completion tools,
 ### Prerequisites
 
 To make use of twinny properly, you will need to run the [ollama](https://github.com/jmorganca/ollama) API.
+
+The easiest way to run the ollama API is to install ollama then run this command.
+
+`
+ollama run codellama:7b-code '<PRE> def compute_gcd(x, y): <SUF>return result <MID>'
+`
+
+Replace 7b with the model which you would like to run e.g 13b or 34b.
 
 ### Installation & Setup
 
