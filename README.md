@@ -14,27 +14,13 @@ The aim of twinny is to democratise the development of AI code completion tools,
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### Easy Installation
 
-To make use of twinny properly, you will need to run the [ollama](https://github.com/jmorganca/ollama) API.
+**twinny** and **ollama** are designed to work together. When installing the **twinny** extension in Visual Studio Code, it will automatically prompt and guide you through the installation of **ollama**, ensuring a seamless setup process.
 
-The easiest way to run the ollama API is to install ollama then run this command.
+Install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny)
 
-`
-ollama run codellama:7b-code '<PRE> def compute_gcd(x, y): <SUF>return result <MID>'
-`
-
-Replace 7b with the model which you would like to run e.g 13b or 34b. Please make aure that you are using the `code` version. Once you have a reply from the ollama model the API should have started automatically along side it.
-
-The extension will prompt and guide you through the installation of Ollama if you don't have it installed.
-
-### Installation & Setup
-
-Once you have the [ollama](https://github.com/jmorganca/ollama) API up and running you will need to install the extension.
-
-You can install the verified extension using vscode or visit [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) for more information on how to install it.
-
-When the extension is running and the Ollama server is running you will see a `🤖` icon at the bottom of your editor.
+When the extension is running and the Ollama server is running you will see a `🤖` icon at the bottom of your code editor.
 
 Enjoy enhanced code completions with **twinny**! 🎉
 
