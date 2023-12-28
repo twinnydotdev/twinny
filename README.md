@@ -2,7 +2,7 @@
 
 ### [Install the vscode extension](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny#review-details)
 
-**twinny** is a locally hosted AI code completion plugin for Visual Studio Code, designed to work seamlessly with [ollama](https://github.com/jmorganca/ollama).
+**twinny** is a locally hosted AI code completion plugin for vscode, designed to work seamlessly with [ollama](https://github.com/jmorganca/ollama).
 
 ![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
 
