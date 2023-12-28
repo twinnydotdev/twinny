@@ -24,7 +24,7 @@ The easiest way to run the ollama API is to install ollama then run this command
 ollama run codellama:7b-code '<PRE> def compute_gcd(x, y): <SUF>return result <MID>'
 `
 
-Replace 7b with the model which you would like to run e.g 13b or 34b.
+Replace 7b with the model which you would like to run e.g 13b or 34b. Please make aure that you are using the `code` version. Once you have a reply from the ollama model thrle API should have started automatically along side it.
 
 ### Installation & Setup
 
