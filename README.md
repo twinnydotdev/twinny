@@ -50,6 +50,6 @@ npm install
 
 4. Start the plugin in development mode by pressing `F5` within Visual Studio Code.
 
-Contributions are welcome for both the extension and the API please open an issue describing your changes and open a pull request when ready.
+Contributions are welcome please open an issue describing your changes and open a pull request when ready.
 
 This project is under MIT licence, please read the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) file for more information.
