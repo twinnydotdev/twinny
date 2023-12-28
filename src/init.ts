@@ -9,7 +9,7 @@ export async function init() {
 
   const isInstalled = await getIsInstalled()
 
-  if (isInstalled) {
+  if (!isInstalled) {
     await window.showInformationMessage(
       'Ollama installation required by twinny',
       'Install Ollama'
