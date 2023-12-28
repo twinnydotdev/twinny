@@ -8,14 +8,22 @@ import {
 } from 'vscode'
 
 import { CompletionProvider } from './completion'
+import { init } from './init'
 
-export function activate(context: ExtensionContext) {
+export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
+  const model = config.get('ollamaModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
-  statusBar.text = '$(code)'
-  statusBar.tooltip = 'twinny - Ready'
+  statusBar.text = '🤖'
+  statusBar.tooltip = `twinny is running: ${model}`
 
-  const completionProvider = new CompletionProvider(statusBar);
+  try {
+    await init()
+  } catch (e) {
+    console.error(e)
+  }
+
+  const completionProvider = new CompletionProvider(statusBar)
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -35,12 +43,13 @@ export function activate(context: ExtensionContext) {
     statusBar.show()
   }
 
-	context.subscriptions.push(
-    workspace.onDidChangeConfiguration(event => {
+  context.subscriptions.push(
+    workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
       }
 
       completionProvider.updateConfig()
-	}));
+    })
+  )
 }

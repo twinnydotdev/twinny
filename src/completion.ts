@@ -63,7 +63,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         let completion = ''
 
         try {
-          this._statusBar.text = '$(code)'
+          this._statusBar.text = '🤖'
 
           await new Promise((resolveStream) => {
             this._statusBar.text = '$(loading~spin)'
@@ -85,7 +85,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   if (json.response === '\n' || json.response.match('<EOT>')) {
                     onComplete()
                     resolveStream(null)
-                    this._statusBar.text = '$(code)'
+                    this._statusBar.text = '🤖'
                     resolve(
                       this.getInlineCompletions(
                         completion.replace('<EOT>', ''),

@@ -26,11 +26,15 @@ ollama run codellama:7b-code '<PRE> def compute_gcd(x, y): <SUF>return result <M
 
 Replace 7b with the model which you would like to run e.g 13b or 34b. Please make aure that you are using the `code` version. Once you have a reply from the ollama model the API should have started automatically along side it.
 
+The extension will prompt and guide you through the installation of Ollama if you don't have it installed.
+
 ### Installation & Setup
 
 Once you have the [ollama](https://github.com/jmorganca/ollama) API up and running you will need to install the extension.
 
 You can install the verified extension using vscode or visit [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) for more information on how to install it.
+
+When the extension is running and the Ollama server is running you will see a `🤖` icon at the bottom of your editor.
 
 Enjoy enhanced code completions with **twinny**! 🎉
 
