@@ -14,14 +14,15 @@ export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
   const model = config.get('ollamaModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
-  statusBar.text = '🤖'
-  statusBar.tooltip = `twinny is running: ${model}`
 
   try {
     await init()
   } catch (e) {
     console.error(e)
   }
+
+  statusBar.text = '🤖'
+  statusBar.tooltip = `twinny is running: ${model}`
 
   const completionProvider = new CompletionProvider(statusBar)
 
