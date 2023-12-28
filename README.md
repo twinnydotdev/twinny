@@ -20,7 +20,7 @@ The aim of twinny is to democratise the development of AI code completion tools,
 - Easy to install
 - Free
 - Private
-- Configurable API endpoint and port for Ollama API
+- Configurable endpoint and port for Ollama API
 
 ## 🚀 Getting Started
 
