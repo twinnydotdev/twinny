@@ -12,6 +12,16 @@ twinny is aptly named as your "twin" pair programmer, assisting you in writing c
 
 The aim of twinny is to democratise the development of AI code completion tools, join me on this journey!
 
+## Features 🤖
+
+- Auto code completion
+- Fast and accurate
+- Multiple language support
+- Easy to install
+- Free
+- Private
+- Configurable API endpoint and port for Ollama API
+
 ## 🚀 Getting Started
 
 ### Easy Installation
