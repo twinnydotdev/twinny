@@ -9,6 +9,8 @@ import {
 
 import { CompletionProvider } from './completion'
 import { init } from './init'
+import { SidebarProvider } from './sidebar'
+import { streamResponse } from './utils'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
@@ -25,6 +27,7 @@ export async function activate(context: ExtensionContext) {
   statusBar.tooltip = `twinny is running: ${model}`
 
   const completionProvider = new CompletionProvider(statusBar)
+  const sidebarProvider = new SidebarProvider(context.extensionUri)
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -37,6 +40,44 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.disable', () => {
       statusBar.hide()
     }),
+    commands.registerCommand('twinny.explain', () => {
+      const editor = window.activeTextEditor
+      if (editor) {
+        const selection = editor.selection
+        const text = editor.document.getText(selection)
+        console.log(`Selected: ${text}`)
+        let completion = ''
+        streamResponse(
+          {
+            hostname: 'localhost',
+            port: 11434,
+            method: 'POST',
+            path: '/api/generate'
+          },
+          {
+            model: 'codellama',
+            prompt: `Refactor this code in a markdown window ${text}`
+          },
+          (chunk, onComplete) => {
+            try {
+              const json = JSON.parse(chunk)
+              completion = completion + json.response
+              sidebarProvider._view?.webview.postMessage({
+                type: 'onSelectedText',
+                value: completion
+              })
+              if (json.response.match('<EOT>')) {
+                onComplete()
+              }
+            } catch (error) {
+              console.error('Error parsing JSON:', error)
+              return
+            }
+          }
+        )
+      }
+    }),
+    window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
     statusBar
   )
 

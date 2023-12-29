@@ -33,9 +33,22 @@
   "author": {
     "name": "rjmacarthy"
   },
-  "main": "./dist/extension.js",
+  "main": "./out/extension.js",
   "contributes": {
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorTextFocus",
+          "command": "twinny.explain",
+          "group": "navigation"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "twinny.explain",
+        "title": "Twinny - Explain"
+      },
       {
         "command": "twinny.enable",
         "shortTitle": "Enable twinny",
@@ -45,8 +58,33 @@
         "command": "twinny.disable",
         "title": "Disable twinny",
         "shortTitle": "Disable twinny"
+      },
+      {
+        "command": "twinny.showSidebar",
+        "shortTitle": "Enable twinny sidebar",
+        "title": "Enable twinny sidebar"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "twinny-sidebar-view",
+          "title": "twinny",
+          "icon": "assets/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "twinny-sidebar-view": [
+        {
+          "type": "webview",
+          "id": "twinny-sidebar",
+          "name": "twinny",
+          "icon": "tw",
+          "contextualTitle": "twinny"
+        }
+      ]
+    },
     "configuration": {
       "title": "twinny",
       "properties": {
@@ -91,21 +129,37 @@
     "vscode:publish": "npm exec vsce publish"
   },
   "devDependencies": {
+    "@githubocto/tailwind-vscode": "^1.0.5",
     "@types/glob": "^7.2.0",
     "@types/mocha": "^9.1.1",
-    "@types/node": "16.x",
+    "@types/node": "^16.18.68",
+    "@types/react-dom": "^18.2.18",
     "@types/vscode": "^1.70.0",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
     "@vscode/test-electron": "^2.1.5",
     "@vscode/vsce": "^2.18.0",
+    "css-loader": "^6.8.1",
     "eslint": "^8.20.0",
     "glob": "^8.0.3",
     "mocha": "^10.0.0",
+    "style-loader": "^3.3.3",
     "stylelint-config-standard-scss": "^11.0.0",
-    "ts-loader": "^9.3.1",
+    "tailwindcss": "^3.4.0",
+    "ts-loader": "^9.5.1",
     "typescript": "^4.7.4",
     "webpack": "^5.74.0",
     "webpack-cli": "^4.10.0"
+  },
+  "dependencies": {
+    "@microsoft/fast-react-wrapper": "^0.3.22",
+    "@types/react": "^18.2.46",
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "node-polyfill-webpack-plugin": "^3.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "stream-http": "^3.2.0"
   }
 }

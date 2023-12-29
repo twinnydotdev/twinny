@@ -5,6 +5,7 @@
 'use strict'
 
 const path = require('path')
+const NodePolyfillPlugin = require('node-polyfill-webpack-plugin')
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
@@ -16,7 +17,7 @@ const extensionConfig = {
 
   entry: './src/extension.ts',
   output: {
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'out'),
     filename: 'extension.js',
     libraryTarget: 'commonjs2'
   },
@@ -24,7 +25,7 @@ const extensionConfig = {
     vscode: 'commonjs vscode'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.tsx', '.js']
   },
   module: {
     rules: [
@@ -45,4 +46,45 @@ const extensionConfig = {
   }
 }
 
-module.exports = [extensionConfig]
+/** @type WebpackConfig */
+const webviewConfig = {
+  target: 'web',
+  mode: 'development',
+
+  entry: './src/webview/index.tsx',
+  output: {
+    path: path.resolve(__dirname, 'out'),
+    filename: 'sidebar.js'
+  },
+  resolve: {
+    extensions: ['.js', '.ts', '.tsx', '.json'],
+    fallback: {
+      http: require.resolve('stream-http')
+    }
+  },
+  plugins: [new NodePolyfillPlugin()],
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'ts-loader'
+        }
+      },
+      {
+        test: /\.(module\.css)|(.css)$/,
+        use: [
+          'style-loader',
+          {
+            loader: 'css-loader',
+            options: { modules: true }
+          }
+        ]
+      }
+    ]
+  },
+  devtool: 'source-map'
+}
+
+module.exports = [extensionConfig, webviewConfig]

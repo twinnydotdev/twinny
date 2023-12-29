@@ -38,7 +38,7 @@ function getIsInstalled() {
       } else {
         exec('ollama list', async () => {
           console.log(
-            "Running 'ollama list' to check if ollama server is running."
+            'Running \'ollama list\' to check if ollama server is running.'
           )
 
           resolve(true)
