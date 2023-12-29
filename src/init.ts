@@ -6,6 +6,12 @@ const OLLAMA_URL = 'https://ollama.ai/download'
 export async function init() {
   const config = workspace.getConfiguration('twinny')
   const model = config.get('ollamaModelName') as string
+  const ollamaBaseUrl = config.get('ollamaBaseUrl') as string
+
+  if (ollamaBaseUrl !== 'localhost') {
+    // Running twinny with external Ollama server.
+    return
+  }
 
   const isInstalled = await getIsInstalled()
 
@@ -32,7 +38,7 @@ function getIsInstalled() {
       } else {
         exec('ollama list', async () => {
           console.log(
-            'Running \'ollama list\' to check if ollama server is running.'
+            "Running 'ollama list' to check if ollama server is running."
           )
 
           resolve(true)
