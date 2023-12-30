@@ -1,12 +1,10 @@
 import { createRoot } from 'react-dom/client'
 
-import Sidebar from './chat'
-
-import './index.css'
+import { Chat } from './chat'
 
 const container = document.querySelector('#root')
 
 if (container) {
   const root = createRoot(container)
-  root.render(<Sidebar />)
+  root.render(<Chat />)
 }

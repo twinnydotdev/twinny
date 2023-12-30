@@ -9,7 +9,7 @@ import {
   StatusBarItem,
   window
 } from 'vscode'
-import { streamResponse } from './utils'
+import { streamResponse } from '../utils'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -20,7 +20,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
-  private _model = this._config.get('ollamaModelName') as string
+  private _model = this._config.get('fimOllamaModelName') as string
   private _baseurl = this._config.get('ollamaBaseUrl') as string
   private _apiport = this._config.get('ollamaApiPort') as number
 

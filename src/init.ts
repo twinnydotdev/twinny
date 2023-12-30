@@ -5,7 +5,7 @@ const OLLAMA_URL = 'https://ollama.ai/download'
 
 export async function init() {
   const config = workspace.getConfiguration('twinny')
-  const model = config.get('ollamaModelName') as string
+  const model = config.get('fimOllamaModelName') as string
   const ollamaBaseUrl = config.get('ollamaBaseUrl') as string
 
   if (ollamaBaseUrl !== 'localhost') {

@@ -39,8 +39,11 @@
       "editor/context": [
         {
           "when": "editorTextFocus",
-          "command": "twinny.explain",
-          "group": "navigation"
+          "command": "twinny.explain"
+        },
+        {
+          "when": "editorTextFocus",
+          "command": "twinny.refactor"
         }
       ]
     },
@@ -48,6 +51,10 @@
       {
         "command": "twinny.explain",
         "title": "Twinny - Explain"
+      },
+      {
+        "command": "twinny.refactor",
+        "title": "Twinny - Refactor"
       },
       {
         "command": "twinny.enable",
@@ -100,7 +107,11 @@
           "type": "boolean",
           "default": true
         },
-        "twinny.ollamaModelName": {
+        "twinny.chatModelName": {
+          "type": "string",
+          "default": "codellama"
+        },
+        "twinny.fimModelName": {
           "type": "string",
           "default": "codellama:7b-code"
         },
@@ -134,6 +145,7 @@
     "@types/mocha": "^9.1.1",
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
+    "@types/react-syntax-highlighter": "^15.5.11",
     "@types/vscode": "^1.70.0",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
@@ -142,7 +154,9 @@
     "css-loader": "^6.8.1",
     "eslint": "^8.20.0",
     "glob": "^8.0.3",
+    "i": "^0.3.7",
     "mocha": "^10.0.0",
+    "npm": "^10.2.5",
     "style-loader": "^3.3.3",
     "stylelint-config-standard-scss": "^11.0.0",
     "tailwindcss": "^3.4.0",
@@ -159,6 +173,8 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
+    "react-syntax-highlighter": "^15.5.0",
+    "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0"
   }

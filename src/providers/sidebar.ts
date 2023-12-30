@@ -1,13 +1,15 @@
 import * as vscode from 'vscode'
+import { chatCompletion } from '../utils'
+import { chatMessage } from '../prompts'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
-  _view?: vscode.WebviewView
+  view?: vscode.WebviewView
   _doc?: vscode.TextDocument
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this._view = webviewView
+    this.view = webviewView
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -17,43 +19,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
 
-    webviewView.webview.onDidReceiveMessage(async (data) => {
-      switch (data.type) {
-        case 'onFetchText': {
-          const editor = vscode.window.activeTextEditor
-
-          if (editor === undefined) {
-            vscode.window.showErrorMessage('No active text editor')
-            return
-          }
-
-          const text = editor.document.getText(editor.selection)
-          this._view?.webview.postMessage({
-            type: 'onSelectedText',
-            value: text
-          })
-          break
-        }
-        case 'onInfo': {
-          if (!data.value) {
-            return
-          }
-          vscode.window.showInformationMessage(data.value)
-          break
-        }
-        case 'onError': {
-          if (!data.value) {
-            return
-          }
-          vscode.window.showErrorMessage(data.value)
-          break
+    webviewView.webview.onDidReceiveMessage(
+      (data: { type: string; data: string }) => {
+        if (data.type === 'chatMessage') {
+          chatCompletion(
+            (selection) => chatMessage(data.data, selection),
+            this.view
+          )
         }
       }
-    })
+    )
   }
 
   public revive(panel: vscode.WebviewView) {
-    this._view = panel
+    this.view = panel
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {

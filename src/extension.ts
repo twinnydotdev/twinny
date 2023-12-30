@@ -7,14 +7,16 @@ import {
   workspace
 } from 'vscode'
 
-import { CompletionProvider } from './completion'
+import { CompletionProvider } from './providers/completion'
 import { init } from './init'
-import { SidebarProvider } from './sidebar'
-import { streamResponse } from './utils'
+import { SidebarProvider } from './providers/sidebar'
+import { chatCompletion } from './utils'
+import { explain, refactor } from './prompts'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
-  const model = config.get('ollamaModelName') as string
+  const fimModel = config.get('fimModelName') as string
+  const chatModel = config.get('chatModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
 
   try {
@@ -24,7 +26,7 @@ export async function activate(context: ExtensionContext) {
   }
 
   statusBar.text = '🤖'
-  statusBar.tooltip = `twinny is running: ${model}`
+  statusBar.tooltip = `twinny is running: fim: ${fimModel} chat: ${chatModel}`
 
   const completionProvider = new CompletionProvider(statusBar)
   const sidebarProvider = new SidebarProvider(context.extensionUri)
@@ -40,43 +42,12 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.disable', () => {
       statusBar.hide()
     }),
-    commands.registerCommand('twinny.explain', () => {
-      const editor = window.activeTextEditor
-      if (editor) {
-        const selection = editor.selection
-        const text = editor.document.getText(selection)
-        console.log(`Selected: ${text}`)
-        let completion = ''
-        streamResponse(
-          {
-            hostname: 'localhost',
-            port: 11434,
-            method: 'POST',
-            path: '/api/generate'
-          },
-          {
-            model: 'codellama',
-            prompt: `Refactor this code in a markdown window ${text}`
-          },
-          (chunk, onComplete) => {
-            try {
-              const json = JSON.parse(chunk)
-              completion = completion + json.response
-              sidebarProvider._view?.webview.postMessage({
-                type: 'onSelectedText',
-                value: completion
-              })
-              if (json.response.match('<EOT>')) {
-                onComplete()
-              }
-            } catch (error) {
-              console.error('Error parsing JSON:', error)
-              return
-            }
-          }
-        )
-      }
-    }),
+    commands.registerCommand('twinny.explain', () =>
+      chatCompletion(explain, sidebarProvider.view)
+    ),
+    commands.registerCommand('twinny.refactor', () =>
+      chatCompletion(refactor, sidebarProvider.view)
+    ),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
     statusBar
   )

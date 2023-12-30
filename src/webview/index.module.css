@@ -1,0 +1,33 @@
+vscode-panel-view {
+  flex-direction: column;
+}
+
+vscode-text-area {
+  width: 100%;
+}
+
+code {
+  white-space: pre-wrap;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 95vh;
+}
+
+.markdown {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.chatbox, .send {
+  margin-top: 7px;
+}
+
+.send {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 5px;
+}
