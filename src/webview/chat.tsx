@@ -7,21 +7,12 @@ import {
   VSCodeProgressRing
 } from '@vscode/webview-ui-toolkit/react'
 
-import styles from './index.module.css'
 import { Message } from './message'
-import { BOT_NAME, USER_NAME } from './const'
+import { BOT_NAME, USER_NAME } from './constants'
 
-interface PostMessage {
-  type: string
-  value: string
-}
+import styles from './index.module.css'
 
 const vscode = window.acquireVsCodeApi()
-
-interface Message {
-  role: string
-  content: string
-}
 
 export const Chat = () => {
   const [inputText, setInputText] = useState('')

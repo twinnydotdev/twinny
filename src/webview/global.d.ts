@@ -14,6 +14,11 @@ interface Window {
 	}
 }
 
+interface PostMessage {
+  type: string
+  value: string
+}
+
 interface Message {
   role: string
   content: string
