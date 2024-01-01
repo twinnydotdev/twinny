@@ -19,6 +19,7 @@ Chat:
 - Free
 - Private
 - Configurable endpoint and port for Ollama API
+- Chat feature like Copilot Chat
 
 ## 🚀 Getting Started
 
