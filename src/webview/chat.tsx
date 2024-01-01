@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'react'
 import {
   VSCodeButton,
   VSCodeTextArea,
-  VSCodePanelView
+  VSCodePanelView,
+  VSCodeProgressRing
 } from '@vscode/webview-ui-toolkit/react'
 
 import styles from './index.module.css'
 import { Message } from './message'
-import { BOT_NAME, USER_NAME, WELCOME_MESSAGE } from './const'
+import { BOT_NAME, USER_NAME } from './const'
 
 interface PostMessage {
   type: string
@@ -18,45 +19,42 @@ interface PostMessage {
 const vscode = window.acquireVsCodeApi()
 
 interface Message {
-  sender: string
-  message: string
+  role: string
+  content: string
 }
-
-const MESSAGE_WINDOW = 2
 
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      sender: BOT_NAME,
-      message: WELCOME_MESSAGE
-    }
-  ])
+  const [loading, setLoading] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
   const [completion, setCompletion] = useState<string>()
   const divRef = useRef<HTMLDivElement>(null)
 
   const handleSendMessage = (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
 
-    const lastTwoMessages = messages
-      .slice(-MESSAGE_WINDOW)
-      .map((msg) => msg.message)
-      .join('\n')
-
-    const fullMessage = lastTwoMessages + '\n' + inputText.trim()
-
     if (inputText.trim()) {
-      setMessages((prev) => [
-        ...prev,
-        { sender: USER_NAME, message: inputText }
-      ])
-
       setInputText('')
 
       vscode.postMessage({
         type: 'chatMessage',
-        data: fullMessage
+        data: messages.length
+          ? [
+              ...messages,
+              {
+                role: 'user',
+                content: inputText.trim()
+              }
+            ]
+          : [
+              {
+                role: 'user',
+                content: inputText.trim()
+              }
+            ]
       })
+
+      setMessages((prev) => [...prev, { role: USER_NAME, content: inputText }])
     }
   }
 
@@ -65,6 +63,7 @@ export const Chat = () => {
       const message: PostMessage = event.data
       switch (message.type) {
         case 'onCompletion': {
+          setLoading(false)
           setCompletion(message.value)
           setTimeout(() => {
             if (divRef.current) {
@@ -73,13 +72,17 @@ export const Chat = () => {
           }, 200)
           break
         }
+        case 'onLoading': {
+          setLoading(true)
+          break
+        }
         case 'onEnd': {
           setMessages((prev) => {
             return [
               ...prev,
               {
-                sender: BOT_NAME,
-                message: message.value
+                role: BOT_NAME,
+                content: message.value
               }
             ]
           })
@@ -94,9 +97,18 @@ export const Chat = () => {
       <div className={styles.container}>
         <div className={styles.markdown} ref={divRef}>
           {messages.map((message) => (
-            <Message sender={message.sender} message={message.message} />
+            <Message sender={message.role} message={message.content} />
           ))}
-          {!!completion && <Message sender={BOT_NAME} message={completion} />}
+          {loading && (
+            <div className={styles.loading}>
+              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
+            </div>
+          )}
+          {!!completion && (
+            <>
+              <Message sender={BOT_NAME} message={completion} />
+            </>
+          )}
         </div>
         <form onSubmit={handleSendMessage}>
           <div className={styles.chatbox}>

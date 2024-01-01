@@ -12,13 +12,13 @@ export const CodeBlock = (props: CodeBlockProps) => {
   const match = /language-(\w+)/.exec(className || '')
   return match ? (
     <SyntaxHighlighter
-      children={String(children).replace(/\n$/, '')}
+      children={String(children).trimStart().replace(/\n$/, '')}
       style={vscDarkPlus}
-      language={match[1]}
+      language={match[1] || 'typescript'}
     />
   ) : (
-    <code className={className} {...props}>
-      {children}
+    <code>
+      {String(children)}
     </code>
   )
 }

@@ -20,10 +20,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
 
     webviewView.webview.onDidReceiveMessage(
-      (data: { type: string; data: string }) => {
+      (data: { type: string; data: Message[] }) => {
         if (data.type === 'chatMessage') {
           chatCompletion(
-            (selection) => chatMessage(data.data, selection),
+            (selection: string) => chatMessage(data.data, selection),
             this.view
           )
         }

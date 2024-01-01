@@ -7,4 +7,4 @@ If you highlight code in your editor I will be able to help you with things like
 
 export const BOT_NAME = 'twinny'
 
-export const USER_NAME = '🙂 user'
+export const USER_NAME = 'user'

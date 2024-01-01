@@ -37,53 +37,55 @@ export function chatCompletion(
   getPrompt: (code: string) => string,
   view?: WebviewView
 ) {
+
+  view?.webview.postMessage({
+    type: 'onLoading',
+  })
+
   const editor = window.activeTextEditor
   const config = workspace.getConfiguration('twinny')
   const chatModel = config.get('chatModelName') as string
   const hostname = config.get('ollamaBaseUrl') as string
   const port = config.get('ollamaApiPort') as number
+  const selection = editor?.selection
+  const text = editor?.document.getText(selection)
+  const prompt = getPrompt(text || '')
 
-  if (editor) {
-    const selection = editor.selection
-    const text = editor.document.getText(selection)
-    const prompt = getPrompt(text)
-    let completion = ''
+  let completion = ''
 
-    console.log(`Prompt: ${prompt}`)
+  streamResponse(
+    {
+      hostname,
+      port,
+      method: 'POST',
+      path: '/api/generate'
+    },
+    {
+      model: chatModel,
+      prompt
+    },
+    (chunk, onComplete) => {
+      try {
+        const json = JSON.parse(chunk)
+        completion = completion + json.response
 
-    streamResponse(
-      {
-        hostname,
-        port,
-        method: 'POST',
-        path: '/api/generate'
-      },
-      {
-        model: chatModel,
-        prompt
-      },
-      (chunk, onComplete) => {
-        try {
-          const json = JSON.parse(chunk)
-          completion = completion + json.response
-          view?.webview.postMessage({
-            type: 'onCompletion',
-            value: completion
-          })
-          if (json.response.match('<EOT>')) {
-            onComplete()
-          }
-        } catch (error) {
-          console.error('Error parsing JSON:', error)
-          return
-        }
-      },
-      () => {
         view?.webview.postMessage({
-          type: 'onEnd',
-          value: completion
+          type: 'onCompletion',
+          value: completion.trimStart()
         })
+        if (json.response.match('<EOT>')) {
+          onComplete()
+        }
+      } catch (error) {
+        console.error('Error parsing JSON:', error)
+        return
       }
-    )
-  }
+    },
+    () => {
+      view?.webview.postMessage({
+        type: 'onEnd',
+        value: completion
+      })
+    }
+  )
 }

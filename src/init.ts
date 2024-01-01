@@ -5,7 +5,8 @@ const OLLAMA_URL = 'https://ollama.ai/download'
 
 export async function init() {
   const config = workspace.getConfiguration('twinny')
-  const model = config.get('fimOllamaModelName') as string
+  const fimModel = config.get('fimModelName') as string
+  const chatModel = config.get('chatModelName') as string
   const ollamaBaseUrl = config.get('ollamaBaseUrl') as string
 
   if (ollamaBaseUrl !== 'localhost') {
@@ -24,7 +25,9 @@ export async function init() {
     env.openExternal(Uri.parse(OLLAMA_URL))
   }
 
-  await checkModel(model)
+  await checkModel(fimModel)
+
+  await checkModel(chatModel)
 
   await startServer()
 }

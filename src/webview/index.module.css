@@ -22,6 +22,11 @@ code {
   overflow-x: hidden;
 }
 
+.loading {
+  display: flex;
+  justify-content: center;
+}
+
 .chatbox, .send {
   margin-top: 7px;
 }

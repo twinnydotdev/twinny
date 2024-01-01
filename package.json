@@ -44,6 +44,18 @@
         {
           "when": "editorTextFocus",
           "command": "twinny.refactor"
+        },
+        {
+          "when": "editorTextFocus",
+          "command": "twinny.addTypes"
+        },
+        {
+          "when": "editorTextFocus",
+          "command": "twinny.addTests"
+        },
+        {
+          "when": "editorTextFocus",
+          "command": "twinny.generateDocs"
         }
       ]
     },
@@ -55,6 +67,18 @@
       {
         "command": "twinny.refactor",
         "title": "Twinny - Refactor"
+      },
+      {
+        "command": "twinny.addTypes",
+        "title": "Twinny - Add types"
+      },
+      {
+        "command": "twinny.addTests",
+        "title": "Twinny - Write tests"
+      },
+      {
+        "command": "twinny.generateDocs",
+        "title": "Twinny - Generate docs"
       },
       {
         "command": "twinny.enable",
@@ -77,7 +101,7 @@
         {
           "id": "twinny-sidebar-view",
           "title": "twinny",
-          "icon": "assets/icon.png"
+          "icon": "assets/twinny.png"
         }
       ]
     },
@@ -109,7 +133,7 @@
         },
         "twinny.chatModelName": {
           "type": "string",
-          "default": "codellama"
+          "default": "codellama:7b-instruct"
         },
         "twinny.fimModelName": {
           "type": "string",
