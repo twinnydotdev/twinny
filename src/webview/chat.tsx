@@ -101,7 +101,7 @@ export const Chat = () => {
           ))}
           {loading && (
             <div className={styles.loading}>
-              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
+              <VSCodeProgressRing aria-label='Loading'></VSCodeProgressRing>
             </div>
           )}
           {!!completion && (
@@ -122,7 +122,7 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            <VSCodeButton type="submit" appearance="primary">
+            <VSCodeButton type='submit' appearance='primary'>
               Send message
             </VSCodeButton>
           </div>
