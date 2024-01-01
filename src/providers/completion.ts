@@ -20,7 +20,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
-  private _model = this._config.get('fimOllamaModelName') as string
+  private _model = this._config.get('fimModelName') as string
   private _baseurl = this._config.get('ollamaBaseUrl') as string
   private _apiport = this._config.get('ollamaApiPort') as number
 
@@ -82,7 +82,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 try {
                   const json = JSON.parse(chunk)
                   completion = completion + json.response
-                  if (json.response === '\n' || json.response.match('<EOT>')) {
+                  console.log(completion)
+                  if (json.response && json.response === '\n' || json.response.match('<EOT>')) {
                     onComplete()
                     resolveStream(null)
                     this._statusBar.text = '🤖'
