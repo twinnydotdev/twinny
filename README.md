@@ -10,7 +10,7 @@ Completion:
 
 Chat:
 
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/eabbde10-898b-4178-a4e3-2080b8a7cabe" width="760"/>
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/56373e39-3f25-4db8-9c55-612289f3fde3" width="760"/>
 
 ## Features 🤖
 
