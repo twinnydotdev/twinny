@@ -6,15 +6,6 @@ vscode-text-area {
   width: 100%;
 }
 
-vscode-button {
-  display: flex;
-  align-items: center;
-}
-
-.icon {
-  margin-right: 5px;
-}
-
 code {
   white-space: pre-wrap;
 }

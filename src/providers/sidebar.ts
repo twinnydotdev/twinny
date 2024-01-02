@@ -57,25 +57,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, 'out', 'sidebar.js')
     )
 
-    const stylesUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        this._extensionUri,
-        'node_modules',
-        '@vscode',
-        'codicons',
-        'dist',
-        'codicon.css'
-      )
-    )
-
     const nonce = getNonce()
 
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
-        <link href="${stylesUri}" rel="stylesheet">
         <meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:11434; font-src https: vscode-resource:; img-src vscode-resource: https:; script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;">
+				<meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:11434; img-src vscode-resource: https:; script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Sidebar</title>
     </head>

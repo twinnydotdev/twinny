@@ -44,19 +44,11 @@ export const CodeBlock = (props: CodeBlockProps) => {
       <div className={styles.codeOptions}>
         {codeActionTypes.includes(completionType) && (
           <>
-            <VSCodeButton onClick={handleAccept}>
-              <span className={cn('codicon codicon-check', styles.icon)}></span>
-              Accept
-            </VSCodeButton>
-            <VSCodeButton onClick={handleOpenDiff}>
-              <span className={cn('codicon codicon-diff', styles.icon)}></span>
-              View diff
-            </VSCodeButton>
+            <VSCodeButton onClick={handleAccept}>Accept</VSCodeButton>
+            <VSCodeButton onClick={handleOpenDiff}>View diff</VSCodeButton>
           </>
         )}
-        <VSCodeButton onClick={handleCopy}>
-          <span className={cn('codicon codicon-copy', styles.icon)}></span> Copy
-        </VSCodeButton>
+        <VSCodeButton onClick={handleCopy}>Copy</VSCodeButton>
       </div>
       <SyntaxHighlighter
         children={String(children).trimStart().replace(/\n$/, '')}
