@@ -18,8 +18,7 @@ export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
-  const [completionType, setCompletionType] = useState<string>('')
-  const [completion, setCompletion] = useState<string>()
+  const [completion, setCompletion] = useState<Message | null>()
   const divRef = useRef<HTMLDivElement>(null)
 
   const scrollBottom = () => {
@@ -43,18 +42,23 @@ export const Chat = () => {
               ...messages,
               {
                 role: 'user',
-                content: inputText.trim()
+                content: inputText.trim(),
+                type: ''
               }
             ]
           : [
               {
                 role: 'user',
-                content: inputText.trim()
+                content: inputText.trim(),
+                type: ''
               }
             ]
       })
 
-      setMessages((prev) => [...prev, { role: USER_NAME, content: inputText }])
+      setMessages((prev) => [
+        ...prev,
+        { role: USER_NAME, content: inputText, type: '' }
+      ])
 
       scrollBottom()
     }
@@ -63,11 +67,14 @@ export const Chat = () => {
   useEffect(() => {
     window.addEventListener('message', (event) => {
       const message: PostMessage = event.data
-      setCompletionType(message.value.type)
       switch (message.type) {
         case 'onCompletion': {
           setLoading(false)
-          setCompletion(message.value.completion)
+          setCompletion({
+            role: BOT_NAME,
+            content: message.value.completion,
+            type: message.value.type
+          })
           scrollBottom()
           break
         }
@@ -81,11 +88,12 @@ export const Chat = () => {
               ...prev,
               {
                 role: BOT_NAME,
-                content: message.value.completion
+                content: message.value.completion,
+                type: message.value.type
               }
             ]
           })
-          setCompletion('')
+          setCompletion(null)
         }
       }
     })
@@ -97,7 +105,7 @@ export const Chat = () => {
         <div className={styles.markdown} ref={divRef}>
           {messages.map((message) => (
             <Message
-              completionType={completionType}
+              completionType={message.type}
               sender={message.role}
               message={message.content}
             />
@@ -110,9 +118,9 @@ export const Chat = () => {
           {!!completion && (
             <>
               <Message
-                completionType={completionType}
+                completionType={completion.type}
                 sender={BOT_NAME}
-                message={completion}
+                message={completion.content}
               />
             </>
           )}

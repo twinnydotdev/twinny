@@ -2,6 +2,7 @@ import { request } from 'http'
 import { RequestOptions } from 'https'
 import { Uri, WebviewView, commands, window, workspace } from 'vscode'
 import { prompts } from './prompts'
+import path from 'path'
 
 interface StreamBody {
   model: string
@@ -50,7 +51,7 @@ export function chatCompletion(
   const port = config.get('ollamaApiPort') as number
   const selection = editor?.selection
   const text = editor?.document.getText(selection) || ''
-  const template = prompts[type] ? prompts[type](text): ''
+  const template = prompts[type] ? prompts[type](text) : ''
   const prompt: string = template ? template : getPrompt?.(text) || ''
 
   let completion = ''
@@ -98,12 +99,29 @@ export function chatCompletion(
   )
 }
 
+const tmpDir = path.join(__dirname, './tmp')
+
 export function openDiffView(original: string, proposed: string) {
-  const uri1 = Uri.file('./tmp/original.txt')
-  const uri2 = Uri.file('./tmp/proposed.txt')
+  const uri1 = Uri.file(`${tmpDir}/twinny-original.txt`)
+  const uri2 = Uri.file(`${tmpDir}/twinny-proposed.txt`)
 
   workspace.fs.writeFile(uri1, Buffer.from(original, 'utf8'))
   workspace.fs.writeFile(uri2, Buffer.from(proposed, 'utf8'))
 
   commands.executeCommand('vscode.diff', uri1, uri2)
+}
+
+export async function deleteTempFiles() {
+  const dir = Uri.file(tmpDir)
+
+  try {
+    const files = await workspace.fs.readDirectory(dir)
+
+    for (const [file] of files) {
+      const fileUri = Uri.file(path.join(dir.path, file))
+      await workspace.fs.delete(fileUri)
+    }
+  } catch (err) {
+    return
+  }
 }

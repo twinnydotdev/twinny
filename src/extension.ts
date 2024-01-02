@@ -10,7 +10,7 @@ import {
 import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
-import { chatCompletion } from './utils'
+import { chatCompletion, deleteTempFiles } from './utils'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
@@ -81,4 +81,8 @@ export async function activate(context: ExtensionContext) {
       completionProvider.updateConfig()
     })
   )
+}
+
+export function deactivate() {
+  deleteTempFiles()
 }
