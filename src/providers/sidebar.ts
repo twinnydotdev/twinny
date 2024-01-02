@@ -38,8 +38,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (data.type === 'accept') {
           const editor = vscode.window.activeTextEditor
           const selection = editor?.selection
-          const text = editor?.document.getText(selection)
-          openDiffView(text || '', data.data as string)
+
+          if (!selection) {
+            return
+          }
+
+          vscode.window.activeTextEditor?.edit((editBuilder) => {
+            editBuilder.replace(selection, data.data as string)
+          })
         }
       }
     )

@@ -18,14 +18,21 @@ export const CodeBlock = (props: CodeBlockProps) => {
   const { className, children } = props
   const match = /language-(\w+)/.exec(className || '')
 
-  const copyToClipboard = () => {
+  const handleCopy = () => {
     const text = String(children).replace(/^\n/, '')
     navigator.clipboard.writeText(text)
   }
 
-  const openDiff = () => {
+  const handleOpenDiff = () => {
     global.vscode.postMessage({
       type: 'openDiff',
+      data: String(children).replace(/^\n/, '')
+    })
+  }
+
+  const handleAccept = () => {
+    global.vscode.postMessage({
+      type: 'accept',
       data: String(children).replace(/^\n/, '')
     })
   }
@@ -33,15 +40,15 @@ export const CodeBlock = (props: CodeBlockProps) => {
   return match ? (
     <>
       <div className={styles.codeOptions}>
-        <VSCodeButton onClick={copyToClipboard}>
+        <VSCodeButton onClick={handleAccept}>
           <span className={cn('codicon codicon-check', styles.icon)}></span>
           Accept
         </VSCodeButton>
-        <VSCodeButton onClick={openDiff}>
+        <VSCodeButton onClick={handleOpenDiff}>
           <span className={cn('codicon codicon-diff', styles.icon)}></span>
           View diff
         </VSCodeButton>
-        <VSCodeButton onClick={copyToClipboard}>
+        <VSCodeButton onClick={handleCopy}>
           <span className={cn('codicon codicon-copy', styles.icon)}></span> Copy
         </VSCodeButton>
       </div>
