@@ -1,6 +1,7 @@
 import { request } from 'http'
 import { RequestOptions } from 'https'
 import { Uri, WebviewView, commands, window, workspace } from 'vscode'
+import { prompts } from './prompts'
 
 interface StreamBody {
   model: string
@@ -34,8 +35,9 @@ export async function streamResponse(
 }
 
 export function chatCompletion(
-  getPrompt: (code: string) => string,
-  view?: WebviewView
+  type: string,
+  view?: WebviewView,
+  getPrompt?: (code: string) => string
 ) {
   view?.webview.postMessage({
     type: 'onLoading'
@@ -47,8 +49,9 @@ export function chatCompletion(
   const hostname = config.get('ollamaBaseUrl') as string
   const port = config.get('ollamaApiPort') as number
   const selection = editor?.selection
-  const text = editor?.document.getText(selection)
-  const prompt = getPrompt(text || '')
+  const text = editor?.document.getText(selection) || ''
+  const template = prompts[type] ? prompts[type](text): ''
+  const prompt: string = template ? template : getPrompt?.(text) || ''
 
   let completion = ''
 
@@ -70,7 +73,10 @@ export function chatCompletion(
 
         view?.webview.postMessage({
           type: 'onCompletion',
-          value: completion.trimStart()
+          value: {
+            type,
+            completion: completion.trimStart()
+          }
         })
         if (json.response.match('<EOT>')) {
           onComplete()
@@ -83,7 +89,10 @@ export function chatCompletion(
     () => {
       view?.webview.postMessage({
         type: 'onEnd',
-        value: completion
+        value: {
+          type,
+          completion: completion.trimStart()
+        }
       })
     }
   )

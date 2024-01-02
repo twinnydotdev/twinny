@@ -53,3 +53,16 @@ export const chatMessage = (messages: Message[], selection: string) =>
       )
       .join('\n')}
   `
+interface Prompts {
+  [key: string]: (code: string) => string
+}
+
+export const codeActionTypes = ['add-types', 'refactor']
+
+export const prompts: Prompts = {
+  explain: explain,
+  'add-types': addTypes,
+  refactor: refactor,
+  'add-tests': addTests,
+  'generate-docs': generateDocs
+}

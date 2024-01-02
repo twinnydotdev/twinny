@@ -12,21 +12,29 @@ import { BOT_NAME, USER_NAME } from './constants'
 
 import styles from './index.module.css'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
+  const [completionType, setCompletionType] = useState<string>('')
   const [completion, setCompletion] = useState<string>()
   const divRef = useRef<HTMLDivElement>(null)
+
+  const scrollBottom = () => {
+    setTimeout(() => {
+      if (divRef.current) {
+        divRef.current.scrollTop = divRef.current.scrollHeight
+      }
+    }, 200)
+  }
 
   const handleSendMessage = (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
 
     if (inputText.trim()) {
       setInputText('')
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const global = globalThis as any
 
       global.vscode.postMessage({
         type: 'chatMessage',
@@ -47,21 +55,20 @@ export const Chat = () => {
       })
 
       setMessages((prev) => [...prev, { role: USER_NAME, content: inputText }])
+
+      scrollBottom()
     }
   }
 
   useEffect(() => {
     window.addEventListener('message', (event) => {
       const message: PostMessage = event.data
+      setCompletionType(message.value.type)
       switch (message.type) {
         case 'onCompletion': {
           setLoading(false)
-          setCompletion(message.value)
-          setTimeout(() => {
-            if (divRef.current) {
-              divRef.current.scrollTop = divRef.current.scrollHeight
-            }
-          }, 200)
+          setCompletion(message.value.completion)
+          scrollBottom()
           break
         }
         case 'onLoading': {
@@ -74,7 +81,7 @@ export const Chat = () => {
               ...prev,
               {
                 role: BOT_NAME,
-                content: message.value
+                content: message.value.completion
               }
             ]
           })
@@ -89,16 +96,24 @@ export const Chat = () => {
       <div className={styles.container}>
         <div className={styles.markdown} ref={divRef}>
           {messages.map((message) => (
-            <Message sender={message.role} message={message.content} />
+            <Message
+              completionType={completionType}
+              sender={message.role}
+              message={message.content}
+            />
           ))}
           {loading && (
             <div className={styles.loading}>
-              <VSCodeProgressRing aria-label='Loading'></VSCodeProgressRing>
+              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
             </div>
           )}
           {!!completion && (
             <>
-              <Message sender={BOT_NAME} message={completion} />
+              <Message
+                completionType={completionType}
+                sender={BOT_NAME}
+                message={completion}
+              />
             </>
           )}
         </div>
@@ -114,7 +129,7 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            <VSCodeButton type='submit' appearance='primary'>
+            <VSCodeButton type="submit" appearance="primary">
               Send message
             </VSCodeButton>
           </div>

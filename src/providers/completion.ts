@@ -82,7 +82,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 try {
                   const json = JSON.parse(chunk)
                   completion = completion + json.response
-                  console.log(completion)
                   if (json.response && json.response === '\n' || json.response.match('<EOT>')) {
                     onComplete()
                     resolveStream(null)

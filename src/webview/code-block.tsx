@@ -5,9 +5,11 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import cn from 'classnames'
 
 import styles from './index.module.css'
+import { codeActionTypes } from '../prompts'
 
 interface CodeBlockProps {
   className?: string
+  completionType: string
   children?: ReactNode
 }
 
@@ -15,7 +17,7 @@ interface CodeBlockProps {
 const global = globalThis as any
 
 export const CodeBlock = (props: CodeBlockProps) => {
-  const { className, children } = props
+  const { className, children, completionType } = props
   const match = /language-(\w+)/.exec(className || '')
 
   const handleCopy = () => {
@@ -40,14 +42,18 @@ export const CodeBlock = (props: CodeBlockProps) => {
   return match ? (
     <>
       <div className={styles.codeOptions}>
-        <VSCodeButton onClick={handleAccept}>
-          <span className={cn('codicon codicon-check', styles.icon)}></span>
-          Accept
-        </VSCodeButton>
-        <VSCodeButton onClick={handleOpenDiff}>
-          <span className={cn('codicon codicon-diff', styles.icon)}></span>
-          View diff
-        </VSCodeButton>
+        {codeActionTypes.includes(completionType) && (
+          <>
+            <VSCodeButton onClick={handleAccept}>
+              <span className={cn('codicon codicon-check', styles.icon)}></span>
+              Accept
+            </VSCodeButton>
+            <VSCodeButton onClick={handleOpenDiff}>
+              <span className={cn('codicon codicon-diff', styles.icon)}></span>
+              View diff
+            </VSCodeButton>
+          </>
+        )}
         <VSCodeButton onClick={handleCopy}>
           <span className={cn('codicon codicon-copy', styles.icon)}></span> Copy
         </VSCodeButton>

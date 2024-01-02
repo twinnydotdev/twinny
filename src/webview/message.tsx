@@ -8,9 +8,10 @@ import styles from './index.module.css'
 interface MessageProps {
   message: string
   sender: string
+  completionType: string
 }
 
-export const Message = ({ message, sender }: MessageProps) => {
+export const Message = ({ message, sender, completionType }: MessageProps) => {
   return (
     <div className={styles.message}>
       <b>{sender}</b>
@@ -18,7 +19,7 @@ export const Message = ({ message, sender }: MessageProps) => {
         remarkPlugins={[remarkGfm]}
         components={{
           code(props) {
-            return <CodeBlock {...props} />
+            return <CodeBlock completionType={completionType} {...props} />
           }
         }}
       >
