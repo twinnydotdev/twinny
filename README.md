@@ -12,7 +12,7 @@ Chat:
 
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/56373e39-3f25-4db8-9c55-612289f3fde3" width="760"/>
 
-## Features 🤖
+## 🤖 Features
 
 - Auto code completion
 - Fast and accurate
@@ -22,6 +22,10 @@ Chat:
 - Private
 - Configurable endpoint and port for Ollama API
 - Chat feature like Copilot Chat
+- View diff for code completions
+- Accept solution directly to editor
+- Copy generated code solution blocks
+- Chat history preserved per conversation
 
 ## 🚀 Getting Started
 
