@@ -12,14 +12,22 @@ import { BOT_NAME, USER_NAME } from './constants'
 
 import styles from './index.module.css'
 
-const vscode = window.acquireVsCodeApi()
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
-  const [completion, setCompletion] = useState<string>()
+  const [completion, setCompletion] = useState<Message | null>()
   const divRef = useRef<HTMLDivElement>(null)
+
+  const scrollBottom = () => {
+    setTimeout(() => {
+      if (divRef.current) {
+        divRef.current.scrollTop = divRef.current.scrollHeight
+      }
+    }, 200)
+  }
 
   const handleSendMessage = (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
@@ -27,25 +35,32 @@ export const Chat = () => {
     if (inputText.trim()) {
       setInputText('')
 
-      vscode.postMessage({
+      global.vscode.postMessage({
         type: 'chatMessage',
         data: messages.length
           ? [
               ...messages,
               {
                 role: 'user',
-                content: inputText.trim()
+                content: inputText.trim(),
+                type: ''
               }
             ]
           : [
               {
                 role: 'user',
-                content: inputText.trim()
+                content: inputText.trim(),
+                type: ''
               }
             ]
       })
 
-      setMessages((prev) => [...prev, { role: USER_NAME, content: inputText }])
+      setMessages((prev) => [
+        ...prev,
+        { role: USER_NAME, content: inputText, type: '' }
+      ])
+
+      scrollBottom()
     }
   }
 
@@ -55,12 +70,12 @@ export const Chat = () => {
       switch (message.type) {
         case 'onCompletion': {
           setLoading(false)
-          setCompletion(message.value)
-          setTimeout(() => {
-            if (divRef.current) {
-              divRef.current.scrollTop = divRef.current.scrollHeight
-            }
-          }, 200)
+          setCompletion({
+            role: BOT_NAME,
+            content: message.value.completion,
+            type: message.value.type
+          })
+          scrollBottom()
           break
         }
         case 'onLoading': {
@@ -73,11 +88,12 @@ export const Chat = () => {
               ...prev,
               {
                 role: BOT_NAME,
-                content: message.value
+                content: message.value.completion,
+                type: message.value.type
               }
             ]
           })
-          setCompletion('')
+          setCompletion(null)
         }
       }
     })
@@ -88,16 +104,24 @@ export const Chat = () => {
       <div className={styles.container}>
         <div className={styles.markdown} ref={divRef}>
           {messages.map((message) => (
-            <Message sender={message.role} message={message.content} />
+            <Message
+              completionType={message.type}
+              sender={message.role}
+              message={message.content}
+            />
           ))}
           {loading && (
             <div className={styles.loading}>
-              <VSCodeProgressRing aria-label='Loading'></VSCodeProgressRing>
+              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
             </div>
           )}
           {!!completion && (
             <>
-              <Message sender={BOT_NAME} message={completion} />
+              <Message
+                completionType={completion.type}
+                sender={BOT_NAME}
+                message={completion.content}
+              />
             </>
           )}
         </div>
@@ -113,7 +137,7 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            <VSCodeButton type='submit' appearance='primary'>
+            <VSCodeButton type="submit" appearance="primary">
               Send message
             </VSCodeButton>
           </div>

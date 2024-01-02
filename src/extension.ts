@@ -10,8 +10,7 @@ import {
 import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
-import { chatCompletion } from './utils'
-import { addTests, addTypes, explain, generateDocs, refactor } from './prompts'
+import { chatCompletion, deleteTempFiles } from './utils'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
@@ -42,29 +41,32 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.disable', () => {
       statusBar.hide()
     }),
-    commands.registerCommand('twinny.explain', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      chatCompletion(explain, sidebarProvider.view)
-    }),
-    commands.registerCommand('twinny.addTypes', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      chatCompletion(addTypes, sidebarProvider.view)
-    }),
-    commands.registerCommand('twinny.refactor', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      chatCompletion(refactor, sidebarProvider.view)
-    }),
-    commands.registerCommand('twinny.addTests', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      chatCompletion(addTests, sidebarProvider.view)
-    }),
-    commands.registerCommand('twinny.generateDocs', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      chatCompletion(generateDocs, sidebarProvider.view)
-    }),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
     statusBar
   )
+
+  setTimeout(() => {
+    commands.registerCommand('twinny.explain', () => {
+      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      chatCompletion('explain', sidebarProvider.view)
+    }),
+      commands.registerCommand('twinny.addTypes', () => {
+        commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+        chatCompletion('add-types', sidebarProvider.view)
+      }),
+      commands.registerCommand('twinny.refactor', () => {
+        commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+        chatCompletion('refactor', sidebarProvider.view)
+      }),
+      commands.registerCommand('twinny.addTests', () => {
+        commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+        chatCompletion('add-tests', sidebarProvider.view)
+      }),
+      commands.registerCommand('twinny.generateDocs', () => {
+        commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+        chatCompletion('generate-docs', sidebarProvider.view)
+      })
+  }, 2000)
 
   if (config.get('enabled')) {
     statusBar.show()
@@ -79,4 +81,8 @@ export async function activate(context: ExtensionContext) {
       completionProvider.updateConfig()
     })
   )
+}
+
+export function deactivate() {
+  deleteTempFiles()
 }

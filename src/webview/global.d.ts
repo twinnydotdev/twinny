@@ -7,19 +7,23 @@ declare module '*.css' {
 }
 
 interface Window {
-	acquireVsCodeApi: <T = unknown>() => {
-		getState: () => T;
-		setState: (data: T) => void;
-		postMessage: (msg: unknown) => void;
-	}
+  acquireVsCodeApi: <T = unknown>() => {
+    getState: () => T
+    setState: (data: T) => void
+    postMessage: (msg: unknown) => void
+  }
 }
 
 interface PostMessage {
   type: string
-  value: string
+  value: {
+    type: string
+    completion: string
+  }
 }
 
 interface Message {
   role: string
   content: string
+  type: string
 }
