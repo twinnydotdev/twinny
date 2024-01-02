@@ -39,7 +39,7 @@ When the extension is running and the Ollama server is running you will see a `ð
 
 Enjoy enhanced code completions with **twinny**! ðŸŽ‰
 
-### Development and contributions
+## Development and contributions
 
 1. Clone this repository:
 
