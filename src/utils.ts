@@ -1,6 +1,6 @@
 import { request } from 'http'
 import { RequestOptions } from 'https'
-import { WebviewView, window, workspace } from 'vscode'
+import { Uri, WebviewView, commands, window, workspace } from 'vscode'
 
 interface StreamBody {
   model: string
@@ -37,9 +37,8 @@ export function chatCompletion(
   getPrompt: (code: string) => string,
   view?: WebviewView
 ) {
-
   view?.webview.postMessage({
-    type: 'onLoading',
+    type: 'onLoading'
   })
 
   const editor = window.activeTextEditor
@@ -88,4 +87,14 @@ export function chatCompletion(
       })
     }
   )
+}
+
+export function openDiffView(original: string, proposed: string) {
+  const uri1 = Uri.file('./tmp/original.txt')
+  const uri2 = Uri.file('./tmp/proposed.txt')
+
+  workspace.fs.writeFile(uri1, Buffer.from(original, 'utf8'))
+  workspace.fs.writeFile(uri2, Buffer.from(proposed, 'utf8'))
+
+  commands.executeCommand('vscode.diff', uri1, uri2)
 }

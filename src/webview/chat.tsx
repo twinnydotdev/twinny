@@ -12,8 +12,6 @@ import { BOT_NAME, USER_NAME } from './constants'
 
 import styles from './index.module.css'
 
-const vscode = window.acquireVsCodeApi()
-
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,7 +25,10 @@ export const Chat = () => {
     if (inputText.trim()) {
       setInputText('')
 
-      vscode.postMessage({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const global = globalThis as any
+
+      global.vscode.postMessage({
         type: 'chatMessage',
         data: messages.length
           ? [

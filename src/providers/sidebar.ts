@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { chatCompletion } from '../utils'
+import { chatCompletion, openDiffView } from '../utils'
 import { chatMessage } from '../prompts'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -20,12 +20,26 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
 
     webviewView.webview.onDidReceiveMessage(
-      (data: { type: string; data: Message[] }) => {
+      (data: { type: string; data: Message[] | string }) => {
+        console.log(data)
         if (data.type === 'chatMessage') {
           chatCompletion(
-            (selection: string) => chatMessage(data.data, selection),
+            (selection: string) =>
+              chatMessage(data.data as Message[], selection),
             this.view
           )
+        }
+        if (data.type === 'openDiff') {
+          const editor = vscode.window.activeTextEditor
+          const selection = editor?.selection
+          const text = editor?.document.getText(selection)
+          openDiffView(text || '', data.data as string)
+        }
+        if (data.type === 'accept') {
+          const editor = vscode.window.activeTextEditor
+          const selection = editor?.selection
+          const text = editor?.document.getText(selection)
+          openDiffView(text || '', data.data as string)
         }
       }
     )
@@ -40,13 +54,25 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, 'out', 'sidebar.js')
     )
 
+    const stylesUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        'node_modules',
+        '@vscode',
+        'codicons',
+        'dist',
+        'codicon.css'
+      )
+    )
+
     const nonce = getNonce()
 
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
+        <link href="${stylesUri}" rel="stylesheet">
         <meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:11434; img-src vscode-resource: https:; script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;">
+				<meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:11434; font-src https: vscode-resource:; img-src vscode-resource: https:; script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Sidebar</title>
     </head>
