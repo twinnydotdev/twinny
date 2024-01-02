@@ -5,10 +5,12 @@
 **twinny** is a locally hosted AI code completion plugin for vscode, designed to work seamlessly with [ollama](https://github.com/jmorganca/ollama).
 
 Completion:
+
 ![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
 
 Chat:
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/eabbde10-898b-4178-a4e3-2080b8a7cabe" width="720"/>
+
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/eabbde10-898b-4178-a4e3-2080b8a7cabe" width="760"/>
 
 ## Features 🤖
 
