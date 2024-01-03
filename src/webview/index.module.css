@@ -27,7 +27,8 @@ code {
   justify-content: center;
 }
 
-.chatbox, .send {
+.chatbox,
+.send {
   margin-top: 7px;
 }
 
@@ -40,4 +41,9 @@ code {
 .codeOptions {
   display: flex;
   gap: 3px;
+}
+
+.settings {
+  display: flex;
+  justify-content: flex-end;
 }
