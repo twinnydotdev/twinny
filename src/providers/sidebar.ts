@@ -32,6 +32,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           const text = editor?.document.getText(selection)
           openDiffView(text || '', data.data as string)
         }
+        if (data.type === 'openSettings') {
+          vscode.commands.executeCommand('workbench.action.openSettings', '@ext:rjmacarthy.twinny')
+        }
         if (data.type === 'accept') {
           const editor = vscode.window.activeTextEditor
           const selection = editor?.selection
