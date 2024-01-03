@@ -125,3 +125,12 @@ export async function deleteTempFiles() {
     return
   }
 }
+
+export const delayExecution = <T extends () => void>(
+  fn: T,
+  delay = 200
+): NodeJS.Timeout => {
+  return setTimeout(() => {
+    fn()
+  }, delay)
+}
