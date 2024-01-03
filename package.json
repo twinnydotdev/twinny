@@ -47,7 +47,7 @@
     "Testing",
     "Data Science",
     "Extension Packs",
-    "Linters",
+    "Linters"
   ],
   "activationEvents": [
     "onStartupFinished"
