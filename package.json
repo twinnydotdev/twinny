@@ -11,7 +11,20 @@
     "localhost",
     "no-leaks",
     "private",
-    "twinny"
+    "twinny",
+    "ai",
+    "ollama",
+    "llama",
+    "development",
+    "extension",
+    "llama-code",
+    "snippets",
+    "chat",
+    "code-snippets",
+    "autocomplete",
+    "intellisense",
+    "llama-ai",
+    "vscode-extension"
   ],
   "repository": {
     "url": "https://github.com/rjmacarthy/twinny"
@@ -25,7 +38,16 @@
     "url": "https://github.com/rjmacarthy/twinny/issues"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Snippets",
+    "Debuggers",
+    "Formatters",
+    "Machine Learning",
+    "Education",
+    "Testing",
+    "Data Science",
+    "Extension Packs",
+    "Linters",
   ],
   "activationEvents": [
     "onStartupFinished"
