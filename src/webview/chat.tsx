@@ -130,6 +130,7 @@ export const Chat = () => {
           <Selection onSelect={scrollBottom} />
           <div className={styles.chatbox}>
             <VSCodeTextArea
+              placeholder='Message twinny'
               rows={5}
               value={inputText}
               onChange={(e) => {
