@@ -6,7 +6,7 @@ import styles from './index.module.css'
 const global = globalThis as any
 
 export const Settings = () => {
-  const handleClick = (): void => {
+  const handleClickSettings = (): void => {
     global.vscode.postMessage({
       type: 'openSettings'
     })
@@ -14,9 +14,9 @@ export const Settings = () => {
 
   return (
     <div className={styles.settings}>
-      <VSCodeButton appearance='icon' onClick={handleClick}>
-      <SvgSettings />
-    </VSCodeButton>
+      <VSCodeButton appearance="icon" onClick={handleClickSettings}>
+        <SvgSettings />
+      </VSCodeButton>
     </div>
   )
 }
