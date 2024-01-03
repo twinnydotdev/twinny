@@ -7,7 +7,7 @@ Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion
 <br>
 
 <div align="center">
-    <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny#review-details">
+    <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny">
       <img src="https://code.visualstudio.com/assets/images/code-stable.png" height="50" />
       <h4>
         Install the twinny vscode extension
