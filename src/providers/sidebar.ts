@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { chatCompletion, openDiffView } from '../utils'
+import { chatCompletion, getTextSelection, openDiffView } from '../utils'
 import { chatMessage } from '../prompts'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -19,6 +19,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
 
+    vscode.window.onDidChangeTextEditorSelection(
+      (event: vscode.TextEditorSelectionChangeEvent) => {
+        const text = event.textEditor.document.getText(event.selections[0])
+        this.view?.webview.postMessage({
+          type: 'textSelection',
+          value: {
+            type: 'selection',
+            completion: text
+          }
+        })
+      }
+    )
+
     webviewView.webview.onDidReceiveMessage(
       (data: { type: string; data: Message[] | string }) => {
         if (data.type === 'chatMessage') {
@@ -33,9 +46,21 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           openDiffView(text || '', data.data as string)
         }
         if (data.type === 'openSettings') {
-          vscode.commands.executeCommand('workbench.action.openSettings', '@ext:rjmacarthy.twinny')
+          vscode.commands.executeCommand(
+            'workbench.action.openSettings',
+            '@ext:rjmacarthy.twinny'
+          )
         }
-        if (data.type === 'accept') {
+        if (data.type === 'getTextSelection') {
+          this.view?.webview.postMessage({
+            type: 'textSelection',
+            value: {
+              type: 'selection',
+              completion: getTextSelection()
+            }
+          })
+        }
+        if (data.type === 'acceptSolution') {
           const editor = vscode.window.activeTextEditor
           const selection = editor?.selection
 

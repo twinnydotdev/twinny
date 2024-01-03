@@ -8,6 +8,7 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import { Message } from './message'
+import { Selection } from './selection'
 import { BOT_NAME, USER_NAME } from './constants'
 
 import styles from './index.module.css'
@@ -126,8 +127,10 @@ export const Chat = () => {
           )}
         </div>
         <form onSubmit={handleSendMessage}>
+          <Selection onSelect={scrollBottom} />
           <div className={styles.chatbox}>
             <VSCodeTextArea
+              rows={5}
               value={inputText}
               onChange={(e) => {
                 const event =

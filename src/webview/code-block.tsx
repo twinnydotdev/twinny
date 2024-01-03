@@ -2,7 +2,6 @@ import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
 import { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import cn from 'classnames'
 
 import styles from './index.module.css'
 import { codeActionTypes } from '../prompts'
@@ -34,7 +33,7 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   const handleAccept = () => {
     global.vscode.postMessage({
-      type: 'accept',
+      type: 'acceptSolution',
       data: String(children).replace(/^\n/, '')
     })
   }
