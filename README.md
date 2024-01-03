@@ -1,16 +1,33 @@
 # twinny
 
-### [Install the vscode extension](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny#review-details)
+<br>
 
-**twinny** is a locally hosted AI code completion plugin for vscode, designed to work seamlessly with [ollama](https://github.com/jmorganca/ollama).
+Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for vscode designed to work seamlessly with [ollama](https://github.com/jmorganca/ollama). Like Github Copilot but 100% free and 100% private.
 
-Completion:
+<br>
 
-![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
+<div align="center">
+    <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny#review-details">
+      <img src="https://code.visualstudio.com/assets/images/code-stable.png" height="50" />
+      <h4>
+        Install the twinny vscode extension
+      </h4>
+    </a>
+</div>
 
-Chat:
 
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/56373e39-3f25-4db8-9c55-612289f3fde3" width="760"/>
+
+## 🚀 Getting Started
+
+### Easy Installation
+
+twinny and [Ollama](https://github.com/jmorganca/ollama) are designed to work together. When installing the twinny extension in Visual Studio Code, it will automatically prompt and guide you through the installation of Ollama using two default small models `codellama:7b-instruct` for chat and `codellama:7b-code` for "fill in the middle".
+
+You can install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny)
+
+When the extension is running and the Ollama server is running you will see a `🤖` icon at the bottom of your code editor which indicates which models are running.
+
+That's it! Enjoy enhanced code completions and chat with twinny! 🎉
 
 ## 🤖 Features
 
@@ -27,17 +44,13 @@ Chat:
 - Copy generated code solution blocks
 - Chat history preserved per conversation
 
-## 🚀 Getting Started
+Completion:
 
-### Easy Installation
+![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
 
-**twinny** and **ollama** are designed to work together. When installing the **twinny** extension in Visual Studio Code, it will automatically prompt and guide you through the installation of **ollama**, ensuring a seamless setup process.
+Chat:
 
-Install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny)
-
-When the extension is running and the Ollama server is running you will see a `🤖` icon at the bottom of your code editor.
-
-Enjoy enhanced code completions with **twinny**! 🎉
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/56373e39-3f25-4db8-9c55-612289f3fde3" width="760"/>
 
 ## Development and contributions
 
