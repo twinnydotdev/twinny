@@ -14,7 +14,11 @@ export const Settings = () => {
 
   return (
     <div className={styles.settings}>
-      <VSCodeButton appearance="icon" onClick={handleClickSettings}>
+      <VSCodeButton
+        title="Open extension settings"
+        appearance="icon"
+        onClick={handleClickSettings}
+      >
         <SvgSettings />
       </VSCodeButton>
     </div>

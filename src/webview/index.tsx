@@ -4,7 +4,7 @@ import { Chat } from './chat'
 import { Settings } from './settings'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(globalThis as any).vscode = window.acquireVsCodeApi()
+(globalThis as any).vscode = window.acquireVsCodeApi()
 
 const container = document.querySelector('#root')
 

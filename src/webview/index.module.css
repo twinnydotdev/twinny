@@ -47,3 +47,10 @@ code {
   display: flex;
   justify-content: flex-end;
 }
+
+.selection {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+

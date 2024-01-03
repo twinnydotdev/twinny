@@ -1,6 +1,6 @@
 import { request } from 'http'
 import { RequestOptions } from 'https'
-import { Uri, WebviewView, commands, window, workspace } from 'vscode'
+import { Uri, WebviewView, commands, window, workspace,  } from 'vscode'
 import { prompts } from './prompts'
 import path from 'path'
 
@@ -133,4 +133,11 @@ export const delayExecution = <T extends () => void>(
   return setTimeout(() => {
     fn()
   }, delay)
+}
+
+export const getTextSelection = () => {
+  const editor = window.activeTextEditor
+  const selection = editor?.selection
+  const text = editor?.document.getText(selection)
+  return text || ''
 }
