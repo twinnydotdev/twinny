@@ -17,6 +17,7 @@ import styles from './index.module.css'
 const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [completion, setCompletion] = useState<Message | null>()
@@ -70,6 +71,7 @@ export const Chat = () => {
       const message: PostMessage = event.data
       switch (message.type) {
         case 'onCompletion': {
+          setIsGenerating(true)
           setLoading(false)
           setCompletion({
             role: BOT_NAME,
@@ -95,6 +97,7 @@ export const Chat = () => {
             ]
           })
           setCompletion(null)
+          setIsGenerating(false)
         }
       }
     })
@@ -130,6 +133,7 @@ export const Chat = () => {
           <Selection onSelect={scrollBottom} />
           <div className={styles.chatbox}>
             <VSCodeTextArea
+              disabled={isGenerating}
               placeholder='Message twinny'
               rows={5}
               value={inputText}
@@ -141,7 +145,7 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            <VSCodeButton type="submit" appearance="primary">
+            <VSCodeButton disabled={isGenerating} type="submit" appearance="primary">
               Send message
             </VSCodeButton>
           </div>
