@@ -134,7 +134,7 @@ export const Chat = () => {
           <div className={styles.chatbox}>
             <VSCodeTextArea
               disabled={isGenerating}
-              placeholder='Message twinny'
+              placeholder="Message twinny"
               rows={5}
               value={inputText}
               onChange={(e) => {
@@ -145,7 +145,11 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            <VSCodeButton disabled={isGenerating} type="submit" appearance="primary">
+            <VSCodeButton
+              disabled={isGenerating}
+              type="submit"
+              appearance="primary"
+            >
               Send message
             </VSCodeButton>
           </div>
