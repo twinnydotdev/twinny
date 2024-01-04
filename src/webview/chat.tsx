@@ -12,6 +12,8 @@ import { Selection } from './selection'
 import { BOT_NAME, USER_NAME } from './constants'
 
 import styles from './index.module.css'
+import { useWorkSpaceContext } from './hooks'
+//import { useWorkSpaceContext } from './hooks'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -19,7 +21,8 @@ export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  const lastConversation = useWorkSpaceContext<Message[]>('lastConversation')
+  const [messages, setMessages] = useState<Message[] | undefined>()
   const [completion, setCompletion] = useState<Message | null>()
   const divRef = useRef<HTMLDivElement>(null)
 
@@ -36,10 +39,9 @@ export const Chat = () => {
 
     if (inputText.trim()) {
       setInputText('')
-
       global.vscode.postMessage({
         type: 'chatMessage',
-        data: messages.length
+        data: messages?.length
           ? [
               ...messages,
               {
@@ -58,7 +60,7 @@ export const Chat = () => {
       })
 
       setMessages((prev) => [
-        ...prev,
+        ...(prev || []),
         { role: USER_NAME, content: inputText, type: '' }
       ])
 
@@ -87,14 +89,20 @@ export const Chat = () => {
         }
         case 'onEnd': {
           setMessages((prev) => {
-            return [
-              ...prev,
+            const update = [
+              ...(prev || []),
               {
                 role: BOT_NAME,
                 content: message.value.completion,
                 type: message.value.type
               }
             ]
+            global.vscode.postMessage({
+              type: 'setTwinnyWorkSpaceContext',
+              key: 'lastConversation',
+              data: update
+            })
+            return update
           })
           setCompletion(null)
           setIsGenerating(false)
@@ -103,16 +111,25 @@ export const Chat = () => {
     })
   }, [])
 
+  useEffect(() => {
+    if (lastConversation?.length) {
+      return setMessages(lastConversation)
+    }
+    setMessages([])
+  }, [lastConversation])
+
   return (
     <VSCodePanelView>
       <div className={styles.container}>
         <div className={styles.markdown} ref={divRef}>
-          {messages.map((message) => (
-            <Message
-              completionType={message.type}
-              sender={message.role}
-              message={message.content}
-            />
+          {messages?.map((message, index) => (
+            <div key={`message-${index}`}>
+              <Message
+                completionType={message.type}
+                sender={message.role}
+                message={message.content}
+              />
+            </div>
           ))}
           {loading && (
             <div className={styles.loading}>

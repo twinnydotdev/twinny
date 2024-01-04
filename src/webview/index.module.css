@@ -16,6 +16,13 @@ code {
   height: 95vh;
 }
 
+.controlBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
 .markdown {
   flex-grow: 1;
   overflow-y: auto;
