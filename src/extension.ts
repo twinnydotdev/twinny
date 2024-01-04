@@ -11,12 +11,14 @@ import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
 import { chatCompletion, delayExecution, deleteTempFiles } from './utils'
+import { setContext } from './context'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
+  setContext(context)
 
   try {
     await init()

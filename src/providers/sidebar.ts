@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import { chatCompletion, getTextSelection, openDiffView } from '../utils'
 import { chatMessage } from '../prompts'
+import { getContext } from '../context'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
@@ -33,7 +34,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     )
 
     webviewView.webview.onDidReceiveMessage(
-      (data: { type: string; data: Message[] | string }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (data: any) => {
+        const context = getContext()
+
         if (data.type === 'chatMessage') {
           chatCompletion('chat', this.view, (selection: string) =>
             chatMessage(data.data as Message[], selection)
@@ -63,14 +67,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (data.type === 'acceptSolution') {
           const editor = vscode.window.activeTextEditor
           const selection = editor?.selection
-
-          if (!selection) {
-            return
-          }
-
+          if (!selection) return
           vscode.window.activeTextEditor?.edit((editBuilder) => {
             editBuilder.replace(selection, data.data as string)
           })
+        }
+        if (data.type === 'getTwinnyWorkspaceContext') {
+          this.view?.webview.postMessage({
+            type: `twinnyWorkSpaceContext-${data.key}`,
+            value: context?.workspaceState.get(`twinnyWorkSpaceContext-${data.key}`) || ''
+          })
+        }
+        if (data.type === 'setTwinnyWorkSpaceContext') {
+          context?.workspaceState.update(
+            `twinnyWorkSpaceContext-${data.key}`,
+            data.data
+          )
         }
       }
     )
