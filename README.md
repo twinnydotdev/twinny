@@ -59,7 +59,7 @@ Chat:
 - phind-codellama for chat (https://ollama.ai/library/phind-codellama)
 
 For FIM - The model must support the llama or deepseek special tokens for prefix and suffix.
-For chat - All llama models should work, although model will probably work too, results may vary if the special tokens are different from Llama.
+For chat - All llama models should work, although any model will probably work too, results may vary if the special tokens are different from Llama.
 
 ## Development and contributions
 
