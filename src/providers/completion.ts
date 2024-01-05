@@ -112,6 +112,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private getPrompt(document: TextDocument, position: Position) {
     const { prefix, suffix } = this.getContext(document, position)
 
+    if (this._model.includes('deepseek')) {
+      return `<｜fim▁begin｜>${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
+    }
+
     return `<PRE> ${prefix} <SUF> ${suffix} <MID>`
   }
 
