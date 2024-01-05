@@ -52,6 +52,15 @@ Chat:
 
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/56373e39-3f25-4db8-9c55-612289f3fde3" width="760"/>
 
+## Supported Ollama models
+
+- codellama `instruct` for chat and `code` for FIM. (https://ollama.ai/library/codellama)
+- deepseek-coder for both chat and FIM (https://ollama.ai/library/deepseek-coder)
+- phind-codellama for chat (https://ollama.ai/library/phind-codellama)
+
+For FIM - The model must support the llama or deepseek special tokens for prefix and suffix.
+For chat - All llama models should work, although model will probably work too, results may vary if the special tokens are different from Llama.
+
 ## Development and contributions
 
 1. Clone this repository:
