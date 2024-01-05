@@ -50,8 +50,9 @@ export function chatCompletion(
   const hostname = config.get('ollamaBaseUrl') as string
   const port = config.get('ollamaApiPort') as number
   const selection = editor?.selection
+  const modelType = chatModel.includes('llama') ? 'llama' : 'deepseek'
   const text = editor?.document.getText(selection) || ''
-  const template = prompts[type] ? prompts[type](text) : ''
+  const template = prompts[type] ? prompts[type](text, modelType) : ''
   const prompt: string = template ? template : getPrompt?.(text) || ''
 
   let completion = ''

@@ -1,11 +1,13 @@
 import * as vscode from 'vscode'
 import { chatCompletion, getTextSelection, openDiffView } from '../utils'
-import { chatMessage } from '../prompts'
+import { chatMessageDeepSeek, chatMessageLlama } from '../prompts'
 import { getContext } from '../context'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
   _doc?: vscode.TextDocument
+  private _config = vscode.workspace.getConfiguration('twinny')
+  private _model = this._config.get('chatModelName') as string
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -37,11 +39,23 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (data: any) => {
         const context = getContext()
+        const modelType = this._model.includes('llama') ? 'llama' : 'deepseek'
 
         if (data.type === 'chatMessage') {
-          chatCompletion('chat', this.view, (selection: string) =>
-            chatMessage(data.data as Message[], selection)
-          )
+          chatCompletion('chat', this.view, (selection: string) => {
+            if (this._model.includes('deepseek')) {
+              return chatMessageDeepSeek(
+                data.data as Message[],
+                selection,
+                modelType
+              )
+            }
+            return chatMessageLlama(
+              data.data as Message[],
+              selection,
+              modelType
+            )
+          })
         }
         if (data.type === 'openDiff') {
           const editor = vscode.window.activeTextEditor
@@ -75,7 +89,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (data.type === 'getTwinnyWorkspaceContext') {
           this.view?.webview.postMessage({
             type: `twinnyWorkSpaceContext-${data.key}`,
-            value: context?.workspaceState.get(`twinnyWorkSpaceContext-${data.key}`) || ''
+            value:
+              context?.workspaceState.get(
+                `twinnyWorkSpaceContext-${data.key}`
+              ) || ''
           })
         }
         if (data.type === 'setTwinnyWorkSpaceContext') {
