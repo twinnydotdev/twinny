@@ -1,6 +1,6 @@
-import { request } from 'http'
+import { ClientRequest, request } from 'http'
 import { RequestOptions } from 'https'
-import { Uri, WebviewView, commands, window, workspace,  } from 'vscode'
+import { Uri, WebviewView, commands, window, workspace } from 'vscode'
 import { prompts } from './prompts'
 import path from 'path'
 
@@ -13,7 +13,8 @@ export async function streamResponse(
   options: RequestOptions,
   body: StreamBody,
   onData: (chunk: string, resolve: () => void) => void,
-  onEnd?: () => void
+  onEnd?: () => void,
+  cb?: (req: ClientRequest) => void
 ) {
   const req = request(options, (res) => {
     res.on('data', (chunk: string) => {
@@ -32,6 +33,7 @@ export async function streamResponse(
   })
 
   req.write(JSON.stringify(body))
+  cb?.(req)
   req.end()
 }
 
@@ -94,6 +96,13 @@ export function chatCompletion(
         value: {
           type,
           completion: completion.trimStart()
+        }
+      })
+    },
+    (req: ClientRequest) => {
+      view?.webview.onDidReceiveMessage((data: { type: string }) => {
+        if (data.type === 'twinnyStopGeneration') {
+          req.destroy()
         }
       })
     }

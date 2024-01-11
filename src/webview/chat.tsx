@@ -9,17 +9,18 @@ import {
 
 import { Message } from './message'
 import { Selection } from './selection'
-import { BOT_NAME, USER_NAME } from './constants'
+import { BOT_NAME, StopIcon, USER_NAME } from './constants'
 
 import styles from './index.module.css'
 import { useWorkSpaceContext } from './hooks'
-//import { useWorkSpaceContext } from './hooks'
+import { delayExecution } from '../utils'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [stopped, setStopped] = useState(false)
   const [loading, setLoading] = useState(false)
   const lastConversation = useWorkSpaceContext<Message[]>('lastConversation')
   const [messages, setMessages] = useState<Message[] | undefined>()
@@ -68,11 +69,62 @@ export const Chat = () => {
     }
   }
 
+  const messageEnd = (message: PostMessage) => {
+    setMessages((prev) => {
+      const update = [
+        ...(prev || []),
+        {
+          role: BOT_NAME,
+          content: message.value.completion,
+          type: message.value.type
+        }
+      ]
+      global.vscode.postMessage({
+        type: 'setTwinnyWorkSpaceContext',
+        key: 'lastConversation',
+        data: update
+      })
+      return update
+    })
+    setCompletion(null)
+    setIsGenerating(false)
+  }
+
+  const handleStopGeneration = () => {
+    setStopped(true)
+    global.vscode.postMessage({
+      type: 'twinnyStopGeneration'
+    })
+    setMessages((prev) => {
+      const update = [
+        ...(prev || []),
+        {
+          role: BOT_NAME,
+          content: completion?.content || '',
+          type: 'chatMessage'
+        }
+      ]
+      global.vscode.postMessage({
+        type: 'setTwinnyWorkSpaceContext',
+        key: 'lastConversation',
+        data: update
+      })
+      return update
+    })
+    setCompletion(null)
+    setTimeout(() => {
+      setStopped(false)
+    }, 100)
+  }
+
   useEffect(() => {
     window.addEventListener('message', (event) => {
       const message: PostMessage = event.data
       switch (message.type) {
         case 'onCompletion': {
+          if (stopped) {
+            return setIsGenerating(false)
+          }
           setIsGenerating(true)
           setLoading(false)
           setCompletion({
@@ -88,28 +140,11 @@ export const Chat = () => {
           break
         }
         case 'onEnd': {
-          setMessages((prev) => {
-            const update = [
-              ...(prev || []),
-              {
-                role: BOT_NAME,
-                content: message.value.completion,
-                type: message.value.type
-              }
-            ]
-            global.vscode.postMessage({
-              type: 'setTwinnyWorkSpaceContext',
-              key: 'lastConversation',
-              data: update
-            })
-            return update
-          })
-          setCompletion(null)
-          setIsGenerating(false)
+          messageEnd(message)
         }
       }
     })
-  }, [])
+  }, [stopped])
 
   useEffect(() => {
     if (lastConversation?.length) {
@@ -162,6 +197,16 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
+            {isGenerating && (
+              <VSCodeButton
+                type="button"
+                appearance="icon"
+                onClick={handleStopGeneration}
+                aria-label="Stop generation"
+              >
+                <StopIcon />
+              </VSCodeButton>
+            )}
             <VSCodeButton
               disabled={isGenerating}
               type="submit"
