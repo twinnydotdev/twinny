@@ -117,8 +117,6 @@ export const Chat = () => {
     }, 100)
   }
 
-  console.log(isGenerating)
-
   useEffect(() => {
     window.addEventListener('message', (event) => {
       const message: PostMessage = event.data
