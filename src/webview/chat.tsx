@@ -90,7 +90,6 @@ export const Chat = () => {
   }
 
   const handleStopGeneration = () => {
-
     global.vscode.postMessage({
       type: 'twinnyStopGeneration'
     })
@@ -112,9 +111,6 @@ export const Chat = () => {
     })
     setStopped(true)
     setCompletion(null)
-    setTimeout(() => {
-      setStopped(false)
-    }, 100)
   }
 
   useEffect(() => {
@@ -122,10 +118,13 @@ export const Chat = () => {
       const message: PostMessage = event.data
       switch (message.type) {
         case 'onCompletion': {
-          setIsGenerating(true)
           if (stopped) {
+            console.log('stopped')
+            setStopped(false)
             return setIsGenerating(false)
           }
+          setIsGenerating(true)
+          console.log('start')
           setLoading(false)
           setCompletion({
             role: BOT_NAME,
