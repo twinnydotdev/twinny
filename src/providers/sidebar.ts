@@ -7,7 +7,7 @@ import {
   MESSAGE_KEY,
   MESSAGE_NAME,
   MODEL
-} from '../webview/constants'
+} from '../constants'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView

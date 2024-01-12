@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { MESSAGE_NAME } from './constants'
+import { MESSAGE_NAME } from '../constants'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

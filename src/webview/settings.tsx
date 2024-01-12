@@ -1,6 +1,6 @@
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
 
-import { MESSAGE_NAME } from './constants'
+import { MESSAGE_NAME } from '../constants'
 import { SvgSettings } from './icons'
 
 import styles from './index.module.css'

@@ -1,6 +1,6 @@
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
 
-import { MESSAGE_KEY, MESSAGE_NAME } from './constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { ClearChatIcon } from './icons'
 
 import styles from './index.module.css'
