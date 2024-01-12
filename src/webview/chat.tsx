@@ -13,7 +13,6 @@ import { BOT_NAME, StopIcon, USER_NAME } from './constants'
 
 import styles from './index.module.css'
 import { useWorkSpaceContext } from './hooks'
-import { delayExecution } from '../utils'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
