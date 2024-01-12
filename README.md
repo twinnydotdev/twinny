@@ -50,7 +50,8 @@ Completion:
 
 Chat:
 
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/56373e39-3f25-4db8-9c55-612289f3fde3" width="760"/>
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/679bd283-28e9-47ff-9165-84dfe293c56a" width="760"/>
+
 
 ## Supported Ollama models
 
