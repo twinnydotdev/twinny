@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "2.5.3",
+  "version": "2.5.4",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
