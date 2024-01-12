@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 
+import { MESSAGE_NAME } from './constants'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 
@@ -7,7 +9,7 @@ export const useSelection = (onSelect: () => void) => {
   const [selection, setSelection] = useState('')
   const handler = (event: MessageEvent) => {
     const message: PostMessage = event.data
-    if (message?.type === 'textSelection') {
+    if (message?.type === MESSAGE_NAME.twinnyTextSelection) {
       setSelection(message?.value.completion.trim())
       onSelect?.()
     }
@@ -16,7 +18,7 @@ export const useSelection = (onSelect: () => void) => {
   useEffect(() => {
     window.addEventListener('message', handler)
     global.vscode.postMessage({
-      type: 'getTextSelection'
+      type: MESSAGE_NAME.twinnyTextSelection
     })
     return () => window.removeEventListener('message', handler)
   }, [])
@@ -29,7 +31,7 @@ export const useWorkSpaceContext = <T>(key: string) => {
 
   const handler = (event: MessageEvent) => {
     const message: PostMessage = event.data
-    if (message?.type === `twinnyWorkSpaceContext-${key}`) {
+    if (message?.type === `${MESSAGE_NAME.twinnyWorkspaceContext}-${key}`) {
       setContext(event.data.value)
     }
   }
@@ -37,7 +39,7 @@ export const useWorkSpaceContext = <T>(key: string) => {
   useEffect(() => {
     window.addEventListener('message', handler)
     global.vscode.postMessage({
-      type: 'getTwinnyWorkspaceContext',
+      type: MESSAGE_NAME.twinnyWorkspaceContext,
       key
     })
 

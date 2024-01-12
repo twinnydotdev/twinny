@@ -1,7 +1,8 @@
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import CodeBlock from './code-block'
 import { VSCodeDivider } from '@vscode/webview-ui-toolkit/react'
+
+import CodeBlock from './code-block'
 
 import styles from './index.module.css'
 

@@ -2,6 +2,12 @@ import * as vscode from 'vscode'
 import { chatCompletion, getTextSelection, openDiffView } from '../utils'
 import { chatMessageDeepSeek, chatMessageLlama } from '../prompts'
 import { getContext } from '../context'
+import {
+  EXTENSION_NAME,
+  MESSAGE_KEY,
+  MESSAGE_NAME,
+  MODEL
+} from '../webview/constants'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
@@ -26,9 +32,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       (event: vscode.TextEditorSelectionChangeEvent) => {
         const text = event.textEditor.document.getText(event.selections[0])
         this.view?.webview.postMessage({
-          type: 'textSelection',
+          type: MESSAGE_NAME.twinnyTextSelection,
           value: {
-            type: 'selection',
+            type: MESSAGE_KEY.selection,
             completion: text
           }
         })
@@ -39,46 +45,52 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (data: any) => {
         const context = getContext()
-        const modelType = this._model.includes('llama') ? 'llama' : 'deepseek'
+        const modelType = this._model.includes(MODEL.llama)
+          ? MODEL.llama
+          : MODEL.deepseek
 
-        if (data.type === 'chatMessage') {
-          chatCompletion('chat', this.view, (selection: string) => {
-            if (this._model.includes('deepseek')) {
-              return chatMessageDeepSeek(
+        if (data.type === MESSAGE_NAME.twinnyChatMessage) {
+          chatCompletion(
+            MESSAGE_NAME.twinnyChat,
+            this.view,
+            (selection: string) => {
+              if (this._model.includes(MODEL.deepseek)) {
+                return chatMessageDeepSeek(
+                  data.data as Message[],
+                  selection,
+                  modelType
+                )
+              }
+              return chatMessageLlama(
                 data.data as Message[],
                 selection,
                 modelType
               )
             }
-            return chatMessageLlama(
-              data.data as Message[],
-              selection,
-              modelType
-            )
-          })
+          )
         }
-        if (data.type === 'openDiff') {
+        if (data.type === MESSAGE_NAME.twinnyOpenDiff) {
           const editor = vscode.window.activeTextEditor
           const selection = editor?.selection
           const text = editor?.document.getText(selection)
           openDiffView(text || '', data.data as string)
         }
-        if (data.type === 'openSettings') {
+        if (data.type === MESSAGE_NAME.twinnyOpenSettings) {
           vscode.commands.executeCommand(
             'workbench.action.openSettings',
-            '@ext:rjmacarthy.twinny'
+            EXTENSION_NAME
           )
         }
-        if (data.type === 'getTextSelection') {
+        if (data.type === MESSAGE_NAME.twinnyTextSelection) {
           this.view?.webview.postMessage({
-            type: 'textSelection',
+            type: MESSAGE_NAME.twinnyTextSelection,
             value: {
-              type: 'selection',
+              type: MESSAGE_KEY.selection,
               completion: getTextSelection()
             }
           })
         }
-        if (data.type === 'acceptSolution') {
+        if (data.type === MESSAGE_NAME.twinnyAcceptSolution) {
           const editor = vscode.window.activeTextEditor
           const selection = editor?.selection
           if (!selection) return
@@ -86,18 +98,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             editBuilder.replace(selection, data.data as string)
           })
         }
-        if (data.type === 'getTwinnyWorkspaceContext') {
+        if (data.type === MESSAGE_NAME.twinnyWorkspaceContext) {
           this.view?.webview.postMessage({
-            type: `twinnyWorkSpaceContext-${data.key}`,
+            type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
             value:
               context?.workspaceState.get(
-                `twinnyWorkSpaceContext-${data.key}`
+                `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
               ) || ''
           })
         }
-        if (data.type === 'setTwinnyWorkSpaceContext') {
+        if (data.type === MESSAGE_NAME.twinnySetWorkspaceContext) {
           context?.workspaceState.update(
-            `twinnyWorkSpaceContext-${data.key}`,
+            `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
             data.data
           )
         }

@@ -1,7 +1,7 @@
 const systemMesage = `You are a helpful, respectful and honest coding assistant.
-Always reply with using markfown.
-For code refactoring use markdown code formatting.
-If you are not sure which language formatting to use, use \`typescript\`
+Always reply with using markdown.
+For code refactoring, use markdown code formatting.
+If you are not sure which language formatting to use, use \`typescript\`;
 `
 
 export const getSystemMessage = (modelType: string) => {
@@ -24,24 +24,29 @@ export const addTypes = (code: string, modelType: string) =>
     Add types to the following code, keep the code the same just add the types \`\`\`${code}\`\`\`.
   `
 
-export const refactor = (code: string, modelType: string) =>
+export const refactor = (code: string, modelType: string): string =>
   `
     ${getSystemMessage(modelType)}
-    Refactor the following code \`\`\`${code}\`\`\` do not change how it works.
-    Always reply with markdown for code blocks formatting e.g if its typescript use \`typescript\` or \`python\`.
-    If you are not sure which language this is add \`typescript\`
+    Refactor the following code without altering its functionality:
+    \`\`\`${code}\`\`\`
+    Always format responses with Markdown for code blocks. For instance, use \`typescript\` or \`python\` for code formatting.
+    If the language of the code is uncertain, default to using \`typescript\`.
   `
 
-export const addTests = (code: string, modelType: string) =>
+export const addTests = (code: string, modelType: string): string =>
   `
     ${getSystemMessage(modelType)}
-    Write unit tests for the following \`\`\`${code}\`\`\` use the most popular testing library for the inferred language.
+    Write unit tests for the following code block:
+    \`\`\`${code}\`\`\`
+    Please use the most popular testing library suitable for the language of the code.
   `
 
-export const generateDocs = (code: string, modelType: string) =>
+export const generateDocs = (code: string, modelType: string): string =>
   `
     ${getSystemMessage(modelType)}
-    Generate documentation \`\`\`${code}\`\`\` use the most popular documentation for the inferred language e.g JSDoc for JavaScript.
+    Generate documentation for the following code block:
+    \`\`\`${code}\`\`\`
+    Use the most popular documentation tool for the inferred language, e.g., JSDoc for JavaScript.
   `
 
 export const chatMessageLlama = (
