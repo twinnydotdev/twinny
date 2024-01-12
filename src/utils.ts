@@ -4,6 +4,7 @@ import { Uri, WebviewView, commands, window, workspace } from 'vscode'
 
 import { prompts } from './prompts'
 import path from 'path'
+import { MESSAGE_NAME, MODEL } from './webview/constants'
 
 interface StreamBody {
   model: string
@@ -18,7 +19,6 @@ export async function streamResponse(
   cb?: (req: ClientRequest) => void,
   useTls = false
 ) {
-
   const _request = useTls ? httpsRequest : request
 
   const req = _request(options, (res) => {
@@ -48,7 +48,7 @@ export function chatCompletion(
   getPrompt?: (code: string) => string
 ) {
   view?.webview.postMessage({
-    type: 'onLoading'
+    type: MESSAGE_NAME.twinnyOnLoading
   })
 
   const editor = window.activeTextEditor
@@ -58,7 +58,9 @@ export function chatCompletion(
   const port = config.get('ollamaApiPort') as number
   const useTls = config.get('ollamaUseTls') as boolean
   const selection = editor?.selection
-  const modelType = chatModel.includes('llama') ? 'llama' : 'deepseek'
+  const modelType = chatModel.includes(MODEL.llama)
+    ? MODEL.llama
+    : MODEL.deepseek
   const text = editor?.document.getText(selection) || ''
   const template = prompts[type] ? prompts[type](text, modelType) : ''
   const prompt: string = template ? template : getPrompt?.(text) || ''
@@ -82,7 +84,7 @@ export function chatCompletion(
         completion = completion + json.response
 
         view?.webview.postMessage({
-          type: 'onCompletion',
+          type: MESSAGE_NAME.twinnyOnCompletion,
           value: {
             type,
             completion: completion.trimStart()
@@ -98,7 +100,7 @@ export function chatCompletion(
     },
     () => {
       view?.webview.postMessage({
-        type: 'onEnd',
+        type: MESSAGE_NAME.twinnyOnEnd,
         value: {
           type,
           completion: completion.trimStart()
@@ -107,12 +109,12 @@ export function chatCompletion(
     },
     (req: ClientRequest) => {
       view?.webview.onDidReceiveMessage((data: { type: string }) => {
-        if (data.type === 'twinnyStopGeneration') {
+        if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
           req.destroy()
         }
       })
     },
-    useTls,
+    useTls
   )
 }
 

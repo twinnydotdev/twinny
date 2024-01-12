@@ -9,10 +9,12 @@ import {
 
 import { Message } from './message'
 import { Selection } from './selection'
-import { BOT_NAME, StopIcon, USER_NAME } from './constants'
+import { BOT_NAME, EMPTY_MESAGE, MESSAGE_KEY, MESSAGE_NAME, USER_NAME } from './constants'
+
+import { useWorkSpaceContext } from './hooks'
+import { StopIcon } from './icons'
 
 import styles from './index.module.css'
-import { useWorkSpaceContext } from './hooks'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -39,19 +41,19 @@ export const Chat = () => {
     if (inputText.trim()) {
       setInputText('')
       global.vscode.postMessage({
-        type: 'chatMessage',
+        type: MESSAGE_NAME.twinnyChatMessage,
         data: messages?.length
           ? [
               ...messages,
               {
-                role: 'user',
+                role: USER_NAME,
                 content: inputText.trim(),
                 type: ''
               }
             ]
           : [
               {
-                role: 'user',
+                role: USER_NAME,
                 content: inputText.trim(),
                 type: ''
               }
@@ -65,31 +67,34 @@ export const Chat = () => {
     }
   }
 
-  const messageEnd = (message: PostMessage) => {
-    genertingRef.current = false
+  const onMessageEnd = (message: PostMessage) => {
     setMessages((prev) => {
       const update = [
         ...(prev || []),
         {
           role: BOT_NAME,
-          content: message.value.completion,
+          content: message.value.completion || EMPTY_MESAGE,
           type: message.value.type
         }
       ]
       global.vscode.postMessage({
-        type: 'setTwinnyWorkSpaceContext',
-        key: 'lastConversation',
+        type: MESSAGE_NAME.twinnySetWorkspaceContext,
+        key: MESSAGE_KEY.lastConversation,
         data: update
       })
       return update
     })
     setCompletion(null)
+    genertingRef.current = false
+    setTimeout(() => {
+      stopRef.current = false
+    }, 1000)
   }
 
   const messageHandler = (event: MessageEvent) => {
     const message: PostMessage = event.data
     switch (message.type) {
-      case 'onCompletion': {
+      case MESSAGE_NAME.twinnyOnCompletion: {
         if (stopRef.current) {
           genertingRef.current = false
           return
@@ -98,19 +103,19 @@ export const Chat = () => {
         setLoading(false)
         setCompletion({
           role: BOT_NAME,
-          content: message.value.completion,
+          content: message.value.completion || EMPTY_MESAGE,
           type: message.value.type
         })
         scrollBottom()
         break
       }
-      case 'onLoading': {
+      case MESSAGE_NAME.twinnyOnLoading: {
         setLoading(true)
         scrollBottom()
         break
       }
-      case 'onEnd': {
-        messageEnd(message)
+      case MESSAGE_NAME.twinnyOnEnd: {
+        onMessageEnd(message)
       }
     }
   }
@@ -119,35 +124,20 @@ export const Chat = () => {
     stopRef.current = true
     genertingRef.current = false
     global.vscode.postMessage({
-      type: 'twinnyStopGeneration'
+      type: MESSAGE_NAME.twinnyStopGeneration
     })
-    setMessages((prev) => {
-      const update = [
-        ...(prev || []),
-        {
-          role: BOT_NAME,
-          content: completion?.content || '',
-          type: 'chatMessage'
-        }
-      ]
-      global.vscode.postMessage({
-        type: 'setTwinnyWorkSpaceContext',
-        key: 'lastConversation',
-        data: update
-      })
-      return update
+    onMessageEnd({
+      type: MESSAGE_KEY.chatMessage,
+      value: {
+        completion: completion?.content || '',
+        type: MESSAGE_KEY.chatMessage
+      }
     })
-    setCompletion(null)
-    setTimeout(() => {
-      stopRef.current = false
-    }, 1000)
   }
 
   useEffect(() => {
     window.addEventListener('message', messageHandler)
   }, [])
-
-  console.log(lastConversation)
 
   useEffect(() => {
     if (lastConversation?.length) {

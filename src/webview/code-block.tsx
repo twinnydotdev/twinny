@@ -3,8 +3,10 @@ import { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-import styles from './index.module.css'
 import { codeActionTypes } from '../prompts'
+import { MESSAGE_NAME } from './constants'
+
+import styles from './index.module.css'
 
 interface CodeBlockProps {
   className?: string
@@ -26,14 +28,14 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   const handleOpenDiff = () => {
     global.vscode.postMessage({
-      type: 'openDiff',
+      type: MESSAGE_NAME.twinnyAcceptSolution,
       data: String(children).replace(/^\n/, '')
     })
   }
 
   const handleAccept = () => {
     global.vscode.postMessage({
-      type: 'acceptSolution',
+      type: MESSAGE_NAME.twinnyAcceptSolution,
       data: String(children).replace(/^\n/, '')
     })
   }
