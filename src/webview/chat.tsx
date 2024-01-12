@@ -86,7 +86,6 @@ export const Chat = () => {
   }
 
   const messageHandler = (event: MessageEvent) => {
-    console.log(stopRef.current)
     const message: PostMessage = event.data
     switch (message.type) {
       case 'onCompletion': {
