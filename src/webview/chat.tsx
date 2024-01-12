@@ -147,6 +147,14 @@ export const Chat = () => {
     window.addEventListener('message', messageHandler)
   }, [])
 
+  console.log(lastConversation)
+
+  useEffect(() => {
+    if (lastConversation?.length) {
+      return setMessages(lastConversation)
+    }
+    setMessages([])
+  }, [lastConversation])
 
   return (
     <VSCodePanelView>
