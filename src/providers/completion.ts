@@ -9,7 +9,7 @@ import {
   StatusBarItem,
   window
 } from 'vscode'
-import { streamResponse } from '../utils'
+import { noop, streamResponse } from '../utils'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -23,6 +23,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _model = this._config.get('fimModelName') as string
   private _baseurl = this._config.get('ollamaBaseUrl') as string
   private _apiport = this._config.get('ollamaApiPort') as number
+  private _useTls = this._config.get('ollamaUseTls') as boolean
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
@@ -98,7 +99,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   console.error('Error parsing JSON:', error)
                   return
                 }
-              }
+              },
+              noop,
+              noop,
+              this._useTls,
             )
           })
         } catch (error) {

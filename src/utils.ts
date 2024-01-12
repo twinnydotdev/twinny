@@ -1,6 +1,7 @@
-import { ClientRequest, request } from 'http'
-import { RequestOptions } from 'https'
+import { ClientRequest, RequestOptions, request } from 'http'
+import { request as httpsRequest } from 'https'
 import { Uri, WebviewView, commands, window, workspace } from 'vscode'
+
 import { prompts } from './prompts'
 import path from 'path'
 
@@ -14,9 +15,13 @@ export async function streamResponse(
   body: StreamBody,
   onData: (chunk: string, resolve: () => void) => void,
   onEnd?: () => void,
-  cb?: (req: ClientRequest) => void
+  cb?: (req: ClientRequest) => void,
+  useTls = false
 ) {
-  const req = request(options, (res) => {
+
+  const _request = useTls ? httpsRequest : request
+
+  const req = _request(options, (res) => {
     res.on('data', (chunk: string) => {
       onData(chunk.toString(), () => {
         res.destroy()
@@ -51,6 +56,7 @@ export function chatCompletion(
   const chatModel = config.get('chatModelName') as string
   const hostname = config.get('ollamaBaseUrl') as string
   const port = config.get('ollamaApiPort') as number
+  const useTls = config.get('ollamaUseTls') as boolean
   const selection = editor?.selection
   const modelType = chatModel.includes('llama') ? 'llama' : 'deepseek'
   const text = editor?.document.getText(selection) || ''
@@ -105,7 +111,8 @@ export function chatCompletion(
           req.destroy()
         }
       })
-    }
+    },
+    useTls,
   )
 }
 
@@ -151,3 +158,5 @@ export const getTextSelection = () => {
   const text = editor?.document.getText(selection)
   return text || ''
 }
+
+export const noop = () => undefined

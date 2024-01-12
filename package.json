@@ -168,6 +168,10 @@
         "twinny.ollamaApiPort": {
           "type": "number",
           "default": 11434
+        },
+        "twinny.ollamaUseTls": {
+          "type": "boolean",
+          "default": false
         }
       }
     }
