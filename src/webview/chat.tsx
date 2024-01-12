@@ -105,6 +105,7 @@ export const Chat = () => {
       }
       case 'onLoading': {
         setLoading(true)
+        scrollBottom()
         break
       }
       case 'onEnd': {
