@@ -4,7 +4,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 import { codeActionTypes } from '../prompts'
-import { MESSAGE_NAME } from './constants'
+import { MESSAGE_NAME } from '../constants'
 
 import styles from './index.module.css'
 

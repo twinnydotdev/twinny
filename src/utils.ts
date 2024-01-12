@@ -4,7 +4,7 @@ import { Uri, WebviewView, commands, window, workspace } from 'vscode'
 
 import { prompts } from './prompts'
 import path from 'path'
-import { MESSAGE_NAME, MODEL } from './webview/constants'
+import { MESSAGE_NAME, MODEL } from './constants'
 
 interface StreamBody {
   model: string

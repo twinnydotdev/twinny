@@ -9,7 +9,7 @@ import {
 
 import { Message } from './message'
 import { Selection } from './selection'
-import { BOT_NAME, EMPTY_MESAGE, MESSAGE_KEY, MESSAGE_NAME, USER_NAME } from './constants'
+import { BOT_NAME, EMPTY_MESAGE, MESSAGE_KEY, MESSAGE_NAME, USER_NAME } from '../constants'
 
 import { useWorkSpaceContext } from './hooks'
 import { StopIcon } from './icons'
