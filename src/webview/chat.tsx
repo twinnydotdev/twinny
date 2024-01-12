@@ -18,8 +18,8 @@ import { useWorkSpaceContext } from './hooks'
 const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [stopped, setStopped] = useState(false)
+  const genertingRef = useRef(false)
+  const stopRef = useRef(false)
   const [loading, setLoading] = useState(false)
   const lastConversation = useWorkSpaceContext<Message[]>('lastConversation')
   const [messages, setMessages] = useState<Message[] | undefined>()
@@ -36,7 +36,6 @@ export const Chat = () => {
 
   const handleSendMessage = (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
-
     if (inputText.trim()) {
       setInputText('')
       global.vscode.postMessage({
@@ -58,12 +57,10 @@ export const Chat = () => {
               }
             ]
       })
-
       setMessages((prev) => [
         ...(prev || []),
         { role: USER_NAME, content: inputText, type: '' }
       ])
-
       scrollBottom()
     }
   }
@@ -85,11 +82,41 @@ export const Chat = () => {
       })
       return update
     })
-    setCompletion(null)
-    setIsGenerating(false)
+
+  }
+
+  const messageHandler = (event: MessageEvent) => {
+    console.log(stopRef.current)
+    const message: PostMessage = event.data
+    switch (message.type) {
+      case 'onCompletion': {
+        if (stopRef.current) {
+          genertingRef.current = false
+          return
+        }
+        genertingRef.current = true
+        setLoading(false)
+        setCompletion({
+          role: BOT_NAME,
+          content: message.value.completion,
+          type: message.value.type
+        })
+        scrollBottom()
+        break
+      }
+      case 'onLoading': {
+        setLoading(true)
+        break
+      }
+      case 'onEnd': {
+        messageEnd(message)
+      }
+    }
   }
 
   const handleStopGeneration = () => {
+    stopRef.current = true
+    genertingRef.current = false
     global.vscode.postMessage({
       type: 'twinnyStopGeneration'
     })
@@ -109,41 +136,15 @@ export const Chat = () => {
       })
       return update
     })
-    setStopped(true)
     setCompletion(null)
+    setTimeout(() => {
+      stopRef.current = false
+    }, 1000)
   }
 
   useEffect(() => {
-    window.addEventListener('message', (event) => {
-      const message: PostMessage = event.data
-      switch (message.type) {
-        case 'onCompletion': {
-          if (stopped) {
-            console.log('stopped')
-            setStopped(false)
-            return setIsGenerating(false)
-          }
-          setIsGenerating(true)
-          console.log('start')
-          setLoading(false)
-          setCompletion({
-            role: BOT_NAME,
-            content: message.value.completion,
-            type: message.value.type
-          })
-          scrollBottom()
-          break
-        }
-        case 'onLoading': {
-          setLoading(true)
-          break
-        }
-        case 'onEnd': {
-          messageEnd(message)
-        }
-      }
-    })
-  }, [stopped])
+    window.addEventListener('message', messageHandler)
+  }, [])
 
   useEffect(() => {
     if (lastConversation?.length) {
@@ -184,7 +185,7 @@ export const Chat = () => {
           <Selection onSelect={scrollBottom} />
           <div className={styles.chatbox}>
             <VSCodeTextArea
-              disabled={isGenerating}
+              disabled={genertingRef.current}
               placeholder="Message twinny"
               rows={5}
               value={inputText}
@@ -196,7 +197,7 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            {isGenerating && (
+            {genertingRef.current && (
               <VSCodeButton
                 type="button"
                 appearance="icon"
@@ -207,7 +208,7 @@ export const Chat = () => {
               </VSCodeButton>
             )}
             <VSCodeButton
-              disabled={isGenerating}
+              disabled={genertingRef.current}
               type="submit"
               appearance="primary"
             >
