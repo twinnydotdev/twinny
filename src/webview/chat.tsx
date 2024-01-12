@@ -66,6 +66,7 @@ export const Chat = () => {
   }
 
   const messageEnd = (message: PostMessage) => {
+    genertingRef.current = false
     setMessages((prev) => {
       const update = [
         ...(prev || []),
@@ -82,7 +83,6 @@ export const Chat = () => {
       })
       return update
     })
-
   }
 
   const messageHandler = (event: MessageEvent) => {
