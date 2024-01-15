@@ -10,6 +10,7 @@ import {
   window
 } from 'vscode'
 import { noop, streamResponse } from '../utils'
+import { getCache, setCache } from '../cache'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -47,7 +48,21 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._debouncer = setTimeout(async () => {
         if (!this._config.get('enabled')) return resolve([])
 
-        const prompt = this.getPrompt(document, position)
+        const { prompt, prefix, suffix } = this.getPrompt(document, position)
+
+        const cachedValue = getCache({ prefix, suffix })
+
+        if (cachedValue) {
+          return resolve(
+            this.getInlineCompletion(
+              cachedValue,
+              position,
+              document,
+              prefix,
+              suffix
+            )
+          )
+        }
 
         if (!prompt) return resolve([] as InlineCompletionItem[])
 
@@ -84,7 +99,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                       this.getInlineCompletion(
                         completion.replace('<EOT>', ''),
                         position,
-                        document
+                        document,
+                        prefix,
+                        suffix
                       )
                     )
                   }
@@ -110,10 +127,18 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const { prefix, suffix } = this.getContext(document, position)
 
     if (this._model.includes('deepseek')) {
-      return `<｜fim▁begin｜>${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
+      return {
+        prompt: `<｜fim▁begin｜>${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
+        prefix,
+        suffix
+      }
     }
 
-    return `<PRE> ${prefix} <SUF> ${suffix} <MID>`
+    return {
+      prompt: `<PRE> ${prefix} <SUF> ${suffix} <MID>`,
+      prefix,
+      suffix
+    }
   }
 
   private registerOnChangeContextListener() {
@@ -145,7 +170,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   getContext(
     document: TextDocument,
-    position: Position
+    position: Position,
   ): { prefix: string; suffix: string } {
     const line = position.line
     const startLine = Math.max(0, line - this._contextLength)
@@ -163,7 +188,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private getInlineCompletion(
     completion: string,
     position: Position,
-    document: TextDocument
+    document: TextDocument,
+    prefix: string,
+    suffix: string
   ): InlineCompletionItem[] {
     const editor = window.activeTextEditor
     if (!editor) return []
@@ -212,6 +239,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (lineText.includes(completion.trim())) {
       return []
     }
+
+    setCache({
+      prefix,
+      suffix,
+      completion,
+    })
 
     return [
       new InlineCompletionItem(completion.trim(), new Range(position, position))
