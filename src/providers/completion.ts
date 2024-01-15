@@ -73,7 +73,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 try {
                   const json = JSON.parse(chunk)
                   completion = completion + json.response
-                  if (json.response && json.response === '\n' || json.response.match('<EOT>')) {
+                  if (
+                    (json.response && json.response === '\n') ||
+                    json.response.match('<EOT>')
+                  ) {
                     onComplete()
                     resolveStream(null)
                     this._statusBar.text = '🤖'
@@ -92,7 +95,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               },
               noop,
               noop,
-              this._useTls,
+              this._useTls
             )
           })
         } catch (error) {
@@ -173,15 +176,41 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       ]
     }
 
+    const cursorPosition = editor.selection.active
+
     const charBeforeRange = new Range(
       position.translate(0, -1),
       editor.selection.start
     )
 
+    const lineEndPosition = editor.document.lineAt(cursorPosition.line).range
+      .end
+
+    const textAfterRange = new Range(cursorPosition, lineEndPosition)
+    const textAfterCursor = document.getText(textAfterRange).trim()
     const charBefore = document.getText(charBeforeRange)
+    const lineStart = editor.document.lineAt(cursorPosition).range.start
+    const lineRange = new Range(lineStart, lineEndPosition)
+    const lineText = document.getText(lineRange)
+
+    if (
+      completion.trim() === '/' ||
+      lineText.includes(completion.trim()) ||
+      (completion.trim() === '/>' && lineText.includes('</'))
+    ) {
+      return []
+    }
 
     if (completion === ' ' && charBefore === ' ') {
       completion = completion.slice(1, completion.length)
+    }
+
+    if (completion.includes(textAfterCursor)) {
+      completion = completion.replace(textAfterCursor, '').replace('\n', '')
+    }
+
+    if (lineText.includes(completion.trim())) {
+      return []
     }
 
     return [
