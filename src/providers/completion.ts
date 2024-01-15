@@ -39,16 +39,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return
     }
 
-    const line = editor.document.lineAt(position.line)
-
-    const charsAfterRange = new Range(editor.selection.start, line.range.end)
-
-    const textAfterCursor = editor.document.getText(charsAfterRange)
-
-    if (textAfterCursor.trim()) {
-      return
-    }
-
     return new Promise((resolve) => {
       if (this._debouncer) {
         clearTimeout(this._debouncer)
@@ -88,7 +78,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                     resolveStream(null)
                     this._statusBar.text = '🤖'
                     resolve(
-                      this.getInlineCompletions(
+                      this.getInlineCompletion(
                         completion.replace('<EOT>', ''),
                         position,
                         document
@@ -167,7 +157,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { prefix, suffix }
   }
 
-  private getInlineCompletions(
+  private getInlineCompletion(
     completion: string,
     position: Position,
     document: TextDocument
