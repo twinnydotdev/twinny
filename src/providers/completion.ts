@@ -8,6 +8,7 @@ import {
   workspace,
   StatusBarItem,
   window,
+  Uri
 } from 'vscode'
 import 'string_score'
 import { noop, streamResponse } from '../utils'
@@ -51,19 +52,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
       this._debouncer = setTimeout(async () => {
         if (!this._config.get('enabled')) return resolve([])
-        const currentLine = editor.document.lineAt(
-          editor.selection.active.line
-        ).text
 
-        const codeContext = this.getFileContext()
-
-        const context = this.getPromptContext(currentLine, codeContext)
+        const context = this.getFileContext(document.uri)
 
         const { prompt, prefix, suffix } = this.getPrompt(
           document,
           position,
           context,
-          language,
+          language
         )
 
         const cachedCompletion = getCache({ prefix, suffix })
@@ -82,10 +78,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         if (!prompt) return resolve([] as InlineCompletionItem[])
 
         let completion = ''
+        let chunkCount = 0
 
         try {
           this._statusBar.text = '🤖'
-
           await new Promise((resolveStream) => {
             this._statusBar.text = '$(loading~spin)'
             streamResponse(
@@ -105,9 +101,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               (chunk, onComplete) => {
                 try {
                   const json = JSON.parse(chunk)
-                  completion = completion + json.response
+                completion = completion + json.response
+                  chunkCount = chunkCount + 1
                   if (
-                    (json.response && json.response === '\n') ||
+                    (chunkCount !== 1 && json.response === '\n') ||
                     json.response.match('<EOT>')
                   ) {
                     onComplete()
@@ -141,46 +138,66 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
+  // TODO: Move to own file to prevent formatting
   private getPrompt(
     document: TextDocument,
     position: Position,
-    context: string[],
-    language: string | undefined,
+    context: string,
+    language: string | undefined
   ) {
-    const header = this.getFileHeader(language)
+    const header = this.getFileHeader(language, document.uri)
     const { prefix, suffix } = this.getPositionContext(document, position)
 
     if (this._model.includes('deepseek')) {
       return {
-        prompt: `<｜fim▁begin｜> \n${context.join('')}${header}\n${prefix}<｜fim▁hole｜> ${suffix} <｜fim▁end｜>`,
+        prompt: `<｜fim▁begin｜> ${context}\n${header}${prefix} <｜fim▁hole｜>${suffix} <｜fim▁end｜>`,
         prefix,
         suffix
       }
     }
 
     return {
-      prompt: `<PRE> \n${context.join('')}${header}\n${prefix} <SUF> ${suffix} <MID>`,
+      prompt: `<PRE> ${context}\n${header}${prefix} <SUF>${suffix} <MID>`,
       prefix,
       suffix
     }
   }
 
-  private getFileHeader(languageId: string | undefined) {
+  private getFileHeader(languageId: string | undefined, uri: Uri) {
     const lang = languages[languageId as keyof typeof languages]
 
     if (!lang) {
       return ''
     }
 
-    const language = `${lang.comment?.start || ''} Language: ${lang.name} ${
-      lang.comment?.end || ''
-    }`
+    const language = `${lang.comment?.start || ''} Language: ${
+      lang.name
+    } (${languageId}) ${lang.comment?.end || ''}`
 
-    return `${language}`
+    const path = `${lang.comment?.start || ''} File uri: ${
+      uri.toString()
+    } (${languageId}) ${lang.comment?.end || ''}`
+
+    return `\n${language}\n${path}\n`
   }
 
-  private getFileContext(): string[] {
+  private calculateSimilarity(path1: string, path2: string): number {
+    const components1 = path1.split('/');
+    const components2 = path2.split('/');
+
+    const fileName1 = components1[components1.length - 1];
+    const fileName2 = components2[components2.length - 1];
+
+    const folderSimilarity = components1.slice(0, -1).join('/').score(components2.slice(0, -1).join('/'), 0.5);
+
+    const filenameSimilarity = fileName1.score(fileName2, 0.5);
+
+    return folderSimilarity + filenameSimilarity;
+  }
+
+  private getFileContext(uri: Uri): string {
     const codeSnippets: string[] = []
+    const currentFileName = uri.toString()
 
     for (const document of workspace.textDocuments) {
       if (
@@ -190,42 +207,18 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         continue
       }
 
-      const text = `${this.getFileHeader(document.languageId)}${document.getText()}`
+      const text = `${this.getFileHeader(document.languageId, document.uri)}${document.getText()}`
 
-      if (!codeSnippets.includes(text)) {
+      const similarity = this.calculateSimilarity(currentFileName.toString(), document.uri.toString())
+
+      if (similarity > 1) {
         codeSnippets.push(text)
       }
     }
 
-    return codeSnippets
+    return codeSnippets.join('\n')
   }
 
-  private getPromptContext(
-    currentLine: string,
-    codeSnippets: string[]
-  ): string[] {
-    const matches: string[] = []
-
-    const totalSnippetLines = codeSnippets.reduce((prev, curr) => {
-      return prev + curr.split('\n').length
-    }, 0)
-
-    for (const snippet of codeSnippets) {
-      if (totalSnippetLines < this._contextLength / 2) {
-        matches.push(codeSnippets.join('\n\n'))
-      }
-
-      const lines = snippet.split('\n')
-
-      for (const line of lines) {
-        if (line.score(currentLine, 0.5) > 0) {
-          matches.push(`${line}\n`)
-        }
-      }
-    }
-
-    return matches
-  }
 
   getPositionContext(
     document: TextDocument,
