@@ -39,7 +39,6 @@ export async function streamResponse(
   })
 
   req.write(JSON.stringify(body))
-  console.log(body)
   cb?.(req)
   req.end()
 }
