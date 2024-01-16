@@ -15,10 +15,8 @@ import { getCache, setCache } from '../cache'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
-  private _lineContexts: string[] = []
-  private _lineContextLength = 10
-  private _lineContextTimeout = 200
   private _debouncer: NodeJS.Timeout | undefined
+  private _document: TextDocument | undefined
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
@@ -30,13 +28,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
-    this.registerOnChangeContextListener()
   }
 
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
+    this._document = document
     const editor = window.activeTextEditor
     if (!editor) {
       return
@@ -53,7 +51,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           editor.selection.active.line
         ).text
 
-        const codeContext = this.getContextSnippets()
+        const codeContext = this.getFileContext()
+
         const context = this.getPromptContext(currentLine, codeContext)
 
         const { prompt, prefix, suffix } = this.getPrompt(
@@ -61,13 +60,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           position,
           context
         )
-        const cachedValue = getCache({ prefix, suffix })
-        if (cachedValue) {
+
+        const cachedCompletion = getCache({ prefix, suffix })
+
+        if (cachedCompletion) {
           return resolve(
-            this.getInlineCompletion(
-              cachedValue,
+            this.triggerInlineCompletion(
+              cachedCompletion,
               position,
-              document,
               prefix,
               suffix
             )
@@ -108,11 +108,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                     onComplete()
                     resolveStream(null)
                     this._statusBar.text = '🤖'
+                    completion = completion.replace('<EOT>', '')
                     resolve(
-                      this.getInlineCompletion(
-                        completion.replace('<EOT>', ''),
+                      this.triggerInlineCompletion(
+                        completion,
                         position,
-                        document,
                         prefix,
                         suffix
                       )
@@ -141,7 +141,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     position: Position,
     context: string[]
   ) {
-    const { prefix, suffix } = this.getContext(document, position)
+    const { prefix, suffix } = this.getPositionContext(document, position)
 
     if (this._model.includes('deepseek')) {
       return {
@@ -160,7 +160,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
   }
 
-  private getContextSnippets(): string[] {
+  private getFileContext(): string[] {
     const codeSnippets: string[] = []
 
     for (const document of workspace.textDocuments) {
@@ -205,34 +205,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return matches
   }
 
-  private registerOnChangeContextListener() {
-    let timeout: NodeJS.Timer | undefined
-    window.onDidChangeTextEditorSelection((e) => {
-      if (timeout) clearTimeout(timeout)
-      timeout = setTimeout(() => {
-        const editor = window.activeTextEditor
-        if (!editor) return
-        const document = editor.document
-        const line = editor.document.lineAt(e.selections[0].anchor.line)
-        const lineText = document.getText(
-          new Range(
-            line.lineNumber,
-            0,
-            line.lineNumber,
-            line.range.end.character
-          )
-        )
-        if (lineText.trim().length < 2) return // most likely a bracket or un-interesting
-        if (this._lineContexts.length === this._lineContextLength) {
-          this._lineContexts.pop()
-        }
-        this._lineContexts.unshift(lineText.trim())
-        this._lineContexts = [...new Set(this._lineContexts)]
-      }, this._lineContextTimeout)
-    })
-  }
-
-  getContext(
+  getPositionContext(
     document: TextDocument,
     position: Position
   ): { prefix: string; suffix: string } {
@@ -249,10 +222,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { prefix, suffix }
   }
 
-  private getInlineCompletion(
+  private triggerInlineCompletion(
     completion: string,
     position: Position,
-    document: TextDocument,
     prefix: string,
     suffix: string
   ): InlineCompletionItem[] {
@@ -278,16 +250,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       .end
 
     const textAfterRange = new Range(cursorPosition, lineEndPosition)
-    const textAfterCursor = document.getText(textAfterRange).trim()
-    const charBefore = document.getText(charBeforeRange)
+    const textAfterCursor = this._document?.getText(textAfterRange).trim() || ''
+    const charBefore = this._document?.getText(charBeforeRange)
     const lineStart = editor.document.lineAt(cursorPosition).range.start
     const lineRange = new Range(lineStart, lineEndPosition)
-    const lineText = document.getText(lineRange)
+    const lineText = this._document?.getText(lineRange)
 
     if (
       completion.trim() === '/' ||
-      lineText.includes(completion.trim()) ||
-      (completion.trim() === '/>' && lineText.includes('</'))
+      lineText?.includes(completion.trim()) ||
+      (completion.trim() === '/>' && lineText?.includes('</'))
     ) {
       return []
     }
@@ -300,7 +272,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       completion = completion.replace(textAfterCursor, '').replace('\n', '')
     }
 
-    if (lineText.includes(completion.trim())) {
+    if (lineText?.includes(completion.trim())) {
       return []
     }
 
