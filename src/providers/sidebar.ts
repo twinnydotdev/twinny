@@ -6,7 +6,7 @@ import {
   EXTENSION_NAME,
   MESSAGE_KEY,
   MESSAGE_NAME,
-  MODEL
+  MODEL,
 } from '../constants'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {

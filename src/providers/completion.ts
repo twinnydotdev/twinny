@@ -66,7 +66,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           position,
           context,
           language,
-          uri
         )
 
         const cachedCompletion = getCache({ prefix, suffix })
@@ -149,9 +148,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     position: Position,
     context: string[],
     language: string | undefined,
-    uri: Uri | undefined
   ) {
-    const header = this.getFileHeader(language, uri)
+    const header = this.getFileHeader(language)
     const { prefix, suffix } = this.getPositionContext(document, position)
 
     if (this._model.includes('deepseek')) {
@@ -173,7 +171,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
   }
 
-  private getFileHeader(languageId: string | undefined, uri: Uri | undefined) {
+  private getFileHeader(languageId: string | undefined) {
     const lang = languages[languageId as keyof typeof languages]
 
     if (!lang) {
@@ -184,11 +182,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       lang.comment?.end || ''
     }`
 
-    const path = `Path: ${lang.comment?.start || ''} ${uri?.toString()} ${
-      lang.comment?.end || ''
-    }`
-
-    return `\n\n${path}\n${language}\n\n`
+    return `\n\n${language}\n\n`
   }
 
   private getFileContext(): string[] {
@@ -202,7 +196,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         continue
       }
 
-      const text = `${this.getFileHeader(document.languageId, document.uri)}${document.getText()}`
+      const text = `${this.getFileHeader(document.languageId)}${document.getText()}`
 
       if (!codeSnippets.includes(text)) {
         codeSnippets.push(text)
