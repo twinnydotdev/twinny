@@ -9,6 +9,7 @@ import { MESSAGE_NAME, MODEL } from './constants'
 interface StreamBody {
   model: string
   prompt: string
+  options: Record<string, unknown>
 }
 
 export async function streamResponse(
@@ -38,6 +39,7 @@ export async function streamResponse(
   })
 
   req.write(JSON.stringify(body))
+  console.log(body)
   cb?.(req)
   req.end()
 }
@@ -67,10 +69,10 @@ export function chatCompletion(
   const prompt: string = template ? template : getPrompt?.(text) || ''
 
   let completion = ''
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {}
 
   if (bearerToken) {
-    headers.Authorization = `Bearer ${bearerToken}`;
+    headers.Authorization = `Bearer ${bearerToken}`
   }
 
   streamResponse(
@@ -79,11 +81,14 @@ export function chatCompletion(
       port,
       method: 'POST',
       path: '/api/generate',
-      headers,
+      headers
     },
     {
       model: chatModel,
-      prompt
+      prompt,
+      options: {
+        temperature: config.get('temperature') as number,
+      },
     },
     (chunk, onComplete) => {
       try {
