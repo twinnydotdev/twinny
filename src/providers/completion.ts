@@ -7,11 +7,13 @@ import {
   TextDocument,
   workspace,
   StatusBarItem,
-  window
+  window,
+  Uri
 } from 'vscode'
 import 'string_score'
 import { noop, streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
+import { languages } from '../languages'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -36,6 +38,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     this._document = document
     const editor = window.activeTextEditor
+
+    const language = editor?.document.languageId
+    const uri = editor?.document.uri
+
     if (!editor) {
       return
     }
@@ -58,7 +64,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const { prompt, prefix, suffix } = this.getPrompt(
           document,
           position,
-          context
+          context,
+          language,
+          uri
         )
 
         const cachedCompletion = getCache({ prefix, suffix })
@@ -139,25 +147,48 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private getPrompt(
     document: TextDocument,
     position: Position,
-    context: string[]
+    context: string[],
+    language: string | undefined,
+    uri: Uri | undefined
   ) {
+    const header = this.getFileHeader(language, uri)
     const { prefix, suffix } = this.getPositionContext(document, position)
 
     if (this._model.includes('deepseek')) {
       return {
         prompt: `<｜fim▁begin｜>${context.join(
           ''
-        )} ${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
+        )} ${header}\n\n${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
         prefix,
         suffix
       }
     }
 
     return {
-      prompt: `<PRE> ${context.join('')} ${prefix} <SUF> ${suffix} <MID>`,
+      prompt: `<PRE> ${context.join(
+        ''
+      )} ${header}\n\n${prefix}<SUF> ${suffix} <MID>`,
       prefix,
       suffix
     }
+  }
+
+  private getFileHeader(languageId: string | undefined, uri: Uri | undefined) {
+    const lang = languages[languageId as keyof typeof languages]
+
+    if (!lang) {
+      return ''
+    }
+
+    const language = `Language: ${lang.comment?.start || ''} ${lang.name} ${
+      lang.comment?.end || ''
+    }`
+
+    const path = `Path: ${lang.comment?.start || ''} ${uri?.toString()} ${
+      lang.comment?.end || ''
+    }`
+
+    return `\n\n${path}\n${language}\n\n`
   }
 
   private getFileContext(): string[] {
@@ -171,8 +202,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         continue
       }
 
-      const fullText = document.getText()
-      codeSnippets.push(fullText)
+      const text = `${this.getFileHeader(document.languageId, document.uri)}${document.getText()}`
+
+      if (!codeSnippets.includes(text)) {
+        codeSnippets.push(text)
+      }
     }
 
     return codeSnippets
