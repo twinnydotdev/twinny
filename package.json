@@ -1,6 +1,6 @@
 {
   "name": "twinny",
-  "displayName": "twinny - AI Code Completion and Chat plugin using Ollama",
+  "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
   "version": "2.6.4",
   "icon": "assets/icon.png",
