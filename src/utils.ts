@@ -57,6 +57,7 @@ export function chatCompletion(
   const hostname = config.get('ollamaBaseUrl') as string
   const port = config.get('ollamaApiPort') as number
   const useTls = config.get('ollamaUseTls') as boolean
+  const bearerToken = config.get('ollamaApiBearerToken') as string
   const selection = editor?.selection
   const modelType = chatModel.includes(MODEL.llama)
     ? MODEL.llama
@@ -66,13 +67,19 @@ export function chatCompletion(
   const prompt: string = template ? template : getPrompt?.(text) || ''
 
   let completion = ''
+  const headers: Record<string, string> = {};
+
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`;
+  }
 
   streamResponse(
     {
       hostname,
       port,
       method: 'POST',
-      path: '/api/generate'
+      path: '/api/generate',
+      headers,
     },
     {
       model: chatModel,
