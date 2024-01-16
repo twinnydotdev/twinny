@@ -150,14 +150,17 @@
           "default": 200
         },
         "twinny.enabled": {
+          "order": 2,
           "type": "boolean",
           "default": true
         },
         "twinny.chatModelName": {
+          "order": 1,
           "type": "string",
           "default": "codellama:7b-instruct"
         },
         "twinny.fimModelName": {
+          "order": 0,
           "type": "string",
           "default": "codellama:7b-code"
         },
@@ -172,6 +175,10 @@
         "twinny.ollamaUseTls": {
           "type": "boolean",
           "default": false
+        },
+        "twinny.ollamaApiBearerToken": {
+          "type": "string",
+          "default": ""
         }
       }
     }
