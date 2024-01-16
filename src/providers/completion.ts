@@ -178,14 +178,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return codeSnippets
   }
 
-  private getTotalSnippetLines(codeSnippets: string[]) {
-    let lines = 0
-    for (const snippet of codeSnippets) {
-      lines += snippet.split('\n').length
-    }
-    return lines
-  }
-
   private getPromptContext(
     currentLine: string,
     codeSnippets: string[]
