@@ -188,8 +188,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return prev + curr.split('\n').length
     }, 0)
 
-    console.log(totalSnippetLines)
-
     for (const snippet of codeSnippets) {
       if (totalSnippetLines < this._contextLength / 2) {
         matches.push(codeSnippets.join('\n\n'))
