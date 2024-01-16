@@ -8,7 +8,6 @@ import {
   workspace,
   StatusBarItem,
   window,
-  Uri
 } from 'vscode'
 import 'string_score'
 import { noop, streamResponse } from '../utils'
@@ -40,7 +39,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const editor = window.activeTextEditor
 
     const language = editor?.document.languageId
-    const uri = editor?.document.uri
 
     if (!editor) {
       return
@@ -154,18 +152,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (this._model.includes('deepseek')) {
       return {
-        prompt: `<｜fim▁begin｜>${context.join(
-          ''
-        )} ${header}\n\n${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
+        prompt: `<｜fim▁begin｜> \n${context.join('')}${header}\n${prefix}<｜fim▁hole｜> ${suffix} <｜fim▁end｜>`,
         prefix,
         suffix
       }
     }
 
     return {
-      prompt: `<PRE> ${context.join(
-        ''
-      )} ${header}\n\n${prefix}<SUF> ${suffix} <MID>`,
+      prompt: `<PRE> \n${context.join('')}${header}\n${prefix} <SUF> ${suffix} <MID>`,
       prefix,
       suffix
     }
@@ -178,11 +172,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return ''
     }
 
-    const language = `Language: ${lang.comment?.start || ''} ${lang.name} ${
+    const language = `${lang.comment?.start || ''} Language: ${lang.name} ${
       lang.comment?.end || ''
     }`
 
-    return `\n\n${language}\n\n`
+    return `${language}`
   }
 
   private getFileContext(): string[] {
