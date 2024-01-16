@@ -143,7 +143,7 @@
       "properties": {
         "twinny.contextLength": {
           "type": "number",
-          "default": 10
+          "default": 300
         },
         "twinny.debounceWait": {
           "type": "number",
@@ -179,6 +179,10 @@
         "twinny.ollamaApiBearerToken": {
           "type": "string",
           "default": ""
+        },
+        "twinny.temperature": {
+          "type": "number",
+          "default": 1
         }
       }
     }
@@ -203,6 +207,7 @@
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
     "@types/react-syntax-highlighter": "^15.5.11",
+    "@types/string_score": "^0.1.31",
     "@types/vscode": "^1.70.0",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
@@ -233,6 +238,7 @@
     "react-syntax-highlighter": "^15.5.0",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
-    "stream-http": "^3.2.0"
+    "stream-http": "^3.2.0",
+    "string_score": "^0.1.22"
   }
 }
