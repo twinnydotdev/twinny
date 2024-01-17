@@ -186,7 +186,7 @@
         },
         "twinny.temperature": {
           "type": "number",
-          "default": 1.5
+          "default": 1
         }
       }
     }
