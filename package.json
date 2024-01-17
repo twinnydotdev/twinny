@@ -180,9 +180,13 @@
           "type": "string",
           "default": ""
         },
+        "twinny.useFileContext": {
+          "type": "boolean",
+          "default": true
+        },
         "twinny.temperature": {
           "type": "number",
-          "default": 1
+          "default": 1.5
         }
       }
     }
