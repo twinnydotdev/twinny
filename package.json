@@ -127,7 +127,7 @@
         {
           "id": "twinny-sidebar-view",
           "title": "twinny",
-          "icon": "assets/twinny.png"
+          "icon": "assets/twinny.svg"
         }
       ]
     },
@@ -137,7 +137,7 @@
           "type": "webview",
           "id": "twinny-sidebar",
           "name": "twinny",
-          "icon": "tw",
+          "icon": "assets/twinny.svg",
           "contextualTitle": "twinny"
         }
       ]
