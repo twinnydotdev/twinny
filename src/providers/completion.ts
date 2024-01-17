@@ -27,6 +27,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _apiport = this._config.get('ollamaApiPort') as number
   private _useTls = this._config.get('ollamaUseTls') as boolean
   private _temperature = this._config.get('temperature') as number
+  private _useFileContext = this._config.get('useFileContext') as number
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
@@ -145,19 +146,20 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     context: string,
     language: string | undefined
   ) {
-    const header = this.getFileHeader(language, document.uri)
+    const header = this._useFileContext ? this.getFileHeader(language, document.uri) : ''
     const { prefix, suffix } = this.getPositionContext(document, position)
+    const fileContext = this._useFileContext ? context : ''
 
     if (this._model.includes('deepseek')) {
       return {
-        prompt: `<｜fim▁begin｜> ${context}\n${header}${prefix} <｜fim▁hole｜>${suffix} <｜fim▁end｜>`,
+        prompt: `<｜fim▁begin｜> ${fileContext}\n${header}${prefix} <｜fim▁hole｜>${suffix} <｜fim▁end｜>`,
         prefix,
         suffix
       }
     }
 
     return {
-      prompt: `<PRE> ${context}\n${header}${prefix} <SUF>${suffix} <MID>`,
+      prompt: `<PRE> ${fileContext}\n${header}${prefix} <SUF>${suffix} <MID>`,
       prefix,
       suffix
     }
@@ -307,5 +309,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._debounceWait = this._config.get('debounceWait') as number
     this._contextLength = this._config.get('contextLength') as number
     this._temperature = this._config.get('temperature') as number
+    this._useFileContext = this._config.get('useFileContext') as number
   }
 }
