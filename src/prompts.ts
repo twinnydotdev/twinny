@@ -1,3 +1,5 @@
+import { MODEL } from './constants'
+
 const systemMesage = `You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
 For code refactoring, use markdown code formatting.
@@ -7,9 +9,7 @@ If you are not sure which language formatting to use, use \`typescript\`;
 export const getSystemMessage = (modelType: string) => {
   return modelType.includes('deepseek')
     ? systemMesage
-    : `<<SYS>>
-    ${systemMesage}
-    <</SYS>>`
+    : `<<SYS>>${systemMesage}<</SYS>>`
 }
 
 export const explain = (code: string, modelType: string) =>
@@ -101,4 +101,18 @@ export const prompts: Prompts = {
   refactor: refactor,
   'add-tests': addTests,
   'generate-docs': generateDocs
+}
+
+export const getPromptModel = (model: string) => {
+  return model.includes(MODEL.llama) ? MODEL.llama : MODEL.deepseek
+}
+
+export const buildPrompt = (
+  model: string,
+  context: string,
+  template: string
+) => {
+  return prompts[template]
+    ? prompts[template](context, getPromptModel(model))
+    : context
 }

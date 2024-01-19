@@ -43,7 +43,6 @@ function getIsInstalled() {
           console.log(
             'Running \'ollama list\' to check if ollama server is running.'
           )
-
           resolve(true)
         })
       }
@@ -114,7 +113,6 @@ async function checkModel(model: string) {
               window.showErrorMessage(
                 `Install failed. Please open Ollama in your terminal and run \`ollama pull ${model}\``
               )
-
               resolve(false)
             }
           )

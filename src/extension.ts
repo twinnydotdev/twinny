@@ -10,7 +10,7 @@ import {
 import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
-import { chatCompletion, delayExecution, deleteTempFiles } from './utils'
+import { delayExecution, deleteTempFiles } from './utils'
 import { setContext } from './context'
 
 export async function activate(context: ExtensionContext) {
@@ -45,25 +45,23 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand('twinny.explain', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => chatCompletion('explain', sidebarProvider.view))
+      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('explain'))
     }),
     commands.registerCommand('twinny.addTypes', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => chatCompletion('add-types', sidebarProvider.view))
+      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('add-types'))
     }),
     commands.registerCommand('twinny.refactor', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => chatCompletion('refactor', sidebarProvider.view))
+      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('refactor'))
     }),
     commands.registerCommand('twinny.addTests', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => chatCompletion('add-tests', sidebarProvider.view))
+      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('add-tests'))
     }),
     commands.registerCommand('twinny.generateDocs', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() =>
-        chatCompletion('generate-docs', sidebarProvider.view)
-      )
+      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('generate-docs'))
     }),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
     statusBar

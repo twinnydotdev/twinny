@@ -8,12 +8,15 @@ import {
   workspace,
   StatusBarItem,
   window,
-  Uri
+  Uri,
+  TextEditor
 } from 'vscode'
 import 'string_score'
-import { noop, streamResponse } from '../utils'
+import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { languages } from '../languages'
+import { InlineCompletion, StreamBody } from '../types'
+import { RequestOptions } from 'https'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -22,15 +25,44 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
-  private _model = this._config.get('fimModelName') as string
-  private _baseurl = this._config.get('ollamaBaseUrl') as string
-  private _apiport = this._config.get('ollamaApiPort') as number
-  private _useTls = this._config.get('ollamaUseTls') as boolean
+  private _fimModel = this._config.get('fimModelName') as string
+  private _baseUrl = this._config.get('ollamaBaseUrl') as string
+  private _port = this._config.get('ollamaApiPort') as number
   private _temperature = this._config.get('temperature') as number
   private _useFileContext = this._config.get('useFileContext') as number
+  private _bearerToken = this._config.get('ollamaApiBearerToken') as number
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
+  }
+
+  private buildStreamRequest(prompt: string) {
+    const headers: Record<string, string> = {}
+
+    if (this._bearerToken) {
+      headers.Authorization = `Bearer ${this._bearerToken}`
+    }
+
+    const requestBody: StreamBody = {
+      model: this._fimModel,
+      prompt,
+      options: {
+        temperature: this._temperature
+      }
+    }
+
+    const requestOptions: RequestOptions = {
+      hostname: this._baseUrl,
+      port: this._port,
+      path: '/api/generate',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this._bearerToken}`
+      }
+    }
+
+    return { requestOptions, requestBody }
   }
 
   public async provideInlineCompletionItems(
@@ -66,70 +98,49 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const cachedCompletion = getCache({ prefix, suffix })
 
         if (cachedCompletion) {
-          return resolve(
-            this.triggerInlineCompletion(
+          return resolve([
+            new InlineCompletionItem(
               cachedCompletion,
-              position,
-              prefix,
-              suffix
+              new Range(position, position)
             )
-          )
+          ])
         }
 
-        if (!prompt) return resolve([] as InlineCompletionItem[])
-
-        let completion = ''
-        let chunkCount = 0
+        if (!prompt) return resolve([])
 
         try {
+          let completion = ''
+          let chunkCount = 0
           this._statusBar.text = '🤖'
-          await new Promise((resolveStream) => {
-            this._statusBar.text = '$(loading~spin)'
-            streamResponse(
-              {
-                hostname: this._baseurl,
-                port: this._apiport,
-                method: 'POST',
-                path: '/api/generate'
-              },
-              {
-                model: this._model,
-                prompt,
-                options: {
-                  temperature: this._temperature
-                }
-              },
-              (chunk, onComplete) => {
-                try {
-                  const json = JSON.parse(chunk)
-                completion = completion + json.response
-                  chunkCount = chunkCount + 1
-                  if (
-                    (chunkCount !== 1 && json.response === '\n') ||
-                    json.response.match('<EOT>')
-                  ) {
-                    onComplete()
-                    resolveStream(null)
-                    this._statusBar.text = '🤖'
-                    completion = completion.replace('<EOT>', '')
-                    resolve(
-                      this.triggerInlineCompletion(
-                        completion,
-                        position,
-                        prefix,
-                        suffix
-                      )
-                    )
-                  }
-                } catch (error) {
-                  console.error('Error parsing JSON:', error)
-                  return
-                }
-              },
-              noop,
-              noop,
-              this._useTls
-            )
+          this._statusBar.text = '$(loading~spin)'
+
+          const { requestBody, requestOptions } =
+            this.buildStreamRequest(prompt)
+
+          streamResponse({
+            body: requestBody,
+            options: requestOptions,
+            onData: (chunk, onDestroy) => {
+              const json = JSON.parse(chunk)
+              completion = completion + json.response
+              chunkCount = chunkCount + 1
+              if (
+                (chunkCount !== 1 && json.response === '\n') ||
+                json.response.match('<EOT>')
+              ) {
+                this._statusBar.text = '🤖'
+                completion = completion.replace('<EOT>', '')
+                onDestroy()
+                resolve(
+                  this.triggerInlineCompletion({
+                    completion,
+                    position,
+                    prefix,
+                    suffix
+                  })
+                )
+              }
+            }
           })
         } catch (error) {
           this._statusBar.text = '$(alert)'
@@ -146,11 +157,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     context: string,
     language: string | undefined
   ) {
-    const header = this._useFileContext ? this.getFileHeader(language, document.uri) : ''
+    const header = this._useFileContext
+      ? this.getFileHeader(language, document.uri)
+      : ''
     const { prefix, suffix } = this.getPositionContext(document, position)
     const fileContext = this._useFileContext ? context : ''
 
-    if (this._model.includes('deepseek')) {
+    if (this._fimModel.includes('deepseek')) {
       return {
         prompt: `<｜fim▁begin｜> ${fileContext}\n${header}${prefix} <｜fim▁hole｜>${suffix} <｜fim▁end｜>`,
         prefix,
@@ -176,25 +189,28 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       lang.name
     } (${languageId}) ${lang.comment?.end || ''}`
 
-    const path = `${lang.comment?.start || ''} File uri: ${
-      uri.toString()
-    } (${languageId}) ${lang.comment?.end || ''}`
+    const path = `${
+      lang.comment?.start || ''
+    } File uri: ${uri.toString()} (${languageId}) ${lang.comment?.end || ''}`
 
     return `\n${language}\n${path}\n`
   }
 
   private calculateSimilarity(path1: string, path2: string): number {
-    const components1 = path1.split('/');
-    const components2 = path2.split('/');
+    const components1 = path1.split('/')
+    const components2 = path2.split('/')
 
-    const fileName1 = components1[components1.length - 1];
-    const fileName2 = components2[components2.length - 1];
+    const fileName1 = components1[components1.length - 1]
+    const fileName2 = components2[components2.length - 1]
 
-    const folderSimilarity = components1.slice(0, -1).join('/').score(components2.slice(0, -1).join('/'), 0.5);
+    const folderSimilarity = components1
+      .slice(0, -1)
+      .join('/')
+      .score(components2.slice(0, -1).join('/'), 0.5)
 
-    const filenameSimilarity = fileName1.score(fileName2, 0.5);
+    const filenameSimilarity = fileName1.score(fileName2, 0.5)
 
-    return folderSimilarity + filenameSimilarity;
+    return folderSimilarity + filenameSimilarity
   }
 
   private getFileContext(uri: Uri): string {
@@ -209,9 +225,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         continue
       }
 
-      const text = `${this.getFileHeader(document.languageId, document.uri)}${document.getText()}`
+      const text = `${this.getFileHeader(
+        document.languageId,
+        document.uri
+      )}${document.getText()}`
 
-      const similarity = this.calculateSimilarity(currentFileName.toString(), document.uri.toString())
+      const similarity = this.calculateSimilarity(
+        currentFileName.toString(),
+        document.uri.toString()
+      )
 
       if (similarity > 1) {
         codeSnippets.push(text)
@@ -220,7 +242,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     return codeSnippets.join('\n')
   }
-
 
   getPositionContext(
     document: TextDocument,
@@ -239,23 +260,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { prefix, suffix }
   }
 
-  private triggerInlineCompletion(
+  private getFormattedCompletion = (
     completion: string,
-    position: Position,
-    prefix: string,
-    suffix: string
-  ): InlineCompletionItem[] {
-    const editor = window.activeTextEditor
-    if (!editor) return []
-    if (position.character === 0) {
-      return [
-        new InlineCompletionItem(
-          completion as string,
-          new Range(position, position)
-        )
-      ]
-    }
-
+    editor: TextEditor,
+    position: Position
+  ) => {
     const cursorPosition = editor.selection.active
 
     const charBeforeRange = new Range(
@@ -278,7 +287,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       lineText?.includes(completion.trim()) ||
       (completion.trim() === '/>' && lineText?.includes('</'))
     ) {
-      return []
+      return ''
     }
 
     if (completion === ' ' && charBefore === ' ') {
@@ -290,18 +299,32 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     if (lineText?.includes(completion.trim())) {
+      return ''
+    }
+
+    return completion.trim()
+  }
+
+  private triggerInlineCompletion(
+    inlineCompletion: InlineCompletion
+  ): InlineCompletionItem[] {
+    const { position, prefix, suffix } = inlineCompletion
+
+    const editor = window.activeTextEditor
+
+    if (!editor) {
       return []
     }
 
-    setCache({
-      prefix,
-      suffix,
-      completion
-    })
+    const completion = this.getFormattedCompletion(
+      inlineCompletion.completion,
+      editor,
+      position
+    )
 
-    return [
-      new InlineCompletionItem(completion.trim(), new Range(position, position))
-    ]
+    setCache({ prefix, suffix, completion })
+
+    return [new InlineCompletionItem(completion, new Range(position, position))]
   }
 
   public updateConfig() {
@@ -310,5 +333,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._contextLength = this._config.get('contextLength') as number
     this._temperature = this._config.get('temperature') as number
     this._useFileContext = this._config.get('useFileContext') as number
+    this._fimModel = this._config.get('fimModelName') as string
   }
 }

@@ -172,10 +172,6 @@
           "type": "number",
           "default": 11434
         },
-        "twinny.ollamaUseTls": {
-          "type": "boolean",
-          "default": false
-        },
         "twinny.ollamaApiBearerToken": {
           "type": "string",
           "default": ""
