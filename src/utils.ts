@@ -1,26 +1,21 @@
 import { ClientRequest, RequestOptions, request } from 'http'
 import { request as httpsRequest } from 'https'
-import { Uri, WebviewView, commands, window, workspace } from 'vscode'
+import { Uri, commands, window, workspace } from 'vscode'
 
-import { prompts } from './prompts'
 import path from 'path'
-import { MESSAGE_NAME, MODEL } from './constants'
+import { StreamBody } from './types'
 
-interface StreamBody {
-  model: string
-  prompt: string
-  options: Record<string, unknown>
+interface StreamResponseOptions {
+  body: StreamBody
+  options: RequestOptions
+  onData: (chunk: string, resolve: () => void) => void
+  onEnd?: () => void
+  onStart?: (req: ClientRequest) => void
 }
 
-export async function streamResponse(
-  options: RequestOptions,
-  body: StreamBody,
-  onData: (chunk: string, resolve: () => void) => void,
-  onEnd?: () => void,
-  cb?: (req: ClientRequest) => void,
-  useTls = false
-) {
-  const _request = useTls ? httpsRequest : request
+export async function streamResponse(opts: StreamResponseOptions) {
+  const { body, options, onData, onEnd, onStart } = opts
+  const _request = options.hostname?.includes('https') ? httpsRequest : request
 
   const req = _request(options, (res) => {
     res.on('data', (chunk: string) => {
@@ -39,94 +34,8 @@ export async function streamResponse(
   })
 
   req.write(JSON.stringify(body))
-  cb?.(req)
+  onStart?.(req)
   req.end()
-}
-
-export function chatCompletion(
-  type: string,
-  view?: WebviewView,
-  getPrompt?: (code: string) => string
-) {
-  view?.webview.postMessage({
-    type: MESSAGE_NAME.twinnyOnLoading
-  })
-
-  const editor = window.activeTextEditor
-  const config = workspace.getConfiguration('twinny')
-  const chatModel = config.get('chatModelName') as string
-  const hostname = config.get('ollamaBaseUrl') as string
-  const port = config.get('ollamaApiPort') as number
-  const useTls = config.get('ollamaUseTls') as boolean
-  const bearerToken = config.get('ollamaApiBearerToken') as string
-  const selection = editor?.selection
-  const modelType = chatModel.includes(MODEL.llama)
-    ? MODEL.llama
-    : MODEL.deepseek
-  const text = editor?.document.getText(selection) || ''
-  const template = prompts[type] ? prompts[type](text, modelType) : ''
-  const prompt: string = template ? template : getPrompt?.(text) || ''
-
-  let completion = ''
-  const headers: Record<string, string> = {}
-
-  if (bearerToken) {
-    headers.Authorization = `Bearer ${bearerToken}`
-  }
-
-  streamResponse(
-    {
-      hostname,
-      port,
-      method: 'POST',
-      path: '/api/generate',
-      headers
-    },
-    {
-      model: chatModel,
-      prompt,
-      options: {
-        temperature: config.get('temperature') as number,
-      },
-    },
-    (chunk, onComplete) => {
-      try {
-        const json = JSON.parse(chunk)
-        completion = completion + json.response
-
-        view?.webview.postMessage({
-          type: MESSAGE_NAME.twinnyOnCompletion,
-          value: {
-            type,
-            completion: completion.trimStart()
-          }
-        })
-        if (json.response.match('<EOT>')) {
-          onComplete()
-        }
-      } catch (error) {
-        console.error('Error parsing JSON:', error)
-        return
-      }
-    },
-    () => {
-      view?.webview.postMessage({
-        type: MESSAGE_NAME.twinnyOnEnd,
-        value: {
-          type,
-          completion: completion.trimStart()
-        }
-      })
-    },
-    (req: ClientRequest) => {
-      view?.webview.onDidReceiveMessage((data: { type: string }) => {
-        if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
-          req.destroy()
-        }
-      })
-    },
-    useTls
-  )
 }
 
 const tmpDir = path.join(__dirname, './tmp')

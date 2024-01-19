@@ -51,7 +51,7 @@ export function getCache(args: {
 export function setCache(args: {
   prefix: string
   suffix: string | null
-  completion: string | null
+  completion: string
 }) {
   const key = getKey(args)
   cache.set(key, args.completion)
