@@ -25,5 +25,5 @@ interface PostMessage {
 interface Message {
   role: string
   content: string
-  type: string
+  type?: string
 }

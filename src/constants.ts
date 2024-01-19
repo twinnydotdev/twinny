@@ -1,3 +1,6 @@
+import { addTests, addTypes, explain, generateDocs, refactor } from './prompts'
+import { Prompts } from './types'
+
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const BOT_NAME = 'twinny'
 export const USER_NAME = 'user'
@@ -22,10 +25,21 @@ export const MESSAGE_NAME = {
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
+  twinnySendSystemMessage: 'twinny-send-system-message'
 }
 
 export const MESSAGE_KEY = {
   lastConversation: 'lastConversation',
   selection: 'selection',
-  chatMessage: 'chatMessage',
+  chatMessage: 'chatMessage'
+}
+
+export const codeActionTypes = ['add-types', 'refactor']
+
+export const prompts: Prompts = {
+  explain: explain,
+  'add-types': addTypes,
+  refactor: refactor,
+  'add-tests': addTests,
+  'generate-docs': generateDocs
 }

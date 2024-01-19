@@ -42,38 +42,30 @@ export const Chat = () => {
     }, 200)
   }
 
-  const handleSendMessage = (e: React.FormEvent | React.KeyboardEvent) => {
+  const handleSubmitForm = (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
-    if (inputText.trim()) {
+    const input = inputText.trim()
+    if (input) {
       setInputText('')
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnyChatMessage,
-        data: messages?.length
-          ? [
-              ...messages,
-              {
-                role: USER_NAME,
-                content: inputText.trim(),
-                type: ''
-              }
-            ]
-          : [
-              {
-                role: USER_NAME,
-                content: inputText.trim(),
-                type: ''
-              }
-            ]
+        data: [
+          ...(messages || []),
+          {
+            role: USER_NAME,
+            content: input
+          }
+        ]
       })
       setMessages((prev) => [
         ...(prev || []),
-        { role: USER_NAME, content: inputText, type: '' }
+        { role: USER_NAME, content: input, type: '' }
       ])
       scrollBottom()
     }
   }
 
-  const onMessageEnd = (message: PostMessage) => {
+  const handleCompletionEnd = (message: PostMessage) => {
     setMessages((prev) => {
       const update = [
         ...(prev || []),
@@ -97,31 +89,39 @@ export const Chat = () => {
     }, 1000)
   }
 
-  const messageHandler = (event: MessageEvent) => {
+  const handleCompletionMessage = (message: PostMessage) => {
+    if (stopRef.current) {
+      genertingRef.current = false
+      return
+    }
+    genertingRef.current = true
+    setLoading(false)
+    setCompletion({
+      role: BOT_NAME,
+      content: message.value.completion || EMPTY_MESAGE,
+      type: message.value.type
+    })
+    scrollBottom()
+  }
+
+  const handleLoadingMessage = () => {
+    setLoading(true)
+    scrollBottom()
+  }
+
+  const messageEventHandler = (event: MessageEvent) => {
     const message: PostMessage = event.data
     switch (message.type) {
       case MESSAGE_NAME.twinnyOnCompletion: {
-        if (stopRef.current) {
-          genertingRef.current = false
-          return
-        }
-        genertingRef.current = true
-        setLoading(false)
-        setCompletion({
-          role: BOT_NAME,
-          content: message.value.completion || EMPTY_MESAGE,
-          type: message.value.type
-        })
-        scrollBottom()
+        handleCompletionMessage(message)
         break
       }
       case MESSAGE_NAME.twinnyOnLoading: {
-        setLoading(true)
-        scrollBottom()
+        handleLoadingMessage()
         break
       }
       case MESSAGE_NAME.twinnyOnEnd: {
-        onMessageEnd(message)
+        handleCompletionEnd(message)
       }
     }
   }
@@ -132,7 +132,7 @@ export const Chat = () => {
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyStopGeneration
     })
-    onMessageEnd({
+    handleCompletionEnd({
       type: MESSAGE_KEY.chatMessage,
       value: {
         completion: completion?.content || '',
@@ -142,9 +142,9 @@ export const Chat = () => {
   }
 
   useEffect(() => {
-    window.addEventListener('message', messageHandler)
+    window.addEventListener('message', messageEventHandler)
     return () => {
-      window.removeEventListener('message', messageHandler)
+      window.removeEventListener('message', messageEventHandler)
     }
   }, [])
 
@@ -162,7 +162,7 @@ export const Chat = () => {
           {messages?.map((message, index) => (
             <div key={`message-${index}`}>
               <Message
-                completionType={message.type}
+                completionType={message.type || ''}
                 sender={message.role}
                 message={message.content}
               />
@@ -176,14 +176,14 @@ export const Chat = () => {
           {!!completion && (
             <>
               <Message
-                completionType={completion.type}
+                completionType={completion.type || ''}
                 sender={BOT_NAME}
                 message={completion.content}
               />
             </>
           )}
         </div>
-        <form onSubmit={handleSendMessage}>
+        <form onSubmit={handleSubmitForm}>
           <Selection onSelect={scrollBottom} />
           <div className={styles.chatbox}>
             <VSCodeTextArea

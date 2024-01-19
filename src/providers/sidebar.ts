@@ -1,30 +1,19 @@
 import * as vscode from 'vscode'
-import { getTextSelection, openDiffView } from '../utils'
+import { getPromptModel, getTextSelection, openDiffView } from '../utils'
 import { getContext } from '../context'
 import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME, MODEL } from '../constants'
 import { ChatService } from '../chat-service'
-import {
-  chatMessageDeepSeek,
-  chatMessageLlama,
-  getPromptModel
-} from '../prompts'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
   _doc?: vscode.TextDocument
   private _config = vscode.workspace.getConfiguration('twinny')
   private _model = this._config.get('chatModelName') as string
+  private _modelType = MODEL.llama
   public chatService: ChatService | undefined = undefined
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public getPrompt = (data: any, selection: string) => {
-    const modelType = getPromptModel(this._model)
-    if (this._model.includes(MODEL.deepseek)) {
-      return chatMessageDeepSeek(data.data as Message[], selection, modelType)
-    }
-    return chatMessageLlama(data.data as Message[], selection, modelType)
+  constructor(private readonly _extensionUri: vscode.Uri) {
+    this._modelType = getPromptModel(this._model)
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -55,9 +44,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       (data: any) => {
         const context = getContext()
         if (data.type === MESSAGE_NAME.twinnyChatMessage) {
-          this.chatService?.streamChatCompletion(MESSAGE_NAME.twinnyChat, (selection) =>
-            this.getPrompt(data, selection)
-          )
+          this.chatService?.streamChatCompletion(data.data as Message[])
         }
         if (data.type === MESSAGE_NAME.twinnyOpenDiff) {
           const editor = vscode.window.activeTextEditor

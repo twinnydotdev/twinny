@@ -45,23 +45,33 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand('twinny.explain', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('explain'))
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('explain')
+      )
     }),
     commands.registerCommand('twinny.addTypes', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('add-types'))
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('add-types')
+      )
     }),
     commands.registerCommand('twinny.refactor', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('refactor'))
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('refactor')
+      )
     }),
     commands.registerCommand('twinny.addTests', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('add-tests'))
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
+      )
     }),
     commands.registerCommand('twinny.generateDocs', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
-      delayExecution(() => sidebarProvider.chatService?.streamChatCompletion('generate-docs'))
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('generate-docs')
+      )
     }),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
     statusBar

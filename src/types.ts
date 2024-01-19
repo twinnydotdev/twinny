@@ -12,3 +12,8 @@ export interface InlineCompletion {
   prefix: string
   suffix: string
 }
+
+export interface Prompts {
+  [key: string]: (code: string, modelType: string) => string
+}
+

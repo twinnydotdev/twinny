@@ -1,10 +1,14 @@
-import { WebviewView, window, workspace } from 'vscode'
-import { MESSAGE_NAME } from './constants'
-import { buildPrompt } from './prompts'
-import { streamResponse } from './utils'
 import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
+import { WebviewView, window, workspace } from 'vscode'
+
+import {
+  chatMessageDeepSeek,
+  chatMessageLlama,
+} from './prompts'
+import { MESSAGE_NAME, MODEL, prompts } from './constants'
 import { StreamBody } from './types'
+import { getPromptModel, streamResponse } from './utils'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -13,7 +17,6 @@ export class ChatService {
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
   private _port = this._config.get('ollamaApiPort') as string
-  private _template = ''
   private _view?: WebviewView
 
   constructor(view?: WebviewView) {
@@ -58,7 +61,6 @@ export class ChatService {
       this._view?.webview.postMessage({
         type: MESSAGE_NAME.twinnyOnCompletion,
         value: {
-          type: this._template,
           completion: this._completion.trimStart()
         }
       })
@@ -75,7 +77,6 @@ export class ChatService {
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
-        type: this._template,
         completion: this._completion.trimStart()
       }
     })
@@ -89,32 +90,58 @@ export class ChatService {
     })
   }
 
-  public streamChatCompletion(
-    template: string,
-    getPrompt?: (context: string) => string
-  ) {
-    this._template = template
+  public buildChatMessagePrompt = (messages: Message[]) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
-    const context = editor?.document.getText(selection) || ''
-    this._completion = ''
+    const selectionContext = editor?.document.getText(selection) || ''
+    const modelType = getPromptModel(this._chatModel)
+    if (this._chatModel.includes(MODEL.deepseek)) {
+      return chatMessageDeepSeek(messages, selectionContext, modelType)
+    }
+    return chatMessageLlama(messages, selectionContext, modelType)
+  }
 
-    const prompt = getPrompt
-      ? getPrompt(context)
-      : buildPrompt(this._chatModel, context, template)
+  public buildTemplatePrompt = (template: string, message: string) => {
+    const editor = window.activeTextEditor
+    const selection = editor?.selection
+    const selectionContext = editor?.document.getText(selection) || ''
+    const modelType = getPromptModel(this._chatModel)
+    return prompts[template]
+      ? prompts[template](selectionContext, modelType)
+      : message
+  }
 
-    const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
-
+  private streamResponse({
+    requestBody,
+    requestOptions
+  }: {
+    requestBody: StreamBody
+    requestOptions: RequestOptions
+  }) {
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnLoading
     })
 
-    streamResponse({
+    return streamResponse({
       body: requestBody,
       options: requestOptions,
       onData: this.onStreamData,
       onEnd: this.onStreamEnd,
       onStart: this.onStreamStart
     })
+  }
+
+  public streamChatCompletion(messages: Message[]) {
+    this._completion = ''
+    const prompt = this.buildChatMessagePrompt(messages)
+    const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
+    return this.streamResponse({ requestBody, requestOptions })
+  }
+
+  public streamTemplateCompletion(promptTemplate: string, context = '') {
+    this._completion = ''
+    const prompt = this.buildTemplatePrompt(promptTemplate, context)
+    const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
+    return this.streamResponse({ requestBody, requestOptions })
   }
 }

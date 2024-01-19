@@ -1,9 +1,6 @@
-import { MODEL } from './constants'
-
 const systemMesage = `You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
-For code refactoring, use markdown code formatting.
-If you are not sure which language formatting to use, use \`typescript\`;
+For code refactoring, use markdown with code formatting.
 `
 
 export const getSystemMessage = (modelType: string) => {
@@ -89,30 +86,4 @@ export const chatMessageDeepSeek = (
       )
       .join('\n')}
   `
-interface Prompts {
-  [key: string]: (code: string, modelType: string) => string
-}
 
-export const codeActionTypes = ['add-types', 'refactor']
-
-export const prompts: Prompts = {
-  explain: explain,
-  'add-types': addTypes,
-  refactor: refactor,
-  'add-tests': addTests,
-  'generate-docs': generateDocs
-}
-
-export const getPromptModel = (model: string) => {
-  return model.includes(MODEL.llama) ? MODEL.llama : MODEL.deepseek
-}
-
-export const buildPrompt = (
-  model: string,
-  context: string,
-  template: string
-) => {
-  return prompts[template]
-    ? prompts[template](context, getPromptModel(model))
-    : context
-}

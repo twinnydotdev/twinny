@@ -7,12 +7,15 @@ import CodeBlock from './code-block'
 import styles from './index.module.css'
 
 interface MessageProps {
-  message: string
+  message?: string
   sender: string
   completionType: string
 }
 
 export const Message = ({ message, sender, completionType }: MessageProps) => {
+  if (!message) {
+    return null
+  }
   return (
     <div className={styles.message}>
       <b>{sender}</b>

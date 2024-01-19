@@ -4,6 +4,7 @@ import { Uri, commands, window, workspace } from 'vscode'
 
 import path from 'path'
 import { StreamBody } from './types'
+import { MODEL } from './constants'
 
 interface StreamResponseOptions {
   body: StreamBody
@@ -79,6 +80,10 @@ export const getTextSelection = () => {
   const selection = editor?.selection
   const text = editor?.document.getText(selection)
   return text || ''
+}
+
+export const getPromptModel = (model: string) => {
+  return model.includes(MODEL.llama) ? MODEL.llama : MODEL.deepseek
 }
 
 export const noop = () => undefined
