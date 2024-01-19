@@ -92,7 +92,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           const storedData = context?.workspaceState.get(
             `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
           )
-          console.log(`${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`)
           webviewView.webview.postMessage({
             type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
             value: storedData || ''
