@@ -49,6 +49,9 @@ export async function activate(context: ExtensionContext) {
         sidebarProvider.chatService?.streamTemplateCompletion('explain')
       )
     }),
+    commands.registerCommand('twinny.stopGeneration', () => {
+      completionProvider.destroyStream()
+    }),
     commands.registerCommand('twinny.addTypes', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
       delayExecution(() =>

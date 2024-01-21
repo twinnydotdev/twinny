@@ -15,6 +15,8 @@ export class ChatService {
   private _baseUrl = this._config.get('ollamaBaseUrl') as string
   private _bearerToken = this._config.get('ollamaApiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
+  private _temperature = this._config.get('temperature') as number
+  private _numPredictChat = this._config.get('umPredictChat') as number
   private _completion = ''
   private _port = this._config.get('ollamaApiPort') as string
   private _view?: WebviewView
@@ -34,7 +36,8 @@ export class ChatService {
       model: this._chatModel,
       prompt,
       options: {
-        temperature: this._config.get('temperature') as number
+        temperature: this._temperature,
+        num_predict: this._numPredictChat
       }
     }
 

@@ -108,6 +108,10 @@
         "title": "Enable twinny"
       },
       {
+        "command": "twinny.stopGeneration",
+        "title": "Stop generation"
+      },
+      {
         "command": "twinny.disable",
         "title": "Disable twinny",
         "shortTitle": "Disable twinny"
@@ -183,6 +187,14 @@
         "twinny.temperature": {
           "type": "number",
           "default": 1
+        },
+        "twinny.numPredictChat": {
+          "type": "number",
+          "default": 128
+        },
+        "twinny.numPredictFim": {
+          "type": "number",
+          "default": -2
         }
       }
     }

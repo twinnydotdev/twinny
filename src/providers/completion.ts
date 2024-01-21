@@ -17,9 +17,10 @@ import { getCache, setCache } from '../cache'
 import { languages } from '../languages'
 import { InlineCompletion, StreamBody } from '../types'
 import { RequestOptions } from 'https'
+import { ClientRequest } from 'http'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
-  private _statusBar: StatusBarItem
+  private statusBar: StatusBarItem
   private _debouncer: NodeJS.Timeout | undefined
   private _document: TextDocument | undefined
   private _config = workspace.getConfiguration('twinny')
@@ -29,11 +30,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _baseUrl = this._config.get('ollamaBaseUrl') as string
   private _port = this._config.get('ollamaApiPort') as number
   private _temperature = this._config.get('temperature') as number
+  private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as number
   private _bearerToken = this._config.get('ollamaApiBearerToken') as number
+  private _currentReq : ClientRequest | undefined = undefined
 
   constructor(statusBar: StatusBarItem) {
-    this._statusBar = statusBar
+    this.statusBar = statusBar
   }
 
   private buildStreamRequest(prompt: string) {
@@ -48,7 +51,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       prompt,
       options: {
         temperature: this._temperature,
-        num_predict: -2,
+        num_predict: this._numPredictFim || -2
       }
     }
 
@@ -64,6 +67,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     return { requestOptions, requestBody }
+  }
+
+  public destroyStream = () => {
+    this._currentReq?.destroy()
+    this.statusBar.text = '🤖'
   }
 
   public async provideInlineCompletionItems(
@@ -112,8 +120,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         try {
           let completion = ''
           let chunkCount = 0
-          this._statusBar.text = '🤖'
-          this._statusBar.text = '$(loading~spin)'
+          this.statusBar.text = '$(loading~spin)'
+          this.statusBar.command = 'twinny.stopGeneration'
 
           const { requestBody, requestOptions } =
             this.buildStreamRequest(prompt)
@@ -121,12 +129,18 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           streamResponse({
             body: requestBody,
             options: requestOptions,
+            onStart: (req) => {
+              this._currentReq = req
+            },
             onData: (chunk, onDestroy) => {
               const json = JSON.parse(chunk)
               completion = completion + json.response
               chunkCount = chunkCount + 1
-              if (json.response.match('<EOT>')) {
-                this._statusBar.text = '🤖'
+              if (
+                (chunkCount !== 1 && json.response === '\n') ||
+                json.response.match('<EOT>')
+              ) {
+                this.statusBar.text = '🤖'
                 completion = completion.replace('<EOT>', '')
                 onDestroy()
                 resolve(
@@ -141,7 +155,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             }
           })
         } catch (error) {
-          this._statusBar.text = '$(alert)'
+          this.statusBar.text = '$(alert)'
           return resolve([] as InlineCompletionItem[])
         }
       }, this._debounceWait as number)
@@ -332,5 +346,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._temperature = this._config.get('temperature') as number
     this._useFileContext = this._config.get('useFileContext') as number
     this._fimModel = this._config.get('fimModelName') as string
+    this._numPredictFim = this._config.get('numPredictFim') as number
   }
 }
