@@ -47,7 +47,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       model: this._fimModel,
       prompt,
       options: {
-        temperature: this._temperature
+        temperature: this._temperature,
+        num_predict: -2,
       }
     }
 
@@ -124,10 +125,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               const json = JSON.parse(chunk)
               completion = completion + json.response
               chunkCount = chunkCount + 1
-              if (
-                (chunkCount !== 1 && json.response === '\n') ||
-                json.response.match('<EOT>')
-              ) {
+              if (json.response.match('<EOT>')) {
                 this._statusBar.text = '🤖'
                 completion = completion.replace('<EOT>', '')
                 onDestroy()
