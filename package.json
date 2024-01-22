@@ -195,6 +195,10 @@
         "twinny.numPredictFim": {
           "type": "number",
           "default": -2
+        },
+        "twinny.ollamaUseTls": {
+          "type": "boolean",
+          "default": false
         }
       }
     }

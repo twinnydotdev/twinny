@@ -17,7 +17,10 @@ interface StreamResponseOptions {
 
 export async function streamResponse(opts: StreamResponseOptions) {
   const { body, options, onData, onEnd, onStart } = opts
-  const _request = options.hostname?.includes('https') ? httpsRequest : request
+  const config = workspace.getConfiguration('twinny')
+  const useTls = config.get('ollamaUseTls')
+
+  const _request = useTls ? httpsRequest : request
 
   const req = _request(options, (res) => {
     res.on('data', (chunk: string) => {
