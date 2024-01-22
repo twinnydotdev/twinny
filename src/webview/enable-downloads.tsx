@@ -25,7 +25,7 @@ export const EnableDownloads = () => {
     })
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyNotification,
-      data: 'twinny automatic model download enabled, restart vscode to activate.'
+      data: 'twinny automatic model download enabled.'
     })
     setDownloadsCancelled(false)
   }
