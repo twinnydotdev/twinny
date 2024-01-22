@@ -46,7 +46,7 @@ export const useGlobalContext = <T>(key: string) => {
     return () => window.removeEventListener('message', handler)
   }, [])
 
-  return {context, setContext }
+  return { context, setContext }
 }
 
 export const useWorkSpaceContext = <T>(key: string) => {
