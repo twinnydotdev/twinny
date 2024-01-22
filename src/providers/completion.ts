@@ -12,7 +12,7 @@ import {
   TextEditor
 } from 'vscode'
 import 'string_score'
-import { streamResponse } from '../utils'
+import { getIsModelAvailable, streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { languages } from '../languages'
 import { InlineCompletion, StreamBody } from '../types'
@@ -20,7 +20,7 @@ import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
-  private statusBar: StatusBarItem
+  private _statusBar: StatusBarItem
   private _debouncer: NodeJS.Timeout | undefined
   private _document: TextDocument | undefined
   private _config = workspace.getConfiguration('twinny')
@@ -34,9 +34,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _useFileContext = this._config.get('useFileContext') as number
   private _bearerToken = this._config.get('ollamaApiBearerToken') as number
   private _currentReq : ClientRequest | undefined = undefined
+  private _isModelAvailable = true
 
   constructor(statusBar: StatusBarItem) {
-    this.statusBar = statusBar
+    this._statusBar = statusBar
+    this.setModelAvailability()
+  }
+
+  private setModelAvailability = async () => {
+    this._isModelAvailable = await getIsModelAvailable(this._fimModel)
   }
 
   private buildStreamRequest(prompt: string) {
@@ -71,7 +77,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   public destroyStream = () => {
     this._currentReq?.destroy()
-    this.statusBar.text = '🤖'
+    this._statusBar.text = '🤖'
   }
 
   public async provideInlineCompletionItems(
@@ -82,6 +88,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const editor = window.activeTextEditor
 
     const language = editor?.document.languageId
+
+    if (!this._isModelAvailable) {
+      this._statusBar.text = '$(error)'
+      this._statusBar.tooltip = `Model ${this._fimModel} not found.`
+      return
+    }
 
     if (!editor) {
       return
@@ -120,8 +132,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         try {
           let completion = ''
           let chunkCount = 0
-          this.statusBar.text = '$(loading~spin)'
-          this.statusBar.command = 'twinny.stopGeneration'
+          this._statusBar.text = '$(loading~spin)'
+          this._statusBar.command = 'twinny.stopGeneration'
 
           const { requestBody, requestOptions } =
             this.buildStreamRequest(prompt)
@@ -140,7 +152,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 (chunkCount !== 1 && json.response === '\n') ||
                 json.response.match('<EOT>')
               ) {
-                this.statusBar.text = '🤖'
+                this._statusBar.text = '🤖'
                 completion = completion.replace('<EOT>', '')
                 onDestroy()
                 resolve(
@@ -155,7 +167,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             }
           })
         } catch (error) {
-          this.statusBar.text = '$(alert)'
+          this._statusBar.text = '$(alert)'
           return resolve([] as InlineCompletionItem[])
         }
       }, this._debounceWait as number)

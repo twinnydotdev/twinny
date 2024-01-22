@@ -1,6 +1,6 @@
 import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
-import { WebviewView, window, workspace } from 'vscode'
+import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
 import {
   chatMessageDeepSeek,
@@ -8,21 +8,29 @@ import {
 } from './prompts'
 import { MESSAGE_NAME, MODEL, prompts } from './constants'
 import { StreamBody } from './types'
-import { getPromptModel, streamResponse } from './utils'
+import { getIsModelAvailable, getPromptModel, streamResponse } from './utils'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
   private _baseUrl = this._config.get('ollamaBaseUrl') as string
   private _bearerToken = this._config.get('ollamaApiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
-  private _temperature = this._config.get('temperature') as number
-  private _numPredictChat = this._config.get('umPredictChat') as number
   private _completion = ''
+  private _isModelAvailable = true
+  private _numPredictChat = this._config.get('numPredictChat') as number
   private _port = this._config.get('ollamaApiPort') as string
+  private _temperature = this._config.get('temperature') as number
   private _view?: WebviewView
+  private _statusBar: StatusBarItem
 
-  constructor(view?: WebviewView) {
+  constructor(statusBar: StatusBarItem, view?: WebviewView,) {
     this._view = view
+    this._statusBar = statusBar
+    this.setModelAvailability()
+  }
+
+  private setModelAvailability = async () => {
+    this._isModelAvailable = await getIsModelAvailable(this._chatModel)
   }
 
   private buildStreamRequest(prompt: string) {
@@ -77,15 +85,18 @@ export class ChatService {
   }
 
   private onStreamEnd = () => {
+    this._statusBar.text = '🤖'
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
-        completion: this._completion.trimStart()
+        completion: this._completion.trimStart(),
+        error: !this._isModelAvailable,
       }
     })
   }
 
   private onStreamStart = (req: ClientRequest) => {
+    this._statusBar.text = '$(loading~spin)'
     this._view?.webview.onDidReceiveMessage((data: { type: string }) => {
       if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
         req.destroy()

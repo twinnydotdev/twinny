@@ -30,7 +30,7 @@ export async function activate(context: ExtensionContext) {
   statusBar.tooltip = `twinny is running: fim: ${fimModel} chat: ${chatModel}`
 
   const completionProvider = new CompletionProvider(statusBar)
-  const sidebarProvider = new SidebarProvider(context.extensionUri)
+  const sidebarProvider = new SidebarProvider(context.extensionUri, statusBar)
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(

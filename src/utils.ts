@@ -5,6 +5,7 @@ import { Uri, commands, window, workspace } from 'vscode'
 import path from 'path'
 import { StreamBody } from './types'
 import { MODEL } from './constants'
+import { exec } from 'child_process'
 
 interface StreamResponseOptions {
   body: StreamBody
@@ -84,6 +85,23 @@ export const getTextSelection = () => {
 
 export const getPromptModel = (model: string) => {
   return model.includes(MODEL.llama) ? MODEL.llama : MODEL.deepseek
+}
+
+export const getIsModelAvailable = (model: string) => {
+  return new Promise<boolean>((resolve, reject) => {
+    exec('ollama list', (error, stdout) => {
+      if (error) {
+        console.log(`exec error: ${error.message}`)
+        reject()
+      }
+
+      if (stdout.match(model)) {
+        resolve(true)
+      }
+
+      resolve(false)
+    })
+  })
 }
 
 export const noop = () => undefined

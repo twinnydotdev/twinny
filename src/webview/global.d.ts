@@ -19,6 +19,7 @@ interface PostMessage {
   value: {
     type: string
     completion: string
+    error?: boolean
   }
 }
 

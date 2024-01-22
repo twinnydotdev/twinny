@@ -71,7 +71,9 @@ export const Chat = () => {
         ...(prev || []),
         {
           role: BOT_NAME,
-          content: message.value.completion || EMPTY_MESAGE,
+          content: !message.value.error
+            ? message.value.completion
+            : EMPTY_MESAGE,
           type: message.value.type
         }
       ]

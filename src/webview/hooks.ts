@@ -26,6 +26,29 @@ export const useSelection = (onSelect: () => void) => {
   return selection
 }
 
+export const useGlobalContext = <T>(key: string) => {
+  const [context, setContext] = useState<T>()
+
+  const handler = (event: MessageEvent) => {
+    const message: PostMessage = event.data
+    if (message?.type === `${MESSAGE_NAME.twinnyGlobalContext}-${key}`) {
+      setContext(event.data.value)
+    }
+  }
+
+  useEffect(() => {
+    window.addEventListener('message', handler)
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyGlobalContext,
+      key
+    })
+
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  return {context, setContext }
+}
+
 export const useWorkSpaceContext = <T>(key: string) => {
   const [context, setContext] = useState<T>()
 
