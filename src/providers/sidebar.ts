@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
-import { getPromptModel, getTextSelection, openDiffView } from '../utils'
+import { getIsModelAvailable, getTextSelection, openDiffView } from '../utils'
 import { getContext } from '../context'
-import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME, MODEL } from '../constants'
+import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { ChatService } from '../chat-service'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -9,15 +9,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   _doc?: vscode.TextDocument
   private _config = vscode.workspace.getConfiguration('twinny')
   private _model = this._config.get('chatModelName') as string
-  private _modelType = MODEL.llama
   public chatService: ChatService | undefined = undefined
+  private _statusBar: vscode.StatusBarItem
 
-  constructor(private readonly _extensionUri: vscode.Uri) {
-    this._modelType = getPromptModel(this._model)
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    statusBar: vscode.StatusBarItem
+  ) {
+    this._statusBar = statusBar
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.chatService = new ChatService(webviewView)
+    this.chatService = new ChatService(this._statusBar, webviewView)
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -42,6 +45,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (data: any) => {
+        const isModelAvailable = getIsModelAvailable(this._model)
+
+        if (!isModelAvailable) {
+          return
+        }
+
         const context = getContext()
         if (data.type === MESSAGE_NAME.twinnyChatMessage) {
           this.chatService?.streamChatCompletion(data.data as Message[])
@@ -75,13 +84,28 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             editBuilder.replace(selection, data.data as string)
           })
         }
+        if (data.type === MESSAGE_NAME.twinnyGlobalContext) {
+          const storedData = context?.globalState.get(
+            `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`
+          )
+          webviewView.webview.postMessage({
+            type: `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
+            value: storedData
+          })
+        }
+        if (data.type === MESSAGE_NAME.twinnySetGlobalContext) {
+          context?.globalState.update(
+            `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
+            data.data
+          )
+        }
         if (data.type === MESSAGE_NAME.twinnyWorkspaceContext) {
           const storedData = context?.workspaceState.get(
             `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
           )
           webviewView.webview.postMessage({
             type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
-            value: storedData || ''
+            value: storedData
           })
         }
         if (data.type === MESSAGE_NAME.twinnySetWorkspaceContext) {
@@ -89,6 +113,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
             data.data
           )
+        }
+        if (data.type === MESSAGE_NAME.twinnyNotification) {
+          vscode.window.showInformationMessage(data.data)
         }
       }
     )

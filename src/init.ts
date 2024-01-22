@@ -1,5 +1,14 @@
 import { exec } from 'child_process'
-import { Uri, window, env, ProgressLocation, workspace } from 'vscode'
+import {
+  Uri,
+  window,
+  env,
+  ProgressLocation,
+  workspace,
+  CancellationToken
+} from 'vscode'
+import { getContext } from './context'
+import { MESSAGE_KEY, MESSAGE_NAME } from './constants'
 
 const OLLAMA_URL = 'https://ollama.ai/download'
 
@@ -8,6 +17,7 @@ export async function init() {
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
   const ollamaBaseUrl = config.get('ollamaBaseUrl') as string
+  const context = getContext()
 
   if (ollamaBaseUrl !== 'localhost') {
     // Running twinny with external Ollama server.
@@ -23,6 +33,15 @@ export async function init() {
     )
 
     env.openExternal(Uri.parse(OLLAMA_URL))
+  }
+
+  const settingsKey = `${MESSAGE_NAME.twinnyGlobalContext}-${MESSAGE_KEY.downloadCancelled}`
+
+  const isDownloadCancelled = context?.globalState.get(settingsKey)
+
+  if (isDownloadCancelled) {
+    await startServer()
+    return
   }
 
   await checkModel(fimModel)
@@ -56,6 +75,7 @@ async function startServer() {
 }
 
 async function checkModel(model: string) {
+  const context = getContext()
   return new Promise((resolve) => {
     exec('ollama list', (error, stdout) => {
       if (error) throw error
@@ -66,9 +86,9 @@ async function checkModel(model: string) {
             {
               location: ProgressLocation.Notification,
               title: 'twinny downloading',
-              cancellable: false
+              cancellable: true
             },
-            async (progress) => {
+            async (progress, token: CancellationToken) => {
               return new Promise((resolve, reject) => {
                 const childProcess = exec(`ollama pull ${model}`)
 
@@ -98,6 +118,14 @@ async function checkModel(model: string) {
                     resolve('')
                   }
                 })
+
+                token.onCancellationRequested(() => {
+                  context?.globalState.update(
+                    `${MESSAGE_NAME.twinnyGlobalContext}-${MESSAGE_KEY.downloadCancelled}`,
+                    true
+                  )
+                  reject()
+                })
               })
             }
           )
@@ -106,12 +134,11 @@ async function checkModel(model: string) {
               window.showInformationMessage(
                 'Ollama has been installed. Please reload window to enable twinny.'
               )
-
               resolve(true)
             },
             () => {
               window.showErrorMessage(
-                `Install failed. Please open Ollama in your terminal and run \`ollama pull ${model}\``
+                `Something went wrong when trying to download the model ${model}.`
               )
               resolve(false)
             }
