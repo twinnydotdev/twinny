@@ -5,7 +5,8 @@ import {
   env,
   ProgressLocation,
   workspace,
-  CancellationToken
+  CancellationToken,
+  commands
 } from 'vscode'
 import { getContext } from './context'
 import { MESSAGE_KEY, MESSAGE_NAME } from './constants'
@@ -120,6 +121,8 @@ async function checkModel(model: string) {
                 })
 
                 token.onCancellationRequested(() => {
+                  commands.executeCommand('workbench.action.reloadWindow');
+
                   context?.globalState.update(
                     `${MESSAGE_NAME.twinnyGlobalContext}-${MESSAGE_KEY.downloadCancelled}`,
                     true
