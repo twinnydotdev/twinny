@@ -2,10 +2,7 @@ import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
 import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
-import {
-  chatMessageDeepSeek,
-  chatMessageLlama,
-} from './prompts'
+import { chatMessageDeepSeek, chatMessageLlama } from './prompts'
 import { MESSAGE_NAME, MODEL, prompts } from './constants'
 import { StreamBody } from './types'
 import { getIsModelAvailable, getPromptModel, streamResponse } from './utils'
@@ -23,7 +20,7 @@ export class ChatService {
   private _view?: WebviewView
   private _statusBar: StatusBarItem
 
-  constructor(statusBar: StatusBarItem, view?: WebviewView,) {
+  constructor(statusBar: StatusBarItem, view?: WebviewView) {
     this._view = view
     this._statusBar = statusBar
     this.setModelAvailability()
@@ -90,7 +87,7 @@ export class ChatService {
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
         completion: this._completion.trimStart(),
-        error: !this._isModelAvailable,
+        error: !this._isModelAvailable
       }
     })
   }

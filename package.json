@@ -190,7 +190,7 @@
         },
         "twinny.numPredictChat": {
           "type": "number",
-          "default": 128
+          "default": 512
         },
         "twinny.numPredictFim": {
           "type": "number",
