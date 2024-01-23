@@ -33,7 +33,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as number
   private _bearerToken = this._config.get('ollamaApiBearerToken') as number
-  private _currentReq : ClientRequest | undefined = undefined
+  private _currentReq: ClientRequest | undefined = undefined
   private _isModelAvailable = true
 
   constructor(statusBar: StatusBarItem) {
@@ -78,6 +78,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   public destroyStream = () => {
     this._currentReq?.destroy()
     this._statusBar.text = '🤖'
+  }
+
+  public removeContext(jsonString: string): string {
+    let completion: string = jsonString
+
+    if (jsonString.match('context')) {
+      // TODO: flimsy
+      completion = JSON.parse(jsonString.split(',"context')[0] + '}')
+    }
+
+    return completion
   }
 
   public async provideInlineCompletionItems(
@@ -145,24 +156,30 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               this._currentReq = req
             },
             onData: (chunk, onDestroy) => {
-              const json = JSON.parse(chunk)
-              completion = completion + json.response
-              chunkCount = chunkCount + 1
-              if (
-                (chunkCount !== 1 && json.response === '\n') ||
-                json.response.match('<EOT>')
-              ) {
-                this._statusBar.text = '🤖'
-                completion = completion.replace('<EOT>', '')
+              try {
+                const json = JSON.parse(this.removeContext(chunk.toString()))
+                completion = completion + json.response
+                chunkCount = chunkCount + 1
+                if (
+                  (chunkCount !== 1 && json.response === '\n') ||
+                  json.response.match('<EOT>')
+                ) {
+                  this._statusBar.text = '🤖'
+                  completion = completion.replace('<EOT>', '')
+                  onDestroy()
+                  resolve(
+                    this.triggerInlineCompletion({
+                      completion,
+                      position,
+                      prefix,
+                      suffix
+                    })
+                  )
+                }
+              } catch (e) {
+                this._currentReq?.destroy()
                 onDestroy()
-                resolve(
-                  this.triggerInlineCompletion({
-                    completion,
-                    position,
-                    prefix,
-                    suffix
-                  })
-                )
+                console.error(e)
               }
             }
           })

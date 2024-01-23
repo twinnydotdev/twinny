@@ -24,7 +24,7 @@ export async function streamResponse(opts: StreamResponseOptions) {
 
   const req = _request(options, (res) => {
     res.on('data', (chunk: string) => {
-      onData(chunk.toString(), () => {
+      onData(chunk, () => {
         res.destroy()
       })
     })
@@ -38,9 +38,13 @@ export async function streamResponse(opts: StreamResponseOptions) {
     console.error(`Request error: ${error.message}`)
   })
 
-  req.write(JSON.stringify(body))
-  onStart?.(req)
-  req.end()
+  try {
+    req.write(JSON.stringify(body))
+    onStart?.(req)
+    req.end()
+  } catch (e) {
+    req.destroy()
+  }
 }
 
 const tmpDir = path.join(__dirname, './tmp')
