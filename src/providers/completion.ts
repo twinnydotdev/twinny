@@ -15,7 +15,7 @@ import 'string_score'
 import { getIsModelAvailable, streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { languages } from '../languages'
-import { InlineCompletion, StreamBody } from '../types'
+import { InlineCompletion, OllamStreamResponse, StreamBody } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
 
@@ -160,12 +160,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onStart: (req) => {
               this._currentReq = req
             },
-            onData: (chunk, destroy) => {
-              if (!chunk) {
+            onData: (json: OllamStreamResponse, destroy) => {
+              if (!json.response) {
                 return
               }
               try {
-                const json = JSON.parse(chunk.toString())
                 completion = completion + json.response
                 chunkCount = chunkCount + 1
                 if (

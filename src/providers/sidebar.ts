@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import { getIsModelAvailable, getTextSelection, openDiffView } from '../utils'
 import { getContext } from '../context'
 import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
-import { ChatService } from '../chat-service'
+import { ChatService } from '../stream'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
