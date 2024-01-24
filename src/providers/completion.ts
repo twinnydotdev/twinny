@@ -83,17 +83,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
   }
 
-  public removeContext(jsonString: string): string {
-    let completion: string = jsonString
-
-    if (jsonString.match('context')) {
-      // TODO: flimsy
-      completion = JSON.parse(jsonString.split(',"context')[0] + '}')
-    }
-
-    return completion
-  }
-
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position
