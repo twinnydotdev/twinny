@@ -33,6 +33,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as number
   private _bearerToken = this._config.get('ollamaApiBearerToken') as number
+  private _enableCompletionCache = this._config.get(
+    'enableCompletionCache'
+  ) as boolean
   private _currentReq: ClientRequest | undefined = undefined
   private _isModelAvailable = true
 
@@ -129,13 +132,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const cachedCompletion = getCache({ prefix, suffix })
 
-        if (cachedCompletion) {
-          return resolve([
-            new InlineCompletionItem(
-              cachedCompletion,
-              new Range(position, position)
-            )
-          ])
+        if (cachedCompletion && this._enableCompletionCache) {
+          return resolve(
+            this.triggerInlineCompletion({
+              completion: cachedCompletion,
+              position,
+              prefix,
+              suffix
+            })
+          )
         }
 
         if (!prompt) return resolve([])
@@ -170,6 +175,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   this._statusBar.text = '🤖'
                   completion = completion.replace('<EOT>', '')
                   destroy()
+                  this._currentReq?.destroy()
                   resolve(
                     this.triggerInlineCompletion({
                       completion,
@@ -310,9 +316,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   ) => {
     const cursorPosition = editor.selection.active
 
-
     const charBeforeRange = new Range(
-      position.translate(0, position.character === 0 ? 0 : Math.min(position.character, -1)),
+      position.translate(
+        0,
+        position.character === 0 ? 0 : Math.min(position.character, -1)
+      ),
       editor.selection.start
     )
 
@@ -366,7 +374,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       position
     )
 
-    setCache({ prefix, suffix, completion })
+    if (this._enableCompletionCache) {
+      setCache({ prefix, suffix, completion })
+    }
 
     return [new InlineCompletionItem(completion, new Range(position, position))]
   }
@@ -379,5 +389,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._useFileContext = this._config.get('useFileContext') as number
     this._fimModel = this._config.get('fimModelName') as string
     this._numPredictFim = this._config.get('numPredictFim') as number
+    this._enableCompletionCache = this._config.get(
+      'enableCompletionCache'
+    ) as boolean
   }
 }

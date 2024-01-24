@@ -147,58 +147,76 @@
       "properties": {
         "twinny.contextLength": {
           "type": "number",
-          "default": 300
+          "default": 300,
+          "description": "How many lines before and after to include in FIM prompts"
         },
         "twinny.debounceWait": {
           "type": "number",
-          "default": 200
+          "default": 300,
+          "description": "The amount of time to wait before triggering the next completion in milliseconds"
         },
         "twinny.enabled": {
           "order": 2,
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Enable or disable twinny extension"
         },
         "twinny.chatModelName": {
           "order": 1,
           "type": "string",
-          "default": "codellama:7b-instruct"
+          "default": "codellama:7b-instruct",
+          "description": "The Ollama model for twinny chat completions"
         },
         "twinny.fimModelName": {
           "order": 0,
           "type": "string",
-          "default": "codellama:7b-code"
+          "default": "codellama:7b-code",
+          "description": "The Ollama model for twinny FIM completions"
         },
         "twinny.ollamaBaseUrl": {
           "type": "string",
-          "default": "localhost"
+          "default": "localhost",
+          "description": "The Ollama API base url"
         },
         "twinny.ollamaApiPort": {
           "type": "number",
-          "default": 11434
+          "default": 11434,
+          "description": "The Ollama API port"
         },
         "twinny.ollamaApiBearerToken": {
           "type": "string",
-          "default": ""
+          "default": "",
+          "description": "Whether to use a Bearer token for the Ollama API connection"
         },
         "twinny.useFileContext": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Scan open documents and provide to completion prompt"
         },
         "twinny.temperature": {
           "type": "number",
-          "default": 1
+          "default": 1,
+          "description": "The temperature sent to Ollama with for model options"
         },
         "twinny.numPredictChat": {
           "type": "number",
-          "default": 512
+          "default": 512,
+          "description": "Max number of tokens to generate for chat completions"
         },
         "twinny.numPredictFim": {
           "type": "number",
-          "default": -2
+          "default": -2,
+          "description": "Max number of tokens to generate for fim completions"
         },
         "twinny.ollamaUseTls": {
           "type": "boolean",
-          "default": false
+          "default": false,
+          "description": "Whether to use TLS for the Ollama API connection e.g https"
+        },
+        "twinny.enableCompletionCache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether or not to cache previously completed FIM completions with the same prompt"
         }
       }
     }
