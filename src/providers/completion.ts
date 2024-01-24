@@ -311,7 +311,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const cursorPosition = editor.selection.active
 
 
-    const charBeforeRange =new Range(
+    const charBeforeRange = new Range(
       position.translate(0, position.character === 0 ? 0 : Math.min(position.character, -1)),
       editor.selection.start
     )
