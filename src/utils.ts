@@ -10,7 +10,7 @@ import { exec } from 'child_process'
 interface StreamResponseOptions {
   body: StreamBody
   options: RequestOptions
-  onData: (chunk: string, resolve: () => void) => void
+  onData: (chunk: string, destroy: () => void) => void
   onEnd?: () => void
   onStart?: (req: ClientRequest) => void
 }

@@ -155,18 +155,22 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onStart: (req) => {
               this._currentReq = req
             },
-            onData: (chunk, onDestroy) => {
+            onData: (chunk, destroy) => {
+              if (!chunk) {
+                return
+              }
               try {
-                const json = JSON.parse(this.removeContext(chunk.toString()))
+                const json = JSON.parse(chunk.toString())
                 completion = completion + json.response
                 chunkCount = chunkCount + 1
+                console.log(completion)
                 if (
-                  (chunkCount !== 1 && json.response === '\n') ||
+                  (chunkCount > 1 && json.response === '\n') ||
                   json.response.match('<EOT>')
                 ) {
                   this._statusBar.text = '🤖'
                   completion = completion.replace('<EOT>', '')
-                  onDestroy()
+                  destroy()
                   resolve(
                     this.triggerInlineCompletion({
                       completion,
@@ -178,7 +182,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 }
               } catch (e) {
                 this._currentReq?.destroy()
-                onDestroy()
                 console.error(e)
               }
             }
@@ -308,8 +311,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   ) => {
     const cursorPosition = editor.selection.active
 
-    const charBeforeRange = new Range(
-      position.translate(0, -1),
+
+    const charBeforeRange =new Range(
+      position.translate(0, position.character === 0 ? 0 : Math.min(position.character, -1)),
       editor.selection.start
     )
 
