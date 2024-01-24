@@ -22,11 +22,18 @@ export async function streamResponse(opts: StreamResponseOptions) {
 
   const _request = useTls ? httpsRequest : request
 
+  let ongoingChunk = ''
+
   const req = _request(options, (res) => {
     res.on('data', (chunk: string) => {
-      onData(chunk, () => {
-        res.destroy()
-      })
+      ongoingChunk += chunk
+      if (/\n$/.exec(chunk)) {
+        onData(ongoingChunk, () => {
+          res.destroy()
+        })
+
+        ongoingChunk = ''
+      }
     })
 
     res.once('end', () => {
