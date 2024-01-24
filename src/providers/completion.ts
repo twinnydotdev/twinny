@@ -163,7 +163,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 const json = JSON.parse(chunk.toString())
                 completion = completion + json.response
                 chunkCount = chunkCount + 1
-                console.log(completion)
                 if (
                   (chunkCount > 1 && json.response === '\n') ||
                   json.response.match('<EOT>')
