@@ -27,12 +27,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
   private _fimModel = this._config.get('fimModelName') as string
-  private _baseUrl = this._config.get('ollamaBaseUrl') as string
-  private _port = this._config.get('ollamaApiPort') as number
+  private _baseUrl = this._config.get('baseUrl') as string
+  private _port = this._config.get('apiPort') as number
+  private _apiPath = this._config.get('apiPath') as string
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as number
-  private _bearerToken = this._config.get('ollamaApiBearerToken') as number
+  private _bearerToken = this._config.get('apiBearerToken') as number
   private _enableCompletionCache = this._config.get(
     'enableCompletionCache'
   ) as boolean
@@ -58,6 +59,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const requestBody: StreamBody = {
       model: this._fimModel,
       prompt,
+      stream: true,
       options: {
         temperature: this._temperature,
         num_predict: this._numPredictFim || -2
@@ -67,7 +69,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const requestOptions: RequestOptions = {
       hostname: this._baseUrl,
       port: this._port,
-      path: '/api/generate',
+      path: this._apiPath,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -134,6 +136,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (!prompt) return resolve([])
 
+        console.log(prompt)
+
         try {
           let completion = ''
           let chunkCount = 0
@@ -149,17 +153,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onStart: (req) => {
               this._currentReq = req
             },
-            onData: (stringBuffer: string, destroy) => {
+            onData: (json: OllamStreamResponse, destroy) => {
+              const data = json.response || json.content
+              if (!data) {
+                return
+              }
               try {
-                const json: OllamStreamResponse = JSON.parse(stringBuffer)
-                if (!json.response) {
-                  return
-                }
-                completion = completion + json.response
+                completion = completion + data
                 chunkCount = chunkCount + 1
                 if (
-                  (chunkCount > 1 && json.response === '\n') ||
-                  json.response.match('<EOT>')
+                  (chunkCount > 1 && data === '\n') ||
+                  data?.match('<EOT>')
                 ) {
                   this._statusBar.text = '🤖'
                   completion = completion.replace('<EOT>', '')
@@ -378,6 +382,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._useFileContext = this._config.get('useFileContext') as number
     this._fimModel = this._config.get('fimModelName') as string
     this._numPredictFim = this._config.get('numPredictFim') as number
+    this._apiPath = this._config.get('apiPath') as string
+    this._port = this._config.get('apiPort') as number
+    this._baseUrl = this._config.get('baseUrl') as string
     this._enableCompletionCache = this._config.get(
       'enableCompletionCache'
     ) as boolean

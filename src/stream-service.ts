@@ -4,18 +4,19 @@ import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
 import { chatMessageDeepSeek, chatMessageLlama } from './prompts'
 import { MESSAGE_NAME, MODEL, prompts } from './constants'
-import { StreamBody } from './types'
+import { OllamStreamResponse, StreamBody } from './types'
 import { getIsModelAvailable, getPromptModel, streamResponse } from './utils'
 
-export class ChatService {
+export class StreamService {
   private _config = workspace.getConfiguration('twinny')
-  private _baseUrl = this._config.get('ollamaBaseUrl') as string
-  private _bearerToken = this._config.get('ollamaApiBearerToken') as string
+  private _baseUrl = this._config.get('baseUrl') as string
+  private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
   private _isModelAvailable = true
   private _numPredictChat = this._config.get('numPredictChat') as number
-  private _port = this._config.get('ollamaApiPort') as string
+  private _port = this._config.get('apiPort') as string
+  private _apiPath = this._config.get('apiPath') as string
   private _temperature = this._config.get('temperature') as number
   private _view?: WebviewView
   private _statusBar: StatusBarItem
@@ -24,6 +25,13 @@ export class ChatService {
     this._view = view
     this._statusBar = statusBar
     this.setModelAvailability()
+
+    workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration('twinny')) {
+        return
+      }
+      this.updateConfig()
+    })
   }
 
   private setModelAvailability = async () => {
@@ -40,6 +48,7 @@ export class ChatService {
     const requestBody: StreamBody = {
       model: this._chatModel,
       prompt,
+      stream: true,
       options: {
         temperature: this._temperature,
         num_predict: this._numPredictChat
@@ -49,7 +58,7 @@ export class ChatService {
     const requestOptions: RequestOptions = {
       hostname: this._baseUrl,
       port: this._port,
-      path: '/api/generate',
+      path: this._apiPath,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,10 +69,10 @@ export class ChatService {
     return { requestOptions, requestBody }
   }
 
-  private onStreamData = (stringBuffer: string, onDestroy: () => void) => {
+  private onStreamData = (json: OllamStreamResponse, onDestroy: () => void) => {
     try {
-      const json = JSON.parse(stringBuffer)
-      this._completion = this._completion + json.response
+      const data = json.response || json.content
+      this._completion = this._completion + data
 
       this._view?.webview.postMessage({
         type: MESSAGE_NAME.twinnyOnCompletion,
@@ -71,7 +80,7 @@ export class ChatService {
           completion: this._completion.trimStart()
         }
       })
-      if (json.response.match('<EOT>')) {
+      if (data?.match('<EOT>')) {
         onDestroy()
       }
     } catch (error) {
@@ -153,5 +162,14 @@ export class ChatService {
     const prompt = this.buildTemplatePrompt(promptTemplate, context)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
+  }
+
+  public updateConfig() {
+    this._config = workspace.getConfiguration('twinny')
+    this._temperature = this._config.get('temperature') as number
+    this._chatModel = this._config.get('chatModelName') as string
+    this._apiPath = this._config.get('apiPath') as string
+    this._port = this._config.get('apiPort') as string
+    this._baseUrl = this._config.get('baseUrl') as string
   }
 }

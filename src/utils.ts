@@ -15,10 +15,14 @@ interface StreamResponseOptions {
   onStart?: (req: ClientRequest) => void
 }
 
+export const isLlamaCppStream = (stringBuffer: string) => {
+  return stringBuffer.startsWith('data:')
+}
+
 export async function streamResponse(opts: StreamResponseOptions) {
   const { body, options, onData, onEnd, onStart } = opts
   const config = workspace.getConfiguration('twinny')
-  const useTls = config.get('ollamaUseTls')
+  const useTls = config.get('useTls')
 
   const _request = useTls ? httpsRequest : request
 

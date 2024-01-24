@@ -3,6 +3,7 @@ import { Position } from 'vscode'
 export interface StreamBody {
   model: string
   prompt: string
+  stream: true,
   options: Record<string, unknown>
 }
 
@@ -17,6 +18,7 @@ export interface OllamStreamResponse {
   model: string;
   created_at: string;
   response: string;
+  content: string;
   done: boolean;
   context: number[];
   total_duration: number;

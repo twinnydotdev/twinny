@@ -165,28 +165,33 @@
           "order": 1,
           "type": "string",
           "default": "codellama:7b-instruct",
-          "description": "The Ollama model for twinny chat completions"
+          "description": "If using Ollama the model for twinny chat completions"
         },
         "twinny.fimModelName": {
           "order": 0,
           "type": "string",
           "default": "codellama:7b-code",
-          "description": "The Ollama model for twinny FIM completions"
+          "description": "If using Ollama the model for twinny FIM completions"
         },
-        "twinny.ollamaBaseUrl": {
+        "twinny.baseUrl": {
           "type": "string",
           "default": "localhost",
-          "description": "The Ollama API base url"
+          "description": "The API base url"
         },
-        "twinny.ollamaApiPort": {
+        "twinny.apiPort": {
           "type": "number",
           "default": 11434,
-          "description": "The Ollama API port"
+          "description": "The API port e.g 11434 for Ollama and 8080 for llama.cpp"
         },
-        "twinny.ollamaApiBearerToken": {
+        "twinny.apiPath": {
+          "type": "string",
+          "default": "/api/generate",
+          "description": "The API completion path e.g /api/generate for Ollama and /completion for llama.cpp"
+        },
+        "twinny.apiBearerToken": {
           "type": "string",
           "default": "",
-          "description": "Whether to use a Bearer token for the Ollama API connection"
+          "description": "Whether to use a Bearer token for the API connection"
         },
         "twinny.useFileContext": {
           "type": "boolean",
@@ -196,7 +201,7 @@
         "twinny.temperature": {
           "type": "number",
           "default": 1,
-          "description": "The temperature sent to Ollama with for model options"
+          "description": "The temperature sent for model completions"
         },
         "twinny.numPredictChat": {
           "type": "number",
@@ -208,10 +213,10 @@
           "default": -2,
           "description": "Max number of tokens to generate for fim completions"
         },
-        "twinny.ollamaUseTls": {
+        "twinny.useTls": {
           "type": "boolean",
           "default": false,
-          "description": "Whether to use TLS for the Ollama API connection e.g https"
+          "description": "Whether to use TLS for the completion API connection e.g https"
         },
         "twinny.enableCompletionCache": {
           "type": "boolean",

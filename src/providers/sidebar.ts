@@ -2,14 +2,14 @@ import * as vscode from 'vscode'
 import { getIsModelAvailable, getTextSelection, openDiffView } from '../utils'
 import { getContext } from '../context'
 import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
-import { ChatService } from '../stream'
+import { StreamService } from '../stream-service'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
   _doc?: vscode.TextDocument
   private _config = vscode.workspace.getConfiguration('twinny')
   private _model = this._config.get('chatModelName') as string
-  public chatService: ChatService | undefined = undefined
+  public streamService: StreamService | undefined = undefined
   private _statusBar: vscode.StatusBarItem
 
   constructor(
@@ -20,7 +20,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.chatService = new ChatService(this._statusBar, webviewView)
+    this.streamService = new StreamService(this._statusBar, webviewView)
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -53,7 +53,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         const context = getContext()
         if (data.type === MESSAGE_NAME.twinnyChatMessage) {
-          this.chatService?.streamChatCompletion(data.data as Message[])
+          this.streamService?.streamChatCompletion(data.data as Message[])
         }
         if (data.type === MESSAGE_NAME.twinnyOpenDiff) {
           const editor = vscode.window.activeTextEditor
