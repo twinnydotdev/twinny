@@ -22,18 +22,18 @@ export async function streamResponse(opts: StreamResponseOptions) {
 
   const _request = useTls ? httpsRequest : request
 
+  let stringBuffer = ''
+
   const req = _request(options, (res) => {
-    let stringBuffer = ''
     res.on('data', (chunk: string) => {
       stringBuffer += chunk
-      try {
-        const data: OllamStreamResponse = JSON.parse(stringBuffer)
-        stringBuffer = ''
-        onData(data, () => {
+      if (/\n$/.exec(chunk)) {
+
+        onData(stringBuffer, () => {
           res.destroy()
         })
-      } catch (e) {
-        return
+
+        stringBuffer = ''
       }
     })
 
