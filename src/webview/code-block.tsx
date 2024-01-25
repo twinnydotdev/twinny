@@ -20,7 +20,6 @@ const global = globalThis as any
 
 export const CodeBlock = (props: CodeBlockProps) => {
   const { children, completionType, language } = props
-  console.log(language?.languageId.toString())
 
   const handleCopy = () => {
     const text = String(children).replace(/^\n/, '')
