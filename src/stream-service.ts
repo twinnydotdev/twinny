@@ -2,20 +2,21 @@ import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
 import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
-import { chatMessageDeepSeek, chatMessageLlama } from './prompts'
-import { MESSAGE_NAME, MODEL, prompts } from './constants'
-import { StreamBody } from './types'
-import { getIsModelAvailable, getPromptModel, streamResponse } from './utils'
+import { chatMessage } from './prompts'
+import { MESSAGE_NAME, prompts } from './constants'
+import { StreamResponse, StreamOptions } from './types'
+import { getIsModelAvailable, streamResponse } from './utils'
 
-export class ChatService {
+export class StreamService {
   private _config = workspace.getConfiguration('twinny')
-  private _baseUrl = this._config.get('ollamaBaseUrl') as string
-  private _bearerToken = this._config.get('ollamaApiBearerToken') as string
+  private _apiUrl = this._config.get('apiUrl') as string
+  private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
   private _isModelAvailable = true
   private _numPredictChat = this._config.get('numPredictChat') as number
-  private _port = this._config.get('ollamaApiPort') as string
+  private _port = this._config.get('chatApiPort') as string
+  private _apiPath = this._config.get('chatApiPath') as string
   private _temperature = this._config.get('temperature') as number
   private _view?: WebviewView
   private _statusBar: StatusBarItem
@@ -24,6 +25,13 @@ export class ChatService {
     this._view = view
     this._statusBar = statusBar
     this.setModelAvailability()
+
+    workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration('twinny')) {
+        return
+      }
+      this.updateConfig()
+    })
   }
 
   private setModelAvailability = async () => {
@@ -37,9 +45,13 @@ export class ChatService {
       headers.Authorization = `Bearer ${this._bearerToken}`
     }
 
-    const requestBody: StreamBody = {
+    const requestBody: StreamOptions = {
       model: this._chatModel,
       prompt,
+      stream: true,
+      n_predict: this._numPredictChat,
+      temperature: this._temperature,
+      // Ollama
       options: {
         temperature: this._temperature,
         num_predict: this._numPredictChat
@@ -47,9 +59,9 @@ export class ChatService {
     }
 
     const requestOptions: RequestOptions = {
-      hostname: this._baseUrl,
+      hostname: this._apiUrl,
       port: this._port,
-      path: '/api/generate',
+      path: this._apiPath,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,10 +72,18 @@ export class ChatService {
     return { requestOptions, requestBody }
   }
 
-  private onStreamData = (stringBuffer: string, onDestroy: () => void) => {
+  private onStreamData = (
+    streamResponse: StreamResponse | undefined,
+    onDestroy: () => void
+  ) => {
     try {
-      const json = JSON.parse(stringBuffer)
-      this._completion = this._completion + json.response
+      const data = streamResponse?.response || streamResponse?.content
+
+      if (!data) {
+        return
+      }
+
+      this._completion = this._completion + data
 
       this._view?.webview.postMessage({
         type: MESSAGE_NAME.twinnyOnCompletion,
@@ -71,7 +91,7 @@ export class ChatService {
           completion: this._completion.trimStart()
         }
       })
-      if (json.response.match('<EOT>')) {
+      if (data?.match('<EOT>')) {
         onDestroy()
       }
     } catch (error) {
@@ -104,28 +124,21 @@ export class ChatService {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    const modelType = getPromptModel(this._chatModel)
-    if (this._chatModel.includes(MODEL.deepseek)) {
-      return chatMessageDeepSeek(messages, selectionContext, modelType)
-    }
-    return chatMessageLlama(messages, selectionContext, modelType)
+    return chatMessage(messages, selectionContext)
   }
 
   public buildTemplatePrompt = (template: string, message: string) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    const modelType = getPromptModel(this._chatModel)
-    return prompts[template]
-      ? prompts[template](selectionContext, modelType)
-      : message
+    return prompts[template] ? prompts[template](selectionContext) : message
   }
 
   private streamResponse({
     requestBody,
     requestOptions
   }: {
-    requestBody: StreamBody
+    requestBody: StreamOptions
     requestOptions: RequestOptions
   }) {
     this._view?.webview.postMessage({
@@ -153,5 +166,14 @@ export class ChatService {
     const prompt = this.buildTemplatePrompt(promptTemplate, context)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
+  }
+
+  public updateConfig() {
+    this._config = workspace.getConfiguration('twinny')
+    this._temperature = this._config.get('temperature') as number
+    this._chatModel = this._config.get('chatModelName') as string
+    this._apiPath = this._config.get('chatApiPath') as string
+    this._port = this._config.get('chatApiPort') as string
+    this._apiUrl = this._config.get('apiUrl') as string
   }
 }

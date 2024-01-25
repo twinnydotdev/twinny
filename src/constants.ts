@@ -5,11 +5,6 @@ export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const BOT_NAME = 'twinny'
 export const USER_NAME = 'user'
 
-export const MODEL = {
-  llama: 'llama',
-  deepseek: 'deepseek'
-}
-
 export const EMPTY_MESAGE = 'Sorry, I don’t understand. Please try again.'
 export const MODEL_ERROR = 'Sorry, something went wrong...'
 

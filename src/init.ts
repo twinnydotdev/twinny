@@ -17,10 +17,10 @@ export async function init() {
   const config = workspace.getConfiguration('twinny')
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
-  const ollamaBaseUrl = config.get('ollamaBaseUrl') as string
+  const ollamaapiUrl = config.get('apiUrl') as string
   const context = getContext()
 
-  if (ollamaBaseUrl !== 'localhost') {
+  if (ollamaapiUrl !== 'localhost') {
     // Running twinny with external Ollama server.
     return
   }
@@ -59,10 +59,20 @@ function getIsInstalled() {
         console.log('Ollama is not installed.')
         resolve(false)
       } else {
-        exec('ollama list', async () => {
+        exec('ollama list', async (error) => {
+
           console.log(
             'Running \'ollama list\' to check if ollama server is running.'
           )
+
+          if (error) {
+            // Ollama is installed but the service is stopped.
+            window.showInformationMessage(
+              'Something went wrong when trying to contact the Ollama server...'
+            )
+            return resolve(false)
+          }
+
           resolve(true)
         })
       }

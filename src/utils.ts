@@ -3,22 +3,39 @@ import { request as httpsRequest } from 'https'
 import { Uri, commands, window, workspace } from 'vscode'
 
 import path from 'path'
-import { StreamBody } from './types'
-import { MODEL } from './constants'
+import { StreamOptions, StreamResponse } from './types'
 import { exec } from 'child_process'
 
 interface StreamResponseOptions {
-  body: StreamBody
+  body: StreamOptions
   options: RequestOptions
-  onData: (stringBuffer: string, destroy: () => void) => void
+  onData: (
+    streamResponse: StreamResponse | undefined,
+    destroy: () => void
+  ) => void
   onEnd?: () => void
   onStart?: (req: ClientRequest) => void
+}
+
+export const isLlamaCppStream = (stringBuffer: string) => {
+  return stringBuffer.startsWith('data:')
+}
+
+const safeParseJson = (stringBuffer: string): StreamResponse | undefined => {
+  try {
+    if (isLlamaCppStream(stringBuffer)) {
+      return JSON.parse(stringBuffer.split('data:')[1])
+    }
+    return JSON.parse(stringBuffer)
+  } catch (e) {
+    return undefined
+  }
 }
 
 export async function streamResponse(opts: StreamResponseOptions) {
   const { body, options, onData, onEnd, onStart } = opts
   const config = workspace.getConfiguration('twinny')
-  const useTls = config.get('ollamaUseTls')
+  const useTls = config.get('useTls')
 
   const _request = useTls ? httpsRequest : request
 
@@ -26,12 +43,15 @@ export async function streamResponse(opts: StreamResponseOptions) {
 
   const req = _request(options, (res) => {
     res.on('data', (chunk: string) => {
-      stringBuffer += chunk
-      if (/\n$/.exec(chunk)) {
-        onData(stringBuffer, () => {
-          res.destroy()
-        })
-        stringBuffer = ''
+      stringBuffer += chunk.toString()
+      try {
+        if (/\n$/.exec(stringBuffer)) {
+          const streamResponse = safeParseJson(stringBuffer)
+          onData(streamResponse, () => res.destroy())
+          stringBuffer = ''
+        }
+      } catch (e) {
+        return
       }
     })
     res.once('end', () => {
@@ -93,10 +113,6 @@ export const getTextSelection = () => {
   const selection = editor?.selection
   const text = editor?.document.getText(selection)
   return text || ''
-}
-
-export const getPromptModel = (model: string) => {
-  return model.includes(MODEL.llama) ? MODEL.llama : MODEL.deepseek
 }
 
 export const getIsModelAvailable = (model: string) => {

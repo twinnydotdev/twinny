@@ -1,58 +1,68 @@
-const systemMesage = `You are a helpful, respectful and honest coding assistant.
+export const getSystemMessage =
+  () => `<<SYS>>You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
-For code refactoring, use markdown with code formatting.
-`
+For code refactoring, use markdown with code formatting.<</SYS>>`
 
-export const getSystemMessage = (modelType: string) => {
-  return modelType.includes('deepseek')
-    ? systemMesage
-    : `<<SYS>>${systemMesage}<</SYS>>`
-}
-
-export const explain = (code: string, modelType: string) =>
+export const explain = (code: string) =>
   `
-    ${getSystemMessage(modelType)}
-    Explain the following code \`\`\`${code}\`\`\` do not waffle on.
+    ${getSystemMessage()}
+
+    Explain the following code do not waffle on.
+
+    \`\`\`
+    ${code}
+    \`\`\`
   `
 
-export const addTypes = (code: string, modelType: string) =>
+export const addTypes = (code: string) =>
   `
-    ${getSystemMessage(modelType)}
-    Add types to the following code, keep the code the same just add the types \`\`\`${code}\`\`\`.
+    ${getSystemMessage()}
+
+    Add types to the following code, keep the code the same just add the types.
+
+    \`\`\`
+    ${code}
+    \`\`\`.
   `
 
-export const refactor = (code: string, modelType: string): string =>
+export const refactor = (code: string): string =>
   `
-    ${getSystemMessage(modelType)}
+    ${getSystemMessage()}
+
     Refactor the following code without altering its functionality:
-    \`\`\`${code}\`\`\`
+
+    \`\`\`
+    ${code}
+    \`\`\`
+
     Always format responses with Markdown for code blocks. For instance, use \`typescript\` or \`python\` for code formatting.
     If the language of the code is uncertain, default to using \`typescript\`.
   `
 
-export const addTests = (code: string, modelType: string): string =>
+export const addTests = (code: string): string =>
   `
-    ${getSystemMessage(modelType)}
+    ${getSystemMessage()}
     Write unit tests for the following code block:
     \`\`\`${code}\`\`\`
     Please use the most popular testing library suitable for the language of the code.
   `
 
-export const generateDocs = (code: string, modelType: string): string =>
+export const generateDocs = (code: string): string =>
   `
-    ${getSystemMessage(modelType)}
+    ${getSystemMessage()}
+
     Generate documentation for the following code block:
-    \`\`\`${code}\`\`\`
+
+    \`\`\`
+    ${code}
+    \`\`\`
+
     Use the most popular documentation tool for the inferred language, e.g., JSDoc for JavaScript.
   `
 
-export const chatMessageLlama = (
-  messages: Message[],
-  selection: string,
-  modelType: string
-) =>
+export const chatMessage = (messages: Message[], selection: string) =>
   `
-    ${messages.length === 1 ? getSystemMessage(modelType) : ''}
+    ${messages.length === 1 ? getSystemMessage() : ''}
 
     ${messages
       .map((message) =>
@@ -64,26 +74,3 @@ export const chatMessageLlama = (
       )
       .join('\n')}
   `
-
-export const chatMessageDeepSeek = (
-  messages: Message[],
-  selection: string,
-  modelType: string
-) =>
-  `
-    ${messages.length === 1 ? getSystemMessage(modelType) : ''}
-
-    ${messages
-      .map((message) =>
-        message.role === 'user'
-          ? `### Instruction:
-          ${message.content} ${selection ? ` \`\`\`${selection}\`\`\` ` : ''}`
-          : `
-            ### Response:
-            ${message.content}
-            <|EOT|>
-          `
-      )
-      .join('\n')}
-  `
-
