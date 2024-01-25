@@ -42,9 +42,9 @@ export const refactor = (code: string): string =>
 export const addTests = (code: string): string =>
   `
     ${getSystemMessage()}
-    [INST]Write unit tests for the following code block:
+    Write unit tests for the following code block:
     \`\`\`${code}\`\`\`
-    Please use the most popular testing library suitable for the language of the code.[/INST]
+    Please use the most popular testing library suitable for the language of the code.
   `
 
 export const generateDocs = (code: string): string =>
