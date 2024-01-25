@@ -20,6 +20,7 @@ interface PostMessage {
     type: string
     completion: string
     error?: boolean
+    data?: any
   }
 }
 

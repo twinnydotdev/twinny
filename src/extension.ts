@@ -49,6 +49,12 @@ export async function activate(context: ExtensionContext) {
         sidebarProvider.streamService?.streamTemplateCompletion('explain')
       )
     }),
+    commands.registerCommand('twinny.fixCode', () => {
+      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      delayExecution(() =>
+        sidebarProvider.streamService?.streamTemplateCompletion('fix-code')
+      )
+    }),
     commands.registerCommand('twinny.stopGeneration', () => {
       completionProvider.destroyStream()
     }),

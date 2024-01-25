@@ -61,3 +61,39 @@ code {
   gap: 2px;
 }
 
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.suggestion {
+  display: flex;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 2px;
+  justify-content: flex-start;
+  gap: 5px;
+  align-items: center;
+  flex: 0 0 calc(50% - 5px);
+  box-sizing: border-box;
+  margin-bottom: 5px;
+  min-height: 40px;
+  padding: 0 7px;
+}
+
+.suggestion svg {
+  width: 20px;
+}
+
+.suggestion:nth-child(odd) {
+  margin-right: 10px;
+}
+
+.suggestion--disabled {
+  opacity: 0.5;
+}
+
+.suggestion:hover {
+  background: var(--vscode-inputOption-hoverBackground);
+  cursor: pointer;
+}

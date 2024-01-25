@@ -294,6 +294,7 @@
     "@microsoft/fast-react-wrapper": "^0.3.22",
     "@types/react": "^18.2.46",
     "@vscode/webview-ui-toolkit": "^1.4.0",
+    "classnames": "^2.5.1",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

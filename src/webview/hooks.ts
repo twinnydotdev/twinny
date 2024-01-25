@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { MESSAGE_NAME } from '../constants'
+import { LanguageType } from '../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -24,6 +25,22 @@ export const useSelection = (onSelect: () => void) => {
   }, [])
 
   return selection
+}
+
+export const useLanguage = () => {
+  const [language, setLanguage] = useState<LanguageType | undefined>()
+  const handler = (event: MessageEvent) => {
+    const message: PostMessage = event.data
+    if (message?.type === MESSAGE_NAME.twinnySendLanguage) {
+      console.log('language')
+      setLanguage(message?.value.data)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+  useEffect(() => {
+    window.addEventListener('message', handler)
+  }, [])
+  return language
 }
 
 export const useGlobalContext = <T>(key: string) => {

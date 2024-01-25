@@ -6,19 +6,20 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { MESSAGE_NAME, codeActionTypes } from '../constants'
 
 import styles from './index.module.css'
+import { LanguageType } from '../types'
 
 interface CodeBlockProps {
   className?: string
   completionType: string
   children?: ReactNode
+  language: LanguageType | undefined
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 
 export const CodeBlock = (props: CodeBlockProps) => {
-  const { className, children, completionType } = props
-  const match = /language-(\w+)/.exec(className || '')
+  const { children, completionType, language } = props
 
   const handleCopy = () => {
     const text = String(children).replace(/^\n/, '')
@@ -39,7 +40,7 @@ export const CodeBlock = (props: CodeBlockProps) => {
     })
   }
 
-  return match ? (
+  return (
     <>
       <div className={styles.codeOptions}>
         {codeActionTypes.includes(completionType) && (
@@ -53,11 +54,9 @@ export const CodeBlock = (props: CodeBlockProps) => {
       <SyntaxHighlighter
         children={String(children).trimStart().replace(/\n$/, '')}
         style={vscDarkPlus}
-        language={match[1] || 'typescript'}
+        language={language?.languageId?.toString()}
       />
     </>
-  ) : (
-    <code>{String(children)}</code>
   )
 }
 

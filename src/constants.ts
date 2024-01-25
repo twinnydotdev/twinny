@@ -1,4 +1,4 @@
-import { addTests, addTypes, explain, generateDocs, refactor } from './prompts'
+import { addTests, addTypes, explain, fixCode, generateDocs, refactor } from './prompts'
 import { Prompts } from './types'
 
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
@@ -25,8 +25,9 @@ export const MESSAGE_NAME = {
   twinnyWorkspaceContext: 'twinny-workspace-context',
   twinnyGlobalContext: 'twinny-global-context',
   twinnySendSystemMessage: 'twinny-send-system-message',
-
-  twinnyEnableModelDownload: 'twinny-enable-model-download'
+  twinnyClickSuggestion: 'twinny-click-suggestion',
+  twinnyEnableModelDownload: 'twinny-enable-model-download',
+  twinnySendLanguage: 'twinny-send-language',
 }
 
 export const MESSAGE_KEY = {
@@ -43,5 +44,6 @@ export const prompts: Prompts = {
   'add-types': addTypes,
   refactor: refactor,
   'add-tests': addTests,
-  'generate-docs': generateDocs
+  'generate-docs': generateDocs,
+  'fix-code': fixCode,
 }

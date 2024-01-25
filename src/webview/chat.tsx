@@ -17,10 +17,11 @@ import {
   USER_NAME
 } from '../constants'
 
-import { useWorkSpaceContext } from './hooks'
+import { useLanguage, useSelection, useWorkSpaceContext } from './hooks'
 import { StopIcon } from './icons'
 
 import styles from './index.module.css'
+import { Suggestions } from './suggestions'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -33,6 +34,7 @@ export const Chat = () => {
   const [messages, setMessages] = useState<Message[] | undefined>()
   const [completion, setCompletion] = useState<Message | null>()
   const divRef = useRef<HTMLDivElement>(null)
+  const language = useLanguage()
 
   const scrollBottom = () => {
     setTimeout(() => {
@@ -41,6 +43,8 @@ export const Chat = () => {
       }
     }, 200)
   }
+
+  const selection = useSelection(scrollBottom)
 
   const handleSubmitForm = (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
@@ -165,6 +169,7 @@ export const Chat = () => {
                 completionType={message.type || ''}
                 sender={message.role}
                 message={message.content}
+                language={language}
               />
             </div>
           ))}
@@ -179,10 +184,14 @@ export const Chat = () => {
                 completionType={completion.type || ''}
                 sender={BOT_NAME}
                 message={completion.content}
+                language={language}
               />
             </>
           )}
         </div>
+        {!!selection.length && (
+          <Suggestions isDisabled={!!genertingRef.current} />
+        )}
         <form onSubmit={handleSubmitForm}>
           <Selection onSelect={scrollBottom} />
           <div className={styles.chatbox}>
