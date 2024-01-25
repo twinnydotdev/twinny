@@ -34,9 +34,11 @@ The main values which need to be updated to switch between Ollama and llama.cpp 
 - `apiPath` - The API path which defaults to `/api/generate` for Ollama and `/completion` for llama.cpp (See llama.cpp docs or Ollama docs).
 - `apiPort` - The port of your Ollama (default 11434) or llama.cpp server (default 8080)
 
-If you are using llama.cpp the settings for fim model name and chat model name will be ignored as this should already be configured when running the llama.cpp server.
+If you are using llama.cpp - The twinny settings for FIM model name and Chat model name will be ignored, as this should already be configured when running the llama.cpp server.
 
-When the extension is running and the extension is ready you will see a `🤖` icon at the bottom of your code editor which indicates which models are running.
+When the extension is ready you will see a `🤖` icon at the bottom of your code editor.
+
+You will also see which models are being used (only applicable to Ollama hosted servers).
 
 That's it! Enjoy enhanced code completions and chat with twinny! 🎉
 
@@ -64,36 +66,37 @@ Chat:
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/679bd283-28e9-47ff-9165-84dfe293c56a" width="760"/>
 
 
-## Tested ans supported Ollama models
+## Tested and supported Ollama models
 
 twinny and Ollama have been tested and are working with the following models:
 
 - codellama `instruct` for chat and `code` for FIM. (https://ollama.ai/library/codellama)
 - phind-codellama for chat (https://ollama.ai/library/phind-codellama)
 
-For FIM - The model must support the llama or deepseek special tokens for prefix and suffix.
+For FIM - The model must support the llama special tokens for prefix and suffix.
 For chat - All llama models should work, although any model will probably work too, results may vary if the special tokens are different from Llama.
 
-## Tested and supported Llama CPP models
+## Tested and supported llama.cpp models
 
 twinny and llama.ccp has been tested and are working with the following models:
  
 - https://huggingface.co/TheBloke/CodeLlama-7B-GGUF 
 - https://huggingface.co/TheBloke/CodeLlama-13B-GGUF
 
-# Contributing
+
+## Known issues
+
+- If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
+- Some models may not support the special tokens of llama which means they would not work correctly for FIM completions.
+- Sometimes a restart of vscode is required for new settings to take effect
+- FIM and Chat completions for llama.cpp aren't working if using one api/model endpoint (i.e spit out garbage chat/fim completions), so use two different endpoints (one for chat and another for fim) or use Ollama instead of llama.cpp
+  
+If you have a suggestion for improvement please open an issue and I will do my best to make it happen!
+
+## Contributing
 
 We are actively looking for contributors who want to help improve the project, if you are interested in helping out please reach out on [twitter](https://x.com/rjmacarthy).
 
 Contributions are welcome please open an issue describing your changes and open a pull request when ready.
 
 This project is under MIT licence, please read the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) file for more information.
-
-## Known issues
-
-- If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
-- Some modles may not support the special tokens of llama or deepseek which means they would not work correctly for FIM completions.
-- Sometimes a restart of vscode is required for new settings to take effect.
-- FIM and Chat completions for llama.cpp aren't working if using one api/model endpoint, so use two different endpoints (one for chat and another for fim) or use Ollama instead of llama.cpp
-  
-If you have a suggestion for improvement please open an issue and I will do my best to make it happen!
