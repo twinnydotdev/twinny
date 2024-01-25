@@ -1,7 +1,7 @@
 export const getSystemMessage =
-  () => `You are a helpful, respectful and honest coding assistant.
+  () => `<<SYS>>You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
-For code refactoring, use markdown with code formatting.`
+For code refactoring, use markdown with code formatting.<</SYS>>`
 
 export const explain = (code: string) =>
   `
