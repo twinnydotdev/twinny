@@ -149,11 +149,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onStart: (req) => {
               this._currentReq = req
             },
-            onData: (json: OllamStreamResponse, destroy) => {
-              if (!json.response) {
-                return
-              }
+            onData: (stringBuffer: string, destroy) => {
               try {
+                const json: OllamStreamResponse = JSON.parse(stringBuffer)
+                if (!json.response) {
+                  return
+                }
                 completion = completion + json.response
                 chunkCount = chunkCount + 1
                 if (

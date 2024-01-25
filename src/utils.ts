@@ -3,14 +3,14 @@ import { request as httpsRequest } from 'https'
 import { Uri, commands, window, workspace } from 'vscode'
 
 import path from 'path'
-import { OllamStreamResponse, StreamBody } from './types'
+import { StreamBody } from './types'
 import { MODEL } from './constants'
 import { exec } from 'child_process'
 
 interface StreamResponseOptions {
   body: StreamBody
   options: RequestOptions
-  onData: (data: OllamStreamResponse, destroy: () => void) => void
+  onData: (stringBuffer: string, destroy: () => void) => void
   onEnd?: () => void
   onStart?: (req: ClientRequest) => void
 }
@@ -22,21 +22,18 @@ export async function streamResponse(opts: StreamResponseOptions) {
 
   const _request = useTls ? httpsRequest : request
 
+  let stringBuffer = ''
+
   const req = _request(options, (res) => {
-    let stringBuffer = ''
     res.on('data', (chunk: string) => {
       stringBuffer += chunk
-      try {
-        const data: OllamStreamResponse = JSON.parse(stringBuffer)
-        stringBuffer = ''
-        onData(data, () => {
+      if (/\n$/.exec(chunk)) {
+        onData(stringBuffer, () => {
           res.destroy()
         })
-      } catch (e) {
-        return
+        stringBuffer = ''
       }
     })
-
     res.once('end', () => {
       onEnd?.()
     })
