@@ -6,7 +6,6 @@ export interface StreamOptions {
   stream: true,
   n_predict?: number
   temperature?: number
-  stop?: string[],
   // Ollama
   options: Record<string, unknown>
 }

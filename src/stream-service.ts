@@ -51,7 +51,6 @@ export class StreamService {
       stream: true,
       n_predict: this._numPredictChat,
       temperature: this._temperature,
-      stop: ['</s>', 'Twinny:', 'User:'],
       // Ollama
       options: {
         temperature: this._temperature,
