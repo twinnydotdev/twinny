@@ -150,7 +150,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               this._currentReq = req
             },
             onData: (stringBuffer: string, destroy) => {
-
               try {
                 const json: OllamStreamResponse = JSON.parse(stringBuffer)
                 if (!json.response) {

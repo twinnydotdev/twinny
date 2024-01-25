@@ -34,7 +34,6 @@ export async function streamResponse(opts: StreamResponseOptions) {
         stringBuffer = ''
       }
     })
-
     res.once('end', () => {
       onEnd?.()
     })
