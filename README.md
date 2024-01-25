@@ -90,6 +90,7 @@ twinny and llama.ccp has been tested and are working with the following models:
 - Some models may not support the special tokens of llama which means they would not work correctly for FIM completions.
 - Sometimes a restart of vscode is required for new settings to take effect
 - FIM and Chat completions for llama.cpp aren't working if using one api/model endpoint (i.e spit out garbage chat/fim completions), so use two different endpoints (one for chat and another for fim) or use Ollama instead of llama.cpp
+- Using file context often causes incorrect completions for FIM completions because small models get confused when provided with more than one file context.
   
 If you have a suggestion for improvement please open an issue and I will do my best to make it happen!
 
