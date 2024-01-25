@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { getIsModelAvailable, getTextSelection, openDiffView } from '../utils'
+import { getTextSelection, openDiffView } from '../utils'
 import { getContext } from '../context'
 import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { StreamService } from '../stream-service'
@@ -45,12 +45,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (data: any) => {
-        const isModelAvailable = getIsModelAvailable(this._model)
-
-        if (!isModelAvailable) {
-          return
-        }
-
         const context = getContext()
         if (data.type === MESSAGE_NAME.twinnyChatMessage) {
           this.streamService?.streamChatCompletion(data.data as Message[])

@@ -115,21 +115,4 @@ export const getTextSelection = () => {
   return text || ''
 }
 
-export const getIsModelAvailable = (model: string) => {
-  return new Promise<boolean>((resolve, reject) => {
-    exec('ollama list', (error, stdout) => {
-      if (error) {
-        console.log(`exec error: ${error.message}`)
-        reject()
-      }
-
-      if (stdout.match(model)) {
-        resolve(true)
-      }
-
-      resolve(false)
-    })
-  })
-}
-
 export const noop = () => undefined

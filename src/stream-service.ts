@@ -5,7 +5,7 @@ import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 import { chatMessage } from './prompts'
 import { MESSAGE_NAME, prompts } from './constants'
 import { StreamResponse, StreamOptions } from './types'
-import { getIsModelAvailable, streamResponse } from './utils'
+import { streamResponse } from './utils'
 
 export class StreamService {
   private _config = workspace.getConfiguration('twinny')
@@ -13,7 +13,6 @@ export class StreamService {
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
-  private _isModelAvailable = true
   private _numPredictChat = this._config.get('numPredictChat') as number
   private _port = this._config.get('chatApiPort') as string
   private _apiPath = this._config.get('chatApiPath') as string
@@ -24,7 +23,6 @@ export class StreamService {
   constructor(statusBar: StatusBarItem, view?: WebviewView) {
     this._view = view
     this._statusBar = statusBar
-    this.setModelAvailability()
 
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
@@ -32,10 +30,6 @@ export class StreamService {
       }
       this.updateConfig()
     })
-  }
-
-  private setModelAvailability = async () => {
-    this._isModelAvailable = await getIsModelAvailable(this._chatModel)
   }
 
   private buildStreamRequest(prompt: string) {
@@ -106,7 +100,6 @@ export class StreamService {
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
         completion: this._completion.trimStart(),
-        error: !this._isModelAvailable
       }
     })
   }

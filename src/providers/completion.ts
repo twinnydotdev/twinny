@@ -12,7 +12,7 @@ import {
   TextEditor
 } from 'vscode'
 import 'string_score'
-import { getIsModelAvailable, streamResponse } from '../utils'
+import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { languages } from '../languages'
 import { InlineCompletion, StreamOptions } from '../types'
@@ -43,11 +43,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
-    this.setModelAvailability()
-  }
-
-  private setModelAvailability = async () => {
-    this._isModelAvailable = await getIsModelAvailable(this._fimModel)
   }
 
   private buildStreamRequest(prompt: string) {
@@ -97,12 +92,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const editor = window.activeTextEditor
 
     const language = editor?.document.languageId
-
-    if (!this._isModelAvailable) {
-      this._statusBar.text = '$(error)'
-      this._statusBar.tooltip = `Model ${this._fimModel} not found.`
-      return
-    }
 
     if (!editor) {
       return
