@@ -17,10 +17,10 @@ export async function init() {
   const config = workspace.getConfiguration('twinny')
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
-  const ollamaapiUrl = config.get('apiUrl') as string
+  const apiUrl = config.get('apiUrl') as string
   const context = getContext()
 
-  if (ollamaapiUrl !== 'localhost') {
+  if (apiUrl !== 'localhost') {
     // Running twinny with external Ollama server.
     return
   }
@@ -34,6 +34,7 @@ export async function init() {
     )
 
     env.openExternal(Uri.parse(OLLAMA_URL))
+    return
   }
 
   const settingsKey = `${MESSAGE_NAME.twinnyGlobalContext}-${MESSAGE_KEY.downloadCancelled}`
