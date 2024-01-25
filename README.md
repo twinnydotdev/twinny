@@ -66,6 +66,8 @@ Chat:
 
 ## Tested ans supported Ollama models
 
+twinny and Ollama have been tested and are working with the following models:
+
 - codellama `instruct` for chat and `code` for FIM. (https://ollama.ai/library/codellama)
 - phind-codellama for chat (https://ollama.ai/library/phind-codellama)
 
@@ -74,10 +76,14 @@ For chat - All llama models should work, although any model will probably work t
 
 ## Tested and supported Llama CPP models
 
-- twinny and [llama.cpp](https://github.com/ggerganov/llama.cpp) has been tested and is working with the following model: https://huggingface.co/TheBloke/CodeLlama-7B-GGUF
+twinny and llama.ccp has been tested and are working with the following models:
+ 
+- https://huggingface.co/TheBloke/CodeLlama-7B-GGUF 
+- https://huggingface.co/TheBloke/CodeLlama-13B-GGUF
 
-For FIM - The model must support the llama or deepseek special tokens for prefix and suffix.
-For chat - All llama models should work, although any model will probably work too, results may vary if the special tokens are different from Llama.
+# Contributing
+
+We are actively looking for contributors who want to help improve the project, if you are interested in helping out please reach out on [twitter](https://x.com/rjmacarthy).
 
 Contributions are welcome please open an issue describing your changes and open a pull request when ready.
 
@@ -88,5 +94,6 @@ This project is under MIT licence, please read the [LICENSE](https://github.com/
 - If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
 - Some modles may not support the special tokens of llama or deepseek which means they would not work correctly for FIM completions.
 - Sometimes a restart of vscode is required for new settings to take effect.
+- FIM and Chat completions for llama.cpp aren't working if using one api/model endpoint, so use two different endpoints (one for chat and another for fim) or use Ollama instead of llama.cpp
   
 If you have a suggestion for improvement please open an issue and I will do my best to make it happen!
