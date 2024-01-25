@@ -145,83 +145,117 @@
     "configuration": {
       "title": "twinny",
       "properties": {
-        "twinny.contextLength": {
-          "type": "number",
-          "default": 300,
-          "description": "How many lines before and after to include in FIM prompts"
-        },
-        "twinny.debounceWait": {
-          "type": "number",
-          "default": 300,
-          "description": "The amount of time to wait before triggering the next completion in milliseconds"
-        },
         "twinny.enabled": {
-          "order": 2,
+          "order": 0,
           "type": "boolean",
           "default": true,
           "description": "Enable or disable twinny extension"
         },
-        "twinny.chatModelName": {
+        "twinny.apiUrl": {
           "order": 1,
           "type": "string",
-          "default": "codellama:7b-instruct",
-          "description": "If using Ollama the model for twinny chat completions"
-        },
-        "twinny.fimModelName": {
-          "order": 0,
-          "type": "string",
-          "default": "codellama:7b-code",
-          "description": "If using Ollama the model for twinny FIM completions"
-        },
-        "twinny.baseUrl": {
-          "type": "string",
           "default": "localhost",
-          "description": "The API base url"
+          "description": "The completion API url",
+          "required": true
         },
-        "twinny.apiPort": {
-          "type": "number",
-          "default": 11434,
-          "description": "The API port e.g 11434 for Ollama and 8080 for llama.cpp"
-        },
-        "twinny.apiPath": {
+        "twinny.chatApiPath": {
+          "order": 2,
           "type": "string",
           "default": "/api/generate",
-          "description": "The API completion path e.g /api/generate for Ollama and /completion for llama.cpp"
+          "description": "The API completion path usually `/api/generate` for Ollama and `/completion` for llama.cpp",
+          "required": true
         },
-        "twinny.apiBearerToken": {
+        "twinny.chatApiPort": {
+          "order": 3,
+          "type": "number",
+          "default": 11434,
+          "description": "The API port usually `11434` for Ollama and `8080` for llama.cpp (May differ depending on API configuration)",
+          "required": true
+        },
+        "twinny.fimApiPort": {
+          "order": 4,
+          "type": "number",
+          "default": 11434,
+          "description": "The API port usually `11434` for Ollama and `8080` for llama.cpp (May differ depending on API configuration)",
+          "required": true
+        },
+        "twinny.fimApiPath": {
+          "order": 5,
           "type": "string",
-          "default": "",
-          "description": "Whether to use a Bearer token for the API connection"
+          "default": "/api/generate",
+          "description": "The API completion path usually `/api/generate` for Ollama and `/completion` for llama.cpp",
+          "required": true
         },
-        "twinny.useFileContext": {
-          "type": "boolean",
-          "default": true,
-          "description": "Scan open documents and provide to completion prompt"
+        "twinny.chatModelName": {
+          "order": 6,
+          "type": "string",
+          "default": "codellama:7b-instruct",
+          "description": "(Ollama API only) The model for twinny chat completions"
+        },
+        "twinny.fimModelName": {
+          "order": 7,
+          "type": "string",
+          "default": "codellama:7b-code",
+          "description": "(Ollama API only) The model for twinny FIM completions"
+        },
+        "twinny.contextLength": {
+          "order": 8,
+          "type": "number",
+          "default": 300,
+          "description": "How many lines before and after to include in FIM prompts",
+          "required": true
+        },
+        "twinny.debounceWait": {
+          "order": 9,
+          "type": "number",
+          "default": 300,
+          "description": "The amount of time to wait before triggering the next completion in milliseconds",
+          "required": true
         },
         "twinny.temperature": {
+          "order": 10,
           "type": "number",
           "default": 1,
-          "description": "The temperature sent for model completions"
+          "description": "The model temperature sent for completions",
+          "required": true
+        },
+        "twinny.useFileContext": {
+          "order": 11,
+          "type": "boolean",
+          "default": true,
+          "description": "Optional setting which scans neighbouring documents to provide to completion prompts"
+        },
+        "twinny.enableCompletionCache": {
+          "order": 12,
+          "type": "boolean",
+          "default": true,
+          "description": "Whether or not to cache previously completed FIM completions with the same prompt"
         },
         "twinny.numPredictChat": {
+          "order": 13,
           "type": "number",
           "default": 512,
-          "description": "Max number of tokens to generate for chat completions"
+          "description": "Maximum number of tokens to generate for chat completions",
+          "required": true
         },
         "twinny.numPredictFim": {
+          "order": 14,
           "type": "number",
-          "default": -2,
-          "description": "Max number of tokens to generate for fim completions"
+          "default": -1,
+          "description": "Maximum number of tokens to generate for fim completions default is -1 for infinite, twinny will stop when ready.",
+          "required": true
         },
         "twinny.useTls": {
+          "order": 15,
           "type": "boolean",
           "default": false,
           "description": "Whether to use TLS for the completion API connection e.g https"
         },
-        "twinny.enableCompletionCache": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether or not to cache previously completed FIM completions with the same prompt"
+        "twinny.apiBearerToken": {
+          "order": 16,
+          "type": "string",
+          "default": "",
+          "description": "Whether to use a Bearer token for the API connection"
         }
       }
     }

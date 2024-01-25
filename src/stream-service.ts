@@ -2,21 +2,21 @@ import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
 import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
-import { chatMessageDeepSeek, chatMessageLlama } from './prompts'
-import { MESSAGE_NAME, MODEL, prompts } from './constants'
-import { OllamStreamResponse, StreamBody } from './types'
-import { getIsModelAvailable, getPromptModel, streamResponse } from './utils'
+import { chatMessage } from './prompts'
+import { MESSAGE_NAME, prompts } from './constants'
+import { StreamResponse, StreamOptions } from './types'
+import { getIsModelAvailable, streamResponse } from './utils'
 
 export class StreamService {
   private _config = workspace.getConfiguration('twinny')
-  private _baseUrl = this._config.get('baseUrl') as string
+  private _apiUrl = this._config.get('apiUrl') as string
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
   private _isModelAvailable = true
   private _numPredictChat = this._config.get('numPredictChat') as number
-  private _port = this._config.get('apiPort') as string
-  private _apiPath = this._config.get('apiPath') as string
+  private _port = this._config.get('chatApiPort') as string
+  private _apiPath = this._config.get('chatApiPath') as string
   private _temperature = this._config.get('temperature') as number
   private _view?: WebviewView
   private _statusBar: StatusBarItem
@@ -45,10 +45,16 @@ export class StreamService {
       headers.Authorization = `Bearer ${this._bearerToken}`
     }
 
-    const requestBody: StreamBody = {
+    console.log(prompt)
+
+    const requestBody: StreamOptions = {
       model: this._chatModel,
       prompt,
       stream: true,
+      n_predict: this._numPredictChat,
+      temperature: this._temperature,
+      stop: ['</s>', 'Twinny:', 'User:'],
+      // Ollama
       options: {
         temperature: this._temperature,
         num_predict: this._numPredictChat
@@ -56,7 +62,7 @@ export class StreamService {
     }
 
     const requestOptions: RequestOptions = {
-      hostname: this._baseUrl,
+      hostname: this._apiUrl,
       port: this._port,
       path: this._apiPath,
       method: 'POST',
@@ -69,9 +75,17 @@ export class StreamService {
     return { requestOptions, requestBody }
   }
 
-  private onStreamData = (json: OllamStreamResponse, onDestroy: () => void) => {
+  private onStreamData = (
+    streamResponse: StreamResponse | undefined,
+    onDestroy: () => void
+  ) => {
     try {
-      const data = json.response || json.content
+      const data = streamResponse?.response || streamResponse?.content
+
+      if (!data) {
+        return
+      }
+
       this._completion = this._completion + data
 
       this._view?.webview.postMessage({
@@ -113,28 +127,21 @@ export class StreamService {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    const modelType = getPromptModel(this._chatModel)
-    if (this._chatModel.includes(MODEL.deepseek)) {
-      return chatMessageDeepSeek(messages, selectionContext, modelType)
-    }
-    return chatMessageLlama(messages, selectionContext, modelType)
+    return chatMessage(messages, selectionContext)
   }
 
   public buildTemplatePrompt = (template: string, message: string) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    const modelType = getPromptModel(this._chatModel)
-    return prompts[template]
-      ? prompts[template](selectionContext, modelType)
-      : message
+    return prompts[template] ? prompts[template](selectionContext) : message
   }
 
   private streamResponse({
     requestBody,
     requestOptions
   }: {
-    requestBody: StreamBody
+    requestBody: StreamOptions
     requestOptions: RequestOptions
   }) {
     this._view?.webview.postMessage({
@@ -168,8 +175,8 @@ export class StreamService {
     this._config = workspace.getConfiguration('twinny')
     this._temperature = this._config.get('temperature') as number
     this._chatModel = this._config.get('chatModelName') as string
-    this._apiPath = this._config.get('apiPath') as string
-    this._port = this._config.get('apiPort') as string
-    this._baseUrl = this._config.get('baseUrl') as string
+    this._apiPath = this._config.get('chatApiPath') as string
+    this._port = this._config.get('chatApiPort') as string
+    this._apiUrl = this._config.get('apiUrl') as string
   }
 }

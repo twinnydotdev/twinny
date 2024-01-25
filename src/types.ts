@@ -1,9 +1,13 @@
 import { Position } from 'vscode'
 
-export interface StreamBody {
+export interface StreamOptions {
   model: string
   prompt: string
   stream: true,
+  n_predict?: number
+  temperature?: number
+  stop?: string[],
+  // Ollama
   options: Record<string, unknown>
 }
 
@@ -14,7 +18,7 @@ export interface InlineCompletion {
   suffix: string
 }
 
-export interface OllamStreamResponse {
+export interface StreamResponse {
   model: string;
   created_at: string;
   response: string;
@@ -31,6 +35,6 @@ export interface OllamStreamResponse {
 
 
 export interface Prompts {
-  [key: string]: (code: string, modelType: string) => string
+  [key: string]: (code: string) => string
 }
 

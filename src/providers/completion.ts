@@ -15,9 +15,10 @@ import 'string_score'
 import { getIsModelAvailable, streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { languages } from '../languages'
-import { InlineCompletion, OllamStreamResponse, StreamBody } from '../types'
+import { InlineCompletion, StreamOptions } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
+import { getFimPromptTemplate } from '../prompt-template'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -27,12 +28,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
   private _fimModel = this._config.get('fimModelName') as string
-  private _baseUrl = this._config.get('baseUrl') as string
-  private _port = this._config.get('apiPort') as number
-  private _apiPath = this._config.get('apiPath') as string
+  private _apiUrl = this._config.get('apiUrl') as string
+  private _port = this._config.get('fimApiPort') as number
+  private _apiPath = this._config.get('fimApiPath') as string
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
-  private _useFileContext = this._config.get('useFileContext') as number
+  private _useFileContext = this._config.get('useFileContext') as boolean
   private _bearerToken = this._config.get('apiBearerToken') as number
   private _enableCompletionCache = this._config.get(
     'enableCompletionCache'
@@ -56,10 +57,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       headers.Authorization = `Bearer ${this._bearerToken}`
     }
 
-    const requestBody: StreamBody = {
+    const requestBody: StreamOptions = {
       model: this._fimModel,
       prompt,
       stream: true,
+      n_predict: this._numPredictFim,
+      temperature: this._temperature,
+      // Ollama
       options: {
         temperature: this._temperature,
         num_predict: this._numPredictFim || -2
@@ -67,7 +71,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     const requestOptions: RequestOptions = {
-      hostname: this._baseUrl,
+      hostname: this._apiUrl,
       port: this._port,
       path: this._apiPath,
       method: 'POST',
@@ -114,12 +118,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const context = this.getFileContext(document.uri)
 
-        const { prompt, prefix, suffix } = this.getPrompt(
-          document,
-          position,
+        const { prefix, suffix } = this.getPositionContext(document, position)
+
+        const { prompt } = getFimPromptTemplate({
           context,
-          language
-        )
+          prefix,
+          suffix,
+          header: this.getFileHeader(language, document.uri),
+          useFileContext: this._useFileContext
+        })
 
         const cachedCompletion = getCache({ prefix, suffix })
 
@@ -136,8 +143,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (!prompt) return resolve([])
 
-        console.log(prompt)
-
         try {
           let completion = ''
           let chunkCount = 0
@@ -153,17 +158,22 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onStart: (req) => {
               this._currentReq = req
             },
-            onData: (json: OllamStreamResponse, destroy) => {
-              const data = json.response || json.content
-              if (!data) {
-                return
-              }
+            onData: (streamResponse, destroy) => {
               try {
-                completion = completion + data
+                const completionString =
+                  streamResponse?.response || streamResponse?.content
+
+                if (!completionString) {
+                  this._statusBar.text = '🤖'
+                  return resolve([])
+                }
+
+                completion = completion + completionString
                 chunkCount = chunkCount + 1
+
                 if (
-                  (chunkCount > 1 && data === '\n') ||
-                  data?.match('<EOT>')
+                  (chunkCount > 1 && completionString === '\n') ||
+                  completion?.match('<EOT>')
                 ) {
                   this._statusBar.text = '🤖'
                   completion = completion.replace('<EOT>', '')
@@ -190,34 +200,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         }
       }, this._debounceWait as number)
     })
-  }
-
-  // TODO: Move to own file to prevent formatting
-  private getPrompt(
-    document: TextDocument,
-    position: Position,
-    context: string,
-    language: string | undefined
-  ) {
-    const header = this._useFileContext
-      ? this.getFileHeader(language, document.uri)
-      : ''
-    const { prefix, suffix } = this.getPositionContext(document, position)
-    const fileContext = this._useFileContext ? context : ''
-
-    if (this._fimModel.includes('deepseek')) {
-      return {
-        prompt: `<｜fim▁begin｜> ${fileContext}\n${header}${prefix} <｜fim▁hole｜>${suffix} <｜fim▁end｜>`,
-        prefix,
-        suffix
-      }
-    }
-
-    return {
-      prompt: `<PRE> ${fileContext}\n${header}${prefix} <SUF>${suffix} <MID>`,
-      prefix,
-      suffix
-    }
   }
 
   private getFileHeader(languageId: string | undefined, uri: Uri) {
@@ -379,12 +361,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._debounceWait = this._config.get('debounceWait') as number
     this._contextLength = this._config.get('contextLength') as number
     this._temperature = this._config.get('temperature') as number
-    this._useFileContext = this._config.get('useFileContext') as number
+    this._useFileContext = this._config.get('useFileContext') as boolean
     this._fimModel = this._config.get('fimModelName') as string
     this._numPredictFim = this._config.get('numPredictFim') as number
-    this._apiPath = this._config.get('apiPath') as string
-    this._port = this._config.get('apiPort') as number
-    this._baseUrl = this._config.get('baseUrl') as string
+    this._apiPath = this._config.get('fimApiPath') as string
+    this._port = this._config.get('fimApiPort') as number
+    this._apiUrl = this._config.get('apiUrl') as string
     this._enableCompletionCache = this._config.get(
       'enableCompletionCache'
     ) as boolean
