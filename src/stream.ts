@@ -4,7 +4,7 @@ import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
 import { chatMessageDeepSeek, chatMessageLlama } from './prompts'
 import { MESSAGE_NAME, MODEL, prompts } from './constants'
-import { OllamStreamResponse, StreamBody } from './types'
+import { StreamBody } from './types'
 import { getIsModelAvailable, getPromptModel, streamResponse } from './utils'
 
 export class ChatService {
@@ -60,8 +60,9 @@ export class ChatService {
     return { requestOptions, requestBody }
   }
 
-  private onStreamData = (json: OllamStreamResponse, onDestroy: () => void) => {
+  private onStreamData = (stringBuffer: string, onDestroy: () => void) => {
     try {
+      const json = JSON.parse(stringBuffer)
       this._completion = this._completion + json.response
 
       this._view?.webview.postMessage({
