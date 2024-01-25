@@ -45,8 +45,6 @@ export class StreamService {
       headers.Authorization = `Bearer ${this._bearerToken}`
     }
 
-    console.log(prompt)
-
     const requestBody: StreamOptions = {
       model: this._chatModel,
       prompt,
