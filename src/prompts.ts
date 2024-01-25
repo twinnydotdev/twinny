@@ -23,6 +23,8 @@ export const addTypes = (code: string) =>
     \`\`\`
     ${code}
     \`\`\`.
+
+    Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
   `
 
 export const refactor = (code: string): string =>
@@ -35,8 +37,7 @@ export const refactor = (code: string): string =>
     ${code}
     \`\`\`
 
-    Always format responses with Markdown for code blocks. For instance, use \`typescript\` or \`python\` for code formatting.
-    If the language of the code is uncertain, default to using \`typescript\`.
+    Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
   `
 
 export const addTests = (code: string): string =>
@@ -45,6 +46,15 @@ export const addTests = (code: string): string =>
     Write unit tests for the following code block:
     \`\`\`${code}\`\`\`
     Please use the most popular testing library suitable for the language of the code.
+    Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+  `
+
+export const fixCode = (code: string): string =>
+  `
+    ${getSystemMessage()}
+    Fix the following code by adding or removing lines without altering its functionality:
+    \`\`\`${code}\`\`\`
+    Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
   `
 
 export const generateDocs = (code: string): string =>
@@ -58,6 +68,7 @@ export const generateDocs = (code: string): string =>
     \`\`\`
 
     Use the most popular documentation tool for the inferred language, e.g., JSDoc for JavaScript.
+    Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
   `
 
 export const chatMessage = (messages: Message[], selection: string) =>

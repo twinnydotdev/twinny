@@ -4,7 +4,7 @@ import { Uri, commands, window, workspace } from 'vscode'
 
 import path from 'path'
 import { StreamOptions, StreamResponse } from './types'
-import { exec } from 'child_process'
+import { languages } from './languages'
 
 interface StreamResponseOptions {
   body: StreamOptions
@@ -113,6 +113,16 @@ export const getTextSelection = () => {
   const selection = editor?.selection
   const text = editor?.document.getText(selection)
   return text || ''
+}
+
+export const getLanguage = () => {
+  const editor = window.activeTextEditor
+  const languageId = editor?.document.languageId
+  const language = languages[languageId as keyof typeof languages]
+  return {
+    language,
+    languageId,
+  }
 }
 
 export const noop = () => undefined

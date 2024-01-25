@@ -61,6 +61,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             EXTENSION_NAME
           )
         }
+        if (data.type === MESSAGE_NAME.twinnyClickSuggestion) {
+          vscode.commands.executeCommand(data.data)
+        }
         if (data.type === MESSAGE_NAME.twinnyTextSelection) {
           webviewView.webview.postMessage({
             type: MESSAGE_NAME.twinnyTextSelection,

@@ -32,6 +32,10 @@ export interface StreamResponse {
   eval_duration: number;
 }
 
+export interface LanguageType {
+  language: string
+  languageId: string
+}
 
 export interface Prompts {
   [key: string]: (code: string) => string

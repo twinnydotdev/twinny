@@ -5,7 +5,7 @@ import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 import { chatMessage } from './prompts'
 import { MESSAGE_NAME, prompts } from './constants'
 import { StreamResponse, StreamOptions } from './types'
-import { streamResponse } from './utils'
+import { getLanguage, streamResponse } from './utils'
 
 export class StreamService {
   private _config = workspace.getConfiguration('twinny')
@@ -99,7 +99,7 @@ export class StreamService {
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
-        completion: this._completion.trimStart(),
+        completion: this._completion.trimStart()
       }
     })
   }
@@ -147,8 +147,18 @@ export class StreamService {
     })
   }
 
+  private sendEditorLanguage = () => {
+    this._view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnySendLanguage,
+      value: {
+        data: getLanguage()
+      }
+    } as PostMessage)
+  }
+
   public streamChatCompletion(messages: Message[]) {
     this._completion = ''
+    this.sendEditorLanguage()
     const prompt = this.buildChatMessagePrompt(messages)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
@@ -156,6 +166,7 @@ export class StreamService {
 
   public streamTemplateCompletion(promptTemplate: string, context = '') {
     this._completion = ''
+    this.sendEditorLanguage()
     const prompt = this.buildTemplatePrompt(promptTemplate, context)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
