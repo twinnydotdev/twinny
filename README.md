@@ -52,7 +52,6 @@ That's it! Enjoy enhanced code completions and chat with twinny! 🎉
 - Easy to install
 - Configurable endpoint and port and path for completion API
 - Chat feature like Copilot Chat
-- View diff for code completions
 - Accept solution directly to editor
 - Copy generated code solution blocks
 - Chat history preserved per conversation
