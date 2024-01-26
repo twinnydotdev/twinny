@@ -5,7 +5,7 @@ import { VSCodeDivider } from '@vscode/webview-ui-toolkit/react'
 import CodeBlock from './code-block'
 
 import styles from './index.module.css'
-import { LanguageType } from '../types'
+import { LanguageType, ThemeType } from '../types'
 import React from 'react'
 
 interface MessageProps {
@@ -13,13 +13,15 @@ interface MessageProps {
   sender: string
   completionType: string
   language: LanguageType | undefined
+  theme: ThemeType | undefined
 }
 
 export const Message = ({
   message,
   sender,
   completionType,
-  language
+  language,
+  theme,
 }: MessageProps) => {
   if (!message) {
     return null
@@ -35,9 +37,8 @@ export const Message = ({
               return (
                 <CodeBlock
                   language={language}
+                  theme={theme}
                   completionType={completionType}
-                  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                  //@ts-ignore
                   {...children.props}
                 />
               )

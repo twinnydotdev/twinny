@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { getTextSelection, openDiffView } from '../utils'
+import { getTextSelection, getTheme, openDiffView } from '../utils'
 import { getContext } from '../context'
 import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { StreamService } from '../stream-service'
@@ -42,6 +42,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         })
       }
     )
+
+    vscode.window.onDidChangeActiveColorTheme(() => {
+      webviewView.webview.postMessage({
+        type: MESSAGE_NAME.twinnySendTheme,
+        value: {
+          data: getTheme()
+        }
+      })
+    })
 
     webviewView.webview.onDidReceiveMessage(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,6 +120,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
             data.data
           )
+        }
+        if (data.type === MESSAGE_NAME.twinnySendTheme) {
+          webviewView.webview.postMessage({
+            type: MESSAGE_NAME.twinnySendTheme,
+            value: {
+              data: getTheme()
+            }
+          })
         }
         if (data.type === MESSAGE_NAME.twinnyNotification) {
           vscode.window.showInformationMessage(data.data)

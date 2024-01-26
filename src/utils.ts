@@ -1,9 +1,9 @@
 import { ClientRequest, RequestOptions, request } from 'http'
 import { request as httpsRequest } from 'https'
-import { Uri, commands, window, workspace } from 'vscode'
+import { ColorThemeKind, Uri, commands, window, workspace } from 'vscode'
 
 import path from 'path'
-import { StreamOptions, StreamResponse } from './types'
+import { StreamOptions, StreamResponse, Theme } from './types'
 import { languages } from './languages'
 
 interface StreamResponseOptions {
@@ -121,7 +121,18 @@ export const getLanguage = () => {
   const language = languages[languageId as keyof typeof languages]
   return {
     language,
-    languageId,
+    languageId
+  }
+}
+
+export const getTheme = () => {
+  const currentTheme = window.activeColorTheme
+  if (currentTheme.kind === ColorThemeKind.Light) {
+    return Theme.Light
+  } else if (currentTheme.kind === ColorThemeKind.Dark) {
+    return Theme.Dark
+  } else {
+    return Theme.Contrast
   }
 }
 

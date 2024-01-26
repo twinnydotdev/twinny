@@ -16,7 +16,7 @@ import {
   USER_NAME
 } from '../constants'
 
-import { useSelection, useWorkSpaceContext } from './hooks'
+import { useSelection, useTheme, useWorkSpaceContext } from './hooks'
 import { StopIcon } from './icons'
 
 import styles from './index.module.css'
@@ -30,6 +30,7 @@ export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const genertingRef = useRef(false)
   const stopRef = useRef(false)
+  const theme = useTheme()
   const [loading, setLoading] = useState(false)
   const lastConversation = useWorkSpaceContext<MessageType[]>('lastConversation')
   const [messages, setMessages] = useState<MessageType[] | undefined>()
@@ -172,6 +173,7 @@ export const Chat = () => {
                 sender={message.role}
                 message={message.content}
                 language={message.language}
+                theme={theme}
               />
             </div>
           ))}
@@ -187,6 +189,7 @@ export const Chat = () => {
                 sender={BOT_NAME}
                 message={completion.content}
                 language={completion.language}
+                theme={theme}
               />
             </>
           )}

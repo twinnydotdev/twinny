@@ -2,8 +2,8 @@ import { addTests, addTypes, explain, fixCode, generateDocs, refactor } from './
 import { Prompts } from './types'
 
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
-export const BOT_NAME = 'twinny'
-export const USER_NAME = 'user'
+export const BOT_NAME = '🤖 twinny'
+export const USER_NAME = '👤 You'
 
 export const EMPTY_MESAGE = 'Sorry, I don’t understand. Please try again.'
 export const MODEL_ERROR = 'Sorry, something went wrong...'
@@ -28,6 +28,7 @@ export const MESSAGE_NAME = {
   twinnyClickSuggestion: 'twinny-click-suggestion',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
   twinnySendLanguage: 'twinny-send-language',
+  twinnySendTheme : 'twinny-send-theme',
 }
 
 export const MESSAGE_KEY = {

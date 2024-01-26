@@ -28,6 +28,7 @@ export type LanguageType = {
   extensions: string[]
   filenames?: string[]
   comment?: { start: string; end?: string }
+  base?: Language
 }
 
 export const languages: { [key in Language]: LanguageType } = {
@@ -39,7 +40,8 @@ export const languages: { [key in Language]: LanguageType } = {
   typescriptreact: {
     name: 'Typescript React',
     extensions: ['.tsx'],
-    comment: { start: '//' }
+    comment: { start: '//' },
+    base: 'typescript'
   },
   javascript: {
     name: 'Javascript',
