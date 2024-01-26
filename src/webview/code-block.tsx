@@ -28,7 +28,7 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   const handleOpenDiff = () => {
     global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnyAcceptSolution,
+      type: MESSAGE_NAME.twinnyOpenDiff,
       data: String(children).replace(/^\n/, '')
     })
   }

@@ -41,3 +41,20 @@ export interface Prompts {
   [key: string]: (code: string) => string
 }
 
+export interface PostMessage {
+  type: string
+  value: {
+    type: string
+    completion: string
+    error?: boolean
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data?: any
+  }
+}
+export interface MessageType {
+  role: string
+  content: string
+  type?: string
+  language?: LanguageType
+}
+

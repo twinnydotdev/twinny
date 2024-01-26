@@ -7,7 +7,6 @@ import {
   VSCodeProgressRing
 } from '@vscode/webview-ui-toolkit/react'
 
-import { Message } from './message'
 import { Selection } from './selection'
 import {
   BOT_NAME,
@@ -17,11 +16,13 @@ import {
   USER_NAME
 } from '../constants'
 
-import { useLanguage, useSelection, useWorkSpaceContext } from './hooks'
+import { useSelection, useWorkSpaceContext } from './hooks'
 import { StopIcon } from './icons'
 
 import styles from './index.module.css'
 import { Suggestions } from './suggestions'
+import { MessageType, PostMessage } from '../types'
+import { Message } from './message'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -30,11 +31,10 @@ export const Chat = () => {
   const genertingRef = useRef(false)
   const stopRef = useRef(false)
   const [loading, setLoading] = useState(false)
-  const lastConversation = useWorkSpaceContext<Message[]>('lastConversation')
-  const [messages, setMessages] = useState<Message[] | undefined>()
-  const [completion, setCompletion] = useState<Message | null>()
+  const lastConversation = useWorkSpaceContext<MessageType[]>('lastConversation')
+  const [messages, setMessages] = useState<MessageType[] | undefined>()
+  const [completion, setCompletion] = useState<MessageType | null>()
   const divRef = useRef<HTMLDivElement>(null)
-  const language = useLanguage()
 
   const scrollBottom = () => {
     setTimeout(() => {
@@ -76,7 +76,8 @@ export const Chat = () => {
         {
           role: BOT_NAME,
           content: message.value.completion || EMPTY_MESAGE,
-          type: message.value.type
+          type: message.value.type,
+          language: message.value.data,
         }
       ]
       global.vscode.postMessage({
@@ -103,7 +104,8 @@ export const Chat = () => {
     setCompletion({
       role: BOT_NAME,
       content: message.value.completion || EMPTY_MESAGE,
-      type: message.value.type
+      type: message.value.type,
+      language: message.value.data,
     })
     scrollBottom()
   }
@@ -169,7 +171,7 @@ export const Chat = () => {
                 completionType={message.type || ''}
                 sender={message.role}
                 message={message.content}
-                language={language}
+                language={message.language}
               />
             </div>
           ))}
@@ -184,7 +186,7 @@ export const Chat = () => {
                 completionType={completion.type || ''}
                 sender={BOT_NAME}
                 message={completion.content}
-                language={language}
+                language={completion.language}
               />
             </>
           )}

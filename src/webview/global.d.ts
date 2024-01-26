@@ -13,19 +13,3 @@ interface Window {
     postMessage: (msg: unknown) => void
   }
 }
-
-interface PostMessage {
-  type: string
-  value: {
-    type: string
-    completion: string
-    error?: boolean
-    data?: any
-  }
-}
-
-interface Message {
-  role: string
-  content: string
-  type?: string
-}

@@ -4,7 +4,7 @@ import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
 import { chatMessage } from './prompts'
 import { MESSAGE_NAME, prompts } from './constants'
-import { StreamResponse, StreamOptions } from './types'
+import { StreamResponse, StreamOptions, PostMessage, MessageType } from './types'
 import { getLanguage, streamResponse } from './utils'
 
 export class StreamService {
@@ -19,6 +19,7 @@ export class StreamService {
   private _temperature = this._config.get('temperature') as number
   private _view?: WebviewView
   private _statusBar: StatusBarItem
+  private _promptTemplate = ''
 
   constructor(statusBar: StatusBarItem, view?: WebviewView) {
     this._view = view
@@ -82,9 +83,11 @@ export class StreamService {
       this._view?.webview.postMessage({
         type: MESSAGE_NAME.twinnyOnCompletion,
         value: {
-          completion: this._completion.trimStart()
+          completion: this._completion.trimStart(),
+          data: getLanguage(),
+          type: this._promptTemplate,
         }
-      })
+      } as PostMessage)
       if (data?.match('<EOT>')) {
         onDestroy()
       }
@@ -99,9 +102,11 @@ export class StreamService {
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
-        completion: this._completion.trimStart()
+        completion: this._completion.trimStart(),
+        data: getLanguage(),
+        type: this._promptTemplate,
       }
-    })
+    } as PostMessage)
   }
 
   private onStreamStart = (req: ClientRequest) => {
@@ -113,7 +118,7 @@ export class StreamService {
     })
   }
 
-  public buildChatMessagePrompt = (messages: Message[]) => {
+  public buildChatMessagePrompt = (messages: MessageType[]) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
@@ -156,7 +161,7 @@ export class StreamService {
     } as PostMessage)
   }
 
-  public streamChatCompletion(messages: Message[]) {
+  public streamChatCompletion(messages: MessageType[]) {
     this._completion = ''
     this.sendEditorLanguage()
     const prompt = this.buildChatMessagePrompt(messages)
@@ -166,6 +171,7 @@ export class StreamService {
 
   public streamTemplateCompletion(promptTemplate: string, context = '') {
     this._completion = ''
+    this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
     const prompt = this.buildTemplatePrompt(promptTemplate, context)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)

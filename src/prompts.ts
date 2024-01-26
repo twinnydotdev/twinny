@@ -1,3 +1,5 @@
+import { MessageType } from './types'
+
 export const getSystemMessage =
   () => `<<SYS>>You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
@@ -25,6 +27,7 @@ export const addTypes = (code: string) =>
     \`\`\`.
 
     Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+    Do not explain the code in your response.
   `
 
 export const refactor = (code: string): string =>
@@ -38,6 +41,7 @@ export const refactor = (code: string): string =>
     \`\`\`
 
     Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+    Do not explain the code in your response.
   `
 
 export const addTests = (code: string): string =>
@@ -55,6 +59,7 @@ export const fixCode = (code: string): string =>
     Fix the following code by adding or removing lines without altering its functionality:
     \`\`\`${code}\`\`\`
     Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+    Do not explain the code in your response.
   `
 
 export const generateDocs = (code: string): string =>
@@ -71,7 +76,7 @@ export const generateDocs = (code: string): string =>
     Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
   `
 
-export const chatMessage = (messages: Message[], selection: string) =>
+export const chatMessage = (messages: MessageType[], selection: string) =>
   `
     ${messages.length === 1 ? getSystemMessage() : ''}
 
