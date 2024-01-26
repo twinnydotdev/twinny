@@ -3,6 +3,7 @@ import { getTextSelection, openDiffView } from '../utils'
 import { getContext } from '../context'
 import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { StreamService } from '../stream-service'
+import { MessageType } from '../types'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
@@ -47,7 +48,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       (data: any) => {
         const context = getContext()
         if (data.type === MESSAGE_NAME.twinnyChatMessage) {
-          this.streamService?.streamChatCompletion(data.data as Message[])
+          this.streamService?.streamChatCompletion(data.data as MessageType[])
         }
         if (data.type === MESSAGE_NAME.twinnyOpenDiff) {
           const editor = vscode.window.activeTextEditor

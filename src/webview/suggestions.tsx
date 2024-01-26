@@ -1,12 +1,13 @@
-import styles from './index.module.css'
 import { CodeIcon, ExplainIcon, FixCodeIcon, TestsIcon } from './icons'
 import { MESSAGE_NAME } from '../constants'
 import cn from 'classnames'
 
+import styles from './index.module.css'
+
 const SUGGESTIONS = [
   {
     name: 'refactor',
-    value: 'Refactor this code',
+    value: 'Refactor',
     icon: <CodeIcon />,
     message: 'twinny.refactor'
   },
@@ -17,14 +18,14 @@ const SUGGESTIONS = [
     message: 'twinny.addTests'
   },
   {
-    name: 'fix-code',
-    value: 'Fix selected code',
+    name: 'add-types',
+    value: 'Add types',
     icon: <FixCodeIcon />,
-    message: 'twinny.fixCode'
+    message: 'twinny.addTypes'
   },
   {
     name: 'explain',
-    value: 'Explain the code',
+    value: 'Explain',
     icon: <ExplainIcon />,
     message: 'twinny.explain'
   }

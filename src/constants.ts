@@ -37,7 +37,7 @@ export const MESSAGE_KEY = {
   chatMessage: 'chatMessage'
 }
 
-export const codeActionTypes = ['add-types', 'refactor']
+export const codeActionTypes = ['add-types', 'refactor', 'generate-docs', 'fix-code']
 
 export const prompts: Prompts = {
   explain: explain,
