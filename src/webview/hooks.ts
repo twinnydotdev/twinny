@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 
 import { MESSAGE_NAME } from '../constants'
-import { PostMessage } from '../types'
+import { PostMessage, ThemeType } from '../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 
-export const useSelection = (onSelect: () => void) => {
+export const useSelection = (onSelect?: () => void) => {
   const [selection, setSelection] = useState('')
   const handler = (event: MessageEvent) => {
     const message: PostMessage = event.data
@@ -71,4 +71,22 @@ export const useWorkSpaceContext = <T>(key: string) => {
   }, [])
 
   return context
+}
+
+export const useTheme = () => {
+  const [theme, setTheme] = useState<ThemeType | undefined>()
+  const handler = (event: MessageEvent) => {
+    const message: PostMessage = event.data
+    if (message?.type === MESSAGE_NAME.twinnySendTheme) {
+      setTheme(message?.value.data)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnySendTheme,
+    })
+    window.addEventListener('message', handler)
+  }, [])
+  return theme
 }

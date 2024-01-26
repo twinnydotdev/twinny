@@ -58,3 +58,10 @@ export interface MessageType {
   language?: LanguageType
 }
 
+export const Theme = {
+  Light: 'Light',
+  Dark: 'Dark',
+  Contrast: 'Contrast'
+} as const
+
+export type ThemeType = (typeof Theme)[keyof typeof Theme]

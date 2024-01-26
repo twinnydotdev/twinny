@@ -48,6 +48,7 @@ code {
 .codeOptions {
   display: flex;
   gap: 3px;
+  margin: 10px 0;
 }
 
 .settings {
