@@ -59,7 +59,7 @@ That's it! Enjoy enhanced code completions and chat with twinny! 🎉
 
 Completion:
 
-![twinny](https://github.com/rjmacarthy/twinny/assets/5537428/95a1d8d5-f2fb-47b3-b246-23ff822464c3)
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b" width="760"/>
 
 Chat:
 
