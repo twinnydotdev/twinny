@@ -16,6 +16,30 @@ Are you fed up of all of those so called "free" Copilot alternatives with paywal
 </div>
 
 
+### How twinny helps developers
+
+Fast and accurate code completion:
+
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b" width="760"/>
+
+Chat with AI about your code
+
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/679bd283-28e9-47ff-9165-84dfe293c56a" width="760"/>
+
+#### Other features 
+
+- Free
+- Private
+- Auto code completion
+- Fast and accurate
+- Multiple language support
+- Easy to install
+- Configurable endpoint and port and path for completion API
+- Chat feature like Copilot Chat
+- Accept solution directly to editor
+- Copy generated code solution blocks
+- Chat history preserved per conversation
+
 ## 🚀 Getting Started
 
 ### Easy Installation
@@ -41,29 +65,6 @@ When the extension is ready you will see a `🤖` icon at the bottom of your cod
 You will also see which models are being used (only applicable to Ollama hosted servers).
 
 That's it! Enjoy enhanced code completions and chat with twinny! 🎉
-
-## 🤖 Features
-
-- Free
-- Private
-- Auto code completion
-- Fast and accurate
-- Multiple language support
-- Easy to install
-- Configurable endpoint and port and path for completion API
-- Chat feature like Copilot Chat
-- Accept solution directly to editor
-- Copy generated code solution blocks
-- Chat history preserved per conversation
-
-Completion:
-
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b" width="760"/>
-
-Chat:
-
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/679bd283-28e9-47ff-9165-84dfe293c56a" width="760"/>
-
 
 ## Tested and supported Ollama models
 
