@@ -1,3 +1,4 @@
+import { USER_NAME } from './constants'
 import { MessageType } from './types'
 
 export const SYSTEM_MESSAGE = `<<SYS>>You are a helpful, respectful and honest coding assistant.
@@ -70,7 +71,7 @@ export const chatMessage = (messages: MessageType[], selection: string) =>
 
     ${messages
       .map((message) =>
-        message.role === 'user'
+        message.role === USER_NAME
           ? `[INST] ${message.content} ${
               selection ? ` \`\`\`${selection}\`\`\` ` : ''
             } [/INST]`
