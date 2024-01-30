@@ -161,13 +161,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 chunkCount = chunkCount + 1
 
                 if (
-                  (chunkCount > 1 && completionString === '\n') ||
+                  (chunkCount > 6 && completionString === '\n') ||
                   completion?.match('<EOT>')
                 ) {
                   this._statusBar.text = '🤖'
                   completion = completion.replace('<EOT>', '')
                   destroy()
-                  this._currentReq?.destroy()
                   resolve(
                     this.triggerInlineCompletion({
                       completion,
@@ -273,27 +272,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { prefix, suffix }
   }
 
-  private getFormattedCompletion = (
-    completion: string,
-    editor: TextEditor,
-    position: Position
-  ) => {
+  private getFormattedCompletion = (completion: string, editor: TextEditor) => {
     const cursorPosition = editor.selection.active
-
-    const charBeforeRange = new Range(
-      position.translate(
-        0,
-        position.character === 0 ? 0 : Math.min(position.character, -1)
-      ),
-      editor.selection.start
-    )
 
     const lineEndPosition = editor.document.lineAt(cursorPosition.line).range
       .end
 
-    const textAfterRange = new Range(cursorPosition, lineEndPosition)
-    const textAfterCursor = this._document?.getText(textAfterRange).trim() || ''
-    const charBefore = this._document?.getText(charBeforeRange)
     const lineStart = editor.document.lineAt(cursorPosition).range.start
     const lineRange = new Range(lineStart, lineEndPosition)
     const lineText = this._document?.getText(lineRange)
@@ -306,19 +290,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return ''
     }
 
-    if (completion === ' ' && charBefore === ' ') {
-      completion = completion.slice(1, completion.length)
+    if (completion.endsWith('\n')){
+      const parts = completion.split('\n');
+      completion = parts.slice(0, -1).join('\n') + parts.slice(-1);
     }
 
-    if (completion.includes(textAfterCursor)) {
-      completion = completion.replace(textAfterCursor, '').replace('\n', '')
-    }
-
-    if (lineText?.includes(completion.trim())) {
-      return ''
-    }
-
-    return completion.trim()
+    return completion
   }
 
   private triggerInlineCompletion(
@@ -334,8 +311,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     const completion = this.getFormattedCompletion(
       inlineCompletion.completion,
-      editor,
-      position
+      editor
     )
 
     if (this._enableCompletionCache) {
