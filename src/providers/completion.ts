@@ -9,7 +9,9 @@ import {
   StatusBarItem,
   window,
   Uri,
-  TextEditor
+  TextEditor,
+  InlineCompletionContext,
+  CompletionTriggerKind
 } from 'vscode'
 import 'string_score'
 import { streamResponse } from '../utils'
@@ -34,6 +36,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
+  private _disableAutoSuggest = this._config.get('disableAutoSuggest') as boolean
   private _bearerToken = this._config.get('apiBearerToken') as number
   private _enableCompletionCache = this._config.get(
     'enableCompletionCache'
@@ -86,10 +89,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   public async provideInlineCompletionItems(
     document: TextDocument,
-    position: Position
+    position: Position,
+    context: InlineCompletionContext,
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     this._document = document
     const editor = window.activeTextEditor
+
+    if (context.triggerKind === CompletionTriggerKind.TriggerCharacter.valueOf() && this._disableAutoSuggest) {
+      return
+    }
 
     const language = editor?.document.languageId
 
@@ -327,6 +335,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._contextLength = this._config.get('contextLength') as number
     this._temperature = this._config.get('temperature') as number
     this._useFileContext = this._config.get('useFileContext') as boolean
+    this._disableAutoSuggest = this._config.get('disableAutoSuggest') as boolean
     this._fimModel = this._config.get('fimModelName') as string
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._apiPath = this._config.get('fimApiPath') as string

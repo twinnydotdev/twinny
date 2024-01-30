@@ -122,6 +122,12 @@
         "title": "Enable twinny sidebar"
       }
     ],
+    "keybindings": [
+      {
+        "key": "Alt+\\",
+        "command": "editor.action.inlineSuggest.trigger"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -256,6 +262,12 @@
           "type": "string",
           "default": "",
           "description": "Whether to use a Bearer token for the API connection"
+        },
+        "twinny.disableAutoSuggest": {
+          "order": 16,
+          "type": "boolean",
+          "default": false,
+          "description": "Disable auto suggestion in favour of manual trigger default (Alt+\\)"
         }
       }
     }
