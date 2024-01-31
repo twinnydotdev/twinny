@@ -36,7 +36,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
-  private _disableAutoSuggest = this._config.get('disableAutoSuggest') as boolean
+  private _disableAutoSuggest = this._config.get(
+    'disableAutoSuggest'
+  ) as boolean
   private _bearerToken = this._config.get('apiBearerToken') as number
   private _enableCompletionCache = this._config.get(
     'enableCompletionCache'
@@ -90,12 +92,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
-    context: InlineCompletionContext,
+    context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     this._document = document
     const editor = window.activeTextEditor
 
-    if (context.triggerKind === CompletionTriggerKind.TriggerCharacter.valueOf() && this._disableAutoSuggest) {
+    if (
+      context.triggerKind ===
+        CompletionTriggerKind.TriggerCharacter.valueOf() &&
+      this._disableAutoSuggest
+    ) {
       return
     }
 
@@ -298,9 +304,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return ''
     }
 
-    if (completion.endsWith('\n')){
-      const parts = completion.split('\n');
-      completion = parts.slice(0, -1).join('\n') + parts.slice(-1);
+    if (completion.endsWith('\n')) {
+      const parts = completion.split('\n')
+      completion = parts.slice(0, -1).join('\n') + parts.slice(-1)
     }
 
     return completion

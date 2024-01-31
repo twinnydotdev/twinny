@@ -21,8 +21,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.streamService = new StreamService(this._statusBar, webviewView);
-    this.view = webviewView;
+    this.streamService = new StreamService(this._statusBar, webviewView)
+    this.view = webviewView
 
     webviewView.webview.options = {
       enableScripts: true,

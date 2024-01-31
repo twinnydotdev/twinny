@@ -132,7 +132,7 @@ async function checkModel(model: string) {
                 })
 
                 token.onCancellationRequested(() => {
-                  commands.executeCommand('workbench.action.reloadWindow');
+                  commands.executeCommand('workbench.action.reloadWindow')
 
                   context?.globalState.update(
                     `${MESSAGE_NAME.twinnyGlobalContext}-${MESSAGE_KEY.downloadCancelled}`,

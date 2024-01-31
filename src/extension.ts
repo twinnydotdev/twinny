@@ -91,17 +91,22 @@ export async function activate(context: ExtensionContext) {
       )
     }),
     commands.registerCommand('twinny.enableDownload', () => {
-      sidebarProvider.setGlobalContext(getContext(),
-        {
-          key: MESSAGE_KEY.downloadCancelled,
-          data: false
-        })
-      vscode.window.showInformationMessage('twinny automatic model download enabled.')
-
+      sidebarProvider.setGlobalContext(getContext(), {
+        key: MESSAGE_KEY.downloadCancelled,
+        data: false
+      })
+      vscode.window.showInformationMessage(
+        'twinny automatic model download enabled.'
+      )
     }),
     commands.registerCommand('twinny.newChat', () => {
-      sidebarProvider.setTwinnyWorkspaceContext(getContext(), { key: MESSAGE_KEY.lastConversation, data: [] });
-      sidebarProvider.getTwinnyWorkspaceContext(getContext(), { key: MESSAGE_KEY.lastConversation });
+      sidebarProvider.setTwinnyWorkspaceContext(getContext(), {
+        key: MESSAGE_KEY.lastConversation,
+        data: []
+      })
+      sidebarProvider.getTwinnyWorkspaceContext(getContext(), {
+        key: MESSAGE_KEY.lastConversation
+      })
     }),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
     statusBar
