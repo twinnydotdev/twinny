@@ -21,7 +21,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.streamService = new StreamService(this._statusBar, webviewView)
+    this.streamService = new StreamService(this._statusBar, webviewView);
+    this.view = webviewView;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -95,10 +96,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           })
         }
         if (data.type === MESSAGE_NAME.twinnySetGlobalContext) {
-          context?.globalState.update(
-            `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
-            data.data
-          )
+          this.setGlobalContext(context, data)
         }
         if (data.type === MESSAGE_NAME.twinnyWorkspaceContext) {
           this.getTwinnyWorkspaceContext(context, data)
@@ -118,6 +116,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           vscode.window.showInformationMessage(data.data)
         }
       }
+    )
+  }
+
+  public setGlobalContext(context: vscode.ExtensionContext | null, data: any) {
+    context?.globalState.update(
+      `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
+      data.data
     )
   }
 

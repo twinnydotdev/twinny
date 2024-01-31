@@ -149,6 +149,12 @@
         "shortTitle": "New chat",
         "title": "Open a new Twinny chat",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "twinny.enableDownload",
+        "shortTitle": "Enable Download",
+        "title": "Enable the download of not locally installed model",
+        "icon": "$(desktop-download)"
       }
     ],
     "keybindings": [
