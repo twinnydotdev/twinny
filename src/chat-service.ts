@@ -123,14 +123,14 @@ export class ChatService {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return chatMessage(messages, selectionContext, language.name)
+    return chatMessage(messages, selectionContext, language?.name)
   }
 
   public buildTemplatePrompt = (template: string, message: string, language: LanguageType) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return prompts[template] ? prompts[template](selectionContext, language.name) : message
+    return prompts[template] ? prompts[template](selectionContext, language?.name) : message
   }
 
   private streamResponse({
