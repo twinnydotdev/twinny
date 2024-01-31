@@ -253,7 +253,7 @@
         "twinny.contextLength": {
           "order": 8,
           "type": "number",
-          "default": 300,
+          "default": 50,
           "description": "How many lines before and after to include in FIM prompts",
           "required": true
         },
