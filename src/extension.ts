@@ -6,12 +6,14 @@ import {
   window,
   workspace
 } from 'vscode'
+import * as vscode from 'vscode'
 
 import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
 import { delayExecution, deleteTempFiles } from './utils'
-import { setContext } from './context'
+import { getContext, setContext } from './context'
+import { EXTENSION_NAME, MESSAGE_KEY } from './constants'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
@@ -81,6 +83,16 @@ export async function activate(context: ExtensionContext) {
       delayExecution(() =>
         sidebarProvider.streamService?.streamTemplateCompletion('generate-docs')
       )
+    }),
+    commands.registerCommand('twinny.settings', () => {
+      vscode.commands.executeCommand(
+        'workbench.action.openSettings',
+        EXTENSION_NAME
+      )
+    }),
+    commands.registerCommand('twinny.newChat', () => {
+      sidebarProvider.setTwinnyWorkspaceContext(getContext(), { key: MESSAGE_KEY.lastConversation, data: [] });
+      sidebarProvider.getTwinnyWorkspaceContext(getContext(), { key: MESSAGE_KEY.lastConversation });
     }),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
     statusBar
