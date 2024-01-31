@@ -70,7 +70,11 @@ export const generateDocs = (code: string, language: string): string =>
     Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
   `
 
-export const chatMessage = (messages: MessageType[], selection: string) =>
+export const chatMessage = (
+  messages: MessageType[],
+  selection: string,
+  language: string
+) =>
   `
     ${messages.length === 1 ? SYSTEM_MESSAGE : ''}
 
@@ -79,7 +83,7 @@ export const chatMessage = (messages: MessageType[], selection: string) =>
         message.role === USER_NAME
           ? `[INST] ${message.content} ${
               selection ? ` \`\`\`${selection}\`\`\` ` : ''
-            } [/INST]`
+            } ${language ? `The language is ${language}` : ''}[/INST]`
           : `${message.content}`
       )
       .join('\n')}

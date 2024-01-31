@@ -119,11 +119,11 @@ export class ChatService {
     })
   }
 
-  public buildChatMessagePrompt = (messages: MessageType[]) => {
+  public buildChatMessagePrompt = (messages: MessageType[], language: LanguageType) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return chatMessage(messages, selectionContext)
+    return chatMessage(messages, selectionContext, language.name)
   }
 
   public buildTemplatePrompt = (template: string, message: string, language: LanguageType) => {
@@ -163,9 +163,10 @@ export class ChatService {
   }
 
   public streamChatCompletion(messages: MessageType[]) {
+    const{ language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()
-    const prompt = this.buildChatMessagePrompt(messages)
+    const prompt = this.buildChatMessagePrompt(messages, language)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
   }
