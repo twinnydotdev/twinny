@@ -40,6 +40,14 @@ Chat with AI about your code
 - Copy generated code solution blocks
 - Chat history preserved per conversation
 
+## Keyboard shortcuts
+
+| Shortcut                     | Description                              |
+| ---------------------------- | ---------------------------------------- |
+| `ALT+\`                      | Trigger inline code completion           |
+| `CTRL+SHIFT+t`               | Open twinny sidebar                      |
+| `CTRL+SHIFT+/`               | Stop code generation                     | 
+
 ## 🚀 Getting Started
 
 ### Easy Installation
