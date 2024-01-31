@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { KeyboardEventHandler, useEffect, useRef, useState } from 'react'
 
 import {
   VSCodeButton,
@@ -32,10 +32,13 @@ export const Chat = () => {
   const stopRef = useRef(false)
   const theme = useTheme()
   const [loading, setLoading] = useState(false)
-  const lastConversation = useWorkSpaceContext<MessageType[]>('lastConversation')
+  const lastConversation =
+    useWorkSpaceContext<MessageType[]>('lastConversation')
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const divRef = useRef<HTMLDivElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chatRef = useRef<any>(null) // TODO: type...
 
   const scrollBottom = () => {
     setTimeout(() => {
@@ -47,29 +50,6 @@ export const Chat = () => {
 
   const selection = useSelection(scrollBottom)
 
-  const handleSubmitForm = (e: React.FormEvent | React.KeyboardEvent) => {
-    e.preventDefault()
-    const input = inputText.trim()
-    if (input) {
-      setInputText('')
-      global.vscode.postMessage({
-        type: MESSAGE_NAME.twinnyChatMessage,
-        data: [
-          ...(messages || []),
-          {
-            role: USER_NAME,
-            content: input
-          }
-        ]
-      })
-      setMessages((prev) => [
-        ...(prev || []),
-        { role: USER_NAME, content: input, type: '' }
-      ])
-      scrollBottom()
-    }
-  }
-
   const handleCompletionEnd = (message: PostMessage) => {
     setMessages((prev) => {
       const update = [
@@ -78,7 +58,7 @@ export const Chat = () => {
           role: BOT_NAME,
           content: message.value.completion || EMPTY_MESAGE,
           type: message.value.type,
-          language: message.value.data,
+          language: message.value.data
         }
       ]
       global.vscode.postMessage({
@@ -91,6 +71,7 @@ export const Chat = () => {
     setCompletion(null)
     genertingRef.current = false
     setTimeout(() => {
+      chatRef.current?.focus()
       stopRef.current = false
     }, 1000)
   }
@@ -106,7 +87,7 @@ export const Chat = () => {
       role: BOT_NAME,
       content: message.value.completion || EMPTY_MESAGE,
       type: message.value.type,
-      language: message.value.data,
+      language: message.value.data
     })
     scrollBottom()
   }
@@ -129,6 +110,15 @@ export const Chat = () => {
       }
       case MESSAGE_NAME.twinnyOnEnd: {
         handleCompletionEnd(message)
+        break
+      }
+      case MESSAGE_NAME.twinnyStopGeneration: {
+        setCompletion(null)
+        genertingRef.current = false
+        chatRef.current?.focus()
+        setTimeout(() => {
+          stopRef.current = false
+        }, 1000)
       }
     }
   }
@@ -148,8 +138,30 @@ export const Chat = () => {
     })
   }
 
+  const handleSubmitForm = (input: string) => {
+    if (input) {
+      setInputText('')
+      global.vscode.postMessage({
+        type: MESSAGE_NAME.twinnyChatMessage,
+        data: [
+          ...(messages || []),
+          {
+            role: USER_NAME,
+            content: input
+          }
+        ]
+      })
+      setMessages((prev) => [
+        ...(prev || []),
+        { role: USER_NAME, content: input, type: '' }
+      ])
+      scrollBottom()
+    }
+  }
+
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
+    chatRef.current?.focus()
     return () => {
       window.removeEventListener('message', messageEventHandler)
     }
@@ -197,14 +209,21 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!genertingRef.current} />
         )}
-        <form onSubmit={handleSubmitForm}>
+        <form>
           <Selection onSelect={scrollBottom} />
           <div className={styles.chatbox}>
             <VSCodeTextArea
+              ref={chatRef}
               disabled={genertingRef.current}
               placeholder="Message twinny"
               rows={5}
               value={inputText}
+              onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                if (e.ctrlKey && e.key === 'Enter') {
+                  const target = e.target as HTMLTextAreaElement;
+                  handleSubmitForm(target.value)
+                }
+              }}
               onChange={(e) => {
                 const event =
                   e as unknown as React.ChangeEvent<HTMLTextAreaElement>
@@ -225,7 +244,7 @@ export const Chat = () => {
             )}
             <VSCodeButton
               disabled={genertingRef.current}
-              type="submit"
+              onClick={() => handleSubmitForm(inputText)}
               appearance="primary"
             >
               Send message

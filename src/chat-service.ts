@@ -4,7 +4,12 @@ import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
 import { chatMessage } from './prompts'
 import { MESSAGE_NAME, prompts } from './constants'
-import { StreamResponse, StreamOptions, PostMessage, MessageType } from './types'
+import {
+  StreamResponse,
+  StreamOptions,
+  PostMessage,
+  MessageType
+} from './types'
 import { getLanguage, streamResponse } from './utils'
 import { LanguageType } from './languages'
 
@@ -21,6 +26,7 @@ export class ChatService {
   private _view?: WebviewView
   private _statusBar: StatusBarItem
   private _promptTemplate = ''
+  private _currentRequest?: ClientRequest
 
   constructor(statusBar: StatusBarItem, view?: WebviewView) {
     this._view = view
@@ -86,7 +92,7 @@ export class ChatService {
         value: {
           completion: this._completion.trimStart(),
           data: getLanguage(),
-          type: this._promptTemplate,
+          type: this._promptTemplate
         }
       } as PostMessage)
       if (data?.match('<EOT>')) {
@@ -105,13 +111,14 @@ export class ChatService {
       value: {
         completion: this._completion.trimStart(),
         data: getLanguage(),
-        type: this._promptTemplate,
+        type: this._promptTemplate
       }
     } as PostMessage)
   }
 
   private onStreamStart = (req: ClientRequest) => {
     this._statusBar.text = '$(loading~spin)'
+    this._currentRequest = req
     this._view?.webview.onDidReceiveMessage((data: { type: string }) => {
       if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
         req.destroy()
@@ -119,18 +126,40 @@ export class ChatService {
     })
   }
 
-  public buildChatMessagePrompt = (messages: MessageType[], language: LanguageType) => {
+  public destroyStream = () => {
+    this._currentRequest?.destroy()
+    this._statusBar.text = '🤖'
+    this._view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyOnEnd,
+      value: {
+        completion: this._completion.trimStart(),
+        data: getLanguage(),
+        type: this._promptTemplate
+      }
+    } as PostMessage)
+  }
+
+  public buildChatMessagePrompt = (
+    messages: MessageType[],
+    language: LanguageType
+  ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
     return chatMessage(messages, selectionContext, language?.name)
   }
 
-  public buildTemplatePrompt = (template: string, message: string, language: LanguageType) => {
+  public buildTemplatePrompt = (
+    template: string,
+    message: string,
+    language: LanguageType
+  ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return prompts[template] ? prompts[template](selectionContext, language?.name) : message
+    return prompts[template]
+      ? prompts[template](selectionContext, language?.name)
+      : message
   }
 
   private streamResponse({
@@ -163,7 +192,7 @@ export class ChatService {
   }
 
   public streamChatCompletion(messages: MessageType[]) {
-    const{ language } = getLanguage()
+    const { language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()
     const prompt = this.buildChatMessagePrompt(messages, language)
@@ -172,7 +201,7 @@ export class ChatService {
   }
 
   public streamTemplateCompletion(promptTemplate: string, context = '') {
-    const{ language } = getLanguage()
+    const { language } = getLanguage()
     this._completion = ''
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()

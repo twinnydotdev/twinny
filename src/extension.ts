@@ -59,6 +59,7 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand('twinny.stopGeneration', () => {
       completionProvider.destroyStream()
+      sidebarProvider.destroyStream()
     }),
     commands.registerCommand('twinny.addTypes', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
