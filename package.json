@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.0.8",
+  "version": "3.0.9",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -83,17 +83,17 @@
       "view/title": [
         {
           "command": "twinny.enableDownload",
-					"when": "view == twinny-sidebar",
+          "when": "view == twinny-sidebar",
           "group": "navigation@1"
         },
         {
           "command": "twinny.newChat",
-					"when": "view == twinny-sidebar",
+          "when": "view == twinny-sidebar",
           "group": "navigation@2"
         },
         {
           "command": "twinny.settings",
-					"when": "view == twinny-sidebar",
+          "when": "view == twinny-sidebar",
           "group": "navigation@3"
         }
       ]
