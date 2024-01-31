@@ -40,14 +40,6 @@ Chat with AI about your code
 - Copy generated code solution blocks
 - Chat history preserved per conversation
 
-## Keyboard shortcuts
-
-| Shortcut                     | Description                              |
-| ---------------------------- | ---------------------------------------- |
-| `ALT+\`                      | Trigger inline code completion           |
-| `CTRL+SHIFT+t`               | Open twinny sidebar                      |
-| `CTRL+SHIFT+/`               | Stop code generation                     | 
-
 ## 🚀 Getting Started
 
 ### Easy Installation
@@ -90,6 +82,14 @@ twinny and llama.ccp has been tested and are working with the following models:
  
 - https://huggingface.co/TheBloke/CodeLlama-7B-GGUF 
 - https://huggingface.co/TheBloke/CodeLlama-13B-GGUF
+
+## Keyboard shortcuts
+
+| Shortcut                     | Description                              |
+| ---------------------------- | ---------------------------------------- |
+| `ALT+\`                      | Trigger inline code completion           |
+| `CTRL+SHIFT+t`               | Open twinny sidebar                      |
+| `CTRL+SHIFT+/`               | Stop code generation                     | 
 
 
 ## Known issues
