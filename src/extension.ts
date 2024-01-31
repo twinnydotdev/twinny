@@ -12,7 +12,7 @@ import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
 import { delayExecution, deleteTempFiles } from './utils'
-import { getContext, setContext } from './context'
+import { setContext } from './context'
 import { EXTENSION_NAME, MESSAGE_KEY } from './constants'
 
 export async function activate(context: ExtensionContext) {
@@ -90,21 +90,30 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_NAME
       )
     }),
-    commands.registerCommand('twinny.enableDownload', () => {
-      sidebarProvider.setGlobalContext(getContext(), {
+    commands.registerCommand('twinny.disableDownloads', () => {
+      sidebarProvider.setGlobalContext(context, {
+        key: MESSAGE_KEY.downloadCancelled,
+        data: true
+      })
+      vscode.window.showInformationMessage(
+        'twinny automatic model downloads disabled.'
+      )
+    }),
+    commands.registerCommand('twinny.enableDownloads', () => {
+      sidebarProvider.setGlobalContext(context, {
         key: MESSAGE_KEY.downloadCancelled,
         data: false
       })
       vscode.window.showInformationMessage(
-        'twinny automatic model download enabled.'
+        'twinny automatic model downloads enabled.'
       )
     }),
     commands.registerCommand('twinny.newChat', () => {
-      sidebarProvider.setTwinnyWorkspaceContext(getContext(), {
+      sidebarProvider.setTwinnyWorkspaceContext(context, {
         key: MESSAGE_KEY.lastConversation,
         data: []
       })
-      sidebarProvider.getTwinnyWorkspaceContext(getContext(), {
+      sidebarProvider.getTwinnyWorkspaceContext(context, {
         key: MESSAGE_KEY.lastConversation
       })
     }),

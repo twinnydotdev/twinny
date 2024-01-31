@@ -82,19 +82,24 @@
       ],
       "view/title": [
         {
-          "command": "twinny.enableDownload",
+          "command": "twinny.enableDownloads",
           "when": "view == twinny-sidebar",
           "group": "navigation@1"
         },
         {
-          "command": "twinny.newChat",
+          "command": "twinny.disableDownloads",
           "when": "view == twinny-sidebar",
           "group": "navigation@2"
         },
         {
-          "command": "twinny.settings",
+          "command": "twinny.newChat",
           "when": "view == twinny-sidebar",
           "group": "navigation@3"
+        },
+        {
+          "command": "twinny.settings",
+          "when": "view == twinny-sidebar",
+          "group": "navigation@4"
         }
       ]
     },
@@ -140,21 +145,27 @@
       },
       {
         "command": "twinny.settings",
-        "shortTitle": "Twinny settings",
-        "title": "Access Twinny settings",
+        "shortTitle": "twinny settings",
+        "title": "Open twinny settings",
         "icon": "$(gear)"
       },
       {
         "command": "twinny.newChat",
         "shortTitle": "New chat",
-        "title": "Open a new Twinny chat",
+        "title": "Start a new chat",
         "icon": "$(comment-discussion)"
       },
       {
-        "command": "twinny.enableDownload",
-        "shortTitle": "Enable Download",
-        "title": "Enable the download of not locally installed model",
+        "command": "twinny.enableDownloads",
+        "shortTitle": "Enable downloads",
+        "title": "Enable automatic model downloads",
         "icon": "$(desktop-download)"
+      },
+      {
+        "command": "twinny.disableDownloads",
+        "shortTitle": "Disable downloads",
+        "title": "Disable automatic model downloads",
+        "icon": "$(stop-circle)"
       }
     ],
     "keybindings": [
