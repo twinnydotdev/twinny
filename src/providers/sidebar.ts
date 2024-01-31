@@ -124,7 +124,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     )
   }
 
-  public getTwinnyWorkspaceContext(context: vscode.ExtensionContext | null, data: any) {
+  public getTwinnyWorkspaceContext(
+    context: vscode.ExtensionContext | null,
+    data: any
+  ) {
     const storedData = context?.workspaceState.get(
       `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
     )
@@ -134,11 +137,21 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  public setTwinnyWorkspaceContext(context: vscode.ExtensionContext | null, data: any) {
+  public setTwinnyWorkspaceContext(
+    context: vscode.ExtensionContext | null,
+    data: any
+  ) {
     context?.workspaceState.update(
       `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
       data.data
     )
+  }
+
+  public destroyStream() {
+    this.chatService?.destroyStream()
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyStopGeneration
+    })
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {

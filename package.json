@@ -172,6 +172,14 @@
       {
         "key": "Alt+\\",
         "command": "editor.action.inlineSuggest.trigger"
+      },
+      {
+        "key": "CTRL+SHIFT+t",
+        "command": "workbench.view.extension.twinny-sidebar-view"
+      },
+      {
+        "key": "CTRL+SHIFT+/",
+        "command": "twinny.stopGeneration"
       }
     ],
     "viewsContainers": {
