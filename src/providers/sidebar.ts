@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import { getTextSelection, getTheme, openDiffView } from '../utils'
 import { getContext } from '../context'
-import { EXTENSION_NAME, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { StreamService } from '../stream-service'
 import { MessageType } from '../types'
 
@@ -21,7 +21,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.streamService = new StreamService(this._statusBar, webviewView)
+    this.streamService = new StreamService(this._statusBar, webviewView);
+    this.view = webviewView;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -65,12 +66,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           const text = editor?.document.getText(selection)
           openDiffView(text || '', data.data as string)
         }
-        if (data.type === MESSAGE_NAME.twinnyOpenSettings) {
-          vscode.commands.executeCommand(
-            'workbench.action.openSettings',
-            EXTENSION_NAME
-          )
-        }
         if (data.type === MESSAGE_NAME.twinnyClickSuggestion) {
           vscode.commands.executeCommand(data.data)
         }
@@ -101,25 +96,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           })
         }
         if (data.type === MESSAGE_NAME.twinnySetGlobalContext) {
-          context?.globalState.update(
-            `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
-            data.data
-          )
+          this.setGlobalContext(context, data)
         }
         if (data.type === MESSAGE_NAME.twinnyWorkspaceContext) {
-          const storedData = context?.workspaceState.get(
-            `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
-          )
-          webviewView.webview.postMessage({
-            type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
-            value: storedData
-          })
+          this.getTwinnyWorkspaceContext(context, data)
         }
         if (data.type === MESSAGE_NAME.twinnySetWorkspaceContext) {
-          context?.workspaceState.update(
-            `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
-            data.data
-          )
+          this.setTwinnyWorkspaceContext(context, data)
         }
         if (data.type === MESSAGE_NAME.twinnySendTheme) {
           webviewView.webview.postMessage({
@@ -133,6 +116,30 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           vscode.window.showInformationMessage(data.data)
         }
       }
+    )
+  }
+
+  public setGlobalContext(context: vscode.ExtensionContext | null, data: any) {
+    context?.globalState.update(
+      `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
+      data.data
+    )
+  }
+
+  public getTwinnyWorkspaceContext(context: vscode.ExtensionContext | null, data: any) {
+    const storedData = context?.workspaceState.get(
+      `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
+    )
+    this.view?.webview.postMessage({
+      type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
+      value: storedData
+    })
+  }
+
+  public setTwinnyWorkspaceContext(context: vscode.ExtensionContext | null, data: any) {
+    context?.workspaceState.update(
+      `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
+      data.data
     )
   }
 

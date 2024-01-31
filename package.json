@@ -79,6 +79,23 @@
           "when": "editorTextFocus",
           "command": "twinny.generateDocs"
         }
+      ],
+      "view/title": [
+        {
+          "command": "twinny.enableDownload",
+					"when": "view == twinny-sidebar",
+          "group": "navigation@1"
+        },
+        {
+          "command": "twinny.newChat",
+					"when": "view == twinny-sidebar",
+          "group": "navigation@2"
+        },
+        {
+          "command": "twinny.settings",
+					"when": "view == twinny-sidebar",
+          "group": "navigation@3"
+        }
       ]
     },
     "commands": [
@@ -120,6 +137,24 @@
         "command": "twinny.showSidebar",
         "shortTitle": "Enable twinny sidebar",
         "title": "Enable twinny sidebar"
+      },
+      {
+        "command": "twinny.settings",
+        "shortTitle": "Twinny settings",
+        "title": "Access Twinny settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "twinny.newChat",
+        "shortTitle": "New chat",
+        "title": "Open a new Twinny chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "twinny.enableDownload",
+        "shortTitle": "Enable Download",
+        "title": "Enable the download of not locally installed model",
+        "icon": "$(desktop-download)"
       }
     ],
     "keybindings": [
