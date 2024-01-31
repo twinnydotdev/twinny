@@ -48,13 +48,13 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.explain', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
       delayExecution(() =>
-        sidebarProvider.streamService?.streamTemplateCompletion('explain')
+        sidebarProvider.chatService?.streamTemplateCompletion('explain')
       )
     }),
     commands.registerCommand('twinny.fixCode', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
       delayExecution(() =>
-        sidebarProvider.streamService?.streamTemplateCompletion('fix-code')
+        sidebarProvider.chatService?.streamTemplateCompletion('fix-code')
       )
     }),
     commands.registerCommand('twinny.stopGeneration', () => {
@@ -63,25 +63,25 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.addTypes', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
       delayExecution(() =>
-        sidebarProvider.streamService?.streamTemplateCompletion('add-types')
+        sidebarProvider.chatService?.streamTemplateCompletion('add-types')
       )
     }),
     commands.registerCommand('twinny.refactor', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
       delayExecution(() =>
-        sidebarProvider.streamService?.streamTemplateCompletion('refactor')
+        sidebarProvider.chatService?.streamTemplateCompletion('refactor')
       )
     }),
     commands.registerCommand('twinny.addTests', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
       delayExecution(() =>
-        sidebarProvider.streamService?.streamTemplateCompletion('add-tests')
+        sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
       )
     }),
     commands.registerCommand('twinny.generateDocs', () => {
       commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
       delayExecution(() =>
-        sidebarProvider.streamService?.streamTemplateCompletion('generate-docs')
+        sidebarProvider.chatService?.streamTemplateCompletion('generate-docs')
       )
     }),
     commands.registerCommand('twinny.settings', () => {

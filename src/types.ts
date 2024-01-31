@@ -38,7 +38,7 @@ export interface LanguageType {
 }
 
 export interface Prompts {
-  [key: string]: (code: string) => string
+  [key: string]: (code: string, language: string) => string
 }
 
 export interface PostMessage {

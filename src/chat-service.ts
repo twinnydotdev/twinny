@@ -6,8 +6,9 @@ import { chatMessage } from './prompts'
 import { MESSAGE_NAME, prompts } from './constants'
 import { StreamResponse, StreamOptions, PostMessage, MessageType } from './types'
 import { getLanguage, streamResponse } from './utils'
+import { LanguageType } from './languages'
 
-export class StreamService {
+export class ChatService {
   private _config = workspace.getConfiguration('twinny')
   private _apiUrl = this._config.get('apiUrl') as string
   private _bearerToken = this._config.get('apiBearerToken') as string
@@ -125,11 +126,11 @@ export class StreamService {
     return chatMessage(messages, selectionContext)
   }
 
-  public buildTemplatePrompt = (template: string, message: string) => {
+  public buildTemplatePrompt = (template: string, message: string, language: LanguageType) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return prompts[template] ? prompts[template](selectionContext) : message
+    return prompts[template] ? prompts[template](selectionContext, language.name) : message
   }
 
   private streamResponse({
@@ -170,10 +171,11 @@ export class StreamService {
   }
 
   public streamTemplateCompletion(promptTemplate: string, context = '') {
+    const{ language } = getLanguage()
     this._completion = ''
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
-    const prompt = this.buildTemplatePrompt(promptTemplate, context)
+    const prompt = this.buildTemplatePrompt(promptTemplate, context, language)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
   }
