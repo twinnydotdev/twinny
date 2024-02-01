@@ -7,14 +7,19 @@ import { useSelection } from './hooks'
 import { CodeIcon } from './icons'
 
 import styles from './index.module.css'
+import { LanguageType } from '../types'
+import { getLanguageMatch } from './utils'
 
 interface SelectionProps {
   onSelect: () => void
+  language: LanguageType | undefined
 }
 
-export const Selection = ({ onSelect }: SelectionProps) => {
+export const Selection = ({ onSelect, language }: SelectionProps) => {
   const selection = useSelection(onSelect)
   const [isVisible, setIsVisible] = useState(false)
+
+  const lang = getLanguageMatch(language, '')
 
   if (!selection) {
     return null
@@ -28,7 +33,7 @@ export const Selection = ({ onSelect }: SelectionProps) => {
         <SyntaxHighlighter
           children={selection.trimStart().replace(/\n$/, '')}
           style={vscDarkPlus}
-          language="typescript"
+          language={lang}
         />
       )}
       <div className={styles.selection}>

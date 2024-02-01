@@ -1,5 +1,5 @@
 import { USER_NAME } from './constants'
-import { MessageType } from './types'
+import { Messages } from './types'
 
 export const SYSTEM_MESSAGE = `<<SYS>>You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
@@ -71,7 +71,7 @@ export const generateDocs = (code: string, language: string): string =>
   `
 
 export const chatMessage = (
-  messages: MessageType[],
+  messages: Messages[],
   selection: string,
   language: string
 ) =>

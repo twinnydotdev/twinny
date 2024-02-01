@@ -3,8 +3,8 @@ import { request as httpsRequest } from 'https'
 import { ColorThemeKind, Uri, commands, window, workspace } from 'vscode'
 
 import path from 'path'
-import { StreamOptions, StreamResponse, Theme } from './types'
-import { languages } from './languages'
+import { StreamOptions, StreamResponse, Theme, LanguageType } from './types'
+import { supportedLanguages } from './languages'
 
 interface StreamResponseOptions {
   body: StreamOptions
@@ -115,10 +115,10 @@ export const getTextSelection = () => {
   return text || ''
 }
 
-export const getLanguage = () => {
+export const getLanguage = (): LanguageType => {
   const editor = window.activeTextEditor
   const languageId = editor?.document.languageId
-  const language = languages[languageId as keyof typeof languages]
+  const language = supportedLanguages[languageId as keyof typeof supportedLanguages]
   return {
     language,
     languageId

@@ -7,11 +7,11 @@ import { MESSAGE_NAME, prompts } from './constants'
 import {
   StreamResponse,
   StreamOptions,
-  PostMessage,
-  MessageType
+  ServerMessage,
+  Messages,
 } from './types'
 import { getLanguage, streamResponse } from './utils'
-import { LanguageType } from './languages'
+import { CodeLanguageDetails } from './languages'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -94,7 +94,7 @@ export class ChatService {
           data: getLanguage(),
           type: this._promptTemplate
         }
-      } as PostMessage)
+      } as ServerMessage)
       if (data?.match('<EOT>')) {
         onDestroy()
       }
@@ -113,7 +113,7 @@ export class ChatService {
         data: getLanguage(),
         type: this._promptTemplate
       }
-    } as PostMessage)
+    } as ServerMessage)
   }
 
   private onStreamStart = (req: ClientRequest) => {
@@ -136,29 +136,29 @@ export class ChatService {
         data: getLanguage(),
         type: this._promptTemplate
       }
-    } as PostMessage)
+    } as ServerMessage)
   }
 
   public buildChatMessagePrompt = (
-    messages: MessageType[],
-    language: LanguageType
+    messages: Messages[],
+    language: CodeLanguageDetails
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return chatMessage(messages, selectionContext, language?.name)
+    return chatMessage(messages, selectionContext, language?.langName)
   }
 
   public buildTemplatePrompt = (
     template: string,
     message: string,
-    language: LanguageType
+    language: CodeLanguageDetails
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
     return prompts[template]
-      ? prompts[template](selectionContext, language?.name)
+      ? prompts[template](selectionContext, language?.langName)
       : message
   }
 
@@ -188,10 +188,10 @@ export class ChatService {
       value: {
         data: getLanguage()
       }
-    } as PostMessage)
+    } as ServerMessage)
   }
 
-  public streamChatCompletion(messages: MessageType[]) {
+  public streamChatCompletion(messages: Messages[]) {
     const { language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()

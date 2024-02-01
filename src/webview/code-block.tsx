@@ -7,7 +7,7 @@ import { MESSAGE_NAME, codeActionTypes } from '../constants'
 
 import styles from './index.module.css'
 import { LanguageType, Theme, ThemeType } from '../types'
-import { Language, languages } from '../languages'
+import { getLanguageMatch } from './utils'
 
 interface CodeBlockProps {
   className?: string
@@ -23,30 +23,7 @@ const global = globalThis as any
 export const CodeBlock = (props: CodeBlockProps) => {
   const { children, completionType, language, className, theme } = props
 
-  const match = /language-(\w+)/.exec(className || '')
-
-  const getLanguage = () => {
-    if (match && match.length) {
-      const matchedLanguage = languages[match[1] as Language]
-
-      return matchedLanguage && matchedLanguage.base
-        ? matchedLanguage.base
-        : match[1]
-    }
-
-    if (language && language.languageId) {
-      const languageId = language.languageId.toString()
-      const languageEntry = languages[languageId as Language]
-
-      return languageEntry && languageEntry.base
-        ? languageEntry.base
-        : languageId
-    }
-
-    return 'javascript'
-  }
-
-  const lang = getLanguage()
+  const lang = getLanguageMatch(language, className)
 
   const handleCopy = () => {
     const text = String(children).replace(/^\n/, '')

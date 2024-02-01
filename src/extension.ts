@@ -32,7 +32,12 @@ export async function activate(context: ExtensionContext) {
   statusBar.tooltip = `twinny is running: fim: ${fimModel} chat: ${chatModel}`
 
   const completionProvider = new CompletionProvider(statusBar)
-  const sidebarProvider = new SidebarProvider(context.extensionUri, statusBar)
+
+  if (!context) {
+    return
+  }
+
+  const sidebarProvider = new SidebarProvider(statusBar, context)
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -92,7 +97,7 @@ export async function activate(context: ExtensionContext) {
       )
     }),
     commands.registerCommand('twinny.disableDownloads', () => {
-      sidebarProvider.setGlobalContext(context, {
+      sidebarProvider.setGlobalContext({
         key: MESSAGE_KEY.downloadCancelled,
         data: true
       })
@@ -101,7 +106,7 @@ export async function activate(context: ExtensionContext) {
       )
     }),
     commands.registerCommand('twinny.enableDownloads', () => {
-      sidebarProvider.setGlobalContext(context, {
+      sidebarProvider.setGlobalContext({
         key: MESSAGE_KEY.downloadCancelled,
         data: false
       })
@@ -110,12 +115,12 @@ export async function activate(context: ExtensionContext) {
       )
     }),
     commands.registerCommand('twinny.newChat', () => {
-      sidebarProvider.setTwinnyWorkspaceContext(context, {
+      sidebarProvider.setTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation,
-        data: []
+        messages: [],
       })
-      sidebarProvider.getTwinnyWorkspaceContext(context, {
-        key: MESSAGE_KEY.lastConversation
+      sidebarProvider.getTwinnyWorkspaceContext({
+        key: MESSAGE_KEY.lastConversation,
       })
     }),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),

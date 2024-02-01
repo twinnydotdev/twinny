@@ -1,21 +1,22 @@
 import * as vscode from 'vscode'
-import { getTextSelection, getTheme, openDiffView } from '../utils'
-import { getContext } from '../context'
+import { getLanguage, getTextSelection, getTheme, openDiffView } from '../utils'
 import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { ChatService } from '../chat-service'
-import { MessageType } from '../types'
+import { ClientMessage, ServerMessage } from '../types'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
   _doc?: vscode.TextDocument
   public chatService: ChatService | undefined = undefined
   private _statusBar: vscode.StatusBarItem
+  private context: vscode.ExtensionContext
 
   constructor(
-    private readonly _extensionUri: vscode.Uri,
-    statusBar: vscode.StatusBarItem
+    statusBar: vscode.StatusBarItem,
+    context: vscode.ExtensionContext
   ) {
     this._statusBar = statusBar
+    this.context = context
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -24,7 +25,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [this._extensionUri]
+      localResourceRoots: [this.context?.extensionUri]
     }
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
@@ -51,103 +52,116 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       })
     })
 
-    webviewView.webview.onDidReceiveMessage(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (data: any) => {
-        const context = getContext()
-        if (data.type === MESSAGE_NAME.twinnyChatMessage) {
-          this.chatService?.streamChatCompletion(data.data as MessageType[])
-        }
-        if (data.type === MESSAGE_NAME.twinnyOpenDiff) {
-          const editor = vscode.window.activeTextEditor
-          const selection = editor?.selection
-          const text = editor?.document.getText(selection)
-          openDiffView(text || '', data.data as string)
-        }
-        if (data.type === MESSAGE_NAME.twinnyClickSuggestion) {
-          vscode.commands.executeCommand(data.data)
-        }
-        if (data.type === MESSAGE_NAME.twinnyTextSelection) {
-          webviewView.webview.postMessage({
-            type: MESSAGE_NAME.twinnyTextSelection,
-            value: {
-              type: MESSAGE_KEY.selection,
-              completion: getTextSelection()
-            }
-          })
-        }
-        if (data.type === MESSAGE_NAME.twinnyAcceptSolution) {
-          const editor = vscode.window.activeTextEditor
-          const selection = editor?.selection
-          if (!selection) return
-          vscode.window.activeTextEditor?.edit((editBuilder) => {
-            editBuilder.replace(selection, data.data as string)
-          })
-        }
-        if (data.type === MESSAGE_NAME.twinnyGlobalContext) {
-          const storedData = context?.globalState.get(
-            `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`
-          )
-          webviewView.webview.postMessage({
-            type: `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
-            value: storedData
-          })
-        }
-        if (data.type === MESSAGE_NAME.twinnySetGlobalContext) {
-          this.setGlobalContext(context, data)
-        }
-        if (data.type === MESSAGE_NAME.twinnyWorkspaceContext) {
-          this.getTwinnyWorkspaceContext(context, data)
-        }
-        if (data.type === MESSAGE_NAME.twinnySetWorkspaceContext) {
-          this.setTwinnyWorkspaceContext(context, data)
-        }
-        if (data.type === MESSAGE_NAME.twinnySendTheme) {
-          webviewView.webview.postMessage({
-            type: MESSAGE_NAME.twinnySendTheme,
-            value: {
-              data: getTheme()
-            }
-          })
-        }
-        if (data.type === MESSAGE_NAME.twinnyNotification) {
-          vscode.window.showInformationMessage(data.data)
-        }
+    webviewView.webview.onDidReceiveMessage((data: ClientMessage) => {
+      const eventHandlers = {
+        [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
+        [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
+        [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,
+        [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
+        [MESSAGE_NAME.twinnyAcceptSolution]: this.acceptSolution,
+        [MESSAGE_NAME.twinnyGlobalContext]: this.getGlobalContext,
+        [MESSAGE_NAME.twinnySetGlobalContext]: this.setGlobalContext,
+        [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
+        [MESSAGE_NAME.twinnySetWorkspaceContext]: this.setTwinnyWorkspaceContext,
+        [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
+        [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
+        [MESSAGE_NAME.twinnyNotification]: this.sendNotification
       }
-    )
+      eventHandlers[data.type as string](data)
+    })
   }
 
-  public setGlobalContext(context: vscode.ExtensionContext | null, data: any) {
-    context?.globalState.update(
+  public sendNotification = (data: ClientMessage) => {
+    vscode.window.showInformationMessage(data.data as string)
+  }
+
+  public clickSuggestion = (data: ClientMessage) => {
+    vscode.commands.executeCommand(data.data as string)
+  }
+
+  public streamChatCompletion = (data: ClientMessage) => {
+    this.chatService?.streamChatCompletion(data.messages || [])
+  }
+
+  public openDiff = (data: ClientMessage) => {
+    const editor = vscode.window.activeTextEditor
+    const selection = editor?.selection
+    const text = editor?.document.getText(selection)
+    openDiffView(text || '', data.data as string)
+  }
+
+  public getSelectedText = () => {
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyTextSelection,
+      value: {
+        type: MESSAGE_KEY.selection,
+        completion: getTextSelection()
+      }
+    })
+  }
+
+  public acceptSolution = (data: ClientMessage) => {
+    const editor = vscode.window.activeTextEditor
+    const selection = editor?.selection
+    if (!selection) return
+    vscode.window.activeTextEditor?.edit((editBuilder) => {
+      editBuilder.replace(selection, data.data as string)
+    })
+  }
+
+  public getGlobalContext = (data: ClientMessage) => {
+    const storedData = this.context?.globalState.get(
+      `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`
+    )
+    this.view?.webview.postMessage({
+      type: `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
+      value: storedData
+    })
+  }
+
+  public getTheme = () => {
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnySendTheme,
+      value: {
+        data: getTheme()
+      }
+    })
+  }
+
+  public getCurrentLanguage = () => {
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnySendLanguage,
+      value: {
+        data: getLanguage()
+      }
+    } as ServerMessage)
+  }
+
+  public setGlobalContext = (data: ClientMessage) => {
+    this.context?.globalState.update(
       `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
       data.data
     )
   }
 
-  public getTwinnyWorkspaceContext(
-    context: vscode.ExtensionContext | null,
-    data: any
-  ) {
-    const storedData = context?.workspaceState.get(
+  public getTwinnyWorkspaceContext = (data: ClientMessage) => {
+    const storedData = this.context?.workspaceState.get(
       `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`
     )
     this.view?.webview.postMessage({
       type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
-      value: storedData
-    })
+      value: storedData,
+    } as ServerMessage)
   }
 
-  public setTwinnyWorkspaceContext(
-    context: vscode.ExtensionContext | null,
-    data: any
-  ) {
-    context?.workspaceState.update(
+  public setTwinnyWorkspaceContext = (data: ClientMessage) => {
+    this.context.workspaceState.update(
       `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
-      data.data
+      data.data || data.messages
     )
   }
 
-  public destroyStream() {
+  public destroyStream = () => {
     this.chatService?.destroyStream()
     this.view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyStopGeneration
@@ -156,7 +170,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private _getHtmlForWebview(webview: vscode.Webview) {
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'out', 'sidebar.js')
+      vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.js')
     )
 
     const nonce = getNonce()

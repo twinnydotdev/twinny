@@ -16,7 +16,7 @@ import {
 import 'string_score'
 import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
-import { languages } from '../languages'
+import { supportedLanguages } from '../languages'
 import { InlineCompletion, StreamOptions } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
@@ -205,19 +205,19 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private getFileHeader(languageId: string | undefined, uri: Uri) {
-    const lang = languages[languageId as keyof typeof languages]
+    const lang = supportedLanguages[languageId as keyof typeof supportedLanguages]
 
     if (!lang) {
       return ''
     }
 
-    const language = `${lang.comment?.start || ''} Language: ${
-      lang.name
-    } (${languageId}) ${lang.comment?.end || ''}`
+    const language = `${lang.syntaxComments?.start || ''} Language: ${
+      lang.langName
+    } (${languageId}) ${lang.syntaxComments?.end || ''}`
 
     const path = `${
-      lang.comment?.start || ''
-    } File uri: ${uri.toString()} (${languageId}) ${lang.comment?.end || ''}`
+      lang.syntaxComments?.start || ''
+    } File uri: ${uri.toString()} (${languageId}) ${lang.syntaxComments?.end || ''}`
 
     return `\n${language}\n${path}\n`
   }

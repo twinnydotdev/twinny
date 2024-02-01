@@ -1,4 +1,4 @@
-export type Language =
+export type CodeLanguage =
   | 'bat'
   | 'c'
   | 'cpp'
@@ -22,118 +22,87 @@ export type Language =
   | 'typescriptreact'
   | 'xml'
   | 'yaml'
+  | 'lua'
+  | 'perl'
+  | 'r'
+  | 'ruby'
+  | 'scala'
+  | 'sql'
+  | 'typescriptreactnative'
+  | 'xaml'
 
-export type LanguageType = {
-  name: string
-  extensions: string[]
-  filenames?: string[]
-  comment?: { start: string; end?: string }
-  base?: Language
+export type CodeLanguageDetails = {
+  langName: string
+  fileExtensions: string[]
+  filenamePatterns?: string[]
+  syntaxComments?: { start: string; end?: string }
+  derivedFrom?: CodeLanguage
 }
 
-export const languages: { [key in Language]: LanguageType } = {
-  typescript: {
-    name: 'Typescript',
-    extensions: ['.ts', '.cts', '.mts'],
-    comment: { start: '//' }
-  },
-  typescriptreact: {
-    name: 'Typescript React',
-    extensions: ['.tsx'],
-    comment: { start: '//' },
-    base: 'typescript'
-  },
-  javascript: {
-    name: 'Javascript',
-    extensions: ['.js', '.jsx', '.cjs'],
-    comment: { start: '//' }
-  },
-  jsx: {
-    name: 'JSX',
-    extensions: ['.jsx'],
-    comment: { start: '//' }
-  },
-  html: {
-    name: 'HTML',
-    extensions: ['.htm', '.html'],
-    comment: { start: '<!--', end: '-->' }
-  },
-  css: {
-    name: 'CSS',
-    extensions: ['.css']
-  },
-  sass: {
-    name: 'SASS',
-    extensions: ['.sass'],
-    comment: { start: '//' }
-  },
-  scss: {
-    name: 'SCSS',
-    extensions: ['.scss'],
-    comment: { start: '//' }
-  },
-  json: {
-    name: 'JSON',
-    extensions: ['.json', '.jsonl', '.geojson']
-  },
-  yaml: {
-    name: 'YAML',
-    extensions: ['.yml', '.yaml'],
-    comment: { start: '#' }
-  },
-  xml: {
-    name: 'XML',
-    extensions: ['.xml'],
-    comment: { start: '<!--', end: '-->' }
-  },
-  java: {
-    name: 'Java',
-    extensions: ['.java'],
-    comment: { start: '//' }
-  },
-  kotlin: {
-    name: 'Kotlin',
-    extensions: ['.kt', '.ktm', '.kts'],
-    comment: { start: '//' }
-  },
-  swift: {
-    name: 'Swift',
-    extensions: ['.swift'],
-    comment: { start: '//' }
-  },
-  'objective-c': {
-    name: 'Objective C',
-    extensions: ['.h', '.m', '.mm'],
-    comment: { start: '//' }
-  },
-  rust: {
-    name: 'Rust',
-    extensions: ['.rs', '.rs.in'],
-    comment: { start: '//' }
-  },
-  python: {
-    name: 'Python',
-    extensions: ['.py'],
-    comment: { start: '#' }
+export const supportedLanguages: {
+  [key in CodeLanguage]: CodeLanguageDetails
+} = {
+  bat: {
+    langName: 'BAT file',
+    fileExtensions: ['.bat', '.cmd'],
+    syntaxComments: { start: 'REM' }
   },
   c: {
-    name: 'C',
-    extensions: ['.c', '.h'],
-    comment: { start: '//' }
+    langName: 'C',
+    fileExtensions: ['.c', '.h'],
+    syntaxComments: { start: '//' }
   },
   cpp: {
-    name: 'C++',
-    extensions: ['.cpp', '.h'],
-    comment: { start: '//' }
+    langName: 'C++',
+    fileExtensions: ['.cpp', '.h'],
+    syntaxComments: { start: '//' }
+  },
+  css: {
+    langName: 'CSS',
+    fileExtensions: ['.css']
   },
   go: {
-    name: 'Go',
-    extensions: ['.go'],
-    comment: { start: '//' }
+    langName: 'Go',
+    fileExtensions: ['.go'],
+    syntaxComments: { start: '//' }
+  },
+  html: {
+    langName: 'HTML',
+    fileExtensions: ['.htm', '.html'],
+    syntaxComments: { start: '<!--', end: '-->' }
+  },
+  java: {
+    langName: 'Java',
+    fileExtensions: ['.java'],
+    syntaxComments: { start: '//' }
+  },
+  javascript: {
+    langName: 'Javascript',
+    fileExtensions: ['.js', '.jsx', '.cjs'],
+    syntaxComments: { start: '//' }
+  },
+  json: {
+    langName: 'JSON',
+    fileExtensions: ['.json', '.jsonl', '.geojson']
+  },
+  jsx: {
+    langName: 'JSX',
+    fileExtensions: ['.jsx'],
+    syntaxComments: { start: '//' }
+  },
+  kotlin: {
+    langName: 'Kotlin',
+    fileExtensions: ['.kt', '.ktm', '.kts'],
+    syntaxComments: { start: '//' }
+  },
+  'objective-c': {
+    langName: 'Objective C',
+    fileExtensions: ['.h', '.m', '.mm'],
+    syntaxComments: { start: '//' }
   },
   php: {
-    name: 'PHP',
-    extensions: [
+    langName: 'PHP',
+    fileExtensions: [
       '.aw',
       '.ctp',
       '.fcgi',
@@ -145,16 +114,98 @@ export const languages: { [key in Language]: LanguageType } = {
       '.phps',
       '.phpt'
     ],
-    comment: { start: '//' }
+    syntaxComments: { start: '//' }
   },
-  bat: {
-    name: 'BAT file',
-    extensions: ['.bat', '.cmd'],
-    comment: { start: 'REM' }
+  python: {
+    langName: 'Python',
+    fileExtensions: ['.py'],
+    syntaxComments: { start: '#' }
+  },
+  rust: {
+    langName: 'Rust',
+    fileExtensions: ['.rs', '.rs.in'],
+    syntaxComments: { start: '//' }
+  },
+  sass: {
+    langName: 'SASS',
+    fileExtensions: ['.sass'],
+    syntaxComments: { start: '//' }
+  },
+  scss: {
+    langName: 'SCSS',
+    fileExtensions: ['.scss'],
+    syntaxComments: { start: '//' }
   },
   shellscript: {
-    name: 'Shell',
-    extensions: ['.bash', '.sh'],
-    comment: { start: '#' }
+    langName: 'Shell',
+    fileExtensions: ['.bash', '.sh'],
+    syntaxComments: { start: '#' }
+  },
+  swift: {
+    langName: 'Swift',
+    fileExtensions: ['.swift'],
+    syntaxComments: { start: '//' }
+  },
+  typescript: {
+    langName: 'Typescript',
+    fileExtensions: ['.ts', '.cts', '.mts'],
+    syntaxComments: { start: '//' }
+  },
+  typescriptreact: {
+    langName: 'Typescript React',
+    fileExtensions: ['.tsx'],
+    syntaxComments: { start: '//' },
+    derivedFrom: 'typescript'
+  },
+  xml: {
+    langName: 'XML',
+    fileExtensions: ['.xml'],
+    syntaxComments: { start: '<!--', end: '-->' }
+  },
+  yaml: {
+    langName: 'YAML',
+    fileExtensions: ['.yml', '.yaml'],
+    syntaxComments: { start: '#' }
+  },
+  lua: {
+    langName: 'Lua',
+    fileExtensions: ['.lua'],
+    syntaxComments: { start: '--' }
+  },
+  perl: {
+    langName: 'Perl',
+    fileExtensions: ['.pl', '.pm'],
+    syntaxComments: { start: '#' }
+  },
+  r: {
+    langName: 'R',
+    fileExtensions: ['.r', '.R'],
+    syntaxComments: { start: '#' }
+  },
+  ruby: {
+    langName: 'Ruby',
+    fileExtensions: ['.rb'],
+    syntaxComments: { start: '#' }
+  },
+  scala: {
+    langName: 'Scala',
+    fileExtensions: ['.scala'],
+    syntaxComments: { start: '//' }
+  },
+  sql: {
+    langName: 'SQL',
+    fileExtensions: ['.sql'],
+    syntaxComments: { start: '--' }
+  },
+  typescriptreactnative: {
+    langName: 'Typescript React Native',
+    fileExtensions: ['.tsx'],
+    syntaxComments: { start: '//' },
+    derivedFrom: 'typescript'
+  },
+  xaml: {
+    langName: 'XAML',
+    fileExtensions: ['.xaml'],
+    syntaxComments: { start: '<!--', end: '-->' }
   }
 }

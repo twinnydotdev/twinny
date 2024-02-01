@@ -1,4 +1,4 @@
-import { KeyboardEventHandler, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   VSCodeButton,
@@ -16,12 +16,12 @@ import {
   USER_NAME
 } from '../constants'
 
-import { useSelection, useTheme, useWorkSpaceContext } from './hooks'
+import { useLanguage, useSelection, useTheme, useWorkSpaceContext } from './hooks'
 import { StopIcon } from './icons'
 
 import styles from './index.module.css'
 import { Suggestions } from './suggestions'
-import { MessageType, PostMessage } from '../types'
+import { ClientMessage, Messages, ServerMessage } from '../types'
 import { Message } from './message'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,11 +31,12 @@ export const Chat = () => {
   const genertingRef = useRef(false)
   const stopRef = useRef(false)
   const theme = useTheme()
+  const language = useLanguage()
   const [loading, setLoading] = useState(false)
   const lastConversation =
-    useWorkSpaceContext<MessageType[]>('lastConversation')
-  const [messages, setMessages] = useState<MessageType[] | undefined>()
-  const [completion, setCompletion] = useState<MessageType | null>()
+    useWorkSpaceContext<Messages[]>(MESSAGE_KEY.lastConversation)
+  const [messages, setMessages] = useState<Messages[] | undefined>()
+  const [completion, setCompletion] = useState<Messages | null>()
   const divRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chatRef = useRef<any>(null) // TODO: type...
@@ -50,7 +51,7 @@ export const Chat = () => {
 
   const selection = useSelection(scrollBottom)
 
-  const handleCompletionEnd = (message: PostMessage) => {
+  const handleCompletionEnd = (message: ServerMessage) => {
     setMessages((prev) => {
       const update = [
         ...(prev || []),
@@ -64,8 +65,8 @@ export const Chat = () => {
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnySetWorkspaceContext,
         key: MESSAGE_KEY.lastConversation,
-        data: update
-      })
+        messages: update
+      } as ClientMessage)
       return update
     })
     setCompletion(null)
@@ -76,7 +77,7 @@ export const Chat = () => {
     }, 1000)
   }
 
-  const handleCompletionMessage = (message: PostMessage) => {
+  const handleCompletionMessage = (message: ServerMessage) => {
     if (stopRef.current) {
       genertingRef.current = false
       return
@@ -98,7 +99,7 @@ export const Chat = () => {
   }
 
   const messageEventHandler = (event: MessageEvent) => {
-    const message: PostMessage = event.data
+    const message: ServerMessage = event.data
     switch (message.type) {
       case MESSAGE_NAME.twinnyOnCompletion: {
         handleCompletionMessage(message)
@@ -128,7 +129,7 @@ export const Chat = () => {
     genertingRef.current = false
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyStopGeneration
-    })
+    } as ClientMessage)
     handleCompletionEnd({
       type: MESSAGE_KEY.chatMessage,
       value: {
@@ -143,14 +144,14 @@ export const Chat = () => {
       setInputText('')
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnyChatMessage,
-        data: [
+        messages: [
           ...(messages || []),
           {
             role: USER_NAME,
             content: input
           }
         ]
-      })
+      } as ClientMessage)
       setMessages((prev) => [
         ...(prev || []),
         { role: USER_NAME, content: input, type: '' }
@@ -210,7 +211,7 @@ export const Chat = () => {
           <Suggestions isDisabled={!!genertingRef.current} />
         )}
         <form>
-          <Selection onSelect={scrollBottom} />
+          <Selection onSelect={scrollBottom} language={language} />
           <div className={styles.chatbox}>
             <VSCodeTextArea
               ref={chatRef}

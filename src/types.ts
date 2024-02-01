@@ -1,4 +1,5 @@
 import { Position } from 'vscode'
+import { CodeLanguageDetails } from './languages'
 
 export interface StreamOptions {
   model: string
@@ -33,25 +34,31 @@ export interface StreamResponse {
 }
 
 export interface LanguageType {
-  language: string
-  languageId: string
+  language: CodeLanguageDetails
+  languageId: string | undefined
 }
 
 export interface Prompts {
   [key: string]: (code: string, language: string) => string
 }
 
-export interface PostMessage {
+export interface ClientMessage {
+  data?: string | boolean
+  type?: string
+  key?: string
+  messages?: Messages[]
+}
+
+export interface ServerMessage<T = LanguageType> {
   type: string
   value: {
     type: string
     completion: string
     error?: boolean
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data?: any
+    data?: T
   }
 }
-export interface MessageType {
+export interface Messages {
   role: string
   content: string
   type?: string
