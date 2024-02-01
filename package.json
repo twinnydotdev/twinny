@@ -82,16 +82,6 @@
       ],
       "view/title": [
         {
-          "command": "twinny.enableDownloads",
-          "when": "view == twinny-sidebar",
-          "group": "navigation@1"
-        },
-        {
-          "command": "twinny.disableDownloads",
-          "when": "view == twinny-sidebar",
-          "group": "navigation@2"
-        },
-        {
           "command": "twinny.newChat",
           "when": "view == twinny-sidebar",
           "group": "navigation@3"
@@ -209,20 +199,20 @@
           "order": 0,
           "type": "boolean",
           "default": true,
-          "description": "Enable or disable twinny extension"
+          "description": "Activates or deactivates the Twinny extension."
         },
         "twinny.apiUrl": {
           "order": 1,
           "type": "string",
           "default": "localhost",
-          "description": "The completion API url",
+          "description": "URL for the completion API.",
           "required": true
         },
         "twinny.chatApiPath": {
           "order": 2,
           "type": "string",
           "default": "/api/generate",
-          "description": "The API completion path usually `/api/generate` for Ollama and `/completion` for llama.cpp",
+          "description": "Endpoint path for chat completions. Defaults to '/api/generate' for Ollama and '/completion' for llama.cpp.",
           "required": true
         },
         "twinny.chatApiPort": {
@@ -243,85 +233,91 @@
           "order": 5,
           "type": "string",
           "default": "/api/generate",
-          "description": "The API completion path usually `/api/generate` for Ollama and `/completion` for llama.cpp",
+          "description": "Endpoint path for FIM completions. Defaults to '/api/generate' for Ollama and '/completion' for llama.cpp.",
           "required": true
         },
         "twinny.chatModelName": {
           "order": 6,
           "type": "string",
           "default": "codellama:7b-instruct",
-          "description": "(Ollama API only) The model for twinny chat completions"
+          "description": "Model identifier for chat completions. Applicable only for Ollama API."
         },
         "twinny.fimModelName": {
           "order": 7,
           "type": "string",
           "default": "codellama:7b-code",
-          "description": "(Ollama API only) The model for twinny FIM completions"
+          "description": "Model identifier for FIM completions. Applicable only for Ollama API."
+        },
+        "twinny.disableAutoSuggest": {
+          "order": 8,
+          "type": "boolean",
+          "default": false,
+          "description": "Disables automatic suggestions, manual trigger (default shortcut Alt+\\)."
         },
         "twinny.contextLength": {
-          "order": 8,
+          "order": 9,
           "type": "number",
-          "default": 50,
-          "description": "How many lines before and after to include in FIM prompts",
+          "default": 10,
+          "description": "Defines the number of lines before and after the current line to include in FIM prompts.",
           "required": true
         },
         "twinny.debounceWait": {
-          "order": 9,
+          "order": 11,
           "type": "number",
           "default": 300,
-          "description": "The amount of time to wait before triggering the next completion in milliseconds",
+          "description": "Delay in milliseconds before triggering the next completion.",
           "required": true
         },
         "twinny.temperature": {
-          "order": 10,
+          "order": 12,
           "type": "number",
           "default": 1,
-          "description": "The model temperature sent for completions",
+          "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
         "twinny.useFileContext": {
-          "order": 11,
+          "order": 13,
           "type": "boolean",
           "default": true,
-          "description": "Optional setting which scans neighbouring documents to provide to completion prompts"
+          "description": "Enables scanning of neighboring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
-          "order": 12,
+          "order": 14,
           "type": "boolean",
           "default": true,
-          "description": "Whether or not to cache previously completed FIM completions with the same prompt"
+          "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 13,
+          "order": 15,
           "type": "number",
           "default": 512,
-          "description": "Maximum number of tokens to generate for chat completions",
+          "description": "Maximum token limit for chat completions.",
           "required": true
         },
         "twinny.numPredictFim": {
-          "order": 14,
+          "order": 16,
           "type": "number",
           "default": -1,
-          "description": "Maximum number of tokens to generate for fim completions default is -1 for infinite, twinny will stop when ready.",
+          "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny stops at logical line breaks.",
           "required": true
         },
-        "twinny.useTls": {
-          "order": 15,
+        "twinny.disableServerChecks": {
+          "order": 18,
           "type": "boolean",
           "default": false,
-          "description": "Whether to use TLS for the completion API connection e.g https"
+          "description": "Disables automatic LLM server checks at startup, preventing auto-downloads and prompts."
+        },
+        "twinny.useTls": {
+          "order": 19,
+          "type": "boolean",
+          "default": false,
+          "description": "Enables TLS encryption for API connections."
         },
         "twinny.apiBearerToken": {
-          "order": 16,
+          "order": 20,
           "type": "string",
           "default": "",
-          "description": "Whether to use a Bearer token for the API connection"
-        },
-        "twinny.disableAutoSuggest": {
-          "order": 16,
-          "type": "boolean",
-          "default": false,
-          "description": "Disable auto suggestion in favour of manual trigger default (Alt+\\)"
+          "description": "Bearer token for secure API authentication."
         }
       }
     }

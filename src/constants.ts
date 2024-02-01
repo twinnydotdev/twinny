@@ -8,6 +8,8 @@ export const USER_NAME = '👤 You'
 export const EMPTY_MESAGE = 'Sorry, I don’t understand. Please try again.'
 export const MODEL_ERROR = 'Sorry, something went wrong...'
 
+export const OLLAMA_DOWNLOAD_URL = 'https://ollama.ai/download'
+
 export const MESSAGE_NAME = {
   twinnyAcceptSolution: 'twinny-accept-solution',
   twinnyChat: 'twinny-chat',
