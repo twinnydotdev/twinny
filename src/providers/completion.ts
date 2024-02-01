@@ -175,7 +175,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 chunkCount = chunkCount + 1
 
                 if (
-                  (chunkCount > 6 && completionString === '\n') ||
+                  (chunkCount > 1 && completionString === '\n') ||
                   completion?.match('<EOT>')
                 ) {
                   this._statusBar.text = '🤖'
