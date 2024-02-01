@@ -262,59 +262,59 @@
           "required": true
         },
         "twinny.debounceWait": {
-          "order": 11,
+          "order": 10,
           "type": "number",
           "default": 300,
           "description": "Delay in milliseconds before triggering the next completion.",
           "required": true
         },
         "twinny.temperature": {
-          "order": 12,
+          "order": 11,
           "type": "number",
           "default": 1,
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
         "twinny.useFileContext": {
-          "order": 13,
+          "order": 12,
           "type": "boolean",
           "default": true,
           "description": "Enables scanning of neighboring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
-          "order": 14,
+          "order": 13,
           "type": "boolean",
           "default": true,
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 15,
+          "order": 14,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for chat completions.",
           "required": true
         },
         "twinny.numPredictFim": {
-          "order": 16,
+          "order": 15,
           "type": "number",
           "default": -1,
           "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny stops at logical line breaks.",
           "required": true
         },
         "twinny.disableServerChecks": {
-          "order": 18,
+          "order": 16,
           "type": "boolean",
           "default": false,
           "description": "Disables automatic LLM server checks at startup, preventing auto-downloads and prompts."
         },
         "twinny.useTls": {
-          "order": 19,
+          "order": 17,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
         "twinny.apiBearerToken": {
-          "order": 20,
+          "order": 18,
           "type": "string",
           "default": "",
           "description": "Bearer token for secure API authentication."
