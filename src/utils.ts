@@ -13,7 +13,7 @@ interface StreamResponseOptions {
     streamResponse: StreamResponse | undefined,
     destroy: () => void
   ) => void
-  onEnd?: () => void
+  onEnd?: (destroy: () => void) => void
   onStart?: (req: ClientRequest) => void
 }
 
@@ -55,7 +55,7 @@ export async function streamResponse(opts: StreamResponseOptions) {
       }
     })
     res.once('end', () => {
-      onEnd?.()
+      onEnd?.(() => res.destroy())
     })
   })
 

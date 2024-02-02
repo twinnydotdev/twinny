@@ -50,7 +50,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     'enableCompletionCache'
   ) as boolean
   private _currentReq: ClientRequest | undefined = undefined
-  private _isModelAvailable = true
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
@@ -107,34 +106,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return getFimPromptTemplateLLama(args)
   }
 
-  public handleCompleteEnd({
-    completion,
-    position,
-    prefix,
-    suffix,
-    stop
-  }: InlineCompletion) {
-    this._statusBar.text = '🤖'
-
-    for (const word of stop) {
-      completion = completion.replace(word, '')
-    }
-
-    return this.triggerInlineCompletion({
-      completion,
-      position,
-      prefix,
-      suffix,
-      stop
-    })
-  }
-
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     this._document = document
+
     const editor = window.activeTextEditor
 
     if (
@@ -159,6 +137,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._debouncer = setTimeout(async () => {
         if (!this._config.get('enabled')) return resolve([])
 
+        let completion = ''
+
         const context = this.getFileContext(document.uri)
 
         const { prefix, suffix } = this.getPositionContext(document, position)
@@ -174,9 +154,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const cachedCompletion = getCache({ prefix, suffix })
 
         if (cachedCompletion && this._enableCompletionCache) {
+          completion = cachedCompletion
           return resolve(
             this.triggerInlineCompletion({
-              completion: cachedCompletion,
+              completion,
               position,
               prefix,
               suffix,
@@ -196,53 +177,73 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           const { requestBody, requestOptions } =
             this.buildStreamRequest(prompt)
 
-            streamResponse({
-              body: requestBody,
-              options: requestOptions,
-              onStart: (req) => {
-                this._currentReq = req
-              },
-              onData: (streamResponse, destroy) => {
-                try {
-                  const completionString =
-                    streamResponse?.response || streamResponse?.content
+          streamResponse({
+            body: requestBody,
+            options: requestOptions,
+            onStart: (req) => {
+              this._currentReq = req
+            },
+            onEnd: (destroy) => {
+              destroy()
+              this._statusBar.text = '🤖'
+              stop.forEach((stopWord) => {
+                completion = completion.split(stopWord).join('')
+              })
+              resolve(
+                this.triggerInlineCompletion({
+                  completion,
+                  position,
+                  prefix,
+                  suffix,
+                  stop
+                })
+              )
+            },
+            onData: (streamResponse, destroy) => {
+              try {
+                const completionString =
+                  streamResponse?.response || streamResponse?.content
 
-                  if (!completionString) {
-                    this._statusBar.text = '🤖'
-                    return resolve([])
-                  }
-
-                  completion = completion + completionString
-                  chunkCount = chunkCount + 1
-
-                  if (
-                    (chunkCount > 1 && completionString === '\n') ||
-                    stop.some(stopSequence => completion?.includes(stopSequence))
-                    ) {
-                    this._statusBar.text = '🤖'
-                    completion = completion.replace('<EOT>', '')
-                    destroy()
-                    resolve(
-                      this.triggerInlineCompletion({
-                        completion,
-                        position,
-                        prefix,
-                        suffix,
-                        stop
-                      })
-                    )
-                  }
-                } catch (e) {
-                  this._currentReq?.destroy()
-                  console.error(e)
+                if (completionString === undefined) {
+                  return
                 }
+
+                completion = completion + completionString
+                chunkCount = chunkCount + 1
+
+                if (
+                  (chunkCount > 1 && completionString === '\n') ||
+                  stop.some((stopSequence) =>
+                    completion?.includes(stopSequence)
+                  )
+                ) {
+                  destroy()
+                  this._currentReq?.destroy()
+                  this._statusBar.text = '🤖'
+                  stop.forEach((stopWord) => {
+                    completion = completion.split(stopWord).join('')
+                  })
+                  resolve(
+                    this.triggerInlineCompletion({
+                      completion,
+                      position,
+                      prefix,
+                      suffix,
+                      stop
+                    })
+                  )
+                }
+              } catch (e) {
+                this._currentReq?.destroy()
+                console.error(e)
               }
-            })
-          } catch (error) {
-            this._statusBar.text = '$(alert)'
-            return resolve([] as InlineCompletionItem[])
-          }
-      }, this._debounceWait as number)
+            }
+          })
+        } catch (error) {
+          this._statusBar.text = '$(alert)'
+          return resolve([] as InlineCompletionItem[])
+        }
+      }, this._debounceWait)
     })
   }
 
@@ -341,25 +342,33 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const lineEndPosition = editor.document.lineAt(cursorPosition.line).range
       .end
 
+    const textAfterRange = new Range(cursorPosition, lineEndPosition)
+    const textAfterCursor = this._document?.getText(textAfterRange) || ''
     const lineStart = editor.document.lineAt(cursorPosition).range.start
     const lineRange = new Range(lineStart, lineEndPosition)
     const lineText = this._document?.getText(lineRange)
 
+    if (completion.includes(textAfterCursor)) {
+      completion = completion.replace(textAfterCursor, '')
+    }
+
+    if (lineText?.includes(completion)) {
+      return ''
+    }
+
     if (
       completion.trim() === '/' ||
-      lineText?.includes(completion.trim()) ||
+      lineText?.includes(completion) ||
       (completion.trim() === '/>' && lineText?.includes('</'))
     ) {
       return ''
     }
 
-    if (
-      completion.endsWith('\n') &&
-      this._fimTemplateFormat === fimTempateFormats.codellama
-    ) {
-      const parts = completion.split('\n')
-      completion = parts.slice(0, -1).join('\n') + parts.slice(-1)
+    if (textAfterCursor) {
+      completion = completion.trim()
     }
+
+    completion = completion.replace(/^[ \t]+|[ \t]+$/gm, '')
 
     return completion
   }
@@ -384,7 +393,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       setCache({ prefix, suffix, completion })
     }
 
-    return [new InlineCompletionItem(completion, new Range(position, position))]
+    return [
+      new InlineCompletionItem(
+        completion,
+        new Range(position, position)
+      )
+    ]
   }
 
   public updateConfig() {
@@ -398,6 +412,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._apiPath = this._config.get('fimApiPath') as string
     this._port = this._config.get('fimApiPort') as number
+    this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._apiUrl = this._config.get('apiUrl') as string
     this._enableCompletionCache = this._config.get(
       'enableCompletionCache'
