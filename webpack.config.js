@@ -22,12 +22,11 @@ const extensionConfig = {
     filename: 'extension.js',
     libraryTarget: 'commonjs2'
   },
-  externals: [{
-    vscode: 'commonjs vscode',
-  }, nodeExternals()],
+  externals: {vscode: 'commonjs vscode'},
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
   },
+
   module: {
     rules: [
       {

@@ -2,10 +2,10 @@ import * as fs from 'fs'
 import * as Handlebars from 'handlebars'
 import * as path from 'path'
 import { DefaultTemplate } from './types'
+import { defaultTemplates } from './templates'
 
 export class TemplateProvider {
   private _basePath: string
-  private _sourcePath: string = path.join(__dirname, '../src/templates')
 
   constructor(basePath: string) {
     this._basePath = basePath
@@ -34,17 +34,9 @@ export class TemplateProvider {
     const destPath = path.join(this._basePath)
     try {
       fs.mkdirSync(destPath, { recursive: true })
-      fs.readdir(this._sourcePath, (err, files) => {
-        if (err) {
-          console.error('Failed to list source templates', err)
-          return
-        }
-
-        files.forEach((file) => {
-          const srcFile = path.join(this._sourcePath, file)
-          const destFile = path.join(destPath, file)
-          fs.copyFileSync(srcFile, destFile)
-        })
+      defaultTemplates.forEach(({name, template}) => {
+        const destFile = path.join(destPath, name)
+        fs.writeFileSync(`${destFile}.hbs`, template, 'utf8')
       })
     } catch (e) {
       console.log(`Problem creating default templates "${this._basePath}`)

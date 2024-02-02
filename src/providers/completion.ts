@@ -13,7 +13,6 @@ import {
   InlineCompletionContext,
   CompletionTriggerKind
 } from 'vscode'
-import 'string_score'
 import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
