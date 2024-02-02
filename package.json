@@ -281,20 +281,20 @@
         "twinny.temperature": {
           "order": 12,
           "type": "number",
-          "default": 1,
+          "default": 0.2,
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
         "twinny.useFileContext": {
           "order": 13,
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Enables scanning of neighboring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
           "order": 14,
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
