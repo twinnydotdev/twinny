@@ -131,8 +131,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           useFileContext: this._useFileContext
         })
 
-        console.log(prompt)
-
         const cachedCompletion = getCache({ prefix, suffix })
 
         if (cachedCompletion && this._enableCompletionCache) {
