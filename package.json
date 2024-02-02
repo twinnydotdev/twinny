@@ -82,14 +82,19 @@
       ],
       "view/title": [
         {
+          "command": "twinny.templates",
+          "when": "view == twinny.sidebar",
+          "group": "navigation@0"
+        },
+        {
           "command": "twinny.newChat",
           "when": "view == twinny.sidebar",
-          "group": "navigation@3"
+          "group": "navigation@1"
         },
         {
           "command": "twinny.settings",
           "when": "view == twinny.sidebar",
-          "group": "navigation@4"
+          "group": "navigation@2"
         }
       ]
     },
@@ -141,16 +146,10 @@
         "icon": "$(comment-discussion)"
       },
       {
-        "command": "twinny.enableDownloads",
-        "shortTitle": "Enable downloads",
-        "title": "Enable automatic model downloads",
-        "icon": "$(desktop-download)"
-      },
-      {
-        "command": "twinny.disableDownloads",
-        "shortTitle": "Disable downloads",
-        "title": "Disable automatic model downloads",
-        "icon": "$(stop-circle)"
+        "command": "twinny.templates",
+        "shortTitle": "Edit twinny templates",
+        "title": "Edit twinny templates",
+        "icon": "$(files)"
       }
     ],
     "keybindings": [
@@ -331,6 +330,7 @@
     "vscode:publish": "npm exec vsce publish"
   },
   "devDependencies": {
+    "@types/handlebars": "^4.1.0",
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
     "@types/react-syntax-highlighter": "^15.5.11",
@@ -345,13 +345,15 @@
     "ts-loader": "^9.5.1",
     "typescript": "^4.7.4",
     "webpack": "^5.74.0",
-    "webpack-cli": "^4.10.0"
+    "webpack-cli": "^4.10.0",
+    "webpack-node-externals": "^3.0.0"
   },
   "dependencies": {
     "@microsoft/fast-react-wrapper": "^0.3.22",
     "@types/react": "^18.2.46",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "classnames": "^2.5.1",
+    "handlebars": "^4.7.8",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

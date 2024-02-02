@@ -131,6 +131,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           useFileContext: this._useFileContext
         })
 
+        console.log(prompt)
+
         const cachedCompletion = getCache({ prefix, suffix })
 
         if (cachedCompletion && this._enableCompletionCache) {
@@ -205,6 +207,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private getFileHeader(languageId: string | undefined, uri: Uri) {
+
+    if (!this._useFileContext) {
+      return ''
+    }
+
     const lang = supportedLanguages[languageId as keyof typeof supportedLanguages]
 
     if (!lang) {
