@@ -21,11 +21,12 @@ const extensionConfig = {
     filename: 'extension.js',
     libraryTarget: 'commonjs2'
   },
-  externals: {vscode: 'commonjs vscode'},
+  externals: {
+    vscode: 'commonjs vscode',
+  },
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
   },
-
   module: {
     rules: [
       {
@@ -36,6 +37,11 @@ const extensionConfig = {
             loader: 'ts-loader'
           }
         ]
+      },
+      {
+        test: /\.hbs$/,
+        exclude: /(node_modules)/,
+        loader: 'handlebars-loader'
       }
     ]
   },
