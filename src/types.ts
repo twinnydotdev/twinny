@@ -86,3 +86,11 @@ export interface ChatTemplateData {
 }
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
+
+export interface PromptTemplate {
+  context: string
+  header: string
+  suffix: string
+  prefix: string
+  useFileContext: boolean
+}

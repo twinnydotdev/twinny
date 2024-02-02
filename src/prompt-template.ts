@@ -1,10 +1,4 @@
-interface PrompTemplate {
-  context: string
-  header: string
-  suffix: string
-  prefix: string
-  useFileContext: boolean
-}
+import { PromptTemplate } from './types'
 
 export const getFimPromptTemplateLLama = ({
   context,
@@ -12,7 +6,7 @@ export const getFimPromptTemplateLLama = ({
   useFileContext,
   suffix,
   prefix
-}: PrompTemplate) => {
+}: PromptTemplate) => {
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
@@ -29,7 +23,7 @@ export const getFimPromptTemplateDeepseek = ({
   useFileContext,
   suffix,
   prefix
-}: PrompTemplate) => {
+}: PromptTemplate) => {
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
@@ -46,7 +40,7 @@ export const getFimPromptTemplateStableCode = ({
   useFileContext,
   suffix,
   prefix
-}: PrompTemplate) => {
+}: PromptTemplate) => {
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {

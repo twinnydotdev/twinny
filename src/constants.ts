@@ -37,4 +37,10 @@ export const MESSAGE_KEY = {
   chatMessage: 'chatMessage'
 }
 
+export const fimTempateFormats = {
+  deepseek: 'deepseek',
+  codellama: 'codellama',
+  stableCode: 'stable-code'
+}
+
 export const codeActionTypes = ['add-types', 'refactor', 'generate-docs', 'fix-code']

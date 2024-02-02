@@ -16,10 +16,11 @@ import {
 import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
-import { InlineCompletion, StreamOptions } from '../types'
+import { InlineCompletion, PromptTemplate, StreamOptions } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
-import { getFimPromptTemplateLLama } from '../prompt-template'
+import { getFimPromptTemplateDeepseek, getFimPromptTemplateLLama, getFimPromptTemplateStableCode } from '../prompt-template'
+import { fimTempateFormats } from '../constants'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -35,6 +36,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
+  private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _disableAutoSuggest = this._config.get(
     'disableAutoSuggest'
   ) as boolean
@@ -88,8 +90,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
   }
 
-  public getFimTemplate () {
-    return
+  public getFimTemplate(args: PromptTemplate) {
+    switch (this._fimTemplateFormat) {
+      case fimTempateFormats.codellama:
+        return getFimPromptTemplateLLama(args)
+      case fimTempateFormats.deepseek:
+        return getFimPromptTemplateDeepseek(args)
+      case fimTempateFormats.stableCode:
+        return getFimPromptTemplateStableCode(args)
+    }
+    return getFimPromptTemplateLLama(args)
   }
 
   public async provideInlineCompletionItems(
@@ -126,7 +136,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const { prefix, suffix } = this.getPositionContext(document, position)
 
-        const { prompt } = getFimPromptTemplateLLama({
+        const { prompt, stop } = this.getFimTemplate({
           context,
           prefix,
           suffix,
@@ -179,8 +189,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
                 if (
                   (chunkCount > 1 && completionString === '\n') ||
-                  completion?.match('<EOT>')
-                ) {
+                  stop.some(stopSequence => completion?.includes(stopSequence))
+                  ) {
                   this._statusBar.text = '🤖'
                   completion = completion.replace('<EOT>', '')
                   destroy()
@@ -208,12 +218,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private getFileHeader(languageId: string | undefined, uri: Uri) {
-
     if (!this._useFileContext) {
       return ''
     }
 
-    const lang = supportedLanguages[languageId as keyof typeof supportedLanguages]
+    const lang =
+      supportedLanguages[languageId as keyof typeof supportedLanguages]
 
     if (!lang) {
       return ''
@@ -225,7 +235,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     const path = `${
       lang.syntaxComments?.start || ''
-    } File uri: ${uri.toString()} (${languageId}) ${lang.syntaxComments?.end || ''}`
+    } File uri: ${uri.toString()} (${languageId}) ${
+      lang.syntaxComments?.end || ''
+    }`
 
     return `\n${language}\n${path}\n`
   }
