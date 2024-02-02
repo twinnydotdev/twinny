@@ -5,7 +5,7 @@ import { DefaultTemplate } from './types'
 
 export class TemplateProvider {
   private _basePath: string
-  private _sourcePath: string = path.join(__dirname, '../src/templates') // Adjust this path as necessary
+  private _sourcePath: string = path.join(__dirname, '../src/templates')
 
   constructor(basePath: string) {
     this._basePath = basePath
@@ -32,44 +32,60 @@ export class TemplateProvider {
 
   public copyDefaultTemplates() {
     const destPath = path.join(this._basePath)
-    fs.mkdirSync(destPath, { recursive: true })
-    fs.readdir(this._sourcePath, (err, files) => {
-      if (err) {
-        console.error('Failed to list source templates', err)
-        return
-      }
+    try {
+      fs.mkdirSync(destPath, { recursive: true })
+      fs.readdir(this._sourcePath, (err, files) => {
+        if (err) {
+          console.error('Failed to list source templates', err)
+          return
+        }
 
-      files.forEach((file) => {
-        const srcFile = path.join(this._sourcePath, file)
-        const destFile = path.join(destPath, file)
-        fs.copyFileSync(srcFile, destFile)
+        files.forEach((file) => {
+          const srcFile = path.join(this._sourcePath, file)
+          const destFile = path.join(destPath, file)
+          fs.copyFileSync(srcFile, destFile)
+        })
       })
-    })
+    } catch (e) {
+      console.log(`Problem creating default templates "${this._basePath}`)
+    }
   }
 
   public readSystemMessageTemplate() {
     const path = `${this._basePath}/system.hbs`
-    return new Promise<string>((resolve, reject) => {
-      fs.readFile(
-        path,
-        { encoding: 'utf-8' },
-        (err, templateString: string) => {
-          if (err) return reject(err)
-          resolve(templateString)
-        }
+    try {
+      return new Promise<string>((resolve, reject) => {
+        fs.readFile(
+          path,
+          { encoding: 'utf-8' },
+          (err, templateString: string) => {
+            if (err) return reject(err)
+            resolve(templateString)
+          }
+        )
+      })
+    } catch (e) {
+      console.log(
+        `Problem reading default template "${this._basePath}/system.hbs`
       )
-    })
+      return Promise.reject()
+    }
   }
 
   public compileTemplateFromFile<T>(templateName: string) {
     const path = `${this._basePath}/${templateName}.hbs`
-    return new Promise<HandlebarsTemplateDelegate<T>>((resolve, reject) => {
-      fs.readFile(path, { encoding: 'utf-8' }, (err, templateString) => {
-        if (err) return reject(err)
-        const template = Handlebars.compile(templateString)
-        resolve(template)
+    try {
+      return new Promise<HandlebarsTemplateDelegate<T>>((resolve, reject) => {
+        fs.readFile(path, { encoding: 'utf-8' }, (err, templateString) => {
+          if (err) return reject(err)
+          const template = Handlebars.compile(templateString)
+          resolve(template)
+        })
       })
-    })
+    } catch (e) {
+      console.log(`Problem reading default template "${path}"`)
+      return Promise.reject(e)
+    }
   }
 
   public async renderTemplate<T extends DefaultTemplate>(
