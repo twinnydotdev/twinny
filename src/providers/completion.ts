@@ -19,7 +19,7 @@ import { supportedLanguages } from '../languages'
 import { InlineCompletion, StreamOptions } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
-import { getFimPromptTemplate } from '../prompt-template'
+import { getFimPromptTemplateLLama } from '../prompt-template'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -88,6 +88,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
   }
 
+  public getFimTemplate () {
+    return
+  }
+
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
@@ -122,7 +126,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const { prefix, suffix } = this.getPositionContext(document, position)
 
-        const { prompt } = getFimPromptTemplate({
+        const { prompt } = getFimPromptTemplateLLama({
           context,
           prefix,
           suffix,
