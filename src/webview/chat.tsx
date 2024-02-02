@@ -21,7 +21,7 @@ import { StopIcon } from './icons'
 
 import styles from './index.module.css'
 import { Suggestions } from './suggestions'
-import { ClientMessage, Messages, ServerMessage } from '../types'
+import { ClientMessage, MessageType, ServerMessage } from '../types'
 import { Message } from './message'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,9 +34,9 @@ export const Chat = () => {
   const language = useLanguage()
   const [loading, setLoading] = useState(false)
   const lastConversation =
-    useWorkSpaceContext<Messages[]>(MESSAGE_KEY.lastConversation)
-  const [messages, setMessages] = useState<Messages[] | undefined>()
-  const [completion, setCompletion] = useState<Messages | null>()
+    useWorkSpaceContext<MessageType[]>(MESSAGE_KEY.lastConversation)
+  const [messages, setMessages] = useState<MessageType[] | undefined>()
+  const [completion, setCompletion] = useState<MessageType | null>()
   const divRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chatRef = useRef<any>(null) // TODO: type...

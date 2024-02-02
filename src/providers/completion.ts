@@ -13,7 +13,6 @@ import {
   InlineCompletionContext,
   CompletionTriggerKind
 } from 'vscode'
-import 'string_score'
 import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
@@ -205,6 +204,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private getFileHeader(languageId: string | undefined, uri: Uri) {
+
+    if (!this._useFileContext) {
+      return ''
+    }
+
     const lang = supportedLanguages[languageId as keyof typeof supportedLanguages]
 
     if (!lang) {

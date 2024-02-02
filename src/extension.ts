@@ -4,8 +4,11 @@ import {
   languages,
   StatusBarAlignment,
   window,
-  workspace
+  workspace,
+  Uri,
 } from 'vscode'
+import * as path from 'path'
+import * as os from 'os'
 import * as vscode from 'vscode'
 
 import { CompletionProvider } from './providers/completion'
@@ -14,12 +17,16 @@ import { SidebarProvider } from './providers/sidebar'
 import { delayExecution, deleteTempFiles } from './utils'
 import { setContext } from './context'
 import { EXTENSION_NAME, MESSAGE_KEY } from './constants'
+import { TemplateProvider } from './template-provider'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
+  const templateDir =
+    config.get('templateDir') as string  ||
+    path.join(os.homedir(), '.twinny/templates') as string
   setContext(context)
 
   try {
@@ -32,12 +39,13 @@ export async function activate(context: ExtensionContext) {
   statusBar.tooltip = `twinny is running: fim: ${fimModel} chat: ${chatModel}`
 
   const completionProvider = new CompletionProvider(statusBar)
+  new TemplateProvider(templateDir).createTemplateDir()
 
   if (!context) {
     return
   }
 
-  const sidebarProvider = new SidebarProvider(statusBar, context)
+  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -90,37 +98,22 @@ export async function activate(context: ExtensionContext) {
         sidebarProvider.chatService?.streamTemplateCompletion('generate-docs')
       )
     }),
+    commands.registerCommand('twinny.templates', async () => {
+      await vscode.commands.executeCommand('vscode.openFolder', Uri.parse(templateDir), true);
+    }),
     commands.registerCommand('twinny.settings', () => {
       vscode.commands.executeCommand(
         'workbench.action.openSettings',
         EXTENSION_NAME
       )
     }),
-    commands.registerCommand('twinny.disableDownloads', () => {
-      sidebarProvider.setGlobalContext({
-        key: MESSAGE_KEY.downloadCancelled,
-        data: true
-      })
-      vscode.window.showInformationMessage(
-        'twinny automatic model downloads disabled.'
-      )
-    }),
-    commands.registerCommand('twinny.enableDownloads', () => {
-      sidebarProvider.setGlobalContext({
-        key: MESSAGE_KEY.downloadCancelled,
-        data: false
-      })
-      vscode.window.showInformationMessage(
-        'twinny automatic model downloads enabled.'
-      )
-    }),
     commands.registerCommand('twinny.newChat', () => {
       sidebarProvider.setTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation,
-        messages: [],
+        messages: []
       })
       sidebarProvider.getTwinnyWorkspaceContext({
-        key: MESSAGE_KEY.lastConversation,
+        key: MESSAGE_KEY.lastConversation
       })
     }),
     window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),

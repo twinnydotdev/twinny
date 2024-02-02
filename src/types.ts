@@ -38,15 +38,11 @@ export interface LanguageType {
   languageId: string | undefined
 }
 
-export interface Prompts {
-  [key: string]: (code: string, language: string) => string
-}
-
 export interface ClientMessage {
   data?: string | boolean
   type?: string
   key?: string
-  messages?: Messages[]
+  messages?: MessageType[]
 }
 
 export interface ServerMessage<T = LanguageType> {
@@ -58,7 +54,7 @@ export interface ServerMessage<T = LanguageType> {
     data?: T
   }
 }
-export interface Messages {
+export interface MessageType {
   role: string
   content: string
   type?: string
@@ -70,5 +66,23 @@ export const Theme = {
   Dark: 'Dark',
   Contrast: 'Contrast'
 } as const
+
+export interface DefaultTemplate {
+  systemMessage?: string
+}
+
+export interface TemplateData extends Record<string, string | undefined> {
+  systemMessage?: string
+  code: string
+  language: string
+}
+
+export interface ChatTemplateData {
+  systemMessage?: string
+  role: string
+  messages: MessageType[]
+  code: string
+  language: string
+}
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]

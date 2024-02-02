@@ -10,17 +10,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public chatService: ChatService | undefined = undefined
   private _statusBar: vscode.StatusBarItem
   private context: vscode.ExtensionContext
+  private _templateDir: string
 
   constructor(
     statusBar: vscode.StatusBarItem,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
+    templateDir: string
   ) {
     this._statusBar = statusBar
     this.context = context
+    this._templateDir = templateDir
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.chatService = new ChatService(this._statusBar, webviewView)
+    this.chatService = new ChatService(this._statusBar, this._templateDir, webviewView)
     this.view = webviewView
 
     webviewView.webview.options = {
@@ -52,7 +55,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       })
     })
 
-    webviewView.webview.onDidReceiveMessage((data: ClientMessage) => {
+    webviewView.webview.onDidReceiveMessage((messeage: ClientMessage) => {
       const eventHandlers = {
         [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
         [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
@@ -67,7 +70,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
         [MESSAGE_NAME.twinnyNotification]: this.sendNotification
       }
-      eventHandlers[data.type as string](data)
+      eventHandlers[messeage.type as string](messeage)
     })
   }
 

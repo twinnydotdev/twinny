@@ -21,12 +21,11 @@ const extensionConfig = {
     filename: 'extension.js',
     libraryTarget: 'commonjs2'
   },
-  externals: {
-    vscode: 'commonjs vscode'
-  },
+  externals: {vscode: 'commonjs vscode'},
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
   },
+
   module: {
     rules: [
       {
@@ -60,7 +59,7 @@ const webviewConfig = {
     extensions: ['.js', '.ts', '.tsx', '.json'],
     fallback: {
       http: require.resolve('stream-http')
-    }
+    },
   },
   plugins: [new NodePolyfillPlugin()],
   module: {
