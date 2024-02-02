@@ -16,6 +16,7 @@ export interface InlineCompletion {
   position: Position
   prefix: string
   suffix: string
+  stop: string[]
 }
 
 export interface StreamResponse {

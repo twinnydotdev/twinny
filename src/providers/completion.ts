@@ -13,13 +13,18 @@ import {
   InlineCompletionContext,
   CompletionTriggerKind
 } from 'vscode'
+import 'string_score'
 import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
 import { InlineCompletion, PromptTemplate, StreamOptions } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
-import { getFimPromptTemplateDeepseek, getFimPromptTemplateLLama, getFimPromptTemplateStableCode } from '../prompt-template'
+import {
+  getFimPromptTemplateDeepseek,
+  getFimPromptTemplateLLama,
+  getFimPromptTemplateStableCode
+} from '../prompt-template'
 import { fimTempateFormats } from '../constants'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
@@ -102,6 +107,28 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return getFimPromptTemplateLLama(args)
   }
 
+  public handleCompleteEnd({
+    completion,
+    position,
+    prefix,
+    suffix,
+    stop
+  }: InlineCompletion) {
+    this._statusBar.text = '🤖'
+
+    for (const word of stop) {
+      completion = completion.replace(word, '')
+    }
+
+    return this.triggerInlineCompletion({
+      completion,
+      position,
+      prefix,
+      suffix,
+      stop
+    })
+  }
+
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
@@ -152,7 +179,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               completion: cachedCompletion,
               position,
               prefix,
-              suffix
+              suffix,
+              stop
             })
           )
         }
@@ -160,6 +188,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         if (!prompt) return resolve([])
 
         try {
+          console.log('FUCK')
           let completion = ''
           let chunkCount = 0
           this._statusBar.text = '$(loading~spin)'
@@ -168,51 +197,52 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           const { requestBody, requestOptions } =
             this.buildStreamRequest(prompt)
 
-          streamResponse({
-            body: requestBody,
-            options: requestOptions,
-            onStart: (req) => {
-              this._currentReq = req
-            },
-            onData: (streamResponse, destroy) => {
-              try {
-                const completionString =
-                  streamResponse?.response || streamResponse?.content
+            streamResponse({
+              body: requestBody,
+              options: requestOptions,
+              onStart: (req) => {
+                this._currentReq = req
+              },
+              onData: (streamResponse, destroy) => {
+                try {
+                  const completionString =
+                    streamResponse?.response || streamResponse?.content
 
-                if (!completionString) {
-                  this._statusBar.text = '🤖'
-                  return resolve([])
+                  if (!completionString) {
+                    this._statusBar.text = '🤖'
+                    return resolve([])
+                  }
+
+                  completion = completion + completionString
+                  chunkCount = chunkCount + 1
+
+                  if (
+                    (chunkCount > 1 && completionString === '\n') ||
+                    stop.some(stopSequence => completion?.includes(stopSequence))
+                    ) {
+                    this._statusBar.text = '🤖'
+                    completion = completion.replace('<EOT>', '')
+                    destroy()
+                    resolve(
+                      this.triggerInlineCompletion({
+                        completion,
+                        position,
+                        prefix,
+                        suffix,
+                        stop
+                      })
+                    )
+                  }
+                } catch (e) {
+                  this._currentReq?.destroy()
+                  console.error(e)
                 }
-
-                completion = completion + completionString
-                chunkCount = chunkCount + 1
-
-                if (
-                  (chunkCount > 1 && completionString === '\n') ||
-                  stop.some(stopSequence => completion?.includes(stopSequence))
-                  ) {
-                  this._statusBar.text = '🤖'
-                  completion = completion.replace('<EOT>', '')
-                  destroy()
-                  resolve(
-                    this.triggerInlineCompletion({
-                      completion,
-                      position,
-                      prefix,
-                      suffix
-                    })
-                  )
-                }
-              } catch (e) {
-                this._currentReq?.destroy()
-                console.error(e)
               }
-            }
-          })
-        } catch (error) {
-          this._statusBar.text = '$(alert)'
-          return resolve([] as InlineCompletionItem[])
-        }
+            })
+          } catch (error) {
+            this._statusBar.text = '$(alert)'
+            return resolve([] as InlineCompletionItem[])
+          }
       }, this._debounceWait as number)
     })
   }
@@ -324,7 +354,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return ''
     }
 
-    if (completion.endsWith('\n')) {
+    if (
+      completion.endsWith('\n') &&
+      this._fimTemplateFormat === fimTempateFormats.codellama
+    ) {
       const parts = completion.split('\n')
       completion = parts.slice(0, -1).join('\n') + parts.slice(-1)
     }

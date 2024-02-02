@@ -235,8 +235,20 @@
           "description": "Endpoint path for FIM completions. Defaults to '/api/generate' for Ollama and '/completion' for llama.cpp.",
           "required": true
         },
-        "twinny.fimTemplateFormat": {
+        "twinny.chatModelName": {
           "order": 6,
+          "type": "string",
+          "default": "codellama:7b-instruct",
+          "description": "Model identifier for chat completions. Applicable only for Ollama API."
+        },
+        "twinny.fimModelName": {
+          "order": 7,
+          "type": "string",
+          "default": "codellama:7b-code",
+          "description": "Model identifier for FIM completions. Applicable only for Ollama API."
+        },
+        "twinny.fimTemplateFormat": {
+          "order": 8,
           "type": "string",
           "enum": [
             "stable-code",
@@ -245,18 +257,6 @@
           ],
           "default": "codellama",
           "description": "The prompt format to be used for FIM completions."
-        },
-        "twinny.chatModelName": {
-          "order": 7,
-          "type": "string",
-          "default": "codellama:7b-instruct",
-          "description": "Model identifier for chat completions. Applicable only for Ollama API."
-        },
-        "twinny.fimModelName": {
-          "order": 8,
-          "type": "string",
-          "default": "codellama:7b-code",
-          "description": "Model identifier for FIM completions. Applicable only for Ollama API."
         },
         "twinny.disableAutoSuggest": {
           "order": 9,
@@ -298,33 +298,33 @@
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 15,
+          "order": 16,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for chat completions.",
           "required": true
         },
         "twinny.numPredictFim": {
-          "order": 16,
+          "order": 15,
           "type": "number",
           "default": -1,
           "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny stops at logical line breaks.",
           "required": true
         },
         "twinny.disableServerChecks": {
-          "order": 17,
+          "order": 16,
           "type": "boolean",
           "default": false,
           "description": "Disables automatic LLM server checks at startup, preventing auto-downloads and prompts."
         },
         "twinny.useTls": {
-          "order": 18,
+          "order": 17,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
         "twinny.apiBearerToken": {
-          "order": 19,
+          "order": 18,
           "type": "string",
           "default": "",
           "description": "Bearer token for secure API authentication."
