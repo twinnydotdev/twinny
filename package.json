@@ -83,12 +83,12 @@
       "view/title": [
         {
           "command": "twinny.newChat",
-          "when": "view == twinny-sidebar",
+          "when": "view == twinny.sidebar",
           "group": "navigation@3"
         },
         {
           "command": "twinny.settings",
-          "when": "view == twinny-sidebar",
+          "when": "view == twinny.sidebar",
           "group": "navigation@4"
         }
       ]
@@ -129,11 +129,6 @@
         "shortTitle": "Disable twinny"
       },
       {
-        "command": "twinny.showSidebar",
-        "shortTitle": "Enable twinny sidebar",
-        "title": "Enable twinny sidebar"
-      },
-      {
         "command": "twinny.settings",
         "shortTitle": "twinny settings",
         "title": "Open twinny settings",
@@ -165,7 +160,7 @@
       },
       {
         "key": "CTRL+SHIFT+t",
-        "command": "workbench.view.extension.twinny-sidebar-view"
+        "command": "twinny.sidebar.focus"
       },
       {
         "key": "CTRL+SHIFT+/",
@@ -185,7 +180,7 @@
       "twinny-sidebar-view": [
         {
           "type": "webview",
-          "id": "twinny-sidebar",
+          "id": "twinny.sidebar",
           "name": "twinny",
           "icon": "assets/twinny.svg",
           "contextualTitle": "twinny"
