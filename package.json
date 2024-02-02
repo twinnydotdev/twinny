@@ -247,47 +247,58 @@
           "default": "codellama:7b-code",
           "description": "Model identifier for FIM completions. Applicable only for Ollama API."
         },
-        "twinny.disableAutoSuggest": {
+        "twinny.fimTemplateFormat": {
           "order": 8,
+          "type": "string",
+          "enum": [
+            "stable-code",
+            "codellama",
+            "deepseek"
+          ],
+          "default": "codellama",
+          "description": "The prompt format to be used for FIM completions."
+        },
+        "twinny.disableAutoSuggest": {
+          "order": 9,
           "type": "boolean",
           "default": false,
           "description": "Disables automatic suggestions, manual trigger (default shortcut Alt+\\)."
         },
         "twinny.contextLength": {
-          "order": 9,
+          "order": 10,
           "type": "number",
           "default": 10,
           "description": "Defines the number of lines before and after the current line to include in FIM prompts.",
           "required": true
         },
         "twinny.debounceWait": {
-          "order": 10,
+          "order": 11,
           "type": "number",
           "default": 300,
           "description": "Delay in milliseconds before triggering the next completion.",
           "required": true
         },
         "twinny.temperature": {
-          "order": 11,
+          "order": 12,
           "type": "number",
-          "default": 1,
+          "default": 0.2,
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
         "twinny.useFileContext": {
-          "order": 12,
+          "order": 13,
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Enables scanning of neighboring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
-          "order": 13,
+          "order": 14,
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 14,
+          "order": 16,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for chat completions.",

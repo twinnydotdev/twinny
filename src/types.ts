@@ -16,6 +16,7 @@ export interface InlineCompletion {
   position: Position
   prefix: string
   suffix: string
+  stop: string[]
 }
 
 export interface StreamResponse {
@@ -86,3 +87,11 @@ export interface ChatTemplateData {
 }
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
+
+export interface PromptTemplate {
+  context: string
+  header: string
+  suffix: string
+  prefix: string
+  useFileContext: boolean
+}

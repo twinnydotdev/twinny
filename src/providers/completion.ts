@@ -17,10 +17,15 @@ import 'string_score'
 import { streamResponse } from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
-import { InlineCompletion, StreamOptions } from '../types'
+import { InlineCompletion, PromptTemplate, StreamOptions } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
-import { getFimPromptTemplate } from '../prompt-template'
+import {
+  getFimPromptTemplateDeepseek,
+  getFimPromptTemplateLLama,
+  getFimPromptTemplateStableCode
+} from '../prompt-template'
+import { fimTempateFormats } from '../constants'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -36,6 +41,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
+  private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _disableAutoSuggest = this._config.get(
     'disableAutoSuggest'
   ) as boolean
@@ -44,7 +50,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     'enableCompletionCache'
   ) as boolean
   private _currentReq: ClientRequest | undefined = undefined
-  private _isModelAvailable = true
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
@@ -89,12 +94,25 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
   }
 
+  public getFimTemplate(args: PromptTemplate) {
+    switch (this._fimTemplateFormat) {
+      case fimTempateFormats.codellama:
+        return getFimPromptTemplateLLama(args)
+      case fimTempateFormats.deepseek:
+        return getFimPromptTemplateDeepseek(args)
+      case fimTempateFormats.stableCode:
+        return getFimPromptTemplateStableCode(args)
+    }
+    return getFimPromptTemplateLLama(args)
+  }
+
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     this._document = document
+
     const editor = window.activeTextEditor
 
     if (
@@ -119,11 +137,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._debouncer = setTimeout(async () => {
         if (!this._config.get('enabled')) return resolve([])
 
+        let completion = ''
+
         const context = this.getFileContext(document.uri)
 
         const { prefix, suffix } = this.getPositionContext(document, position)
 
-        const { prompt } = getFimPromptTemplate({
+        const { prompt, stop } = this.getFimTemplate({
           context,
           prefix,
           suffix,
@@ -134,12 +154,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const cachedCompletion = getCache({ prefix, suffix })
 
         if (cachedCompletion && this._enableCompletionCache) {
+          completion = cachedCompletion
           return resolve(
             this.triggerInlineCompletion({
-              completion: cachedCompletion,
+              completion,
               position,
               prefix,
-              suffix
+              suffix,
+              stop
             })
           )
         }
@@ -161,14 +183,29 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onStart: (req) => {
               this._currentReq = req
             },
+            onEnd: (destroy) => {
+              destroy()
+              this._statusBar.text = '🤖'
+              stop.forEach((stopWord) => {
+                completion = completion.split(stopWord).join('')
+              })
+              resolve(
+                this.triggerInlineCompletion({
+                  completion,
+                  position,
+                  prefix,
+                  suffix,
+                  stop
+                })
+              )
+            },
             onData: (streamResponse, destroy) => {
               try {
                 const completionString =
                   streamResponse?.response || streamResponse?.content
 
-                if (!completionString) {
-                  this._statusBar.text = '🤖'
-                  return resolve([])
+                if (completionString === undefined) {
+                  return
                 }
 
                 completion = completion + completionString
@@ -176,17 +213,23 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
                 if (
                   (chunkCount > 1 && completionString === '\n') ||
-                  completion?.match('<EOT>')
+                  stop.some((stopSequence) =>
+                    completion?.includes(stopSequence)
+                  )
                 ) {
-                  this._statusBar.text = '🤖'
-                  completion = completion.replace('<EOT>', '')
                   destroy()
+                  this._currentReq?.destroy()
+                  this._statusBar.text = '🤖'
+                  stop.forEach((stopWord) => {
+                    completion = completion.split(stopWord).join('')
+                  })
                   resolve(
                     this.triggerInlineCompletion({
                       completion,
                       position,
                       prefix,
-                      suffix
+                      suffix,
+                      stop
                     })
                   )
                 }
@@ -200,17 +243,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           this._statusBar.text = '$(alert)'
           return resolve([] as InlineCompletionItem[])
         }
-      }, this._debounceWait as number)
+      }, this._debounceWait)
     })
   }
 
   private getFileHeader(languageId: string | undefined, uri: Uri) {
-
     if (!this._useFileContext) {
       return ''
     }
 
-    const lang = supportedLanguages[languageId as keyof typeof supportedLanguages]
+    const lang =
+      supportedLanguages[languageId as keyof typeof supportedLanguages]
 
     if (!lang) {
       return ''
@@ -222,7 +265,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     const path = `${
       lang.syntaxComments?.start || ''
-    } File uri: ${uri.toString()} (${languageId}) ${lang.syntaxComments?.end || ''}`
+    } File uri: ${uri.toString()} (${languageId}) ${
+      lang.syntaxComments?.end || ''
+    }`
 
     return `\n${language}\n${path}\n`
   }
@@ -297,22 +342,33 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const lineEndPosition = editor.document.lineAt(cursorPosition.line).range
       .end
 
+    const textAfterRange = new Range(cursorPosition, lineEndPosition)
+    const textAfterCursor = this._document?.getText(textAfterRange) || ''
     const lineStart = editor.document.lineAt(cursorPosition).range.start
     const lineRange = new Range(lineStart, lineEndPosition)
     const lineText = this._document?.getText(lineRange)
 
+    if (completion.includes(textAfterCursor)) {
+      completion = completion.replace(textAfterCursor, '')
+    }
+
+    if (lineText?.includes(completion)) {
+      return ''
+    }
+
     if (
       completion.trim() === '/' ||
-      lineText?.includes(completion.trim()) ||
+      lineText?.includes(completion) ||
       (completion.trim() === '/>' && lineText?.includes('</'))
     ) {
       return ''
     }
 
-    if (completion.endsWith('\n')) {
-      const parts = completion.split('\n')
-      completion = parts.slice(0, -1).join('\n') + parts.slice(-1)
+    if (textAfterCursor) {
+      completion = completion.trim()
     }
+
+    completion = completion.replace(/^[ \t]+|[ \t]+$/gm, '')
 
     return completion
   }
@@ -337,7 +393,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       setCache({ prefix, suffix, completion })
     }
 
-    return [new InlineCompletionItem(completion, new Range(position, position))]
+    return [
+      new InlineCompletionItem(
+        completion,
+        new Range(position, position)
+      )
+    ]
   }
 
   public updateConfig() {
@@ -351,6 +412,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._apiPath = this._config.get('fimApiPath') as string
     this._port = this._config.get('fimApiPort') as number
+    this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._apiUrl = this._config.get('apiUrl') as string
     this._enableCompletionCache = this._config.get(
       'enableCompletionCache'
