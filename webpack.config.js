@@ -6,7 +6,6 @@
 
 const path = require('path')
 const NodePolyfillPlugin = require('node-polyfill-webpack-plugin')
-const nodeExternals = require('webpack-node-externals')
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
