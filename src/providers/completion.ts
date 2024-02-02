@@ -188,7 +188,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         if (!prompt) return resolve([])
 
         try {
-          console.log('FUCK')
           let completion = ''
           let chunkCount = 0
           this._statusBar.text = '$(loading~spin)'
