@@ -6,6 +6,7 @@
 
 const path = require('path')
 const NodePolyfillPlugin = require('node-polyfill-webpack-plugin')
+const nodeExternals = require('webpack-node-externals')
 
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
@@ -21,9 +22,9 @@ const extensionConfig = {
     filename: 'extension.js',
     libraryTarget: 'commonjs2'
   },
-  externals: {
-    vscode: 'commonjs vscode'
-  },
+  externals: [{
+    vscode: 'commonjs vscode',
+  }, nodeExternals()],
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
   },
@@ -60,7 +61,7 @@ const webviewConfig = {
     extensions: ['.js', '.ts', '.tsx', '.json'],
     fallback: {
       http: require.resolve('stream-http')
-    }
+    },
   },
   plugins: [new NodePolyfillPlugin()],
   module: {

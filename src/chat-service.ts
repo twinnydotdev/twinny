@@ -2,16 +2,18 @@ import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
 import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
 
-import { chatMessage } from './prompts'
-import { MESSAGE_NAME, prompts } from './constants'
+import { MESSAGE_NAME, USER_NAME } from './constants'
 import {
   StreamResponse,
   StreamOptions,
   ServerMessage,
-  Messages,
+  MessageType,
+  TemplateData,
+  ChatTemplateData
 } from './types'
 import { getLanguage, streamResponse } from './utils'
 import { CodeLanguageDetails } from './languages'
+import { TemplateProvider } from './template-provider'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -27,11 +29,17 @@ export class ChatService {
   private _statusBar: StatusBarItem
   private _promptTemplate = ''
   private _currentRequest?: ClientRequest
+  private _templateProvider?: TemplateProvider
 
-  constructor(statusBar: StatusBarItem, view?: WebviewView) {
+  constructor(
+    statusBar: StatusBarItem,
+    templateDir: string,
+    view?: WebviewView
+  ) {
     this._view = view
     this._statusBar = statusBar
 
+    this._templateProvider = new TemplateProvider(templateDir)
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
@@ -139,27 +147,38 @@ export class ChatService {
     } as ServerMessage)
   }
 
-  public buildChatMessagePrompt = (
-    messages: Messages[],
+  public buildChatMessagePrompt = async (
+    messages: MessageType[],
     language: CodeLanguageDetails
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return chatMessage(messages, selectionContext, language?.langName)
+    const prompt =
+      await this._templateProvider?.renderTemplate<ChatTemplateData>('chat', {
+        code: selectionContext || '',
+        messages,
+        role: USER_NAME,
+        language: language?.langName
+      })
+    return prompt || ''
   }
 
-  public buildTemplatePrompt = (
+  public buildTemplatePrompt = async (
     template: string,
-    message: string,
     language: CodeLanguageDetails
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    return prompts[template]
-      ? prompts[template](selectionContext, language?.langName)
-      : message
+    const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
+      template,
+      {
+        code: selectionContext || '',
+        language: language.langName
+      }
+    )
+    return prompt || ''
   }
 
   private streamResponse({
@@ -191,21 +210,21 @@ export class ChatService {
     } as ServerMessage)
   }
 
-  public streamChatCompletion(messages: Messages[]) {
+  public async streamChatCompletion(messages: MessageType[]) {
     const { language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()
-    const prompt = this.buildChatMessagePrompt(messages, language)
+    const prompt = await this.buildChatMessagePrompt(messages, language)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
   }
 
-  public streamTemplateCompletion(promptTemplate: string, context = '') {
+  public async streamTemplateCompletion(promptTemplate: string) {
     const { language } = getLanguage()
     this._completion = ''
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
-    const prompt = this.buildTemplatePrompt(promptTemplate, context, language)
+    const prompt = await this.buildTemplatePrompt(promptTemplate, language)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
   }

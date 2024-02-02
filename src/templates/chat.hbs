@@ -1,0 +1,17 @@
+{{#if (eq messages.length 1)}}
+{{{systemMessage}}}
+{{/if}}
+{{#each messages}}
+  {{#if (eq this.role '👤 You')}}
+    [INST] {{{this.content}}}
+    {{#if ../code}}
+    \`\`\`
+      {{{../code}}}
+    \`\`\`
+    {{/if}} {{#if ../language}}
+    The language is {{../language}}
+    {{/if}}[/INST]
+  {{else}}
+    {{{this.content}}}
+  {{/if}}
+{{/each}}

@@ -1,6 +1,3 @@
-import { addTests, addTypes, explain, fixCode, generateDocs, refactor } from './prompts'
-import { Prompts } from './types'
-
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const BOT_NAME = '🤖 twinny'
 export const USER_NAME = '👤 You'
@@ -41,12 +38,3 @@ export const MESSAGE_KEY = {
 }
 
 export const codeActionTypes = ['add-types', 'refactor', 'generate-docs', 'fix-code']
-
-export const prompts: Prompts = {
-  explain: explain,
-  'add-types': addTypes,
-  refactor: refactor,
-  'add-tests': addTests,
-  'generate-docs': generateDocs,
-  'fix-code': fixCode,
-}
