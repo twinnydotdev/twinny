@@ -236,6 +236,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   completionString === '\n' &&
                   !this._useMultiLineCompletions
                 ) {
+                  destroy()
+                  this._currentReq?.destroy()
                   return resolve(
                     this.handleEndStream({
                       position,
