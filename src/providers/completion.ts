@@ -238,6 +238,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 ) {
                   destroy()
                   this._currentReq?.destroy()
+                  this._statusBar.text = '🤖'
+                  stop.forEach((stopWord) => {
+                    completion = completion.split(stopWord).join('')
+                  })
                   return resolve(
                     this.handleEndStream({
                       position,

@@ -31,6 +31,7 @@ Chat with AI about your code
 - Free
 - Private
 - Auto code completion
+- Single or 
 - Fast and accurate
 - Multiple language support
 - Easy to install
