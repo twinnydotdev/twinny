@@ -9,5 +9,3 @@ export function setContext(newContext: ExtensionContext) {
 export function getContext() {
   return context
 }
-
-module.exports = { setContext, getContext }

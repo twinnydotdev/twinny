@@ -39,6 +39,11 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   return (
     <>
+      <SyntaxHighlighter
+        children={String(children).trimStart().replace(/\n$/, '')}
+        style={theme === Theme.Dark ? vscDarkPlus : vs}
+        language={lang}
+      />
       <div className={styles.codeOptions}>
         {codeActionTypes.includes(completionType) && (
           <>
@@ -47,11 +52,6 @@ export const CodeBlock = (props: CodeBlockProps) => {
         )}
         <VSCodeButton onClick={handleCopy}>Copy</VSCodeButton>
       </div>
-      <SyntaxHighlighter
-        children={String(children).trimStart().replace(/\n$/, '')}
-        style={theme === Theme.Dark ? vscDarkPlus : vs}
-        language={lang}
-      />
     </>
   )
 }
