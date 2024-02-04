@@ -31,9 +31,10 @@ Chat with AI about your code
 - Free
 - Private
 - Auto code completion
-- Single or 
+- Configurable single or multiline completions
 - Fast and accurate
 - Multiple language support
+- Configurable prompt templates
 - Easy to install
 - Configurable endpoint and port and path for completion API
 - Chat feature like Copilot Chat
