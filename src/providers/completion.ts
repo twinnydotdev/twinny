@@ -42,6 +42,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
+  private _useMultiLineCompletions = this._config.get(
+    'useMultiLineCompletions'
+  ) as boolean
+  private maxLines = this._config.get('maxLines') as number
   private _disableAutoSuggest = this._config.get(
     'disableAutoSuggest'
   ) as boolean
@@ -106,6 +110,22 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return getFimPromptTemplateLLama(args)
   }
 
+  public handleEndStream = ({
+    completion,
+    position,
+    prefix,
+    suffix,
+    stop
+  }: InlineCompletion) => {
+    return this.triggerInlineCompletion({
+      completion,
+      position,
+      prefix,
+      suffix,
+      stop
+    })
+  }
+
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
@@ -155,13 +175,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (cachedCompletion && this._enableCompletionCache) {
           completion = cachedCompletion
-          return resolve(
-            this.triggerInlineCompletion({
-              completion,
+          resolve(
+            this.handleEndStream({
               position,
               prefix,
               suffix,
-              stop
+              stop,
+              completion
             })
           )
         }
@@ -171,6 +191,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         try {
           let completion = ''
           let chunkCount = 0
+          let lines = 0
           this._statusBar.text = '$(loading~spin)'
           this._statusBar.command = 'twinny.stopGeneration'
 
@@ -190,12 +211,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 completion = completion.split(stopWord).join('')
               })
               resolve(
-                this.triggerInlineCompletion({
-                  completion,
+                this.handleEndStream({
                   position,
                   prefix,
                   suffix,
-                  stop
+                  stop,
+                  completion
                 })
               )
             },
@@ -212,7 +233,26 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 chunkCount = chunkCount + 1
 
                 if (
-                  (chunkCount > 1 && completionString === '\n') ||
+                  completionString === '\n' &&
+                  !this._useMultiLineCompletions
+                ) {
+                  return resolve(
+                    this.handleEndStream({
+                      position,
+                      prefix,
+                      suffix,
+                      stop,
+                      completion
+                    })
+                  )
+                }
+
+                if (completionString === '\n') {
+                  lines++
+                }
+
+                if (
+                  lines > this.maxLines ||
                   stop.some((stopSequence) =>
                     completion?.includes(stopSequence)
                   )
@@ -224,12 +264,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                     completion = completion.split(stopWord).join('')
                   })
                   resolve(
-                    this.triggerInlineCompletion({
-                      completion,
+                    this.handleEndStream({
                       position,
                       prefix,
                       suffix,
-                      stop
+                      stop,
+                      completion
                     })
                   )
                 }
@@ -358,17 +398,29 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (
       completion.trim() === '/' ||
-      lineText?.includes(completion) ||
       (completion.trim() === '/>' && lineText?.includes('</'))
     ) {
       return ''
     }
 
-    if (textAfterCursor) {
-      completion = completion.trim()
-    }
+    if (!this._useMultiLineCompletions) {
+      let nextLineIndex = cursorPosition.line + 1
 
-    completion = completion.replace(/^[ \t]+|[ \t]+$/gm, '')
+      while (nextLineIndex < cursorPosition.line + 3) {
+        const nextLineText = editor.document.lineAt(nextLineIndex).text
+
+        const normalizedNextLineText = nextLineText
+          .replace(/\r?\n|\r/g, '')
+          .trim()
+        const normalizedCompletion = completion.replace(/\r?\n|\r/g, '').trim()
+
+        if (normalizedNextLineText === normalizedCompletion) {
+          return ''
+        }
+
+        nextLineIndex++
+      }
+    }
 
     return completion
   }
@@ -393,12 +445,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       setCache({ prefix, suffix, completion })
     }
 
-    return [
-      new InlineCompletionItem(
-        completion,
-        new Range(position, position)
-      )
-    ]
+    return [new InlineCompletionItem(completion, new Range(position, position))]
   }
 
   public updateConfig() {
@@ -414,6 +461,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._port = this._config.get('fimApiPort') as number
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._apiUrl = this._config.get('apiUrl') as string
+    this._useMultiLineCompletions = this._config.get(
+      'useMultiLineCompletions'
+    ) as boolean
+    this.maxLines = this._config.get('maxLines') as number
     this._enableCompletionCache = this._config.get(
       'enableCompletionCache'
     ) as boolean
