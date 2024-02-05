@@ -5,30 +5,24 @@ import { VSCodeDivider } from '@vscode/webview-ui-toolkit/react'
 import CodeBlock from './code-block'
 
 import styles from './index.module.css'
-import { LanguageType, ThemeType } from '../types'
+import { MessageType, ThemeType } from '../types'
 import React from 'react'
 
 interface MessageProps {
-  message?: string
-  sender: string
-  completionType: string
-  language: LanguageType | undefined
+  message?: MessageType
   theme: ThemeType | undefined
 }
 
 export const Message = ({
   message,
-  sender,
-  completionType,
-  language,
   theme,
 }: MessageProps) => {
-  if (!message) {
+  if (!message?.content) {
     return null
   }
   return (
     <div className={styles.message}>
-      <b>{sender}</b>
+      <b>{message.role}</b>
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -36,9 +30,9 @@ export const Message = ({
             if (React.isValidElement(children)) {
               return (
                 <CodeBlock
-                  language={language}
+                  language={message.language}
                   theme={theme}
-                  completionType={completionType}
+                  completionType={message.type}
                   {...children.props}
                 />
               )
@@ -50,7 +44,7 @@ export const Message = ({
           }
         }}
       >
-        {message.trimStart()}
+        {message.content.trimStart()}
       </Markdown>
       <VSCodeDivider />
     </div>

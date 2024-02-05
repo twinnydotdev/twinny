@@ -49,10 +49,11 @@ export interface ClientMessage {
 export interface ServerMessage<T = LanguageType> {
   type: string
   value: {
-    type: string
     completion: string
-    error?: boolean
     data?: T
+    error?: boolean
+    errorMessage?: string
+    type: string
   }
 }
 export interface MessageType {
@@ -60,6 +61,7 @@ export interface MessageType {
   content: string
   type?: string
   language?: LanguageType
+  error?: boolean
 }
 
 export const Theme = {

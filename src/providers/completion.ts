@@ -283,7 +283,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 this._currentReq?.destroy()
                 console.error(e)
               }
-            }
+            },
+            onError: (error) => {
+              this._statusBar.text = '🤖'
+              console.error(error)
+              this._currentReq?.destroy()
+              resolve([])
+            },
           })
         } catch (error) {
           this._statusBar.text = '$(alert)'

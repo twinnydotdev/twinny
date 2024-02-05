@@ -10,7 +10,6 @@ import {
 import { Selection } from './selection'
 import {
   BOT_NAME,
-  EMPTY_MESAGE,
   MESSAGE_KEY,
   MESSAGE_NAME,
   USER_NAME
@@ -23,6 +22,7 @@ import styles from './index.module.css'
 import { Suggestions } from './suggestions'
 import { ClientMessage, MessageType, ServerMessage } from '../types'
 import { Message } from './message'
+import { getCompletionContent } from './utils'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -57,7 +57,7 @@ export const Chat = () => {
         ...(prev || []),
         {
           role: BOT_NAME,
-          content: message.value.completion || EMPTY_MESAGE,
+          content: getCompletionContent(message),
           type: message.value.type,
           language: message.value.data
         }
@@ -70,6 +70,7 @@ export const Chat = () => {
       return update
     })
     setCompletion(null)
+    setLoading(false)
     genertingRef.current = false
     setTimeout(() => {
       chatRef.current?.focus()
@@ -86,9 +87,10 @@ export const Chat = () => {
     setLoading(false)
     setCompletion({
       role: BOT_NAME,
-      content: message.value.completion || EMPTY_MESAGE,
+      content: getCompletionContent(message),
       type: message.value.type,
-      language: message.value.data
+      language: message.value.data,
+      error: message.value.error,
     })
     scrollBottom()
   }
@@ -182,10 +184,7 @@ export const Chat = () => {
           {messages?.map((message, index) => (
             <div key={`message-${index}`}>
               <Message
-                completionType={message.type || ''}
-                sender={message.role}
-                message={message.content}
-                language={message.language}
+                message={message}
                 theme={theme}
               />
             </div>
@@ -198,11 +197,11 @@ export const Chat = () => {
           {!!completion && (
             <>
               <Message
-                completionType={completion.type || ''}
-                sender={BOT_NAME}
-                message={completion.content}
-                language={completion.language}
                 theme={theme}
+                message={{
+                  ...completion,
+                  role: BOT_NAME
+                }}
               />
             </>
           )}

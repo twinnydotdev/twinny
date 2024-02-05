@@ -125,6 +125,16 @@ export class ChatService {
     } as ServerMessage)
   }
 
+  private onStreamError = (error: Error) => {
+    this._view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyOnEnd,
+      value: {
+        error: true,
+        errorMessage: error.message,
+      }
+    } as ServerMessage)
+  }
+
   private onStreamStart = (req: ClientRequest) => {
     this._statusBar.text = '$(loading~spin)'
     this._currentRequest = req
@@ -200,7 +210,8 @@ export class ChatService {
       options: requestOptions,
       onData: this.onStreamData,
       onEnd: this.onStreamEnd,
-      onStart: this.onStreamStart
+      onStart: this.onStreamStart,
+      onError: this.onStreamError,
     })
   }
 
