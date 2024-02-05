@@ -161,7 +161,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const context = this.getFileContext(document.uri)
 
-        const { prefix, suffix } = this.getPositionContext(document, position)
+        const { prefix, suffix } = this.getCursorPositionContext(document, position)
 
         const { prompt, stop } = this.getFimTemplate({
           context,
@@ -324,7 +324,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return `\n${language}\n${path}\n`
   }
 
-  private calculateSimilarity(path1: string, path2: string): number {
+  private calculateFilePathSimilarity(path1: string, path2: string): number {
     const components1 = path1.split('/')
     const components2 = path2.split('/')
 
@@ -358,12 +358,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         document.uri
       )}${document.getText()}`
 
-      const similarity = this.calculateSimilarity(
+      const filePathSimilarity = this.calculateFilePathSimilarity(
         currentFileName.toString(),
         document.uri.toString()
       )
 
-      if (similarity > 1) {
+      if (filePathSimilarity > 1) {
         codeSnippets.push(text)
       }
     }
@@ -371,7 +371,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return codeSnippets.join('\n')
   }
 
-  getPositionContext(
+  getCursorPositionContext(
     document: TextDocument,
     position: Position
   ): { prefix: string; suffix: string } {
@@ -399,9 +399,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const lineStart = editor.document.lineAt(cursorPosition).range.start
     const lineRange = new Range(lineStart, lineEndPosition)
     const lineText = this._document?.getText(lineRange)
+    const normalizedCompletion = completion.replace(/\r?\n|\r/g, '').trim()
 
-    if (completion.includes(textAfterCursor)) {
-      completion = completion.replace(textAfterCursor, '')
+    if (textAfterCursor.trim() === normalizedCompletion.trim()) {
+      return ''
     }
 
     if (lineText?.includes(completion)) {
@@ -424,7 +425,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const normalizedNextLineText = nextLineText
           .replace(/\r?\n|\r/g, '')
           .trim()
-        const normalizedCompletion = completion.replace(/\r?\n|\r/g, '').trim()
 
         if (normalizedNextLineText === normalizedCompletion) {
           return ''
