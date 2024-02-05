@@ -1,8 +1,8 @@
 import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
-import { StatusBarItem, WebviewView, window, workspace } from 'vscode'
+import { StatusBarItem, WebviewView, commands, window, workspace } from 'vscode'
 
-import { MESSAGE_NAME, USER_NAME } from './constants'
+import { CONTEXT_NAME, MESSAGE_NAME, USER_NAME } from './constants'
 import {
   StreamResponse,
   StreamOptions,
@@ -114,6 +114,7 @@ export class ChatService {
 
   private onStreamEnd = () => {
     this._statusBar.text = '🤖'
+    commands.executeCommand('setContext', CONTEXT_NAME.twinnyGeneratingText, false)
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
@@ -127,6 +128,7 @@ export class ChatService {
   private onStreamStart = (req: ClientRequest) => {
     this._statusBar.text = '$(loading~spin)'
     this._currentRequest = req
+    commands.executeCommand('setContext', CONTEXT_NAME.twinnyGeneratingText, true)
     this._view?.webview.onDidReceiveMessage((data: { type: string }) => {
       if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
         req.destroy()
@@ -137,6 +139,7 @@ export class ChatService {
   public destroyStream = () => {
     this._currentRequest?.destroy()
     this._statusBar.text = '🤖'
+    commands.executeCommand('setContext', CONTEXT_NAME.twinnyGeneratingText, true)
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {

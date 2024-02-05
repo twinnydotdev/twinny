@@ -37,6 +37,10 @@ export const MESSAGE_KEY = {
   chatMessage: 'chatMessage'
 }
 
+export const CONTEXT_NAME = {
+  twinnyGeneratingText: 'twinnyGeneratingText',
+}
+
 export const fimTempateFormats = {
   deepseek: 'deepseek',
   codellama: 'codellama',
