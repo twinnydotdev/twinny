@@ -8,15 +8,19 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import { Selection } from './selection'
-import {
-  BOT_NAME,
-  MESSAGE_KEY,
-  MESSAGE_NAME,
-  USER_NAME
-} from '../constants'
+import { BOT_NAME, MESSAGE_KEY, MESSAGE_NAME, USER_NAME } from '../constants'
 
-import { useLanguage, useSelection, useTheme, useWorkSpaceContext } from './hooks'
-import { StopIcon } from './icons'
+import {
+  useLanguage,
+  useSelection,
+  useTheme,
+  useWorkSpaceContext
+} from './hooks'
+import {
+  DisabledAutoScrollIcon,
+  EnabledAutoScrollIcon,
+  StopIcon
+} from './icons'
 
 import styles from './index.module.css'
 import { Suggestions } from './suggestions'
@@ -33,11 +37,16 @@ export const Chat = () => {
   const theme = useTheme()
   const language = useLanguage()
   const [loading, setLoading] = useState(false)
-  const lastConversation =
-    useWorkSpaceContext<MessageType[]>(MESSAGE_KEY.lastConversation)
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const divRef = useRef<HTMLDivElement>(null)
+  const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
+  const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
+    boolean | undefined
+  >(autoScrollContext)
+  const lastConversation = useWorkSpaceContext<MessageType[]>(
+    MESSAGE_KEY.lastConversation
+  )
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chatRef = useRef<any>(null) // TODO: type...
 
@@ -65,8 +74,8 @@ export const Chat = () => {
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnySetWorkspaceContext,
         key: MESSAGE_KEY.lastConversation,
-        messages: update
-      } as ClientMessage)
+        data: update
+      } as ClientMessage<MessageType[]>)
       return update
     })
     setCompletion(null)
@@ -85,19 +94,19 @@ export const Chat = () => {
     }
     genertingRef.current = true
     setLoading(false)
+    if (isAutoScrolledEnabled) scrollBottom()
     setCompletion({
       role: BOT_NAME,
       content: getCompletionContent(message),
       type: message.value.type,
       language: message.value.data,
-      error: message.value.error,
+      error: message.value.error
     })
-    scrollBottom()
   }
 
   const handleLoadingMessage = () => {
     setLoading(true)
-    scrollBottom()
+    if (isAutoScrolledEnabled) scrollBottom()
   }
 
   const messageEventHandler = (event: MessageEvent) => {
@@ -158,8 +167,22 @@ export const Chat = () => {
         ...(prev || []),
         { role: USER_NAME, content: input, type: '' }
       ])
-      scrollBottom()
+      if (isAutoScrolledEnabled) scrollBottom()
     }
+  }
+
+  const togggleAutoScroll = () => {
+    setIsAutoScrolledEnabled((prev) => {
+      global.vscode.postMessage({
+        type: MESSAGE_NAME.twinnySetWorkspaceContext,
+        key: MESSAGE_KEY.autoScroll,
+        data: !prev
+      } as ClientMessage)
+
+      if (!prev) scrollBottom()
+
+      return !prev
+    })
   }
 
   useEffect(() => {
@@ -168,14 +191,17 @@ export const Chat = () => {
     return () => {
       window.removeEventListener('message', messageEventHandler)
     }
-  }, [])
+  }, [isAutoScrolledEnabled])
 
   useEffect(() => {
+    if (autoScrollContext !== undefined)
+      setIsAutoScrolledEnabled(autoScrollContext)
+
     if (lastConversation?.length) {
       return setMessages(lastConversation)
     }
     setMessages([])
-  }, [lastConversation])
+  }, [lastConversation, autoScrollContext])
 
   return (
     <VSCodePanelView>
@@ -183,10 +209,7 @@ export const Chat = () => {
         <div className={styles.markdown} ref={divRef}>
           {messages?.map((message, index) => (
             <div key={`message-${index}`}>
-              <Message
-                message={message}
-                theme={theme}
-              />
+              <Message message={message} theme={theme} />
             </div>
           ))}
           {loading && (
@@ -209,8 +232,21 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!genertingRef.current} />
         )}
-        <form>
+        <div className={styles.chatOptions}>
+          <VSCodeButton
+            onClick={togggleAutoScroll}
+            title="Toggle auto scroll on/off"
+            appearance="icon"
+          >
+            {isAutoScrolledEnabled ? (
+              <EnabledAutoScrollIcon />
+            ) : (
+              <DisabledAutoScrollIcon />
+            )}
+          </VSCodeButton>
           <Selection onSelect={scrollBottom} language={language} />
+        </div>
+        <form>
           <div className={styles.chatbox}>
             <VSCodeTextArea
               ref={chatRef}
@@ -220,7 +256,7 @@ export const Chat = () => {
               value={inputText}
               onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
                 if (e.ctrlKey && e.key === 'Enter') {
-                  const target = e.target as HTMLTextAreaElement;
+                  const target = e.target as HTMLTextAreaElement
                   handleSubmitForm(target.value)
                 }
               }}

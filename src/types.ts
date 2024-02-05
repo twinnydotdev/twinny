@@ -39,11 +39,10 @@ export interface LanguageType {
   languageId: string | undefined
 }
 
-export interface ClientMessage {
-  data?: string | boolean
+export interface ClientMessage<T = string | boolean> {
+  data?: T
   type?: string
   key?: string
-  messages?: MessageType[]
 }
 
 export interface ServerMessage<T = LanguageType> {

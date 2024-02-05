@@ -34,7 +34,8 @@ export const MESSAGE_KEY = {
   lastConversation: 'lastConversation',
   downloadCancelled: 'downloadCancelled',
   selection: 'selection',
-  chatMessage: 'chatMessage'
+  chatMessage: 'chatMessage',
+  autoScroll: 'autoScroll',
 }
 
 export const CONTEXT_NAME = {

@@ -110,7 +110,7 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.newChat', () => {
       sidebarProvider.setTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation,
-        messages: []
+        data: []
       })
       sidebarProvider.getTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation

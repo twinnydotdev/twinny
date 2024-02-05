@@ -52,9 +52,7 @@ Do not explain the code in your response.
     name: 'generate-docs',
     template: `{{{systemMessage}}}
 Generate documentation for the following code block:
-\`\`\`
 {{{code}}}
-\`\`\`
 Use the most popular documentation tool for the language {{{language}}}. If you don't know infer the tool.
 Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
   `
@@ -75,9 +73,7 @@ For code refactoring, use markdown with code formatting.<</SYS>>
   {{#if (eq this.role '👤 You')}}
     [INST] {{{this.content}}}
     {{#if ../code}}
-    \`\`\`
       {{{../code}}}
-    \`\`\`
     {{/if}} {{#if ../language}}
     The language is {{../language}}
     {{/if}}[/INST]
