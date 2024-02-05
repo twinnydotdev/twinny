@@ -78,8 +78,9 @@ twinny and Ollama have been tested and are working on Linux with a 3090 with the
 
 For FIM 
 
-- The model must support the llama special tokens for prefix and suffix. 
+- The model must support the llama special tokens for prefix and suffix if using codellama models.
 - Only use deepseek base models for FIM completions for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
+- For stable-code `stable-code:code` has been tested and works for FIM.
 
 For chat 
 
