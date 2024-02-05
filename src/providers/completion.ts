@@ -283,7 +283,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 this._currentReq?.destroy()
                 console.error(e)
               }
-            }
+            },
+            onError: (error) => {
+              this._statusBar.text = '🤖'
+              console.error(error)
+              this._currentReq?.destroy()
+              resolve([])
+            },
           })
         } catch (error) {
           this._statusBar.text = '$(alert)'
@@ -306,7 +312,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     const language = `${lang.syntaxComments?.start || ''} Language: ${
-      lang.langName
+      lang?.langName
     } (${languageId}) ${lang.syntaxComments?.end || ''}`
 
     const path = `${

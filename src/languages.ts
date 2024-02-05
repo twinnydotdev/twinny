@@ -32,11 +32,11 @@ export type CodeLanguage =
   | 'xaml'
 
 export type CodeLanguageDetails = {
-  langName: string
   fileExtensions: string[]
   filenamePatterns?: string[]
   syntaxComments?: { start: string; end?: string }
   derivedFrom?: CodeLanguage
+  langName?: string
 }
 
 export const supportedLanguages: {

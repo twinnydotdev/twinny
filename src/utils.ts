@@ -1,4 +1,4 @@
-import { ClientRequest, RequestOptions, request } from 'http'
+import { ClientRequest, IncomingMessage, RequestOptions, request } from 'http'
 import { request as httpsRequest } from 'https'
 import { ColorThemeKind, Uri, commands, window, workspace } from 'vscode'
 
@@ -15,6 +15,7 @@ interface StreamResponseOptions {
   ) => void
   onEnd?: (destroy: () => void) => void
   onStart?: (req: ClientRequest) => void
+  onError?: (error: Error) => void
 }
 
 export const isLlamaCppStream = (stringBuffer: string) => {
@@ -33,7 +34,7 @@ const safeParseJson = (stringBuffer: string): StreamResponse | undefined => {
 }
 
 export async function streamResponse(opts: StreamResponseOptions) {
-  const { body, options, onData, onEnd, onStart } = opts
+  const { body, options, onData, onEnd, onError, onStart } = opts
   const config = workspace.getConfiguration('twinny')
   const useTls = config.get('useTls')
 
@@ -41,7 +42,22 @@ export async function streamResponse(opts: StreamResponseOptions) {
 
   let stringBuffer = ''
 
-  const req = _request(options, (res) => {
+  const req = _request(options, (res: IncomingMessage) => {
+    const statusCode = res.statusCode
+
+    if (typeof statusCode !== 'number') {
+      onError?.(new Error('Response statusCode is undefined'))
+      return
+    }
+
+    if (statusCode < 200 || statusCode >= 300) {
+      onError?.(
+        new Error(`Server responded with status code: ${res.statusCode}`)
+      )
+      res.destroy()
+      return
+    }
+
     res.on('data', (chunk: string) => {
       stringBuffer += chunk.toString()
       try {
@@ -51,23 +67,28 @@ export async function streamResponse(opts: StreamResponseOptions) {
           stringBuffer = ''
         }
       } catch (e) {
-        return
+        onError?.(e instanceof Error ? e : new Error('Error processing data'))
+        res.destroy()
       }
     })
+
     res.once('end', () => {
       onEnd?.(() => res.destroy())
     })
   })
 
-  req.on('error', (error) => {
-    console.error(`Request error: ${error.message}`)
+  req.on('error', (error: Error) => {
+    onError?.(error)
   })
 
   try {
-    req.write(JSON.stringify(body))
+    if (body) {
+      req.write(JSON.stringify(body))
+    }
     onStart?.(req)
     req.end()
   } catch (e) {
+    onError?.(e instanceof Error ? e : new Error('Error sending request'))
     req.destroy()
   }
 }
@@ -118,7 +139,8 @@ export const getTextSelection = () => {
 export const getLanguage = (): LanguageType => {
   const editor = window.activeTextEditor
   const languageId = editor?.document.languageId
-  const language = supportedLanguages[languageId as keyof typeof supportedLanguages]
+  const language =
+    supportedLanguages[languageId as keyof typeof supportedLanguages]
   return {
     language,
     languageId

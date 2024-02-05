@@ -1,5 +1,6 @@
+import { EMPTY_MESAGE } from '../constants'
 import { CodeLanguage, supportedLanguages } from '../languages'
-import { LanguageType } from '../types'
+import { LanguageType, ServerMessage } from '../types'
 
 export const getLanguageMatch = (
   language: LanguageType | undefined,
@@ -23,4 +24,12 @@ export const getLanguageMatch = (
   }
 
   return 'javascript'
+}
+
+export const getCompletionContent = (message: ServerMessage) => {
+  if (message.value.error && message.value.errorMessage) {
+    return message.value.errorMessage
+  }
+
+  return message.value.completion || EMPTY_MESAGE
 }

@@ -307,7 +307,7 @@
           "order": 15,
           "type": "boolean",
           "default": false,
-          "description": "Enables scanning of neighboring documents to enhance completion prompts. (Experimental)"
+          "description": "Enables scanning of neighbouring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
           "order": 16,
