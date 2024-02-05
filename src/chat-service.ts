@@ -172,7 +172,7 @@ export class ChatService {
         code: selectionContext || '',
         messages,
         role: USER_NAME,
-        language: language?.langName
+        language: language?.langName || 'unknown'
       })
     return prompt || ''
   }
@@ -188,7 +188,7 @@ export class ChatService {
       template,
       {
         code: selectionContext || '',
-        language: language.langName
+        language: language?.langName || 'unknown'
       }
     )
     return prompt || ''

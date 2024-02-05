@@ -312,7 +312,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     const language = `${lang.syntaxComments?.start || ''} Language: ${
-      lang.langName
+      lang?.langName
     } (${languageId}) ${lang.syntaxComments?.end || ''}`
 
     const path = `${
