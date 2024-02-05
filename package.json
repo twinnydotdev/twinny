@@ -83,17 +83,17 @@
       "view/title": [
         {
           "command": "twinny.templates",
-          "when": "view == twinny-sidebar",
+          "when": "view == twinny.sidebar",
           "group": "navigation@0"
         },
         {
           "command": "twinny.newChat",
-          "when": "view == twinny-sidebar",
+          "when": "view == twinny.sidebar",
           "group": "navigation@1"
         },
         {
           "command": "twinny.settings",
-          "when": "view == twinny-sidebar",
+          "when": "view == twinny.sidebar",
           "group": "navigation@2"
         }
       ]
@@ -164,7 +164,7 @@
       },
       {
         "key": "CTRL+SHIFT+t",
-        "command": "workbench.view.extension.twinny-sidebar-view"
+        "command": "twinny.sidebar.focus"
       },
       {
         "key": "CTRL+SHIFT+/",
@@ -184,7 +184,7 @@
       "twinny-sidebar-view": [
         {
           "type": "webview",
-          "id": "twinny-sidebar",
+          "id": "twinny.sidebar",
           "name": "twinny",
           "icon": "assets/twinny.svg",
           "contextualTitle": "twinny"

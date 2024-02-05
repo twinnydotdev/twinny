@@ -59,13 +59,13 @@ export async function activate(context: ExtensionContext) {
       statusBar.hide()
     }),
     commands.registerCommand('twinny.explain', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
         sidebarProvider.chatService?.streamTemplateCompletion('explain')
       )
     }),
     commands.registerCommand('twinny.fixCode', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
         sidebarProvider.chatService?.streamTemplateCompletion('fix-code')
       )
@@ -75,25 +75,25 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.destroyStream()
     }),
     commands.registerCommand('twinny.addTypes', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
         sidebarProvider.chatService?.streamTemplateCompletion('add-types')
       )
     }),
     commands.registerCommand('twinny.refactor', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
         sidebarProvider.chatService?.streamTemplateCompletion('refactor')
       )
     }),
     commands.registerCommand('twinny.addTests', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
         sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
       )
     }),
     commands.registerCommand('twinny.generateDocs', () => {
-      commands.executeCommand('workbench.view.extension.twinny-sidebar-view')
+      commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
         sidebarProvider.chatService?.streamTemplateCompletion('generate-docs')
       )
@@ -116,7 +116,7 @@ export async function activate(context: ExtensionContext) {
         key: MESSAGE_KEY.lastConversation
       })
     }),
-    window.registerWebviewViewProvider('twinny-sidebar', sidebarProvider),
+    window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),
     statusBar
   )
 
