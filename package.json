@@ -160,15 +160,18 @@
     "keybindings": [
       {
         "key": "Alt+\\",
-        "command": "editor.action.inlineSuggest.trigger"
+        "command": "editor.action.inlineSuggest.trigger",
+        "when": "editorTextFocus && !editorReadonly"
       },
       {
         "key": "CTRL+SHIFT+t",
-        "command": "twinny.sidebar.focus"
+        "command": "twinny.sidebar.focus",
+        "when": "editorTextFocus && !editorReadonly"
       },
       {
         "key": "CTRL+SHIFT+/",
-        "command": "twinny.stopGeneration"
+        "command": "twinny.stopGeneration",
+        "when": "twinnyGeneratingText"
       }
     ],
     "viewsContainers": {
