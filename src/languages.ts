@@ -1,12 +1,14 @@
 export type CodeLanguage =
   | 'bat'
   | 'c'
+  | 'csharp'
   | 'cpp'
   | 'css'
   | 'go'
   | 'html'
   | 'java'
   | 'javascript'
+  | 'javascriptreact'
   | 'json'
   | 'jsx'
   | 'kotlin'
@@ -52,6 +54,11 @@ export const supportedLanguages: {
     fileExtensions: ['.c', '.h'],
     syntaxComments: { start: '//' }
   },
+  csharp: {
+    langName: 'C#',
+    fileExtensions: ['.cs'],
+    syntaxComments: { start: '//' }
+  },
   cpp: {
     langName: 'C++',
     fileExtensions: ['.cpp', '.h'],
@@ -79,6 +86,11 @@ export const supportedLanguages: {
   javascript: {
     langName: 'Javascript',
     fileExtensions: ['.js', '.jsx', '.cjs'],
+    syntaxComments: { start: '//' }
+  },
+  javascriptreact: {
+    langName: 'Javascript JSX',
+    fileExtensions: ['.jsx'],
     syntaxComments: { start: '//' }
   },
   json: {
