@@ -39,6 +39,17 @@ code {
   margin-top: 7px;
 }
 
+.chatOptions {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.chatOptions svg {
+  width: 18px;
+  height: 18px;
+}
+
 .send {
   display: flex;
   justify-content: flex-end;

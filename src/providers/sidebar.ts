@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import { getLanguage, getTextSelection, getTheme, openDiffView } from '../utils'
 import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { ChatService } from '../chat-service'
-import { ClientMessage, ServerMessage } from '../types'
+import { ClientMessage, MessageType, ServerMessage } from '../types'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
@@ -23,7 +23,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
-    this.chatService = new ChatService(this._statusBar, this._templateDir, webviewView)
+    this.chatService = new ChatService(
+      this._statusBar,
+      this._templateDir,
+      webviewView
+    )
     this.view = webviewView
 
     webviewView.webview.options = {
@@ -55,23 +59,28 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       })
     })
 
-    webviewView.webview.onDidReceiveMessage((messeage: ClientMessage) => {
-      const eventHandlers = {
-        [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
-        [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
-        [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,
-        [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
-        [MESSAGE_NAME.twinnyAcceptSolution]: this.acceptSolution,
-        [MESSAGE_NAME.twinnyGlobalContext]: this.getGlobalContext,
-        [MESSAGE_NAME.twinnySetGlobalContext]: this.setGlobalContext,
-        [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
-        [MESSAGE_NAME.twinnySetWorkspaceContext]: this.setTwinnyWorkspaceContext,
-        [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
-        [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
-        [MESSAGE_NAME.twinnyNotification]: this.sendNotification
+    webviewView.webview.onDidReceiveMessage(
+      (
+        message: ClientMessage<string | boolean> & ClientMessage<MessageType[]>
+      ) => {
+        const eventHandlers = {
+          [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
+          [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
+          [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,
+          [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
+          [MESSAGE_NAME.twinnyAcceptSolution]: this.acceptSolution,
+          [MESSAGE_NAME.twinnyGlobalContext]: this.getGlobalContext,
+          [MESSAGE_NAME.twinnySetGlobalContext]: this.setGlobalContext,
+          [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnySetWorkspaceContext]:
+            this.setTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
+          [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
+          [MESSAGE_NAME.twinnyNotification]: this.sendNotification
+        }
+        eventHandlers[message.type as string](message)
       }
-      eventHandlers[messeage.type as string](messeage)
-    })
+    )
   }
 
   public sendNotification = (data: ClientMessage) => {
@@ -82,8 +91,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     vscode.commands.executeCommand(data.data as string)
   }
 
-  public streamChatCompletion = (data: ClientMessage) => {
-    this.chatService?.streamChatCompletion(data.messages || [])
+  public streamChatCompletion = (data: ClientMessage<MessageType[]>) => {
+    this.chatService?.streamChatCompletion(data.data || [])
   }
 
   public openDiff = (data: ClientMessage) => {
@@ -153,15 +162,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     )
     this.view?.webview.postMessage({
       type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
-      value: storedData,
+      value: storedData
     } as ServerMessage)
   }
 
-  public setTwinnyWorkspaceContext = (data: ClientMessage) => {
+  public setTwinnyWorkspaceContext = <T>(data: ClientMessage<T>) => {
+    const value = data.data
     this.context.workspaceState.update(
       `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
-      data.data || data.messages
+      value
     )
+    this.view?.webview.postMessage({
+      type: `${MESSAGE_NAME.twinnyWorkspaceContext}-${data.key}`,
+      value
+    })
   }
 
   public destroyStream = () => {
