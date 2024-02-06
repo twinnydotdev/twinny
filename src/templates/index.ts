@@ -71,14 +71,14 @@ For code refactoring, use markdown with code formatting.<</SYS>>
 {{/if}}
 {{#each messages}}
   {{#if (eq this.role '👤 You')}}
-    [INST] {{{this.content}}}
+[INST] {{{this.content}}}
     {{#if ../code}}
-      {{{../code}}}
+\`\`\`{{{../code}}}\`\`\`
     {{/if}} {{#if ../language}}
-    The language is {{../language}}
-    {{/if}}[/INST]
+The language is {{../language}}
+{{/if}}[/INST]
   {{else}}
-    {{{this.content}}}
+{{{this.content}}}
   {{/if}}
 {{/each}}
   `

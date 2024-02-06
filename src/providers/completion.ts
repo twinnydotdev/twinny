@@ -161,7 +161,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         const context = this.getFileContext(document.uri)
 
-        const { prefix, suffix } = this.getCursorPositionContext(document, position)
+        const { prefix, suffix } = this.getCursorPositionContext(
+          document,
+          position
+        )
 
         const { prompt, stop } = this.getFimTemplate({
           context,
@@ -233,6 +236,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 chunkCount = chunkCount + 1
 
                 if (
+                  chunkCount > 2 &&
                   completionString === '\n' &&
                   !this._useMultiLineCompletions
                 ) {
@@ -401,7 +405,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const lineText = this._document?.getText(lineRange)
     const normalizedCompletion = completion.replace(/\r?\n|\r/g, '').trim()
 
-    if (textAfterCursor.trim() === normalizedCompletion.trim()) {
+    if (
+      textAfterCursor &&
+      normalizedCompletion &&
+      textAfterCursor.trim() === normalizedCompletion.trim()
+    ) {
       return ''
     }
 
