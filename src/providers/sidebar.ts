@@ -61,9 +61,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage(
       (
-        message: ClientMessage<string | boolean> & ClientMessage<MessageType[]>
+        message: ClientMessage<string | boolean | MessageType[]>
       ) => {
-        const eventHandlers = {
+        const eventHandlers: { [k: string]: (arg0: any) => void } = {
           [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
           [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
           [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,

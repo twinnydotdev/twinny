@@ -155,7 +155,7 @@ export const Chat = () => {
       setInputText('')
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnyChatMessage,
-        messages: [
+        data: [
           ...(messages || []),
           {
             role: USER_NAME,
