@@ -1,5 +1,6 @@
 import { Position } from 'vscode'
 import { CodeLanguageDetails } from './languages'
+import { allBrackets } from './constants'
 
 export interface StreamOptions {
   model: string
@@ -96,3 +97,6 @@ export interface PromptTemplate {
   prefix: string
   useFileContext: boolean
 }
+
+export type Bracket = (typeof allBrackets)[number]
+

@@ -14,7 +14,14 @@ import {
   CompletionTriggerKind
 } from 'vscode'
 import 'string_score'
-import { streamResponse } from '../utils'
+import {
+  bracketMatcher,
+  countLines,
+  getCompletionNormalized,
+  getIsSingleBracket,
+  removeDuplicateLinesDown,
+  streamResponse
+} from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
 import { InlineCompletion, PromptTemplate, StreamOptions } from '../types'
@@ -293,7 +300,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               console.error(error)
               this._currentReq?.destroy()
               resolve([])
-            },
+            }
           })
         } catch (error) {
           this._statusBar.text = '$(alert)'
@@ -394,52 +401,28 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private getFormattedCompletion = (completion: string, editor: TextEditor) => {
     const cursorPosition = editor.selection.active
-
-    const lineEndPosition = editor.document.lineAt(cursorPosition.line).range
-      .end
-
+    const document = editor.document
+    const lineEndPosition = document.lineAt(cursorPosition.line).range.end
     const textAfterRange = new Range(cursorPosition, lineEndPosition)
     const textAfterCursor = this._document?.getText(textAfterRange) || ''
-    const lineStart = editor.document.lineAt(cursorPosition).range.start
-    const lineRange = new Range(lineStart, lineEndPosition)
-    const lineText = this._document?.getText(lineRange)
-    const normalizedCompletion = completion.replace(/\r?\n|\r/g, '').trim()
+    completion = bracketMatcher(completion)
+    const normalizedCompletion = getCompletionNormalized(completion)
 
     if (
-      textAfterCursor &&
-      normalizedCompletion &&
-      textAfterCursor.trim() === normalizedCompletion.trim()
+      (textAfterCursor &&
+        normalizedCompletion &&
+        textAfterCursor.trim() === normalizedCompletion.trim()) ||
+      !normalizedCompletion.length
     ) {
       return ''
     }
 
-    if (lineText?.includes(completion)) {
-      return ''
+    if (getIsSingleBracket(completion)) {
+      return completion.trim()
     }
 
-    if (
-      completion.trim() === '/' ||
-      (completion.trim() === '/>' && lineText?.includes('</'))
-    ) {
-      return ''
-    }
-
-    if (!this._useMultiLineCompletions) {
-      let nextLineIndex = cursorPosition.line + 1
-
-      while (nextLineIndex < cursorPosition.line + 3) {
-        const nextLineText = editor.document.lineAt(nextLineIndex).text
-
-        const normalizedNextLineText = nextLineText
-          .replace(/\r?\n|\r/g, '')
-          .trim()
-
-        if (normalizedNextLineText === normalizedCompletion) {
-          return ''
-        }
-
-        nextLineIndex++
-      }
+    if (!this._useMultiLineCompletions || countLines(normalizedCompletion) >= 2) {
+      completion = removeDuplicateLinesDown(completion, editor, cursorPosition)
     }
 
     return completion

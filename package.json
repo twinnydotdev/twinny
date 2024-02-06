@@ -270,7 +270,7 @@
         "twinny.contextLength": {
           "order": 10,
           "type": "number",
-          "default": 10,
+          "default": 30,
           "description": "Defines the number of lines before and after the current line to include in FIM prompts.",
           "required": true
         },

@@ -48,4 +48,15 @@ export const fimTempateFormats = {
   stableCode: 'stable-code'
 }
 
+export const openingBrackets = ['[', '{', '(']
+export const closingBrackets = [']', '}', ')']
+
+export const openingTags = ['<']
+export const closingTags = ['</']
+
+export const allBrackets = [...openingBrackets, ...closingBrackets] as const
+
+export const BRACKET_REGEX = /^[()[\]{}]+$/
+export const NORMALIZE_REGEX = /\r?\n|\r/g
+
 export const codeActionTypes = ['add-types', 'refactor', 'generate-docs', 'fix-code']
