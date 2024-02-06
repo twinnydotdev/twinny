@@ -1,8 +1,10 @@
 import { CodeIcon, ExplainIcon, FixCodeIcon, TestsIcon } from './icons'
-import { MESSAGE_NAME } from '../constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import cn from 'classnames'
 
 import styles from './index.module.css'
+import { useWorkSpaceContext } from './hooks'
+import { kebabToSentence } from './utils'
 
 const SUGGESTIONS = [
   {
@@ -34,6 +36,8 @@ const SUGGESTIONS = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
+  const templates = useWorkSpaceContext<string[]>(MESSAGE_KEY.selectedTemplates)
+
   const handleOnClickSuggestion = (message: string) => {
     if (isDisabled) return
 
@@ -45,14 +49,15 @@ export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
 
   return (
     <div className={styles.suggestions}>
-      {SUGGESTIONS.map(({ name, value, icon, message }) => (
+      {templates?.map((name) => (
         <div
-          onClick={() => handleOnClickSuggestion(message)}
+          onClick={() => handleOnClickSuggestion(name)}
           key={name}
-          className={cn(styles.suggestion, { [styles['suggestion--disabled']]: isDisabled })}
+          className={cn(styles.suggestion, {
+            [styles['suggestion--disabled']]: isDisabled
+          })}
         >
-          <div className={styles.icon}>{icon}</div>
-          <div>{value}</div>
+          <div>{kebabToSentence(name)}</div>
         </div>
       ))}
     </div>

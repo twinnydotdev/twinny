@@ -20,7 +20,9 @@ export const getLanguageMatch = (
     const languageId = language.languageId.toString()
     const languageEntry = supportedLanguages[languageId as CodeLanguage]
 
-    return languageEntry && languageEntry.derivedFrom ? languageEntry.derivedFrom : languageId
+    return languageEntry && languageEntry.derivedFrom
+      ? languageEntry.derivedFrom
+      : languageId
   }
 
   return 'javascript'
@@ -32,4 +34,20 @@ export const getCompletionContent = (message: ServerMessage) => {
   }
 
   return message.value.completion || EMPTY_MESAGE
+}
+
+export const kebabToSentence = (kebabStr: string) => {
+  if (!kebabStr) {
+    return ''
+  }
+
+  const words = kebabStr.split('-')
+
+  if (!words.length) {
+    return kebabStr
+  }
+
+  words[0] = words[0].charAt(0).toUpperCase() + words[0].slice(1)
+
+  return words.join(' ')
 }

@@ -34,7 +34,7 @@ export class TemplateProvider {
     const destPath = path.join(this._basePath)
     try {
       fs.mkdirSync(destPath, { recursive: true })
-      defaultTemplates.forEach(({name, template}) => {
+      defaultTemplates.forEach(({ name, template }) => {
         const destFile = path.join(destPath, name)
         fs.writeFileSync(`${destFile}.hbs`, template, 'utf8')
       })
@@ -78,6 +78,16 @@ export class TemplateProvider {
       console.log(`Problem reading default template "${path}"`)
       return Promise.reject(e)
     }
+  }
+
+  public listTemplates(): string[] {
+    const files = fs.readdirSync(this._basePath, 'utf8')
+    const templates = files.filter((fileName) => fileName.endsWith('.hbs'))
+    const templateNames = templates
+      .map((fileName) => fileName.replace('.hbs', ''))
+      .sort((a, b) => a.localeCompare(b))
+      .filter(name => name !== 'chat' && name !== 'system')
+    return templateNames
   }
 
   public async renderTemplate<T extends DefaultTemplate>(

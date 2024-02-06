@@ -4,8 +4,7 @@ import {
   languages,
   StatusBarAlignment,
   window,
-  workspace,
-  Uri,
+  workspace
 } from 'vscode'
 import * as path from 'path'
 import * as os from 'os'
@@ -16,8 +15,15 @@ import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
 import { delayExecution, deleteTempFiles } from './utils'
 import { setContext } from './context'
-import { EXTENSION_NAME, MESSAGE_KEY } from './constants'
+import {
+  CONTEXT_NAME,
+  EXTENSION_NAME,
+  MESSAGE_KEY,
+  MESSAGE_NAME,
+  TABS
+} from './constants'
 import { TemplateProvider } from './template-provider'
+import { ServerMessage } from './types'
 
 export async function activate(context: ExtensionContext) {
   const config = workspace.getConfiguration('twinny')
@@ -25,8 +31,8 @@ export async function activate(context: ExtensionContext) {
   const chatModel = config.get('chatModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir =
-    config.get('templateDir') as string  ||
-    path.join(os.homedir(), '.twinny/templates') as string
+    (config.get('templateDir') as string) ||
+    (path.join(os.homedir(), '.twinny/templates') as string)
   setContext(context)
 
   try {
@@ -58,48 +64,48 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.disable', () => {
       statusBar.hide()
     }),
-    commands.registerCommand('twinny.explain', () => {
+    commands.registerCommand('twinny.templateCompletion', (template: string) => {
       commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('explain')
-      )
-    }),
-    commands.registerCommand('twinny.fixCode', () => {
-      commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('fix-code')
+        sidebarProvider.chatService?.streamTemplateCompletion(template)
       )
     }),
     commands.registerCommand('twinny.stopGeneration', () => {
       completionProvider.destroyStream()
       sidebarProvider.destroyStream()
     }),
-    commands.registerCommand('twinny.addTypes', () => {
-      commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('add-types')
-      )
-    }),
-    commands.registerCommand('twinny.refactor', () => {
-      commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('refactor')
-      )
-    }),
-    commands.registerCommand('twinny.addTests', () => {
-      commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
-      )
-    }),
-    commands.registerCommand('twinny.generateDocs', () => {
-      commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('generate-docs')
-      )
-    }),
     commands.registerCommand('twinny.templates', async () => {
-      await vscode.commands.executeCommand('vscode.openFolder', Uri.parse(templateDir), true);
+      await vscode.commands.executeCommand(
+        'vscode.openFolder',
+        vscode.Uri.parse(templateDir),
+        true
+      )
+    }),
+    commands.registerCommand('twinny.manageTemplates', async () => {
+      commands.executeCommand(
+        'setContext',
+        CONTEXT_NAME.twinnyManageTemplates,
+        true
+      )
+      sidebarProvider.view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnySetTab,
+        value: {
+          data: TABS.templates
+        }
+      } as ServerMessage<string>)
+    }),
+    commands.registerCommand('twinny.openChat', () => {
+      commands.executeCommand(
+        'setContext',
+        CONTEXT_NAME.twinnyManageTemplates,
+        false
+      )
+      sidebarProvider.view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnySetTab,
+        value: {
+          data: TABS.chat
+        }
+      } as ServerMessage<string>)
     }),
     commands.registerCommand('twinny.settings', () => {
       vscode.commands.executeCommand(

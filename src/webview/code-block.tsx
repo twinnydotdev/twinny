@@ -3,7 +3,7 @@ import { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-import { MESSAGE_NAME, codeActionTypes } from '../constants'
+import { MESSAGE_NAME, CODE_ACTION_TYPES } from '../constants'
 
 import styles from './index.module.css'
 import { LanguageType, Theme, ThemeType } from '../types'
@@ -45,7 +45,7 @@ export const CodeBlock = (props: CodeBlockProps) => {
         language={lang}
       />
       <div className={styles.codeOptions}>
-        {codeActionTypes.includes(completionType) && (
+        {CODE_ACTION_TYPES.includes(completionType) && (
           <>
             <VSCodeButton onClick={handleAccept}>Accept</VSCodeButton>
           </>
