@@ -22,11 +22,11 @@ import {
   StopIcon
 } from './icons'
 
-import styles from './index.module.css'
 import { Suggestions } from './suggestions'
 import { ClientMessage, MessageType, ServerMessage } from '../types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
+import styles from './index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

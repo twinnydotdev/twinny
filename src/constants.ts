@@ -27,7 +27,10 @@ export const MESSAGE_NAME = {
   twinnyClickSuggestion: 'twinny-click-suggestion',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
   twinnySendLanguage: 'twinny-send-language',
-  twinnySendTheme : 'twinny-send-theme',
+  twinnySendTheme: 'twinny-send-theme',
+  twinnyListTemplates: 'twinny-list-templates',
+  twinnyManageTemplates: 'twinny-manage-templates',
+  twinnySetTab: 'twinny-set-tab'
 }
 
 export const MESSAGE_KEY = {
@@ -36,10 +39,17 @@ export const MESSAGE_KEY = {
   selection: 'selection',
   chatMessage: 'chatMessage',
   autoScroll: 'autoScroll',
+  selectedTemplates: 'selectedTemplates',
 }
 
 export const CONTEXT_NAME = {
   twinnyGeneratingText: 'twinnyGeneratingText',
+  twinnyManageTemplates: 'twinnyManageTemplates'
+}
+
+export const TABS = {
+  chat: 'chat',
+  templates: 'templates'
 }
 
 export const fimTempateFormats = {
@@ -60,4 +70,16 @@ export const allBrackets = [...openingBrackets, ...closingBrackets] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\r?\n|\r/g
 
-export const codeActionTypes = ['add-types', 'refactor', 'generate-docs', 'fix-code']
+export const CODE_ACTION_TYPES = [
+  'add-types',
+  'refactor',
+  'generate-docs',
+  'fix-code'
+]
+
+export const DEFAULT_TEMPLATES = [
+  'refactor',
+  'add-tests',
+  'add-types',
+  'explain'
+]

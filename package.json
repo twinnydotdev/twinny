@@ -82,19 +82,29 @@
       ],
       "view/title": [
         {
+          "command": "twinny.openChat",
+          "group": "navigation@0",
+          "when": "view == twinny.sidebar && twinnyManageTemplates"
+        },
+        {
+          "command": "twinny.manageTemplates",
+          "group": "navigation@1",
+          "when": "view == twinny.sidebar"
+        },
+        {
           "command": "twinny.templates",
           "when": "view == twinny.sidebar",
-          "group": "navigation@0"
+          "group": "navigation@2"
         },
         {
           "command": "twinny.newChat",
           "when": "view == twinny.sidebar",
-          "group": "navigation@1"
+          "group": "navigation@3"
         },
         {
           "command": "twinny.settings",
           "when": "view == twinny.sidebar",
-          "group": "navigation@2"
+          "group": "navigation@4"
         }
       ]
     },
@@ -154,7 +164,19 @@
         "command": "twinny.templates",
         "shortTitle": "Edit twinny templates",
         "title": "Edit twinny templates",
+        "icon": "$(pencil)"
+      },
+      {
+        "command": "twinny.manageTemplates",
+        "shortTitle": "Manage twinny templates",
+        "title": "Manage twinny templates",
         "icon": "$(files)"
+      },
+      {
+        "command": "twinny.openChat",
+        "shortTitle": "Back to chat view",
+        "title": "Back to chat view",
+        "icon": "$(arrow-left)"
       }
     ],
     "keybindings": [

@@ -109,3 +109,9 @@ code {
   background: var(--vscode-inputOption-hoverBackground);
   cursor: pointer;
 }
+
+.templateCheckbox label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}

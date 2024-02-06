@@ -1,8 +1,9 @@
 import * as vscode from 'vscode'
 import { getLanguage, getTextSelection, getTheme, openDiffView } from '../utils'
-import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
+import { DEFAULT_TEMPLATES, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { ChatService } from '../chat-service'
 import { ClientMessage, MessageType, ServerMessage } from '../types'
+import { TemplateProvider } from '../template-provider'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   view?: vscode.WebviewView
@@ -11,6 +12,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private _statusBar: vscode.StatusBarItem
   private context: vscode.ExtensionContext
   private _templateDir: string
+  private _templateProvider: TemplateProvider
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -20,6 +22,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._statusBar = statusBar
     this.context = context
     this._templateDir = templateDir
+    this._templateProvider = new TemplateProvider(templateDir)
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -61,9 +64,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.onDidReceiveMessage(
       (
-        message: ClientMessage<string | boolean | MessageType[]>
+        message: ClientMessage<string | boolean> & ClientMessage<MessageType[]>
       ) => {
-        const eventHandlers: { [k: string]: (arg0: any) => void } = {
+        const eventHandlers = {
           [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
           [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
           [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,
@@ -76,11 +79,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             this.setTwinnyWorkspaceContext,
           [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
           [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
-          [MESSAGE_NAME.twinnyNotification]: this.sendNotification
+          [MESSAGE_NAME.twinnyNotification]: this.sendNotification,
+          [MESSAGE_NAME.twinnyListTemplates]: this.listTemplates
         }
         eventHandlers[message.type as string](message)
       }
     )
+  }
+
+  public listTemplates = () => {
+    const templates = this._templateProvider.listTemplates()
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyListTemplates,
+      value: {
+        data: templates
+      }
+    } as ServerMessage<string[]>)
   }
 
   public sendNotification = (data: ClientMessage) => {
@@ -88,7 +102,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public clickSuggestion = (data: ClientMessage) => {
-    vscode.commands.executeCommand(data.data as string)
+    vscode.commands.executeCommand('twinny.templateCompletion', data.data as string)
   }
 
   public streamChatCompletion = (data: ClientMessage<MessageType[]>) => {
