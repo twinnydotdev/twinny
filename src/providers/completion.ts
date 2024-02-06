@@ -19,6 +19,7 @@ import {
   countLines,
   getCompletionNormalized,
   getIsSingleBracket,
+  removeDoubleQuoteEndings,
   removeDuplicateLinesDown,
   streamResponse
 } from '../utils'
@@ -311,10 +312,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private getFileHeader(languageId: string | undefined, uri: Uri) {
-    if (!this._useFileContext) {
-      return ''
-    }
-
     const lang =
       supportedLanguages[languageId as keyof typeof supportedLanguages]
 
@@ -356,6 +353,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const codeSnippets: string[] = []
     const currentFileName = uri.toString()
 
+    const documentCount = workspace.textDocuments.length
+
     for (const document of workspace.textDocuments) {
       if (
         document.fileName === window.activeTextEditor?.document.fileName ||
@@ -374,7 +373,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         document.uri.toString()
       )
 
-      if (filePathSimilarity > 1) {
+      if (filePathSimilarity > 1 || documentCount <= 3) {
         codeSnippets.push(text)
       }
     }
@@ -424,6 +423,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (!this._useMultiLineCompletions || countLines(normalizedCompletion) >= 2) {
       completion = removeDuplicateLinesDown(completion, editor, cursorPosition)
     }
+
+    completion = removeDoubleQuoteEndings(completion, textAfterCursor.at(0) as string)
 
     return completion
   }

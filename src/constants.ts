@@ -53,6 +53,7 @@ export const closingBrackets = [']', '}', ')']
 
 export const openingTags = ['<']
 export const closingTags = ['</']
+export const quotes = ['"', '\'']
 
 export const allBrackets = [...openingBrackets, ...closingBrackets] as const
 

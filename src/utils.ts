@@ -199,10 +199,11 @@ export const countLines = (inputString: string) => {
 
 export const bracketMatcher = (completion: string): string => {
   let accumulatedCompletion = ''
-  const normalisedCompletion = completion.replace(/\s+/g, '')
+  const normalisedCompletion = completion.replace(NORMALIZE_REGEX, '')
   const openBrackets: Bracket[] = []
 
-  if (BRACKET_REGEX.test(normalisedCompletion) || completion.length <= 1) return completion
+  if (BRACKET_REGEX.test(normalisedCompletion) || completion.length <= 1)
+    return completion
 
   for (const character of completion) {
     if (openingBrackets.includes(character)) {
@@ -210,7 +211,10 @@ export const bracketMatcher = (completion: string): string => {
     }
 
     if (closingBrackets.includes(character)) {
-      if (openBrackets.length && isMatchingPair(openBrackets.at(-1), character)) {
+      if (
+        openBrackets.length &&
+        isMatchingPair(openBrackets.at(-1), character)
+      ) {
         openBrackets.pop()
       } else {
         break
@@ -232,10 +236,15 @@ export const removeDuplicateLinesDown = (
   const accumulatedCompletion = completion
   const lineCount = editor.document.lineCount
   let nextLineIndex = cursorPosition.line + 1
-  while (nextLineIndex < cursorPosition.line + linesDown && nextLineIndex < lineCount) {
+  while (
+    nextLineIndex < cursorPosition.line + linesDown &&
+    nextLineIndex < lineCount
+  ) {
     const line = editor.document.lineAt(nextLineIndex)
     const nextLineText = line.text
-    const accumulatedCompletion = nextLineText.replace(NORMALIZE_REGEX, '').trim()
+    const accumulatedCompletion = nextLineText
+      .replace(NORMALIZE_REGEX, '')
+      .trim()
     if (accumulatedCompletion === completion) return ''
     nextLineIndex++
   }
@@ -247,5 +256,18 @@ export const getIsSingleBracket = (completion: string) =>
 
 export const getCompletionNormalized = (completion: string) =>
   completion.replace(NORMALIZE_REGEX, '')
+
+export const removeDoubleQuoteEndings = (
+  completion: string,
+  nextCharacter: string
+) => {
+  if (
+    completion.endsWith('\'' || completion.endsWith('"')) &&
+    (nextCharacter === '"' || nextCharacter === '\'')
+  ) {
+    completion = completion.slice(0, -1)
+  }
+  return completion
+}
 
 export const noop = () => undefined
