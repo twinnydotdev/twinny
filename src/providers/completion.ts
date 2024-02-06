@@ -411,20 +411,27 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       (textAfterCursor &&
         normalizedCompletion &&
         textAfterCursor.trim() === normalizedCompletion.trim()) ||
-      !normalizedCompletion.length
+      !normalizedCompletion.length ||
+      completion.endsWith(textAfterCursor)
     ) {
-      return ''
+      completion = completion.replace(textAfterCursor, '')
     }
 
     if (getIsSingleBracket(completion)) {
       return completion.trim()
     }
 
-    if (!this._useMultiLineCompletions || countLines(normalizedCompletion) >= 2) {
+    if (
+      !this._useMultiLineCompletions ||
+      countLines(normalizedCompletion) >= 2
+    ) {
       completion = removeDuplicateLinesDown(completion, editor, cursorPosition)
     }
 
-    completion = removeDoubleQuoteEndings(completion, textAfterCursor.at(0) as string)
+    completion = removeDoubleQuoteEndings(
+      completion,
+      textAfterCursor.at(0) as string
+    )
 
     return completion
   }
