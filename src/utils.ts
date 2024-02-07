@@ -16,7 +16,8 @@ import {
   StreamResponse,
   Theme,
   LanguageType,
-  Bracket
+  Bracket,
+  StreamOptionsMessages
 } from './types'
 import { supportedLanguages } from './languages'
 import {
@@ -29,7 +30,7 @@ import {
 } from './constants'
 
 interface StreamResponseOptions {
-  body: StreamOptions
+  body: StreamOptions | StreamOptionsMessages
   options: RequestOptions
   onData: (
     streamResponse: StreamResponse | undefined,
@@ -45,8 +46,10 @@ export const isLlamaCppStream = (stringBuffer: string) => {
 }
 
 const safeParseJson = (stringBuffer: string): StreamResponse | undefined => {
+  const config = workspace.getConfiguration('twinny')
+  const useOpenAiApiFormat = config.get('useOpenAiApiFormat')
   try {
-    if (isLlamaCppStream(stringBuffer)) {
+    if (isLlamaCppStream(stringBuffer) || useOpenAiApiFormat) {
       return JSON.parse(stringBuffer.split('data:')[1])
     }
     return JSON.parse(stringBuffer)
@@ -59,7 +62,7 @@ export async function streamResponse(opts: StreamResponseOptions) {
   const { body, options, onData, onEnd, onError, onStart } = opts
   const config = workspace.getConfiguration('twinny')
   const useTls = config.get('useTls')
-  const timeoutDuration = 10000 // 10 seconds
+  const timeoutDuration = 20000
   const _request = useTls ? httpsRequest : request
   let stringBuffer = ''
 

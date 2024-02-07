@@ -260,6 +260,12 @@
           "description": "Endpoint path for FIM completions. Defaults to '/api/generate' for Ollama and '/completion' for llama.cpp.",
           "required": true
         },
+        "twinny.useOpenAiApiFormat": {
+          "order": 0,
+          "type": "boolean",
+          "default": false,
+          "description": "Uses the format open AI uses for its API. (Not recommended)"
+        },
         "twinny.chatModelName": {
           "order": 6,
           "type": "string",

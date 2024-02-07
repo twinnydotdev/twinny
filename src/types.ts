@@ -5,11 +5,20 @@ import { allBrackets } from './constants'
 export interface StreamOptions {
   model: string
   prompt: string
-  stream: true
+  stream: boolean
   n_predict?: number
+  max_tokens: number,
   temperature?: number
+  messages?: MessageType[],
   // Ollama
   options: Record<string, unknown>
+}
+
+export interface StreamOptionsMessages {
+  stream: boolean
+  max_tokens: number
+  temperature?: number
+  prompt: string
 }
 
 export interface InlineCompletion {
@@ -33,6 +42,12 @@ export interface StreamResponse {
   prompt_eval_duration: number
   eval_count: number
   eval_duration: number
+  choices: [{
+    text: string,
+    delta: {
+      content: string
+    }
+  }],
 }
 
 export interface LanguageType {

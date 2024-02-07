@@ -25,7 +25,12 @@ import {
 } from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
-import { InlineCompletion, PromptTemplate, StreamOptions } from '../types'
+import {
+  InlineCompletion,
+  PromptTemplate,
+  StreamOptions,
+  StreamOptionsMessages
+} from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
 import {
@@ -50,6 +55,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
+  private _useOpenAiApiFormat = this._config.get(
+    'useOpenAiApiFormat'
+  ) as boolean
   private _useMultiLineCompletions = this._config.get(
     'useMultiLineCompletions'
   ) as boolean
@@ -79,6 +87,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       prompt,
       stream: true,
       n_predict: this._numPredictFim,
+      max_tokens: this._numPredictFim, // LM Studio
       temperature: this._temperature,
       // Ollama
       options: {
@@ -206,8 +215,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           this._statusBar.text = '$(loading~spin)'
           this._statusBar.command = 'twinny.stopGeneration'
 
-          const { requestBody, requestOptions } =
-            this.buildStreamRequest(prompt)
+          const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
 
           streamResponse({
             body: requestBody,
@@ -234,7 +242,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onData: (streamResponse, destroy) => {
               try {
                 const completionString =
-                  streamResponse?.response || streamResponse?.content
+                  streamResponse?.response || // llama.cpp
+                  streamResponse?.content || // ollama
+                  streamResponse?.choices[0].text // lm studio / OpenAI
 
                 if (completionString === undefined) {
                   return
@@ -469,6 +479,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._apiPath = this._config.get('fimApiPath') as string
     this._port = this._config.get('fimApiPort') as number
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
+    this._useOpenAiApiFormat = this._config.get('useOpenAiApiFormat') as boolean
     this._apiUrl = this._config.get('apiUrl') as string
     this._useMultiLineCompletions = this._config.get(
       'useMultiLineCompletions'

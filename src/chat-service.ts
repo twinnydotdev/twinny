@@ -25,6 +25,9 @@ export class ChatService {
   private _port = this._config.get('chatApiPort') as string
   private _apiPath = this._config.get('chatApiPath') as string
   private _temperature = this._config.get('temperature') as number
+  private _useOpenAiApiFormat = this._config.get(
+    'useOpenAiApiFormat'
+  ) as boolean
   private _view?: WebviewView
   private _statusBar: StatusBarItem
   private _promptTemplate = ''
@@ -48,7 +51,7 @@ export class ChatService {
     })
   }
 
-  private buildStreamRequest(prompt: string) {
+  private buildStreamRequest(prompt: string, messages?: MessageType[]) {
     const headers: Record<string, string> = {}
 
     if (this._bearerToken) {
@@ -58,8 +61,10 @@ export class ChatService {
     const requestBody: StreamOptions = {
       model: this._chatModel,
       prompt,
+      messages,
       stream: true,
       n_predict: this._numPredictChat,
+      max_tokens: this._numPredictChat,
       temperature: this._temperature,
       // Ollama
       options: {
@@ -87,7 +92,13 @@ export class ChatService {
     onDestroy: () => void
   ) => {
     try {
-      const data = streamResponse?.response || streamResponse?.content
+      let data =
+        streamResponse?.response || // llama.cpp
+        streamResponse?.content // ollama
+
+      if (!data && streamResponse?.choices?.length) {
+        data = streamResponse.choices[0].delta.content
+      } // lm studio / OpenAI)
 
       if (!data) {
         return
@@ -172,6 +183,24 @@ export class ChatService {
     } as ServerMessage)
   }
 
+  public buildChatMessages = async (
+    messages: MessageType[],
+    language: CodeLanguageDetails
+  ) => {
+    const editor = window.activeTextEditor
+    const selection = editor?.selection
+    const selectionContext = editor?.document.getText(selection) || ''
+    const systemMessage =
+      await this._templateProvider?.readSystemMessageTemplate()
+    return [
+      {
+        role: 'system',
+        content: systemMessage
+      },
+      ...messages
+    ] as MessageType[]
+  }
+
   public buildChatMessagePrompt = async (
     messages: MessageType[],
     language: CodeLanguageDetails
@@ -249,8 +278,12 @@ export class ChatService {
     const { language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()
+    const promptMesages = await this.buildChatMessages(messages, language)
     const prompt = await this.buildChatMessagePrompt(messages, language)
-    const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
+    const { requestBody, requestOptions } = this.buildStreamRequest(
+      prompt,
+      promptMesages
+    )
     return this.streamResponse({ requestBody, requestOptions })
   }
 
