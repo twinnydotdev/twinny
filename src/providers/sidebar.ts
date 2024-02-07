@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { getLanguage, getTextSelection, getTheme, openDiffView } from '../utils'
-import { DEFAULT_TEMPLATES, MESSAGE_KEY, MESSAGE_NAME } from '../constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { ChatService } from '../chat-service'
 import { ClientMessage, MessageType, ServerMessage } from '../types'
 import { TemplateProvider } from '../template-provider'
