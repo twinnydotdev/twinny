@@ -22,8 +22,8 @@ export class TemplateProvider {
     try {
       const exists = fs.existsSync(this._basePath)
       if (!exists) {
-        this.copyDefaultTemplates()
         fs.mkdirSync(this._basePath, { recursive: true })
+        this.copyDefaultTemplates()
         console.log(`The folder ${this._basePath} has been created`)
       }
     } catch (err) {
