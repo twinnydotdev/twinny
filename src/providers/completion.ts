@@ -373,7 +373,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         document.uri.toString()
       )
 
-      if (filePathSimilarity > 1 || documentCount <= 3) {
+      if (filePathSimilarity > 1) {
         codeSnippets.push(text)
       }
     }
