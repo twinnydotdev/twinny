@@ -1,3 +1,5 @@
+import { defaultTemplates } from './templates'
+
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const BOT_NAME = '🤖 twinny'
 export const USER_NAME = '👤 You'
@@ -39,7 +41,7 @@ export const MESSAGE_KEY = {
   selection: 'selection',
   chatMessage: 'chatMessage',
   autoScroll: 'autoScroll',
-  selectedTemplates: 'selectedTemplates',
+  selectedTemplates: 'selectedTemplates'
 }
 
 export const CONTEXT_NAME = {
@@ -69,6 +71,8 @@ export const allBrackets = [...openingBrackets, ...closingBrackets] as const
 
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\r?\n|\r/g
+
+export const ALL_TEMPLATES = defaultTemplates.map(({ name }) => name)
 
 export const CODE_ACTION_TYPES = [
   'add-types',

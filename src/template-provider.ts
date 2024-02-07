@@ -3,6 +3,7 @@ import * as Handlebars from 'handlebars'
 import * as path from 'path'
 import { DefaultTemplate } from './types'
 import { defaultTemplates } from './templates'
+import { ALL_TEMPLATES } from './constants'
 
 export class TemplateProvider {
   private _basePath: string
@@ -69,7 +70,16 @@ export class TemplateProvider {
     try {
       return new Promise<HandlebarsTemplateDelegate<T>>((resolve, reject) => {
         fs.readFile(path, { encoding: 'utf-8' }, (err, templateString) => {
-          if (err) return reject(err)
+          if (err && err.code !== 'ENOENT') return reject(err)
+
+          if (!templateString && ALL_TEMPLATES.includes(templateName)) {
+            templateString = defaultTemplates.find(({ name }) => name === templateName)?.template || ''
+            if (!templateString) {
+              return reject(new Error(`Template "${templateName}" not found`))
+            }
+            return resolve(Handlebars.compile(templateString))
+          }
+
           const template = Handlebars.compile(templateString)
           resolve(template)
         })

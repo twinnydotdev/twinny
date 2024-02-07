@@ -2,7 +2,7 @@ import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
 import { StatusBarItem, WebviewView, commands, window, workspace } from 'vscode'
 
-import { CONTEXT_NAME, MESSAGE_NAME, USER_NAME } from './constants'
+import { CONTEXT_NAME, MESSAGE_NAME, TABS, USER_NAME } from './constants'
 import {
   StreamResponse,
   StreamOptions,
@@ -114,7 +114,11 @@ export class ChatService {
 
   private onStreamEnd = () => {
     this._statusBar.text = '🤖'
-    commands.executeCommand('setContext', CONTEXT_NAME.twinnyGeneratingText, false)
+    commands.executeCommand(
+      'setContext',
+      CONTEXT_NAME.twinnyGeneratingText,
+      false
+    )
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
@@ -130,7 +134,7 @@ export class ChatService {
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
         error: true,
-        errorMessage: error.message,
+        errorMessage: error.message
       }
     } as ServerMessage)
   }
@@ -138,7 +142,11 @@ export class ChatService {
   private onStreamStart = (req: ClientRequest) => {
     this._statusBar.text = '$(loading~spin)'
     this._currentRequest = req
-    commands.executeCommand('setContext', CONTEXT_NAME.twinnyGeneratingText, true)
+    commands.executeCommand(
+      'setContext',
+      CONTEXT_NAME.twinnyGeneratingText,
+      true
+    )
     this._view?.webview.onDidReceiveMessage((data: { type: string }) => {
       if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
         req.destroy()
@@ -149,7 +157,11 @@ export class ChatService {
   public destroyStream = () => {
     this._currentRequest?.destroy()
     this._statusBar.text = '🤖'
-    commands.executeCommand('setContext', CONTEXT_NAME.twinnyGeneratingText, true)
+    commands.executeCommand(
+      'setContext',
+      CONTEXT_NAME.twinnyGeneratingText,
+      true
+    )
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
@@ -211,7 +223,7 @@ export class ChatService {
       onData: this.onStreamData,
       onEnd: this.onStreamEnd,
       onStart: this.onStreamStart,
-      onError: this.onStreamError,
+      onError: this.onStreamError
     })
   }
 
@@ -222,6 +234,15 @@ export class ChatService {
         data: getLanguage()
       }
     } as ServerMessage)
+  }
+
+  public focusChatTab = () => {
+    this._view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnySetTab,
+      value: {
+        data: TABS.chat
+      }
+    } as ServerMessage<string>)
   }
 
   public async streamChatCompletion(messages: MessageType[]) {
@@ -238,6 +259,7 @@ export class ChatService {
     this._completion = ''
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
+    this.focusChatTab()
     const prompt = await this.buildTemplatePrompt(promptTemplate, language)
     const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
     return this.streamResponse({ requestBody, requestOptions })
