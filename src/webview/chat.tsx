@@ -4,7 +4,8 @@ import {
   VSCodeButton,
   VSCodeTextArea,
   VSCodePanelView,
-  VSCodeProgressRing
+  VSCodeProgressRing,
+  VSCodeBadge
 } from '@vscode/webview-ui-toolkit/react'
 
 import { Selection } from './selection'
@@ -17,6 +18,7 @@ import {
   useWorkSpaceContext
 } from './hooks'
 import {
+  CodeIcon,
   DisabledAutoScrollIcon,
   EnabledAutoScrollIcon,
   StopIcon
@@ -32,6 +34,7 @@ import styles from './index.module.css'
 const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
+  const [isSelectionVisible, setIsSelectionVisible] = useState<boolean>(false)
   const genertingRef = useRef(false)
   const stopRef = useRef(false)
   const theme = useTheme()
@@ -185,6 +188,10 @@ export const Chat = () => {
     })
   }
 
+  const handleToggleSelection = () => {
+    setIsSelectionVisible((prev) => !prev)
+  }
+
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     chatRef.current?.focus()
@@ -232,6 +239,11 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!genertingRef.current} />
         )}
+        <Selection
+          isVisible={isSelectionVisible}
+          onSelect={scrollBottom}
+          language={language}
+        />
         <div className={styles.chatOptions}>
           <VSCodeButton
             onClick={togggleAutoScroll}
@@ -244,7 +256,14 @@ export const Chat = () => {
               <DisabledAutoScrollIcon />
             )}
           </VSCodeButton>
-          <Selection onSelect={scrollBottom} language={language} />
+          <VSCodeButton
+            title="Toggle selection preview"
+            appearance="icon"
+            onClick={handleToggleSelection}
+          >
+            <CodeIcon />
+          </VSCodeButton>
+          <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
         </div>
         <form>
           <div className={styles.chatbox}>
