@@ -82,7 +82,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [MESSAGE_NAME.twinnyNotification]: this.sendNotification,
           [MESSAGE_NAME.twinnyListTemplates]: this.listTemplates
         }
-        eventHandlers[message.type as string](message)
+        eventHandlers[message.type as string]?.(message)
       }
     )
   }
