@@ -21,6 +21,7 @@ import {
 import { supportedLanguages } from './languages'
 import {
   BRACKET_REGEX,
+  LINE_BREAK_REGEX,
   NORMALIZE_REGEX,
   allBrackets,
   closingBrackets,
@@ -58,9 +59,8 @@ export async function streamResponse(opts: StreamResponseOptions) {
   const { body, options, onData, onEnd, onError, onStart } = opts
   const config = workspace.getConfiguration('twinny')
   const useTls = config.get('useTls')
-
+  const timeoutDuration = 10000 // 10 seconds
   const _request = useTls ? httpsRequest : request
-
   let stringBuffer = ''
 
   const req = _request(options, (res: IncomingMessage) => {
@@ -72,9 +72,7 @@ export async function streamResponse(opts: StreamResponseOptions) {
     }
 
     if (statusCode < 200 || statusCode >= 300) {
-      onError?.(
-        new Error(`Server responded with status code: ${res.statusCode}`)
-      )
+      onError?.(new Error(`Server responded with status code: ${statusCode}`))
       res.destroy()
       return
     }
@@ -82,7 +80,7 @@ export async function streamResponse(opts: StreamResponseOptions) {
     res.on('data', (chunk: string) => {
       stringBuffer += chunk.toString()
       try {
-        if (/\n$/.exec(stringBuffer)) {
+        if (LINE_BREAK_REGEX.exec(stringBuffer)) {
           const streamResponse = safeParseJson(stringBuffer)
           onData(streamResponse, () => res.destroy())
           stringBuffer = ''
@@ -100,6 +98,11 @@ export async function streamResponse(opts: StreamResponseOptions) {
 
   req.on('error', (error: Error) => {
     onError?.(error)
+  })
+
+  req.setTimeout(timeoutDuration, () => {
+    req.destroy()
+    onError?.(new Error('Request timed out'))
   })
 
   try {

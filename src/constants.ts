@@ -71,6 +71,7 @@ export const allBrackets = [...openingBrackets, ...closingBrackets] as const
 
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\r?\n|\r/g
+export const LINE_BREAK_REGEX = /\r?\n$/
 
 export const ALL_TEMPLATES = defaultTemplates.map(({ name }) => name)
 

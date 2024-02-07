@@ -33,7 +33,7 @@ import {
   getFimPromptTemplateLLama,
   getFimPromptTemplateStableCode
 } from '../prompt-template'
-import { fimTempateFormats } from '../constants'
+import { LINE_BREAK_REGEX, fimTempateFormats } from '../constants'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -244,9 +244,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 chunkCount = chunkCount + 1
 
                 if (
+                  !this._useMultiLineCompletions &&
                   chunkCount > 2 &&
-                  completionString === '\n' &&
-                  !this._useMultiLineCompletions
+                  LINE_BREAK_REGEX.exec(completionString)
                 ) {
                   destroy()
                   this._currentReq?.destroy()
@@ -265,7 +265,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   )
                 }
 
-                if (completionString === '\n') {
+                if (LINE_BREAK_REGEX.exec(completionString)) {
                   lines++
                 }
 
@@ -352,8 +352,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private getFileContext(uri: Uri): string {
     const codeSnippets: string[] = []
     const currentFileName = uri.toString()
-
-    const documentCount = workspace.textDocuments.length
 
     for (const document of workspace.textDocuments) {
       if (
