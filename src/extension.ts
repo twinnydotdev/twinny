@@ -64,6 +64,36 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.disable', () => {
       statusBar.hide()
     }),
+    commands.registerCommand('twinny.explain', () => {
+      commands.executeCommand('twinny.sidebar.focus')
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('explain')
+      )
+    }),
+    commands.registerCommand('twinny.addTypes', () => {
+      commands.executeCommand('twinny.sidebar.focus')
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('add-types')
+      )
+    }),
+    commands.registerCommand('twinny.refactor', () => {
+      commands.executeCommand('twinny.sidebar.focus')
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('refactor')
+      )
+    }),
+    commands.registerCommand('twinny.generateDocs', () => {
+      commands.executeCommand('twinny.sidebar.focus')
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('generate-docs')
+      )
+    }),
+    commands.registerCommand('twinny.addTests', () => {
+      commands.executeCommand('twinny.sidebar.focus')
+      delayExecution(() =>
+        sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
+      )
+    }),
     commands.registerCommand('twinny.templateCompletion', (template: string) => {
       commands.executeCommand('twinny.sidebar.focus')
       delayExecution(() =>
