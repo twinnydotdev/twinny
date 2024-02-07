@@ -9,7 +9,8 @@ import {
   ServerMessage,
   MessageType,
   TemplateData,
-  ChatTemplateData
+  ChatTemplateData,
+  MessageRoleContent
 } from './types'
 import { getLanguage, streamResponse } from './utils'
 import { CodeLanguageDetails } from './languages'
@@ -51,7 +52,10 @@ export class ChatService {
     })
   }
 
-  private buildStreamRequest(prompt: string, messages?: MessageType[]) {
+  private buildStreamRequest(
+    prompt: string,
+    messages?: MessageType[] | MessageRoleContent[]
+  ) {
     const headers: Record<string, string> = {}
 
     if (this._bearerToken) {
@@ -183,22 +187,43 @@ export class ChatService {
     } as ServerMessage)
   }
 
-  public buildChatMessages = async (
+  public buildMesageRoleContent = async (
     messages: MessageType[],
     language: CodeLanguageDetails
-  ) => {
+  ): Promise<MessageRoleContent[]> => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    const systemMessage =
-      await this._templateProvider?.readSystemMessageTemplate()
-    return [
-      {
-        role: 'system',
-        content: systemMessage
-      },
-      ...messages
-    ] as MessageType[]
+    const systemMessage = {
+      role: 'system',
+      content: await this._templateProvider?.readSystemMessageTemplate()
+    }
+
+    if (messages.length > 0 && (language || selectionContext)) {
+      const lastMessage = messages[messages.length - 1]
+
+      const detailsToAppend = []
+
+      if (language.langName) {
+        detailsToAppend.push(`Language: ${language.langName}`)
+      }
+
+      if (selectionContext) {
+        detailsToAppend.push(`Selection: ${selectionContext}`)
+      }
+
+      const detailsString =
+        detailsToAppend.length ? `\n\n${detailsToAppend.join('; ')}` : ''
+
+      const updatedLastMessage = {
+        ...lastMessage,
+        content: `${lastMessage.content}${detailsString}`
+      }
+
+      messages.splice(messages.length - 1, 1, updatedLastMessage)
+    }
+
+    return [systemMessage, ...messages]
   }
 
   public buildChatMessagePrompt = async (
@@ -278,11 +303,14 @@ export class ChatService {
     const { language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()
-    const promptMesages = await this.buildChatMessages(messages, language)
+    const messageRoleContent = await this.buildMesageRoleContent(
+      messages,
+      language
+    )
     const prompt = await this.buildChatMessagePrompt(messages, language)
     const { requestBody, requestOptions } = this.buildStreamRequest(
       prompt,
-      promptMesages
+      messageRoleContent
     )
     return this.streamResponse({ requestBody, requestOptions })
   }

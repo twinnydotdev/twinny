@@ -3,6 +3,8 @@ import { defaultTemplates } from './templates'
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const BOT_NAME = 'assistant'
 export const USER_NAME = 'user'
+export const TWINNY = '🤖 twinny'
+export const YOU = '👤 You'
 
 export const EMPTY_MESAGE = 'Sorry, I don’t understand. Please try again.'
 export const MODEL_ERROR = 'Sorry, something went wrong...'

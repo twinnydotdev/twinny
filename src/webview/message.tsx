@@ -7,6 +7,7 @@ import CodeBlock from './code-block'
 import styles from './index.module.css'
 import { MessageType, ThemeType } from '../types'
 import React from 'react'
+import { BOT_NAME, TWINNY, YOU } from '../constants'
 
 interface MessageProps {
   message?: MessageType
@@ -22,7 +23,7 @@ export const Message = ({
   }
   return (
     <div className={styles.message}>
-      <b>{message.role}</b>
+      <b>{message.role === BOT_NAME ? TWINNY : YOU}</b>
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{

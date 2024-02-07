@@ -9,9 +9,8 @@ export interface StreamOptions {
   n_predict?: number
   max_tokens: number,
   temperature?: number
-  messages?: MessageType[],
-  // Ollama
-  options: Record<string, unknown>
+  messages?: MessageType[] | MessageRoleContent,
+  options: Record<string, unknown> // Ollama
 }
 
 export interface StreamOptionsMessages {
@@ -73,11 +72,13 @@ export interface ServerMessage<T = LanguageType> {
 }
 export interface MessageType {
   role: string
-  content: string
+  content: string | undefined
   type?: string
   language?: LanguageType
   error?: boolean
 }
+
+export type MessageRoleContent = Pick<MessageType, 'role' | 'content'>
 
 export const Theme = {
   Light: 'Light',
