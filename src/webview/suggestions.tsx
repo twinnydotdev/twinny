@@ -1,42 +1,19 @@
-import { CodeIcon, ExplainIcon, FixCodeIcon, TestsIcon } from './icons'
 import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import cn from 'classnames'
 
 import styles from './index.module.css'
-import { useWorkSpaceContext } from './hooks'
+import { useTemplates, useWorkSpaceContext } from './hooks'
 import { kebabToSentence } from './utils'
-
-const SUGGESTIONS = [
-  {
-    name: 'refactor',
-    value: 'Refactor',
-    icon: <CodeIcon />,
-    message: 'twinny.refactor'
-  },
-  {
-    name: 'tests',
-    value: 'Write tests',
-    icon: <TestsIcon />,
-    message: 'twinny.addTests'
-  },
-  {
-    name: 'add-types',
-    value: 'Add types',
-    icon: <FixCodeIcon />,
-    message: 'twinny.addTypes'
-  },
-  {
-    name: 'explain',
-    value: 'Explain',
-    icon: <ExplainIcon />,
-    message: 'twinny.explain'
-  }
-]
+import { useEffect, useState } from 'react'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
-  const templates = useWorkSpaceContext<string[]>(MESSAGE_KEY.selectedTemplates)
+  const templateContext = useWorkSpaceContext<string[]>(
+    MESSAGE_KEY.selectedTemplates
+  )
+  const { templates, saveTemplates } = useTemplates()
+  const [suggestions, setSuggestions] = useState<string[]>()
 
   const handleOnClickSuggestion = (message: string) => {
     if (isDisabled) return
@@ -47,9 +24,27 @@ export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
     })
   }
 
+  const fixDeletedTemplates = (savedTemplates: string[]) => {
+    const availableTemplates = savedTemplates.filter((template) =>
+      templates?.includes(template)
+    )
+    if (availableTemplates.length !== savedTemplates.length) {
+      saveTemplates(availableTemplates)
+    }
+    return availableTemplates
+  }
+
+  useEffect(() => {
+    if (!templateContext?.length) {
+      return
+    }
+    const filteredTemplates = fixDeletedTemplates(templateContext)
+    setSuggestions(filteredTemplates)
+  }, [templates])
+
   return (
     <div className={styles.suggestions}>
-      {templates?.map((name) => (
+      {suggestions?.map((name) => (
         <div
           onClick={() => handleOnClickSuggestion(name)}
           key={name}
