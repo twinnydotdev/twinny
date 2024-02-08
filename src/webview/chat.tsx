@@ -266,7 +266,7 @@ export const Chat = () => {
           <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
         </div>
         <form>
-          <div className={styles.chatbox}>
+          <div className={styles.chatBox}>
             <VSCodeTextArea
               ref={chatRef}
               disabled={genertingRef.current}

@@ -10,6 +10,10 @@ code {
   white-space: pre-wrap;
 }
 
+pre code {
+  background-color: transparent; /* Use transparent instead of none */
+}
+
 .container {
   display: flex;
   flex-direction: column;
@@ -27,6 +31,7 @@ code {
   flex-grow: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 5px;
 }
 
 .loading {

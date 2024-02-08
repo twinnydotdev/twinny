@@ -30,9 +30,7 @@ export async function activate(context: ExtensionContext) {
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
-  const templateDir =
-    (config.get('templateDir') as string) ||
-    (path.join(os.homedir(), '.twinny/templates') as string)
+  const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   setContext(context)
 
   try {

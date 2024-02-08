@@ -370,7 +370,7 @@
         },
         "twinny.useTls": {
           "order": 21,
-          "type": "boolean",
+          "type": "string",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
@@ -415,7 +415,6 @@
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
-    "@microsoft/fast-react-wrapper": "^0.3.22",
     "@types/react": "^18.2.46",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "classnames": "^2.5.1",

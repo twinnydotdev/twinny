@@ -42,7 +42,6 @@ export class ChatService {
   ) {
     this._view = view
     this._statusBar = statusBar
-
     this._templateProvider = new TemplateProvider(templateDir)
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
