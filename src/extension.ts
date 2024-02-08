@@ -163,17 +163,11 @@ export async function activate(context: ExtensionContext) {
     statusBar.show()
   }
 
-
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration('twinny')) {
-        return
-      }
+      if (!event.affectsConfiguration('twinny')) return
+      if (event.affectsConfiguration('twinny.apiProvider')) setApiDefaults()
       completionProvider.updateConfig()
-
-      if (event.affectsConfiguration('twinny.apiProvider')) {
-        setApiDefaults(event)
-      }
     })
   )
 }
