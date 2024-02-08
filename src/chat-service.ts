@@ -9,15 +9,18 @@ import {
   ServerMessage,
   MessageType,
   TemplateData,
-  ChatTemplateData
+  ChatTemplateData,
+  MessageRoleContent,
 } from './types'
-import { getLanguage, streamResponse } from './utils'
+import { getLanguage } from './utils'
 import { CodeLanguageDetails } from './languages'
 import { TemplateProvider } from './template-provider'
+import { streamResponse } from './stream'
+import { createStreamRequestBody, getChatDataFromProvider } from './requests'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
-  private _apiUrl = this._config.get('apiUrl') as string
+  private _apiHostname = this._config.get('apiHostname') as string
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
@@ -25,6 +28,7 @@ export class ChatService {
   private _port = this._config.get('chatApiPort') as string
   private _apiPath = this._config.get('chatApiPath') as string
   private _temperature = this._config.get('temperature') as number
+  private _apiProvider = this._config.get('apiProvider') as string
   private _view?: WebviewView
   private _statusBar: StatusBarItem
   private _promptTemplate = ''
@@ -38,7 +42,6 @@ export class ChatService {
   ) {
     this._view = view
     this._statusBar = statusBar
-
     this._templateProvider = new TemplateProvider(templateDir)
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
@@ -48,28 +51,18 @@ export class ChatService {
     })
   }
 
-  private buildStreamRequest(prompt: string) {
+  private buildStreamRequest(
+    prompt: string,
+    messages?: MessageType[] | MessageRoleContent[]
+  ) {
     const headers: Record<string, string> = {}
 
     if (this._bearerToken) {
       headers.Authorization = `Bearer ${this._bearerToken}`
     }
 
-    const requestBody: StreamOptions = {
-      model: this._chatModel,
-      prompt,
-      stream: true,
-      n_predict: this._numPredictChat,
-      temperature: this._temperature,
-      // Ollama
-      options: {
-        temperature: this._temperature,
-        num_predict: this._numPredictChat
-      }
-    }
-
     const requestOptions: RequestOptions = {
-      hostname: this._apiUrl,
+      hostname: this._apiHostname,
       port: this._port,
       path: this._apiPath,
       method: 'POST',
@@ -79,6 +72,13 @@ export class ChatService {
       }
     }
 
+    const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
+      model: this._chatModel,
+      numPredictChat: this._numPredictChat,
+      temperature: this._temperature,
+      messages
+    })
+
     return { requestOptions, requestBody }
   }
 
@@ -87,11 +87,7 @@ export class ChatService {
     onDestroy: () => void
   ) => {
     try {
-      const data = streamResponse?.response || streamResponse?.content
-
-      if (!data) {
-        return
-      }
+      const data = getChatDataFromProvider(this._apiProvider, streamResponse)
 
       this._completion = this._completion + data
 
@@ -172,6 +168,46 @@ export class ChatService {
     } as ServerMessage)
   }
 
+  public buildMesageRoleContent = async (
+    messages: MessageType[],
+    language: CodeLanguageDetails
+  ): Promise<MessageRoleContent[]> => {
+    const editor = window.activeTextEditor
+    const selection = editor?.selection
+    const selectionContext = editor?.document.getText(selection) || ''
+    const systemMessage = {
+      role: 'system',
+      content: await this._templateProvider?.readSystemMessageTemplate()
+    }
+
+    if (messages.length > 0 && (language || selectionContext)) {
+      const lastMessage = messages[messages.length - 1]
+
+      const detailsToAppend = []
+
+      if (language.langName) {
+        detailsToAppend.push(`Language: ${language.langName}`)
+      }
+
+      if (selectionContext) {
+        detailsToAppend.push(`Selection: ${selectionContext}`)
+      }
+
+      const detailsString = detailsToAppend.length
+        ? `\n\n${detailsToAppend.join('; ')}`
+        : ''
+
+      const updatedLastMessage = {
+        ...lastMessage,
+        content: `${lastMessage.content}${detailsString}`
+      }
+
+      messages.splice(messages.length - 1, 1, updatedLastMessage)
+    }
+
+    return [systemMessage, ...messages]
+  }
+
   public buildChatMessagePrompt = async (
     messages: MessageType[],
     language: CodeLanguageDetails
@@ -249,8 +285,15 @@ export class ChatService {
     const { language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()
+    const messageRoleContent = await this.buildMesageRoleContent(
+      messages,
+      language
+    )
     const prompt = await this.buildChatMessagePrompt(messages, language)
-    const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
+    const { requestBody, requestOptions } = this.buildStreamRequest(
+      prompt,
+      messageRoleContent
+    )
     return this.streamResponse({ requestBody, requestOptions })
   }
 
@@ -261,7 +304,19 @@ export class ChatService {
     this.sendEditorLanguage()
     this.focusChatTab()
     const prompt = await this.buildTemplatePrompt(promptTemplate, language)
-    const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
+    const messageRoleContent = await this.buildMesageRoleContent(
+      [
+        {
+          content: prompt,
+          role: 'user'
+        }
+      ],
+      language
+    )
+    const { requestBody, requestOptions } = this.buildStreamRequest(
+      prompt,
+      messageRoleContent
+    )
     return this.streamResponse({ requestBody, requestOptions })
   }
 
@@ -271,6 +326,7 @@ export class ChatService {
     this._chatModel = this._config.get('chatModelName') as string
     this._apiPath = this._config.get('chatApiPath') as string
     this._port = this._config.get('chatApiPort') as string
-    this._apiUrl = this._config.get('apiUrl') as string
+    this._apiHostname = this._config.get('apiHostname') as string
+    this._apiProvider = this._config.get('apiProvider') as string
   }
 }

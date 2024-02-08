@@ -17,10 +17,10 @@ const config = workspace.getConfiguration('twinny')
 export async function init() {
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
-  const apiUrl = config.get('apiUrl') as string
+  const apiHostname = config.get('apiHostname') as string
   const disableServerChecks = config.get('disableServerChecks') as boolean
 
-  if (apiUrl !== 'localhost' || disableServerChecks) {
+  if (apiHostname !== 'localhost' || disableServerChecks) {
     return
   }
 

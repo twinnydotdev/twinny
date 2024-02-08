@@ -13,7 +13,7 @@ import * as vscode from 'vscode'
 import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
-import { delayExecution, deleteTempFiles } from './utils'
+import { delayExecution, noop, setApiDefaults } from './utils'
 import { setContext } from './context'
 import {
   CONTEXT_NAME,
@@ -30,9 +30,7 @@ export async function activate(context: ExtensionContext) {
   const fimModel = config.get('fimModelName') as string
   const chatModel = config.get('chatModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
-  const templateDir =
-    (config.get('templateDir') as string) ||
-    (path.join(os.homedir(), '.twinny/templates') as string)
+  const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   setContext(context)
 
   try {
@@ -94,12 +92,15 @@ export async function activate(context: ExtensionContext) {
         sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
       )
     }),
-    commands.registerCommand('twinny.templateCompletion', (template: string) => {
-      commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion(template)
-      )
-    }),
+    commands.registerCommand(
+      'twinny.templateCompletion',
+      (template: string) => {
+        commands.executeCommand('twinny.sidebar.focus')
+        delayExecution(() =>
+          sidebarProvider.chatService?.streamTemplateCompletion(template)
+        )
+      }
+    ),
     commands.registerCommand('twinny.stopGeneration', () => {
       completionProvider.destroyStream()
       sidebarProvider.destroyStream()
@@ -162,15 +163,13 @@ export async function activate(context: ExtensionContext) {
 
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration('twinny')) {
-        return
-      }
-
+      if (!event.affectsConfiguration('twinny')) return
+      if (event.affectsConfiguration('twinny.apiProvider')) setApiDefaults()
       completionProvider.updateConfig()
     })
   )
 }
 
 export function deactivate() {
-  deleteTempFiles()
+  noop()
 }

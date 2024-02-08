@@ -32,11 +32,9 @@ export class TemplateProvider {
   }
 
   public copyDefaultTemplates() {
-    const destPath = path.join(this._basePath)
     try {
-      fs.mkdirSync(destPath, { recursive: true })
       defaultTemplates.forEach(({ name, template }) => {
-        const destFile = path.join(destPath, name)
+        const destFile = path.join(this._basePath, name)
         fs.writeFileSync(`${destFile}.hbs`, template, 'utf8')
       })
     } catch (e) {
