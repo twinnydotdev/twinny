@@ -33,7 +33,6 @@ export const Message = ({
                 <CodeBlock
                   language={message.language}
                   theme={theme}
-                  completionType={message.type}
                   {...children.props}
                 />
               )

@@ -35,7 +35,8 @@ export const MESSAGE_NAME = {
   twinnySendTheme: 'twinny-send-theme',
   twinnyListTemplates: 'twinny-list-templates',
   twinnyManageTemplates: 'twinny-manage-templates',
-  twinnySetTab: 'twinny-set-tab'
+  twinnySetTab: 'twinny-set-tab',
+  twinnyNewDocument: 'twinny-new-document',
 }
 
 export const MESSAGE_KEY = {
@@ -97,13 +98,6 @@ export const API_PROVIDERS: ApiProviders = {
 export const PROVIDER_NAMES = Object.keys(API_PROVIDERS)
 
 export const ALL_TEMPLATES = defaultTemplates.map(({ name }) => name)
-
-export const CODE_ACTION_TYPES = [
-  'add-types',
-  'refactor',
-  'generate-docs',
-  'fix-code'
-]
 
 export const DEFAULT_TEMPLATES = [
   'refactor',

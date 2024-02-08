@@ -79,7 +79,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
           [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
           [MESSAGE_NAME.twinnyNotification]: this.sendNotification,
-          [MESSAGE_NAME.twinnyListTemplates]: this.listTemplates
+          [MESSAGE_NAME.twinnyListTemplates]: this.listTemplates,
+          [MESSAGE_NAME.twinnyNewDocument]: this.createNewUntitledDocument
         }
         eventHandlers[message.type as string]?.(message)
       }
@@ -101,7 +102,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public clickSuggestion = (data: ClientMessage) => {
-    vscode.commands.executeCommand('twinny.templateCompletion', data.data as string)
+    vscode.commands.executeCommand(
+      'twinny.templateCompletion',
+      data.data as string
+    )
   }
 
   public streamChatCompletion = (data: ClientMessage<MessageType[]>) => {
@@ -124,6 +128,21 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     if (!selection) return
     vscode.window.activeTextEditor?.edit((editBuilder) => {
       editBuilder.replace(selection, data.data as string)
+    })
+  }
+
+  public createNewUntitledDocument = async (data: ClientMessage) => {
+    const lang = getLanguage()
+    const document = await vscode.workspace.openTextDocument({
+      content: data.data as string,
+      language: lang.languageId
+    })
+    await vscode.window.showTextDocument(document)
+    const editor = await vscode.window.showTextDocument(document)
+
+    await editor.edit((editBuilder) => {
+      const startPosition = new vscode.Position(0, 0)
+      editBuilder.insert(startPosition, data.data as string)
     })
   }
 
@@ -196,13 +215,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.js')
     )
 
+    const codiconCssUri = vscode.Uri.joinPath(this.context.extensionUri, 'assets', 'codicon.css');
+
+    const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)
+
     const nonce = getNonce()
 
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
+        <link href="${codiconCssWebviewUri}" rel="stylesheet">
         <meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:11434; img-src vscode-resource: https:; script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;">
+				<meta
+          http-equiv="Content-Security-Policy"
+          content="default-src 'self' http://localhost:11434;
+          img-src vscode-resource: https:;
+          font-src vscode-webview-resource:;
+          script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;"
+        >
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Sidebar</title>
     </head>

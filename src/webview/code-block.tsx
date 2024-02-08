@@ -3,7 +3,7 @@ import { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-import { MESSAGE_NAME, CODE_ACTION_TYPES } from '../constants'
+import { MESSAGE_NAME } from '../constants'
 
 import styles from './index.module.css'
 import { LanguageType, Theme, ThemeType } from '../types'
@@ -11,7 +11,6 @@ import { getLanguageMatch } from './utils'
 
 interface CodeBlockProps {
   className?: string
-  completionType: string
   children?: ReactNode
   language: LanguageType | undefined
   theme: ThemeType
@@ -21,13 +20,20 @@ interface CodeBlockProps {
 const global = globalThis as any
 
 export const CodeBlock = (props: CodeBlockProps) => {
-  const { children, completionType, language, className, theme } = props
+  const { children, language, className, theme } = props
 
   const lang = getLanguageMatch(language, className)
 
   const handleCopy = () => {
     const text = String(children).replace(/^\n/, '')
     navigator.clipboard.writeText(text)
+  }
+
+  const handleNewDocument = () => {
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyNewDocument,
+      data: String(children).replace(/^\n/, '')
+    })
   }
 
   const handleAccept = () => {
@@ -45,12 +51,23 @@ export const CodeBlock = (props: CodeBlockProps) => {
         language={lang}
       />
       <div className={styles.codeOptions}>
-        {CODE_ACTION_TYPES.includes(completionType) && (
-          <>
-            <VSCodeButton onClick={handleAccept}>Accept</VSCodeButton>
-          </>
-        )}
-        <VSCodeButton onClick={handleCopy}>Copy</VSCodeButton>
+        <VSCodeButton
+          title="Accept solution"
+          onClick={handleAccept}
+          appearance="icon"
+        >
+          <span className="codicon codicon-check"></span>
+        </VSCodeButton>
+        <VSCodeButton title="Copy code" onClick={handleCopy} appearance="icon">
+          <span className="codicon codicon-copy"></span>
+        </VSCodeButton>
+        <VSCodeButton
+          title="Append to new document"
+          onClick={handleNewDocument}
+          appearance="icon"
+        >
+          <span className="codicon codicon-new-file"></span>
+        </VSCodeButton>
       </div>
     </>
   )

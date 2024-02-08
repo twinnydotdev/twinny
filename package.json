@@ -416,6 +416,7 @@
   },
   "dependencies": {
     "@types/react": "^18.2.46",
+    "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
