@@ -56,7 +56,7 @@ You can find the settings inside the extension sidebar by clicking the gear icon
 
 The main values which need to be updated to switch between Ollama and llama.cpp are:
 
-- `apiUrl` - The url to your Ollama or llama.cpp server (default: localhost)
+- `apiHostname` - The url to your Ollama or llama.cpp server (default: localhost)
 - `apiPath` - The API path which defaults to `/api/generate` for Ollama and `/completion` for llama.cpp (See llama.cpp docs or Ollama docs).
 - `apiPort` - The port of your Ollama (default 11434) or llama.cpp server (default 8080)
 

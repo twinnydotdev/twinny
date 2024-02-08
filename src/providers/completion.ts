@@ -20,17 +20,11 @@ import {
   getCompletionNormalized,
   getIsSingleBracket,
   removeDoubleQuoteEndings,
-  removeDuplicateLinesDown,
-  streamResponse
+  removeDuplicateLinesDown
 } from '../utils'
 import { getCache, setCache } from '../cache'
 import { supportedLanguages } from '../languages'
-import {
-  InlineCompletion,
-  PromptTemplate,
-  StreamOptions,
-  StreamOptionsMessages
-} from '../types'
+import { InlineCompletion, PromptTemplate } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
 import {
@@ -39,6 +33,8 @@ import {
   getFimPromptTemplateStableCode
 } from '../prompt-template'
 import { LINE_BREAK_REGEX, fimTempateFormats } from '../constants'
+import { streamResponse } from '../stream'
+import { createStreamRequestBody } from '../requests'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -48,16 +44,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
   private _fimModel = this._config.get('fimModelName') as string
-  private _apiUrl = this._config.get('apiUrl') as string
+  private _apiHostname = this._config.get('apiHostname') as string
   private _port = this._config.get('fimApiPort') as number
   private _apiPath = this._config.get('fimApiPath') as string
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
+  private _apiProvider = this._config.get('apiProvider') as string
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
-  private _useOpenAiApiFormat = this._config.get(
-    'useOpenAiApiFormat'
-  ) as boolean
   private _useMultiLineCompletions = this._config.get(
     'useMultiLineCompletions'
   ) as boolean
@@ -65,7 +59,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _disableAutoSuggest = this._config.get(
     'disableAutoSuggest'
   ) as boolean
-  private _bearerToken = this._config.get('apiBearerToken') as number
+  private _apiBearerToken = this._config.get('apiBearerToken') as string
   private _enableCompletionCache = this._config.get(
     'enableCompletionCache'
   ) as boolean
@@ -78,32 +72,24 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private buildStreamRequest(prompt: string) {
     const headers: Record<string, string> = {}
 
-    if (this._bearerToken) {
-      headers.Authorization = `Bearer ${this._bearerToken}`
+    if (this._apiBearerToken) {
+      headers.Authorization = `Bearer ${this._apiBearerToken}`
     }
 
-    const requestBody: StreamOptions = {
+    const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
       model: this._fimModel,
-      prompt,
-      stream: true,
-      n_predict: this._numPredictFim,
-      max_tokens: this._numPredictFim, // LM Studio
-      temperature: this._temperature,
-      // Ollama
-      options: {
-        temperature: this._temperature,
-        num_predict: this._numPredictFim || -2
-      }
-    }
+      numPredictChat: this._numPredictFim,
+      temperature: this._temperature
+    })
 
     const requestOptions: RequestOptions = {
-      hostname: this._apiUrl,
+      hostname: this._apiHostname,
       port: this._port,
       path: this._apiPath,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this._bearerToken}`
+        Authorization: `Bearer ${this._apiBearerToken}`
       }
     }
 
@@ -215,7 +201,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           this._statusBar.text = '$(loading~spin)'
           this._statusBar.command = 'twinny.stopGeneration'
 
-          const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
+          const { requestBody, requestOptions } =
+            this.buildStreamRequest(prompt)
 
           streamResponse({
             body: requestBody,
@@ -242,9 +229,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             onData: (streamResponse, destroy) => {
               try {
                 const completionString =
-                  streamResponse?.response || // llama.cpp
+                  streamResponse?.response || // llamacpp
                   streamResponse?.content || // ollama
-                  streamResponse?.choices[0].text // lm studio / OpenAI
+                  streamResponse?.choices[0].text // lmstudio
 
                 if (completionString === undefined) {
                   return
@@ -286,7 +273,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   )
                 ) {
                   destroy()
-                  this._currentReq?.destroy()
                   this._statusBar.text = '🤖'
                   stop.forEach((stopWord) => {
                     completion = completion.split(stopWord).join('')
@@ -479,8 +465,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._apiPath = this._config.get('fimApiPath') as string
     this._port = this._config.get('fimApiPort') as number
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
-    this._useOpenAiApiFormat = this._config.get('useOpenAiApiFormat') as boolean
-    this._apiUrl = this._config.get('apiUrl') as string
+    this._apiBearerToken = this._config.get('apiBearerToken') as string
+    this._apiHostname = this._config.get('apiHostname') as string
     this._useMultiLineCompletions = this._config.get(
       'useMultiLineCompletions'
     ) as boolean

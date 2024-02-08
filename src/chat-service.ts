@@ -10,15 +10,17 @@ import {
   MessageType,
   TemplateData,
   ChatTemplateData,
-  MessageRoleContent
+  MessageRoleContent,
 } from './types'
-import { getLanguage, streamResponse } from './utils'
+import { getLanguage } from './utils'
 import { CodeLanguageDetails } from './languages'
 import { TemplateProvider } from './template-provider'
+import { streamResponse } from './stream'
+import { createStreamRequestBody, getChatDataFromProvider } from './requests'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
-  private _apiUrl = this._config.get('apiUrl') as string
+  private _apiHostname = this._config.get('apiHostname') as string
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
@@ -26,9 +28,7 @@ export class ChatService {
   private _port = this._config.get('chatApiPort') as string
   private _apiPath = this._config.get('chatApiPath') as string
   private _temperature = this._config.get('temperature') as number
-  private _useOpenAiApiFormat = this._config.get(
-    'useOpenAiApiFormat'
-  ) as boolean
+  private _apiProvider = this._config.get('apiProvider') as string
   private _view?: WebviewView
   private _statusBar: StatusBarItem
   private _promptTemplate = ''
@@ -62,23 +62,8 @@ export class ChatService {
       headers.Authorization = `Bearer ${this._bearerToken}`
     }
 
-    const requestBody: StreamOptions = {
-      model: this._chatModel,
-      prompt,
-      messages,
-      stream: true,
-      n_predict: this._numPredictChat,
-      max_tokens: this._numPredictChat,
-      temperature: this._temperature,
-      // Ollama
-      options: {
-        temperature: this._temperature,
-        num_predict: this._numPredictChat
-      }
-    }
-
     const requestOptions: RequestOptions = {
-      hostname: this._apiUrl,
+      hostname: this._apiHostname,
       port: this._port,
       path: this._apiPath,
       method: 'POST',
@@ -88,6 +73,13 @@ export class ChatService {
       }
     }
 
+    const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
+      model: this._chatModel,
+      numPredictChat: this._numPredictChat,
+      temperature: this._temperature,
+      messages
+    })
+
     return { requestOptions, requestBody }
   }
 
@@ -96,17 +88,7 @@ export class ChatService {
     onDestroy: () => void
   ) => {
     try {
-      let data =
-        streamResponse?.response || // llama.cpp
-        streamResponse?.content // ollama
-
-      if (!data && streamResponse?.choices?.length) {
-        data = streamResponse.choices[0].delta.content
-      } // lm studio / OpenAI)
-
-      if (!data) {
-        return
-      }
+      const data = getChatDataFromProvider(this._apiProvider, streamResponse)
 
       this._completion = this._completion + data
 
@@ -212,8 +194,9 @@ export class ChatService {
         detailsToAppend.push(`Selection: ${selectionContext}`)
       }
 
-      const detailsString =
-        detailsToAppend.length ? `\n\n${detailsToAppend.join('; ')}` : ''
+      const detailsString = detailsToAppend.length
+        ? `\n\n${detailsToAppend.join('; ')}`
+        : ''
 
       const updatedLastMessage = {
         ...lastMessage,
@@ -322,7 +305,19 @@ export class ChatService {
     this.sendEditorLanguage()
     this.focusChatTab()
     const prompt = await this.buildTemplatePrompt(promptTemplate, language)
-    const { requestBody, requestOptions } = this.buildStreamRequest(prompt)
+    const messageRoleContent = await this.buildMesageRoleContent(
+      [
+        {
+          content: prompt,
+          role: 'user'
+        }
+      ],
+      language
+    )
+    const { requestBody, requestOptions } = this.buildStreamRequest(
+      prompt,
+      messageRoleContent
+    )
     return this.streamResponse({ requestBody, requestOptions })
   }
 
@@ -332,6 +327,7 @@ export class ChatService {
     this._chatModel = this._config.get('chatModelName') as string
     this._apiPath = this._config.get('chatApiPath') as string
     this._port = this._config.get('chatApiPort') as string
-    this._apiUrl = this._config.get('apiUrl') as string
+    this._apiHostname = this._config.get('apiHostname') as string
+    this._apiProvider = this._config.get('apiProvider') as string
   }
 }

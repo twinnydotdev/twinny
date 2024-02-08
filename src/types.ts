@@ -1,23 +1,24 @@
 import { Position } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { allBrackets } from './constants'
+import { RequestOptions } from 'https'
+import { ClientRequest } from 'http'
 
 export interface StreamOptions {
-  model: string
   prompt: string
   stream: boolean
   n_predict?: number
-  max_tokens: number,
   temperature?: number
-  messages?: MessageType[] | MessageRoleContent,
-  options: Record<string, unknown> // Ollama
 }
 
-export interface StreamOptionsMessages {
-  stream: boolean
+export interface StreamOptionsOllama extends StreamOptions {
+  model: string
+  options: Record<string, unknown>
+}
+
+export interface StreamOptionsMessages extends StreamOptions {
+  messages?: MessageType[] | MessageRoleContent
   max_tokens: number
-  temperature?: number
-  prompt: string
 }
 
 export interface InlineCompletion {
@@ -41,12 +42,14 @@ export interface StreamResponse {
   prompt_eval_duration: number
   eval_count: number
   eval_duration: number
-  choices: [{
-    text: string,
-    delta: {
-      content: string
+  choices: [
+    {
+      text: string
+      delta: {
+        content: string
+      }
     }
-  }],
+  ]
 }
 
 export interface LanguageType {
@@ -114,5 +117,26 @@ export interface PromptTemplate {
   useFileContext: boolean
 }
 
+export interface ApiProviders {
+  [key: string]: { fimApiPath: string; chatApiPath: string; port: number }
+}
+
 export type Bracket = (typeof allBrackets)[number]
 
+export interface StreamResponseOptions {
+  body: StreamOptions | StreamOptionsMessages
+  options: RequestOptions
+  onData: (
+    streamResponse: StreamResponse | undefined,
+    destroy: () => void
+  ) => void
+  onEnd?: (destroy: () => void) => void
+  onStart?: (req: ClientRequest) => void
+  onError?: (error: Error) => void
+}
+
+export const ProviderNames = {
+  Ollama: 'ollama',
+  LlamaCpp: 'llamacpp',
+  LMStudio: 'lmstudio'
+} as const

@@ -1,4 +1,5 @@
 import { defaultTemplates } from './templates'
+import { ApiProviders } from './types'
 
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const BOT_NAME = 'assistant'
@@ -74,6 +75,26 @@ export const allBrackets = [...openingBrackets, ...closingBrackets] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n$/
+
+export const API_PROVIDERS: ApiProviders = {
+  ollama: {
+    fimApiPath: '/api/generate',
+    chatApiPath: '/api/generate',
+    port: 11434
+  },
+  llamacpp: {
+    fimApiPath: '/completion',
+    chatApiPath: '/completion',
+    port: 8080
+  },
+  lmstudio: {
+    fimApiPath: '/v1/completions',
+    chatApiPath: '/v1/chat/completions',
+    port: 1234
+  }
+}
+
+export const PROVIDER_NAMES = Object.keys(API_PROVIDERS)
 
 export const ALL_TEMPLATES = defaultTemplates.map(({ name }) => name)
 

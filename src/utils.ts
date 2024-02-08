@@ -1,151 +1,26 @@
-import { ClientRequest, IncomingMessage, RequestOptions, request } from 'http'
-import { request as httpsRequest } from 'https'
 import {
   ColorThemeKind,
+  ConfigurationChangeEvent,
+  ConfigurationTarget,
   Position,
   TextEditor,
-  Uri,
   commands,
   window,
   workspace
 } from 'vscode'
 
-import path from 'path'
-import {
-  StreamOptions,
-  StreamResponse,
-  Theme,
-  LanguageType,
-  Bracket,
-  StreamOptionsMessages
-} from './types'
+import { Theme, LanguageType, Bracket } from './types'
 import { supportedLanguages } from './languages'
 import {
+  API_PROVIDERS,
   BRACKET_REGEX,
-  LINE_BREAK_REGEX,
+  EXTENSION_NAME,
   NORMALIZE_REGEX,
+  PROVIDER_NAMES,
   allBrackets,
   closingBrackets,
   openingBrackets
 } from './constants'
-
-interface StreamResponseOptions {
-  body: StreamOptions | StreamOptionsMessages
-  options: RequestOptions
-  onData: (
-    streamResponse: StreamResponse | undefined,
-    destroy: () => void
-  ) => void
-  onEnd?: (destroy: () => void) => void
-  onStart?: (req: ClientRequest) => void
-  onError?: (error: Error) => void
-}
-
-export const isLlamaCppStream = (stringBuffer: string) => {
-  return stringBuffer.startsWith('data:')
-}
-
-const safeParseJson = (stringBuffer: string): StreamResponse | undefined => {
-  const config = workspace.getConfiguration('twinny')
-  const useOpenAiApiFormat = config.get('useOpenAiApiFormat')
-  try {
-    if (isLlamaCppStream(stringBuffer) || useOpenAiApiFormat) {
-      return JSON.parse(stringBuffer.split('data:')[1])
-    }
-    return JSON.parse(stringBuffer)
-  } catch (e) {
-    return undefined
-  }
-}
-
-export async function streamResponse(opts: StreamResponseOptions) {
-  const { body, options, onData, onEnd, onError, onStart } = opts
-  const config = workspace.getConfiguration('twinny')
-  const useTls = config.get('useTls')
-  const timeoutDuration = 20000
-  const _request = useTls ? httpsRequest : request
-  let stringBuffer = ''
-
-  const req = _request(options, (res: IncomingMessage) => {
-    const statusCode = res.statusCode
-
-    if (typeof statusCode !== 'number') {
-      onError?.(new Error('Response statusCode is undefined'))
-      return
-    }
-
-    if (statusCode < 200 || statusCode >= 300) {
-      onError?.(new Error(`Server responded with status code: ${statusCode}`))
-      res.destroy()
-      return
-    }
-
-    res.on('data', (chunk: string) => {
-      stringBuffer += chunk.toString()
-      try {
-        if (LINE_BREAK_REGEX.exec(stringBuffer)) {
-          const streamResponse = safeParseJson(stringBuffer)
-          onData(streamResponse, () => res.destroy())
-          stringBuffer = ''
-        }
-      } catch (e) {
-        onError?.(e instanceof Error ? e : new Error('Error processing data'))
-        res.destroy()
-      }
-    })
-
-    res.once('end', () => {
-      onEnd?.(() => res.destroy())
-    })
-  })
-
-  req.on('error', (error: Error) => {
-    onError?.(error)
-  })
-
-  req.setTimeout(timeoutDuration, () => {
-    req.destroy()
-    onError?.(new Error('Request timed out'))
-  })
-
-  try {
-    if (body) {
-      req.write(JSON.stringify(body))
-    }
-    onStart?.(req)
-    req.end()
-  } catch (e) {
-    onError?.(e instanceof Error ? e : new Error('Error sending request'))
-    req.destroy()
-  }
-}
-
-const tmpDir = path.join(__dirname, './tmp')
-
-export function openDiffView(original: string, proposed: string) {
-  const uri1 = Uri.file(`${tmpDir}/twinny-original.txt`)
-  const uri2 = Uri.file(`${tmpDir}/twinny-proposed.txt`)
-
-  workspace.fs.writeFile(uri1, Buffer.from(original, 'utf8'))
-  workspace.fs.writeFile(uri2, Buffer.from(proposed, 'utf8'))
-
-  commands.executeCommand('vscode.diff', uri1, uri2)
-}
-
-export async function deleteTempFiles() {
-  const dir = Uri.file(tmpDir)
-
-  try {
-    const files = await workspace.fs.readDirectory(dir)
-
-    for (const [file] of files) {
-      const fileUri = Uri.file(path.join(dir.path, file))
-      await workspace.fs.delete(fileUri)
-    }
-  } catch (err) {
-    return
-  }
-}
 
 export const delayExecution = <T extends () => void>(
   fn: T,
@@ -268,12 +143,27 @@ export const removeDoubleQuoteEndings = (
   nextCharacter: string
 ) => {
   if (
-    completion.endsWith('\'' || completion.endsWith('"')) &&
-    (nextCharacter === '"' || nextCharacter === '\'')
+    completion.endsWith("'" || completion.endsWith('"')) &&
+    (nextCharacter === '"' || nextCharacter === "'")
   ) {
     completion = completion.slice(0, -1)
   }
   return completion
+}
+
+export const setApiDefaults = () => {
+  const config = workspace.getConfiguration('twinny')
+
+  const provider = config.get('apiProvider') as string
+
+  if (PROVIDER_NAMES.includes(provider)) {
+    const { fimApiPath, chatApiPath, port } = API_PROVIDERS[provider]
+    config.update('fimApiPath', fimApiPath, ConfigurationTarget.Global)
+    config.update('chatApiPath', chatApiPath, ConfigurationTarget.Global)
+    config.update('chatApiPort', port, ConfigurationTarget.Global)
+    config.update('fimApiPort', port, ConfigurationTarget.Global)
+    commands.executeCommand('workbench.action.openSettings', EXTENSION_NAME)
+  }
 }
 
 export const noop = () => undefined

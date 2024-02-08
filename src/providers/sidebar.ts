@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { getLanguage, getTextSelection, getTheme, openDiffView } from '../utils'
+import { getLanguage, getTextSelection, getTheme } from '../utils'
 import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
 import { ChatService } from '../chat-service'
 import { ClientMessage, MessageType, ServerMessage } from '../types'
@@ -68,7 +68,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       ) => {
         const eventHandlers = {
           [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
-          [MESSAGE_NAME.twinnyOpenDiff]: this.openDiff,
           [MESSAGE_NAME.twinnyClickSuggestion]: this.clickSuggestion,
           [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
           [MESSAGE_NAME.twinnyAcceptSolution]: this.acceptSolution,
@@ -107,13 +106,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   public streamChatCompletion = (data: ClientMessage<MessageType[]>) => {
     this.chatService?.streamChatCompletion(data.data || [])
-  }
-
-  public openDiff = (data: ClientMessage) => {
-    const editor = vscode.window.activeTextEditor
-    const selection = editor?.selection
-    const text = editor?.document.getText(selection)
-    openDiffView(text || '', data.data as string)
   }
 
   public getSelectedText = () => {

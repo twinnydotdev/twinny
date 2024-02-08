@@ -13,7 +13,7 @@ import * as vscode from 'vscode'
 import { CompletionProvider } from './providers/completion'
 import { init } from './init'
 import { SidebarProvider } from './providers/sidebar'
-import { delayExecution, deleteTempFiles } from './utils'
+import { delayExecution, noop, setApiDefaults } from './utils'
 import { setContext } from './context'
 import {
   CONTEXT_NAME,
@@ -94,12 +94,15 @@ export async function activate(context: ExtensionContext) {
         sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
       )
     }),
-    commands.registerCommand('twinny.templateCompletion', (template: string) => {
-      commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion(template)
-      )
-    }),
+    commands.registerCommand(
+      'twinny.templateCompletion',
+      (template: string) => {
+        commands.executeCommand('twinny.sidebar.focus')
+        delayExecution(() =>
+          sidebarProvider.chatService?.streamTemplateCompletion(template)
+        )
+      }
+    ),
     commands.registerCommand('twinny.stopGeneration', () => {
       completionProvider.destroyStream()
       sidebarProvider.destroyStream()
@@ -160,17 +163,21 @@ export async function activate(context: ExtensionContext) {
     statusBar.show()
   }
 
+
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
       }
-
       completionProvider.updateConfig()
+
+      if (event.affectsConfiguration('twinny.apiProvider')) {
+        setApiDefaults(event)
+      }
     })
   )
 }
 
 export function deactivate() {
-  deleteTempFiles()
+  noop()
 }
