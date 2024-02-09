@@ -64,8 +64,8 @@ export const fimTempateFormats = {
   stableCode: 'stable-code'
 }
 
-export const openingBrackets = ['[', '{', '(']
-export const closingBrackets = [']', '}', ')']
+export const openingBrackets = ['{', '(']
+export const closingBrackets = ['}', ')']
 
 export const openingTags = ['<']
 export const closingTags = ['</']

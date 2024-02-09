@@ -219,9 +219,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           streamResponse({
             body: requestBody,
             options: requestOptions,
-            onStart: (req) => {
-              this._currentReq = req
-            },
             onEnd: (destroy) => {
               this._logger.log(`Streaming response end due to request end ${this._nonce} \nCompletion: ${completion}`)
               destroy()
@@ -257,7 +254,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 ) {
                   this._logger.log(`Streaming response end due to line break ${this._nonce} \nCompletion: ${completion}`)
                   destroy()
-                  this._currentReq?.destroy()
                   this._statusBar.text = '🤖'
                   stop.forEach((stopWord) => {
                     completion = completion.split(stopWord).join('')
@@ -300,14 +296,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   )
                 }
               } catch (e) {
-                this._currentReq?.destroy()
                 console.error(e)
               }
             },
             onError: (error) => {
               this._statusBar.text = '🤖'
               console.error(error)
-              this._currentReq?.destroy()
               resolve([])
             }
           })
@@ -461,6 +455,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (this._enableCompletionCache) {
       setCache({ prefix, suffix, completion })
     }
+
+    this._logger.log(`\n Inline completion triggered: Formatted completion: ${completion}\n`)
 
     return [new InlineCompletionItem(completion, new Range(position, position))]
   }
