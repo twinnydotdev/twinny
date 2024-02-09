@@ -370,7 +370,7 @@
         },
         "twinny.useTls": {
           "order": 21,
-          "type": "string",
+          "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
