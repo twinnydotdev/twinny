@@ -210,7 +210,6 @@ export class ChatService {
 
   public buildChatMessagePrompt = async (
     messages: MessageType[],
-    language?: CodeLanguageDetails
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
@@ -220,7 +219,6 @@ export class ChatService {
         code: selectionContext || '',
         messages,
         role: USER_NAME,
-        language: language?.langName || 'unknown'
       })
     return prompt || ''
   }

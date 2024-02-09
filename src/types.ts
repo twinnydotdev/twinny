@@ -104,7 +104,7 @@ export interface ChatTemplateData {
   role: string
   messages: MessageType[]
   code: string
-  language: string
+  language?: string
 }
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
