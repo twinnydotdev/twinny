@@ -64,3 +64,20 @@ export const getChatDataFromProvider = (
         : ''
   }
 }
+
+export const getFimDataFromProvider = (provider: string, data: StreamResponse | undefined) => {
+  switch (provider) {
+    case ProviderNames.Ollama:
+      return data?.response
+    case ProviderNames.LlamaCpp:
+      return data?.content
+    default:
+      if (!data?.choices.length) return
+      if (data?.choices[0].delta.content === 'undefined') {
+        return ''
+      }
+      return data?.choices[0].delta?.content
+        ? data?.choices[0].delta.content
+        : ''
+  }
+}

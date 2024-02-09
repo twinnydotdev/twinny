@@ -34,7 +34,7 @@ import {
 } from '../prompt-template'
 import { LINE_BREAK_REGEX, fimTempateFormats } from '../constants'
 import { streamResponse } from '../stream'
-import { createStreamRequestBody } from '../requests'
+import { createStreamRequestBody, getFimDataFromProvider } from '../requests'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
@@ -228,10 +228,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             },
             onData: (streamResponse, destroy) => {
               try {
-                const completionString =
-                  streamResponse?.response || // llamacpp
-                  streamResponse?.content || // ollama
-                  streamResponse?.choices[0].text // lmstudio
+                const completionString = getFimDataFromProvider(this._apiProvider, streamResponse)
 
                 if (completionString === undefined) {
                   return
