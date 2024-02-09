@@ -11,7 +11,7 @@ const logStreamOptions = (opts: StreamResponseOptions) => {
   logger.log(
     `
 ***Twinny Stream Debug***\n\
-Streaming response from ${opts.options.host}:${opts.options.port}.\n\
+Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
 Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
 Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
     `
