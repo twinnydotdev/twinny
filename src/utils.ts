@@ -104,7 +104,7 @@ export const bracketMatcher = (completion: string): string => {
     accumulatedCompletion += character
   }
 
-  return accumulatedCompletion.trimEnd()
+  return accumulatedCompletion.trimEnd() || completion
 }
 
 export const removeDuplicateLinesDown = (

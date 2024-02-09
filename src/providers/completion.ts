@@ -402,6 +402,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private getFormattedCompletion = (completion: string, editor: TextEditor) => {
+    const originalCompletion = completion
     const cursorPosition = editor.selection.active
     const document = editor.document
     const lineEndPosition = document.lineAt(cursorPosition.line).range.end
@@ -436,6 +437,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       textAfterCursor.at(0) as string
     )
 
+    if (completion.trimStart() === '' && originalCompletion !== '\n') {
+      completion = completion.trim()
+    }
+
     return completion
   }
 
@@ -459,7 +464,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       setCache({ prefix, suffix, completion })
     }
 
-    this._logger.log(`\n Inline completion triggered: Formatted completion: ${completion}\n`)
+    this._logger.log(`\n Inline completion triggered: Formatted completion: ${JSON.stringify(completion)}\n`)
 
     return [new InlineCompletionItem(completion, new Range(position, position))]
   }
