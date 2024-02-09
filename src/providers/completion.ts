@@ -252,7 +252,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
                 if (
                   !this._useMultiLineCompletions &&
-                  chunkCount > 2 &&
+                  chunkCount > 1 &&
                   LINE_BREAK_REGEX.exec(completionString)
                 ) {
                   this._logger.log(`Streaming response end due to line break ${this._nonce} \nCompletion: ${completion}`)
@@ -420,7 +420,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       completion = completion.replace(textAfterCursor, '')
     }
 
-    if (getIsSingleBracket(completion)) {
+    if (getIsSingleBracket(completion.trim())) {
       return completion.trim()
     }
 
