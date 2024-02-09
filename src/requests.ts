@@ -73,11 +73,11 @@ export const getFimDataFromProvider = (provider: string, data: StreamResponse | 
       return data?.content
     default:
       if (!data?.choices.length) return
-      if (data?.choices[0].delta.content === 'undefined') {
+      if (data?.choices[0].text === 'undefined') {
         return ''
       }
-      return data?.choices[0].delta?.content
-        ? data?.choices[0].delta.content
+      return data?.choices[0].text
+        ? data?.choices[0].text
         : ''
   }
 }
