@@ -1,20 +1,15 @@
 # twinny
 
-<br>
-
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama) or [llama.cpp](https://github.com/ggerganov/llama.cpp). Like Github Copilot but 100% free and 100% private.
-
-<br>
+Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [llama.cpp](https://github.com/ggerganov/llama.cpp) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
 
 <div align="center">
     <p>
-      Install the twinny vscode extension
+      Install the twinny Visual Studio Code extension
     </p>
     <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny">
       <img src="https://code.visualstudio.com/assets/images/code-stable.png" height="50" />
     </a>
 </div>
-
 
 ### How twinny helps developers
 
@@ -31,14 +26,14 @@ Chat with AI about your code
 - Free
 - Private
 - Auto code completion
-- Configurable single or multiline completions
-- Fast and accurate
-- Multiple language support
-- Configurable prompt templates
-- Easy to install
+- Configurable single or multiline completions setting
+- Fast and accurate code completions for fill int he middle
+- Configurable prompt templates add, edit, remove, delete, set as default
+- Easy to get started
 - Configurable endpoint and port and path for completion API
 - Chat feature like Copilot Chat
 - Accept solution directly to editor
+- Create new documents from code blocks
 - Copy generated code solution blocks
 - Chat history preserved per conversation
 
@@ -50,15 +45,11 @@ You can install the verified extension at [this link](https://marketplace.visual
 
 Twinny is configured to use Ollama by deafult. Therefore, when installing the twinny extension in Visual Studio Code, it will automatically prompt and guide you through the installation of Ollama using two default small models `codellama:7b-instruct` for chat and `codellama:7b-code` for "fill in the middle" completions. 
 
-If you already have Ollama installed or you want to use llama.cpp instead, you can cancel the automatic setup of Ollama and proceed to update the values inside twinny extension settings to point to your existing models and server.
+If you already have Ollama installed or you want to use llama.cpp or LM Studio instead, you can cancel the automatic setup of Ollama and proceed to update the values inside twinny extension settings to point to your existing models and server.  At this point it's a good idea to set `Disable Server Checks` option to true which this will disable the checks on startup.
 
 You can find the settings inside the extension sidebar by clicking the gear icon inside the twinny sidebar or by searching for `twinny` in the extensions search bar.
 
-The main values which need to be updated to switch between Ollama and llama.cpp are:
-
-- `apiHostname` - The url to your Ollama or llama.cpp server (default: localhost)
-- `apiPath` - The API path which defaults to `/api/generate` for Ollama and `/completion` for llama.cpp (See llama.cpp docs or Ollama docs).
-- `apiPort` - The port of your Ollama (default 11434) or llama.cpp server (default 8080)
+When choosing an API provider the port and API path names will be updated automatically based on the provider you choose to use.
 
 If you are using llama.cpp - The twinny settings for FIM model name and Chat model name will be ignored, as this should already be configured when running the llama.cpp server.
 
@@ -101,7 +92,6 @@ twinny and llama.ccp has been tested and are working with the following models:
 | `ALT+\`                      | Trigger inline code completion           |
 | `CTRL+SHIFT+t`               | Open twinny sidebar                      |
 | `CTRL+SHIFT+/`               | Stop code generation                     | 
-
 
 ## Known issues
 
