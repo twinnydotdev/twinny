@@ -1,4 +1,4 @@
-import { VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
+import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
 import { useTemplates, useWorkSpaceContext } from './hooks'
 import { DEFAULT_TEMPLATES, MESSAGE_KEY } from '../constants'
 import { useEffect, useState } from 'react'
@@ -40,6 +40,11 @@ export const TemplateSettings = () => {
     })
   }
 
+  const handleResetTemplates = () => {
+    saveTemplates(DEFAULT_TEMPLATES)
+    setSelectedTemplates(DEFAULT_TEMPLATES)
+  }
+
   useEffect(() => {
     if (selectedTemplatesContext !== undefined) {
       return setSelectedTemplates(selectedTemplatesContext)
@@ -50,7 +55,10 @@ export const TemplateSettings = () => {
 
   return (
     <>
-      <h3>Set prompt templates</h3>
+      <h4>Template settings</h4>
+      <p>
+        Select the templates you want to use in the chat interface.
+      </p>
       {templates &&
         templates.map((templateName: string) => (
           <div className={styles.templateCheckbox}>
@@ -66,6 +74,9 @@ export const TemplateSettings = () => {
             </label>
           </div>
         ))}
+      <VSCodeButton className={styles.resetTemplatesButton} onClick={handleResetTemplates}>
+        Reset to default
+      </VSCodeButton>
     </>
   )
 }
