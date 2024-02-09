@@ -35,10 +35,13 @@ import {
 import { LINE_BREAK_REGEX, fimTempateFormats } from '../constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody, getFimDataFromProvider } from '../requests'
+import { Logger } from '../logger'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
+  private _nonce = 0
   private _statusBar: StatusBarItem
   private _debouncer: NodeJS.Timeout | undefined
+  private _logger: Logger
   private _document: TextDocument | undefined
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
@@ -67,6 +70,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
+    this._logger = new Logger()
   }
 
   private buildStreamRequest(prompt: string) {
@@ -158,8 +162,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       }
 
       this._debouncer = setTimeout(async () => {
-        if (!this._config.get('enabled')) return resolve([])
+        if (!this._config.get('enabled')) {
+          this._logger.log('Streaming response end as completions disabled')
+          return resolve([])
+        }
 
+        this._nonce = this._nonce + 1
         let completion = ''
 
         const context = this.getFileContext(document.uri)
@@ -181,6 +189,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (cachedCompletion && this._enableCompletionCache) {
           completion = cachedCompletion
+          this._logger.log(`Streaming response end using cache ${this._nonce} \nCompletion: ${completion}`)
           resolve(
             this.handleEndStream({
               position,
@@ -192,7 +201,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           )
         }
 
-        if (!prompt) return resolve([])
+        if (!prompt) {
+          this._logger.log('Streaming response end prompt not found')
+          return resolve([])
+        }
 
         try {
           let completion = ''
@@ -211,6 +223,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               this._currentReq = req
             },
             onEnd: (destroy) => {
+              this._logger.log(`Streaming response end due to request end ${this._nonce} \nCompletion: ${completion}`)
               destroy()
               this._statusBar.text = '🤖'
               stop.forEach((stopWord) => {
@@ -242,6 +255,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   chunkCount > 2 &&
                   LINE_BREAK_REGEX.exec(completionString)
                 ) {
+                  this._logger.log(`Streaming response end due to line break ${this._nonce} \nCompletion: ${completion}`)
                   destroy()
                   this._currentReq?.destroy()
                   this._statusBar.text = '🤖'
@@ -269,6 +283,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                     completion?.includes(stopSequence)
                   )
                 ) {
+                  this._logger.log(`Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${completion}`)
                   destroy()
                   this._statusBar.text = '🤖'
                   stop.forEach((stopWord) => {

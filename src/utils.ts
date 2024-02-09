@@ -1,6 +1,5 @@
 import {
   ColorThemeKind,
-  ConfigurationChangeEvent,
   ConfigurationTarget,
   Position,
   TextEditor,
@@ -143,8 +142,8 @@ export const removeDoubleQuoteEndings = (
   nextCharacter: string
 ) => {
   if (
-    completion.endsWith("'" || completion.endsWith('"')) &&
-    (nextCharacter === '"' || nextCharacter === "'")
+    completion.endsWith('\'' || completion.endsWith('"')) &&
+    (nextCharacter === '"' || nextCharacter === '\'')
   ) {
     completion = completion.slice(0, -1)
   }

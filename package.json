@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.5.2",
+  "version": "3.5.1",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -379,6 +379,12 @@
           "type": "string",
           "default": "",
           "description": "Bearer token for secure API authentication."
+        },
+        "twinny.enableLogging": {
+          "order": 23,
+          "type": "boolean",
+          "default": false,
+          "description": "Enable twinny debug mode"
         }
       }
     }

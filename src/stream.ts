@@ -3,6 +3,20 @@ import { request as httpsRequest } from 'https'
 import { workspace } from 'vscode'
 import { StreamResponse, StreamResponseOptions } from './types'
 import { LINE_BREAK_REGEX } from './constants'
+import { Logger } from './logger'
+
+const logger = new Logger()
+
+const logStreamOptions = (opts: StreamResponseOptions) => {
+  logger.log(
+    `
+***Twinny Stream Debug***\n\
+Streaming response from ${opts.options.host}:${opts.options.port}.\n\
+Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
+Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
+    `
+  )
+}
 
 export async function streamResponse(opts: StreamResponseOptions) {
   const { body, options, onData, onEnd, onError, onStart } = opts
@@ -11,6 +25,7 @@ export async function streamResponse(opts: StreamResponseOptions) {
   const timeoutDuration = 20000
   const _request = useTls ? httpsRequest : request
   let stringBuffer = ''
+  logStreamOptions(opts)
 
   const req = _request(options, (res: IncomingMessage) => {
     const statusCode = res.statusCode
@@ -21,6 +36,7 @@ export async function streamResponse(opts: StreamResponseOptions) {
     }
 
     if (statusCode < 200 || statusCode >= 300) {
+      logger.log(`Response status code ${statusCode}\n`)
       onError?.(new Error(`Server responded with status code: ${statusCode}`))
       res.destroy()
       return
@@ -35,32 +51,36 @@ export async function streamResponse(opts: StreamResponseOptions) {
           stringBuffer = ''
         }
       } catch (e) {
+        logger.log('Error parsing response\n')
         onError?.(e instanceof Error ? e : new Error('Error processing data'))
         res.destroy()
       }
     })
 
     res.once('end', () => {
+      logger.log('Stream ended')
       onEnd?.(() => res.destroy())
     })
   })
 
   req.on('error', (error: Error) => {
+    logger.log(`Error in stream request ${error.message}\n`)
     onError?.(error)
   })
 
   req.setTimeout(timeoutDuration, () => {
+    logger.log('Stream request timed out')
     req.destroy()
     onError?.(new Error('Request timed out'))
   })
 
   try {
-    if (body) {
-      req.write(JSON.stringify(body))
-    }
+    logger.log('Stream started')
+    if (body) req.write(JSON.stringify(body))
     onStart?.(req)
     req.end()
   } catch (e) {
+    logger.log('Error sending request\n')
     onError?.(e instanceof Error ? e : new Error('Error sending request'))
     req.destroy()
   }
