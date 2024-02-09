@@ -27,7 +27,7 @@ export const getFimPromptTemplateDeepseek = ({
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
-    prompt: `<｜fim▁begin｜>${fileContext}\n${heading}${prefix} <｜fim▁hole｜> ${suffix}<｜fim▁end｜>`,
+    prompt: `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
     prefix,
     suffix,
     stop: ['<｜fim▁begin｜>', '<｜fim▁hole｜>', '<｜fim▁end｜>', '<END>', '<｜end▁of▁sentence｜>']
