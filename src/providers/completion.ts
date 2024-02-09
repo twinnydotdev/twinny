@@ -219,6 +219,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           streamResponse({
             body: requestBody,
             options: requestOptions,
+            onStart: (req: ClientRequest) => {
+              this._currentReq = req
+            },
             onEnd: (destroy) => {
               this._logger.log(`Streaming response end due to request end ${this._nonce} \nCompletion: ${completion}`)
               destroy()
