@@ -70,7 +70,7 @@ For code refactoring, use markdown with code formatting.<</SYS>>
 {{{systemMessage}}}
 {{/if}}
 {{#each messages}}
-  {{#if (eq this.role '👤 You')}}
+  {{#if (eq this.role 'user')}}
 [INST] {{{this.content}}}
     {{#if ../code}}
 \`\`\`{{{../code}}}\`\`\`

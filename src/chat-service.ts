@@ -170,7 +170,7 @@ export class ChatService {
 
   public buildMesageRoleContent = async (
     messages: MessageType[],
-    language: CodeLanguageDetails
+    language?: CodeLanguageDetails
   ): Promise<MessageRoleContent[]> => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
@@ -185,7 +185,7 @@ export class ChatService {
 
       const detailsToAppend = []
 
-      if (language.langName) {
+      if (language?.langName) {
         detailsToAppend.push(`Language: ${language.langName}`)
       }
 
@@ -210,7 +210,7 @@ export class ChatService {
 
   public buildChatMessagePrompt = async (
     messages: MessageType[],
-    language: CodeLanguageDetails
+    language?: CodeLanguageDetails
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
@@ -282,14 +282,12 @@ export class ChatService {
   }
 
   public async streamChatCompletion(messages: MessageType[]) {
-    const { language } = getLanguage()
     this._completion = ''
     this.sendEditorLanguage()
     const messageRoleContent = await this.buildMesageRoleContent(
       messages,
-      language
     )
-    const prompt = await this.buildChatMessagePrompt(messages, language)
+    const prompt = await this.buildChatMessagePrompt(messages)
     const { requestBody, requestOptions } = this.buildStreamRequest(
       prompt,
       messageRoleContent
