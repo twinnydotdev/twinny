@@ -190,7 +190,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         if (cachedCompletion && this._enableCompletionCache) {
           completion = cachedCompletion
           this._logger.log(`Streaming response end using cache ${this._nonce} \nCompletion: ${completion}`)
-          resolve(
+          return resolve(
             this.handleEndStream({
               position,
               prefix,
