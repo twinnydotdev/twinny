@@ -95,7 +95,6 @@ twinny and llama.ccp has been tested and are working with the following models:
 
 ## Known issues
 
-- There are some issues running this extension on Windows in general 
 - If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
 - Some models may not support the special tokens of llama which means they would not work correctly for FIM completions.
 - Sometimes a restart of vscode is required for new settings to take effect
