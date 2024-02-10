@@ -27,15 +27,15 @@ Chat with AI about your code
 - Private
 - Auto code completion
 - Configurable single or multiline completions setting
-- Fast and accurate code completions for fill int he middle
+- Fast and accurate code completions for fill in the middle
 - Configurable prompt templates add, edit, remove, delete, set as default
-- Easy to get started
-- Configurable endpoint and port and path for completion API
+- Easy installation 
+- Ollama, llamacpp and LM Studio compatible
 - Chat feature like Copilot Chat
 - Accept solution directly to editor
 - Create new documents from code blocks
 - Copy generated code solution blocks
-- Chat history preserved per conversation
+- Chat history preserved per workspace
 
 ## 🚀 Getting Started
 
@@ -57,7 +57,7 @@ When the extension is ready you will see a `🤖` icon at the bottom of your cod
 
 You will also see which models are being used (only applicable to Ollama hosted servers).
 
-That's it! Enjoy enhanced code completions and chat with twinny! 🎉
+Enjoy enhanced code completions and chat with twinny! 🎉
 
 ## Tested and supported Ollama models
 
