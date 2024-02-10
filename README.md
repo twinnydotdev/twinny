@@ -11,9 +11,9 @@ Are you fed up of all of those so called "free" Copilot alternatives with paywal
     </a>
 </div>
 
-### How twinny helps you
+### Main features 
 
-Fast and accurate code completion:
+Fill in the middle code completion:
 
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b" width="760"/>
 
@@ -23,12 +23,10 @@ Chat with AI about your code
 
 #### Other features 
 
-- Auto code completion
 - Configurable single or multiline fill-in-middle completions
 - Configurable prompt templates add, edit, remove, delete and set as default
 - Easy installation and setup
 - Ollama, llamacpp and LM Studio API compatible
-- Chat feature sinilar to Copilot Chat
 - Accept code solutions directly to editor
 - Create new documents from code blocks
 - Copy generated code solution blocks
@@ -38,7 +36,7 @@ Chat with AI about your code
 
 ### Easy Installation
 
-You can install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code marketplace.
+Install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code marketplace.
 
 Twinny is configured to use Ollama by deafult. Therefore, when installing the twinny extension in Visual Studio Code, it will automatically prompt and guide you through the installation of Ollama using two default small models `codellama:7b-instruct` for chat and `codellama:7b-code` for "fill in the middle" completions. 
 
