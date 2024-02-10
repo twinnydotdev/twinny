@@ -11,7 +11,7 @@ Are you fed up of all of those so called "free" Copilot alternatives with paywal
     </a>
 </div>
 
-### How twinny helps developers
+### How twinny helps you
 
 Fast and accurate code completion:
 
@@ -23,16 +23,13 @@ Chat with AI about your code
 
 #### Other features 
 
-- Free
-- Private
 - Auto code completion
-- Configurable single or multiline completions setting
-- Fast and accurate code completions for fill in the middle
-- Configurable prompt templates add, edit, remove, delete, set as default
-- Easy installation 
-- Ollama, llamacpp and LM Studio compatible
-- Chat feature like Copilot Chat
-- Accept solution directly to editor
+- Configurable single or multiline fill-in-middle completions
+- Configurable prompt templates add, edit, remove, delete and set as default
+- Easy installation and setup
+- Ollama, llamacpp and LM Studio API compatible
+- Chat feature sinilar to Copilot Chat
+- Accept code solutions directly to editor
 - Create new documents from code blocks
 - Copy generated code solution blocks
 - Chat history preserved per workspace
@@ -55,35 +52,19 @@ If you are using llama.cpp - The twinny settings for FIM model name and Chat mod
 
 When the extension is ready you will see a `🤖` icon at the bottom of your code editor.
 
-You will also see which models are being used (only applicable to Ollama hosted servers).
-
 Enjoy enhanced code completions and chat with twinny! 🎉
 
-## Tested and supported Ollama models
+## Model support
 
-twinny and Ollama have been tested and are working on Linux with a 3090 with the following models:
+**FIM**
 
-- codellama `instruct` for chat and `code` for FIM. (https://ollama.ai/library/codellama)
-- phind-codellama for chat (https://ollama.ai/library/phind-codellama)
-- deepseek-coder:6.7b-base-q5_K_M and deepseek-coder:base for FIM
+- If using Llama the model must support the llama special tokens for prefix and suffix if using codellama models.
+- If using deepseek only use base models for FIM completions for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
+- `stable-code:code` has been tested and works for FIM.
 
-For FIM 
+**Chat**
 
-- The model must support the llama special tokens for prefix and suffix if using codellama models.
-- Only use deepseek base models for FIM completions for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
-- For stable-code `stable-code:code` has been tested and works for FIM.
-
-For chat 
-
-- All llama models should work, although any model will probably work too, results may vary if the special tokens are different from Llama.
-- Prompt templates will need to be updated if using different models due to special tokens see known issues section.
-
-## Tested and supported llama.cpp models
-
-twinny and llama.ccp has been tested and are working with the following models:
- 
-- https://huggingface.co/TheBloke/CodeLlama-7B-GGUF 
-- https://huggingface.co/TheBloke/CodeLlama-13B-GGUF
+- All instruct models should work but prompt templates might need editing if using something other than codellama.
 
 ## Keyboard shortcuts
 
@@ -96,11 +77,10 @@ twinny and llama.ccp has been tested and are working with the following models:
 ## Known issues
 
 - If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
-- Some models may not support the special tokens of llama which means they would not work correctly for FIM completions.
-- Sometimes a restart of vscode is required for new settings to take effect
-- FIM and Chat completions for llama.cpp aren't working if using one api/model endpoint (i.e spit out garbage chat/fim completions), so use two different endpoints (one for chat and another for fim) or use Ollama instead of llama.cpp
-- Using file context often causes incorrect completions for FIM completions because small models get confused when provided with more than one file context.
-- If using stable-code or deekseek for instruct prompt-templates need to be updated.
+- Some models may not support the special tokens of Llama which means they would not work correctly for FIM completions.
+- Sometimes a restart of vscode is required for new settings to take effect.
+- Using file context often causes unreliable completions for FIM because small models get confused when provided with more than one file context.
+- See open issues for more information 
   
 If you have a suggestion for improvement please open an issue and I will do my best to make it happen!
 
