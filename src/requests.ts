@@ -37,6 +37,7 @@ export function createStreamRequestBody(
       }
     default:
       return {
+        model: options.model,
         prompt,
         stream: true,
         max_tokens: options.numPredictChat,
