@@ -1,3 +1,4 @@
+// Derived with credit from https://github.com/ex3ndr/llama-coder/blob/main/src/prompts/processors/languages.ts
 export type CodeLanguage =
   | 'bat'
   | 'c'
