@@ -1,6 +1,6 @@
 # twinny
 
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [llama.cpp](https://github.com/ggerganov/llama.cpp) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
+Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
 
 <div align="center">
     <p>
