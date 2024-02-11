@@ -18,10 +18,8 @@ import {
   useWorkSpaceContext
 } from './hooks'
 import {
-  CodeIcon,
   DisabledAutoScrollIcon,
   EnabledAutoScrollIcon,
-  StopIcon
 } from './icons'
 
 import { Suggestions } from './suggestions'
@@ -261,7 +259,7 @@ export const Chat = () => {
             appearance="icon"
             onClick={handleToggleSelection}
           >
-            <CodeIcon />
+            <span className="codicon codicon-code"></span>
           </VSCodeButton>
           <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
         </div>
@@ -294,7 +292,7 @@ export const Chat = () => {
                 onClick={handleStopGeneration}
                 aria-label="Stop generation"
               >
-                <StopIcon />
+                <span className="codicon codicon-debug-stop"></span>
               </VSCodeButton>
             )}
             <VSCodeButton
