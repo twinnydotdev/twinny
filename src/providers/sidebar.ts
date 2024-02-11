@@ -138,12 +138,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       language: lang.languageId
     })
     await vscode.window.showTextDocument(document)
-    const editor = await vscode.window.showTextDocument(document)
-
-    await editor.edit((editBuilder) => {
-      const startPosition = new vscode.Position(0, 0)
-      editBuilder.insert(startPosition, data.data as string)
-    })
   }
 
   public getGlobalContext = (data: ClientMessage) => {
