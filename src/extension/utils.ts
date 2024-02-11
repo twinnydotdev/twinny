@@ -8,18 +8,18 @@ import {
   workspace
 } from 'vscode'
 
-import { Theme, LanguageType, Bracket } from './types'
+import { Theme, LanguageType, Bracket, ApiProviders, StreamResponse } from './types'
 import { supportedLanguages } from './languages'
 import {
-  API_PROVIDERS,
+  API_PROVIDER,
   BRACKET_REGEX,
   EXTENSION_NAME,
   NORMALIZE_REGEX,
   PROVIDER_NAMES,
-  allBrackets,
-  closingBrackets,
-  openingBrackets
-} from './constants'
+  ALL_BRACKETS,
+  CLOSING_BRACKETS,
+  OPENING_BRACKETS
+} from '../constants'
 
 export const delayExecution = <T extends () => void>(
   fn: T,
@@ -60,7 +60,7 @@ export const getTheme = () => {
 }
 
 export const isBracket = (char: string): char is Bracket => {
-  return allBrackets.includes(char as Bracket)
+  return ALL_BRACKETS.includes(char as Bracket)
 }
 
 export const isMatchingPair = (open?: Bracket, close?: string): boolean => {
@@ -86,11 +86,11 @@ export const bracketMatcher = (completion: string): string => {
     return completion
 
   for (const character of completion) {
-    if (openingBrackets.includes(character)) {
+    if (OPENING_BRACKETS.includes(character)) {
       openBrackets.push(character)
     }
 
-    if (closingBrackets.includes(character)) {
+    if (CLOSING_BRACKETS.includes(character)) {
       if (
         openBrackets.length &&
         isMatchingPair(openBrackets.at(-1), character)
@@ -156,7 +156,7 @@ export const setApiDefaults = () => {
   const provider = config.get('apiProvider') as string
 
   if (PROVIDER_NAMES.includes(provider)) {
-    const { fimApiPath, chatApiPath, port } = API_PROVIDERS[provider]
+    const { fimApiPath, chatApiPath, port } = API_PROVIDER[provider]
     config.update('fimApiPath', fimApiPath, ConfigurationTarget.Global)
     config.update('chatApiPath', chatApiPath, ConfigurationTarget.Global)
     config.update('chatApiPort', port, ConfigurationTarget.Global)
@@ -165,4 +165,38 @@ export const setApiDefaults = () => {
   }
 }
 
-export const noop = () => undefined
+export const getChatDataFromProvider = (
+  provider: string,
+  data: StreamResponse | undefined
+) => {
+  switch (provider) {
+    case ApiProviders.Ollama:
+      return data?.response
+    case ApiProviders.LlamaCpp:
+      return data?.content
+    default:
+      if (data?.choices[0].delta.content === 'undefined') {
+        return ''
+      }
+      return data?.choices[0].delta?.content
+        ? data?.choices[0].delta.content
+        : ''
+  }
+}
+
+export const getFimDataFromProvider = (provider: string, data: StreamResponse | undefined) => {
+  switch (provider) {
+    case ApiProviders.Ollama:
+      return data?.response
+    case ApiProviders.LlamaCpp:
+      return data?.content
+    default:
+      if (!data?.choices.length) return
+      if (data?.choices[0].text === 'undefined') {
+        return ''
+      }
+      return data?.choices[0].text
+        ? data?.choices[0].text
+        : ''
+  }
+}

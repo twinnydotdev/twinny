@@ -18,23 +18,24 @@ import {
   bracketMatcher,
   countLines,
   getCompletionNormalized,
+  getFimDataFromProvider,
   getIsSingleBracket,
   removeDoubleQuoteEndings,
   removeDuplicateLinesDown
 } from '../utils'
-import { getCache, setCache } from '../cache'
+import { cache } from '../cache'
 import { supportedLanguages } from '../languages'
-import { InlineCompletion, PromptTemplate } from '../types'
+import { FimPromptTemplate, InlineCompletion } from '../types'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
 import {
   getFimPromptTemplateDeepseek,
   getFimPromptTemplateLLama,
   getFimPromptTemplateStableCode
-} from '../prompt-template'
-import { LINE_BREAK_REGEX, fimTempateFormats } from '../constants'
+} from '../fim-templates'
+import { FIM_TEMPLATE_FORMAT, LINE_BREAK_REGEX } from '../../constants'
 import { streamResponse } from '../stream'
-import { createStreamRequestBody, getFimDataFromProvider } from '../requests'
+import { createStreamRequestBody } from '../stream-options'
 import { Logger } from '../logger'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
@@ -105,13 +106,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
   }
 
-  public getFimTemplate(args: PromptTemplate) {
+  public getFimTemplate(args: FimPromptTemplate) {
     switch (this._fimTemplateFormat) {
-      case fimTempateFormats.codellama:
+      case FIM_TEMPLATE_FORMAT.codellama:
         return getFimPromptTemplateLLama(args)
-      case fimTempateFormats.deepseek:
+      case FIM_TEMPLATE_FORMAT.deepseek:
         return getFimPromptTemplateDeepseek(args)
-      case fimTempateFormats.stableCode:
+      case FIM_TEMPLATE_FORMAT.stableCode:
         return getFimPromptTemplateStableCode(args)
     }
     return getFimPromptTemplateLLama(args)
@@ -185,11 +186,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           useFileContext: this._useFileContext
         })
 
-        const cachedCompletion = getCache({ prefix, suffix })
+        const cachedCompletion = cache.getCache({ prefix, suffix })
 
         if (cachedCompletion && this._enableCompletionCache) {
           completion = cachedCompletion
-          this._logger.log(`Streaming response end using cache ${this._nonce} \nCompletion: ${completion}`)
+          this._logger.log(
+            `Streaming response end using cache ${this._nonce} \nCompletion: ${completion}`
+          )
           return resolve(
             this.handleEndStream({
               position,
@@ -223,7 +226,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               this._currentReq = req
             },
             onEnd: (destroy) => {
-              this._logger.log(`Streaming response end due to request end ${this._nonce} \nCompletion: ${completion}`)
+              this._logger.log(
+                `Streaming response end due to request end ${this._nonce} \nCompletion: ${completion}`
+              )
               destroy()
               this._statusBar.text = '🤖'
               stop.forEach((stopWord) => {
@@ -241,7 +246,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             },
             onData: (streamResponse, destroy) => {
               try {
-                const completionString = getFimDataFromProvider(this._apiProvider, streamResponse)
+                const completionString = getFimDataFromProvider(
+                  this._apiProvider,
+                  streamResponse
+                )
 
                 if (completionString === undefined) {
                   return
@@ -255,7 +263,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   chunkCount > 1 &&
                   LINE_BREAK_REGEX.exec(completionString)
                 ) {
-                  this._logger.log(`Streaming response end due to line break ${this._nonce} \nCompletion: ${completion}`)
+                  this._logger.log(
+                    `Streaming response end due to line break ${this._nonce} \nCompletion: ${completion}`
+                  )
                   destroy()
                   this._statusBar.text = '🤖'
                   stop.forEach((stopWord) => {
@@ -282,7 +292,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                     completion?.includes(stopSequence)
                   )
                 ) {
-                  this._logger.log(`Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${completion}`)
+                  this._logger.log(
+                    `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${completion}`
+                  )
                   destroy()
                   this._statusBar.text = '🤖'
                   stop.forEach((stopWord) => {
@@ -461,10 +473,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     )
 
     if (this._enableCompletionCache) {
-      setCache({ prefix, suffix, completion })
+      cache.setCache({ prefix, suffix, completion })
     }
 
-    this._logger.log(`\n Inline completion triggered: Formatted completion: ${JSON.stringify(completion)}\n`)
+    this._logger.log(
+      `\n Inline completion triggered: Formatted completion: ${JSON.stringify(
+        completion
+      )}\n`
+    )
 
     return [new InlineCompletionItem(completion, new Range(position, position))]
   }
@@ -484,6 +500,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._apiBearerToken = this._config.get('apiBearerToken') as string
     this._apiHostname = this._config.get('apiHostname') as string
+    this._apiProvider = this._config.get('apiProvider') as string
     this._useMultiLineCompletions = this._config.get(
       'useMultiLineCompletions'
     ) as boolean

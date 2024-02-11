@@ -5,7 +5,7 @@ import { VSCodeDivider } from '@vscode/webview-ui-toolkit/react'
 import CodeBlock from './code-block'
 
 import styles from './index.module.css'
-import { MessageType, ThemeType } from '../types'
+import { MessageType, ThemeType } from '../extension/types'
 import React from 'react'
 import { BOT_NAME, TWINNY, YOU } from '../constants'
 

@@ -10,46 +10,31 @@ import * as path from 'path'
 import * as os from 'os'
 import * as vscode from 'vscode'
 
-import { CompletionProvider } from './providers/completion'
-import { init } from './init'
-import { SidebarProvider } from './providers/sidebar'
-import { delayExecution, noop, setApiDefaults } from './utils'
-import { setContext } from './context'
+import { CompletionProvider } from './extension/providers/completion'
+import { SidebarProvider } from './extension/providers/sidebar'
+import { delayExecution, setApiDefaults } from './extension/utils'
+import { setContext } from './extension/context'
 import {
   CONTEXT_NAME,
   EXTENSION_NAME,
   MESSAGE_KEY,
   MESSAGE_NAME,
-  TABS
+  UI_TABS
 } from './constants'
-import { TemplateProvider } from './template-provider'
-import { ServerMessage } from './types'
+import { TemplateProvider } from './extension/template-provider'
+import { ServerMessage } from './extension/types'
 
 export async function activate(context: ExtensionContext) {
+  setContext(context)
   const config = workspace.getConfiguration('twinny')
-  const fimModel = config.get('fimModelName') as string
-  const chatModel = config.get('chatModelName') as string
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
-  setContext(context)
-
-  try {
-    await init()
-  } catch (e) {
-    console.error(e)
-  }
-
-  statusBar.text = '🤖'
-  statusBar.tooltip = `twinny is running: fim: ${fimModel} chat: ${chatModel}`
-
+  const templateProvider = new TemplateProvider(templateDir)
   const completionProvider = new CompletionProvider(statusBar)
-  new TemplateProvider(templateDir).createTemplateDir()
-
-  if (!context) {
-    return
-  }
-
   const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
+
+  templateProvider.init()
+  statusBar.text = '🤖'
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -121,7 +106,7 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.view?.webview.postMessage({
         type: MESSAGE_NAME.twinnySetTab,
         value: {
-          data: TABS.templates
+          data: UI_TABS.templates
         }
       } as ServerMessage<string>)
     }),
@@ -134,7 +119,7 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.view?.webview.postMessage({
         type: MESSAGE_NAME.twinnySetTab,
         value: {
-          data: TABS.chat
+          data: UI_TABS.chat
         }
       } as ServerMessage<string>)
     }),
@@ -157,9 +142,7 @@ export async function activate(context: ExtensionContext) {
     statusBar
   )
 
-  if (config.get('enabled')) {
-    statusBar.show()
-  }
+  if (config.get('enabled')) statusBar.show()
 
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((event) => {
@@ -168,8 +151,4 @@ export async function activate(context: ExtensionContext) {
       completionProvider.updateConfig()
     })
   )
-}
-
-export function deactivate() {
-  noop()
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
-import { ClientMessage, LanguageType, ServerMessage, ThemeType } from '../types'
+import { ClientMessage, LanguageType, ServerMessage, ThemeType } from '../extension/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

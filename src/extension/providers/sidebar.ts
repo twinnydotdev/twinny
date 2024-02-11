@@ -1,18 +1,19 @@
 import * as vscode from 'vscode'
+
 import { getLanguage, getTextSelection, getTheme } from '../utils'
-import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../../constants'
 import { ChatService } from '../chat-service'
 import { ClientMessage, MessageType, ServerMessage } from '../types'
 import { TemplateProvider } from '../template-provider'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
-  view?: vscode.WebviewView
-  _doc?: vscode.TextDocument
-  public chatService: ChatService | undefined = undefined
+  private _doc?: vscode.TextDocument
   private _statusBar: vscode.StatusBarItem
-  private context: vscode.ExtensionContext
   private _templateDir: string
   private _templateProvider: TemplateProvider
+  private context: vscode.ExtensionContext
+  public chatService: ChatService | undefined = undefined
+  public view?: vscode.WebviewView
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -74,8 +75,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [MESSAGE_NAME.twinnyGlobalContext]: this.getGlobalContext,
           [MESSAGE_NAME.twinnySetGlobalContext]: this.setGlobalContext,
           [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
-          [MESSAGE_NAME.twinnySetWorkspaceContext]:
-            this.setTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnySetWorkspaceContext]: this.setTwinnyWorkspaceContext,
           [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
           [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
           [MESSAGE_NAME.twinnyNotification]: this.sendNotification,
@@ -209,7 +209,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.js')
     )
 
-    const codiconCssUri = vscode.Uri.joinPath(this.context.extensionUri, 'assets', 'codicon.css');
+    const codiconCssUri = vscode.Uri.joinPath(
+      this.context.extensionUri,
+      'assets',
+      'codicon.css'
+    )
 
     const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)
 

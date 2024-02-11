@@ -2,7 +2,7 @@ import { IncomingMessage, request } from 'http'
 import { request as httpsRequest } from 'https'
 import { workspace } from 'vscode'
 import { StreamResponse, StreamResponseOptions } from './types'
-import { LINE_BREAK_REGEX } from './constants'
+import { LINE_BREAK_REGEX } from '../constants'
 import { Logger } from './logger'
 
 const logger = new Logger()

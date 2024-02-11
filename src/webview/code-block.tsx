@@ -6,7 +6,7 @@ import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { MESSAGE_NAME } from '../constants'
 
 import styles from './index.module.css'
-import { LanguageType, Theme, ThemeType } from '../types'
+import { LanguageType, Theme, ThemeType } from '../extension/types'
 import { getLanguageMatch } from './utils'
 
 interface CodeBlockProps {

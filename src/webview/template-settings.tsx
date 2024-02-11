@@ -1,6 +1,6 @@
 import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
 import { useTemplates, useWorkSpaceContext } from './hooks'
-import { DEFAULT_TEMPLATES, MESSAGE_KEY } from '../constants'
+import { DEFAULT_ACTION_TEMPLATES, MESSAGE_KEY } from '../constants'
 import { useEffect, useState } from 'react'
 import { kebabToSentence } from './utils'
 
@@ -41,15 +41,15 @@ export const TemplateSettings = () => {
   }
 
   const handleResetTemplates = () => {
-    saveTemplates(DEFAULT_TEMPLATES)
-    setSelectedTemplates(DEFAULT_TEMPLATES)
+    saveTemplates(DEFAULT_ACTION_TEMPLATES)
+    setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
   }
 
   useEffect(() => {
     if (selectedTemplatesContext !== undefined) {
       return setSelectedTemplates(selectedTemplatesContext)
     } else {
-      setSelectedTemplates(DEFAULT_TEMPLATES)
+      setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
     }
   }, [selectedTemplatesContext])
 

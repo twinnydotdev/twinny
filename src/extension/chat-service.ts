@@ -2,38 +2,38 @@ import { ClientRequest } from 'http'
 import { RequestOptions } from 'https'
 import { StatusBarItem, WebviewView, commands, window, workspace } from 'vscode'
 
-import { CONTEXT_NAME, MESSAGE_NAME, TABS, USER_NAME } from './constants'
+import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER_NAME } from '../constants'
 import {
   StreamResponse,
-  StreamOptions,
+  StreamOptionsBase,
   ServerMessage,
   MessageType,
   TemplateData,
   ChatTemplateData,
   MessageRoleContent,
 } from './types'
-import { getLanguage } from './utils'
+import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from './languages'
 import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
-import { createStreamRequestBody, getChatDataFromProvider } from './requests'
+import { createStreamRequestBody } from './stream-options'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
   private _apiHostname = this._config.get('apiHostname') as string
+  private _apiPath = this._config.get('chatApiPath') as string
+  private _apiProvider = this._config.get('apiProvider') as string
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
+  private _currentRequest?: ClientRequest
   private _numPredictChat = this._config.get('numPredictChat') as number
   private _port = this._config.get('chatApiPort') as string
-  private _apiPath = this._config.get('chatApiPath') as string
-  private _temperature = this._config.get('temperature') as number
-  private _apiProvider = this._config.get('apiProvider') as string
-  private _view?: WebviewView
-  private _statusBar: StatusBarItem
   private _promptTemplate = ''
-  private _currentRequest?: ClientRequest
+  private _statusBar: StatusBarItem
+  private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
+  private _view?: WebviewView
 
   constructor(
     statusBar: StatusBarItem,
@@ -88,9 +88,7 @@ export class ChatService {
   ) => {
     try {
       const data = getChatDataFromProvider(this._apiProvider, streamResponse)
-
       this._completion = this._completion + data
-
       this._view?.webview.postMessage({
         type: MESSAGE_NAME.twinnyOnCompletion,
         value: {
@@ -168,7 +166,7 @@ export class ChatService {
     } as ServerMessage)
   }
 
-  public buildMesageRoleContent = async (
+  private buildMesageRoleContent = async (
     messages: MessageType[],
     language?: CodeLanguageDetails
   ): Promise<MessageRoleContent[]> => {
@@ -208,7 +206,7 @@ export class ChatService {
     return [systemMessage, ...messages]
   }
 
-  public buildChatMessagePrompt = async (
+  private buildChatPrompt = async (
     messages: MessageType[],
   ) => {
     const editor = window.activeTextEditor
@@ -223,7 +221,7 @@ export class ChatService {
     return prompt || ''
   }
 
-  public buildTemplatePrompt = async (
+  private buildTemplatePrompt = async (
     template: string,
     language: CodeLanguageDetails
   ) => {
@@ -244,7 +242,7 @@ export class ChatService {
     requestBody,
     requestOptions
   }: {
-    requestBody: StreamOptions
+    requestBody: StreamOptionsBase
     requestOptions: RequestOptions
   }) {
     this._view?.webview.postMessage({
@@ -270,11 +268,11 @@ export class ChatService {
     } as ServerMessage)
   }
 
-  public focusChatTab = () => {
+  private focusChatTab = () => {
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnySetTab,
       value: {
-        data: TABS.chat
+        data: UI_TABS.chat
       }
     } as ServerMessage<string>)
   }
@@ -285,7 +283,7 @@ export class ChatService {
     const messageRoleContent = await this.buildMesageRoleContent(
       messages,
     )
-    const prompt = await this.buildChatMessagePrompt(messages)
+    const prompt = await this.buildChatPrompt(messages)
     const { requestBody, requestOptions } = this.buildStreamRequest(
       prompt,
       messageRoleContent
@@ -316,7 +314,7 @@ export class ChatService {
     return this.streamResponse({ requestBody, requestOptions })
   }
 
-  public updateConfig() {
+  private updateConfig() {
     this._config = workspace.getConfiguration('twinny')
     this._temperature = this._config.get('temperature') as number
     this._chatModel = this._config.get('chatModelName') as string

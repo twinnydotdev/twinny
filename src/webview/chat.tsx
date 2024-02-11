@@ -25,7 +25,7 @@ import {
 } from './icons'
 
 import { Suggestions } from './suggestions'
-import { ClientMessage, MessageType, ServerMessage } from '../types'
+import { ClientMessage, MessageType, ServerMessage } from '../extension/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
 import styles from './index.module.css'

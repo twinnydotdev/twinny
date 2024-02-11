@@ -25,34 +25,35 @@ class LRUCache {
     }
     this.cache.set(key, value)
   }
-}
 
-const cache = new LRUCache(50)
-
-function normalize(src: string) {
-  return src.split('\n').join('').replace(/\s+/gm, '').replace(' ', '')
-}
-
-function getKey(args: { prefix: string; suffix: string | null }) {
-  if (args.suffix) {
-    return normalize(args.prefix + ' #### ' + args.suffix)
+  normalize(src: string) {
+    return src.split('\n').join('').replace(/\s+/gm, '').replace(' ', '')
   }
-  return normalize(args.prefix)
+
+  getKey(args: { prefix: string; suffix: string | null }) {
+    if (args.suffix) {
+      return this.normalize(args.prefix + ' #### ' + args.suffix)
+    }
+    return this.normalize(args.prefix)
+  }
+
+  getCache(args: {
+    prefix: string
+    suffix: string | null
+  }): string | undefined | null {
+    const key = this.getKey(args)
+    return this.get(key)
+  }
+
+  setCache(args: {
+    prefix: string
+    suffix: string | null
+    completion: string
+  }) {
+    const key = this.getKey(args)
+    this.set(key, args.completion)
+  }
 }
 
-export function getCache(args: {
-  prefix: string
-  suffix: string | null
-}): string | undefined | null {
-  const key = getKey(args)
-  return cache.get(key)
-}
+export const cache = new LRUCache(50)
 
-export function setCache(args: {
-  prefix: string
-  suffix: string | null
-  completion: string
-}) {
-  const key = getKey(args)
-  cache.set(key, args.completion)
-}
