@@ -3,13 +3,16 @@ import * as Handlebars from 'handlebars'
 import * as path from 'path'
 import { DefaultTemplate } from './types'
 import { defaultTemplates } from './templates'
-import { ALL_TEMPLATES } from './constants'
+import { DEFAULT_TEMPLATE_NAMES } from '../constants'
 
 export class TemplateProvider {
   private _basePath: string
 
   constructor(basePath: string) {
     this._basePath = basePath
+  }
+
+  public init () {
     this.createTemplateDir()
     this.registerHandlebarsHelpers()
   }
@@ -70,7 +73,7 @@ export class TemplateProvider {
         fs.readFile(path, { encoding: 'utf-8' }, (err, templateString) => {
           if (err && err.code !== 'ENOENT') return reject(err)
 
-          if (!templateString && ALL_TEMPLATES.includes(templateName)) {
+          if (!templateString && DEFAULT_TEMPLATE_NAMES.includes(templateName)) {
             templateString = defaultTemplates.find(({ name }) => name === templateName)?.template || ''
             if (!templateString) {
               return reject(new Error(`Template "${templateName}" not found`))

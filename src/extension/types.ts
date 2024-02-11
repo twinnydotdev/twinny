@@ -1,22 +1,22 @@
 import { Position } from 'vscode'
 import { CodeLanguageDetails } from './languages'
-import { allBrackets } from './constants'
+import { ALL_BRACKETS } from '../constants'
 import { RequestOptions } from 'https'
 import { ClientRequest } from 'http'
 
-export interface StreamOptions {
+export interface StreamOptionsBase {
   prompt: string
   stream: boolean
   n_predict?: number
   temperature?: number
 }
 
-export interface StreamOptionsOllama extends StreamOptions {
+export interface StreamOptionsOllama extends StreamOptionsBase {
   model: string
   options: Record<string, unknown>
 }
 
-export interface StreamOptionsMessages extends StreamOptions {
+export interface StreamOptionsOpenAI extends StreamOptionsBase {
   messages?: MessageType[] | MessageRoleContent
   max_tokens: number
 }
@@ -109,7 +109,7 @@ export interface ChatTemplateData {
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
 
-export interface PromptTemplate {
+export interface FimPromptTemplate {
   context: string
   header: string
   suffix: string
@@ -121,10 +121,10 @@ export interface ApiProviders {
   [key: string]: { fimApiPath: string; chatApiPath: string; port: number }
 }
 
-export type Bracket = (typeof allBrackets)[number]
+export type Bracket = (typeof ALL_BRACKETS)[number]
 
 export interface StreamResponseOptions {
-  body: StreamOptions | StreamOptionsMessages
+  body: StreamOptionsBase | StreamOptionsOpenAI
   options: RequestOptions
   onData: (
     streamResponse: StreamResponse | undefined,
@@ -135,8 +135,13 @@ export interface StreamResponseOptions {
   onError?: (error: Error) => void
 }
 
-export const ProviderNames = {
+export interface UiTabs {
+  [key: string]: JSX.Element
+}
+
+export const ApiProviders = {
   Ollama: 'ollama',
   LlamaCpp: 'llamacpp',
-  LMStudio: 'lmstudio'
+  LMStudio: 'lmstudio',
+  Oobabooga: 'oobabooga'
 } as const

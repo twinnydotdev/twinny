@@ -1,4 +1,4 @@
-import { PromptTemplate } from './types'
+import { FimPromptTemplate } from './types'
 
 export const getFimPromptTemplateLLama = ({
   context,
@@ -6,7 +6,7 @@ export const getFimPromptTemplateLLama = ({
   useFileContext,
   suffix,
   prefix
-}: PromptTemplate) => {
+}: FimPromptTemplate) => {
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
@@ -23,7 +23,7 @@ export const getFimPromptTemplateDeepseek = ({
   useFileContext,
   suffix,
   prefix
-}: PromptTemplate) => {
+}: FimPromptTemplate) => {
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
@@ -40,7 +40,7 @@ export const getFimPromptTemplateStableCode = ({
   useFileContext,
   suffix,
   prefix
-}: PromptTemplate) => {
+}: FimPromptTemplate) => {
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
