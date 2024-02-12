@@ -3,7 +3,7 @@ import {
   ApiProviders,
   StreamBodyBase,
   StreamBodyOpenAI,
-  StreamOptionsOllama,
+  StreamOptionsOllama
 } from './types'
 
 export function createStreamRequestBody(
@@ -18,6 +18,7 @@ export function createStreamRequestBody(
 ): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case ApiProviders.Ollama:
+    case ApiProviders.OllamaWebUi:
       return {
         model: options.model,
         prompt,

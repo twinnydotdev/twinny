@@ -87,22 +87,22 @@
           "when": "view == twinny.sidebar && twinnyManageTemplates"
         },
         {
-          "command": "twinny.settings",
-          "when": "view == twinny.sidebar",
-          "group": "navigation@1"
-        },
-        {
           "command": "twinny.manageTemplates",
-          "group": "navigation@2",
+          "group": "navigation@1",
           "when": "view == twinny.sidebar"
         },
         {
           "command": "twinny.templates",
           "when": "view == twinny.sidebar",
-          "group": "navigation@3"
+          "group": "navigation@2"
         },
         {
           "command": "twinny.newChat",
+          "when": "view == twinny.sidebar",
+          "group": "navigation@3"
+        },
+        {
+          "command": "twinny.settings",
           "when": "view == twinny.sidebar",
           "group": "navigation@4"
         }
@@ -276,24 +276,13 @@
           "order": 7,
           "type": "string",
           "default": "codellama:7b-instruct",
-          "description": "Model identifier for chat completions. Applicable only for Ollama API."
+          "description": "Model identifier for chat completions. Applicable only for Ollama and Oobabooga API."
         },
         "twinny.fimModelName": {
           "order": 8,
           "type": "string",
           "default": "codellama:7b-code",
-          "description": "Model identifier for FIM completions. Applicable only for Ollama API."
-        },
-        "twinny.fimTemplateFormat": {
-          "order": 9,
-          "type": "string",
-          "enum": [
-            "stable-code",
-            "codellama",
-            "deepseek"
-          ],
-          "default": "codellama",
-          "description": "The prompt format to be used for FIM completions."
+          "description": "Model identifier for FIM completions. Applicable only for Ollama and Oobabooga API."
         },
         "twinny.disableAutoSuggest": {
           "order": 10,

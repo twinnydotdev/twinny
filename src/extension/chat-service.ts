@@ -15,7 +15,7 @@ import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from './languages'
 import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
-import { createStreamRequestBody } from './stream-options'
+import { createStreamRequestBody } from './model-options'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')

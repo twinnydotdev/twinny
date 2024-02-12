@@ -42,7 +42,8 @@ export const MESSAGE_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context'
+  twinnyWorkspaceContext: 'twinny-workspace-context',
+  twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
 }
 
 export const MESSAGE_KEY = {
@@ -65,8 +66,9 @@ export const UI_TABS = {
 }
 
 export const FIM_TEMPLATE_FORMAT = {
-  deepseek: 'deepseek',
   codellama: 'codellama',
+  deepseek: 'deepseek',
+  llama: 'llama',
   stableCode: 'stable-code'
 }
 
@@ -75,6 +77,11 @@ export const API_PROVIDER: ApiProviders = {
     fimApiPath: '/api/generate',
     chatApiPath: '/api/generate',
     port: 11434
+  },
+  ollamawebui: {
+    fimApiPath: '/ollama/api/generate',
+    chatApiPath: '/ollama/api/generate',
+    port: 8080
   },
   llamacpp: {
     fimApiPath: '/completion',

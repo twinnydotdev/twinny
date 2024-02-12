@@ -25,15 +25,21 @@ import {
 } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../languages'
-import { FimPromptTemplate, InlineCompletion, StreamRequestOptions, StreamResponse } from '../types'
 import {
+  FimPromptTemplate,
+  InlineCompletion,
+  StreamRequestOptions,
+  StreamResponse
+} from '../types'
+import {
+  getDefaultFimPromptTemplate,
   getFimPromptTemplateDeepseek,
   getFimPromptTemplateLLama,
   getFimPromptTemplateStableCode
 } from '../fim-templates'
 import { FIM_TEMPLATE_FORMAT, LINE_BREAK_REGEX } from '../../constants'
 import { streamResponse } from '../stream'
-import { createStreamRequestBody } from '../stream-options'
+import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
@@ -54,7 +60,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _apiProvider = this._config.get('apiProvider') as string
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useTls = this._config.get('useTls') as boolean
-  private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _useMultiLineCompletions = this._config.get(
     'useMultiLineCompletions'
   ) as boolean
@@ -102,17 +107,23 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   public getFimTemplate(args: FimPromptTemplate) {
-    switch (this._fimTemplateFormat) {
-      case FIM_TEMPLATE_FORMAT.codellama:
-        return getFimPromptTemplateLLama(args)
-      case FIM_TEMPLATE_FORMAT.deepseek:
-        return getFimPromptTemplateDeepseek(args)
-      case FIM_TEMPLATE_FORMAT.stableCode:
-        return getFimPromptTemplateStableCode(args)
+    if (
+      this._fimModel.includes(FIM_TEMPLATE_FORMAT.codellama) ||
+      this._fimModel.includes(FIM_TEMPLATE_FORMAT.llama)
+    ) {
+      return getFimPromptTemplateLLama(args)
     }
-    return getFimPromptTemplateLLama(args)
-  }
 
+    if (this._fimModel.includes(FIM_TEMPLATE_FORMAT.deepseek)) {
+      return getFimPromptTemplateDeepseek(args)
+    }
+
+    if (this._fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode)) {
+      return getFimPromptTemplateStableCode(args)
+    }
+
+    return getDefaultFimPromptTemplate(args)
+  }
   public handleEndStream = ({
     completion,
     position,
@@ -494,7 +505,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._apiPath = this._config.get('fimApiPath') as string
     this._port = this._config.get('fimApiPort') as number
-    this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._apiBearerToken = this._config.get('apiBearerToken') as string
     this._apiHostname = this._config.get('apiHostname') as string
     this._apiProvider = this._config.get('apiProvider') as string

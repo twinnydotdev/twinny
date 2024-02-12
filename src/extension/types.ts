@@ -122,23 +122,21 @@ export interface ApiProviders {
 export type Bracket = (typeof ALL_BRACKETS)[number]
 
 export interface StreamRequestOptions {
-  hostname: string,
-  path: string,
-  port: string | number,
-  protocol: string,
-  method: string,
+  hostname: string
+  path: string
+  port: string | number
+  protocol: string
+  method: string
   headers: Record<string, string>
 }
 
 export interface StreamRequest {
   body: StreamBodyBase | StreamBodyOpenAI
-  options: StreamRequestOptions,
+  options: StreamRequestOptions
   onEnd?: () => void
   onStart?: (controller: AbortController) => void
   onError?: (error: Error) => void
-  onData: (
-    streamResponse: StreamResponse | undefined,
-  ) => void
+  onData: (streamResponse: StreamResponse | undefined) => void
 }
 
 export interface UiTabs {
@@ -147,7 +145,14 @@ export interface UiTabs {
 
 export const ApiProviders = {
   Ollama: 'ollama',
+  OllamaWebUi: 'ollamawebui',
   LlamaCpp: 'llamacpp',
   LMStudio: 'lmstudio',
   Oobabooga: 'oobabooga'
 } as const
+
+export interface Model {
+  name: string
+}
+
+export type ModelList = Model[]
