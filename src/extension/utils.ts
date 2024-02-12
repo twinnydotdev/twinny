@@ -200,3 +200,21 @@ export const getFimDataFromProvider = (provider: string, data: StreamResponse | 
         : ''
   }
 }
+
+export function isStreamWithDataPrefix(stringBuffer: string) {
+  return stringBuffer.startsWith('data:')
+}
+
+export function safeParseJsonResponse(
+  stringBuffer: string
+): StreamResponse | undefined {
+  try {
+    if (isStreamWithDataPrefix(stringBuffer)) {
+      return JSON.parse(stringBuffer.split('data:')[1])
+    }
+    return JSON.parse(stringBuffer)
+  } catch (e) {
+    return undefined
+  }
+}
+

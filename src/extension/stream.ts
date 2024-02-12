@@ -1,13 +1,10 @@
-import { IncomingMessage, request } from 'http'
-import { request as httpsRequest } from 'https'
-import { workspace } from 'vscode'
-import { StreamResponse, StreamResponseOptions } from './types'
-import { LINE_BREAK_REGEX } from '../constants'
+import { StreamRequest } from './types'
 import { Logger } from './logger'
+import { safeParseJsonResponse } from './utils'
 
 const logger = new Logger()
 
-const logStreamOptions = (opts: StreamResponseOptions) => {
+const logStreamOptions = (opts: StreamRequest) => {
   logger.log(
     `
 ***Twinny Stream Debug***\n\
@@ -18,87 +15,90 @@ Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
   )
 }
 
-export async function streamResponse(opts: StreamResponseOptions) {
-  const { body, options, onData, onEnd, onError, onStart } = opts
-  const config = workspace.getConfiguration('twinny')
-  const useTls = config.get('useTls')
-  const timeoutDuration = 20000
-  const _request = useTls ? httpsRequest : request
-  let stringBuffer = ''
-  logStreamOptions(opts)
+export async function streamResponse(request: StreamRequest) {
+  logStreamOptions(request)
+  const { body, options, onData, onEnd, onError, onStart } = request
+  const controller = new AbortController()
 
-  const req = _request(options, (res: IncomingMessage) => {
-    const statusCode = res.statusCode
+  const { signal } = controller
 
-    if (typeof statusCode !== 'number') {
-      onError?.(new Error('Response statusCode is undefined'))
-      return
+  try {
+    const url = `${options.protocol}://${options.hostname}:${options.port}${options.path}`
+    const fetchOptions = {
+      method: options.method,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal
     }
 
-    if (statusCode < 200 || statusCode >= 300) {
-      logger.log(`Response status code ${statusCode}\n`)
-      onError?.(new Error(`Server responded with status code: ${statusCode}`))
-      res.destroy()
-      return
+    const response = await fetch(url, fetchOptions)
+
+    if (!response.ok) {
+      throw new Error(`Server responded with status code: ${response.status}`)
     }
 
-    res.on('data', (chunk: string) => {
-      stringBuffer += chunk.toString()
-      try {
-        if (LINE_BREAK_REGEX.exec(stringBuffer)) {
-          const jsonResponse = safeParseJsonResponse(stringBuffer)
-          onData(jsonResponse, () => res.destroy())
-          stringBuffer = ''
-        }
-      } catch (e) {
-        logger.log('Error parsing response\n')
-        onError?.(e instanceof Error ? e : new Error('Error processing data'))
-        res.destroy()
+    if (!response.body) {
+      throw new Error('Failed to get a ReadableStream from the response')
+    }
+
+    let buffer = ''
+
+    onStart?.(controller)
+
+    const reader = response.body
+      .pipeThrough(new TextDecoderStream())
+      .pipeThrough(
+        new TransformStream({
+          start() {
+            buffer = ''
+          },
+          transform(chunk) {
+            buffer += chunk
+            let position
+            while ((position = buffer.indexOf('\n')) !== -1) {
+              const line = buffer.substring(0, position)
+              buffer = buffer.substring(position + 1)
+              try {
+                const json = safeParseJsonResponse(line)
+                onData(json)
+              } catch (e) {
+                onError?.(new Error('Error parsing JSON data from event'))
+              }
+            }
+          },
+          flush() {
+            if (buffer) {
+              try {
+                const json = safeParseJsonResponse(buffer)
+                onData(json)
+              } catch (e) {
+                onError?.(new Error('Error parsing JSON data from event'))
+              }
+            }
+          }
+        })
+      )
+      .getReader()
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      if (signal.aborted) break
+      const { done } = await reader.read()
+      if (done) break
+    }
+
+    reader.releaseLock()
+    controller.abort()
+    onEnd?.()
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        onEnd?.()
+      } else {
+        console.error('Fetch error:', error);
       }
-    })
-
-    res.once('end', () => {
-      logger.log('Stream ended')
-      onEnd?.(() => res.destroy())
-    })
-  })
-
-  req.on('error', (error: Error) => {
-    logger.log(`Error in stream request ${error.message}\n`)
-    onError?.(error)
-  })
-
-  req.setTimeout(timeoutDuration, () => {
-    logger.log('Stream request timed out')
-    req.destroy()
-    onError?.(new Error('Request timed out'))
-  })
-
-  try {
-    logger.log('Stream started')
-    if (body) req.write(JSON.stringify(body))
-    onStart?.(req)
-    req.end()
-  } catch (e) {
-    logger.log('Error sending request\n')
-    onError?.(e instanceof Error ? e : new Error('Error sending request'))
-    req.destroy()
-  }
-}
-
-function isStreamWithDataPrefix(stringBuffer: string) {
-  return stringBuffer.startsWith('data:')
-}
-
-function safeParseJsonResponse(
-  stringBuffer: string
-): StreamResponse | undefined {
-  try {
-    if (isStreamWithDataPrefix(stringBuffer)) {
-      return JSON.parse(stringBuffer.split('data:')[1])
     }
-    return JSON.parse(stringBuffer)
-  } catch (e) {
-    return undefined
   }
 }

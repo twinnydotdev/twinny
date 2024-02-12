@@ -1,22 +1,20 @@
 import { Position } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from '../constants'
-import { RequestOptions } from 'https'
-import { ClientRequest } from 'http'
 
-export interface StreamOptionsBase {
+export interface StreamBodyBase {
   prompt: string
   stream: boolean
   n_predict?: number
   temperature?: number
 }
 
-export interface StreamOptionsOllama extends StreamOptionsBase {
+export interface StreamOptionsOllama extends StreamBodyBase {
   model: string
   options: Record<string, unknown>
 }
 
-export interface StreamOptionsOpenAI extends StreamOptionsBase {
+export interface StreamBodyOpenAI extends StreamBodyBase {
   messages?: MessageType[] | MessageRoleContent
   max_tokens: number
 }
@@ -123,16 +121,24 @@ export interface ApiProviders {
 
 export type Bracket = (typeof ALL_BRACKETS)[number]
 
-export interface StreamResponseOptions {
-  body: StreamOptionsBase | StreamOptionsOpenAI
-  options: RequestOptions
+export interface StreamRequestOptions {
+  hostname: string,
+  path: string,
+  port: string | number,
+  protocol: string,
+  method: string,
+  headers: Record<string, string>
+}
+
+export interface StreamRequest {
+  body: StreamBodyBase | StreamBodyOpenAI
+  options: StreamRequestOptions,
+  onEnd?: () => void
+  onStart?: (controller: AbortController) => void
+  onError?: (error: Error) => void
   onData: (
     streamResponse: StreamResponse | undefined,
-    destroy: () => void
   ) => void
-  onEnd?: (destroy: () => void) => void
-  onStart?: (req: ClientRequest) => void
-  onError?: (error: Error) => void
 }
 
 export interface UiTabs {
