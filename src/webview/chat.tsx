@@ -20,6 +20,8 @@ import {
 import {
   DisabledAutoScrollIcon,
   EnabledAutoScrollIcon,
+  DisabledSelectionIcon,
+  EnabledSelectionIcon
 } from './icons'
 
 import { Suggestions } from './suggestions'
@@ -259,7 +261,11 @@ export const Chat = () => {
             appearance="icon"
             onClick={handleToggleSelection}
           >
-            <span className="codicon codicon-code"></span>
+            {isSelectionVisible ? (
+              <EnabledSelectionIcon />
+            ) : (
+              <DisabledSelectionIcon />
+            )}
           </VSCodeButton>
           <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
         </div>
