@@ -59,3 +59,69 @@ export const DisabledAutoScrollIcon = () => (
     />
   </svg>
 )
+
+export const EnabledSelectionIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M 10 7 l -4 5 l 4 5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M 14 7 l 4 5 l -4 5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M 13 6 l -2 12"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />    
+  </svg>
+)
+
+export const DisabledSelectionIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M 10 7 l -4 5 l 4 5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M 14 7 l 4 5 l -4 5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M 13 6 l -2 12"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />    
+    <path
+      d="M 6 6 l 12 12"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+)
