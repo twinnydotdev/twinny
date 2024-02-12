@@ -55,12 +55,6 @@ export class ChatService {
     prompt: string,
     messages?: MessageType[] | MessageRoleContent[]
   ) {
-    const headers: Record<string, string> = {}
-
-    if (this._bearerToken) {
-      headers.Authorization = `Bearer ${this._bearerToken}`
-    }
-
     const requestOptions: StreamRequestOptions = {
       hostname: this._apiHostname,
       port: this._port,

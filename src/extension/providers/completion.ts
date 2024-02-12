@@ -75,12 +75,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private buildStreamRequest(prompt: string) {
-    const headers: Record<string, string> = {}
-
-    if (this._apiBearerToken) {
-      headers.Authorization = `Bearer ${this._apiBearerToken}`
-    }
-
     const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
       model: this._fimModel,
       numPredictChat: this._numPredictFim,
