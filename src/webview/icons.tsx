@@ -81,12 +81,6 @@ export const EnabledSelectionIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    <path
-      d="M 13 6 l -2 12"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />    
   </svg>
 )
 
@@ -111,12 +105,6 @@ export const DisabledSelectionIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    <path
-      d="M 13 6 l -2 12"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />    
     <path
       d="M 6 6 l 12 12"
       stroke="currentColor"
