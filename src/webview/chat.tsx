@@ -28,6 +28,7 @@ import { Suggestions } from './suggestions'
 import { ClientMessage, MessageType, ServerMessage } from '../extension/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
+import { ModelSelect } from './model-select'
 import styles from './index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -212,6 +213,7 @@ export const Chat = () => {
 
   return (
     <VSCodePanelView>
+      <ModelSelect />
       <div className={styles.container}>
         <div className={styles.markdown} ref={divRef}>
           {messages?.map((message, index) => (

@@ -44,6 +44,7 @@ export const MESSAGE_NAME = {
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
+  twinnySetOllamaModel: 'twinny-set-ollama-model',
 }
 
 export const MESSAGE_KEY = {

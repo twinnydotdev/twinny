@@ -124,3 +124,7 @@ pre code {
 .resetTemplatesButton {
   margin-top: 20px;
 }
+
+.modelSelect {
+  width: 100%;
+}

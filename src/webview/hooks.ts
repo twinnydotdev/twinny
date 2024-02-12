@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 
 import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
-import { ClientMessage, LanguageType, ServerMessage, ThemeType } from '../extension/types'
+import {
+  ClientMessage,
+  LanguageType,
+  OllamaModel,
+  ServerMessage,
+  ThemeType
+} from '../extension/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -134,4 +140,23 @@ export const useTemplates = () => {
     window.addEventListener('message', handler)
   }, [])
   return { templates, saveTemplates }
+}
+
+export const useOllamaModels = () => {
+  const [models, setModels] = useState<OllamaModel[] | undefined>([])
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<OllamaModel[]> = event.data
+    if (message?.type === MESSAGE_NAME.twinnyFetchOllamaModels) {
+      setModels(message?.value.data)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyFetchOllamaModels
+    })
+    window.addEventListener('message', handler)
+  }, [])
+  return { models, setModels }
 }
