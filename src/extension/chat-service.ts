@@ -62,7 +62,8 @@ export class ChatService {
       protocol: this._useTls ? 'https' : 'http',
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Connection': 'keep-alive',
+        'Content-Type': 'text/event-stream',
         Authorization: `Bearer ${this._bearerToken}`
       }
     }

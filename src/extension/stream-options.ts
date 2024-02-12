@@ -21,7 +21,7 @@ export function createStreamRequestBody(
       return {
         model: options.model,
         prompt,
-        stream: false,
+        stream: true,
         options: {
           temperature: options.temperature,
           num_predict: options.numPredictChat
@@ -30,7 +30,7 @@ export function createStreamRequestBody(
     case ApiProviders.LlamaCpp:
       return {
         prompt,
-        stream: false,
+        stream: true,
         temperature: options.temperature,
         n_predict: options.numPredictChat
       }
@@ -38,7 +38,7 @@ export function createStreamRequestBody(
       return {
         model: options.model,
         prompt,
-        stream: false,
+        stream: true,
         max_tokens: options.numPredictChat,
         messages: options.messages,
         temperature: options.temperature
