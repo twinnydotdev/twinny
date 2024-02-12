@@ -87,3 +87,7 @@ We are actively looking for contributors who want to help improve the project, i
 Contributions are welcome please open an issue describing your changes and open a pull request when ready.
 
 This project is under MIT licence, please read the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) file for more information.
+
+## Disclaimer
+
+This plugin is provided "as is" and is under active development.  This means that at times it may not work fully as expected.
