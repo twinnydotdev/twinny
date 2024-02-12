@@ -26,9 +26,7 @@ export async function streamResponse(request: StreamRequest) {
     const url = `${options.protocol}://${options.hostname}:${options.port}${options.path}`
     const fetchOptions = {
       method: options.method,
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: options.headers,
       body: JSON.stringify(body),
       signal: controller.signal
     }
