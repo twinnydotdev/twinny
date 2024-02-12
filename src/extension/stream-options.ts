@@ -1,8 +1,8 @@
 import {
   MessageRoleContent,
   ApiProviders,
-  StreamOptionsBase,
-  StreamOptionsOpenAI,
+  StreamBodyBase,
+  StreamBodyOpenAI,
   StreamOptionsOllama,
 } from './types'
 
@@ -15,7 +15,7 @@ export function createStreamRequestBody(
     model: string
     messages?: MessageRoleContent[]
   }
-): StreamOptionsBase | StreamOptionsOllama | StreamOptionsOpenAI {
+): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case ApiProviders.Ollama:
       return {

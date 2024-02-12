@@ -25,9 +25,7 @@ import {
 } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../languages'
-import { FimPromptTemplate, InlineCompletion } from '../types'
-import { RequestOptions } from 'https'
-import { ClientRequest } from 'http'
+import { FimPromptTemplate, InlineCompletion, StreamRequestOptions, StreamResponse } from '../types'
 import {
   getFimPromptTemplateDeepseek,
   getFimPromptTemplateLLama,
@@ -55,6 +53,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _apiProvider = this._config.get('apiProvider') as string
   private _useFileContext = this._config.get('useFileContext') as boolean
+  private _useTls = this._config.get('useTls') as boolean
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _useMultiLineCompletions = this._config.get(
     'useMultiLineCompletions'
@@ -67,11 +66,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _enableCompletionCache = this._config.get(
     'enableCompletionCache'
   ) as boolean
-  private _currentReq: ClientRequest | undefined = undefined
+  private _controller: AbortController | null
 
   constructor(statusBar: StatusBarItem) {
     this._statusBar = statusBar
     this._logger = new Logger()
+    this._controller = null
   }
 
   private buildStreamRequest(prompt: string) {
@@ -87,10 +87,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       temperature: this._temperature
     })
 
-    const requestOptions: RequestOptions = {
+    const requestOptions: StreamRequestOptions = {
       hostname: this._apiHostname,
       port: this._port,
       path: this._apiPath,
+      protocol: this._useTls ? 'https' : 'http',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -102,7 +103,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   public destroyStream = () => {
-    this._currentReq?.destroy()
+    this._controller?.abort()
     this._statusBar.text = '🤖'
   }
 
@@ -222,18 +223,18 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           streamResponse({
             body: requestBody,
             options: requestOptions,
-            onStart: (req: ClientRequest) => {
-              this._currentReq = req
+            onStart: (controller: AbortController) => {
+              this._controller = controller
             },
-            onEnd: (destroy) => {
+            onEnd: () => {
               this._logger.log(
                 `Streaming response end due to request end ${this._nonce} \nCompletion: ${completion}`
               )
-              destroy()
               this._statusBar.text = '🤖'
               stop.forEach((stopWord) => {
                 completion = completion.split(stopWord).join('')
               })
+              this._controller?.abort()
               resolve(
                 this.handleEndStream({
                   position,
@@ -244,7 +245,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 })
               )
             },
-            onData: (streamResponse, destroy) => {
+            onData: (streamResponse: StreamResponse | undefined) => {
               try {
                 const completionString = getFimDataFromProvider(
                   this._apiProvider,
@@ -266,11 +267,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   this._logger.log(
                     `Streaming response end due to line break ${this._nonce} \nCompletion: ${completion}`
                   )
-                  destroy()
                   this._statusBar.text = '🤖'
                   stop.forEach((stopWord) => {
                     completion = completion.split(stopWord).join('')
                   })
+                  this._controller?.abort()
                   return resolve(
                     this.handleEndStream({
                       position,
@@ -295,12 +296,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   this._logger.log(
                     `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${completion}`
                   )
-                  destroy()
                   this._statusBar.text = '🤖'
                   stop.forEach((stopWord) => {
                     completion = completion.split(stopWord).join('')
                   })
-                  resolve(
+                  this._controller?.abort()
+                  return resolve(
                     this.handleEndStream({
                       position,
                       prefix,
@@ -314,14 +315,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 console.error(e)
               }
             },
-            onError: (error) => {
+            onError: (error: Error) => {
               this._statusBar.text = '🤖'
               console.error(error)
+              this._controller?.abort()
               resolve([])
             }
           })
         } catch (error) {
           this._statusBar.text = '$(alert)'
+          this._controller?.abort()
           return resolve([] as InlineCompletionItem[])
         }
       }, this._debounceWait)
@@ -501,6 +504,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._apiBearerToken = this._config.get('apiBearerToken') as string
     this._apiHostname = this._config.get('apiHostname') as string
     this._apiProvider = this._config.get('apiProvider') as string
+    this._useTls = this._config.get('useTls') as boolean
     this._useMultiLineCompletions = this._config.get(
       'useMultiLineCompletions'
     ) as boolean

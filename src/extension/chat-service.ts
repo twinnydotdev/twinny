@@ -1,16 +1,15 @@
-import { ClientRequest } from 'http'
-import { RequestOptions } from 'https'
 import { StatusBarItem, WebviewView, commands, window, workspace } from 'vscode'
 
 import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER_NAME } from '../constants'
 import {
   StreamResponse,
-  StreamOptionsBase,
+  StreamBodyBase,
   ServerMessage,
   MessageType,
   TemplateData,
   ChatTemplateData,
   MessageRoleContent,
+  StreamRequestOptions,
 } from './types'
 import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from './languages'
@@ -25,8 +24,9 @@ export class ChatService {
   private _apiProvider = this._config.get('apiProvider') as string
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
+  private _useTls = this._config.get('useTls') as boolean
   private _completion = ''
-  private _currentRequest?: ClientRequest
+  private _controller?: AbortController
   private _numPredictChat = this._config.get('numPredictChat') as number
   private _port = this._config.get('chatApiPort') as string
   private _promptTemplate = ''
@@ -61,10 +61,11 @@ export class ChatService {
       headers.Authorization = `Bearer ${this._bearerToken}`
     }
 
-    const requestOptions: RequestOptions = {
+    const requestOptions: StreamRequestOptions = {
       hostname: this._apiHostname,
       port: this._port,
       path: this._apiPath,
+      protocol: this._useTls ? 'https' : 'http',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -84,7 +85,6 @@ export class ChatService {
 
   private onStreamData = (
     streamResponse: StreamResponse | undefined,
-    onDestroy: () => void
   ) => {
     try {
       const data = getChatDataFromProvider(this._apiProvider, streamResponse)
@@ -97,9 +97,6 @@ export class ChatService {
           type: this._promptTemplate
         }
       } as ServerMessage)
-      if (data?.match('<EOT>')) {
-        onDestroy()
-      }
     } catch (error) {
       console.error('Error parsing JSON:', error)
       return
@@ -133,9 +130,9 @@ export class ChatService {
     } as ServerMessage)
   }
 
-  private onStreamStart = (req: ClientRequest) => {
+  private onStreamStart = (controller: AbortController) => {
     this._statusBar.text = '$(loading~spin)'
-    this._currentRequest = req
+    this._controller = controller
     commands.executeCommand(
       'setContext',
       CONTEXT_NAME.twinnyGeneratingText,
@@ -143,13 +140,13 @@ export class ChatService {
     )
     this._view?.webview.onDidReceiveMessage((data: { type: string }) => {
       if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
-        req.destroy()
+        this._controller?.abort()
       }
     })
   }
 
   public destroyStream = () => {
-    this._currentRequest?.destroy()
+    this._controller?.abort()
     this._statusBar.text = '🤖'
     commands.executeCommand(
       'setContext',
@@ -242,8 +239,8 @@ export class ChatService {
     requestBody,
     requestOptions
   }: {
-    requestBody: StreamOptionsBase
-    requestOptions: RequestOptions
+    requestBody: StreamBodyBase
+    requestOptions: StreamRequestOptions
   }) {
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnLoading
@@ -322,5 +319,6 @@ export class ChatService {
     this._port = this._config.get('chatApiPort') as string
     this._apiHostname = this._config.get('apiHostname') as string
     this._apiProvider = this._config.get('apiProvider') as string
+    this._useTls = this._config.get('useTls') as boolean
   }
 }
