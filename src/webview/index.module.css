@@ -34,6 +34,17 @@ pre code {
   padding: 5px;
 }
 
+.message {
+  border-radius: 2px;
+  margin-bottom: 10px;
+  margin-top: 5px;
+}
+
+.bot {
+  background: var(--panel-view-border);
+  padding: 1px 10px;
+}
+
 .loading {
   display: flex;
   justify-content: center;
@@ -46,8 +57,21 @@ pre code {
 
 .chatOptions {
   display: flex;
+  justify-content: space-between;
+}
+
+.chatOptions > div {
+  display: flex;
   gap: 3px;
   align-items: center;
+  justify-content: space-between;
+}
+
+.chatOptions vscode-badge {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 20px;
+  white-space: nowrap;
 }
 
 .chatOptions svg {
@@ -65,6 +89,7 @@ pre code {
   display: flex;
   gap: 3px;
   margin: 10px 0;
+  justify-content: flex-end;
 }
 
 .settings {
@@ -123,4 +148,19 @@ pre code {
 
 .resetTemplatesButton {
   margin-top: 20px;
+}
+
+.modelSelect {
+  width: 100%;
+}
+
+.modelSelect div {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.textIcon {
+  font-size: 1.15rem;
+  transform: translateY(-6px);
 }

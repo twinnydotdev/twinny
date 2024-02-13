@@ -151,8 +151,18 @@ export const ApiProviders = {
   Oobabooga: 'oobabooga'
 } as const
 
-export interface Model {
+export interface OllamaModel {
+  parent_model: string
+  format: string
+  family: string
+  parameter_size: string
+  digest: string
+  model: string
+  modified_at: string
   name: string
+  size: number
 }
 
-export type ModelList = Model[]
+export interface OllamaModels {
+  models: OllamaModel[]
+}

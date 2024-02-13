@@ -9,9 +9,16 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import { Selection } from './selection'
-import { BOT_NAME, MESSAGE_KEY, MESSAGE_NAME, USER_NAME } from '../constants'
+import {
+  BOT_NAME,
+  MESSAGE_KEY,
+  MESSAGE_NAME,
+  SETTING_KEY,
+  USER_NAME
+} from '../constants'
 
 import {
+  useConfigurationSetting,
   useLanguage,
   useSelection,
   useTheme,
@@ -25,9 +32,15 @@ import {
 } from './icons'
 
 import { Suggestions } from './suggestions'
-import { ClientMessage, MessageType, ServerMessage } from '../extension/types'
+import {
+  ApiProviders,
+  ClientMessage,
+  MessageType,
+  ServerMessage
+} from '../extension/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
+import { ModelSelect } from './model-select'
 import styles from './index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,7 +55,12 @@ export const Chat = () => {
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
-  const divRef = useRef<HTMLDivElement>(null)
+  const [showModelSelect, setShowModelSelect] = useState<boolean>(false)
+  const { configurationSetting: apiProvider } = useConfigurationSetting(
+    SETTING_KEY.apiProvider
+  )
+
+  const markdownRef = useRef<HTMLDivElement>(null)
   const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
   const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
     boolean | undefined
@@ -55,8 +73,8 @@ export const Chat = () => {
 
   const scrollBottom = () => {
     setTimeout(() => {
-      if (divRef.current) {
-        divRef.current.scrollTop = divRef.current.scrollHeight
+      if (markdownRef.current) {
+        markdownRef.current.scrollTop = markdownRef.current.scrollHeight
       }
     }, 200)
   }
@@ -87,7 +105,24 @@ export const Chat = () => {
     setTimeout(() => {
       chatRef.current?.focus()
       stopRef.current = false
-    }, 1000)
+    }, 200)
+  }
+
+  const handleAddTemplateMessage = (message: ServerMessage) => {
+    if (stopRef.current) {
+      genertingRef.current = false
+      return
+    }
+    genertingRef.current = true
+    setLoading(false)
+    if (isAutoScrolledEnabled) scrollBottom()
+    setMessages((prev) => [
+      ...(prev || []),
+      {
+        role: USER_NAME,
+        content: message.value.completion as string
+      }
+    ])
   }
 
   const handleCompletionMessage = (message: ServerMessage) => {
@@ -97,7 +132,6 @@ export const Chat = () => {
     }
     genertingRef.current = true
     setLoading(false)
-    if (isAutoScrolledEnabled) scrollBottom()
     setCompletion({
       role: BOT_NAME,
       content: getCompletionContent(message),
@@ -105,6 +139,7 @@ export const Chat = () => {
       language: message.value.data,
       error: message.value.error
     })
+    if (isAutoScrolledEnabled) scrollBottom()
   }
 
   const handleLoadingMessage = () => {
@@ -115,6 +150,10 @@ export const Chat = () => {
   const messageEventHandler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     switch (message.type) {
+      case MESSAGE_NAME.twinngAddMessage: {
+        handleAddTemplateMessage(message)
+        break
+      }
       case MESSAGE_NAME.twinnyOnCompletion: {
         handleCompletionMessage(message)
         break
@@ -155,6 +194,7 @@ export const Chat = () => {
 
   const handleSubmitForm = (input: string) => {
     if (input) {
+      setLoading(true)
       setInputText('')
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnyChatMessage,
@@ -162,7 +202,8 @@ export const Chat = () => {
           ...(messages || []),
           {
             role: USER_NAME,
-            content: input
+            content: input,
+            type: 'chat'
           }
         ]
       } as ClientMessage)
@@ -192,6 +233,10 @@ export const Chat = () => {
     setIsSelectionVisible((prev) => !prev)
   }
 
+  const handleToggleModelSelection = () => {
+    setShowModelSelect((prev) => !prev)
+  }
+
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     chatRef.current?.focus()
@@ -213,7 +258,7 @@ export const Chat = () => {
   return (
     <VSCodePanelView>
       <div className={styles.container}>
-        <div className={styles.markdown} ref={divRef}>
+        <div className={styles.markdown} ref={markdownRef}>
           {messages?.map((message, index) => (
             <div key={`message-${index}`}>
               <Message message={message} theme={theme} />
@@ -244,30 +289,42 @@ export const Chat = () => {
           onSelect={scrollBottom}
           language={language}
         />
+        {showModelSelect && <ModelSelect />}
         <div className={styles.chatOptions}>
-          <VSCodeButton
-            onClick={togggleAutoScroll}
-            title="Toggle auto scroll on/off"
-            appearance="icon"
-          >
-            {isAutoScrolledEnabled ? (
-              <EnabledAutoScrollIcon />
-            ) : (
-              <DisabledAutoScrollIcon />
-            )}
-          </VSCodeButton>
-          <VSCodeButton
-            title="Toggle selection preview"
-            appearance="icon"
-            onClick={handleToggleSelection}
-          >
-            {isSelectionVisible ? (
-              <EnabledSelectionIcon />
-            ) : (
-              <DisabledSelectionIcon />
-            )}
-          </VSCodeButton>
-          <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
+          <div>
+            <VSCodeButton
+              onClick={togggleAutoScroll}
+              title="Toggle auto scroll on/off"
+              appearance="icon"
+            >
+              {isAutoScrolledEnabled ? (
+                <EnabledAutoScrollIcon />
+              ) : (
+                <DisabledAutoScrollIcon />
+              )}
+            </VSCodeButton>
+            <VSCodeButton
+              title="Toggle selection preview"
+              appearance="icon"
+              onClick={handleToggleSelection}
+            >
+              {isSelectionVisible ? (
+                <EnabledSelectionIcon />
+              ) : (
+                <DisabledSelectionIcon />
+              )}
+            </VSCodeButton>
+            <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
+          </div>
+          {apiProvider === ApiProviders.Ollama && (
+            <VSCodeButton
+              title="Select active models"
+              appearance="icon"
+              onClick={handleToggleModelSelection}
+            >
+              <span className={styles.textIcon}>🤖</span>
+            </VSCodeButton>
+          )}
         </div>
         <form>
           <div className={styles.chatBox}>

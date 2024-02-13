@@ -8,8 +8,8 @@ export const TWINNY = '🤖 twinny'
 export const YOU = '👤 You'
 export const EMPTY_MESAGE = 'Sorry, I don’t understand. Please try again.'
 export const MODEL_ERROR = 'Sorry, something went wrong...'
-export const OPENING_BRACKETS = ['{', '(']
-export const CLOSING_BRACKETS = ['}', ')']
+export const OPENING_BRACKETS = ['[', '{', '(']
+export const CLOSING_BRACKETS = [']', '}', ')']
 export const OPENING_TAGS = ['<']
 export const CLOSING_TAGS = ['</']
 export const QUOTES = ['"', '\'']
@@ -30,6 +30,7 @@ export const MESSAGE_NAME = {
   twinnyNewDocument: 'twinny-new-document',
   twinnyNotification: 'twinny-notification',
   twinnyOnCompletion: 'twinny-on-completion',
+  twinngAddMessage: 'twinny-add-message',
   twinnyOnEnd: 'twinny-on-end',
   twinnyOnLoading: 'twinny-on-loading',
   twinnyOpenDiff: 'twinny-open-diff',
@@ -44,6 +45,9 @@ export const MESSAGE_NAME = {
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
+  twinnySetOllamaModel: 'twinny-set-ollama-model',
+  twinnySetConfigValue: 'twinny-set-config-value',
+  twinnyGetConfigValue: 'twinnyGetConfigValue',
 }
 
 export const MESSAGE_KEY = {
@@ -53,6 +57,12 @@ export const MESSAGE_KEY = {
   lastConversation: 'lastConversation',
   selectedTemplates: 'selectedTemplates',
   selection: 'selection'
+}
+
+export const SETTING_KEY = {
+  fimModelName: 'fimModelName',
+  chatModelName: 'chatModelName',
+  apiProvider: 'apiProvider',
 }
 
 export const CONTEXT_NAME = {

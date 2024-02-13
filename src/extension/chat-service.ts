@@ -16,6 +16,7 @@ import { CodeLanguageDetails } from './languages'
 import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
 import { createStreamRequestBody } from './model-options'
+import { kebabToSentence } from '../webview/utils'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -226,7 +227,7 @@ export class ChatService {
         language: language?.langName || 'unknown'
       }
     )
-    return prompt || ''
+    return { prompt: prompt || '' , selection: selectionContext }
   }
 
   private streamResponse({
@@ -236,10 +237,6 @@ export class ChatService {
     requestBody: StreamBodyBase
     requestOptions: StreamRequestOptions
   }) {
-    this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnyOnLoading
-    })
-
     return streamResponse({
       body: requestBody,
       options: requestOptions,
@@ -288,7 +285,18 @@ export class ChatService {
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
     this.focusChatTab()
-    const prompt = await this.buildTemplatePrompt(promptTemplate, language)
+    this._view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyOnLoading
+    })
+    const { prompt, selection } = await this.buildTemplatePrompt(promptTemplate, language)
+    this._view?.webview.postMessage({
+      type: MESSAGE_NAME.twinngAddMessage,
+      value: {
+        completion: kebabToSentence(promptTemplate) + '\n\n' + '```\n' + selection,
+        data: getLanguage(),
+        type: this._promptTemplate
+      }
+    } as ServerMessage)
     const messageRoleContent = await this.buildMesageRoleContent(
       [
         {

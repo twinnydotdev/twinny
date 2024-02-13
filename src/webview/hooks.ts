@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 
-import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
-import { ClientMessage, LanguageType, ServerMessage, ThemeType } from '../extension/types'
+import { MESSAGE_KEY, MESSAGE_NAME, SETTING_KEY } from '../constants'
+import {
+  ClientMessage,
+  LanguageType,
+  OllamaModel,
+  ServerMessage,
+  ThemeType
+} from '../extension/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -134,4 +140,80 @@ export const useTemplates = () => {
     window.addEventListener('message', handler)
   }, [])
   return { templates, saveTemplates }
+}
+
+export const useConfigurationSetting = (key: string) => {
+  const [configurationSetting, setConfigurationSettings] = useState<
+    string | boolean | number
+  >()
+
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<string | boolean | number> = event.data
+    if (
+      message?.type === MESSAGE_NAME.twinnyGetConfigValue &&
+      message.value.type === key
+    ) {
+      setConfigurationSettings(message?.value.data)
+    }
+  }
+
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyGetConfigValue,
+      key
+    })
+    window.addEventListener('message', handler)
+  }, [key])
+
+  return { configurationSetting }
+}
+
+export const useOllamaModels = () => {
+  const [models, setModels] = useState<OllamaModel[] | undefined>([])
+  const [chatModelName, setChatModel] = useState<string>()
+  const [fimModelName, setFimModel] = useState<string>()
+  const configValueKeys = [SETTING_KEY.chatModelName, SETTING_KEY.fimModelName]
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<OllamaModel[]> = event.data
+    if (message?.type === MESSAGE_NAME.twinnyFetchOllamaModels) {
+      setModels(message?.value.data)
+    }
+    if (
+      message?.type === MESSAGE_NAME.twinnyGetConfigValue &&
+      message.value.type === SETTING_KEY.chatModelName
+    ) {
+      setChatModel(message?.value.data as string | undefined)
+    }
+    if (
+      message?.type === MESSAGE_NAME.twinnyGetConfigValue &&
+      message.value.type === SETTING_KEY.fimModelName
+    ) {
+      setFimModel(message?.value.data as string | undefined)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+
+  const saveModel = (model: string) => (type: string) => {
+    if (type === SETTING_KEY.chatModelName) setChatModel(model)
+    if (type === SETTING_KEY.fimModelName) setFimModel(model)
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnySetConfigValue,
+      key: type,
+      data: model
+    } as ClientMessage<string>)
+  }
+
+  useEffect(() => {
+    configValueKeys.forEach((key: string) => {
+      global.vscode.postMessage({
+        type: MESSAGE_NAME.twinnyGetConfigValue,
+        key
+      })
+    })
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyFetchOllamaModels
+    })
+    window.addEventListener('message', handler)
+  }, [chatModelName, fimModelName])
+  return { models, setModels, saveModel, chatModelName, fimModelName }
 }
