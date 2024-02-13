@@ -291,29 +291,6 @@ export const Chat = () => {
         />
         {showModelSelect && <ModelSelect />}
         <div className={styles.chatOptions}>
-          <VSCodeButton
-            onClick={togggleAutoScroll}
-            title="Toggle auto scroll on/off"
-            appearance="icon"
-          >
-            {isAutoScrolledEnabled ? (
-              <EnabledAutoScrollIcon />
-            ) : (
-              <DisabledAutoScrollIcon />
-            )}
-          </VSCodeButton>
-          <VSCodeButton
-            title="Toggle selection preview"
-            appearance="icon"
-            onClick={handleToggleSelection}
-          >
-            {isSelectionVisible ? (
-              <EnabledSelectionIcon />
-            ) : (
-              <DisabledSelectionIcon />
-            )}
-          </VSCodeButton>
-          <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
           <div>
             <VSCodeButton
               onClick={togggleAutoScroll}
@@ -331,7 +308,11 @@ export const Chat = () => {
               appearance="icon"
               onClick={handleToggleSelection}
             >
-              <span className="codicon codicon-code"></span>
+              {isSelectionVisible ? (
+                <EnabledSelectionIcon />
+              ) : (
+                <DisabledSelectionIcon />
+              )}
             </VSCodeButton>
             <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
           </div>
