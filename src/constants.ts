@@ -30,6 +30,7 @@ export const MESSAGE_NAME = {
   twinnyNewDocument: 'twinny-new-document',
   twinnyNotification: 'twinny-notification',
   twinnyOnCompletion: 'twinny-on-completion',
+  twinngAddMessage: 'twinny-add-message',
   twinnyOnEnd: 'twinny-on-end',
   twinnyOnLoading: 'twinny-on-loading',
   twinnyOpenDiff: 'twinny-open-diff',

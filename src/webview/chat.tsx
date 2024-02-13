@@ -60,7 +60,7 @@ export const Chat = () => {
     SETTING_KEY.apiProvider
   )
 
-  const divRef = useRef<HTMLDivElement>(null)
+  const markdownRef = useRef<HTMLDivElement>(null)
   const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
   const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
     boolean | undefined
@@ -73,8 +73,8 @@ export const Chat = () => {
 
   const scrollBottom = () => {
     setTimeout(() => {
-      if (divRef.current) {
-        divRef.current.scrollTop = divRef.current.scrollHeight
+      if (markdownRef.current) {
+        markdownRef.current.scrollTop = markdownRef.current.scrollHeight
       }
     }, 200)
   }
@@ -105,7 +105,24 @@ export const Chat = () => {
     setTimeout(() => {
       chatRef.current?.focus()
       stopRef.current = false
-    }, 1000)
+    }, 200)
+  }
+
+  const handleAddTemplateMessage = (message: ServerMessage) => {
+    if (stopRef.current) {
+      genertingRef.current = false
+      return
+    }
+    genertingRef.current = true
+    setLoading(false)
+    if (isAutoScrolledEnabled) scrollBottom()
+    setMessages((prev) => [
+      ...(prev || []),
+      {
+        role: USER_NAME,
+        content: message.value.completion as string
+      }
+    ])
   }
 
   const handleCompletionMessage = (message: ServerMessage) => {
@@ -115,7 +132,6 @@ export const Chat = () => {
     }
     genertingRef.current = true
     setLoading(false)
-    if (isAutoScrolledEnabled) scrollBottom()
     setCompletion({
       role: BOT_NAME,
       content: getCompletionContent(message),
@@ -123,6 +139,7 @@ export const Chat = () => {
       language: message.value.data,
       error: message.value.error
     })
+    if (isAutoScrolledEnabled) scrollBottom()
   }
 
   const handleLoadingMessage = () => {
@@ -133,6 +150,10 @@ export const Chat = () => {
   const messageEventHandler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     switch (message.type) {
+      case MESSAGE_NAME.twinngAddMessage: {
+        handleAddTemplateMessage(message)
+        break
+      }
       case MESSAGE_NAME.twinnyOnCompletion: {
         handleCompletionMessage(message)
         break
@@ -173,6 +194,7 @@ export const Chat = () => {
 
   const handleSubmitForm = (input: string) => {
     if (input) {
+      setLoading(true)
       setInputText('')
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnyChatMessage,
@@ -180,7 +202,8 @@ export const Chat = () => {
           ...(messages || []),
           {
             role: USER_NAME,
-            content: input
+            content: input,
+            type: 'chat'
           }
         ]
       } as ClientMessage)
@@ -235,7 +258,7 @@ export const Chat = () => {
   return (
     <VSCodePanelView>
       <div className={styles.container}>
-        <div className={styles.markdown} ref={divRef}>
+        <div className={styles.markdown} ref={markdownRef}>
           {messages?.map((message, index) => (
             <div key={`message-${index}`}>
               <Message message={message} theme={theme} />

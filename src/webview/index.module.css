@@ -34,6 +34,17 @@ pre code {
   padding: 5px;
 }
 
+.message {
+  border-radius: 2px;
+  margin-bottom: 10px;
+  margin-top: 5px;
+}
+
+.bot {
+  background: var(--panel-view-border);
+  padding: 1px 10px;
+}
+
 .loading {
   display: flex;
   justify-content: center;
@@ -78,6 +89,7 @@ pre code {
   display: flex;
   gap: 3px;
   margin: 10px 0;
+  justify-content: flex-end;
 }
 
 .settings {
