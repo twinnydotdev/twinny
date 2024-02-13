@@ -194,13 +194,17 @@ export const useOllamaModels = () => {
   }
 
   const saveModel = (model: string) => (type: string) => {
-    if (type === SETTING_KEY.chatModelName) setChatModel(model)
-    if (type === SETTING_KEY.fimModelName) setFimModel(model)
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnySetConfigValue,
       key: type,
       data: model
     } as ClientMessage<string>)
+    if (type === SETTING_KEY.chatModelName) {
+      setChatModel(model)
+    }
+    if (type === SETTING_KEY.fimModelName) {
+      setFimModel(model)
+    }
   }
 
   useEffect(() => {
@@ -214,6 +218,7 @@ export const useOllamaModels = () => {
       type: MESSAGE_NAME.twinnyFetchOllamaModels
     })
     window.addEventListener('message', handler)
-  }, [chatModelName, fimModelName])
+  }, [])
+
   return { models, setModels, saveModel, chatModelName, fimModelName }
 }
