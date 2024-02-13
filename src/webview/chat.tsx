@@ -9,9 +9,16 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import { Selection } from './selection'
-import { BOT_NAME, MESSAGE_KEY, MESSAGE_NAME, USER_NAME } from '../constants'
+import {
+  BOT_NAME,
+  MESSAGE_KEY,
+  MESSAGE_NAME,
+  SETTING_KEY,
+  USER_NAME
+} from '../constants'
 
 import {
+  useConfigurationSetting,
   useLanguage,
   useSelection,
   useTheme,
@@ -25,7 +32,12 @@ import {
 } from './icons'
 
 import { Suggestions } from './suggestions'
-import { ClientMessage, MessageType, ServerMessage } from '../extension/types'
+import {
+  ApiProviders,
+  ClientMessage,
+  MessageType,
+  ServerMessage
+} from '../extension/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
 import { ModelSelect } from './model-select'
@@ -43,6 +55,11 @@ export const Chat = () => {
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
+  const [showModelSelect, setShowModelSelect] = useState<boolean>(false)
+  const { configurationSetting: apiProvider } = useConfigurationSetting(
+    SETTING_KEY.apiProvider
+  )
+
   const divRef = useRef<HTMLDivElement>(null)
   const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
   const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
@@ -193,6 +210,10 @@ export const Chat = () => {
     setIsSelectionVisible((prev) => !prev)
   }
 
+  const handleToggleModelSelection = () => {
+    setShowModelSelect((prev) => !prev)
+  }
+
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     chatRef.current?.focus()
@@ -213,7 +234,6 @@ export const Chat = () => {
 
   return (
     <VSCodePanelView>
-      <ModelSelect />
       <div className={styles.container}>
         <div className={styles.markdown} ref={divRef}>
           {messages?.map((message, index) => (
@@ -246,6 +266,7 @@ export const Chat = () => {
           onSelect={scrollBottom}
           language={language}
         />
+        {showModelSelect && <ModelSelect />}
         <div className={styles.chatOptions}>
           <VSCodeButton
             onClick={togggleAutoScroll}
@@ -270,6 +291,36 @@ export const Chat = () => {
             )}
           </VSCodeButton>
           <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
+          <div>
+            <VSCodeButton
+              onClick={togggleAutoScroll}
+              title="Toggle auto scroll on/off"
+              appearance="icon"
+            >
+              {isAutoScrolledEnabled ? (
+                <EnabledAutoScrollIcon />
+              ) : (
+                <DisabledAutoScrollIcon />
+              )}
+            </VSCodeButton>
+            <VSCodeButton
+              title="Toggle selection preview"
+              appearance="icon"
+              onClick={handleToggleSelection}
+            >
+              <span className="codicon codicon-code"></span>
+            </VSCodeButton>
+            <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
+          </div>
+          {apiProvider === ApiProviders.Ollama && (
+            <VSCodeButton
+              title="Select active models"
+              appearance="icon"
+              onClick={handleToggleModelSelection}
+            >
+              <span className={styles.textIcon}>🤖</span>
+            </VSCodeButton>
+          )}
         </div>
         <form>
           <div className={styles.chatBox}>

@@ -48,6 +48,7 @@ pre code {
   display: flex;
   gap: 3px;
   align-items: center;
+  justify-content: space-between;
 }
 
 .chatOptions svg {
@@ -127,4 +128,15 @@ pre code {
 
 .modelSelect {
   width: 100%;
+}
+
+.modelSelect div {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.textIcon {
+  font-size: 1.15rem;
+  transform: translateY(-6px);
 }

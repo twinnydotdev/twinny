@@ -45,6 +45,8 @@ export const MESSAGE_NAME = {
   twinnyWorkspaceContext: 'twinny-workspace-context',
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
   twinnySetOllamaModel: 'twinny-set-ollama-model',
+  twinnySetConfigValue: 'twinny-set-config-value',
+  twinnyGetConfigValue: 'twinnyGetConfigValue',
 }
 
 export const MESSAGE_KEY = {
@@ -54,6 +56,12 @@ export const MESSAGE_KEY = {
   lastConversation: 'lastConversation',
   selectedTemplates: 'selectedTemplates',
   selection: 'selection'
+}
+
+export const SETTING_KEY = {
+  fimModelName: 'fimModelName',
+  chatModelName: 'chatModelName',
+  apiProvider: 'apiProvider',
 }
 
 export const CONTEXT_NAME = {

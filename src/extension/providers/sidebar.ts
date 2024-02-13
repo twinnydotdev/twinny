@@ -3,7 +3,12 @@ import * as vscode from 'vscode'
 import { getLanguage, getTextSelection, getTheme } from '../utils'
 import { MESSAGE_KEY, MESSAGE_NAME } from '../../constants'
 import { ChatService } from '../chat-service'
-import { ClientMessage, MessageType, OllamaModel, ServerMessage } from '../types'
+import {
+  ClientMessage,
+  MessageType,
+  OllamaModel,
+  ServerMessage
+} from '../types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 
@@ -81,17 +86,37 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [MESSAGE_NAME.twinnySendLanguage]: this.getCurrentLanguage,
           [MESSAGE_NAME.twinnySendTheme]: this.getTheme,
           [MESSAGE_NAME.twinnySetGlobalContext]: this.setGlobalContext,
-          [MESSAGE_NAME.twinnySetWorkspaceContext]: this.setTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnySetWorkspaceContext]:
+            this.setTwinnyWorkspaceContext,
           [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
           [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
+          [MESSAGE_NAME.twinnySetConfigValue]: this.setConfigurationValue,
+          [MESSAGE_NAME.twinnyGetConfigValue]: this.getConfigurationValue
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
   }
 
-  public fetchOllamaModels = async () => {
+  public getConfigurationValue = (data: ClientMessage) => {
+    if (!data.key) return
+    const config = vscode.workspace.getConfiguration('twinny')
+    this.view?.webview.postMessage({
+      type: MESSAGE_NAME.twinnyGetConfigValue,
+      value: {
+        data: config.get(data.key as string),
+        type: data.key
+      }
+    } as ServerMessage<string>)
+  }
 
+  public setConfigurationValue = (data: ClientMessage) => {
+    if (!data.key) return
+    const config = vscode.workspace.getConfiguration('twinny')
+    config.update(data.key, data.data, vscode.ConfigurationTarget.Global)
+  }
+
+  public fetchOllamaModels = async () => {
     const models = await this._ollamaService?.fetchModels()
     if (!models) return
     this.view?.webview.postMessage({
