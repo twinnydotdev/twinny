@@ -46,9 +46,21 @@ pre code {
 
 .chatOptions {
   display: flex;
+  justify-content: space-between;
+}
+
+.chatOptions > div {
+  display: flex;
   gap: 3px;
   align-items: center;
   justify-content: space-between;
+}
+
+.chatOptions vscode-badge {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 20px;
+  white-space: nowrap;
 }
 
 .chatOptions svg {
