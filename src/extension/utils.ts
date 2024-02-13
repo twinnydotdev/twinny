@@ -1,24 +1,22 @@
 import {
   ColorThemeKind,
   ConfigurationTarget,
-  Position,
-  TextEditor,
   commands,
   window,
   workspace
 } from 'vscode'
 
-import { Theme, LanguageType, Bracket, ApiProviders, StreamResponse } from './types'
+import {
+  Theme,
+  LanguageType,
+  ApiProviders,
+  StreamResponse
+} from './types'
 import { supportedLanguages } from './languages'
 import {
   API_PROVIDER,
-  BRACKET_REGEX,
   EXTENSION_NAME,
-  NORMALIZE_REGEX,
   PROVIDER_NAMES,
-  ALL_BRACKETS,
-  CLOSING_BRACKETS,
-  OPENING_BRACKETS
 } from '../constants'
 
 export const delayExecution = <T extends () => void>(
@@ -59,96 +57,7 @@ export const getTheme = () => {
   }
 }
 
-export const isBracket = (char: string): char is Bracket => {
-  return ALL_BRACKETS.includes(char as Bracket)
-}
 
-export const isMatchingPair = (open?: Bracket, close?: string): boolean => {
-  return (
-    (open === '[' && close === ']') ||
-    (open === '(' && close === ')') ||
-    (open === '{' && close === '}')
-  )
-}
-
-export const countLines = (inputString: string) => {
-  const lines = inputString.split('\n')
-  const lineCount = lines.length
-  return lineCount
-}
-
-export const bracketMatcher = (completion: string): string => {
-  let accumulatedCompletion = ''
-  const normalisedCompletion = completion.replace(NORMALIZE_REGEX, '')
-  const openBrackets: Bracket[] = []
-
-  if (BRACKET_REGEX.test(normalisedCompletion) || completion.length <= 1)
-    return completion
-
-  for (const character of completion) {
-    if (OPENING_BRACKETS.includes(character)) {
-      openBrackets.push(character)
-    }
-
-    if (CLOSING_BRACKETS.includes(character)) {
-      if (
-        openBrackets.length &&
-        isMatchingPair(openBrackets.at(-1), character)
-      ) {
-        openBrackets.pop()
-      } else {
-        break
-      }
-    }
-
-    accumulatedCompletion += character
-  }
-
-  return accumulatedCompletion.trimEnd() || completion
-}
-
-export const removeDuplicateLinesDown = (
-  completion: string,
-  editor: TextEditor,
-  cursorPosition: Position,
-  linesDown = 3
-) => {
-  const accumulatedCompletion = completion
-  const lineCount = editor.document.lineCount
-  let nextLineIndex = cursorPosition.line + 1
-  while (
-    nextLineIndex < cursorPosition.line + linesDown &&
-    nextLineIndex < lineCount
-  ) {
-    const line = editor.document.lineAt(nextLineIndex)
-    const nextLineText = line.text
-    const accumulatedCompletion = nextLineText
-      .replace(NORMALIZE_REGEX, '')
-      .trim()
-    if (accumulatedCompletion === completion) return ''
-    nextLineIndex++
-  }
-  return accumulatedCompletion
-}
-
-export const getIsSingleBracket = (completion: string) =>
-  completion.length === 1 && isBracket(completion)
-
-export const getCompletionNormalized = (completion: string) =>
-  completion.replace(NORMALIZE_REGEX, '')
-
-export const removeDoubleQuoteEndings = (
-  completion: string,
-  nextCharacter: string
-) => {
-  if (
-    completion.endsWith('\'' || completion.endsWith('"')) &&
-    (nextCharacter === '"' || nextCharacter === '\'')
-  ) {
-    completion = completion.slice(0, -1)
-  }
-  return completion
-}
 
 export const setApiDefaults = () => {
   const config = workspace.getConfiguration('twinny')
@@ -184,7 +93,10 @@ export const getChatDataFromProvider = (
   }
 }
 
-export const getFimDataFromProvider = (provider: string, data: StreamResponse | undefined) => {
+export const getFimDataFromProvider = (
+  provider: string,
+  data: StreamResponse | undefined
+) => {
   switch (provider) {
     case ApiProviders.Ollama:
       return data?.response
@@ -195,9 +107,7 @@ export const getFimDataFromProvider = (provider: string, data: StreamResponse | 
       if (data?.choices[0].text === 'undefined') {
         return ''
       }
-      return data?.choices[0].text
-        ? data?.choices[0].text
-        : ''
+      return data?.choices[0].text ? data?.choices[0].text : ''
   }
 }
 
@@ -217,4 +127,3 @@ export function safeParseJsonResponse(
     return undefined
   }
 }
-

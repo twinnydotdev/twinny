@@ -9,20 +9,11 @@ import {
   StatusBarItem,
   window,
   Uri,
-  TextEditor,
   InlineCompletionContext,
   CompletionTriggerKind
 } from 'vscode'
 import 'string_score'
-import {
-  bracketMatcher,
-  countLines,
-  getCompletionNormalized,
-  getFimDataFromProvider,
-  getIsSingleBracket,
-  removeDoubleQuoteEndings,
-  removeDuplicateLinesDown
-} from '../utils'
+import { getFimDataFromProvider } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../languages'
 import {
@@ -41,6 +32,7 @@ import { FIM_TEMPLATE_FORMAT, LINE_BREAK_REGEX } from '../../constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
+import { CompletionFormatter } from '../completion-formatter'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _nonce = 0
@@ -421,49 +413,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { prefix, suffix }
   }
 
-  private getFormattedCompletion = (completion: string, editor: TextEditor) => {
-    const originalCompletion = completion
-    const cursorPosition = editor.selection.active
-    const document = editor.document
-    const lineEndPosition = document.lineAt(cursorPosition.line).range.end
-    const textAfterRange = new Range(cursorPosition, lineEndPosition)
-    const textAfterCursor = this._document?.getText(textAfterRange) || ''
-    completion = bracketMatcher(completion)
-    const normalizedCompletion = getCompletionNormalized(completion)
-
-    if (
-      (textAfterCursor &&
-        normalizedCompletion &&
-        textAfterCursor.trim() === normalizedCompletion.trim()) ||
-      !normalizedCompletion.length ||
-      completion.endsWith(textAfterCursor)
-    ) {
-      completion = completion.replace(textAfterCursor, '')
-    }
-
-    if (getIsSingleBracket(completion.trim())) {
-      return completion.trim()
-    }
-
-    if (
-      !this._useMultiLineCompletions ||
-      countLines(normalizedCompletion) >= 2
-    ) {
-      completion = removeDuplicateLinesDown(completion, editor, cursorPosition)
-    }
-
-    completion = removeDoubleQuoteEndings(
-      completion,
-      textAfterCursor.at(0) as string
-    )
-
-    if (completion.trimStart() === '' && originalCompletion !== '\n') {
-      completion = completion.trim()
-    }
-
-    return completion
-  }
-
   private triggerInlineCompletion(
     inlineCompletion: InlineCompletion
   ): InlineCompletionItem[] {
@@ -475,10 +424,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return []
     }
 
-    const completion = this.getFormattedCompletion(
+    const completion = new CompletionFormatter(
       inlineCompletion.completion,
       editor
-    )
+    ).format()
 
     if (this._enableCompletionCache) {
       cache.setCache({ prefix, suffix, completion })
