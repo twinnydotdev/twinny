@@ -1,3 +1,4 @@
+import { workspace } from 'vscode'
 import {
   MessageRoleContent,
   ApiProviders,
@@ -16,10 +17,12 @@ export function createStreamRequestBody(
     messages?: MessageRoleContent[]
   }
 ): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
+  const config = workspace.getConfiguration('twinny')
+
   switch (provider) {
     case ApiProviders.Ollama:
     case ApiProviders.OllamaWebUi:
-      return {
+      var result: StreamOptionsOllama = {
         model: options.model,
         prompt,
         stream: true,
@@ -28,6 +31,10 @@ export function createStreamRequestBody(
           num_predict: options.numPredictChat
         }
       }
+      if (config.get('keepModelsInMemory')) {
+        result.keep_alive = -1
+      }
+      return result
     case ApiProviders.LlamaCpp:
       return {
         prompt,
