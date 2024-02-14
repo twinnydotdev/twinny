@@ -284,35 +284,47 @@
           "default": "codellama:7b-code",
           "description": "Model identifier for FIM completions. Applicable only for Ollama and Oobabooga API."
         },
-        "twinny.disableAutoSuggest": {
+        "twinny.fimTemplateFormat": {
           "order": 9,
+          "type": "string",
+          "enum": [
+            "automatic",
+            "stable-code",
+            "codellama",
+            "deepseek"
+          ],
+          "default": "automatic",
+          "description": "The prompt format to be used for FIM completions. Overrides automatic detection."
+        },
+        "twinny.disableAutoSuggest": {
+          "order": 10,
           "type": "boolean",
           "default": false,
           "description": "Disables automatic suggestions, manual trigger (default shortcut Alt+\\)."
         },
         "twinny.contextLength": {
-          "order": 10,
+          "order": 11,
           "type": "number",
           "default": 30,
           "description": "Defines the number of lines before and after the current line to include in FIM prompts.",
           "required": true
         },
         "twinny.debounceWait": {
-          "order": 11,
+          "order": 12,
           "type": "number",
           "default": 300,
           "description": "Delay in milliseconds before triggering the next completion.",
           "required": true
         },
         "twinny.temperature": {
-          "order": 12,
+          "order": 13,
           "type": "number",
           "default": 0.2,
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
         "twinny.useMultiLineCompletions": {
-          "order": 13,
+          "order": 14,
           "type": "boolean",
           "default": false,
           "description": "Use multiline completions, can be inaccurate in some cases."
@@ -321,57 +333,57 @@
           "dependencies": {
             "twinny.useMultiLineCompletions": true
           },
-          "order": 14,
+          "order": 15,
           "type": "number",
           "default": 20,
           "description": "Maximum number of lines to use for multi line completions. Applicable only when useMultiLineCompletions is enabled."
         },
         "twinny.useFileContext": {
-          "order": 15,
+          "order": 16,
           "type": "boolean",
           "default": false,
           "description": "Enables scanning of neighbouring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
-          "order": 16,
+          "order": 17,
           "type": "boolean",
           "default": false,
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 17,
+          "order": 18,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for chat completions.",
           "required": true
         },
         "twinny.numPredictFim": {
-          "order": 18,
+          "order": 19,
           "type": "number",
           "default": -1,
           "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny stops at logical line breaks.",
           "required": true
         },
         "twinny.keepAlive": {
-          "order": 19,
+          "order": 20,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.useTls": {
-          "order": 20,
+          "order": 21,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
         "twinny.apiBearerToken": {
-          "order": 21,
+          "order": 22,
           "type": "string",
           "default": "",
           "description": "Bearer token for secure API authentication."
         },
         "twinny.enableLogging": {
-          "order": 22,
+          "order": 23,
           "type": "boolean",
           "default": false,
           "description": "Enable twinny debug mode"

@@ -17,18 +17,12 @@ import { getFimDataFromProvider } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../languages'
 import {
-  FimPromptTemplate,
   InlineCompletion,
   StreamRequestOptions,
   StreamResponse
 } from '../types'
-import {
-  getDefaultFimPromptTemplate,
-  getFimPromptTemplateDeepseek,
-  getFimPromptTemplateLLama,
-  getFimPromptTemplateStableCode
-} from '../fim-templates'
-import { FIM_TEMPLATE_FORMAT, LINE_BREAK_REGEX } from '../../constants'
+import { getFimTemplate } from '../fim-templates'
+import { LINE_BREAK_REGEX } from '../../constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
@@ -49,6 +43,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _temperature = this._config.get('temperature') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
   private _apiProvider = this._config.get('apiProvider') as string
+  private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useTls = this._config.get('useTls') as boolean
   private _keepAlive = this._config.get('keepAlive') as string | number
@@ -99,24 +94,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
   }
 
-  public getFimTemplate(args: FimPromptTemplate) {
-    if (
-      this._fimModel.includes(FIM_TEMPLATE_FORMAT.codellama) ||
-      this._fimModel.includes(FIM_TEMPLATE_FORMAT.llama)
-    ) {
-      return getFimPromptTemplateLLama(args)
-    }
-
-    if (this._fimModel.includes(FIM_TEMPLATE_FORMAT.deepseek)) {
-      return getFimPromptTemplateDeepseek(args)
-    }
-
-    if (this._fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode)) {
-      return getFimPromptTemplateStableCode(args)
-    }
-
-    return getDefaultFimPromptTemplate(args)
-  }
   public handleEndStream = ({
     completion,
     position,
@@ -175,13 +152,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           position
         )
 
-        const { prompt, stop } = this.getFimTemplate({
-          context,
-          prefix,
-          suffix,
-          header: this.getFileHeader(language, document.uri),
-          useFileContext: this._useFileContext
-        })
+        const { prompt, stop } = getFimTemplate(
+          this._fimModel,
+          this._fimTemplateFormat,
+          {
+            context,
+            prefix,
+            suffix,
+            header: this.getFileHeader(language, document.uri),
+            useFileContext: this._useFileContext
+          }
+        )
 
         const cachedCompletion = cache.getCache({ prefix, suffix })
 
@@ -190,6 +171,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           this._logger.log(
             `Streaming response end using cache ${this._nonce} \nCompletion: ${completion}`
           )
+          this._statusBar.text = '🤖'
           return resolve(
             this.handleEndStream({
               position,
@@ -203,6 +185,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
         if (!prompt) {
           this._logger.log('Streaming response end prompt not found')
+          this._statusBar.text = '🤖'
           return resolve([])
         }
 
@@ -423,10 +406,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return []
     }
 
-    const completion = new CompletionFormatter(
-      inlineCompletion.completion,
-      editor
-    ).format()
+    const completion = new CompletionFormatter(editor).format(
+      inlineCompletion.completion
+    )
 
     if (this._enableCompletionCache) {
       cache.setCache({ prefix, suffix, completion })
@@ -450,6 +432,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._useFileContext = this._config.get('useFileContext') as boolean
     this._disableAutoSuggest = this._config.get('disableAutoSuggest') as boolean
     this._fimModel = this._config.get('fimModelName') as string
+    this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._apiPath = this._config.get('fimApiPath') as string
     this._port = this._config.get('fimApiPort') as number

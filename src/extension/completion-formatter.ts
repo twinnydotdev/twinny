@@ -1,4 +1,4 @@
-import { Range, TextEditor } from 'vscode'
+import { Position, Range, TextEditor } from 'vscode'
 
 import {
   ALL_BRACKETS,
@@ -10,21 +10,22 @@ import { Bracket } from './types'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
+  private _completion = ''
+  private _normalisedCompletion = ''
+  private _originalCompletion = ''
   private _textAfterCursor: string
-  private _completion: string
-  private _normalisedCompletion: string
-  private _originalCompletion: string
+  private _editor: TextEditor
+  private _cursorPosition: Position
 
-  constructor(completion: string, editor: TextEditor) {
-    const cursorPosition = editor.selection.active
+  constructor(editor: TextEditor) {
+    this._editor = editor
+    this._cursorPosition = this._editor.selection.active
     const document = editor.document
-    const lineEndPosition = document.lineAt(cursorPosition.line).range.end
-    const textAfterRange = new Range(cursorPosition, lineEndPosition)
+    const lineEndPosition = document.lineAt(this._cursorPosition.line).range.end
+    const textAfterRange = new Range(this._cursorPosition, lineEndPosition)
     this._textAfterCursor = document?.getText(textAfterRange) || ''
     this._characterAfterCursor = this._textAfterCursor.at(0) as string
-    this._completion = ''
-    this._normalisedCompletion = this.normalise(completion)
-    this._originalCompletion = completion
+    this._editor = editor
   }
 
   private isMatchingPair = (open?: Bracket, close?: string): boolean => {
@@ -35,7 +36,7 @@ export class CompletionFormatter {
     )
   }
 
-  private bracketMatch = (): CompletionFormatter => {
+  private matchCompletionBrackets = (): CompletionFormatter => {
     let accumulatedCompletion = ''
     const openBrackets: Bracket[] = []
     for (const character of this._originalCompletion) {
@@ -56,7 +57,8 @@ export class CompletionFormatter {
       accumulatedCompletion += character
     }
 
-    this._completion = accumulatedCompletion.trimEnd() || this._originalCompletion.trimEnd()
+    this._completion =
+      accumulatedCompletion.trimEnd() || this._originalCompletion.trimEnd()
 
     return this
   }
@@ -76,7 +78,7 @@ export class CompletionFormatter {
 
   private normalise = (text: string) => text?.replace(NORMALIZE_REGEX, '')
 
-  private removeDuplicates = () => {
+  private removeDuplicateText = () => {
     const normalisedAfter = this.normalise(this._textAfterCursor)
     if (
       (normalisedAfter &&
@@ -90,13 +92,29 @@ export class CompletionFormatter {
     return this
   }
 
-  private removeDoubleQuotes = () => {
+  private removeDuplicateQuotes = () => {
     if (
-      this._completion.endsWith('\'' || this._completion.endsWith('"')) &&
-      (this._characterAfterCursor === '"' || this._characterAfterCursor === '\'')
+      this._normalisedCompletion.endsWith('\',') ||
+      this._normalisedCompletion.endsWith('",') ||
+      (this._normalisedCompletion.endsWith('`,') &&
+        ['"', '\'', '`'].includes(this._characterAfterCursor))
+    ) {
+      this._completion = this._completion.slice(0, -3)
+    }
+
+    if (
+      this._normalisedCompletion.endsWith(
+        '\'' ||
+          this._normalisedCompletion.endsWith('"') ||
+          this._normalisedCompletion.endsWith('`')
+      ) &&
+      (this._characterAfterCursor === '"' ||
+        this._characterAfterCursor === '\'' ||
+        this._characterAfterCursor === '`')
     ) {
       this._completion = this._completion.slice(0, -1)
     }
+
     return this
   }
 
@@ -111,12 +129,43 @@ export class CompletionFormatter {
     return this._completion
   }
 
-  public format = (): string => {
-    this
-      .bracketMatch()
-      .removeDoubleQuotes()
-      .removeDuplicates()
+  private preventDuplicateLines = (): CompletionFormatter => {
+    const lineCount = this._editor.document.lineCount
+    let nextLineIndex = this._cursorPosition.line + 1
+    while (
+      nextLineIndex < this._cursorPosition.line + 3 &&
+      nextLineIndex < lineCount
+    ) {
+      const line = this._editor.document.lineAt(nextLineIndex)
+      if (
+        this.normalise(line.text) === this.normalise(this._originalCompletion)
+      ) {
+        this._completion = ''
+        return this
+      }
+      nextLineIndex++
+    }
+
+    return this
+  }
+
+  public removeInvalidLineBreaks = (): CompletionFormatter => {
+    if (this._textAfterCursor) {
+      this._completion = this._completion.trimEnd()
+    }
+    return this
+  }
+
+  public format = (completion: string): string => {
+    this._completion = ''
+    this._normalisedCompletion = this.normalise(completion)
+    this._originalCompletion = completion
+    this.matchCompletionBrackets()
+      .preventDuplicateLines()
+      .removeDuplicateQuotes()
+      .removeDuplicateText()
       .ignoreBlankLines()
+      .removeInvalidLineBreaks()
       .getCompletion()
 
     return this._completion

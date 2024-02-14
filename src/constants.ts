@@ -76,6 +76,7 @@ export const UI_TABS = {
 }
 
 export const FIM_TEMPLATE_FORMAT = {
+  automatic: 'automatic',
   codellama: 'codellama',
   deepseek: 'deepseek',
   llama: 'llama',
