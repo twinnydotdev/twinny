@@ -138,8 +138,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     position: Position,
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
-    this._document = document
-
     const editor = window.activeTextEditor
 
     if (
