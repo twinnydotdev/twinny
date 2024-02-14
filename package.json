@@ -405,6 +405,7 @@
     "vscode:publish": "npm exec vsce publish"
   },
   "devDependencies": {
+    "@types/async-lock": "^1.4.2",
     "@types/handlebars": "^4.1.0",
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
@@ -426,6 +427,7 @@
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
+    "async-lock": "^1.4.1",
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",

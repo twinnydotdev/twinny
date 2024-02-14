@@ -5,16 +5,16 @@ export const getFimPromptTemplateLLama = ({
   context,
   header,
   useFileContext,
-  suffix,
-  prefix
+  prefixSuffix
 }: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
     prompt: `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`,
     prefix,
     suffix,
-    stop: ['<EOT>']
+    stopWords: ['<EOT>']
   }
 }
 
@@ -22,16 +22,16 @@ export const getDefaultFimPromptTemplate = ({
   context,
   header,
   useFileContext,
-  suffix,
-  prefix
+  prefixSuffix,
 }: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
     prompt: `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`,
     prefix,
     suffix,
-    stop: ['<EOT>']
+    stopWords: ['<EOT>']
   }
 }
 
@@ -39,16 +39,16 @@ export const getFimPromptTemplateDeepseek = ({
   context,
   header,
   useFileContext,
-  suffix,
-  prefix
+  prefixSuffix,
 }: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
     prompt: `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
     prefix,
     suffix,
-    stop: [
+    stopWords: [
       '<｜fim▁begin｜>',
       '<｜fim▁hole｜>',
       '<｜fim▁end｜>',
@@ -62,16 +62,16 @@ export const getFimPromptTemplateStableCode = ({
   context,
   header,
   useFileContext,
-  suffix,
-  prefix
+  prefixSuffix,
 }: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
   return {
     prompt: `<fim_prefix>${fileContext}\n${heading}${prefix}<fim_suffix>${suffix}<fim_middle>`,
     prefix,
     suffix,
-    stop: ['<|endoftext|>']
+    stopWords: ['<|endoftext|>']
   }
 }
 

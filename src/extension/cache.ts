@@ -1,3 +1,5 @@
+import { PrefixSuffix } from './types'
+
 class LRUCache {
   private capacity: number
   private cache: Map<string, string | null>
@@ -30,30 +32,23 @@ class LRUCache {
     return src.split('\n').join('').replace(/\s+/gm, '').replace(' ', '')
   }
 
-  getKey(args: { prefix: string; suffix: string | null }) {
-    if (args.suffix) {
-      return this.normalize(args.prefix + ' #### ' + args.suffix)
+  getKey(prefixSuffix: PrefixSuffix) {
+    const { prefix, suffix } = prefixSuffix
+    if (suffix) {
+      return this.normalize(prefix + ' #### ' + suffix)
     }
-    return this.normalize(args.prefix)
+    return this.normalize(prefix)
   }
 
-  getCache(args: {
-    prefix: string
-    suffix: string | null
-  }): string | undefined | null {
-    const key = this.getKey(args)
+  getCache(prefixSuffix: PrefixSuffix): string | undefined | null {
+    const key = this.getKey(prefixSuffix)
     return this.get(key)
   }
 
-  setCache(args: {
-    prefix: string
-    suffix: string | null
-    completion: string
-  }) {
-    const key = this.getKey(args)
-    this.set(key, args.completion)
+  setCache(prefixSuffix: PrefixSuffix, completion: string) {
+    const key = this.getKey(prefixSuffix)
+    this.set(key, completion)
   }
 }
 
 export const cache = new LRUCache(50)
-

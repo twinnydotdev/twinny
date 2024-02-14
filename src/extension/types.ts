@@ -1,4 +1,4 @@
-import { Position } from 'vscode'
+import { InlineCompletionItem, InlineCompletionList, Position } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from '../constants'
 
@@ -20,12 +20,9 @@ export interface StreamBodyOpenAI extends StreamBodyBase {
   max_tokens: number
 }
 
-export interface InlineCompletion {
-  completion: string
-  position: Position
+export interface PrefixSuffix {
   prefix: string
   suffix: string
-  stop: string[]
 }
 
 export interface StreamResponse {
@@ -111,8 +108,7 @@ export type ThemeType = (typeof Theme)[keyof typeof Theme]
 export interface FimPromptTemplate {
   context: string
   header: string
-  suffix: string
-  prefix: string
+  prefixSuffix: PrefixSuffix
   useFileContext: boolean
 }
 
@@ -167,3 +163,11 @@ export interface OllamaModel {
 export interface OllamaModels {
   models: OllamaModel[]
 }
+
+export type ResolvedInlineCompletion = InlineCompletionItem[]
+| InlineCompletionList
+| PromiseLike<
+    InlineCompletionItem[] | InlineCompletionList | null | undefined
+  >
+| null
+| undefined

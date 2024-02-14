@@ -87,7 +87,7 @@ export async function activate(context: ExtensionContext) {
       }
     ),
     commands.registerCommand('twinny.stopGeneration', () => {
-      completionProvider.destroyStream()
+      completionProvider.onError()
       sidebarProvider.destroyStream()
     }),
     commands.registerCommand('twinny.templates', async () => {

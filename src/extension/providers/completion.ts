@@ -10,14 +10,16 @@ import {
   window,
   Uri,
   InlineCompletionContext,
-  CompletionTriggerKind
+  InlineCompletionTriggerKind
 } from 'vscode'
+import AsyncLock from 'async-lock'
 import 'string_score'
 import { getFimDataFromProvider } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../languages'
 import {
-  InlineCompletion,
+  PrefixSuffix,
+  ResolvedInlineCompletion,
   StreamRequestOptions,
   StreamResponse
 } from '../types'
@@ -29,41 +31,45 @@ import { Logger } from '../logger'
 import { CompletionFormatter } from '../completion-formatter'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
-  private _nonce = 0
-  private _statusBar: StatusBarItem
-  private _debouncer: NodeJS.Timeout | undefined
-  private _logger: Logger
   private _config = workspace.getConfiguration('twinny')
-  private _debounceWait = this._config.get('debounceWait') as number
-  private _contextLength = this._config.get('contextLength') as number
-  private _fimModel = this._config.get('fimModelName') as string
+  private _abortController: AbortController | null
   private _apiHostname = this._config.get('apiHostname') as string
-  private _port = this._config.get('fimApiPort') as number
   private _apiPath = this._config.get('fimApiPath') as string
-  private _temperature = this._config.get('temperature') as number
-  private _numPredictFim = this._config.get('numPredictFim') as number
   private _apiProvider = this._config.get('apiProvider') as string
+  private _bearerToken = this._config.get('apiBearerToken') as string
+  private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
+  private _chunkCount = 0
+  private _completion = ''
+  private _debouncer: NodeJS.Timeout | undefined
+  private _debounceWait = this._config.get('debounceWait') as number
+  private _disableAuto = this._config.get('disableAutoSuggest') as boolean
+  private _document: TextDocument | null
+  private _enabled = this._config.get('enabled')
+  private _fimModel = this._config.get('fimModelName') as string
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
-  private _useFileContext = this._config.get('useFileContext') as boolean
-  private _useTls = this._config.get('useTls') as boolean
   private _keepAlive = this._config.get('keepAlive') as string | number
-  private _useMultiLineCompletions = this._config.get(
-    'useMultiLineCompletions'
-  ) as boolean
-  private maxLines = this._config.get('maxLines') as number
-  private _disableAutoSuggest = this._config.get(
-    'disableAutoSuggest'
-  ) as boolean
-  private _apiBearerToken = this._config.get('apiBearerToken') as string
-  private _enableCompletionCache = this._config.get(
-    'enableCompletionCache'
-  ) as boolean
-  private _controller: AbortController | null
+  private _linesGenerated = 0
+  private _lock: AsyncLock
+  private _logger: Logger
+  private _maxLines = this._config.get('maxLines') as number
+  private _nonce = 0
+  private _numLineContext = this._config.get('contextLength') as number
+  private _numPredictFim = this._config.get('numPredictFim') as number
+  private _port = this._config.get('fimApiPort') as number
+  private _position: Position | null
+  private _statusBar: StatusBarItem
+  private _temperature = this._config.get('temperature') as number
+  private _useFileContext = this._config.get('useFileContext') as boolean
+  private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
+  private _useTls = this._config.get('useTls') as boolean
 
   constructor(statusBar: StatusBarItem) {
-    this._statusBar = statusBar
+    this._abortController = null
+    this._document = null
+    this._lock = new AsyncLock()
     this._logger = new Logger()
-    this._controller = null
+    this._position = null
+    this._statusBar = statusBar
   }
 
   private buildStreamRequest(prompt: string) {
@@ -82,32 +88,158 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this._apiBearerToken}`
+        Authorization: `Bearer ${this._bearerToken}`
       }
     }
 
     return { requestOptions, requestBody }
   }
 
-  public destroyStream = () => {
-    this._controller?.abort()
-    this._statusBar.text = '🤖'
+  private getModelStopWords = (prefixSuffix: PrefixSuffix) => {
+    if (!this._document) return []
+    const language = this._document.languageId
+    const { stopWords } = getFimTemplate(
+      this._fimModel,
+      this._fimTemplateFormat,
+      {
+        context: this.getSurroundingCodeContext(this._document?.uri),
+        prefixSuffix,
+        header: this.getAdditionalContext(language, this._document?.uri),
+        useFileContext: this._useFileContext
+      }
+    )
+    return stopWords
   }
 
-  public handleEndStream = ({
-    completion,
-    position,
-    prefix,
-    suffix,
-    stop
-  }: InlineCompletion) => {
-    return this.triggerInlineCompletion({
-      completion,
-      position,
-      prefix,
-      suffix,
-      stop
+  private removeStopWords(prefixSuffix: PrefixSuffix) {
+    const stopWords = this.getModelStopWords(prefixSuffix)
+    stopWords.forEach((stopWord) => {
+      this._completion = this._completion.split(stopWord).join('')
     })
+  }
+
+  private shouldSkipCompletion(context: InlineCompletionContext) {
+    return (
+      context.triggerKind === InlineCompletionTriggerKind.Automatic &&
+      this._disableAuto
+    )
+  }
+
+  private getContainsStopWord(prefixSuffix: PrefixSuffix) {
+    const stopWords = this.getModelStopWords(prefixSuffix)
+    return stopWords.some((stopSequence) =>
+      this._completion?.includes(stopSequence)
+    )
+  }
+
+  private getMaxLinesReached(prefixSuffix: PrefixSuffix) {
+    return (
+      this._linesGenerated > this._maxLines ||
+      this.getContainsStopWord(prefixSuffix)
+    )
+  }
+
+  private getIsSingleLineCompltion(completionString: string) {
+    return (
+      !this._useMultiLine &&
+      this._chunkCount > 1 &&
+      LINE_BREAK_REGEX.exec(completionString)
+    )
+  }
+
+  private getPrompt(prefixSuffix: PrefixSuffix) {
+    if (!this._document || !this._position) return ''
+
+    const language = this._document.languageId
+
+    const { prompt } = getFimTemplate(this._fimModel, this._fimTemplateFormat, {
+      context: this.getSurroundingCodeContext(this._document.uri),
+      prefixSuffix,
+      header: this.getAdditionalContext(language, this._document.uri),
+      useFileContext: this._useFileContext
+    })
+
+    return prompt
+  }
+
+  getPrefixSuffix(document: TextDocument, position: Position): PrefixSuffix {
+    const line = position.line
+    const startLine = Math.max(0, line - this._numLineContext)
+    const endLine = line + this._numLineContext
+
+    const prefixRange = new Range(startLine, 0, line, position.character)
+    const suffixRange = new Range(line, position.character, endLine, 0)
+
+    const prefix = document.getText(prefixRange)
+    const suffix = document.getText(suffixRange)
+
+    return { prefix, suffix }
+  }
+
+  private onData(
+    data: StreamResponse | undefined,
+    prefixSuffix: PrefixSuffix,
+    done: (comlpetion: ResolvedInlineCompletion) => void
+  ) {
+    try {
+      const completionData = getFimDataFromProvider(this._apiProvider, data)
+      if (completionData === undefined) return done([])
+
+      this._completion = this._completion + completionData
+      this._chunkCount = this._chunkCount + 1
+
+      if (this.getIsSingleLineCompltion(completionData)) {
+        this._logger.log(
+          `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
+        )
+        this._abortController?.abort()
+        return done(this.triggerInlineCompletion(prefixSuffix))
+      }
+
+      if (LINE_BREAK_REGEX.exec(completionData)) this._linesGenerated++
+
+      if (this.getMaxLinesReached(prefixSuffix)) {
+        this._logger.log(
+          `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${this._completion}`
+        )
+        this.removeStopWords(prefixSuffix)
+        this._abortController?.abort()
+        return done(this.triggerInlineCompletion(prefixSuffix))
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  private onCache(
+    prefixSuffix: PrefixSuffix,
+    done: (comlpetion: ResolvedInlineCompletion) => void
+  ) {
+    this._logger.log(
+      `Streaming response end using cache ${this._nonce} \nCompletion: ${this._completion}`
+    )
+    return done(this.triggerInlineCompletion(prefixSuffix))
+  }
+
+  private onStart(controller: AbortController) {
+    this._abortController = controller
+  }
+
+  private onEnd(
+    prefixSuffix: PrefixSuffix,
+    resolve: (comlpetion: ResolvedInlineCompletion) => void
+  ) {
+    this._logger.log(
+      `Streaming response end due to request end ${this._nonce} \nCompletion: ${this._completion}`
+    )
+    this.removeStopWords(prefixSuffix)
+    this._abortController?.abort()
+    resolve(this.triggerInlineCompletion(prefixSuffix))
+  }
+
+  public onError = () => {
+    this._abortController?.abort()
+    this._statusBar.text = '🤖'
   }
 
   public async provideInlineCompletionItems(
@@ -117,200 +249,59 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
 
-    if (
-      context.triggerKind ===
-        CompletionTriggerKind.TriggerCharacter.valueOf() &&
-      this._disableAutoSuggest
-    ) {
-      return
-    }
+    if (this.shouldSkipCompletion(context) || !editor || !this._enabled) return
 
-    const language = editor?.document.languageId
+    this._document = document
+    this._position = position
+    this._completion = ''
+    this._chunkCount = 0
+    this._linesGenerated = 0
+    this._nonce = this._nonce + 1
+    this._statusBar.text = '$(loading~spin)'
+    this._statusBar.command = 'twinny.stopGeneration'
 
-    if (!editor) {
-      return
-    }
+    if (this._debouncer) clearTimeout(this._debouncer)
 
-    return new Promise((resolve) => {
-      if (this._debouncer) {
-        clearTimeout(this._debouncer)
-      }
+    return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
+      this._debouncer = setTimeout(() => {
+        this._lock.acquire('completion', () => {
+          return new Promise(
+            (_resolve: (completion: ResolvedInlineCompletion) => void) => {
+              const prefixSuffix = this.getPrefixSuffix(document, position)
 
-      this._debouncer = setTimeout(async () => {
-        if (!this._config.get('enabled')) {
-          this._logger.log('Streaming response end as completions disabled')
-          return resolve([])
-        }
+              const cachedCompletion = cache.getCache(prefixSuffix)
 
-        this._nonce = this._nonce + 1
-        let completion = ''
-
-        const context = this.getFileContext(document.uri)
-
-        const { prefix, suffix } = this.getCursorPositionContext(
-          document,
-          position
-        )
-
-        const { prompt, stop } = getFimTemplate(
-          this._fimModel,
-          this._fimTemplateFormat,
-          {
-            context,
-            prefix,
-            suffix,
-            header: this.getFileHeader(language, document.uri),
-            useFileContext: this._useFileContext
-          }
-        )
-
-        const cachedCompletion = cache.getCache({ prefix, suffix })
-
-        if (cachedCompletion && this._enableCompletionCache) {
-          completion = cachedCompletion
-          this._logger.log(
-            `Streaming response end using cache ${this._nonce} \nCompletion: ${completion}`
-          )
-          this._statusBar.text = '🤖'
-          return resolve(
-            this.handleEndStream({
-              position,
-              prefix,
-              suffix,
-              stop,
-              completion
-            })
-          )
-        }
-
-        if (!prompt) {
-          this._logger.log('Streaming response end prompt not found')
-          this._statusBar.text = '🤖'
-          return resolve([])
-        }
-
-        try {
-          let completion = ''
-          let chunkCount = 0
-          let lines = 0
-          this._statusBar.text = '$(loading~spin)'
-          this._statusBar.command = 'twinny.stopGeneration'
-
-          const { requestBody, requestOptions } =
-            this.buildStreamRequest(prompt)
-
-          streamResponse({
-            body: requestBody,
-            options: requestOptions,
-            onStart: (controller: AbortController) => {
-              this._controller = controller
-            },
-            onEnd: () => {
-              this._logger.log(
-                `Streaming response end due to request end ${this._nonce} \nCompletion: ${completion}`
-              )
-              this._statusBar.text = '🤖'
-              stop.forEach((stopWord) => {
-                completion = completion.split(stopWord).join('')
-              })
-              this._controller?.abort()
-              resolve(
-                this.handleEndStream({
-                  position,
-                  prefix,
-                  suffix,
-                  stop,
-                  completion
-                })
-              )
-            },
-            onData: (streamResponse: StreamResponse | undefined) => {
-              try {
-                const completionString = getFimDataFromProvider(
-                  this._apiProvider,
-                  streamResponse
-                )
-
-                if (completionString === undefined) {
-                  return
-                }
-
-                completion = completion + completionString
-                chunkCount = chunkCount + 1
-
-                if (
-                  !this._useMultiLineCompletions &&
-                  chunkCount > 1 &&
-                  LINE_BREAK_REGEX.exec(completionString)
-                ) {
-                  this._logger.log(
-                    `Streaming response end due to line break ${this._nonce} \nCompletion: ${completion}`
-                  )
-                  this._statusBar.text = '🤖'
-                  stop.forEach((stopWord) => {
-                    completion = completion.split(stopWord).join('')
-                  })
-                  this._controller?.abort()
-                  return resolve(
-                    this.handleEndStream({
-                      position,
-                      prefix,
-                      suffix,
-                      stop,
-                      completion
-                    })
-                  )
-                }
-
-                if (LINE_BREAK_REGEX.exec(completionString)) {
-                  lines++
-                }
-
-                if (
-                  lines > this.maxLines ||
-                  stop.some((stopSequence) =>
-                    completion?.includes(stopSequence)
-                  )
-                ) {
-                  this._logger.log(
-                    `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${completion}`
-                  )
-                  this._statusBar.text = '🤖'
-                  stop.forEach((stopWord) => {
-                    completion = completion.split(stopWord).join('')
-                  })
-                  this._controller?.abort()
-                  return resolve(
-                    this.handleEndStream({
-                      position,
-                      prefix,
-                      suffix,
-                      stop,
-                      completion
-                    })
-                  )
-                }
-              } catch (e) {
-                console.error(e)
+              if (cachedCompletion && this._cacheEnabled) {
+                this._completion = cachedCompletion
+                return this.onCache(prefixSuffix, _resolve)
               }
-            },
-            onError: (error: Error) => {
-              this._statusBar.text = '🤖'
-              console.error(error)
-              this._controller?.abort()
-              resolve([])
+
+              const prompt = this.getPrompt(prefixSuffix)
+
+              const { requestBody, requestOptions } =
+                this.buildStreamRequest(prompt)
+
+              try {
+                streamResponse({
+                  body: requestBody,
+                  options: requestOptions,
+                  onStart: (controller) => this.onStart(controller),
+                  onEnd: () => this.onEnd(prefixSuffix, _resolve),
+                  onData: (data) => this.onData(data, prefixSuffix, _resolve),
+                  onError: this.onError
+                })
+              } catch (error) {
+                this.onError()
+                reject([])
+              }
             }
-          })
-        } catch (error) {
-          this._statusBar.text = '$(alert)'
-          this._controller?.abort()
-          return resolve([] as InlineCompletionItem[])
-        }
+          ).then(resolve, reject)
+        })
       }, this._debounceWait)
     })
   }
 
-  private getFileHeader(languageId: string | undefined, uri: Uri) {
+  private getAdditionalContext(languageId: string | undefined, uri: Uri) {
     const lang =
       supportedLanguages[languageId as keyof typeof supportedLanguages]
 
@@ -331,7 +322,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return `\n${language}\n${path}\n`
   }
 
-  private calculateFilePathSimilarity(path1: string, path2: string): number {
+  private getFilePathSimilarity(path1: string, path2: string): number {
     const components1 = path1.split('/')
     const components2 = path2.split('/')
 
@@ -348,7 +339,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return folderSimilarity + filenameSimilarity
   }
 
-  private getFileContext(uri: Uri): string {
+  private getSurroundingCodeContext(uri: Uri): string {
     const codeSnippets: string[] = []
     const currentFileName = uri.toString()
 
@@ -360,12 +351,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         continue
       }
 
-      const text = `${this.getFileHeader(
+      const text = `${this.getAdditionalContext(
         document.languageId,
         document.uri
       )}${document.getText()}`
 
-      const filePathSimilarity = this.calculateFilePathSimilarity(
+      const filePathSimilarity = this.getFilePathSimilarity(
         currentFileName.toString(),
         document.uri.toString()
       )
@@ -378,75 +369,53 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return codeSnippets.join('\n')
   }
 
-  getCursorPositionContext(
-    document: TextDocument,
-    position: Position
-  ): { prefix: string; suffix: string } {
-    const line = position.line
-    const startLine = Math.max(0, line - this._contextLength)
-    const endLine = line + this._contextLength
-
-    const prefixRange = new Range(startLine, 0, line, position.character)
-    const suffixRange = new Range(line, position.character, endLine, 0)
-
-    const prefix = document.getText(prefixRange)
-    const suffix = document.getText(suffixRange)
-
-    return { prefix, suffix }
-  }
-
   private triggerInlineCompletion(
-    inlineCompletion: InlineCompletion
+    prefixSuffix: PrefixSuffix
   ): InlineCompletionItem[] {
-    const { position, prefix, suffix } = inlineCompletion
-
     const editor = window.activeTextEditor
 
-    if (!editor) {
-      return []
-    }
+    if (!editor || !this._position) return []
 
-    const completion = new CompletionFormatter(editor).format(
-      inlineCompletion.completion
-    )
+    const insertText = new CompletionFormatter(editor).format(this._completion)
 
-    if (this._enableCompletionCache) {
-      cache.setCache({ prefix, suffix, completion })
-    }
+    if (this._cacheEnabled) cache.setCache(prefixSuffix, insertText)
 
     this._logger.log(
       `\n Inline completion triggered: Formatted completion: ${JSON.stringify(
-        completion
+        insertText
       )}\n`
     )
 
-    return [new InlineCompletionItem(completion, new Range(position, position))]
+    this._statusBar.text = '🤖'
+
+    return [
+      new InlineCompletionItem(
+        insertText,
+        new Range(this._position, this._position)
+      )
+    ]
   }
 
   public updateConfig() {
-    this._logger.updateConfig()
+    this._apiHostname = this._config.get('apiHostname') as string
+    this._apiPath = this._config.get('fimApiPath') as string
+    this._apiProvider = this._config.get('apiProvider') as string
+    this._bearerToken = this._config.get('apiBearerToken') as string
+    this._cacheEnabled = this._config.get('enableCompletionCache') as boolean
     this._config = workspace.getConfiguration('twinny')
     this._debounceWait = this._config.get('debounceWait') as number
-    this._contextLength = this._config.get('contextLength') as number
-    this._temperature = this._config.get('temperature') as number
-    this._useFileContext = this._config.get('useFileContext') as boolean
-    this._disableAutoSuggest = this._config.get('disableAutoSuggest') as boolean
+    this._disableAuto = this._config.get('disableAutoSuggest') as boolean
     this._fimModel = this._config.get('fimModelName') as string
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
-    this._numPredictFim = this._config.get('numPredictFim') as number
-    this._apiPath = this._config.get('fimApiPath') as string
-    this._port = this._config.get('fimApiPort') as number
-    this._apiBearerToken = this._config.get('apiBearerToken') as string
-    this._apiHostname = this._config.get('apiHostname') as string
-    this._apiProvider = this._config.get('apiProvider') as string
-    this._useTls = this._config.get('useTls') as boolean
     this._keepAlive = this._config.get('keepAlive') as string | number
-    this._useMultiLineCompletions = this._config.get(
-      'useMultiLineCompletions'
-    ) as boolean
-    this.maxLines = this._config.get('maxLines') as number
-    this._enableCompletionCache = this._config.get(
-      'enableCompletionCache'
-    ) as boolean
+    this._maxLines = this._config.get('maxLines') as number
+    this._numLineContext = this._config.get('contextLength') as number
+    this._numPredictFim = this._config.get('numPredictFim') as number
+    this._port = this._config.get('fimApiPort') as number
+    this._temperature = this._config.get('temperature') as number
+    this._useFileContext = this._config.get('useFileContext') as boolean
+    this._useMultiLine = this._config.get('useMultiLineCompletions') as boolean
+    this._useTls = this._config.get('useTls') as boolean
+    this._logger.updateConfig()
   }
 }
