@@ -11,7 +11,7 @@ export interface StreamBodyBase {
 
 export interface StreamOptionsOllama extends StreamBodyBase {
   model: string
-  keep_alive?: number
+  keep_alive?: string | number
   options: Record<string, unknown>
 }
 

@@ -39,7 +39,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
   private _debouncer: NodeJS.Timeout | undefined
   private _logger: Logger
-  private _document: TextDocument | undefined
   private _config = workspace.getConfiguration('twinny')
   private _debounceWait = this._config.get('debounceWait') as number
   private _contextLength = this._config.get('contextLength') as number
@@ -52,6 +51,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _apiProvider = this._config.get('apiProvider') as string
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useTls = this._config.get('useTls') as boolean
+  private _keepAlive = this._config.get('keepAlive') as string | number
   private _useMultiLineCompletions = this._config.get(
     'useMultiLineCompletions'
   ) as boolean
@@ -75,7 +75,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
       model: this._fimModel,
       numPredictChat: this._numPredictFim,
-      temperature: this._temperature
+      temperature: this._temperature,
+      keepAlive: this._keepAlive
     })
 
     const requestOptions: StreamRequestOptions = {
@@ -458,6 +459,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._apiHostname = this._config.get('apiHostname') as string
     this._apiProvider = this._config.get('apiProvider') as string
     this._useTls = this._config.get('useTls') as boolean
+    this._keepAlive = this._config.get('keepAlive') as string | number
     this._useMultiLineCompletions = this._config.get(
       'useMultiLineCompletions'
     ) as boolean

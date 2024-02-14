@@ -25,15 +25,16 @@ export class ChatService {
   private _apiProvider = this._config.get('apiProvider') as string
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _chatModel = this._config.get('chatModelName') as string
-  private _useTls = this._config.get('useTls') as boolean
   private _completion = ''
   private _controller?: AbortController
+  private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
   private _port = this._config.get('chatApiPort') as string
   private _promptTemplate = ''
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
+  private _useTls = this._config.get('useTls') as boolean
   private _view?: WebviewView
 
   constructor(
@@ -72,7 +73,8 @@ export class ChatService {
       model: this._chatModel,
       numPredictChat: this._numPredictChat,
       temperature: this._temperature,
-      messages
+      messages,
+      keepAlive: this._keepAlive
     })
 
     return { requestOptions, requestBody }
@@ -321,6 +323,7 @@ export class ChatService {
     this._port = this._config.get('chatApiPort') as string
     this._apiHostname = this._config.get('apiHostname') as string
     this._apiProvider = this._config.get('apiProvider') as string
+    this._keepAlive = this._config.get('keepAlive') as string | number
     this._useTls = this._config.get('useTls') as boolean
   }
 }
