@@ -1,4 +1,4 @@
-import { InlineCompletionItem, InlineCompletionList, Position } from 'vscode'
+import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from '../constants'
 

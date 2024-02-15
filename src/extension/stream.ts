@@ -1,19 +1,6 @@
 import { StreamRequest } from './types'
-import { Logger } from './logger'
-import { safeParseJsonResponse } from './utils'
-
-const logger = new Logger()
-
-const logStreamOptions = (opts: StreamRequest) => {
-  logger.log(
-    `
-***Twinny Stream Debug***\n\
-Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
-Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
-Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
-    `
-  )
-}
+import { logStreamOptions, safeParseJsonResponse } from './utils'
+import { COMPLETION_TIMEOUT } from '../constants'
 
 export async function streamResponse(request: StreamRequest) {
   logStreamOptions(request)
@@ -21,6 +8,15 @@ export async function streamResponse(request: StreamRequest) {
   const controller = new AbortController()
 
   const { signal } = controller
+
+  const timeoutId = setTimeout(() => {
+    controller.abort()
+  }, COMPLETION_TIMEOUT)
+
+  const cleanup = () => {
+    clearTimeout(timeoutId)
+    controller.abort()
+  }
 
   try {
     const url = `${options.protocol}://${options.hostname}:${options.port}${options.path}`
@@ -89,15 +85,16 @@ export async function streamResponse(request: StreamRequest) {
       if (done) break
     }
 
-    reader.releaseLock()
-    controller.abort()
+    cleanup()
     onEnd?.()
+    reader.releaseLock()
   } catch (error: unknown) {
+    cleanup()
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
         onEnd?.()
       } else {
-        console.error('Fetch error:', error);
+        console.error('Fetch error:', error)
       }
     }
   }

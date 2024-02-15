@@ -4,7 +4,8 @@ import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
   NORMALIZE_REGEX,
-  OPENING_BRACKETS
+  OPENING_BRACKETS,
+  QUOTES
 } from '../constants'
 import { Bracket } from './types'
 
@@ -14,6 +15,9 @@ export class CompletionFormatter {
   private _normalisedCompletion = ''
   private _originalCompletion = ''
   private _textAfterCursor: string
+  private _lineText: string
+  private _charBeforeCursor: string
+  private _charAfterCursor: string
   private _editor: TextEditor
   private _cursorPosition: Position
 
@@ -23,9 +27,17 @@ export class CompletionFormatter {
     const document = editor.document
     const lineEndPosition = document.lineAt(this._cursorPosition.line).range.end
     const textAfterRange = new Range(this._cursorPosition, lineEndPosition)
+    this._lineText = this._editor.document.lineAt(
+      this._cursorPosition.line
+    ).text
     this._textAfterCursor = document?.getText(textAfterRange) || ''
     this._characterAfterCursor = this._textAfterCursor.at(0) as string
     this._editor = editor
+    this._charBeforeCursor =
+      this._cursorPosition.character > 0
+        ? this._lineText[this._cursorPosition.character - 1]
+        : ''
+    this._charAfterCursor = this._lineText[this._cursorPosition.character]
   }
 
   private isMatchingPair = (open?: Bracket, close?: string): boolean => {
@@ -76,6 +88,17 @@ export class CompletionFormatter {
   private isSingleBracket = (completion: string) =>
     completion.length === 1 && this.isBracket(completion)
 
+  private isOnlyBrackets(completion: string): boolean {
+    if (completion.length === 0) return false
+
+    for (const char of completion) {
+      if (!this.isBracket(char)) {
+        return false
+      }
+    }
+    return true
+  }
+
   private normalise = (text: string) => text?.replace(NORMALIZE_REGEX, '')
 
   private removeDuplicateText = () => {
@@ -92,12 +115,31 @@ export class CompletionFormatter {
     return this
   }
 
+  private isMiddleOfWord() {
+    return /\w/.test(this._charBeforeCursor) && /\w/.test(this._charAfterCursor)
+  }
+
+  private removeUnnecessaryMiddleQuote(): CompletionFormatter {
+    const startsWithQuote = QUOTES.includes(this._completion[0])
+    const endsWithQuote = QUOTES.includes(this._completion.at(-1) as string)
+
+    if (startsWithQuote && this.isMiddleOfWord()) {
+      this._completion = this._completion.substring(1)
+    }
+
+    if (endsWithQuote && this.isMiddleOfWord()) {
+      this._completion = this._completion.slice(0, -1)
+    }
+
+    return this
+  }
+
   private removeDuplicateQuotes = () => {
     if (
       this._normalisedCompletion.endsWith('\',') ||
       this._normalisedCompletion.endsWith('",') ||
       (this._normalisedCompletion.endsWith('`,') &&
-        ['"', '\'', '`'].includes(this._characterAfterCursor))
+        QUOTES.includes(this._characterAfterCursor))
     ) {
       this._completion = this._completion.slice(0, -3)
     }
@@ -115,18 +157,18 @@ export class CompletionFormatter {
       this._completion = this._completion.slice(0, -1)
     }
 
+    if (
+      QUOTES.includes(this._completion.at(-1) as string) &&
+      this._characterAfterCursor === (this._completion.at(-1) as string)
+    ) {
+      this._completion = this._completion.slice(0, -1)
+    }
+
     return this
   }
 
   private isBracket = (char: string): char is Bracket => {
     return ALL_BRACKETS.includes(char as Bracket)
-  }
-
-  private getCompletion = () => {
-    if (this.isSingleBracket(this._normalisedCompletion)) {
-      return this._normalisedCompletion
-    }
-    return this._completion
   }
 
   private preventDuplicateLines = (): CompletionFormatter => {
@@ -156,18 +198,37 @@ export class CompletionFormatter {
     return this
   }
 
+  private getCompletion = () => {
+    if (this.isOnlyBrackets(this._normalisedCompletion)) {
+      return this._normalisedCompletion
+    }
+
+    if (this.isSingleBracket(this._normalisedCompletion)) {
+      return this._normalisedCompletion
+    }
+
+    return this._completion
+  }
+
+  public debug() {
+    console.log(`text after: ${this._textAfterCursor}`)
+    console.log(`original completion: ${this._originalCompletion}`)
+    console.log(`normalised completion: ${this._normalisedCompletion}`)
+    console.log(`character after: ${this._characterAfterCursor}`)
+  }
+
   public format = (completion: string): string => {
     this._completion = ''
     this._normalisedCompletion = this.normalise(completion)
     this._originalCompletion = completion
-    this.matchCompletionBrackets()
+    const infillText = this.matchCompletionBrackets()
       .preventDuplicateLines()
       .removeDuplicateQuotes()
+      .removeUnnecessaryMiddleQuote()
       .removeDuplicateText()
       .ignoreBlankLines()
       .removeInvalidLineBreaks()
       .getCompletion()
-
-    return this._completion
+    return infillText
   }
 }

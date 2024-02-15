@@ -12,11 +12,12 @@ export const OPENING_BRACKETS = ['[', '{', '(']
 export const CLOSING_BRACKETS = [']', '}', ')']
 export const OPENING_TAGS = ['<']
 export const CLOSING_TAGS = ['</']
-export const QUOTES = ['"', '\'']
+export const QUOTES = ['"', '\'', '`']
 export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
-export const NORMALIZE_REGEX = /\r?\n|\r/g
+export const NORMALIZE_REGEX = /\s*\r?\n|\r/g;
 export const LINE_BREAK_REGEX = /\r?\n$/
+export const COMPLETION_TIMEOUT = 20000 // 20 seconds
 
 export const MESSAGE_NAME = {
   twinnyAcceptSolution: 'twinny-accept-solution',
