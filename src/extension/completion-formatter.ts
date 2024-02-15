@@ -179,6 +179,7 @@ export class CompletionFormatter {
 
   private removeDuplicateQuotes = () => {
     if (
+      this._characterAfterCursor &&
       this._normalisedCompletion.endsWith('\',') ||
       this._normalisedCompletion.endsWith('",') ||
       (this._normalisedCompletion.endsWith('`,') &&
