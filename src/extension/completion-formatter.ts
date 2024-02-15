@@ -3,7 +3,6 @@ import { Position, Range, TextEditor } from 'vscode'
 import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
-  NORMALIZE_REGEX,
   OPENING_BRACKETS,
   QUOTES
 } from '../constants'
@@ -99,7 +98,7 @@ export class CompletionFormatter {
     return true
   }
 
-  private normalise = (text: string) => text?.replace(NORMALIZE_REGEX, '')
+  private normalise = (text: string) => text?.trim()
 
   private removeDuplicateText = () => {
     const normalisedAfter = this.normalise(this._textAfterCursor)
@@ -112,22 +111,66 @@ export class CompletionFormatter {
     ) {
       this._completion = this._completion.replace(this._textAfterCursor, '')
     }
+
+    if (
+      this._normalisedCompletion &&
+      normalisedAfter &&
+      this._normalisedCompletion.includes(normalisedAfter)
+    ) {
+      if (QUOTES.includes(normalisedAfter.at(-1) as string)) {
+        this._completion = this._completion.replace(
+          normalisedAfter.slice(0, -1),
+          ''
+        )
+        return this
+      }
+
+      this._completion = this._completion.replace(normalisedAfter, '')
+      return this
+    }
+
+    if (
+      this._normalisedCompletion &&
+      normalisedAfter.includes(this._normalisedCompletion)
+    ) {
+      const before = normalisedAfter.at(
+        normalisedAfter.indexOf(this._normalisedCompletion) - 1
+      ) as string
+      const after = normalisedAfter.at(
+        normalisedAfter.indexOf(this._normalisedCompletion) +
+          this._normalisedCompletion.length
+      ) as string
+      if (this.isMiddleWord(before, after)) {
+        return this
+      }
+      this._completion = ''
+      return this
+    }
+
     return this
   }
 
-  private isMiddleOfWord() {
-    return /\w/.test(this._charBeforeCursor) && /\w/.test(this._charAfterCursor)
+  private isMiddleWord(before: string, after: string) {
+    return before && after && /\w/.test(before) && /\w/.test(after)
+  }
+
+  private isCursorAtMiddleOfWord() {
+    return (
+      this._charAfterCursor &&
+      /\w/.test(this._charBeforeCursor) &&
+      /\w/.test(this._charAfterCursor)
+    )
   }
 
   private removeUnnecessaryMiddleQuote(): CompletionFormatter {
     const startsWithQuote = QUOTES.includes(this._completion[0])
     const endsWithQuote = QUOTES.includes(this._completion.at(-1) as string)
 
-    if (startsWithQuote && this.isMiddleOfWord()) {
+    if (startsWithQuote && this.isCursorAtMiddleOfWord()) {
       this._completion = this._completion.substring(1)
     }
 
-    if (endsWithQuote && this.isMiddleOfWord()) {
+    if (endsWithQuote && this.isCursorAtMiddleOfWord()) {
       this._completion = this._completion.slice(0, -1)
     }
 
@@ -198,15 +241,24 @@ export class CompletionFormatter {
     return this
   }
 
+  private checkBrackets = (): CompletionFormatter => {
+    if (
+      this.isOnlyBrackets(this._normalisedCompletion) ||
+      this.isSingleBracket(this._normalisedCompletion)
+    ) {
+      this._completion = this._normalisedCompletion
+    }
+    return this
+  }
+
+  private skipMiddleOfWord() {
+    if (this.isCursorAtMiddleOfWord()) {
+      this._completion = ''
+    }
+    return this
+  }
+
   private getCompletion = () => {
-    if (this.isOnlyBrackets(this._normalisedCompletion)) {
-      return this._normalisedCompletion
-    }
-
-    if (this.isSingleBracket(this._normalisedCompletion)) {
-      return this._normalisedCompletion
-    }
-
     return this._completion
   }
 
@@ -225,9 +277,11 @@ export class CompletionFormatter {
       .preventDuplicateLines()
       .removeDuplicateQuotes()
       .removeUnnecessaryMiddleQuote()
-      .removeDuplicateText()
       .ignoreBlankLines()
       .removeInvalidLineBreaks()
+      .checkBrackets()
+      .removeDuplicateText()
+      .skipMiddleOfWord()
       .getCompletion()
     return infillText
   }

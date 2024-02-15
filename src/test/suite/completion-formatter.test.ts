@@ -46,16 +46,15 @@ suite('Completion formatter', () => {
     assert.strictEqual(completionFormatter.format('word\')}'), 'word')
   })
 
-  test('removes duplicate closing quote inside word', async () => {
+  test('skips completion in the middle of the word', async () => {
     const document = await vscode.workspace.openTextDocument({
-      content: '\'wod\')}'
+      content: 'word'
     })
-    const editor = await vscode.window.showTextDocument(document)
-    const position = new vscode.Position(0, document.lineAt(0).text.length - 4)
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, document.lineAt(0).text.length - 2)
     editor.selection = new vscode.Selection(position, position)
     const completionFormatter = new CompletionFormatter(editor)
     assert.ok(editor, 'Editor should be defined')
-    const formattedCompletion = completionFormatter.format('r\'')
-    assert.strictEqual(formattedCompletion, 'r')
+    assert.strictEqual(completionFormatter.format('word smithery!'), '')
   })
 })

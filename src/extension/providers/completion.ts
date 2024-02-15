@@ -248,9 +248,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
-
     if (this.shouldSkipCompletion(context) || !editor || !this._enabled) return
-
     this._document = document
     this._position = position
     this._completion = ''
@@ -259,6 +257,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._nonce = this._nonce + 1
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
+    const prefixSuffix = this.getPrefixSuffix(document, position)
+    const prompt = this.getPrompt(prefixSuffix)
+    const cachedCompletion = cache.getCache(prefixSuffix)
+
+    if (cachedCompletion && this._cacheEnabled) {
+      this._completion = cachedCompletion
+      return this.triggerInlineCompletion(prefixSuffix)
+    }
 
     if (this._debouncer) clearTimeout(this._debouncer)
 
@@ -267,16 +273,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._lock.acquire('completion', () => {
           return new Promise(
             (_resolve: (completion: ResolvedInlineCompletion) => void) => {
-              const prefixSuffix = this.getPrefixSuffix(document, position)
-
-              const cachedCompletion = cache.getCache(prefixSuffix)
-
-              if (cachedCompletion && this._cacheEnabled) {
-                this._completion = cachedCompletion
-                return this.onCache(prefixSuffix, _resolve)
-              }
-
-              const prompt = this.getPrompt(prefixSuffix)
 
               const { requestBody, requestOptions } =
                 this.buildStreamRequest(prompt)
