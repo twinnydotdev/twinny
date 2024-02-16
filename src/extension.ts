@@ -55,9 +55,9 @@ export async function activate(context: ExtensionContext) {
     fs.mkdirSync(dbDir, { recursive: true })
   }
 
-  for (const dir of dirs) {
-    db.injest(dir.uri.fsPath)
-  }
+  // for (const dir of dirs) {
+  //   db.injest(dir.uri.fsPath)
+  // }
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(

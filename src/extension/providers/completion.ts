@@ -73,6 +73,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._logger = new Logger()
     this._position = null
     this._statusBar = statusBar
+    this._db.loadAllVectors()
   }
 
   private buildStreamRequest(prompt: string) {
@@ -101,7 +102,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private async getSimilarCode (prefixSuffix: PrefixSuffix) {
     const { prefix, suffix} = prefixSuffix
     const embedding = await this._db.getEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
-    const similar = this._db.findMostSimilar(embedding)
+    const path = this._document?.fileName || ''
+    const name = path.split('/')[path.split('/').length -1]
+    const similar = this._db.findMostSimilar(name, embedding)
     console.log(similar)
   }
 

@@ -88,11 +88,11 @@ export class VectorDB {
     }
   }
 
-  public findMostSimilar(vector: Vector) {
+  public findMostSimilar(fileName: string, vector: Vector) {
     let mostSimilar = { id: '', code: '', similarity: -1 }
     for (const item of Object.values(this._contexts)) {
       const similarity = this.cosineSimilarity(item.vector, vector)
-      if (similarity > mostSimilar.similarity) {
+      if (similarity > mostSimilar.similarity && !fileName.includes(item.id)) {
         mostSimilar = { id: item.id, code: item.chunk, similarity }
       }
     }
@@ -122,12 +122,34 @@ export class VectorDB {
               return vscode.window.showErrorMessage(
                 `Error reading file: ${fullPath}`
               )
-            const embedding = await this.getEmbedding(content)
-            return this.addVector(dirent.name, content.trim(), embedding)
+            const MAX_CHUNK_SIZE = 1000
+            const chunks = this.splitIntoChunks(content, MAX_CHUNK_SIZE)
+
+            for (const chunk of chunks) {
+              const embedding = await this.getEmbedding(chunk)
+              this.addVector(fullPath, chunk.trim(), embedding)
+            }
           })
         }
       })
     })
+  }
+
+  splitIntoChunks(content: string, maxChunkSize: number): string[] {
+    const chunks: string[] = []
+    let currentChunkStart = 0
+
+    while (currentChunkStart < content.length) {
+      const end = Math.min(currentChunkStart + maxChunkSize, content.length)
+      let boundary = content.lastIndexOf('\n', end)
+      if (boundary === -1 || boundary - currentChunkStart < maxChunkSize / 2) {
+        boundary = end
+      }
+      chunks.push(content.substring(currentChunkStart, boundary))
+      currentChunkStart = boundary + 1
+    }
+
+    return chunks
   }
 
   public isDirectoryToIgnore(dirName: string): boolean {
