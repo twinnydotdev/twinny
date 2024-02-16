@@ -29,6 +29,7 @@ import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
 import { CompletionFormatter } from '../completion-formatter'
+import { VectorDB } from '../injest'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -40,6 +41,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
   private _chunkCount = 0
   private _completion = ''
+  private _db: VectorDB
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
   private _disableAuto = this._config.get('disableAutoSuggest') as boolean
@@ -63,8 +65,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
   private _useTls = this._config.get('useTls') as boolean
 
-  constructor(statusBar: StatusBarItem) {
+  constructor(statusBar: StatusBarItem, db: VectorDB) {
     this._abortController = null
+    this._db = db
     this._document = null
     this._lock = new AsyncLock()
     this._logger = new Logger()
@@ -93,6 +96,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     return { requestOptions, requestBody }
+  }
+
+  private async getSimilarCode (prefixSuffix: PrefixSuffix) {
+    const { prefix, suffix} = prefixSuffix
+    const embedding = await this._db.getEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
+    const similar = this._db.findMostSimilar(embedding)
+    console.log(similar)
   }
 
   private getModelStopWords = (prefixSuffix: PrefixSuffix) => {
@@ -147,7 +157,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     )
   }
 
-  private getPrompt(prefixSuffix: PrefixSuffix) {
+  private  getPrompt(prefixSuffix: PrefixSuffix) {
     if (!this._document || !this._position) return ''
 
     const language = this._document.languageId
@@ -259,6 +269,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const prefixSuffix = this.getPrefixSuffix(document, position)
     const prompt = this.getPrompt(prefixSuffix)
     const cachedCompletion = cache.getCache(prefixSuffix)
+
+    const similarCode = await this.getSimilarCode(prefixSuffix)
+
+    console.log(similarCode)
 
     if (cachedCompletion && this._cacheEnabled) {
       this._completion = cachedCompletion

@@ -133,7 +133,7 @@ export interface StreamRequest {
   onEnd?: () => void
   onStart?: (controller: AbortController) => void
   onError?: (error: Error) => void
-  onData: (streamResponse: StreamResponse | undefined) => void
+  onData: (streamResponse: any) => void
 }
 
 export interface UiTabs {

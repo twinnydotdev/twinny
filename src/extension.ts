@@ -9,6 +9,7 @@ import {
 import * as path from 'path'
 import * as os from 'os'
 import * as vscode from 'vscode'
+import * as fs from 'fs'
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
@@ -23,6 +24,7 @@ import {
 } from './constants'
 import { TemplateProvider } from './extension/template-provider'
 import { ServerMessage } from './extension/types'
+import { VectorDB } from './extension/injest'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
@@ -30,11 +32,32 @@ export async function activate(context: ExtensionContext) {
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
-  const completionProvider = new CompletionProvider(statusBar)
+
   const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
 
   templateProvider.init()
   statusBar.text = '🤖'
+
+  const dirs = workspace.workspaceFolders
+  if (!dirs?.length) {
+    window.showErrorMessage('No project open')
+    return
+  }
+
+  const homeDir = os.homedir()
+  const dbDir = path.join(homeDir, '.twinny/database')
+  const dbPath = path.join(dbDir, `${workspace.name}.json`)
+  const db = new VectorDB(dbPath)
+
+  const completionProvider = new CompletionProvider(statusBar, db)
+
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true })
+  }
+
+  for (const dir of dirs) {
+    db.injest(dir.uri.fsPath)
+  }
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
