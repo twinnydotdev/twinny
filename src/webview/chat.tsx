@@ -79,7 +79,9 @@ export const Chat = () => {
     }, 200)
   }
 
-  const selection = useSelection(scrollBottom)
+  const selection = useSelection(() => {
+    if (isAutoScrolledEnabled) scrollBottom()
+  })
 
   const handleCompletionEnd = (message: ServerMessage) => {
     setMessages((prev) => {
