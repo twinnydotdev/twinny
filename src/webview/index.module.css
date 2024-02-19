@@ -55,6 +55,10 @@ pre code {
   margin-top: 7px;
 }
 
+.chatInput {
+  border-radius: 5px;
+}
+
 .chatOptions {
   display: flex;
   justify-content: space-between;

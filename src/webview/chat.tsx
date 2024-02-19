@@ -48,7 +48,7 @@ const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [isSelectionVisible, setIsSelectionVisible] = useState<boolean>(false)
-  const genertingRef = useRef(false)
+  const generatingRef = useRef(false)
   const stopRef = useRef(false)
   const theme = useTheme()
   const language = useLanguage()
@@ -72,6 +72,7 @@ export const Chat = () => {
   const chatRef = useRef<any>(null) // TODO: type...
 
   const scrollBottom = () => {
+    if (!isAutoScrolledEnabled) return
     setTimeout(() => {
       if (markdownRef.current) {
         markdownRef.current.scrollTop = markdownRef.current.scrollHeight
@@ -79,9 +80,7 @@ export const Chat = () => {
     }, 200)
   }
 
-  const selection = useSelection(() => {
-    if (isAutoScrolledEnabled) scrollBottom()
-  })
+  const selection = useSelection(scrollBottom)
 
   const handleCompletionEnd = (message: ServerMessage) => {
     setMessages((prev) => {
@@ -103,7 +102,7 @@ export const Chat = () => {
     })
     setCompletion(null)
     setLoading(false)
-    genertingRef.current = false
+    generatingRef.current = false
     setTimeout(() => {
       chatRef.current?.focus()
       stopRef.current = false
@@ -112,10 +111,10 @@ export const Chat = () => {
 
   const handleAddTemplateMessage = (message: ServerMessage) => {
     if (stopRef.current) {
-      genertingRef.current = false
+      generatingRef.current = false
       return
     }
-    genertingRef.current = true
+    generatingRef.current = true
     setLoading(false)
     if (isAutoScrolledEnabled) scrollBottom()
     setMessages((prev) => [
@@ -129,10 +128,10 @@ export const Chat = () => {
 
   const handleCompletionMessage = (message: ServerMessage) => {
     if (stopRef.current) {
-      genertingRef.current = false
+      generatingRef.current = false
       return
     }
-    genertingRef.current = true
+    generatingRef.current = true
     setLoading(false)
     setCompletion({
       role: BOT_NAME,
@@ -170,7 +169,7 @@ export const Chat = () => {
       }
       case MESSAGE_NAME.twinnyStopGeneration: {
         setCompletion(null)
-        genertingRef.current = false
+        generatingRef.current = false
         chatRef.current?.focus()
         setTimeout(() => {
           stopRef.current = false
@@ -181,7 +180,7 @@ export const Chat = () => {
 
   const handleStopGeneration = () => {
     stopRef.current = true
-    genertingRef.current = false
+    generatingRef.current = false
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyStopGeneration
     } as ClientMessage)
@@ -284,7 +283,7 @@ export const Chat = () => {
           )}
         </div>
         {!!selection.length && (
-          <Suggestions isDisabled={!!genertingRef.current} />
+          <Suggestions isDisabled={!!generatingRef.current} />
         )}
         <Selection
           isVisible={isSelectionVisible}
@@ -332,14 +331,19 @@ export const Chat = () => {
           <div className={styles.chatBox}>
             <VSCodeTextArea
               ref={chatRef}
-              disabled={genertingRef.current}
+              disabled={generatingRef.current}
               placeholder="Message twinny"
-              rows={5}
               value={inputText}
+              className={styles.chatInput}
+              rows={4}
               onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-                if (e.ctrlKey && e.key === 'Enter') {
-                  const target = e.target as HTMLTextAreaElement
+                const target = e.target as HTMLTextAreaElement
+                if (e.key === 'Enter' && !e.ctrlKey) {
+                  e.preventDefault()
+
                   handleSubmitForm(target.value)
+                } else if (e.ctrlKey && e.key === 'Enter') {
+                  setInputText(`${target.value}\n`)
                 }
               }}
               onChange={(e) => {
@@ -350,7 +354,7 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            {genertingRef.current && (
+            {generatingRef.current && (
               <VSCodeButton
                 type="button"
                 appearance="icon"
@@ -361,7 +365,7 @@ export const Chat = () => {
               </VSCodeButton>
             )}
             <VSCodeButton
-              disabled={genertingRef.current}
+              disabled={generatingRef.current}
               onClick={() => handleSubmitForm(inputText)}
               appearance="primary"
             >
