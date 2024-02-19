@@ -30,7 +30,9 @@ export class CompletionFormatter {
       this._cursorPosition.line
     ).text
     this._textAfterCursor = document?.getText(textAfterRange) || ''
-    this._characterAfterCursor = this._textAfterCursor.at(0) as string
+    this._characterAfterCursor = this._textAfterCursor
+      ? (this._textAfterCursor.at(0) as string)
+      : ''
     this._editor = editor
     this._charBeforeCursor =
       this._cursorPosition.character > 0
@@ -106,10 +108,12 @@ export class CompletionFormatter {
       (normalisedAfter &&
         this._normalisedCompletion &&
         normalisedAfter === this._normalisedCompletion) ||
-      !this._completion.length ||
-      this._normalisedCompletion.endsWith(this._textAfterCursor)
+      (this._textAfterCursor &&
+        (!this._completion.length &&
+          this._normalisedCompletion.endsWith(this._textAfterCursor)))
     ) {
-      this._completion = this._completion.replace(this._textAfterCursor, '')
+      this._completion = ''
+      return this
     }
 
     if (
@@ -179,13 +183,14 @@ export class CompletionFormatter {
 
   private removeDuplicateQuotes = () => {
     if (
-      this._characterAfterCursor &&
-      this._normalisedCompletion.endsWith('\',') ||
-      this._normalisedCompletion.endsWith('",') ||
-      (this._normalisedCompletion.endsWith('`,') &&
-        QUOTES.includes(this._characterAfterCursor))
+      this._characterAfterCursor.trim() &&
+      this._characterAfterCursor.trim().length &&
+      (this._normalisedCompletion.endsWith('\',') ||
+        this._normalisedCompletion.endsWith('",') ||
+        (this._normalisedCompletion.endsWith('`,') &&
+          QUOTES.includes(this._characterAfterCursor)))
     ) {
-      this._completion = this._completion.slice(0, -3)
+      this._completion = this._completion.slice(0, -2)
     }
 
     if (
