@@ -399,10 +399,12 @@
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "rebuild": "electron-rebuild -v 19.1.8 node-pty",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "vscode:package": "npm exec vsce package",
-    "vscode:publish": "npm exec vsce publish"
+    "vscode:publish": "npm exec vsce publish",
+    "postinstall": "node scripts/installLanceDB.js"
   },
   "devDependencies": {
     "@types/async-lock": "^1.4.2",
@@ -420,9 +422,11 @@
     "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^2.18.0",
     "css-loader": "^6.8.1",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^8.20.0",
     "glob": "^10.3.10",
     "mocha": "^10.3.0",
+    "node-loader": "^2.0.0",
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.1",
     "typescript": "^4.7.4",
@@ -430,6 +434,7 @@
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
+    "@lancedb/vectordb-linux-x64-gnu": "^0.4.10",
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
@@ -437,7 +442,9 @@
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
+    "install": "^0.13.0",
     "node-polyfill-webpack-plugin": "^3.0.0",
+    "npm": "^10.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
@@ -445,6 +452,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0",
-    "string_score": "^0.1.22"
+    "string_score": "^0.1.22",
+    "vectordb": "^0.4.10"
   }
 }

@@ -3,6 +3,7 @@ import path from 'path'
 import * as vscode from 'vscode'
 import { StreamOptionsOllama, StreamRequestOptions } from './types'
 import { streamEmbedding } from './stream'
+import * as lancedb from 'vectordb'
 
 type Vector = number[]
 
@@ -12,28 +13,38 @@ export class VectorDB {
   private _contexts: Record<string, Value> = {}
   private chunks: string[] = []
 
-  private filePath: string
+  private dbPath: string
+  private tbl: lancedb.Table<number[]> | null = null
 
-  constructor(filePath: string) {
-    this.filePath = filePath
+  constructor(dbPath: string) {
+    this.dbPath = dbPath
   }
 
-  public addVector(id: string, chunk: string, vector: Vector) {
+  public async createDatabase () {
+    const db = await lancedb.connect(this.dbPath)
+    this.tbl = await db.createTable(
+      'embeddings',
+      [],
+      { writeMode: lancedb.WriteMode.Overwrite }
+    )
+  }
+
+  public async addVector(id: string, chunk: string, vector: Vector) {
     if (this.chunks.includes(chunk.trim().toLowerCase())) {
       return
     }
     this.chunks.push(chunk.trim().toLowerCase())
     const context = { id, chunk, vector }
-    this._contexts[id] = context
     const data = JSON.stringify(context)
-    fs.appendFileSync(this.filePath, data + '\n', 'utf8')
-    this.saveContextsToFile()
+    await this.tbl?.add([{
+      vector,
+      item: id,
+      code: data,
+    }]);
+
   }
 
-  private saveContextsToFile() {
-    const data = JSON.stringify(this._contexts, null, 2)
-    fs.writeFileSync(this.filePath, data, 'utf8')
-  }
+
 
   public async getEmbedding(content: string) {
     const requestBody: StreamOptionsOllama = {
@@ -66,39 +77,6 @@ export class VectorDB {
     })
   }
 
-  private cosineSimilarity(vecA: Vector, vecB: Vector): number {
-    let dotProduct = 0.0,
-      normA = 0.0,
-      normB = 0.0
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i]
-      normA += vecA[i] * vecA[i]
-      normB += vecB[i] * vecB[i]
-    }
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
-  }
-
-  public loadAllVectors() {
-    try {
-      const fileContent = fs.readFileSync(this.filePath, 'utf8')
-      const json = JSON.parse(fileContent)
-      this._contexts = json
-    } catch (error) {
-      console.error('Error loading vectors from file:', error)
-    }
-  }
-
-  public findMostSimilar(fileName: string, vector: Vector) {
-    let mostSimilar = { id: '', code: '', similarity: -1 }
-    for (const item of Object.values(this._contexts)) {
-      const similarity = this.cosineSimilarity(item.vector, vector)
-      if (similarity > mostSimilar.similarity && !fileName.includes(item.id)) {
-        mostSimilar = { id: item.id, code: item.chunk, similarity }
-      }
-    }
-    return mostSimilar
-  }
-
   public async injest(directoryPath: string) {
     fs.readdir(directoryPath, { withFileTypes: true }, (err, dirents) => {
       if (err) {
@@ -129,6 +107,7 @@ export class VectorDB {
               const embedding = await this.getEmbedding(chunk)
               this.addVector(fullPath, chunk.trim(), embedding)
             }
+            return ''
           })
         }
       })

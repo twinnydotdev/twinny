@@ -29,7 +29,6 @@ import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
 import { CompletionFormatter } from '../completion-formatter'
-import { VectorDB } from '../injest'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -41,7 +40,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
   private _chunkCount = 0
   private _completion = ''
-  private _db: VectorDB
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
   private _disableAuto = this._config.get('disableAutoSuggest') as boolean
@@ -65,15 +63,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
   private _useTls = this._config.get('useTls') as boolean
 
-  constructor(statusBar: StatusBarItem, db: VectorDB) {
+  constructor(statusBar: StatusBarItem) {
     this._abortController = null
-    this._db = db
     this._document = null
     this._lock = new AsyncLock()
     this._logger = new Logger()
     this._position = null
     this._statusBar = statusBar
-    this._db.loadAllVectors()
   }
 
   private buildStreamRequest(prompt: string) {
@@ -99,14 +95,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { requestOptions, requestBody }
   }
 
-  private async getSimilarCode (prefixSuffix: PrefixSuffix) {
-    const { prefix, suffix} = prefixSuffix
-    const embedding = await this._db.getEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
-    const path = this._document?.fileName || ''
-    const name = path.split('/')[path.split('/').length -1]
-    const similar = this._db.findMostSimilar(name, embedding)
-    console.log(similar)
-  }
+  // private async getSimilarCode (prefixSuffix: PrefixSuffix) {
+  //   const { prefix, suffix} = prefixSuffix
+  //   const embedding = await this._db.getEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
+  //   const path = this._document?.fileName || ''
+  //   const name = path.split('/')[path.split('/').length -1]
+  //   const similar = this._db.findMostSimilar(name, embedding)
+  //   console.log(similar)
+  // }
 
   private getModelStopWords = (prefixSuffix: PrefixSuffix) => {
     if (!this._document) return []
@@ -273,9 +269,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const prompt = this.getPrompt(prefixSuffix)
     const cachedCompletion = cache.getCache(prefixSuffix)
 
-    const similarCode = await this.getSimilarCode(prefixSuffix)
-
-    console.log(similarCode)
+    // const similarCode = await this.getSimilarCode(prefixSuffix)
 
     if (cachedCompletion && this._cacheEnabled) {
       this._completion = cachedCompletion
