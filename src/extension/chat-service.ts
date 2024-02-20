@@ -9,7 +9,7 @@ import {
   TemplateData,
   ChatTemplateData,
   MessageRoleContent,
-  StreamRequestOptions,
+  StreamRequestOptions
 } from './types'
 import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from './languages'
@@ -80,9 +80,7 @@ export class ChatService {
     return { requestOptions, requestBody }
   }
 
-  private onStreamData = (
-    streamResponse: StreamResponse | undefined,
-  ) => {
+  private onStreamData = (streamResponse: StreamResponse | undefined) => {
     try {
       const data = getChatDataFromProvider(this._apiProvider, streamResponse)
       this._completion = this._completion + data
@@ -169,7 +167,9 @@ export class ChatService {
     const selectionContext = editor?.document.getText(selection) || ''
     const systemMessage = {
       role: 'system',
-      content: await this._templateProvider?.readSystemMessageTemplate()
+      content: await this._templateProvider?.readSystemMessageTemplate(
+        this._promptTemplate
+      )
     }
 
     if (messages.length > 0 && (language || selectionContext)) {
@@ -200,9 +200,7 @@ export class ChatService {
     return [systemMessage, ...messages]
   }
 
-  private buildChatPrompt = async (
-    messages: MessageType[],
-  ) => {
+  private buildChatPrompt = async (messages: MessageType[]) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
@@ -210,7 +208,7 @@ export class ChatService {
       await this._templateProvider?.renderTemplate<ChatTemplateData>('chat', {
         code: selectionContext || '',
         messages,
-        role: USER_NAME,
+        role: USER_NAME
       })
     return prompt || ''
   }
@@ -229,7 +227,7 @@ export class ChatService {
         language: language?.langName || 'unknown'
       }
     )
-    return { prompt: prompt || '' , selection: selectionContext }
+    return { prompt: prompt || '', selection: selectionContext }
   }
 
   private streamResponse({
@@ -270,9 +268,7 @@ export class ChatService {
   public async streamChatCompletion(messages: MessageType[]) {
     this._completion = ''
     this.sendEditorLanguage()
-    const messageRoleContent = await this.buildMesageRoleContent(
-      messages,
-    )
+    const messageRoleContent = await this.buildMesageRoleContent(messages)
     const prompt = await this.buildChatPrompt(messages)
     const { requestBody, requestOptions } = this.buildStreamRequest(
       prompt,
@@ -290,11 +286,15 @@ export class ChatService {
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnLoading
     })
-    const { prompt, selection } = await this.buildTemplatePrompt(promptTemplate, language)
+    const { prompt, selection } = await this.buildTemplatePrompt(
+      promptTemplate,
+      language
+    )
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinngAddMessage,
       value: {
-        completion: kebabToSentence(promptTemplate) + '\n\n' + '```\n' + selection,
+        completion:
+          kebabToSentence(promptTemplate) + '\n\n' + '```\n' + selection,
         data: getLanguage(),
         type: this._promptTemplate
       }

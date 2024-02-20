@@ -12,7 +12,7 @@ export class TemplateProvider {
     this._basePath = basePath
   }
 
-  public init () {
+  public init() {
     this.createTemplateDir()
     this.registerHandlebarsHelpers()
   }
@@ -45,8 +45,14 @@ export class TemplateProvider {
     }
   }
 
-  public readSystemMessageTemplate() {
-    const path = `${this._basePath}/system.hbs`
+  public readSystemMessageTemplate(templateName?: string) {
+    const defaultPath = `${this._basePath}/system.hbs`
+
+    /* allow custom system messages, per templated task */
+    const templatePrefix = templateName ? `${templateName}-` : ''
+    const templatePath = `${this._basePath}/${templatePrefix}system.hbs`
+
+    const path = fs.existsSync(templatePath) ? templatePath : defaultPath
     try {
       return new Promise<string>((resolve, reject) => {
         fs.readFile(
@@ -59,9 +65,7 @@ export class TemplateProvider {
         )
       })
     } catch (e) {
-      console.log(
-        `Problem reading default template "${this._basePath}/system.hbs`
-      )
+      console.log(`Problem reading template "${path}`)
       return Promise.reject()
     }
   }
@@ -73,8 +77,13 @@ export class TemplateProvider {
         fs.readFile(path, { encoding: 'utf-8' }, (err, templateString) => {
           if (err && err.code !== 'ENOENT') return reject(err)
 
-          if (!templateString && DEFAULT_TEMPLATE_NAMES.includes(templateName)) {
-            templateString = defaultTemplates.find(({ name }) => name === templateName)?.template || ''
+          if (
+            !templateString &&
+            DEFAULT_TEMPLATE_NAMES.includes(templateName)
+          ) {
+            templateString =
+              defaultTemplates.find(({ name }) => name === templateName)
+                ?.template || ''
             if (!templateString) {
               return reject(new Error(`Template "${templateName}" not found`))
             }
@@ -91,13 +100,17 @@ export class TemplateProvider {
     }
   }
 
+  private filterSystemTemplates = (filterName: string) => {
+    return filterName !== 'chat' && filterName.includes('system') === false
+  }
+
   public listTemplates(): string[] {
     const files = fs.readdirSync(this._basePath, 'utf8')
     const templates = files.filter((fileName) => fileName.endsWith('.hbs'))
     const templateNames = templates
       .map((fileName) => fileName.replace('.hbs', ''))
       .sort((a, b) => a.localeCompare(b))
-      .filter(name => name !== 'chat' && name !== 'system')
+      .filter(this.filterSystemTemplates)
     return templateNames
   }
 
@@ -111,7 +124,7 @@ export class TemplateProvider {
 
       const result = template({
         ...data,
-        systemMessage: await this.readSystemMessageTemplate()
+        systemMessage: await this.readSystemMessageTemplate(templateName)
       })
       return result
     } catch (error) {
