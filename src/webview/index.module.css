@@ -1,5 +1,6 @@
 vscode-panel-view {
   flex-direction: column;
+  padding: 0;
 }
 
 vscode-text-area {
@@ -31,7 +32,6 @@ pre code {
   flex-grow: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 5px;
 }
 
 .message {

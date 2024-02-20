@@ -273,6 +273,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         >
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Sidebar</title>
+        <style>
+          body { padding: 10px }
+        </style>
     </head>
     <body>
         <div id="root"></div>
