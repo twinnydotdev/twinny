@@ -185,8 +185,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       const completionData = getFimDataFromProvider(this._apiProvider, data)
       if (completionData === undefined) return done([])
 
-      this._logger.log(completionData)
-
       this._completion = this._completion + completionData
       this._chunkCount = this._chunkCount + 1
 
