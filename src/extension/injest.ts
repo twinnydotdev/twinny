@@ -4,6 +4,7 @@ import * as vscode from 'vscode'
 import { StreamOptionsOllama, StreamRequestOptions } from './types'
 import { streamEmbedding } from './stream'
 import * as lancedb from 'vectordb'
+import { findFunctionDeclarations } from './visit'
 
 type Vector = number[]
 
@@ -20,13 +21,11 @@ export class VectorDB {
     this.dbPath = dbPath
   }
 
-  public async createDatabase () {
+  public async createDatabase() {
     const db = await lancedb.connect(this.dbPath)
-    this.tbl = await db.createTable(
-      'embeddings',
-      [],
-      { writeMode: lancedb.WriteMode.Overwrite }
-    )
+    this.tbl = await db.createTable('embeddings', [], {
+      writeMode: lancedb.WriteMode.Overwrite
+    })
   }
 
   public async addVector(id: string, chunk: string, vector: Vector) {
@@ -36,15 +35,14 @@ export class VectorDB {
     this.chunks.push(chunk.trim().toLowerCase())
     const context = { id, chunk, vector }
     const data = JSON.stringify(context)
-    await this.tbl?.add([{
-      vector,
-      item: id,
-      code: data,
-    }]);
-
+    await this.tbl?.add([
+      {
+        vector,
+        item: id,
+        code: data
+      }
+    ])
   }
-
-
 
   public async getEmbedding(content: string) {
     const requestBody: StreamOptionsOllama = {
@@ -92,21 +90,29 @@ export class VectorDB {
         }
 
         if (dirent.isDirectory()) {
-          console.log('isDir', dirent)
           this.injest(fullPath)
-        } else if (dirent.isFile()) {
+        } else if (
+          dirent.isFile() &&
+          dirent.name.match('ts$')
+        ) {
+          // only read .ts and .js files for now
           fs.readFile(fullPath, 'utf-8', async (err, content) => {
             if (err)
               return vscode.window.showErrorMessage(
                 `Error reading file: ${fullPath}`
               )
-            const MAX_CHUNK_SIZE = 1000
-            const chunks = this.splitIntoChunks(content, MAX_CHUNK_SIZE)
 
-            for (const chunk of chunks) {
-              const embedding = await this.getEmbedding(chunk)
-              this.addVector(fullPath, chunk.trim(), embedding)
-            }
+            const functions = findFunctionDeclarations(content)
+
+            console.log(functions)
+
+            // const MAX_CHUNK_SIZE = 1000
+            // const chunks = this.splitIntoChunks(content, MAX_CHUNK_SIZE)
+
+            // for (const chunk of chunks) {
+            //   const embedding = await this.getEmbedding(chunk)
+            //   this.addVector(fullPath, chunk.trim(), embedding)
+            // }
             return ''
           })
         }
