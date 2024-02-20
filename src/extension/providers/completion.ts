@@ -179,11 +179,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private onData(
     data: StreamResponse | undefined,
     prefixSuffix: PrefixSuffix,
-    done: (comlpetion: ResolvedInlineCompletion) => void
+    done: (completion: ResolvedInlineCompletion) => void
   ) {
     try {
       const completionData = getFimDataFromProvider(this._apiProvider, data)
       if (completionData === undefined) return done([])
+
+      this._logger.log(completionData)
 
       this._completion = this._completion + completionData
       this._chunkCount = this._chunkCount + 1
@@ -251,7 +253,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (this.shouldSkipCompletion(context) || !editor || !this._enabled) return
     this._document = document
     this._position = position
-    this._completion = ''
     this._chunkCount = 0
     this._linesGenerated = 0
     this._nonce = this._nonce + 1
@@ -271,6 +272,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
       this._debouncer = setTimeout(() => {
         this._lock.acquire('completion', () => {
+          this._completion = ''
           return new Promise(
             (_resolve: (completion: ResolvedInlineCompletion) => void) => {
 
