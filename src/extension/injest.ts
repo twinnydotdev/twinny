@@ -4,16 +4,16 @@ import * as vscode from 'vscode'
 import { StreamOptionsOllama, StreamRequestOptions } from './types'
 import { streamEmbedding } from './stream'
 import * as lancedb from 'vectordb'
-import { findFunctionDeclarations } from './visit'
 
 type Vector = number[]
 
-type Value = { id: string; chunk: string; vector: Vector }
+export type EmbeddedDocument = { id: string; chunk: string; vector: Vector }
 
+const DOCS_TABLE_NAME = 'docs'
 export class VectorDB {
-  private _contexts: Record<string, Value> = {}
+  private _contexts: EmbeddedDocument[] = []
   private chunks: string[] = []
-
+  private _db: lancedb.Connection | null = null
   private dbPath: string
   private tbl: lancedb.Table<number[]> | null = null
 
@@ -21,27 +21,8 @@ export class VectorDB {
     this.dbPath = dbPath
   }
 
-  public async createDatabase() {
-    const db = await lancedb.connect(this.dbPath)
-    this.tbl = await db.createTable('embeddings', [], {
-      writeMode: lancedb.WriteMode.Overwrite
-    })
-  }
-
-  public async addVector(id: string, chunk: string, vector: Vector) {
-    if (this.chunks.includes(chunk.trim().toLowerCase())) {
-      return
-    }
-    this.chunks.push(chunk.trim().toLowerCase())
-    const context = { id, chunk, vector }
-    const data = JSON.stringify(context)
-    await this.tbl?.add([
-      {
-        vector,
-        item: id,
-        code: data
-      }
-    ])
+  public async connect() {
+    this._db = await lancedb.connect(this.dbPath)
   }
 
   public async getEmbedding(content: string) {
@@ -75,49 +56,71 @@ export class VectorDB {
     })
   }
 
-  public async injest(directoryPath: string) {
-    fs.readdir(directoryPath, { withFileTypes: true }, (err, dirents) => {
-      if (err) {
-        vscode.window.showErrorMessage('Error reading directory')
-        return
-      }
+  public async addVector(id: string, chunk: string, vector: Vector) {
+    if (this.chunks.includes(chunk.trim().toLowerCase())) {
+      return
+    }
+    this.chunks.push(chunk.trim().toLowerCase())
+    const context = { id, chunk, vector }
+    this._contexts.push(context)
+  }
 
-      dirents.forEach((dirent) => {
+  async injest(directoryPath: string): Promise<VectorDB> {
+    try {
+      const dirents = await fs.promises.readdir(directoryPath, {
+        withFileTypes: true
+      })
+      const promises = [] // To collect all promises from addVector calls
+
+      for (const dirent of dirents) {
         const fullPath = path.join(directoryPath, dirent.name)
 
         if (this.isDirectoryToIgnore(dirent.name)) {
-          return
+          continue
         }
 
         if (dirent.isDirectory()) {
-          this.injest(fullPath)
-        } else if (
-          dirent.isFile() &&
-          dirent.name.match('ts$')
-        ) {
-          // only read .ts and .js files for now
-          fs.readFile(fullPath, 'utf-8', async (err, content) => {
-            if (err)
-              return vscode.window.showErrorMessage(
-                `Error reading file: ${fullPath}`
-              )
+          await this.injest(fullPath) // Recursively process directories
+        } else if (dirent.isFile()) {
+          const content = await fs.promises.readFile(fullPath, 'utf-8')
+          const MAX_CHUNK_SIZE = 1000
+          const chunks = this.splitIntoChunks(content, MAX_CHUNK_SIZE)
 
-            const functions = findFunctionDeclarations(content)
-
-            console.log(functions)
-
-            // const MAX_CHUNK_SIZE = 1000
-            // const chunks = this.splitIntoChunks(content, MAX_CHUNK_SIZE)
-
-            // for (const chunk of chunks) {
-            //   const embedding = await this.getEmbedding(chunk)
-            //   this.addVector(fullPath, chunk.trim(), embedding)
-            // }
-            return ''
-          })
+          for (const chunk of chunks) {
+            const embedding = await this.getEmbedding(chunk)
+            promises.push(this.addVector(fullPath, chunk.trim(), embedding))
+          }
         }
-      })
-    })
+      }
+
+      await Promise.all(promises)
+    } catch (err) {
+      vscode.window.showErrorMessage('Error processing directory: ' + err)
+    }
+
+    return this
+  }
+
+  async populateDatabase() {
+    const tableNames = await this._db?.tableNames()
+    if (!tableNames?.includes(DOCS_TABLE_NAME)) {
+      await this._db?.createTable(DOCS_TABLE_NAME, this._contexts)
+    } else {
+      const table = await this._db?.openTable(DOCS_TABLE_NAME)
+      await table?.add(this._contexts)
+    }
+  }
+
+  async retrieveDocs(
+    vector: number[],
+    nRetrieve: number
+  ): Promise<EmbeddedDocument[] | undefined> {
+    const table = await this._db?.openTable(DOCS_TABLE_NAME)
+    const docs: EmbeddedDocument[] | undefined = await table
+      ?.search(vector)
+      .limit(nRetrieve)
+      .execute()
+    return docs
   }
 
   splitIntoChunks(content: string, maxChunkSize: number): string[] {

@@ -1,6 +1,7 @@
 import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from '../constants'
+import { EmbeddedDocument } from './injest'
 
 export interface StreamBodyBase {
   prompt: string
@@ -110,6 +111,7 @@ export interface FimPromptTemplate {
   header: string
   prefixSuffix: PrefixSuffix
   useFileContext: boolean
+  documents?: EmbeddedDocument[]
 }
 
 export interface ApiProviders {

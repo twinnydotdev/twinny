@@ -46,18 +46,21 @@ export async function activate(context: ExtensionContext) {
 
   const homeDir = os.homedir()
   const dbDir = path.join(homeDir, '.twinny/database')
-  const dbPath = path.join(dbDir, `${workspace.name}.json`)
+  const dbPath = path.join(dbDir, workspace.name as string)
 
   const db = new VectorDB(dbPath)
-  const completionProvider = new CompletionProvider(statusBar)
+
+  await db.connect()
+
+  const completionProvider = new CompletionProvider(statusBar, db)
 
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true })
   }
 
-  for (const dir of dirs) {
-    db.injest(dir.uri.fsPath)
-  }
+  // for (const dir of dirs) {
+  //   (await db.injest(dir.uri.fsPath)).populateDatabase()
+  // }
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
