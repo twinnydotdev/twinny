@@ -9,6 +9,8 @@ import {
 import * as path from 'path'
 import * as os from 'os'
 import * as vscode from 'vscode'
+import * as fs from 'fs'
+import { EmbeddingDatabase } from './extension/embedding'
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
@@ -30,11 +32,24 @@ export async function activate(context: ExtensionContext) {
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
-  const completionProvider = new CompletionProvider(statusBar)
-  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
+
+
 
   templateProvider.init()
   statusBar.text = '🤖'
+  const homeDir = os.homedir()
+  const dbDir = path.join(homeDir, '.twinny/database')
+  const dbPath = path.join(dbDir, workspace.name as string)
+  const db = new EmbeddingDatabase(dbPath)
+
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true })
+  }
+
+  await db.connect()
+
+  const completionProvider = new CompletionProvider(statusBar, db)
+  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir, db)
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -97,10 +112,10 @@ export async function activate(context: ExtensionContext) {
         true
       )
     }),
-    commands.registerCommand('twinny.manageTemplates', async () => {
+    commands.registerCommand('twinny.additionalOptions', async () => {
       commands.executeCommand(
         'setContext',
-        CONTEXT_NAME.twinnyManageTemplates,
+        CONTEXT_NAME.twinnyAdditionalOptions,
         true
       )
       sidebarProvider.view?.webview.postMessage({
@@ -113,7 +128,7 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.openChat', () => {
       commands.executeCommand(
         'setContext',
-        CONTEXT_NAME.twinnyManageTemplates,
+        CONTEXT_NAME.twinnyAdditionalOptions,
         false
       )
       sidebarProvider.view?.webview.postMessage({

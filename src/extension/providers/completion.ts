@@ -29,6 +29,7 @@ import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
 import { CompletionFormatter } from '../completion-formatter'
+import { EmbeddedDocument, EmbeddingDatabase } from '../embedding'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -62,14 +63,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
   private _useTls = this._config.get('useTls') as boolean
+  private _db: EmbeddingDatabase
 
-  constructor(statusBar: StatusBarItem) {
+  constructor(statusBar: StatusBarItem, db: EmbeddingDatabase) {
     this._abortController = null
     this._document = null
     this._lock = new AsyncLock()
     this._logger = new Logger()
     this._position = null
     this._statusBar = statusBar
+    this._db = db
   }
 
   private buildStreamRequest(prompt: string) {
@@ -93,6 +96,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     return { requestOptions, requestBody }
+  }
+
+  private async getSimilarCode (prefixSuffix: PrefixSuffix) {
+    const { prefix, suffix} = prefixSuffix
+    const embedding = await this._db.fetchModelEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
+    const similar = await this._db.getDocuments(embedding, 5)
+    return similar
   }
 
   private getModelStopWords = (prefixSuffix: PrefixSuffix) => {
@@ -147,16 +157,19 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     )
   }
 
-  private getPrompt(prefixSuffix: PrefixSuffix) {
+  private getPrompt(prefixSuffix: PrefixSuffix, documents: EmbeddedDocument[] | undefined) {
     if (!this._document || !this._position) return ''
 
     const language = this._document.languageId
+
+
 
     const { prompt } = getFimTemplate(this._fimModel, this._fimTemplateFormat, {
       context: this.getSurroundingCodeContext(this._document.uri),
       prefixSuffix,
       header: this.getAdditionalContext(language, this._document.uri),
-      useFileContext: this._useFileContext
+      useFileContext: this._useFileContext,
+      documents,
     })
 
     return prompt
@@ -184,8 +197,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     try {
       const completionData = getFimDataFromProvider(this._apiProvider, data)
       if (completionData === undefined) return done([])
-
-      this._logger.log(completionData)
 
       this._completion = this._completion + completionData
       this._chunkCount = this._chunkCount + 1
@@ -259,8 +270,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
     const prefixSuffix = this.getPrefixSuffix(document, position)
-    const prompt = this.getPrompt(prefixSuffix)
+    const similarCode = await this.getSimilarCode(prefixSuffix)
+    const prompt = this.getPrompt(prefixSuffix, similarCode)
     const cachedCompletion = cache.getCache(prefixSuffix)
+
+    console.log(prompt)
 
     if (cachedCompletion && this._cacheEnabled) {
       this._completion = cachedCompletion

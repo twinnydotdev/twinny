@@ -23,12 +23,17 @@ const extensionConfig = {
   },
   externals: {
     vscode: 'commonjs vscode',
+    vectordb: 'commonjs2 vectordb'
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js']
   },
   module: {
     rules: [
+      {
+        test: /\.node$/,
+        loader: 'node-loader',
+      },
       {
         test: /\.ts$/,
         exclude: /node_modules/,

@@ -17,6 +17,11 @@ import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
 import { createStreamRequestBody } from './model-options'
 import { kebabToSentence } from '../webview/utils'
+import { EmbeddedDocument, EmbeddingDatabase } from './embedding'
+
+interface SimilarDocuments {
+  [key: string]: string
+}
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -27,6 +32,7 @@ export class ChatService {
   private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
   private _controller?: AbortController
+  private _db: EmbeddingDatabase
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
   private _port = this._config.get('chatApiPort') as string
@@ -40,10 +46,12 @@ export class ChatService {
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
+    db: EmbeddingDatabase,
     view?: WebviewView
   ) {
     this._view = view
     this._statusBar = statusBar
+    this._db = db
     this._templateProvider = new TemplateProvider(templateDir)
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
@@ -55,7 +63,8 @@ export class ChatService {
 
   private buildStreamRequest(
     prompt: string,
-    messages?: MessageType[] | MessageRoleContent[]
+    messages?: MessageType[] | MessageRoleContent[],
+    numPredict?: number
   ) {
     const requestOptions: StreamRequestOptions = {
       hostname: this._apiHostname,
@@ -71,7 +80,7 @@ export class ChatService {
 
     const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
       model: this._chatModel,
-      numPredictChat: this._numPredictChat,
+      numPredictChat: numPredict || this._numPredictChat,
       temperature: this._temperature,
       messages,
       keepAlive: this._keepAlive
@@ -96,6 +105,78 @@ export class ChatService {
       console.error('Error parsing JSON:', error)
       return
     }
+  }
+
+  private async getChunkSimilarity(
+    document: EmbeddedDocument,
+    query: string,
+    similarDocuments: SimilarDocuments,
+  ): Promise<string> {
+    const prompt =
+      (await this._templateProvider?.renderTemplate<TemplateData>('rerank', {
+        code: document.chunk || '',
+        query
+      })) || ''
+
+    return new Promise((resolve) => {
+      let response = ''
+      const { requestBody, requestOptions } = this.buildStreamRequest(
+        prompt,
+        [],
+        3
+      )
+
+      const onData = (streamResponse: StreamResponse | undefined) => {
+        const data = getChatDataFromProvider(this._apiProvider, streamResponse)
+        response = response + data
+      }
+
+      const onEnd = () => {
+        console.log(document.id, response)
+        similarDocuments[document.id] = response
+        resolve(response)
+      }
+
+      this.streamResponse({ requestBody, requestOptions, onData, onEnd })
+    })
+  }
+
+  private async getSimilarCodeChunks(code: string) {
+    if (await this._db.hasEmbeddingTable()) {
+      const embedding = await this._db.fetchModelEmbedding(code)
+      const documents = (await this._db.getDocuments(embedding, 100)) || []
+      const similarDocuments: SimilarDocuments = {}
+
+      const similarityPromises = documents.map(async (document) =>
+        await this.getChunkSimilarity(document, code, similarDocuments)
+      )
+
+      await Promise.all(similarityPromises)
+
+      documents.map((document) => {
+        const currentDoc = similarDocuments[document.id]
+        document.relevant = currentDoc.trim().toLowerCase().includes('yes')
+      })
+
+      const filteredDocuments = documents.filter(({ relevant }) => relevant)
+
+      const codeChunks =
+        filteredDocuments
+          ?.map(
+            ({ chunk }) =>
+              `
+Context Code:
+\`\`\`
+${chunk}
+\`\`\`
+            `
+          )
+          .join('\n\n')
+          .trim() || ''
+
+      return codeChunks
+    }
+    return ''
   }
 
   private onStreamEnd = () => {
@@ -189,9 +270,11 @@ export class ChatService {
         ? `\n\n${detailsToAppend.join('; ')}`
         : ''
 
+      const similarCode = await this.getSimilarCodeChunks(selectionContext)
+
       const updatedLastMessage = {
         ...lastMessage,
-        content: `${lastMessage.content}${detailsString}`
+        content: `${similarCode}${lastMessage.content}${detailsString}`
       }
 
       messages.splice(messages.length - 1, 1, updatedLastMessage)
@@ -204,12 +287,28 @@ export class ChatService {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    const prompt =
-      await this._templateProvider?.renderTemplate<ChatTemplateData>('chat', {
+    let prompt = await this._templateProvider?.renderTemplate<ChatTemplateData>(
+      'chat',
+      {
         code: selectionContext || '',
         messages,
         role: USER_NAME
       })
+
+
+
+    const similarCode = await this.getSimilarCodeChunks(prompt || '')
+
+    prompt = await this._templateProvider?.renderTemplate<ChatTemplateData>(
+      'chat',
+      {
+        code: selectionContext || '',
+        messages,
+        role: USER_NAME,
+        similarCode
+      }
+    )
+
     return prompt || ''
   }
 
@@ -220,28 +319,47 @@ export class ChatService {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
-    const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
-      template,
-      {
+
+    let prompt =
+      (await this._templateProvider?.renderTemplate<TemplateData>(template, {
         code: selectionContext || '',
         language: language?.langName || 'unknown'
       }
-    )
-    return { prompt: prompt || '', selection: selectionContext }
+    )) || ''
+
+    const similarCode = await this.getSimilarCodeChunks(selectionContext)
+
+    prompt =
+      (await this._templateProvider?.renderTemplate<TemplateData>(template, {
+        code: selectionContext || '',
+        language: language?.langName || 'unknown',
+        similarCode: similarCode
+      })) || ''
+
+    console.log(prompt)
+
+    return {
+      prompt: prompt,
+      selection: selectionContext
+    }
   }
 
   private streamResponse({
     requestBody,
-    requestOptions
+    requestOptions,
+    onData = this.onStreamData,
+    onEnd = this.onStreamEnd
   }: {
+    onData?: (streamResponse: StreamResponse | undefined) => void
+    onEnd?: () => void
     requestBody: StreamBodyBase
     requestOptions: StreamRequestOptions
   }) {
     return streamResponse({
       body: requestBody,
       options: requestOptions,
-      onData: this.onStreamData,
-      onEnd: this.onStreamEnd,
+      onData,
+      onEnd,
       onStart: this.onStreamStart,
       onError: this.onStreamError
     })
@@ -312,6 +430,7 @@ export class ChatService {
       prompt,
       messageRoleContent
     )
+    console.log(prompt)
     return this.streamResponse({ requestBody, requestOptions })
   }
 

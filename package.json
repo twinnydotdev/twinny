@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.5.39",
+  "version": "3.5.41",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -84,10 +84,10 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates"
+          "when": "view == twinny.sidebar && twinnyAdditionalOptions"
         },
         {
-          "command": "twinny.manageTemplates",
+          "command": "twinny.additionalOptions",
           "group": "navigation@1",
           "when": "view == twinny.sidebar"
         },
@@ -167,10 +167,10 @@
         "icon": "$(pencil)"
       },
       {
-        "command": "twinny.manageTemplates",
-        "shortTitle": "Manage twinny templates",
-        "title": "Manage twinny templates",
-        "icon": "$(files)"
+        "command": "twinny.additionalOptions",
+        "shortTitle": "Additional options",
+        "title": "Additional options",
+        "icon": "$(settings)"
       },
       {
         "command": "twinny.openChat",
@@ -269,23 +269,30 @@
           "order": 6,
           "type": "string",
           "default": "/api/generate",
-          "description": "Endpoint path for FIM completions. Defaults to '/api/generate' for Ollama and '/completion' for llama.cpp.",
+          "description": "Endpoint path for FIM completions.",
+          "required": true
+        },
+        "twinny.embeddingsApiPath": {
+          "order": 7,
+          "type": "string",
+          "default": "/api/embeddings",
+          "description": "Endpoint path for embeddings completions.",
           "required": true
         },
         "twinny.chatModelName": {
-          "order": 7,
+          "order": 8,
           "type": "string",
           "default": "codellama:7b-instruct",
           "description": "Model identifier for chat completions. Applicable only for Ollama and Oobabooga API."
         },
         "twinny.fimModelName": {
-          "order": 8,
+          "order": 9,
           "type": "string",
           "default": "codellama:7b-code",
           "description": "Model identifier for FIM completions. Applicable only for Ollama and Oobabooga API."
         },
         "twinny.fimTemplateFormat": {
-          "order": 9,
+          "order": 10,
           "type": "string",
           "enum": [
             "automatic",
@@ -297,34 +304,34 @@
           "description": "The prompt format to be used for FIM completions. Overrides automatic detection."
         },
         "twinny.disableAutoSuggest": {
-          "order": 10,
+          "order": 11,
           "type": "boolean",
           "default": false,
           "description": "Disables automatic suggestions, manual trigger (default shortcut Alt+\\)."
         },
         "twinny.contextLength": {
-          "order": 11,
+          "order": 12,
           "type": "number",
           "default": 30,
           "description": "Defines the number of lines before and after the current line to include in FIM prompts.",
           "required": true
         },
         "twinny.debounceWait": {
-          "order": 12,
+          "order": 13,
           "type": "number",
           "default": 300,
           "description": "Delay in milliseconds before triggering the next completion.",
           "required": true
         },
         "twinny.temperature": {
-          "order": 13,
+          "order": 14,
           "type": "number",
           "default": 0.2,
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
         "twinny.useMultiLineCompletions": {
-          "order": 14,
+          "order": 15,
           "type": "boolean",
           "default": false,
           "description": "Use multiline completions, can be inaccurate in some cases."
@@ -333,60 +340,66 @@
           "dependencies": {
             "twinny.useMultiLineCompletions": true
           },
-          "order": 15,
+          "order": 16,
           "type": "number",
           "default": 20,
           "description": "Maximum number of lines to use for multi line completions. Applicable only when useMultiLineCompletions is enabled."
         },
         "twinny.useFileContext": {
-          "order": 16,
+          "order": 17,
           "type": "boolean",
           "default": false,
           "description": "Enables scanning of neighbouring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
-          "order": 17,
+          "order": 18,
           "type": "boolean",
           "default": false,
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 18,
+          "order": 19,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for chat completions.",
           "required": true
         },
         "twinny.numPredictFim": {
-          "order": 19,
+          "order": 20,
           "type": "number",
           "default": 250,
           "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny should stop at logical line breaks.",
           "required": true
         },
         "twinny.keepAlive": {
-          "order": 20,
+          "order": 21,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.useTls": {
-          "order": 21,
+          "order": 22,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
         "twinny.apiBearerToken": {
-          "order": 22,
+          "order": 23,
           "type": "string",
           "default": "",
           "description": "Bearer token for secure API authentication."
         },
-        "twinny.enableLogging": {
-          "order": 23,
+        "twinny.useEmbeddings": {
+          "order": 24,
           "type": "boolean",
           "default": false,
-          "description": "Enable twinny debug mode"
+          "description": "Enable/Disable embeddings for completions."
+        },
+        "twinny.useDebugLog": {
+          "order": 24,
+          "type": "boolean",
+          "default": false,
+          "description": "Enable/Disable twinny debug mode"
         }
       }
     }
@@ -399,10 +412,12 @@
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "rebuild": "electron-rebuild -v 19.1.8 node-pty",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "vscode:package": "npm exec vsce package",
-    "vscode:publish": "npm exec vsce publish"
+    "vscode:publish": "npm exec vsce publish",
+    "postinstall": "node scripts/installLanceDB.js"
   },
   "devDependencies": {
     "@types/async-lock": "^1.4.2",
@@ -420,9 +435,11 @@
     "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^2.18.0",
     "css-loader": "^6.8.1",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^8.20.0",
     "glob": "^10.3.10",
     "mocha": "^10.3.0",
+    "node-loader": "^2.0.0",
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.1",
     "typescript": "^4.7.4",
@@ -430,6 +447,7 @@
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
+    "@lancedb/vectordb-linux-x64-gnu": "^0.4.10",
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
@@ -437,7 +455,10 @@
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
+    "install": "^0.13.0",
+    "ncp": "^2.0.0",
     "node-polyfill-webpack-plugin": "^3.0.0",
+    "npm": "^10.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
@@ -445,6 +466,9 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0",
-    "string_score": "^0.1.22"
+    "string_score": "^0.1.22",
+    "tree-sitter-wasms": "^0.1.6",
+    "vectordb": "^0.4.10",
+    "web-tree-sitter": "^0.21.0"
   }
 }
