@@ -1,7 +1,7 @@
 import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from '../constants'
-import { EmbeddedDocument } from './injest'
+import { EmbeddedDocument } from './embedding'
 
 export interface StreamBodyBase {
   prompt: string
@@ -93,7 +93,9 @@ export interface DefaultTemplate {
 export interface TemplateData extends Record<string, string | undefined> {
   systemMessage?: string
   code: string
-  language: string
+  language?: string
+  similarCode?: string
+  query?: string
 }
 
 export interface ChatTemplateData {
@@ -102,6 +104,7 @@ export interface ChatTemplateData {
   messages: MessageType[]
   code: string
   language?: string
+  similarCode?: string
 }
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
@@ -115,7 +118,12 @@ export interface FimPromptTemplate {
 }
 
 export interface ApiProviders {
-  [key: string]: { fimApiPath: string; chatApiPath: string; port: number }
+  [key: string]: {
+    fimApiPath: string
+    chatApiPath: string
+    port: number
+    embeddingsPath?: string
+  }
 }
 
 export type Bracket = (typeof ALL_BRACKETS)[number]
@@ -166,10 +174,11 @@ export interface OllamaModels {
   models: OllamaModel[]
 }
 
-export type ResolvedInlineCompletion = InlineCompletionItem[]
-| InlineCompletionList
-| PromiseLike<
-    InlineCompletionItem[] | InlineCompletionList | null | undefined
-  >
-| null
-| undefined
+export type ResolvedInlineCompletion =
+  | InlineCompletionItem[]
+  | InlineCompletionList
+  | PromiseLike<
+      InlineCompletionItem[] | InlineCompletionList | null | undefined
+    >
+  | null
+  | undefined

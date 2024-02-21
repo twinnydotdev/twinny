@@ -1,12 +1,19 @@
-import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
+import { VSCodeButton, VSCodeCheckbox, VSCodeDivider } from '@vscode/webview-ui-toolkit/react'
 import { useTemplates, useWorkSpaceContext } from './hooks'
-import { DEFAULT_ACTION_TEMPLATES, MESSAGE_KEY } from '../constants'
+import {
+  DEFAULT_ACTION_TEMPLATES,
+  MESSAGE_KEY,
+  MESSAGE_NAME
+} from '../constants'
 import { useEffect, useState } from 'react'
 import { kebabToSentence } from './utils'
 
 import styles from './index.module.css'
+import { ClientMessage } from '../extension/types'
 
-export const TemplateSettings = () => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
+export const AdditionalOptions = () => {
   const { templates, saveTemplates } = useTemplates()
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const selectedTemplatesContext =
@@ -45,6 +52,12 @@ export const TemplateSettings = () => {
     setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
   }
 
+  const handleEmbedDocuments = () => {
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyEmbedDocuments
+    } as ClientMessage<string[]>)
+  }
+
   useEffect(() => {
     if (selectedTemplatesContext !== undefined) {
       return setSelectedTemplates(selectedTemplatesContext)
@@ -55,10 +68,10 @@ export const TemplateSettings = () => {
 
   return (
     <>
+      <h3>Additional Options</h3>
+      <VSCodeDivider />
       <h4>Template settings</h4>
-      <p>
-        Select the templates you want to use in the chat interface.
-      </p>
+      <p>Select the templates you want to use in the chat interface.</p>
       {templates &&
         templates.map((templateName: string) => (
           <div className={styles.templateCheckbox}>
@@ -74,8 +87,19 @@ export const TemplateSettings = () => {
             </label>
           </div>
         ))}
-      <VSCodeButton className={styles.resetTemplatesButton} onClick={handleResetTemplates}>
-        Reset to default
+      <VSCodeButton
+        className={styles.resetTemplatesButton}
+        onClick={handleResetTemplates}
+      >
+        Reset templates
+      </VSCodeButton>
+      <h4>Embedding options</h4>
+      <p>Click the button below to embed all documents in this workspace.</p>
+      <VSCodeButton
+        onClick={handleEmbedDocuments}
+        className={styles.embedDocumentsButton}
+      >
+        Embed Documents
       </VSCodeButton>
     </>
   )

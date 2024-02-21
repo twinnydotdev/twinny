@@ -29,7 +29,7 @@ import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
 import { CompletionFormatter } from '../completion-formatter'
-import { EmbeddedDocument, VectorDB } from '../injest'
+import { EmbeddedDocument, EmbeddingDatabase } from '../embedding'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -63,9 +63,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
   private _useTls = this._config.get('useTls') as boolean
-  private _db: VectorDB
+  private _db: EmbeddingDatabase
 
-  constructor(statusBar: StatusBarItem, db: VectorDB) {
+  constructor(statusBar: StatusBarItem, db: EmbeddingDatabase) {
     this._abortController = null
     this._document = null
     this._lock = new AsyncLock()
@@ -100,8 +100,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private async getSimilarCode (prefixSuffix: PrefixSuffix) {
     const { prefix, suffix} = prefixSuffix
-    const embedding = await this._db.getEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
-    const similar = await this._db.retrieveDocs(embedding, 5)
+    const embedding = await this._db.fetchModelEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
+    const similar = await this._db.getDocuments(embedding, 5)
     return similar
   }
 

@@ -10,7 +10,7 @@ import * as path from 'path'
 import * as os from 'os'
 import * as vscode from 'vscode'
 import * as fs from 'fs'
-import { VectorDB } from './extension/injest'
+import { EmbeddingDatabase } from './extension/embedding'
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
@@ -33,34 +33,23 @@ export async function activate(context: ExtensionContext) {
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
 
-  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
+
 
   templateProvider.init()
   statusBar.text = '🤖'
-
-  const dirs = workspace.workspaceFolders
-  if (!dirs?.length) {
-    window.showErrorMessage('No project open')
-    return
-  }
-
   const homeDir = os.homedir()
   const dbDir = path.join(homeDir, '.twinny/database')
   const dbPath = path.join(dbDir, workspace.name as string)
-
-  const db = new VectorDB(dbPath)
-
-  await db.connect()
-
-  const completionProvider = new CompletionProvider(statusBar, db)
+  const db = new EmbeddingDatabase(dbPath)
 
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true })
   }
 
-  // for (const dir of dirs) {
-  //   (await db.injest(dir.uri.fsPath)).populateDatabase()
-  // }
+  await db.connect()
+
+  const completionProvider = new CompletionProvider(statusBar, db)
+  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir, db)
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -123,10 +112,10 @@ export async function activate(context: ExtensionContext) {
         true
       )
     }),
-    commands.registerCommand('twinny.manageTemplates', async () => {
+    commands.registerCommand('twinny.additionalOptions', async () => {
       commands.executeCommand(
         'setContext',
-        CONTEXT_NAME.twinnyManageTemplates,
+        CONTEXT_NAME.twinnyAdditionalOptions,
         true
       )
       sidebarProvider.view?.webview.postMessage({
@@ -139,7 +128,7 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('twinny.openChat', () => {
       commands.executeCommand(
         'setContext',
-        CONTEXT_NAME.twinnyManageTemplates,
+        CONTEXT_NAME.twinnyAdditionalOptions,
         false
       )
       sidebarProvider.view?.webview.postMessage({

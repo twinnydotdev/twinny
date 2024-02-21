@@ -11,6 +11,7 @@ import {
 } from '../types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
+import { EmbeddingDatabase } from '../embedding'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _context: vscode.ExtensionContext
@@ -20,23 +21,27 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private _ollamaService: OllamaService | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
+  private _db: EmbeddingDatabase
 
   constructor(
     statusBar: vscode.StatusBarItem,
     context: vscode.ExtensionContext,
-    templateDir: string
+    templateDir: string,
+    db: EmbeddingDatabase
   ) {
     this._statusBar = statusBar
     this._context = context
     this._templateDir = templateDir
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
+    this._db = db
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.chatService = new ChatService(
       this._statusBar,
       this._templateDir,
+      this._db,
       webviewView
     )
     this.view = webviewView
@@ -91,11 +96,23 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
           [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
           [MESSAGE_NAME.twinnySetConfigValue]: this.setConfigurationValue,
-          [MESSAGE_NAME.twinnyGetConfigValue]: this.getConfigurationValue
+          [MESSAGE_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
+          [MESSAGE_NAME.twinnyEmbedDocuments]: this.injestDocuments
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
+  }
+
+  public injestDocuments = async () => {
+    const dirs = vscode.workspace.workspaceFolders
+    if (!dirs?.length) {
+      vscode.window.showErrorMessage('No project open')
+      return
+    }
+    for (const dir of dirs) {
+      (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
+    }
   }
 
   public getConfigurationValue = (data: ClientMessage) => {
