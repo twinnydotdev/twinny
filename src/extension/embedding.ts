@@ -1,10 +1,11 @@
 import fs from 'fs'
 import path from 'path'
+import Parser from 'web-tree-sitter'
 import * as vscode from 'vscode'
 import { StreamOptionsOllama, StreamRequestOptions } from './types'
 import { streamEmbedding } from './stream'
 import * as lancedb from 'vectordb'
-import { EMBEDDING_IGNORE_LIST } from '../constants'
+import { EMBEDDING_IGNORE_LIST, WASM_LANGAUAGES } from '../constants'
 
 type Vector = number[]
 
@@ -110,12 +111,16 @@ export class EmbeddingDatabase {
       async (progress) => {
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, 'utf-8')
-          const MAX_CHUNK_SIZE = 500
-          const chunks = this.getDocumentSplitChunks(content, MAX_CHUNK_SIZE)
+          // const MAX_CHUNK_SIZE = 500
+          const chunks = await this.getDocumentSplitChunks(content, filePath)
 
           for (const chunk of chunks) {
             const embedding = await this.fetchModelEmbedding(chunk)
-            await this.addVector(filePath,  `${filePath}\n\n${chunk.trim()}`, embedding)
+            await this.addVector(
+              filePath,
+              `${filePath}\n\n${chunk.trim()}`,
+              embedding
+            )
           }
 
           processedFiles++
@@ -164,22 +169,39 @@ export class EmbeddingDatabase {
     return docs
   }
 
-  private getDocumentSplitChunks(
-    content: string,
-    maxChunkSize: number
-  ): string[] {
-    const chunks: string[] = []
-    let currentChunkStart = 0
+  private async getParserForFile(filePath: string) {
+    await Parser.init()
+    const parser = new Parser()
+    const extension = path.extname(filePath).slice(1);
+    const wasmPath = path.join(
+      __dirname,
+      'tree-sitter-wasms',
+      `tree-sitter-${WASM_LANGAUAGES[extension]}.wasm`
+    )
+    const Language = await Parser.Language.load(wasmPath)
+    parser.setLanguage(Language)
+    return parser
+  }
 
-    while (currentChunkStart < content.length) {
-      const end = Math.min(currentChunkStart + maxChunkSize, content.length)
-      let boundary = content.lastIndexOf('\n', end)
-      if (boundary === -1 || boundary - currentChunkStart < maxChunkSize / 2) {
-        boundary = end
+  private async getDocumentSplitChunks(
+    content: string,
+    filePath: string,
+  ): Promise<string[]> {
+
+    const parser = await this.getParserForFile(filePath)
+    const tree = await parser.parse(content)
+
+    const chunks = tree.rootNode.children.map((node) => {
+      const start = node.startPosition.row
+      const end = node.endPosition.row
+      const chunk = content.substring(start, end).trim()
+      if (this.getIsDuplicateChunk(chunk)) {
+        return ''
+      } else {
+        this._chunks.push(chunk.trim().toLowerCase())
+        return chunk
       }
-      chunks.push(content.substring(currentChunkStart, boundary))
-      currentChunkStart = boundary + 1
-    }
+    }).filter((chunk) => chunk !== '')
 
     return chunks
   }
