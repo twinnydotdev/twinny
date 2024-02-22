@@ -14,9 +14,10 @@ export type EmbeddedDocument = {
   chunk: string
   vector: Vector
   relevant?: boolean
+  isFilePath?: boolean
 }
 
-const TABLE_NAME = 'heimdall-gui'
+const CONTEXT_TABLE_NAME = 'test-contexts' // TODO: Name of workspace
 
 export class EmbeddingDatabase {
   private _config = vscode.workspace.getConfiguration('twinny')
@@ -25,8 +26,7 @@ export class EmbeddingDatabase {
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _port = this._config.get('chatApiPort') as string
   private _embeddingModel = this._config.get('chatModelName') as string
-  private _chunks: string[] = []
-  private _contexts: EmbeddedDocument[] = []
+  private _fileContentContexts: EmbeddedDocument[] = []
   private _db: lancedb.Connection | null = null
   private _dbPath: string
   private _useTls = this._config.get('useTls') as boolean
@@ -71,13 +71,6 @@ export class EmbeddingDatabase {
     })
   }
 
-  private async addVector(id: string, chunk: string, vector: Vector) {
-    if (this.getIsDuplicateChunk(chunk)) return
-    this._chunks.push(chunk.trim().toLowerCase())
-    const context = { id, chunk, vector }
-    this._contexts.push(context)
-  }
-
   private getAllFilePaths = async (dirPath: string): Promise<string[]> => {
     let filePaths: string[] = []
     const dirents = await fs.promises.readdir(dirPath, {
@@ -111,16 +104,17 @@ export class EmbeddingDatabase {
       async (progress) => {
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, 'utf-8')
-          // const MAX_CHUNK_SIZE = 500
           const chunks = await this.getDocumentSplitChunks(content, filePath)
 
           for (const chunk of chunks) {
-            const embedding = await this.fetchModelEmbedding(chunk)
-            await this.addVector(
-              filePath,
-              `${filePath}\n\n${chunk.trim()}`,
-              embedding
-            )
+            const vector = await this.fetchModelEmbedding(chunk)
+            if (this.getIsDuplicateChunk(chunk, chunks)) return
+            const fullContext = {
+              id: filePath,
+              chunk: `${filePath}\n\n${chunk}`,
+              vector
+            }
+            this._fileContentContexts.push(fullContext)
           }
 
           processedFiles++
@@ -144,24 +138,25 @@ export class EmbeddingDatabase {
 
   public async populateDatabase() {
     const tableNames = await this._db?.tableNames()
-    if (!tableNames?.includes(TABLE_NAME)) {
-      await this._db?.createTable(TABLE_NAME, this._contexts)
-    } else {
-      const table = await this._db?.openTable(TABLE_NAME)
-      await table?.add(this._contexts)
+    if (!tableNames?.includes(CONTEXT_TABLE_NAME)) {
+      await this._db?.createTable(CONTEXT_TABLE_NAME, this._fileContentContexts)
+      return
     }
+    const contextTable = await this._db?.openTable(CONTEXT_TABLE_NAME)
+    await contextTable?.add(this._fileContentContexts)
   }
 
   public async hasEmbeddingTable(): Promise<boolean | undefined> {
     const tableNames = await this._db?.tableNames()
-    return tableNames?.includes(TABLE_NAME)
+    return tableNames?.includes(CONTEXT_TABLE_NAME)
   }
 
   public async getDocuments(
     vector: number[],
-    limit: number
+    limit: number,
+    tableName = CONTEXT_TABLE_NAME
   ): Promise<EmbeddedDocument[] | undefined> {
-    const table = await this._db?.openTable(TABLE_NAME)
+    const table = await this._db?.openTable(tableName)
     const docs: EmbeddedDocument[] | undefined = await table
       ?.search(vector)
       .limit(limit)
@@ -169,10 +164,15 @@ export class EmbeddingDatabase {
     return docs
   }
 
-  private async getParserForFile(filePath: string) {
+  private async getParserForFile(filePath: string): Promise<Parser | null> {
     await Parser.init()
     const parser = new Parser()
-    const extension = path.extname(filePath).slice(1);
+    const extension = path.extname(filePath).slice(1)
+
+    if (!WASM_LANGAUAGES[extension]) {
+      return null
+    }
+
     const wasmPath = path.join(
       __dirname,
       'tree-sitter-wasms',
@@ -185,29 +185,48 @@ export class EmbeddingDatabase {
 
   private async getDocumentSplitChunks(
     content: string,
-    filePath: string,
+    filePath: string
   ): Promise<string[]> {
-
     const parser = await this.getParserForFile(filePath)
-    const tree = await parser.parse(content)
 
-    const chunks = tree.rootNode.children.map((node) => {
-      const start = node.startPosition.row
-      const end = node.endPosition.row
-      const chunk = content.substring(start, end).trim()
-      if (this.getIsDuplicateChunk(chunk)) {
-        return ''
-      } else {
-        this._chunks.push(chunk.trim().toLowerCase())
-        return chunk
+    if (!parser) return []
+
+    const tree = parser.parse(content)
+
+    const positionToIndex = (line: number, column: number) => {
+      let index = 0
+      let currentLine = 0
+
+      while (currentLine < line) {
+        index = content.indexOf('\n', index) + 1
+        if (index === 0) break
+        currentLine++
       }
-    }).filter((chunk) => chunk !== '')
+
+      return index + column
+    }
+
+    const chunks = tree.rootNode.children
+      .map((node) => {
+        const start = positionToIndex(
+          node.startPosition.row,
+          node.startPosition.column
+        )
+        const end = positionToIndex(
+          node.endPosition.row,
+          node.endPosition.column
+        )
+        const chunk = content.substring(start, end).trim()
+
+        return chunk
+      })
+      .filter((chunk) => chunk !== '')
 
     return chunks
   }
 
-  private getIsDuplicateChunk(chunk: string): boolean {
-    return this._chunks.includes(chunk.trim().toLowerCase())
+  private getIsDuplicateChunk(chunk: string, chunks: string[]): boolean {
+    return chunks.includes(chunk.trim().toLowerCase())
   }
 
   private getIgnoreDirectory(fileName: string): boolean {

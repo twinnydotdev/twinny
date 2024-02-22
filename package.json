@@ -50,7 +50,8 @@
     "Linters"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onTextDocumentDidChange"
   ],
   "author": {
     "name": "rjmacarthy"

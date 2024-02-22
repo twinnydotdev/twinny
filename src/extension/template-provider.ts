@@ -15,6 +15,7 @@ export class TemplateProvider {
   public init() {
     this.createTemplateDir()
     this.registerHandlebarsHelpers()
+    return this
   }
 
   public registerHandlebarsHelpers(): void {

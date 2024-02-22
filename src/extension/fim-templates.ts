@@ -6,19 +6,12 @@ export const getFimPromptTemplateLLama = ({
   header,
   useFileContext,
   prefixSuffix,
-  documents,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
-  const similarCode = documents?.map(({ id, chunk }) => (
-    `
-      //id: ${id}
-      // chunk : ${chunk}
-    `
-  ))
   return {
-    prompt: `<PRE> ${similarCode} \n ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`,
+    prompt: `<PRE>/* ${fileContext} */ \n  ${heading}${prefix} <SUF> ${suffix} <MID>`,
     prefix,
     suffix,
     stopWords: ['<EOT>']

@@ -60,7 +60,7 @@ export const AdditionalOptions = () => {
 
   useEffect(() => {
     if (selectedTemplatesContext !== undefined) {
-      return setSelectedTemplates(selectedTemplatesContext)
+      setSelectedTemplates(selectedTemplatesContext)
     } else {
       setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
     }

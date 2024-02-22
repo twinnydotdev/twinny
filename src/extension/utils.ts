@@ -14,11 +14,7 @@ import {
   StreamRequest
 } from './types'
 import { supportedLanguages } from './languages'
-import {
-  API_PROVIDER,
-  EXTENSION_NAME,
-  PROVIDER_NAMES,
-} from '../constants'
+import { API_PROVIDER, EXTENSION_NAME, PROVIDER_NAMES } from '../constants'
 import { Logger } from './logger'
 
 const logger = new Logger()
@@ -60,8 +56,6 @@ export const getTheme = () => {
     return Theme.Contrast
   }
 }
-
-
 
 export const setApiDefaults = () => {
   const config = workspace.getConfiguration('twinny')
@@ -132,14 +126,15 @@ export function safeParseJsonResponse(
   }
 }
 
-
 export const logStreamOptions = (opts: StreamRequest) => {
   logger.log(
-    `
+    JSON.stringify(
+      `
 ***Twinny Stream Debug***\n\
 Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
 Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
 Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
     `
+    )
   )
 }

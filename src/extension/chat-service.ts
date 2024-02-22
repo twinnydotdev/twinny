@@ -110,7 +110,7 @@ export class ChatService {
   private async getChunkSimilarity(
     document: EmbeddedDocument,
     query: string,
-    similarDocuments: SimilarDocuments,
+    similarDocuments: SimilarDocuments
   ): Promise<string> {
     const prompt =
       (await this._templateProvider?.renderTemplate<TemplateData>('rerank', {
@@ -144,11 +144,12 @@ export class ChatService {
   private async getSimilarCodeChunks(code: string) {
     if (await this._db.hasEmbeddingTable()) {
       const embedding = await this._db.fetchModelEmbedding(code)
-      const documents = (await this._db.getDocuments(embedding, 100)) || []
+      const documents = (await this._db.getDocuments(embedding, 20)) || []
       const similarDocuments: SimilarDocuments = {}
 
-      const similarityPromises = documents.map(async (document) =>
-        await this.getChunkSimilarity(document, code, similarDocuments)
+      const similarityPromises = documents.map(
+        async (document) =>
+          await this.getChunkSimilarity(document, code, similarDocuments)
       )
 
       await Promise.all(similarityPromises)
@@ -293,9 +294,8 @@ ${chunk}
         code: selectionContext || '',
         messages,
         role: USER_NAME
-      })
-
-
+      }
+    )
 
     const similarCode = await this.getSimilarCodeChunks(prompt || '')
 
@@ -324,8 +324,7 @@ ${chunk}
       (await this._templateProvider?.renderTemplate<TemplateData>(template, {
         code: selectionContext || '',
         language: language?.langName || 'unknown'
-      }
-    )) || ''
+      })) || ''
 
     const similarCode = await this.getSimilarCodeChunks(selectionContext)
 

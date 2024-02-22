@@ -25,31 +25,31 @@ import {
 } from './constants'
 import { TemplateProvider } from './extension/template-provider'
 import { ServerMessage } from './extension/types'
+import { FileInteractionCache } from './extension/file-interaction'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
   const config = workspace.getConfiguration('twinny')
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
-  const templateProvider = new TemplateProvider(templateDir)
+  new TemplateProvider(templateDir).init()
 
-
-
-  templateProvider.init()
-  statusBar.text = '🤖'
+  const openFileCache = new FileInteractionCache()
   const homeDir = os.homedir()
-  const dbDir = path.join(homeDir, '.twinny/database')
+  const dbDir = path.join(homeDir, '.twinny/embeddings')
   const dbPath = path.join(dbDir, workspace.name as string)
+
+  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
   const db = new EmbeddingDatabase(dbPath)
-
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true })
-  }
-
   await db.connect()
 
-  const completionProvider = new CompletionProvider(statusBar, db)
-  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir, db)
+  const completionProvider = new CompletionProvider(statusBar, openFileCache)
+  const sidebarProvider = new SidebarProvider(
+    statusBar,
+    context,
+    templateDir,
+    db
+  )
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -157,7 +157,22 @@ export async function activate(context: ExtensionContext) {
     statusBar
   )
 
-  if (config.get('enabled')) statusBar.show()
+  context.subscriptions.push(
+    workspace.onDidCloseTextDocument((document) => {
+      const filePath = document.uri.fsPath
+      openFileCache.endSession()
+      openFileCache.delete(filePath)
+    }),
+    workspace.onDidOpenTextDocument((document) => {
+      const filePath = document.uri.fsPath
+      openFileCache.startSession(filePath)
+      openFileCache.incrementVisits()
+    }),
+    workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+      console.log(e.document.fileName)
+      openFileCache.incrementStrokes()
+    })
+  )
 
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((event) => {
@@ -166,4 +181,7 @@ export async function activate(context: ExtensionContext) {
       completionProvider.updateConfig()
     })
   )
+
+  if (config.get('enabled')) statusBar.show()
+  statusBar.text = '🤖'
 }

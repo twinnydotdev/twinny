@@ -29,7 +29,7 @@ import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../logger'
 import { CompletionFormatter } from '../completion-formatter'
-import { EmbeddedDocument, EmbeddingDatabase } from '../embedding'
+import { FileInteractionCache } from '../file-interaction'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -63,16 +63,19 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
   private _useTls = this._config.get('useTls') as boolean
-  private _db: EmbeddingDatabase
+  private _fileInteractionCache: FileInteractionCache
 
-  constructor(statusBar: StatusBarItem, db: EmbeddingDatabase) {
+  constructor(
+    statusBar: StatusBarItem,
+    fileInteractionCache: FileInteractionCache
+  ) {
     this._abortController = null
     this._document = null
     this._lock = new AsyncLock()
     this._logger = new Logger()
     this._position = null
     this._statusBar = statusBar
-    this._db = db
+    this._fileInteractionCache = fileInteractionCache
   }
 
   private buildStreamRequest(prompt: string) {
@@ -98,13 +101,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { requestOptions, requestBody }
   }
 
-  private async getSimilarCode (prefixSuffix: PrefixSuffix) {
-    const { prefix, suffix} = prefixSuffix
-    const embedding = await this._db.fetchModelEmbedding(`${prefix.slice(-100)} ${suffix.slice(100)}`)
-    const similar = await this._db.getDocuments(embedding, 5)
-    return similar
-  }
-
   private getModelStopWords = (prefixSuffix: PrefixSuffix) => {
     if (!this._document) return []
     const language = this._document.languageId
@@ -112,7 +108,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._fimModel,
       this._fimTemplateFormat,
       {
-        context: this.getSurroundingCodeContext(this._document?.uri),
+        context: this.getNeighboringCodeContext(this._document?.uri),
         prefixSuffix,
         header: this.getAdditionalContext(language, this._document?.uri),
         useFileContext: this._useFileContext
@@ -157,19 +153,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     )
   }
 
-  private getPrompt(prefixSuffix: PrefixSuffix, documents: EmbeddedDocument[] | undefined) {
+  private async getPrompt(prefixSuffix: PrefixSuffix) {
     if (!this._document || !this._position) return ''
 
     const language = this._document.languageId
-
-
+    const interactionContext = await this.getFileInteractionContext()
 
     const { prompt } = getFimTemplate(this._fimModel, this._fimTemplateFormat, {
-      context: this.getSurroundingCodeContext(this._document.uri),
+      context: interactionContext || '',
       prefixSuffix,
       header: this.getAdditionalContext(language, this._document.uri),
-      useFileContext: this._useFileContext,
-      documents,
+      useFileContext: this._useFileContext
     })
 
     return prompt
@@ -224,16 +218,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
   }
 
-  private onCache(
-    prefixSuffix: PrefixSuffix,
-    done: (comlpetion: ResolvedInlineCompletion) => void
-  ) {
-    this._logger.log(
-      `Streaming response end using cache ${this._nonce} \nCompletion: ${this._completion}`
-    )
-    return done(this.triggerInlineCompletion(prefixSuffix))
-  }
-
   private onStart(controller: AbortController) {
     this._abortController = controller
   }
@@ -270,11 +254,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
     const prefixSuffix = this.getPrefixSuffix(document, position)
-    const similarCode = await this.getSimilarCode(prefixSuffix)
-    const prompt = this.getPrompt(prefixSuffix, similarCode)
+    const prompt = await this.getPrompt(prefixSuffix)
     const cachedCompletion = cache.getCache(prefixSuffix)
-
-    console.log(prompt)
 
     if (cachedCompletion && this._cacheEnabled) {
       this._completion = cachedCompletion
@@ -289,7 +270,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           this._completion = ''
           return new Promise(
             (_resolve: (completion: ResolvedInlineCompletion) => void) => {
-
               const { requestBody, requestOptions } =
                 this.buildStreamRequest(prompt)
 
@@ -351,7 +331,32 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return folderSimilarity + filenameSimilarity
   }
 
-  private getSurroundingCodeContext(uri: Uri): string {
+  private async getFileInteractionContext() {
+    const interactions = this._fileInteractionCache.getAll()
+    const currentFileName = this._document?.fileName || ''
+    const filePaths = interactions
+      .map((interaction) => interaction.name)
+      .slice(0, 3)
+      .filter((path) => path !== currentFileName)
+    const fileChunks = []
+    for (const filePath of filePaths) {
+      const uri = Uri.file(filePath)
+      try {
+        const document = await workspace.openTextDocument(uri)
+        fileChunks.push(`
+// File: \n ${filePath}
+// Content: \n ${document.getText()}
+        `)
+      } catch (error) {
+        console.error('Error opening file:', error)
+        return null
+      }
+    }
+
+    return fileChunks.join('\n')
+  }
+
+  private getNeighboringCodeContext(uri: Uri): string {
     const codeSnippets: string[] = []
     const currentFileName = uri.toString()
 
