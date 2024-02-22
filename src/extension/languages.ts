@@ -53,26 +53,27 @@ export const supportedLanguages: {
   c: {
     langName: 'C',
     fileExtensions: ['.c', '.h'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   csharp: {
     langName: 'C#',
     fileExtensions: ['.cs'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   cpp: {
     langName: 'C++',
     fileExtensions: ['.cpp', '.h'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   css: {
     langName: 'CSS',
-    fileExtensions: ['.css']
+    fileExtensions: ['.css'],
+    syntaxComments: { start: '/*', end: '*/' }
   },
   go: {
     langName: 'Go',
     fileExtensions: ['.go'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   html: {
     langName: 'HTML',
@@ -82,17 +83,17 @@ export const supportedLanguages: {
   java: {
     langName: 'Java',
     fileExtensions: ['.java'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   javascript: {
     langName: 'Javascript',
     fileExtensions: ['.js', '.jsx', '.cjs'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   javascriptreact: {
     langName: 'Javascript JSX',
     fileExtensions: ['.jsx'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   json: {
     langName: 'JSON',
@@ -101,17 +102,17 @@ export const supportedLanguages: {
   jsx: {
     langName: 'JSX',
     fileExtensions: ['.jsx'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   kotlin: {
     langName: 'Kotlin',
     fileExtensions: ['.kt', '.ktm', '.kts'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   'objective-c': {
     langName: 'Objective C',
     fileExtensions: ['.h', '.m', '.mm'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   php: {
     langName: 'PHP',
@@ -127,27 +128,27 @@ export const supportedLanguages: {
       '.phps',
       '.phpt'
     ],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   python: {
     langName: 'Python',
     fileExtensions: ['.py'],
-    syntaxComments: { start: '#' }
+    syntaxComments: { start: '\'\'\'', end: '\'\'\'' }
   },
   rust: {
     langName: 'Rust',
     fileExtensions: ['.rs', '.rs.in'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   sass: {
     langName: 'SASS',
     fileExtensions: ['.sass'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   scss: {
     langName: 'SCSS',
     fileExtensions: ['.scss'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   shellscript: {
     langName: 'Shell',
@@ -157,17 +158,17 @@ export const supportedLanguages: {
   swift: {
     langName: 'Swift',
     fileExtensions: ['.swift'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   typescript: {
     langName: 'Typescript',
     fileExtensions: ['.ts', '.cts', '.mts'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   typescriptreact: {
     langName: 'Typescript React',
     fileExtensions: ['.tsx'],
-    syntaxComments: { start: '//' },
+    syntaxComments: { start: '/*', end: '*/' },
     derivedFrom: 'typescript'
   },
   xml: {
@@ -183,7 +184,7 @@ export const supportedLanguages: {
   lua: {
     langName: 'Lua',
     fileExtensions: ['.lua'],
-    syntaxComments: { start: '--' }
+    syntaxComments: { start: '--', end: '--[[ ]]--' }
   },
   perl: {
     langName: 'Perl',
@@ -198,22 +199,22 @@ export const supportedLanguages: {
   ruby: {
     langName: 'Ruby',
     fileExtensions: ['.rb'],
-    syntaxComments: { start: '#' }
+    syntaxComments: { start: '=begin', end: '=end' }
   },
   scala: {
     langName: 'Scala',
     fileExtensions: ['.scala'],
-    syntaxComments: { start: '//' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   sql: {
     langName: 'SQL',
     fileExtensions: ['.sql'],
-    syntaxComments: { start: '--' }
+    syntaxComments: { start: '/*', end: '*/' }
   },
   typescriptreactnative: {
     langName: 'Typescript React Native',
     fileExtensions: ['.tsx'],
-    syntaxComments: { start: '//' },
+    syntaxComments: { start: '/*', end: '*/' },
     derivedFrom: 'typescript'
   },
   xaml: {
