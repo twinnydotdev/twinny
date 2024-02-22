@@ -71,6 +71,10 @@ Enjoy enhanced code completions and chat with twinny! 🎉
 | `CTRL+SHIFT+t`               | Open twinny sidebar                      |
 | `CTRL+SHIFT+/`               | Stop code generation                     | 
 
+## Workspace context
+
+In the settings there is an option called `useFileContext` this will keep track of sessions, keystrokes, visits and recency of visited files in the current workspace.  This can be enabled to help improve the quality of completions, it's turned off by default but I'm considering turning this on by default in the next release.
+
 ## Known issues
 
 - If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
