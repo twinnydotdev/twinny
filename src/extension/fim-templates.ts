@@ -1,17 +1,24 @@
 import { FIM_TEMPLATE_FORMAT } from '../constants'
+import { supportedLanguages } from './languages'
 import { FimPromptTemplate } from './types'
 
 export const getFimPromptTemplateLLama = ({
   context,
   header,
   useFileContext,
-  prefixSuffix
+  prefixSuffix,
+  language
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  const fileContext = useFileContext ? context : ''
+  const languageId =
+    supportedLanguages[language as keyof typeof supportedLanguages]
+  const fileContext = useFileContext
+    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
+    : ''
   const heading = header ? header : ''
+
   return {
-    prompt: `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`,
+    prompt: `<PRE>${fileContext}*/\n${heading}${prefix} <SUF> ${suffix} <MID>`,
     prefix,
     suffix,
     stopWords: ['<EOT>']
@@ -23,9 +30,14 @@ export const getDefaultFimPromptTemplate = ({
   header,
   useFileContext,
   prefixSuffix,
+  language,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  const fileContext = useFileContext ? context : ''
+  const languageId =
+    supportedLanguages[language as keyof typeof supportedLanguages]
+  const fileContext = useFileContext
+    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
+    : ''
   const heading = header ? header : ''
   return {
     prompt: `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`,
@@ -40,9 +52,14 @@ export const getFimPromptTemplateDeepseek = ({
   header,
   useFileContext,
   prefixSuffix,
+  language,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  const fileContext = useFileContext ? context : ''
+  const languageId =
+    supportedLanguages[language as keyof typeof supportedLanguages]
+  const fileContext = useFileContext
+    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
+    : ''
   const heading = header ? header : ''
   return {
     prompt: `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
@@ -62,7 +79,7 @@ export const getFimPromptTemplateStableCode = ({
   context,
   header,
   useFileContext,
-  prefixSuffix,
+  prefixSuffix
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''

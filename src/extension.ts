@@ -23,6 +23,7 @@ import {
 } from './constants'
 import { TemplateProvider } from './extension/template-provider'
 import { ServerMessage } from './extension/types'
+import { FileInteractionCache } from './extension/file-interaction'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
@@ -30,11 +31,15 @@ export async function activate(context: ExtensionContext) {
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
-  const completionProvider = new CompletionProvider(statusBar)
-  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
+  const openFileCache = new FileInteractionCache()
+  const completionProvider = new CompletionProvider(statusBar, openFileCache)
+  const sidebarProvider = new SidebarProvider(
+    statusBar,
+    context,
+    templateDir,
+  )
 
   templateProvider.init()
-  statusBar.text = '🤖'
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
@@ -142,7 +147,22 @@ export async function activate(context: ExtensionContext) {
     statusBar
   )
 
-  if (config.get('enabled')) statusBar.show()
+  context.subscriptions.push(
+    workspace.onDidCloseTextDocument((document) => {
+      const filePath = document.uri.fsPath
+      openFileCache.endSession()
+      openFileCache.delete(filePath)
+    }),
+    workspace.onDidOpenTextDocument((document) => {
+      const filePath = document.uri.fsPath
+      openFileCache.startSession(filePath)
+      openFileCache.incrementVisits()
+    }),
+    workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+      console.log(e.document.fileName)
+      openFileCache.incrementStrokes()
+    })
+  )
 
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((event) => {
@@ -151,4 +171,7 @@ export async function activate(context: ExtensionContext) {
       completionProvider.updateConfig()
     })
   )
+
+  if (config.get('enabled')) statusBar.show()
+  statusBar.text = '🤖'
 }

@@ -110,6 +110,7 @@ export interface FimPromptTemplate {
   header: string
   prefixSuffix: PrefixSuffix
   useFileContext: boolean
+  language?: string
 }
 
 export interface ApiProviders {
