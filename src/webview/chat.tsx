@@ -28,7 +28,8 @@ import {
   DisabledAutoScrollIcon,
   EnabledAutoScrollIcon,
   DisabledSelectionIcon,
-  EnabledSelectionIcon
+  EnabledSelectionIcon,
+  ScrollDownIcon
 } from './icons'
 
 import { Suggestions } from './suggestions'
@@ -230,6 +231,12 @@ export const Chat = () => {
     })
   }
 
+  const handleScrollBottom = () => {
+    if (markdownRef.current) {
+      markdownRef.current.scrollTop = markdownRef.current.scrollHeight
+    }
+  }
+
   const handleToggleSelection = () => {
     setIsSelectionVisible((prev) => !prev)
   }
@@ -303,6 +310,13 @@ export const Chat = () => {
               ) : (
                 <DisabledAutoScrollIcon />
               )}
+            </VSCodeButton>
+            <VSCodeButton
+              title="Scroll down to the bottom"
+              appearance="icon"
+              onClick={handleScrollBottom}
+            >
+              <ScrollDownIcon/>
             </VSCodeButton>
             <VSCodeButton
               title="Toggle selection preview"
