@@ -31,8 +31,8 @@ export async function activate(context: ExtensionContext) {
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
-  const openFileCache = new FileInteractionCache()
-  const completionProvider = new CompletionProvider(statusBar, openFileCache)
+  const fileInteractionCache = new FileInteractionCache()
+  const completionProvider = new CompletionProvider(statusBar, fileInteractionCache)
   const sidebarProvider = new SidebarProvider(
     statusBar,
     context,
@@ -150,16 +150,16 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(
     workspace.onDidCloseTextDocument((document) => {
       const filePath = document.uri.fsPath
-      openFileCache.endSession()
-      openFileCache.delete(filePath)
+      fileInteractionCache.endSession()
+      fileInteractionCache.delete(filePath)
     }),
     workspace.onDidOpenTextDocument((document) => {
       const filePath = document.uri.fsPath
-      openFileCache.startSession(filePath)
-      openFileCache.incrementVisits()
+      fileInteractionCache.startSession(filePath)
+      fileInteractionCache.incrementVisits()
     }),
     workspace.onDidChangeTextDocument(() => {
-      openFileCache.incrementStrokes()
+      fileInteractionCache.incrementStrokes()
     })
   )
 
