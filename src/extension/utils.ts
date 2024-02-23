@@ -58,33 +58,36 @@ export const getPrefixSuffix = (
   numLines: number,
   document: TextDocument,
   position: Position,
-  precentageRation = [0.15, 0.85]
+  contextRatio = [0.15, 0.85]
 ): PrefixSuffix => {
   const currentLine = position.line
   const numLinesToEnd = document.lineCount - currentLine
 
-  let numLinesPrefix = Math.floor(Math.abs(numLines * precentageRation[0]))
-  let numLinesSuffix = Math.ceil(Math.abs(numLines * precentageRation[1]))
+  let numLinesPrefix = Math.floor(Math.abs(numLines * contextRatio[0]))
+  let numLinesSuffix = Math.ceil(Math.abs(numLines * contextRatio[1]))
 
   if (numLinesSuffix > numLinesToEnd) {
-    numLinesPrefix = numLinesPrefix + numLinesSuffix - numLinesToEnd
+    numLinesPrefix += numLinesSuffix - numLinesToEnd
     numLinesSuffix = numLinesToEnd
   }
 
-  const prefix = document.getText(
-    new Range(
-      Math.max(0, currentLine - numLinesPrefix),
-      0,
-      currentLine,
-      position.character
-    )
+  const prefixRange = new Range(
+    Math.max(0, currentLine - numLinesPrefix),
+    0,
+    currentLine,
+    position.character
+  )
+  const suffixRange = new Range(
+    currentLine,
+    position.character,
+    currentLine + numLinesSuffix,
+    0
   )
 
-  const suffix = document.getText(
-    new Range(currentLine, position.character, currentLine + numLinesSuffix, 0)
-  )
-
-  return { prefix, suffix }
+  return {
+    prefix: document.getText(prefixRange),
+    suffix: document.getText(suffixRange)
+  }
 }
 
 export const getTheme = () => {
