@@ -61,14 +61,14 @@ export const getPrefixSuffix = (
   precentageRation = [0.15, 0.85]
 ): PrefixSuffix => {
   const currentLine = position.line
-  const numlinesToEnd = document.lineCount - currentLine
+  const numLinesToEnd = document.lineCount - currentLine
 
   let numLinesPrefix = Math.floor(Math.abs(numLines * precentageRation[0]))
   let numLinesSuffix = Math.ceil(Math.abs(numLines * precentageRation[1]))
 
-  if (numLinesSuffix > numlinesToEnd) {
-    numLinesPrefix = numLinesPrefix + numLinesSuffix - numlinesToEnd
-    numLinesSuffix = numlinesToEnd
+  if (numLinesSuffix > numLinesToEnd) {
+    numLinesPrefix = numLinesPrefix + numLinesSuffix - numLinesToEnd
+    numLinesSuffix = numLinesToEnd
   }
 
   const prefix = document.getText(
