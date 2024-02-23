@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 
-import { MESSAGE_KEY, MESSAGE_NAME, SETTING_KEY } from '../constants'
+import { MESSAGE_KEY, MESSAGE_NAME, SETTING_KEY } from '../common/constants'
 import {
   ClientMessage,
   LanguageType,
   OllamaModel,
   ServerMessage,
   ThemeType
-} from '../extension/types'
+} from '../common/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

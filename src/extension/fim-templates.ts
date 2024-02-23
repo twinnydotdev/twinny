@@ -1,6 +1,6 @@
-import { FIM_TEMPLATE_FORMAT } from '../constants'
-import { supportedLanguages } from './languages'
-import { FimPromptTemplate } from './types'
+import { FIM_TEMPLATE_FORMAT } from '../common/constants'
+import { supportedLanguages } from '../common/languages'
+import { FimPromptTemplate } from '../common/types'
 
 export const getFimPromptTemplateLLama = ({
   context,

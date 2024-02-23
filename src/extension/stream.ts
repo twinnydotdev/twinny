@@ -1,6 +1,6 @@
-import { StreamRequest } from './types'
+import { StreamRequest } from '../common/types'
 import { logStreamOptions, safeParseJsonResponse } from './utils'
-import { COMPLETION_TIMEOUT } from '../constants'
+import { COMPLETION_TIMEOUT } from '../common/constants'
 
 export async function streamResponse(request: StreamRequest) {
   logStreamOptions(request)

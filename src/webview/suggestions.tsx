@@ -1,4 +1,4 @@
-import { MESSAGE_KEY, MESSAGE_NAME } from '../constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../common/constants'
 import cn from 'classnames'
 
 import styles from './index.module.css'

@@ -49,7 +49,7 @@ export class FileInteractionCache {
   }
 
   getAll() {
-    const recencyWeight = 3
+    const recencyWeight = 2.1
     const keyStrokeWeight = 2
     const sessionLengthWeight = 1
     const visitWeight = 0.5

@@ -15,7 +15,7 @@ import {
   MESSAGE_NAME,
   SETTING_KEY,
   USER_NAME
-} from '../constants'
+} from '../common/constants'
 
 import {
   useConfigurationSetting,
@@ -38,7 +38,7 @@ import {
   ClientMessage,
   MessageType,
   ServerMessage
-} from '../extension/types'
+} from '../common/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
 import { ModelSelect } from './model-select'

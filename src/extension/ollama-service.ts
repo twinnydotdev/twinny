@@ -1,6 +1,6 @@
 import { workspace } from 'vscode'
-import { Logger } from './logger'
-import { OllamaModels } from './types'
+import { Logger } from '../common/logger'
+import { OllamaModels } from '../common/types'
 
 export class OllamaService {
   private logger : Logger

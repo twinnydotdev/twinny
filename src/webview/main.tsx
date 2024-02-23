@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Chat } from './chat'
 import { TemplateSettings } from './template-settings'
-import { ServerMessage } from '../extension/types'
-import { MESSAGE_NAME, UI_TABS } from '../constants'
+import { ServerMessage } from '../common/types'
+import { MESSAGE_NAME, UI_TABS } from '../common/constants'
 
 const tabs: Record<string, JSX.Element> = {
   [UI_TABS.chat]: <Chat />,

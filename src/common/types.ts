@@ -1,6 +1,6 @@
 import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
-import { ALL_BRACKETS } from '../constants'
+import { ALL_BRACKETS } from './constants'
 
 export interface StreamBodyBase {
   prompt: string

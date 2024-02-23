@@ -10,10 +10,10 @@ import * as path from 'path'
 import * as os from 'os'
 import * as vscode from 'vscode'
 
-import { CompletionProvider } from './extension/providers/completion'
-import { SidebarProvider } from './extension/providers/sidebar'
-import { delayExecution, setApiDefaults } from './extension/utils'
-import { setContext } from './extension/context'
+import { CompletionProvider } from '../extension/providers/completion'
+import { SidebarProvider } from '../extension/providers/sidebar'
+import { delayExecution, setApiDefaults } from '../extension/utils'
+import { setContext } from '../extension/context'
 import {
   CONTEXT_NAME,
   EXTENSION_NAME,
@@ -21,9 +21,9 @@ import {
   MESSAGE_NAME,
   UI_TABS
 } from './constants'
-import { TemplateProvider } from './extension/template-provider'
-import { ServerMessage } from './extension/types'
-import { FileInteractionCache } from './extension/file-interaction'
+import { TemplateProvider } from '../extension/template-provider'
+import { ServerMessage } from './types'
+import { FileInteractionCache } from '../extension/file-interaction'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
@@ -158,8 +158,7 @@ export async function activate(context: ExtensionContext) {
       openFileCache.startSession(filePath)
       openFileCache.incrementVisits()
     }),
-    workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
-      console.log(e.document.fileName)
+    workspace.onDidChangeTextDocument(() => {
       openFileCache.incrementStrokes()
     })
   )

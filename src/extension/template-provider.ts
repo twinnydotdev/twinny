@@ -1,9 +1,9 @@
 import * as fs from 'fs'
 import * as Handlebars from 'handlebars'
 import * as path from 'path'
-import { DefaultTemplate } from './types'
+import { DefaultTemplate } from '../common/types'
 import { defaultTemplates } from './templates'
-import { DEFAULT_TEMPLATE_NAMES } from '../constants'
+import { DEFAULT_TEMPLATE_NAMES } from '../common/constants'
 
 export class TemplateProvider {
   private _basePath: string

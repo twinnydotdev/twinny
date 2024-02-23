@@ -1,14 +1,14 @@
 import * as vscode from 'vscode'
 
 import { getLanguage, getTextSelection, getTheme } from '../utils'
-import { MESSAGE_KEY, MESSAGE_NAME } from '../../constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
   ClientMessage,
   MessageType,
   OllamaModel,
   ServerMessage
-} from '../types'
+} from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 

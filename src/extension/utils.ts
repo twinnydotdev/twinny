@@ -1,6 +1,9 @@
 import {
   ColorThemeKind,
   ConfigurationTarget,
+  Position,
+  Range,
+  TextDocument,
   commands,
   window,
   workspace
@@ -11,15 +14,12 @@ import {
   LanguageType,
   ApiProviders,
   StreamResponse,
-  StreamRequest
-} from './types'
-import { supportedLanguages } from './languages'
-import {
-  API_PROVIDER,
-  EXTENSION_NAME,
-  PROVIDER_NAMES,
-} from '../constants'
-import { Logger } from './logger'
+  StreamRequest,
+  PrefixSuffix
+} from '../common/types'
+import { supportedLanguages } from '../common/languages'
+import { API_PROVIDER, EXTENSION_NAME, PROVIDER_NAMES } from '../common/constants'
+import { Logger } from '../common/logger'
 
 const logger = new Logger()
 
@@ -50,6 +50,33 @@ export const getLanguage = (): LanguageType => {
   }
 }
 
+export const getPrefixSuffix = (
+  numLines: number,
+  document: TextDocument,
+  position: Position,
+  precentageRation = [0.15, -1]
+): PrefixSuffix => {
+  const line = position.  line
+  const prefix = document.getText(
+    new Range(
+      Math.max(0, line - Math.ceil(Math.abs(numLines * precentageRation[0]))),
+      0,
+      line,
+      position.character
+    )
+  )
+  const suffix = document.getText(
+    new Range(
+      line,
+      position.character,
+      line + Math.ceil(Math.abs(numLines * precentageRation[1])),
+      0
+    )
+  )
+
+  return { prefix, suffix }
+}
+
 export const getTheme = () => {
   const currentTheme = window.activeColorTheme
   if (currentTheme.kind === ColorThemeKind.Light) {
@@ -60,8 +87,6 @@ export const getTheme = () => {
     return Theme.Contrast
   }
 }
-
-
 
 export const setApiDefaults = () => {
   const config = workspace.getConfiguration('twinny')
@@ -131,7 +156,6 @@ export function safeParseJsonResponse(
     return undefined
   }
 }
-
 
 export const logStreamOptions = (opts: StreamRequest) => {
   logger.log(

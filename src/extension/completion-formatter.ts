@@ -5,8 +5,8 @@ import {
   CLOSING_BRACKETS,
   OPENING_BRACKETS,
   QUOTES
-} from '../constants'
-import { Bracket } from './types'
+} from '../common/constants'
+import { Bracket } from '../common/types'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
