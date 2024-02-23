@@ -18,7 +18,11 @@ import {
   PrefixSuffix
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
-import { API_PROVIDER, EXTENSION_NAME, PROVIDER_NAMES } from '../common/constants'
+import {
+  API_PROVIDER,
+  EXTENSION_NAME,
+  PROVIDER_NAMES
+} from '../common/constants'
 import { Logger } from '../common/logger'
 
 const logger = new Logger()
@@ -54,24 +58,30 @@ export const getPrefixSuffix = (
   numLines: number,
   document: TextDocument,
   position: Position,
-  precentageRation = [0.15, -1]
+  precentageRation = [0.15, 0.85]
 ): PrefixSuffix => {
-  const line = position.  line
+  const currentLine = position.line
+  const numlinesToEnd = document.lineCount - currentLine
+
+  let numLinesPrefix = Math.floor(Math.abs(numLines * precentageRation[0]))
+  let numLinesSuffix = Math.ceil(Math.abs(numLines * precentageRation[1]))
+
+  if (numLinesSuffix > numlinesToEnd) {
+    numLinesPrefix = numLinesPrefix + numLinesSuffix - numlinesToEnd
+    numLinesSuffix = numlinesToEnd
+  }
+
   const prefix = document.getText(
     new Range(
-      Math.max(0, line - Math.ceil(Math.abs(numLines * precentageRation[0]))),
+      Math.max(0, currentLine - numLinesPrefix),
       0,
-      line,
+      currentLine,
       position.character
     )
   )
+
   const suffix = document.getText(
-    new Range(
-      line,
-      position.character,
-      line + Math.ceil(Math.abs(numLines * precentageRation[1])),
-      0
-    )
+    new Range(currentLine, position.character, currentLine + numLinesSuffix, 0)
   )
 
   return { prefix, suffix }
