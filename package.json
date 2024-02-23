@@ -55,7 +55,7 @@
   "author": {
     "name": "rjmacarthy"
   },
-  "main": "./out/extension.js",
+  "main": "./out/index.js",
   "contributes": {
     "menus": {
       "editor/context": [
