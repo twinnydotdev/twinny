@@ -1,6 +1,6 @@
 import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
 import { useTemplates, useWorkSpaceContext } from './hooks'
-import { DEFAULT_ACTION_TEMPLATES, MESSAGE_KEY } from '../constants'
+import { DEFAULT_ACTION_TEMPLATES, MESSAGE_KEY } from '../common/constants'
 import { useEffect, useState } from 'react'
 import { kebabToSentence } from './utils'
 

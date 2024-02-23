@@ -1,6 +1,6 @@
 import { StatusBarItem, WebviewView, commands, window, workspace } from 'vscode'
 
-import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER_NAME } from '../constants'
+import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER_NAME } from '../common/constants'
 import {
   StreamResponse,
   StreamBodyBase,
@@ -10,9 +10,9 @@ import {
   ChatTemplateData,
   MessageRoleContent,
   StreamRequestOptions
-} from './types'
+} from '../common/types'
 import { getChatDataFromProvider, getLanguage } from './utils'
-import { CodeLanguageDetails } from './languages'
+import { CodeLanguageDetails } from '../common/languages'
 import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
 import { createStreamRequestBody } from './model-options'

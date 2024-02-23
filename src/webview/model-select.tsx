@@ -2,7 +2,7 @@ import { VSCodeDivider, VSCodeDropdown } from '@vscode/webview-ui-toolkit/react'
 
 import { useOllamaModels } from './hooks'
 import { getModelShortName } from './utils'
-import { SETTING_KEY } from '../constants'
+import { SETTING_KEY } from '../common/constants'
 
 import styles from './index.module.css'
 

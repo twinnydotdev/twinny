@@ -1,6 +1,6 @@
-import { EMPTY_MESAGE } from '../constants'
-import { CodeLanguage, supportedLanguages } from '../extension/languages'
-import { LanguageType, ServerMessage } from '../extension/types'
+import { EMPTY_MESAGE } from '../common/constants'
+import { CodeLanguage, supportedLanguages } from '../common/languages'
+import { LanguageType, ServerMessage } from '../common/types'
 
 export const getLanguageMatch = (
   language: LanguageType | undefined,

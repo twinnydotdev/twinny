@@ -14,20 +14,20 @@ import {
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
-import { getFimDataFromProvider } from '../utils'
+import { getFimDataFromProvider, getPrefixSuffix } from '../utils'
 import { cache } from '../cache'
-import { supportedLanguages } from '../languages'
+import { supportedLanguages } from '../../common/languages'
 import {
   PrefixSuffix,
   ResolvedInlineCompletion,
   StreamRequestOptions,
   StreamResponse
-} from '../types'
+} from '../../common/types'
 import { getFimTemplate } from '../fim-templates'
-import { LINE_BREAK_REGEX } from '../../constants'
+import { LINE_BREAK_REGEX } from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
-import { Logger } from '../logger'
+import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
 
@@ -101,6 +101,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { requestOptions, requestBody }
   }
 
+  //TODO: Simplify, we shouldn't need to call `getFimTemplate` for the stopwords.
   private getModelStopWords = (prefixSuffix: PrefixSuffix) => {
     if (!this._document) return []
     const language = this._document.languageId
@@ -164,24 +165,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       prefixSuffix,
       header: this.getAdditionalContext(language, this._document.uri),
       useFileContext: this._useFileContext,
-      language: language,
+      language: language
     })
 
     return prompt
-  }
-
-  getPrefixSuffix(document: TextDocument, position: Position): PrefixSuffix {
-    const line = position.line
-    const startLine = Math.max(0, line - this._numLineContext)
-    const endLine = line + this._numLineContext
-
-    const prefixRange = new Range(startLine, 0, line, position.character)
-    const suffixRange = new Range(line, position.character, endLine, 0)
-
-    const prefix = document.getText(prefixRange)
-    const suffix = document.getText(suffixRange)
-
-    return { prefix, suffix }
   }
 
   private onData(
@@ -192,8 +179,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     try {
       const completionData = getFimDataFromProvider(this._apiProvider, data)
       if (completionData === undefined) return done([])
-
-      this._logger.log(completionData)
 
       this._completion = this._completion + completionData
       this._chunkCount = this._chunkCount + 1
@@ -256,7 +241,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._nonce = this._nonce + 1
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
-    const prefixSuffix = this.getPrefixSuffix(document, position)
+    const prefixSuffix = getPrefixSuffix(
+      this._numLineContext,
+      document,
+      position
+    )
     const prompt = await this.getPrompt(prefixSuffix)
     const cachedCompletion = cache.getCache(prefixSuffix)
 
@@ -339,7 +328,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const currentFileName = this._document?.fileName || ''
     const filePaths = interactions
       .map((interaction) => interaction.name)
-      .slice(0, 3)
+      .slice(0, 4)
       .filter((path) => path !== currentFileName)
     const fileChunks = []
     for (const filePath of filePaths) {

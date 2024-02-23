@@ -4,9 +4,9 @@ import remarkGfm from 'remark-gfm'
 import CodeBlock from './code-block'
 
 import styles from './index.module.css'
-import { MessageType, ThemeType } from '../extension/types'
+import { MessageType, ThemeType } from '../common/types'
 import React from 'react'
-import { BOT_NAME, TWINNY, YOU } from '../constants'
+import { BOT_NAME, TWINNY, YOU } from '../common/constants'
 
 interface MessageProps {
   message?: MessageType

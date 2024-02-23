@@ -4,7 +4,7 @@ import {
   StreamBodyBase,
   StreamBodyOpenAI,
   StreamOptionsOllama
-} from './types'
+} from '../common/types'
 
 export function createStreamRequestBody(
   provider: string,

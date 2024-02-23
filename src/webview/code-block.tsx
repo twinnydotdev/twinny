@@ -3,10 +3,10 @@ import { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-import { BOT_NAME, MESSAGE_NAME } from '../constants'
+import { BOT_NAME, MESSAGE_NAME } from '../common/constants'
 
 import styles from './index.module.css'
-import { LanguageType, Theme, ThemeType } from '../extension/types'
+import { LanguageType, Theme, ThemeType } from '../common/types'
 import { getLanguageMatch } from './utils'
 
 interface CodeBlockProps {

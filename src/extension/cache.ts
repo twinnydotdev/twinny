@@ -1,4 +1,4 @@
-import { PrefixSuffix } from './types'
+import { PrefixSuffix } from '../common/types'
 
 export class LRUCache<T = string> {
   private capacity: number

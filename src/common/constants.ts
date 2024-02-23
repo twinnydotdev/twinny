@@ -1,5 +1,5 @@
-import { defaultTemplates } from './extension/templates'
-import { ApiProviders } from './extension/types'
+import { defaultTemplates } from '../extension/templates'
+import { ApiProviders } from './types'
 
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const BOT_NAME = 'assistant'
