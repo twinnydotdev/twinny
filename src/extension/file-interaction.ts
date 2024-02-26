@@ -1,15 +1,8 @@
+import { InteractionItem } from '../common/types'
 import { LRUCache } from './cache'
 
-interface CacheItem {
-  keyStrokes: number | null | undefined
-  lastVisited: number
-  name: string | null | undefined
-  sessionLength: number
-  visits: number | null | undefined
-}
-
 export class FileInteractionCache {
-  private _interactions = new LRUCache<CacheItem>(20)
+  private _interactions = new LRUCache<InteractionItem>(20)
   private _currentFile: string | null = null
   private _sessionStartTime: Date | null = null
   private _sessionPauseTime: Date | null = null
@@ -60,7 +53,8 @@ export class FileInteractionCache {
         keyStrokes: b?.keyStrokes || 0,
         visits: b?.visits || 0,
         sessionLength: b?.sessionLength || 0,
-        lastVisited: b?.lastVisited || 0
+        lastVisited: b?.lastVisited || 0,
+        activeLines: b?.activeLines || [],
       }))
       .sort((a, b) => {
         const recencyA = Date.now() - (a.lastVisited || 0)
@@ -93,14 +87,18 @@ export class FileInteractionCache {
     })
   }
 
-  incrementStrokes() {
+  incrementStrokes(currentLine: number, currentCharacter: number) {
     if (!this._currentFile) return
     const item = this._interactions.get(this._currentFile)
     if (!item) return
 
     this._interactions.set(this._currentFile, {
       ...item,
-      keyStrokes: (item.keyStrokes || 0) + 1
+      keyStrokes: (item.keyStrokes || 0) + 1,
+      activeLines: [
+        ...item.activeLines,
+        { line: currentLine, character: currentCharacter }
+      ]
     })
 
     this.resumeSession()
@@ -152,6 +150,7 @@ export class FileInteractionCache {
         keyStrokes: 0,
         visits: 0,
         sessionLength: 0,
+        activeLines: [],
         lastVisited: Date.now()
       })
     }

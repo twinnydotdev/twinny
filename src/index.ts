@@ -158,8 +158,12 @@ export async function activate(context: ExtensionContext) {
       fileInteractionCache.startSession(filePath)
       fileInteractionCache.incrementVisits()
     }),
-    workspace.onDidChangeTextDocument(() => {
-      fileInteractionCache.incrementStrokes()
+    workspace.onDidChangeTextDocument((e) => {
+      const changes = e.contentChanges[0]
+      if (!changes) return
+      const currentLine = changes.range.start.line
+      const currentCharacter = changes.range.start.character
+      fileInteractionCache.incrementStrokes(currentLine, currentCharacter)
     })
   )
 

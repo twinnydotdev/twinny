@@ -23,8 +23,11 @@ import {
   StreamRequestOptions,
   StreamResponse
 } from '../../common/types'
-import { getFimTemplate } from '../fim-templates'
-import { LINE_BREAK_REGEX } from '../../common/constants'
+import { getFimPrompt, getStopWords } from '../fim-templates'
+import {
+  LINE_BREAK_REGEX,
+  MAX_CONTEXT_LINE_COUNT
+} from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
@@ -46,6 +49,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _disableAuto = this._config.get('disableAutoSuggest') as boolean
   private _document: TextDocument | null
   private _enabled = this._config.get('enabled')
+  private _fileInteractionCache: FileInteractionCache
   private _fimModel = this._config.get('fimModelName') as string
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _keepAlive = this._config.get('keepAlive') as string | number
@@ -59,11 +63,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _port = this._config.get('fimApiPort') as number
   private _position: Position | null
   private _statusBar: StatusBarItem
+  private _stopWords = getStopWords(this._fimModel, this._fimTemplateFormat)
   private _temperature = this._config.get('temperature') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
   private _useTls = this._config.get('useTls') as boolean
-  private _fileInteractionCache: FileInteractionCache
 
   constructor(
     statusBar: StatusBarItem,
@@ -76,155 +80,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._position = null
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
-  }
-
-  private buildStreamRequest(prompt: string) {
-    const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
-      model: this._fimModel,
-      numPredictChat: this._numPredictFim,
-      temperature: this._temperature,
-      keepAlive: this._keepAlive
-    })
-
-    const requestOptions: StreamRequestOptions = {
-      hostname: this._apiHostname,
-      port: this._port,
-      path: this._apiPath,
-      protocol: this._useTls ? 'https' : 'http',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this._bearerToken}`
-      }
-    }
-
-    return { requestOptions, requestBody }
-  }
-
-  //TODO: Simplify, we shouldn't need to call `getFimTemplate` for the stopwords.
-  private getModelStopWords = (prefixSuffix: PrefixSuffix) => {
-    if (!this._document) return []
-    const language = this._document.languageId
-    const { stopWords } = getFimTemplate(
-      this._fimModel,
-      this._fimTemplateFormat,
-      {
-        context: this.getNeighboringCodeContext(this._document?.uri),
-        prefixSuffix,
-        header: this.getAdditionalContext(language, this._document?.uri),
-        useFileContext: this._useFileContext
-      }
-    )
-    return stopWords
-  }
-
-  private removeStopWords(prefixSuffix: PrefixSuffix) {
-    const stopWords = this.getModelStopWords(prefixSuffix)
-    stopWords.forEach((stopWord) => {
-      this._completion = this._completion.split(stopWord).join('')
-    })
-  }
-
-  private shouldSkipCompletion(context: InlineCompletionContext) {
-    return (
-      context.triggerKind === InlineCompletionTriggerKind.Automatic &&
-      this._disableAuto
-    )
-  }
-
-  private getContainsStopWord(prefixSuffix: PrefixSuffix) {
-    const stopWords = this.getModelStopWords(prefixSuffix)
-    return stopWords.some((stopSequence) =>
-      this._completion?.includes(stopSequence)
-    )
-  }
-
-  private getMaxLinesReached(prefixSuffix: PrefixSuffix) {
-    return (
-      this._linesGenerated > this._maxLines ||
-      this.getContainsStopWord(prefixSuffix)
-    )
-  }
-
-  private getIsSingleLineCompltion(completionString: string) {
-    return (
-      !this._useMultiLine &&
-      this._chunkCount > 1 &&
-      LINE_BREAK_REGEX.exec(completionString)
-    )
-  }
-
-  private async getPrompt(prefixSuffix: PrefixSuffix) {
-    if (!this._document || !this._position) return ''
-
-    const language = this._document.languageId
-    const interactionContext = await this.getFileInteractionContext()
-
-    const { prompt } = getFimTemplate(this._fimModel, this._fimTemplateFormat, {
-      context: interactionContext || '',
-      prefixSuffix,
-      header: this.getAdditionalContext(language, this._document.uri),
-      useFileContext: this._useFileContext,
-      language: language
-    })
-
-    return prompt
-  }
-
-  private onData(
-    data: StreamResponse | undefined,
-    prefixSuffix: PrefixSuffix,
-    done: (completion: ResolvedInlineCompletion) => void
-  ) {
-    try {
-      const completionData = getFimDataFromProvider(this._apiProvider, data)
-      if (completionData === undefined) return done([])
-
-      this._completion = this._completion + completionData
-      this._chunkCount = this._chunkCount + 1
-
-      if (this.getIsSingleLineCompltion(completionData)) {
-        this._logger.log(
-          `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        this._abortController?.abort()
-        return done(this.triggerInlineCompletion(prefixSuffix))
-      }
-
-      if (LINE_BREAK_REGEX.exec(completionData)) this._linesGenerated++
-
-      if (this.getMaxLinesReached(prefixSuffix)) {
-        this._logger.log(
-          `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        this.removeStopWords(prefixSuffix)
-        this._abortController?.abort()
-        return done(this.triggerInlineCompletion(prefixSuffix))
-      }
-    } catch (e) {
-      console.error(e)
-    }
-  }
-
-  private onStart(controller: AbortController) {
-    this._abortController = controller
-  }
-
-  private onEnd(
-    prefixSuffix: PrefixSuffix,
-    resolve: (comlpetion: ResolvedInlineCompletion) => void
-  ) {
-    this._logger.log(
-      `Streaming response end due to request end ${this._nonce} \nCompletion: ${this._completion}`
-    )
-    this.removeStopWords(prefixSuffix)
-    this._abortController?.abort()
-    resolve(this.triggerInlineCompletion(prefixSuffix))
-  }
-
-  public onError = () => {
-    this._abortController?.abort()
-    this._statusBar.text = '🤖'
   }
 
   public async provideInlineCompletionItems(
@@ -285,7 +140,86 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private getAdditionalContext(languageId: string | undefined, uri: Uri) {
+  private buildStreamRequest(prompt: string) {
+    const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
+      model: this._fimModel,
+      numPredictChat: this._numPredictFim,
+      temperature: this._temperature,
+      keepAlive: this._keepAlive
+    })
+
+    const requestOptions: StreamRequestOptions = {
+      hostname: this._apiHostname,
+      port: this._port,
+      path: this._apiPath,
+      protocol: this._useTls ? 'https' : 'http',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this._bearerToken}`
+      }
+    }
+
+    return { requestOptions, requestBody }
+  }
+
+  private onData(
+    data: StreamResponse | undefined,
+    prefixSuffix: PrefixSuffix,
+    done: (completion: ResolvedInlineCompletion) => void
+  ) {
+    try {
+      const completionData = getFimDataFromProvider(this._apiProvider, data)
+      if (completionData === undefined) return done([])
+
+      this._completion = this._completion + completionData
+      this._chunkCount = this._chunkCount + 1
+
+      if (this.getIsSingleLineCompletion(completionData)) {
+        this._logger.log(
+          `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
+        )
+        this._abortController?.abort()
+        return done(this.triggerInlineCompletion(prefixSuffix))
+      }
+
+      if (LINE_BREAK_REGEX.exec(completionData)) this._linesGenerated++
+
+      if (this.getMaxLinesReached()) {
+        this._logger.log(
+          `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${this._completion}`
+        )
+        this.removeStopWords()
+        this._abortController?.abort()
+        return done(this.triggerInlineCompletion(prefixSuffix))
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  private onStart(controller: AbortController) {
+    this._abortController = controller
+  }
+
+  private onEnd(
+    prefixSuffix: PrefixSuffix,
+    resolve: (comlpetion: ResolvedInlineCompletion) => void
+  ) {
+    this._logger.log(
+      `Streaming response end due to request end ${this._nonce} \nCompletion: ${this._completion}`
+    )
+    this.removeStopWords()
+    this._abortController?.abort()
+    resolve(this.triggerInlineCompletion(prefixSuffix))
+  }
+
+  public onError = () => {
+    this._abortController?.abort()
+    this._statusBar.text = '🤖'
+  }
+
+  private getPromptHeader(languageId: string | undefined, uri: Uri) {
     const lang =
       supportedLanguages[languageId as keyof typeof supportedLanguages]
 
@@ -306,76 +240,89 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return `\n${language}\n${path}\n`
   }
 
-  private getFilePathSimilarity(path1: string, path2: string): number {
-    const components1 = path1.split('/')
-    const components2 = path2.split('/')
-
-    const fileName1 = components1[components1.length - 1]
-    const fileName2 = components2[components2.length - 1]
-
-    const folderSimilarity = components1
-      .slice(0, -1)
-      .join('/')
-      .score(components2.slice(0, -1).join('/'), 0.5)
-
-    const filenameSimilarity = fileName1.score(fileName2, 0.5)
-
-    return folderSimilarity + filenameSimilarity
-  }
-
   private async getFileInteractionContext() {
     const interactions = this._fileInteractionCache.getAll()
     const currentFileName = this._document?.fileName || ''
-    const filePaths = interactions
-      .map((interaction) => interaction.name)
-      .slice(0, 4)
-      .filter((path) => path !== currentFileName)
-    const fileChunks = []
-    for (const filePath of filePaths) {
+
+    const fileChunks: string[] = []
+    for (const interaction of interactions) {
+      const filePath = interaction.name
       const uri = Uri.file(filePath)
-      try {
-        const document = await workspace.openTextDocument(uri)
+
+      if (currentFileName === filePath) continue
+
+      const activeLines = interaction.activeLines
+
+      const document = await workspace.openTextDocument(uri)
+      const lineCount = document.lineCount
+
+      if (lineCount > MAX_CONTEXT_LINE_COUNT) {
+        const averageLine =
+          activeLines.reduce((acc, curr) => acc + curr.line, 0) /
+          activeLines.length
+        const start = new Position(Math.ceil(averageLine) - 100, 0)
+        const end = new Position(Math.ceil(averageLine) + 100, 0)
         fileChunks.push(`
-// File: \n ${filePath}
+// File: ${filePath}
+// Content: \n ${document.getText(new Range(start, end))}
+        `)
+      } else {
+        fileChunks.push(`
+// File: ${filePath}
 // Content: \n ${document.getText()}
         `)
-      } catch (error) {
-        console.error('Error opening file:', error)
-        return null
       }
     }
 
     return fileChunks.join('\n')
   }
 
-  private getNeighboringCodeContext(uri: Uri): string {
-    const codeSnippets: string[] = []
-    const currentFileName = uri.toString()
+  private removeStopWords() {
+    this._stopWords.forEach((stopWord) => {
+      this._completion = this._completion.split(stopWord).join('')
+    })
+  }
 
-    for (const document of workspace.textDocuments) {
-      if (
-        document.fileName === window.activeTextEditor?.document.fileName ||
-        document.fileName.includes('git')
-      ) {
-        continue
-      }
+  private shouldSkipCompletion(context: InlineCompletionContext) {
+    return (
+      context.triggerKind === InlineCompletionTriggerKind.Automatic &&
+      this._disableAuto
+    )
+  }
 
-      const text = `${this.getAdditionalContext(
-        document.languageId,
-        document.uri
-      )}${document.getText()}`
+  private getContainsStopWord() {
+    return this._stopWords.some((stopSequence) =>
+      this._completion?.includes(stopSequence)
+    )
+  }
 
-      const filePathSimilarity = this.getFilePathSimilarity(
-        currentFileName.toString(),
-        document.uri.toString()
-      )
+  private getMaxLinesReached() {
+    return this._linesGenerated > this._maxLines || this.getContainsStopWord()
+  }
 
-      if (filePathSimilarity > 1) {
-        codeSnippets.push(text)
-      }
-    }
+  private getIsSingleLineCompletion(completionString: string) {
+    return (
+      !this._useMultiLine &&
+      this._chunkCount > 1 &&
+      LINE_BREAK_REGEX.exec(completionString)
+    )
+  }
 
-    return codeSnippets.join('\n')
+  private async getPrompt(prefixSuffix: PrefixSuffix) {
+    if (!this._document || !this._position) return ''
+
+    const language = this._document.languageId
+    const interactionContext = await this.getFileInteractionContext()
+
+    const prompt = getFimPrompt(this._fimModel, this._fimTemplateFormat, {
+      context: interactionContext || '',
+      prefixSuffix,
+      header: this.getPromptHeader(language, this._document.uri),
+      useFileContext: this._useFileContext,
+      language: language
+    })
+
+    return prompt
   }
 
   private triggerInlineCompletion(

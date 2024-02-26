@@ -18,6 +18,7 @@ export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g;
 export const LINE_BREAK_REGEX = /\r?\n$/
 export const COMPLETION_TIMEOUT = 20000 // 20 seconds
+export const MAX_CONTEXT_LINE_COUNT = 200
 
 export const MESSAGE_NAME = {
   twinnyAcceptSolution: 'twinny-accept-solution',
@@ -83,6 +84,18 @@ export const FIM_TEMPLATE_FORMAT = {
   llama: 'llama',
   stableCode: 'stable-code'
 }
+
+export const STOP_LLAMA = ['<EOT>']
+
+export const STOP_DEEPSEEK = [
+  '<｜fim▁begin｜>',
+  '<｜fim▁hole｜>',
+  '<｜fim▁end｜>',
+  '<END>',
+  '<｜end▁of▁sentence｜>'
+]
+
+export const STOP_STABLECODE = ['<|endoftext|>']
 
 export const API_PROVIDER: ApiProviders = {
   ollama: {

@@ -1,4 +1,9 @@
-import { FIM_TEMPLATE_FORMAT } from '../common/constants'
+import {
+  FIM_TEMPLATE_FORMAT,
+  STOP_DEEPSEEK,
+  STOP_LLAMA,
+  STOP_STABLECODE
+} from '../common/constants'
 import { supportedLanguages } from '../common/languages'
 import { FimPromptTemplate } from '../common/types'
 
@@ -13,16 +18,13 @@ export const getFimPromptTemplateLLama = ({
   const languageId =
     supportedLanguages[language as keyof typeof supportedLanguages]
   const fileContext = useFileContext
-    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
+    ? `${languageId?.syntaxComments?.start || ''}${context}${
+        languageId?.syntaxComments?.end || ''
+      }`
     : ''
   const heading = header ? header : ''
 
-  return {
-    prompt: `<PRE>${fileContext}*/\n${heading}${prefix} <SUF> ${suffix} <MID>`,
-    prefix,
-    suffix,
-    stopWords: ['<EOT>']
-  }
+  return `<PRE>${fileContext} \n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
 export const getDefaultFimPromptTemplate = ({
@@ -30,7 +32,7 @@ export const getDefaultFimPromptTemplate = ({
   header,
   useFileContext,
   prefixSuffix,
-  language,
+  language
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const languageId =
@@ -39,12 +41,7 @@ export const getDefaultFimPromptTemplate = ({
     ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
     : ''
   const heading = header ? header : ''
-  return {
-    prompt: `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`,
-    prefix,
-    suffix,
-    stopWords: ['<EOT>']
-  }
+  return `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
 export const getFimPromptTemplateDeepseek = ({
@@ -52,7 +49,7 @@ export const getFimPromptTemplateDeepseek = ({
   header,
   useFileContext,
   prefixSuffix,
-  language,
+  language
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const languageId =
@@ -61,18 +58,7 @@ export const getFimPromptTemplateDeepseek = ({
     ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
     : ''
   const heading = header ? header : ''
-  return {
-    prompt: `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`,
-    prefix,
-    suffix,
-    stopWords: [
-      '<｜fim▁begin｜>',
-      '<｜fim▁hole｜>',
-      '<｜fim▁end｜>',
-      '<END>',
-      '<｜end▁of▁sentence｜>'
-    ]
-  }
+  return `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
 }
 
 export const getFimPromptTemplateStableCode = ({
@@ -84,12 +70,7 @@ export const getFimPromptTemplateStableCode = ({
   const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''
   const heading = header ? header : ''
-  return {
-    prompt: `<fim_prefix>${fileContext}\n${heading}${prefix}<fim_suffix>${suffix}<fim_middle>`,
-    prefix,
-    suffix,
-    stopWords: ['<|endoftext|>']
-  }
+  return `<fim_prefix>${fileContext}\n${heading}${prefix}<fim_suffix>${suffix}<fim_middle>`
 }
 
 function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
@@ -127,7 +108,7 @@ function getFimTemplateChosen(format: string, args: FimPromptTemplate) {
   return getDefaultFimPromptTemplate(args)
 }
 
-export const getFimTemplate = (
+export const getFimPrompt = (
   fimModel: string,
   format: string,
   args: FimPromptTemplate
@@ -136,4 +117,37 @@ export const getFimTemplate = (
     return getFimTemplateAuto(fimModel, args)
   }
   return getFimTemplateChosen(fimModel, args)
+}
+
+export const getStopWordsAuto = (fimModel: string) => {
+  if (
+    fimModel.includes(FIM_TEMPLATE_FORMAT.codellama) ||
+    fimModel.includes(FIM_TEMPLATE_FORMAT.llama)
+  ) {
+    return STOP_LLAMA
+  }
+
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.deepseek)) {
+    return STOP_DEEPSEEK
+  }
+
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode)) {
+    return ['<|endoftext|>']
+  }
+
+  return STOP_LLAMA
+}
+
+export const getStopWordsChosen = (format: string) => {
+  if (format === FIM_TEMPLATE_FORMAT.codellama) return STOP_LLAMA
+  if (format === FIM_TEMPLATE_FORMAT.deepseek) return STOP_DEEPSEEK
+  if (format === FIM_TEMPLATE_FORMAT.stableCode) return STOP_STABLECODE
+  return STOP_LLAMA
+}
+
+export const getStopWords = (fimModel: string, format: string) => {
+  if (format === FIM_TEMPLATE_FORMAT.automatic) {
+    return getStopWordsAuto(fimModel)
+  }
+  return getStopWordsChosen(fimModel)
 }

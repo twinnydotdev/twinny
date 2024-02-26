@@ -172,3 +172,15 @@ export type ResolvedInlineCompletion = InlineCompletionItem[]
   >
 | null
 | undefined
+
+export interface InteractionItem {
+  keyStrokes: number | null | undefined
+  lastVisited: number
+  name: string | null | undefined
+  sessionLength: number
+  visits: number | null | undefined
+  activeLines: {
+    line: number
+    character: number
+  }[]
+}
