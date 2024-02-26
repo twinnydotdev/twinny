@@ -1,6 +1,6 @@
 # twinny
 
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups? Fear not my developer friend! Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [Ollama Web UI](https://github.com/ollama-webui/ollama-webui), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
+Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups? Fear not my developer friend! Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code and any compatible editors (like VSCodium) designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [Ollama Web UI](https://github.com/ollama-webui/ollama-webui), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
 
 <div align="center">
     <p>
@@ -37,7 +37,8 @@ Chat with AI about your code
 
 ### Easy Installation
 
-Install the verified extension via the Visual Studio Code marketplace by clicking [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code.
+For Visual Studio Code install the verified extension via the Visual Studio Code marketplace by clicking [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code.
+For compatible editors (like VSCodium) install the extension from [open-vsx.org](https://open-vsx.org/extension/rjmacarthy/twinny).
 
 Twinny is configured to use the Ollama API by default, however you can change this to use llama.cpp, LM Studio or Oobabooga by changing the API provider in the extension settings. You can find the settings inside the extension sidebar by clicking the gear icon inside the twinny sidebar or by searching for `twinny` in the extensions search bar.
 
