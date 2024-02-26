@@ -1,6 +1,6 @@
 # twinny
 
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
+Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code and any compatible editors (like VSCodium) designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
 
 <div align="center">
     <p>
@@ -36,7 +36,8 @@ Chat with AI about your code
 
 ### Easy Installation
 
-Install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code marketplace.
+For Visual Studio Code install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code marketplace.
+For compatible editors (like VSCodium) install the extension from [open-vsx.org](https://open-vsx.org/extension/rjmacarthy/twinny).
 
 Twinny is configured to use Ollama by deafult. Therefore, when installing the twinny extension in Visual Studio Code, it will automatically prompt and guide you through the installation of Ollama using two default small models `codellama:7b-instruct` for chat and `codellama:7b-code` for "fill in the middle" completions. 
 
