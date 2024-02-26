@@ -11,5 +11,6 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUnusedParameters": true,
     "esModuleInterop": true
-	}
+	},
+  "exclude": ["node_modules", ".vscode-test"]
 }

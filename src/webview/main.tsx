@@ -1,20 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Chat } from './chat'
 import { TemplateSettings } from './template-settings'
-import { ServerMessage } from '../types'
-import { MESSAGE_NAME } from '../constants'
+import { ServerMessage } from '../common/types'
+import { MESSAGE_NAME, UI_TABS } from '../common/constants'
 
-interface TabComponents {
-  [key: string]: { component: JSX.Element }
-}
-
-const tabs: TabComponents = {
-  chat: {
-    component: <Chat />
-  },
-  templates: {
-    component: <TemplateSettings />
-  }
+const tabs: Record<string, JSX.Element> = {
+  [UI_TABS.chat]: <Chat />,
+  [UI_TABS.templates]: <TemplateSettings />
 }
 
 export const Main = () => {
@@ -35,5 +27,7 @@ export const Main = () => {
     return null
   }
 
-  return tabs[tab].component || null
+  const element: JSX.Element = tabs[tab]
+
+  return element || null
 }

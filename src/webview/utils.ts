@@ -1,6 +1,6 @@
-import { EMPTY_MESAGE } from '../constants'
-import { CodeLanguage, supportedLanguages } from '../languages'
-import { LanguageType, ServerMessage } from '../types'
+import { EMPTY_MESAGE } from '../common/constants'
+import { CodeLanguage, supportedLanguages } from '../common/languages'
+import { LanguageType, ServerMessage } from '../common/types'
 
 export const getLanguageMatch = (
   language: LanguageType | undefined,
@@ -50,4 +50,11 @@ export const kebabToSentence = (kebabStr: string) => {
   words[0] = words[0].charAt(0).toUpperCase() + words[0].slice(1)
 
   return words.join(' ')
+}
+
+export const getModelShortName = (name: string) => {
+  if (name.length > 32) {
+    return `${name.substring(0, 15)}...${name.substring(name.length - 16)}`
+  }
+  return name
 }

@@ -3,7 +3,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 import { useSelection } from './hooks'
 
-import { LanguageType } from '../types'
+import { LanguageType } from '../common/types'
 import { getLanguageMatch } from './utils'
 
 interface SelectionProps {

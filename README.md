@@ -1,6 +1,6 @@
 # twinny
 
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups?  Fear not my developer friend!  Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code and any compatible editors (like VSCodium) designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
+Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups? Fear not my developer friend! Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code and any compatible editors (like VSCodium) designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [Ollama Web UI](https://github.com/ollama-webui/ollama-webui), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
 
 <div align="center">
     <p>
@@ -23,47 +23,46 @@ Chat with AI about your code
 
 #### Other features 
 
-- Configurable single or multiline fill-in-middle completions
-- Configurable prompt templates add, edit, remove, delete and set as default
-- Easy installation and setup
-- Ollama, llamacpp and LM Studio API compatible
+- Single or multiline fill-in-middle completions
+- Customisable prompt templates to add context to completions
+- Easy installation via vscode extensions marketplace or by downloading and running a binary directly
+- Customisable settings to change API provider, model name, port number and path 
+- Ollama, llamacpp, oobabooga and LM Studio API compatible
 - Accept code solutions directly to editor
 - Create new documents from code blocks
 - Copy generated code solution blocks
-- Chat history preserved per workspace
+- Chat history preserved per workspace 
 
 ## 🚀 Getting Started
 
 ### Easy Installation
 
-For Visual Studio Code install the verified extension at [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code marketplace.
+For Visual Studio Code install the verified extension via the Visual Studio Code marketplace by clicking [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code.
 For compatible editors (like VSCodium) install the extension from [open-vsx.org](https://open-vsx.org/extension/rjmacarthy/twinny).
 
-Twinny is configured to use Ollama by deafult. Therefore, when installing the twinny extension in Visual Studio Code, it will automatically prompt and guide you through the installation of Ollama using two default small models `codellama:7b-instruct` for chat and `codellama:7b-code` for "fill in the middle" completions. 
+Twinny is configured to use the Ollama API by default, however you can change this to use llama.cpp, LM Studio or Oobabooga by changing the API provider in the extension settings. You can find the settings inside the extension sidebar by clicking the gear icon inside the twinny sidebar or by searching for `twinny` in the extensions search bar.
 
-If you already have Ollama installed or you want to use llama.cpp or LM Studio instead, you can cancel the automatic setup of Ollama and proceed to update the values inside twinny extension settings to point to your existing models and server.  At this point it's a good idea to set `Disable Server Checks` option to true which this will disable the checks on startup.
+Twinny supports the OpenAI API specification so in theory any API should work with Twinny as long as it supports the OpenAI specification.  If you find that isn't the case please open an issue with details of how you are having problems.
 
-You can find the settings inside the extension sidebar by clicking the gear icon inside the twinny sidebar or by searching for `twinny` in the extensions search bar.
+When choosing an API provider the port and API path names will be updated automatically based on the provider you choose to use. These options can also be set manually.
 
-When choosing an API provider the port and API path names will be updated automatically based on the provider you choose to use.
+The option for chat model name and fim model name are only applicable to Ollama and Oobabooga providers.
 
-If you are using llama.cpp - The twinny settings for FIM model name and Chat model name will be ignored, as this should already be configured when running the llama.cpp server.
-
-When the extension is ready you will see a `🤖` icon at the bottom of your code editor.
+When the extension is ready you will see a `🤖` icon at the bottom of your code editor indicating that twinny is ready to use.
 
 Enjoy enhanced code completions and chat with twinny! 🎉
 
 ## Model support
 
-**FIM**
+**Fill in the middle (FIM) completions**
 
-- If using Llama the model must support the llama special tokens for prefix and suffix if using codellama models.
-- If using deepseek only use base models for FIM completions for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
-- `stable-code:code` has been tested and works for FIM.
+- If using Llama the model must support the Llama special tokens.
+- If using deepseek use a base model for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
+- If using stable code `stable-code:code` has been tested and works well.
 
 **Chat**
 
-- All instruct models should work but prompt templates might need editing if using something other than codellama.
+- All models should work for chat generations but the templates might need editing if using something other than codellama and updated with the special tokens.
 
 ## Keyboard shortcuts
 
@@ -73,15 +72,18 @@ Enjoy enhanced code completions and chat with twinny! 🎉
 | `CTRL+SHIFT+t`               | Open twinny sidebar                      |
 | `CTRL+SHIFT+/`               | Stop code generation                     | 
 
+## Workspace context
+
+In the settings there is an option called `useFileContext` this will keep track of sessions, keystrokes, visits and recency of visited files in the current workspace.  This can be enabled to help improve the quality of completions, it's turned off by default but I'm considering turning this on by default in the next release.
+
 ## Known issues
 
 - If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
-- Some models may not support the special tokens of Llama which means they would not work correctly for FIM completions.
-- Sometimes a restart of vscode is required for new settings to take effect.
+- Sometimes a restart of vscode is required for new settings to take effect, please open an issue if you are having problems with this.
 - Using file context often causes unreliable completions for FIM because small models get confused when provided with more than one file context.
-- See open issues for more information 
+- See open issues on github to see any known issues that are not yet fixed.
   
-If you have a suggestion for improvement please open an issue and I will do my best to make it happen!
+If you have a problem with Twinny or have any suggestions please report them on github issues.  Please include your vscode version and OS details in your issue.
 
 ## Contributing
 
@@ -90,3 +92,7 @@ We are actively looking for contributors who want to help improve the project, i
 Contributions are welcome please open an issue describing your changes and open a pull request when ready.
 
 This project is under MIT licence, please read the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) file for more information.
+
+## Disclaimer
+
+This plugin is provided "as is" and is under active development.  This means that at times it may not work fully as expected.

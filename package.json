@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.5.14",
+  "version": "3.6.7",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -55,7 +55,7 @@
   "author": {
     "name": "rjmacarthy"
   },
-  "main": "./out/extension.js",
+  "main": "./out/index.js",
   "contributes": {
     "menus": {
       "editor/context": [
@@ -238,7 +238,8 @@
           "enum": [
             "ollama",
             "llamacpp",
-            "lmstudio"
+            "lmstudio",
+            "oobabooga"
           ],
           "default": "ollama",
           "description": "The API provider to use (sets the paths and port automatically to defaults)."
@@ -275,24 +276,25 @@
           "order": 7,
           "type": "string",
           "default": "codellama:7b-instruct",
-          "description": "Model identifier for chat completions. Applicable only for Ollama API."
+          "description": "Model identifier for chat completions. Applicable only for Ollama and Oobabooga API."
         },
         "twinny.fimModelName": {
           "order": 8,
           "type": "string",
           "default": "codellama:7b-code",
-          "description": "Model identifier for FIM completions. Applicable only for Ollama API."
+          "description": "Model identifier for FIM completions. Applicable only for Ollama and Oobabooga API."
         },
         "twinny.fimTemplateFormat": {
           "order": 9,
           "type": "string",
           "enum": [
+            "automatic",
             "stable-code",
             "codellama",
             "deepseek"
           ],
-          "default": "codellama",
-          "description": "The prompt format to be used for FIM completions."
+          "default": "automatic",
+          "description": "The prompt format to be used for FIM completions. Overrides automatic detection."
         },
         "twinny.disableAutoSuggest": {
           "order": 10,
@@ -358,15 +360,15 @@
         "twinny.numPredictFim": {
           "order": 19,
           "type": "number",
-          "default": -1,
-          "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny stops at logical line breaks.",
+          "default": 250,
+          "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny should stop at logical line breaks.",
           "required": true
         },
-        "twinny.disableServerChecks": {
+        "twinny.keepAlive": {
           "order": 20,
-          "type": "boolean",
-          "default": false,
-          "description": "Disables automatic LLM server checks at startup, preventing auto-downloads and prompts."
+          "type": "string",
+          "default": "5m",
+          "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.useTls": {
           "order": 21,
@@ -403,7 +405,10 @@
     "vscode:publish": "npm exec vsce publish"
   },
   "devDependencies": {
+    "@types/async-lock": "^1.4.2",
+    "@types/glob": "^8.1.0",
     "@types/handlebars": "^4.1.0",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
     "@types/react-syntax-highlighter": "^15.5.11",
@@ -411,9 +416,13 @@
     "@types/vscode": "^1.70.0",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
+    "@vscode/test-cli": "^0.0.6",
+    "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^2.18.0",
     "css-loader": "^6.8.1",
     "eslint": "^8.20.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.3.0",
     "style-loader": "^3.3.3",
     "ts-loader": "^9.5.1",
     "typescript": "^4.7.4",
@@ -424,6 +433,7 @@
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
+    "async-lock": "^1.4.1",
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",

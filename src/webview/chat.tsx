@@ -9,25 +9,39 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import { Selection } from './selection'
-import { BOT_NAME, MESSAGE_KEY, MESSAGE_NAME, USER_NAME } from '../constants'
+import {
+  BOT_NAME,
+  MESSAGE_KEY,
+  MESSAGE_NAME,
+  SETTING_KEY,
+  USER_NAME
+} from '../common/constants'
 
 import {
+  useConfigurationSetting,
   useLanguage,
   useSelection,
   useTheme,
   useWorkSpaceContext
 } from './hooks'
 import {
-  CodeIcon,
   DisabledAutoScrollIcon,
   EnabledAutoScrollIcon,
-  StopIcon
+  DisabledSelectionIcon,
+  EnabledSelectionIcon,
+  ScrollDownIcon
 } from './icons'
 
 import { Suggestions } from './suggestions'
-import { ClientMessage, MessageType, ServerMessage } from '../types'
+import {
+  ApiProviders,
+  ClientMessage,
+  MessageType,
+  ServerMessage
+} from '../common/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
+import { ModelSelect } from './model-select'
 import styles from './index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,14 +49,19 @@ const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const [isSelectionVisible, setIsSelectionVisible] = useState<boolean>(false)
-  const genertingRef = useRef(false)
+  const generatingRef = useRef(false)
   const stopRef = useRef(false)
   const theme = useTheme()
   const language = useLanguage()
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
-  const divRef = useRef<HTMLDivElement>(null)
+  const [showModelSelect, setShowModelSelect] = useState<boolean>(false)
+  const { configurationSetting: apiProvider } = useConfigurationSetting(
+    SETTING_KEY.apiProvider
+  )
+
+  const markdownRef = useRef<HTMLDivElement>(null)
   const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
   const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
     boolean | undefined
@@ -54,9 +73,10 @@ export const Chat = () => {
   const chatRef = useRef<any>(null) // TODO: type...
 
   const scrollBottom = () => {
+    if (!isAutoScrolledEnabled) return
     setTimeout(() => {
-      if (divRef.current) {
-        divRef.current.scrollTop = divRef.current.scrollHeight
+      if (markdownRef.current) {
+        markdownRef.current.scrollTop = markdownRef.current.scrollHeight
       }
     }, 200)
   }
@@ -83,21 +103,37 @@ export const Chat = () => {
     })
     setCompletion(null)
     setLoading(false)
-    genertingRef.current = false
+    generatingRef.current = false
     setTimeout(() => {
       chatRef.current?.focus()
       stopRef.current = false
-    }, 1000)
+    }, 200)
+  }
+
+  const handleAddTemplateMessage = (message: ServerMessage) => {
+    if (stopRef.current) {
+      generatingRef.current = false
+      return
+    }
+    generatingRef.current = true
+    setLoading(false)
+    if (isAutoScrolledEnabled) scrollBottom()
+    setMessages((prev) => [
+      ...(prev || []),
+      {
+        role: USER_NAME,
+        content: message.value.completion as string
+      }
+    ])
   }
 
   const handleCompletionMessage = (message: ServerMessage) => {
     if (stopRef.current) {
-      genertingRef.current = false
+      generatingRef.current = false
       return
     }
-    genertingRef.current = true
+    generatingRef.current = true
     setLoading(false)
-    if (isAutoScrolledEnabled) scrollBottom()
     setCompletion({
       role: BOT_NAME,
       content: getCompletionContent(message),
@@ -105,6 +141,7 @@ export const Chat = () => {
       language: message.value.data,
       error: message.value.error
     })
+    if (isAutoScrolledEnabled) scrollBottom()
   }
 
   const handleLoadingMessage = () => {
@@ -115,6 +152,10 @@ export const Chat = () => {
   const messageEventHandler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     switch (message.type) {
+      case MESSAGE_NAME.twinngAddMessage: {
+        handleAddTemplateMessage(message)
+        break
+      }
       case MESSAGE_NAME.twinnyOnCompletion: {
         handleCompletionMessage(message)
         break
@@ -129,7 +170,7 @@ export const Chat = () => {
       }
       case MESSAGE_NAME.twinnyStopGeneration: {
         setCompletion(null)
-        genertingRef.current = false
+        generatingRef.current = false
         chatRef.current?.focus()
         setTimeout(() => {
           stopRef.current = false
@@ -140,7 +181,7 @@ export const Chat = () => {
 
   const handleStopGeneration = () => {
     stopRef.current = true
-    genertingRef.current = false
+    generatingRef.current = false
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyStopGeneration
     } as ClientMessage)
@@ -155,6 +196,7 @@ export const Chat = () => {
 
   const handleSubmitForm = (input: string) => {
     if (input) {
+      setLoading(true)
       setInputText('')
       global.vscode.postMessage({
         type: MESSAGE_NAME.twinnyChatMessage,
@@ -162,7 +204,8 @@ export const Chat = () => {
           ...(messages || []),
           {
             role: USER_NAME,
-            content: input
+            content: input,
+            type: 'chat'
           }
         ]
       } as ClientMessage)
@@ -188,8 +231,18 @@ export const Chat = () => {
     })
   }
 
+  const handleScrollBottom = () => {
+    if (markdownRef.current) {
+      markdownRef.current.scrollTop = markdownRef.current.scrollHeight
+    }
+  }
+
   const handleToggleSelection = () => {
     setIsSelectionVisible((prev) => !prev)
+  }
+
+  const handleToggleModelSelection = () => {
+    setShowModelSelect((prev) => !prev)
   }
 
   useEffect(() => {
@@ -213,7 +266,7 @@ export const Chat = () => {
   return (
     <VSCodePanelView>
       <div className={styles.container}>
-        <div className={styles.markdown} ref={divRef}>
+        <div className={styles.markdown} ref={markdownRef}>
           {messages?.map((message, index) => (
             <div key={`message-${index}`}>
               <Message message={message} theme={theme} />
@@ -237,46 +290,74 @@ export const Chat = () => {
           )}
         </div>
         {!!selection.length && (
-          <Suggestions isDisabled={!!genertingRef.current} />
+          <Suggestions isDisabled={!!generatingRef.current} />
         )}
         <Selection
           isVisible={isSelectionVisible}
           onSelect={scrollBottom}
           language={language}
         />
+        {showModelSelect && <ModelSelect />}
         <div className={styles.chatOptions}>
-          <VSCodeButton
-            onClick={togggleAutoScroll}
-            title="Toggle auto scroll on/off"
-            appearance="icon"
-          >
-            {isAutoScrolledEnabled ? (
-              <EnabledAutoScrollIcon />
-            ) : (
-              <DisabledAutoScrollIcon />
-            )}
-          </VSCodeButton>
-          <VSCodeButton
-            title="Toggle selection preview"
-            appearance="icon"
-            onClick={handleToggleSelection}
-          >
-            <CodeIcon />
-          </VSCodeButton>
-          <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
+          <div>
+            <VSCodeButton
+              onClick={togggleAutoScroll}
+              title="Toggle auto scroll on/off"
+              appearance="icon"
+            >
+              {isAutoScrolledEnabled ? (
+                <EnabledAutoScrollIcon />
+              ) : (
+                <DisabledAutoScrollIcon />
+              )}
+            </VSCodeButton>
+            <VSCodeButton
+              title="Scroll down to the bottom"
+              appearance="icon"
+              onClick={handleScrollBottom}
+            >
+              <ScrollDownIcon/>
+            </VSCodeButton>
+            <VSCodeButton
+              title="Toggle selection preview"
+              appearance="icon"
+              onClick={handleToggleSelection}
+            >
+              {isSelectionVisible ? (
+                <EnabledSelectionIcon />
+              ) : (
+                <DisabledSelectionIcon />
+              )}
+            </VSCodeButton>
+            <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
+          </div>
+          {apiProvider === ApiProviders.Ollama && (
+            <VSCodeButton
+              title="Select active models"
+              appearance="icon"
+              onClick={handleToggleModelSelection}
+            >
+              <span className={styles.textIcon}>🤖</span>
+            </VSCodeButton>
+          )}
         </div>
         <form>
           <div className={styles.chatBox}>
             <VSCodeTextArea
               ref={chatRef}
-              disabled={genertingRef.current}
+              disabled={generatingRef.current}
               placeholder="Message twinny"
-              rows={5}
               value={inputText}
+              className={styles.chatInput}
+              rows={4}
               onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-                if (e.ctrlKey && e.key === 'Enter') {
-                  const target = e.target as HTMLTextAreaElement
+                const target = e.target as HTMLTextAreaElement
+                if (e.key === 'Enter' && !e.ctrlKey) {
+                  e.preventDefault()
+
                   handleSubmitForm(target.value)
+                } else if (e.ctrlKey && e.key === 'Enter') {
+                  setInputText(`${target.value}\n`)
                 }
               }}
               onChange={(e) => {
@@ -287,18 +368,18 @@ export const Chat = () => {
             />
           </div>
           <div className={styles.send}>
-            {genertingRef.current && (
+            {generatingRef.current && (
               <VSCodeButton
                 type="button"
                 appearance="icon"
                 onClick={handleStopGeneration}
                 aria-label="Stop generation"
               >
-                <StopIcon />
+                <span className="codicon codicon-debug-stop"></span>
               </VSCodeButton>
             )}
             <VSCodeButton
-              disabled={genertingRef.current}
+              disabled={generatingRef.current}
               onClick={() => handleSubmitForm(inputText)}
               appearance="primary"
             >

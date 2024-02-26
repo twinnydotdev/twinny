@@ -1,32 +1,28 @@
-import { Position } from 'vscode'
+import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
-import { allBrackets } from './constants'
-import { RequestOptions } from 'https'
-import { ClientRequest } from 'http'
+import { ALL_BRACKETS } from './constants'
 
-export interface StreamOptions {
+export interface StreamBodyBase {
   prompt: string
   stream: boolean
   n_predict?: number
   temperature?: number
 }
 
-export interface StreamOptionsOllama extends StreamOptions {
+export interface StreamOptionsOllama extends StreamBodyBase {
   model: string
+  keep_alive?: string | number
   options: Record<string, unknown>
 }
 
-export interface StreamOptionsMessages extends StreamOptions {
+export interface StreamBodyOpenAI extends StreamBodyBase {
   messages?: MessageType[] | MessageRoleContent
   max_tokens: number
 }
 
-export interface InlineCompletion {
-  completion: string
-  position: Position
+export interface PrefixSuffix {
   prefix: string
   suffix: string
-  stop: string[]
 }
 
 export interface StreamResponse {
@@ -109,34 +105,82 @@ export interface ChatTemplateData {
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
 
-export interface PromptTemplate {
+export interface FimPromptTemplate {
   context: string
   header: string
-  suffix: string
-  prefix: string
+  prefixSuffix: PrefixSuffix
   useFileContext: boolean
+  language?: string
 }
 
 export interface ApiProviders {
   [key: string]: { fimApiPath: string; chatApiPath: string; port: number }
 }
 
-export type Bracket = (typeof allBrackets)[number]
+export type Bracket = (typeof ALL_BRACKETS)[number]
 
-export interface StreamResponseOptions {
-  body: StreamOptions | StreamOptionsMessages
-  options: RequestOptions
-  onData: (
-    streamResponse: StreamResponse | undefined,
-    destroy: () => void
-  ) => void
-  onEnd?: (destroy: () => void) => void
-  onStart?: (req: ClientRequest) => void
-  onError?: (error: Error) => void
+export interface StreamRequestOptions {
+  hostname: string
+  path: string
+  port: string | number
+  protocol: string
+  method: string
+  headers: Record<string, string>
 }
 
-export const ProviderNames = {
+export interface StreamRequest {
+  body: StreamBodyBase | StreamBodyOpenAI
+  options: StreamRequestOptions
+  onEnd?: () => void
+  onStart?: (controller: AbortController) => void
+  onError?: (error: Error) => void
+  onData: (streamResponse: StreamResponse | undefined) => void
+}
+
+export interface UiTabs {
+  [key: string]: JSX.Element
+}
+
+export const ApiProviders = {
   Ollama: 'ollama',
+  OllamaWebUi: 'ollamawebui',
   LlamaCpp: 'llamacpp',
-  LMStudio: 'lmstudio'
+  LMStudio: 'lmstudio',
+  Oobabooga: 'oobabooga'
 } as const
+
+export interface OllamaModel {
+  parent_model: string
+  format: string
+  family: string
+  parameter_size: string
+  digest: string
+  model: string
+  modified_at: string
+  name: string
+  size: number
+}
+
+export interface OllamaModels {
+  models: OllamaModel[]
+}
+
+export type ResolvedInlineCompletion = InlineCompletionItem[]
+| InlineCompletionList
+| PromiseLike<
+    InlineCompletionItem[] | InlineCompletionList | null | undefined
+  >
+| null
+| undefined
+
+export interface InteractionItem {
+  keyStrokes: number | null | undefined
+  lastVisited: number
+  name: string | null | undefined
+  sessionLength: number
+  visits: number | null | undefined
+  activeLines: {
+    line: number
+    character: number
+  }[]
+}

@@ -15,10 +15,10 @@ const extensionConfig = {
   target: 'node',
   mode: 'none',
 
-  entry: './src/extension.ts',
+  entry: './src/index.ts',
   output: {
     path: path.resolve(__dirname, 'out'),
-    filename: 'extension.js',
+    filename: 'index.js',
     libraryTarget: 'commonjs2'
   },
   externals: {
