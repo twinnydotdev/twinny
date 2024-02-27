@@ -24,6 +24,7 @@ export function createStreamRequestBody(
         model: options.model,
         prompt,
         stream: true,
+        messages: options.messages,
         keep_alive: options.keepAlive,
         options: {
           temperature: options.temperature,

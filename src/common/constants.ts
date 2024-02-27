@@ -100,12 +100,12 @@ export const STOP_STABLECODE = ['<|endoftext|>']
 export const API_PROVIDER: ApiProviders = {
   ollama: {
     fimApiPath: '/api/generate',
-    chatApiPath: '/api/generate',
+    chatApiPath: '/v1/chat/completions',
     port: 11434
   },
   ollamawebui: {
     fimApiPath: '/ollama/api/generate',
-    chatApiPath: '/ollama/api/generate',
+    chatApiPath: '/ollama/v1/chat/completions',
     port: 8080
   },
   llamacpp: {

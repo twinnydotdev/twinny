@@ -247,8 +247,8 @@
         "twinny.chatApiPath": {
           "order": 3,
           "type": "string",
-          "default": "/api/generate",
-          "description": "Endpoint path for chat completions. Defaults to '/api/generate' for Ollama and '/completion' for llama.cpp.",
+          "default": "/v1/chat/completions",
+          "description": "Endpoint path for chat completions.",
           "required": true
         },
         "twinny.chatApiPort": {
@@ -269,7 +269,7 @@
           "order": 6,
           "type": "string",
           "default": "/api/generate",
-          "description": "Endpoint path for FIM completions. Defaults to '/api/generate' for Ollama and '/completion' for llama.cpp.",
+          "description": "Endpoint path for FIM completions.",
           "required": true
         },
         "twinny.chatModelName": {
@@ -385,7 +385,7 @@
         "twinny.enableLogging": {
           "order": 23,
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Enable twinny debug mode"
         }
       }
