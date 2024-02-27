@@ -59,9 +59,9 @@ Always format responses with Markdown for code blocks with the language prefix e
   },
   {
     name: 'system',
-    template: `<<SYS>>You are a helpful, respectful and honest coding assistant.
+    template: `You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
-For code refactoring, use markdown with code formatting.<</SYS>>
+For code refactoring, use markdown with code formatting.
   `
   },
   {
