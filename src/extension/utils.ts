@@ -122,7 +122,10 @@ export const getChatDataFromProvider = (
 ) => {
   switch (provider) {
     case ApiProviders.Ollama:
-      return data?.response
+    case ApiProviders.OllamaWebUi:
+      return data?.choices[0].delta?.content
+        ? data?.choices[0].delta.content
+        : ''
     case ApiProviders.LlamaCpp:
       return data?.content
     default:

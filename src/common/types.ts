@@ -3,7 +3,6 @@ import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from './constants'
 
 export interface StreamBodyBase {
-  prompt: string
   stream: boolean
   n_predict?: number
   temperature?: number
@@ -12,6 +11,8 @@ export interface StreamBodyBase {
 export interface StreamOptionsOllama extends StreamBodyBase {
   model: string
   keep_alive?: string | number
+  messages?: MessageType[] | MessageRoleContent
+  prompt: string
   options: Record<string, unknown>
 }
 
