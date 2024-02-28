@@ -20,4 +20,4 @@ npm install
 
 4. Start the plugin in development mode by pressing `F5` within Visual Studio Code.
 
-Contributions are welcome please open an issue describing your changes and open a pull request when ready.
+Contributions are welcome please open an issue describing your changes and open a pull request to the `development` branch when ready.
