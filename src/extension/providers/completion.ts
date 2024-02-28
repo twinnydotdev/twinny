@@ -265,8 +265,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const averageLine =
           activeLines.reduce((acc, curr) => acc + curr.line, 0) /
           activeLines.length
-        const start = new Position(Math.max(0, Math.ceil(averageLine) - 100), 0)
-        const end = new Position(Math.min(lineCount, Math.ceil(averageLine) + 100), 0)
+        const start = new Position(Math.max(0, Math.ceil(averageLine || 0) - 100), 0)
+        const end = new Position(Math.min(lineCount, Math.ceil(averageLine || 0) + 100), 0)
         fileChunks.push(`
 // File: ${filePath}
 // Content: \n ${document.getText(new Range(start, end))}
