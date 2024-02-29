@@ -116,7 +116,7 @@ export const getFimPrompt = (
   if (format === FIM_TEMPLATE_FORMAT.automatic) {
     return getFimTemplateAuto(fimModel, args)
   }
-  return getFimTemplateChosen(fimModel, args)
+  return getFimTemplateChosen(format, args)
 }
 
 export const getStopWordsAuto = (fimModel: string) => {
@@ -149,5 +149,5 @@ export const getStopWords = (fimModel: string, format: string) => {
   if (format === FIM_TEMPLATE_FORMAT.automatic) {
     return getStopWordsAuto(fimModel)
   }
-  return getStopWordsChosen(fimModel)
+  return getStopWordsChosen(format)
 }
