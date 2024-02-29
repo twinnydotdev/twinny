@@ -82,7 +82,8 @@ export const FIM_TEMPLATE_FORMAT = {
   codellama: 'codellama',
   deepseek: 'deepseek',
   llama: 'llama',
-  stableCode: 'stable-code'
+  stableCode: 'stable-code',
+  starcoder: 'starcoder'
 }
 
 export const STOP_LLAMA = ['<EOT>']
