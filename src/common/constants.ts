@@ -16,7 +16,7 @@ export const QUOTES = ['"', '\'', '`']
 export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g;
-export const LINE_BREAK_REGEX = /\r?\n$/
+export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
 export const COMPLETION_TIMEOUT = 20000 // 20 seconds
 export const MAX_CONTEXT_LINE_COUNT = 200
 

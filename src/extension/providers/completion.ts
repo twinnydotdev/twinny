@@ -309,7 +309,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return (
       !this._useMultiLine &&
       this._chunkCount > 1 &&
-      LINE_BREAK_REGEX.exec(completionString)
+      LINE_BREAK_REGEX.test(completionString)
     )
   }
 
