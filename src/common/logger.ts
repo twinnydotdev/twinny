@@ -1,13 +1,8 @@
 import { workspace } from 'vscode'
 
-
 export class Logger {
   _config = workspace.getConfiguration('twinny')
   _debugEnabled = this._config.get('enableLogging') as boolean
-
-  constructor() {
-    this._config = workspace.getConfiguration('twinny')
-  }
 
   public log = (message: string) => {
     if (!this._debugEnabled) return
