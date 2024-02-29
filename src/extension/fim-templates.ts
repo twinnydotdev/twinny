@@ -85,7 +85,10 @@ function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
     return getFimPromptTemplateDeepseek(args)
   }
 
-  if (fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode)) {
+  if (
+    fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode) ||
+    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder)
+  ) {
     return getFimPromptTemplateStableCode(args)
   }
 
@@ -101,7 +104,7 @@ function getFimTemplateChosen(format: string, args: FimPromptTemplate) {
     return getFimPromptTemplateDeepseek(args)
   }
 
-  if (format === FIM_TEMPLATE_FORMAT.stableCode) {
+  if (format === FIM_TEMPLATE_FORMAT.stableCode || format === FIM_TEMPLATE_FORMAT.starcoder) {
     return getFimPromptTemplateStableCode(args)
   }
 
@@ -131,7 +134,10 @@ export const getStopWordsAuto = (fimModel: string) => {
     return STOP_DEEPSEEK
   }
 
-  if (fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode)) {
+  if (
+    fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode) ||
+    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder)
+  ) {
     return ['<|endoftext|>']
   }
 
@@ -141,7 +147,7 @@ export const getStopWordsAuto = (fimModel: string) => {
 export const getStopWordsChosen = (format: string) => {
   if (format === FIM_TEMPLATE_FORMAT.codellama) return STOP_LLAMA
   if (format === FIM_TEMPLATE_FORMAT.deepseek) return STOP_DEEPSEEK
-  if (format === FIM_TEMPLATE_FORMAT.stableCode) return STOP_STABLECODE
+  if (format === FIM_TEMPLATE_FORMAT.stableCode || format === FIM_TEMPLATE_FORMAT.starcoder) return STOP_STABLECODE
   return STOP_LLAMA
 }
 

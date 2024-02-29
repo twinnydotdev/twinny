@@ -291,7 +291,8 @@
             "automatic",
             "stable-code",
             "codellama",
-            "deepseek"
+            "deepseek",
+            "starcoder"
           ],
           "default": "automatic",
           "description": "The prompt format to be used for FIM completions. Overrides automatic detection."
