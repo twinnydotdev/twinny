@@ -6,10 +6,13 @@ import {
   Position,
   Range,
   TextDocument,
+  Uri,
   commands,
   window,
   workspace
 } from 'vscode'
+
+import path from 'path'
 
 import {
   Theme,
@@ -29,8 +32,14 @@ import {
   PROVIDER_NAMES,
   SKIP_DECLARATION_SYMBOLS,
   SKIP_IMPORT_KEYWORDS_AFTER
+  MAX_CONTEXT_LINE_COUNT,
+  PROVIDER_NAMES,
+  TARGET_EXPORT_NODES,
+  WASM_LANGAUAGES
 } from '../common/constants'
 import { Logger } from '../common/logger'
+import Parser from 'web-tree-sitter'
+import { FileInteractionCache } from './file-interaction'
 
 const logger = new Logger()
 
@@ -281,4 +290,196 @@ Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
 Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
     `
   )
+}
+
+export const getParserForFile = async (filePath: string) => {
+  await Parser.init()
+  const parser = new Parser()
+  const extension = path.extname(filePath).slice(1)
+  const language = WASM_LANGAUAGES[extension]
+
+  if (!language) return null
+
+  const wasmPath = path.join(
+    __dirname,
+    'tree-sitter-wasms',
+    `tree-sitter-${language}.wasm`
+  )
+  const Language = await Parser.Language.load(wasmPath)
+  parser.setLanguage(Language)
+  return parser
+}
+
+export const getDocumentSplitChunks = async (
+  content: string,
+  parser: Parser
+): Promise<string[]> => {
+  const tree = parser.parse(content)
+
+  // Function to recursively search for node types
+  const findNodes = (
+    node: Parser.SyntaxNode,
+    types: string[]
+  ): Parser.SyntaxNode[] => {
+    let nodes = []
+    if (types.includes(node.type)) {
+      nodes.push(node)
+    }
+    for (const child of node.children) {
+      nodes = nodes.concat(findNodes(child, types))
+    }
+    return nodes
+  }
+
+  const targetedNodes = findNodes(tree.rootNode, TARGET_EXPORT_NODES)
+
+  const seenChunks: string[] = [] // To track seen chunks and avoid duplicates
+  const chunks = targetedNodes
+    .map((node: Parser.SyntaxNode) => {
+      const startLine = node.startPosition.row
+      const endLine = node.endPosition.row + 1 // +1 to include the end line
+      const chunk = content
+        .split('\n')
+        .slice(startLine, endLine)
+        .join('\n')
+        .trim()
+
+      if (getIsDuplicateChunk(chunk, seenChunks)) {
+        return '' // Skip duplicates
+      } else {
+        seenChunks.push(chunk.trim().toLowerCase()) // Add to seen list
+        return chunk
+      }
+    })
+    .filter((chunk: string) => chunk !== '')
+
+  return chunks
+}
+
+export const getParsedContext = async (
+  parser: Parser,
+  document: TextDocument,
+  filePath: string
+) => {
+  const fileChunks: string[] = []
+
+  const language =
+    supportedLanguages[document.languageId as keyof typeof supportedLanguages]
+
+  if (parser && language) {
+    const documentChunks = await getDocumentSplitChunks(
+      document.getText(),
+      parser
+    )
+
+    const documentContext = documentChunks
+      .map((docString) => docString)
+      .join('\n')
+
+    fileChunks.push(`// File: ${filePath}
+// Language: ${language.langName}
+// Content: \n ${documentContext}`)
+  }
+
+  return fileChunks
+}
+
+export const getAverageLineContext = (
+  lineCount: number,
+  document: TextDocument,
+  filePath: string,
+  activeLines: {
+    line: number
+    character: number
+  }[]
+) => {
+  const fileChunks = []
+  if (lineCount > MAX_CONTEXT_LINE_COUNT) {
+    const averageLine =
+      activeLines.reduce((acc, curr) => acc + curr.line, 0) / activeLines.length
+    const start = new Position(
+      Math.max(0, Math.ceil(averageLine || 0) - 100),
+      0
+    )
+    const end = new Position(
+      Math.min(lineCount, Math.ceil(averageLine || 0) + 100),
+      0
+    )
+    fileChunks.push(`
+// File: ${filePath}
+// Content: \n ${document.getText(new Range(start, end))}
+    `)
+  } else {
+    fileChunks.push(`
+// File: ${filePath}
+// Content: \n ${document.getText()}
+    `)
+  }
+  return fileChunks
+}
+
+export const getPromptHeader = (languageId: string | undefined, uri: Uri) => {
+  const lang = supportedLanguages[languageId as keyof typeof supportedLanguages]
+
+  if (!lang) {
+    return ''
+  }
+
+  const language = `${lang.syntaxComments?.start || ''} Language: ${
+    lang?.langName
+  } (${languageId}) ${lang.syntaxComments?.end || ''}`
+
+  const path = `${
+    lang.syntaxComments?.start || ''
+  } File uri: ${uri.toString()} (${languageId}) ${
+    lang.syntaxComments?.end || ''
+  }`
+
+  return `\n${language}\n${path}\n`
+}
+
+export const getFileInteractionContext = async (
+  fileInteractionCache: FileInteractionCache,
+  document: TextDocument
+) => {
+  const interactions = fileInteractionCache.getAll()
+  const currentFileName = document.fileName || ''
+
+  let fileChunks: string[] = []
+
+  for (const interaction of interactions) {
+    const filePath = interaction.name
+
+    if (filePath.toString().match('.git')) {
+      continue
+    }
+
+    const uri = Uri.file(filePath)
+
+    if (currentFileName === filePath) continue
+
+    const activeLines = interaction.activeLines
+
+    const document = await workspace.openTextDocument(uri)
+    const lineCount = document.lineCount
+
+    const parser = await getParserForFile(filePath)
+
+    if (parser) {
+      fileChunks = fileChunks.concat(
+        await getParsedContext(parser, document, filePath)
+      )
+      continue
+    }
+
+    fileChunks = fileChunks.concat(
+      getAverageLineContext(lineCount, document, filePath, activeLines)
+    )
+  }
+
+  return fileChunks.join('\n')
+}
+
+const getIsDuplicateChunk = (chunk: string, chunks: string[] = []): boolean => {
+  return chunks.includes(chunk.trim().toLowerCase())
 }

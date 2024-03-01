@@ -15,7 +15,7 @@ export const CLOSING_TAGS = ['</']
 export const QUOTES = ['"', '\'', '`']
 export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
-export const NORMALIZE_REGEX = /\s*\r?\n|\r/g;
+export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
 export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ['=', ':']
@@ -66,7 +66,7 @@ export const MESSAGE_KEY = {
 export const SETTING_KEY = {
   fimModelName: 'fimModelName',
   chatModelName: 'chatModelName',
-  apiProvider: 'apiProvider',
+  apiProvider: 'apiProvider'
 }
 
 export const CONTEXT_NAME = {
@@ -137,4 +137,81 @@ export const DEFAULT_ACTION_TEMPLATES = [
   'add-tests',
   'add-types',
   'explain'
+]
+
+export const WASM_LANGAUAGES: { [key: string]: string } = {
+  cpp: 'cpp',
+  hpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  hxx: 'cpp',
+  cs: 'c_sharp',
+  c: 'c',
+  h: 'c',
+  css: 'css',
+  php: 'php',
+  phtml: 'php',
+  php3: 'php',
+  php4: 'php',
+  php5: 'php',
+  php7: 'php',
+  phps: 'php',
+  'php-s': 'php',
+  bash: 'bash',
+  sh: 'bash',
+  json: 'json',
+  ts: 'typescript',
+  mts: 'typescript',
+  cts: 'typescript',
+  tsx: 'tsx',
+  vue: 'vue',
+  yaml: 'yaml',
+  yml: 'yaml',
+  elm: 'elm',
+  js: 'javascript',
+  jsx: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  py: 'python',
+  pyw: 'python',
+  pyi: 'python',
+  el: 'elisp',
+  emacs: 'elisp',
+  ex: 'elixir',
+  exs: 'elixir',
+  go: 'go',
+  eex: 'embedded_template',
+  heex: 'embedded_template',
+  leex: 'embedded_template',
+  html: 'html',
+  htm: 'html',
+  java: 'java',
+  lua: 'lua',
+  ocaml: 'ocaml',
+  ml: 'ocaml',
+  mli: 'ocaml',
+  ql: 'ql',
+  res: 'rescript',
+  resi: 'rescript',
+  rb: 'ruby',
+  erb: 'ruby',
+  rs: 'rust',
+  rdl: 'systemrdl',
+  toml: 'toml'
+}
+
+export const TARGET_EXPORT_NODES = [
+  'export_statement',
+  'export_declaration',
+  'export_default_declaration',
+  'export_named_declaration',
+  'export_all_declaration',
+  'export_from_declaration',
+  'export_named_specifier',
+  'export_namespace_specifier',
+  'export_default_specifier',
+  'export_namespace_declaration',
+  'export_from_specifier',
+  'export_from_default_specifier',
+  'export_from_namespace_specifier'
 ]

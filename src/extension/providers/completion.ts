@@ -8,14 +8,19 @@ import {
   workspace,
   StatusBarItem,
   window,
-  Uri,
   InlineCompletionContext,
+  Uri,
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
-import { getFimDataFromProvider, getPrefixSuffix, getShouldSkipCompletion } from '../utils'
+import { getShouldSkipCompletion } from '../utils'
+import {
+  getFileInteractionContext,
+  getFimDataFromProvider,
+  getPrefixSuffix,
+  getPromptHeader
+} from '../utils'
 import { cache } from '../cache'
-import { supportedLanguages } from '../../common/languages'
 import {
   PrefixSuffix,
   ResolvedInlineCompletion,
@@ -230,26 +235,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
   }
 
-  private getPromptHeader(languageId: string | undefined, uri: Uri) {
-    const lang =
-      supportedLanguages[languageId as keyof typeof supportedLanguages]
-
-    if (!lang) {
-      return ''
-    }
-
-    const language = `${lang.syntaxComments?.start || ''} Language: ${
-      lang?.langName
-    } (${languageId}) ${lang.syntaxComments?.end || ''}`
-
-    const path = `${
-      lang.syntaxComments?.start || ''
-    } File uri: ${uri.toString()} (${languageId}) ${
-      lang.syntaxComments?.end || ''
-    }`
-
-    return `\n${language}\n${path}\n`
-  }
 
   private async getFileInteractionContext() {
     const interactions = this._fileInteractionCache.getAll()
@@ -325,16 +310,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private async getPrompt(prefixSuffix: PrefixSuffix) {
     if (!this._document || !this._position) return ''
-
     const language = this._document.languageId
-    const interactionContext = await this.getFileInteractionContext()
-
+    const interactionContext = await getFileInteractionContext(this._fileInteractionCache, this._document)
     const prompt = getFimPrompt(this._fimModel, this._fimTemplateFormat, {
       context: interactionContext || '',
       prefixSuffix,
-      header: this.getPromptHeader(language, this._document.uri),
+      header: getPromptHeader(language, this._document.uri),
       useFileContext: this._useFileContext,
-      language: language
     })
 
     return prompt
