@@ -53,24 +53,28 @@ When the extension is ready you will see a `🤖` icon at the bottom of your cod
 Enjoy enhanced code completions and chat with twinny! 🎉
 
 ## Model support
-
-**Fill in the middle (FIM) completions**
-
-- If using Llama the model must support the Llama special tokens.
-- If using deepseek use a base model for example `deepseek-coder:base` and `deepseek-coder:6.7b-base-q5_K_M`
-- If using stable code `stable-code:code` has been tested and works well.
-
-**Chat**
-
-- All models should work for chat generations but the templates might need editing if using something other than codellama and updated with the special tokens.
+Twinny can suggest code either while you are typing in the code editor (these are FIM completions) or you can prompt the model via Twinny's sidebar, in the same way you would chat with any LLM. You can even highlight code in the code editor and ask Twinny via the chat sidebar, to explain the code or provide suggestions. The smaller the size of the model, the faster the response will be.     
+  
+**Models for Chat**  
+Among LLM models, there are models called "instruct models", which are designed for a question & answer mode of chat. All instruct models should work for chat generations, but the templates might need editing if using something other than codellama (they need to be updated with the special tokens).  
+- For computers with a good GPU, use: `deepseek-coder:6.7b-base-q5_K_M` (or any other good instruct model).
+     
+**Models for Fill in the middle (FIM) completions**  
+For FIM completions, you need to use LLM models called "base models". Unlike instruct models, base models will only try to complete your prompt. The are not designed to answer questions.
+If using Llama the model must support the Llama special tokens. 
+- For computers with a good GPU, use: `deepseek-coder:base` or `codellama-code` (or any other good model that is optimised for code completions).
+- For slower computers or computers using only CPU, use `stable-code:3b-code-q4_0` (or any other small base model).
+  
 
 ## Keyboard shortcuts
 
 | Shortcut                     | Description                              |
 | ---------------------------- | ---------------------------------------- |
 | `ALT+\`                      | Trigger inline code completion           |
+| `CTRL+SHIFT+/`               | Stop the inline code generation          | 
+| `Tab`                        | Accept the inline code generated         |
 | `CTRL+SHIFT+t`               | Open twinny sidebar                      |
-| `CTRL+SHIFT+/`               | Stop code generation                     | 
+
 
 ## Workspace context
 
