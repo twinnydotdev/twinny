@@ -24,10 +24,7 @@ import {
   StreamResponse
 } from '../../common/types'
 import { getFimPrompt, getStopWords } from '../fim-templates'
-import {
-  LINE_BREAK_REGEX,
-  MAX_CONTEXT_LINE_COUNT
-} from '../../common/constants'
+import { LINE_BREAK_REGEX, MAX_CONTEXT_LINE_COUNT } from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
@@ -101,6 +98,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       document,
       position
     )
+
+    if (this.isMiddleWord(prefixSuffix)) {
+      return []
+    }
+
     const prompt = await this.getPrompt(prefixSuffix)
     const cachedCompletion = cache.getCache(prefixSuffix)
 
@@ -138,6 +140,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         })
       }, this._debounceWait)
     })
+  }
+
+  private isMiddleWord(prefixSuffix: PrefixSuffix) {
+    const { prefix, suffix } = prefixSuffix
+    return /\w/.test(prefix.at(-1) as string) && /\w/.test(suffix.at(0) as string)
   }
 
   private buildStreamRequest(prompt: string) {
