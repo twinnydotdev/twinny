@@ -102,62 +102,31 @@ export class CompletionFormatter {
 
   private normalise = (text: string) => text?.trim()
 
-  private removeDuplicateText = () => {
-    const normalisedAfter = this.normalise(this._textAfterCursor)
-    if (
-      (normalisedAfter &&
-        this._normalisedCompletion &&
-        normalisedAfter === this._normalisedCompletion) ||
-      (this._textAfterCursor &&
-        (!this._completion.length &&
-          this._normalisedCompletion.endsWith(this._textAfterCursor)))
-    ) {
-      this._completion = ''
-      return this
+  private removeDuplicateText() {
+    const after = this.normalise(this._textAfterCursor)
+
+    const maxLength = Math.min(this._completion.length, after.length)
+    let overlapLength = 0
+
+    for (let length = 1; length <= maxLength; length++) {
+      const endOfCompletion = this._completion.substring(
+        this._completion.length - length
+      )
+      const startOfAfter = after.substring(0, length)
+      if (endOfCompletion === startOfAfter) {
+        overlapLength = length
+      }
     }
 
-    if (
-      this._normalisedCompletion &&
-      normalisedAfter &&
-      this._normalisedCompletion.includes(normalisedAfter)
-    ) {
-      if (QUOTES.includes(normalisedAfter.at(-1) as string)) {
-        this._completion = this._completion.replace(
-          normalisedAfter.slice(0, -1),
-          ''
-        )
-        return this
-      }
-
-      this._completion = this._completion.replace(normalisedAfter, '')
-      return this
-    }
-
-    if (
-      this._normalisedCompletion &&
-      normalisedAfter.includes(this._normalisedCompletion)
-    ) {
-      const before = normalisedAfter.at(
-        normalisedAfter.indexOf(this._normalisedCompletion) - 1
-      ) as string
-      const after = normalisedAfter.at(
-        normalisedAfter.indexOf(this._normalisedCompletion) +
-          this._normalisedCompletion.length
-      ) as string
-      if (this.isMiddleWord(before, after)) {
-        return this
-      }
-      this._completion = ''
-      return this
+    if (overlapLength > 0) {
+      this._completion = this._completion.substring(
+        0,
+        this._completion.length - overlapLength
+      )
     }
 
     return this
   }
-
-  private isMiddleWord(before: string, after: string) {
-    return before && after && /\w/.test(before) && /\w/.test(after)
-  }
-
   private isCursorAtMiddleOfWord() {
     return (
       this._charAfterCursor &&
@@ -247,16 +216,6 @@ export class CompletionFormatter {
     return this
   }
 
-  private checkBrackets = (): CompletionFormatter => {
-    if (
-      this.isOnlyBrackets(this._normalisedCompletion) ||
-      this.isSingleBracket(this._normalisedCompletion)
-    ) {
-      this._completion = this._normalisedCompletion
-    }
-    return this
-  }
-
   private skipMiddleOfWord() {
     if (this.isCursorAtMiddleOfWord()) {
       this._completion = ''
@@ -265,6 +224,9 @@ export class CompletionFormatter {
   }
 
   private getCompletion = () => {
+    if (this._completion.trim().length === 0) {
+      this._completion = ''
+    }
     return this._completion
   }
 
@@ -285,7 +247,6 @@ export class CompletionFormatter {
       .removeUnnecessaryMiddleQuote()
       .ignoreBlankLines()
       .removeInvalidLineBreaks()
-      .checkBrackets()
       .removeDuplicateText()
       .skipMiddleOfWord()
       .getCompletion()
