@@ -58,7 +58,7 @@ export const getPrefixSuffix = (
   numLines: number,
   document: TextDocument,
   position: Position,
-  contextRatio = [0.15, 0.85]
+  contextRatio = [0.85, 0.15]
 ): PrefixSuffix => {
   const currentLine = position.line
   const numLinesToEnd = document.lineCount - currentLine
