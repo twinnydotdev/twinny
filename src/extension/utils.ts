@@ -62,9 +62,13 @@ export const getPrefixSuffix = (
 ): PrefixSuffix => {
   const currentLine = position.line
   const numLinesToEnd = document.lineCount - currentLine
-
   let numLinesPrefix = Math.floor(Math.abs(numLines * contextRatio[0]))
   let numLinesSuffix = Math.ceil(Math.abs(numLines * contextRatio[1]))
+
+  if (numLinesPrefix > currentLine) {
+    numLinesSuffix += numLinesPrefix - currentLine
+    numLinesPrefix = currentLine
+  }
 
   if (numLinesSuffix > numLinesToEnd) {
     numLinesPrefix += numLinesSuffix - numLinesToEnd
