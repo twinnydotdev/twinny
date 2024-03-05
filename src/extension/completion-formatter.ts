@@ -135,7 +135,7 @@ export class CompletionFormatter {
     if (
       this._characterAfterCursor.trim() &&
       this._characterAfterCursor.trim().length &&
-      (this._normalisedCompletion.endsWith("',") ||
+      (this._normalisedCompletion.endsWith('\',') ||
         this._normalisedCompletion.endsWith('",') ||
         (this._normalisedCompletion.endsWith('`,') &&
           QUOTES.includes(this._characterAfterCursor)))
@@ -145,12 +145,12 @@ export class CompletionFormatter {
 
     if (
       this._normalisedCompletion.endsWith(
-        "'" ||
+        '\'' ||
           this._normalisedCompletion.endsWith('"') ||
           this._normalisedCompletion.endsWith('`')
       ) &&
       (this._characterAfterCursor === '"' ||
-        this._characterAfterCursor === "'" ||
+        this._characterAfterCursor === '\'' ||
         this._characterAfterCursor === '`')
     ) {
       this._completion = this._completion.slice(0, -1)
