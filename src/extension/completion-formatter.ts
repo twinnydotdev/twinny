@@ -1,11 +1,6 @@
 import { Position, Range, TextEditor } from 'vscode'
 
-import {
-  ALL_BRACKETS,
-  CLOSING_BRACKETS,
-  OPENING_BRACKETS,
-  QUOTES
-} from '../common/constants'
+import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
 import { Bracket } from '../common/types'
 
 export class CompletionFormatter {
@@ -86,20 +81,6 @@ export class CompletionFormatter {
     return this
   }
 
-  private isSingleBracket = (completion: string) =>
-    completion.length === 1 && this.isBracket(completion)
-
-  private isOnlyBrackets(completion: string): boolean {
-    if (completion.length === 0) return false
-
-    for (const char of completion) {
-      if (!this.isBracket(char)) {
-        return false
-      }
-    }
-    return true
-  }
-
   private normalise = (text: string) => text?.trim()
 
   private removeDuplicateText() {
@@ -154,7 +135,7 @@ export class CompletionFormatter {
     if (
       this._characterAfterCursor.trim() &&
       this._characterAfterCursor.trim().length &&
-      (this._normalisedCompletion.endsWith('\',') ||
+      (this._normalisedCompletion.endsWith("',") ||
         this._normalisedCompletion.endsWith('",') ||
         (this._normalisedCompletion.endsWith('`,') &&
           QUOTES.includes(this._characterAfterCursor)))
@@ -164,12 +145,12 @@ export class CompletionFormatter {
 
     if (
       this._normalisedCompletion.endsWith(
-        '\'' ||
+        "'" ||
           this._normalisedCompletion.endsWith('"') ||
           this._normalisedCompletion.endsWith('`')
       ) &&
       (this._characterAfterCursor === '"' ||
-        this._characterAfterCursor === '\'' ||
+        this._characterAfterCursor === "'" ||
         this._characterAfterCursor === '`')
     ) {
       this._completion = this._completion.slice(0, -1)
@@ -183,10 +164,6 @@ export class CompletionFormatter {
     }
 
     return this
-  }
-
-  private isBracket = (char: string): char is Bracket => {
-    return ALL_BRACKETS.includes(char as Bracket)
   }
 
   private preventDuplicateLines = (): CompletionFormatter => {
@@ -223,6 +200,21 @@ export class CompletionFormatter {
     return this
   }
 
+  private skipSimilarCompletions = () => {
+    const textAfter = this._editor.document.getText(
+      new Range(
+        this._cursorPosition,
+        this._editor.document.lineAt(this._cursorPosition.line).range.end
+      )
+    )
+
+    const score = this._completion.score(textAfter)
+
+    if (score > 0.5) this._completion = ''
+
+    return this
+  }
+
   private getCompletion = () => {
     if (this._completion.trim().length === 0) {
       this._completion = ''
@@ -249,6 +241,7 @@ export class CompletionFormatter {
       .removeInvalidLineBreaks()
       .removeDuplicateText()
       .skipMiddleOfWord()
+      .skipSimilarCompletions()
       .getCompletion()
     return infillText
   }
