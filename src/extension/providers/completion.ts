@@ -10,11 +10,10 @@ import {
   window,
   Uri,
   InlineCompletionContext,
-  InlineCompletionTriggerKind
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
-import { getFimDataFromProvider, getPrefixSuffix } from '../utils'
+import { getFimDataFromProvider, getPrefixSuffix, getShouldSkipCompletion } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
 import {
@@ -24,7 +23,10 @@ import {
   StreamResponse
 } from '../../common/types'
 import { getFimPrompt, getStopWords } from '../fim-templates'
-import { LINE_BREAK_REGEX, MAX_CONTEXT_LINE_COUNT } from '../../common/constants'
+import {
+  LINE_BREAK_REGEX,
+  MAX_CONTEXT_LINE_COUNT,
+} from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
@@ -85,7 +87,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
-    if (this.shouldSkipCompletion(context) || !editor || !this._enabled) return
+    if (getShouldSkipCompletion(context, this._disableAuto) || !editor || !this._enabled) return
     this._document = document
     this._position = position
     this._chunkCount = 0
@@ -144,7 +146,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private isMiddleWord(prefixSuffix: PrefixSuffix) {
     const { prefix, suffix } = prefixSuffix
-    return /\w/.test(prefix.at(-1) as string) && /\w/.test(suffix.at(0) as string)
+    return (
+      /\w/.test(prefix.at(-1) as string) && /\w/.test(suffix.at(0) as string)
+    )
   }
 
   private buildStreamRequest(prompt: string) {
@@ -272,8 +276,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         const averageLine =
           activeLines.reduce((acc, curr) => acc + curr.line, 0) /
           activeLines.length
-        const start = new Position(Math.max(0, Math.ceil(averageLine || 0) - 100), 0)
-        const end = new Position(Math.min(lineCount, Math.ceil(averageLine || 0) + 100), 0)
+        const start = new Position(
+          Math.max(0, Math.ceil(averageLine || 0) - 100),
+          0
+        )
+        const end = new Position(
+          Math.min(lineCount, Math.ceil(averageLine || 0) + 100),
+          0
+        )
         fileChunks.push(`
 // File: ${filePath}
 // Content: \n ${document.getText(new Range(start, end))}
@@ -295,16 +305,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private shouldSkipCompletion(context: InlineCompletionContext) {
-    return (
-      context.triggerKind === InlineCompletionTriggerKind.Automatic &&
-      this._disableAuto
-    )
-  }
-
   private getContainsStopWord() {
     return this._stopWords.some((stopSequence) =>
-      this._completion?.includes(stopSequence)
+      this._completion.includes(stopSequence)
     )
   }
 
