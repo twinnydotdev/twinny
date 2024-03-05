@@ -1,23 +1,41 @@
 # twinny
 
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups? Fear not my developer friend! Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for Visual Studio Code and any compatible editors (like VSCodium) designed to work seamlessly with [Ollama](https://github.com/jmorganca/ollama), [Ollama Web UI](https://github.com/ollama-webui/ollama-webui), [llama.cpp](https://github.com/ggerganov/llama.cpp), [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [LM Studio](https://github.com/lmstudio-ai). Like Github Copilot but 100% free and 100% private.
+Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups? Fear not my developer friend! 
+
+Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for **Visual Studio Code** and any compatible editors (like VSCodium) designed to work seamlessly with: 
+
+- [Ollama](https://github.com/jmorganca/ollama)
+- [Ollama Web UI](https://github.com/ollama-webui/ollama-webui)
+- [llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui)
+- [LM Studio](https://github.com/lmstudio-ai)
+
+Like Github Copilot but 100% free and private.
+
+
 
 <div align="center">
-    <p>
-      Install the twinny Visual Studio Code extension
-    </p>
     <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny">
       <img src="https://code.visualstudio.com/assets/images/code-stable.png" height="50" />
     </a>
+    <p>
+      Install twinny on the <br/> 
+      Visual Studio Code extension marketplace
+    </p>
 </div>
 
-### Main features 
 
-Fill in the middle code completion:
+## Main features
+
+#### Fill in the middle code completion
+
+Get AI based suggestions in real time. While coding you can let twinny autocomplete the code as you are typing.
 
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b" width="760"/>
 
-Chat with AI about your code
+#### Chat with AI about your code
+
+Through the side bar, have a conversation with your model and get explanations about a function, ask it to write tests, ask for a refactor and much more.
 
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/679bd283-28e9-47ff-9165-84dfe293c56a" width="760"/>
 
@@ -35,33 +53,74 @@ Chat with AI about your code
 
 ## 🚀 Getting Started
 
-### Easy Installation
+### With Ollama
 
-For Visual Studio Code install the verified extension via the Visual Studio Code marketplace by clicking [this link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or find the extension in the extensions section of Visual Studio Code.
-For compatible editors (like VSCodium) install the extension from [open-vsx.org](https://open-vsx.org/extension/rjmacarthy/twinny).
+1. Install the VS code extension [link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) (or if [VSCodium](https://open-vsx.org/extension/rjmacarthy/twinny))
+2. Install [ollama](https://ollama.com/)
+3. Choose your model from the [library](https://ollama.com/library) (eg: `codellama:7b`)
 
-Twinny is configured to use the Ollama API by default, however you can change this to use llama.cpp, LM Studio or Oobabooga by changing the API provider in the extension settings. You can find the settings inside the extension sidebar by clicking the gear icon inside the twinny sidebar or by searching for `twinny` in the extensions search bar.
+```sh
+ollama run codellama:7b
+```
 
-Twinny supports the OpenAI API specification so in theory any API should work with Twinny as long as it supports the OpenAI specification.  If you find that isn't the case please open an issue with details of how you are having problems.
+4. Open VS code (if already open a restart might be needed) and press `ctr + shift + T` to open the side panel.
+
+You should see the 🤖 icon indicating that twinny is ready to use.
+
+5. See [Keyboard shortcuts](#keyboard-shortcuts) to start using while coding 🎉
+
+### With llama.cpp / LM Studio / Oobabooga
+
+1. Install the VS code extension [link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) (or if [VSCodium](https://open-vsx.org/extension/rjmacarthy/twinny))
+2. Get [llama.cpp](https://github.com/ggerganov/llama.cpp) / LM Studio / Oobabooga
+3. Download and run the model locally using the chosen provider
+
+4. Open VS code (if already open a restart might be needed) and press `ctr + shift + T` to open the side panel.
+
+5. From the top ⚙️ icon open the settings page and in the `Api Provider` panel change from `ollama` to `llamacpp` (or others respectively).
+6. In the left panel you should see the 🤖 icon indicating that twinny is ready to use.
+
+5. See [Keyboard shortcuts](#keyboard-shortcuts) to start using while coding 🎉
+
+### With other providers
+
+Twinny supports the OpenAI API specification so in theory any provider should work as long as it supports the specification. 
+
+If you find that isn't the case please [open an issue](https://github.com/rjmacarthy/twinny/issues/new/choose) with details of how you are having problems.
+
+
+
+#### Note!
 
 When choosing an API provider the port and API path names will be updated automatically based on the provider you choose to use. These options can also be set manually.
 
 The option for chat model name and fim model name are only applicable to Ollama and Oobabooga providers.
 
-When the extension is ready you will see a `🤖` icon at the bottom of your code editor indicating that twinny is ready to use.
 
-Enjoy enhanced code completions and chat with twinny! 🎉
 
 ## Model support
-Twinny can suggest code either while you are typing in the code editor (these are FIM completions) or you can prompt the model via Twinny's sidebar, in the same way you would chat with any LLM. You can even highlight code in the code editor and ask Twinny via the chat sidebar, to explain the code or provide suggestions. The smaller the size of the model, the faster the response will be.     
-  
-**Models for Chat**  
-Among LLM models, there are models called "instruct models", which are designed for a question & answer mode of chat. All instruct models should work for chat generations, but the templates might need editing if using something other than codellama (they need to be updated with the special tokens).  
+
+Twinny works with any model as long as it can run on your machine and it exposes a OpenAI API compliant endpoint.
+
+Choosing a model is influenced a lot by the machine it will be running, a smaller model will give you a faster response but with a loss in accuracy. 
+
+There are two functionalities that twinny are expecting from a model: 
+
+### **Models for Chat**
+
+Among LLM models, there are models called "instruct models", which are designed for a question & answer mode of chat. 
+
+All instruct models should work for chat generations, but the templates might need editing if using something other than codellama (they need to be updated with the special tokens).
+
 - For computers with a good GPU, use: `deepseek-coder:6.7b-base-q5_K_M` (or any other good instruct model).
-     
-**Models for Fill in the middle (FIM) completions**  
-For FIM completions, you need to use LLM models called "base models". Unlike instruct models, base models will only try to complete your prompt. The are not designed to answer questions.
+  
+
+### **Models for FIM (fill in the middle) completions**
+
+For FIM completions, you need to use LLM models called "base models". Unlike instruct models, base models will only try to complete your prompt. They are not designed to answer questions.
+
 If using Llama the model must support the Llama special tokens. 
+
 - For computers with a good GPU, use: `deepseek-coder:base` or `codellama-code` (or any other good model that is optimised for code completions).
 - For slower computers or computers using only CPU, use `stable-code:3b-code-q4_0` (or any other small base model).
   
@@ -87,6 +146,7 @@ In the settings there is an option called `useFileContext` this will keep track 
 - Using file context often causes unreliable completions for FIM because small models get confused when provided with more than one file context.
 - See open issues on github to see any known issues that are not yet fixed.
   
+
 If you have a problem with Twinny or have any suggestions please report them on github issues.  Please include your vscode version and OS details in your issue.
 
 ## Contributing
