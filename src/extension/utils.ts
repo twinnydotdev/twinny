@@ -1,6 +1,8 @@
 import {
   ColorThemeKind,
   ConfigurationTarget,
+  InlineCompletionContext,
+  InlineCompletionTriggerKind,
   Position,
   Range,
   TextDocument,
@@ -15,13 +17,18 @@ import {
   ApiProviders,
   StreamResponse,
   StreamRequest,
-  PrefixSuffix
+  PrefixSuffix,
+  Bracket
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
+  ALL_BRACKETS,
   API_PROVIDER,
   EXTENSION_NAME,
-  PROVIDER_NAMES
+  IMPORT_SEPARATOR,
+  PROVIDER_NAMES,
+  SKIP_DECLARATION_SYMBOLS,
+  SKIP_IMPORT_KEYWORDS_AFTER
 } from '../common/constants'
 import { Logger } from '../common/logger'
 
@@ -52,6 +59,76 @@ export const getLanguage = (): LanguageType => {
     language,
     languageId
   }
+}
+
+export const getIsBracket = (char: string): char is Bracket => {
+  return ALL_BRACKETS.includes(char as Bracket)
+}
+
+export const getIsSingleBracket = (completion: string) =>
+  completion.length === 1 && getIsBracket(completion)
+
+export const getIsOnlyBrackets = (completion: string) => {
+  if (completion.length === 0) return false
+
+  for (const char of completion) {
+    if (!getIsBracket(char)) {
+      return false
+    }
+  }
+  return true
+}
+
+export const getSkipVariableDeclataion = (
+  characterBefore: string,
+  textAfter: string
+) => {
+  if (
+    SKIP_DECLARATION_SYMBOLS.includes(characterBefore.trim()) &&
+    textAfter.length &&
+    !getIsOnlyBrackets(textAfter)
+  ) {
+    return true
+  }
+  return false
+}
+
+export const getSkipImportDeclaration = (
+  characterBefore: string,
+  textAfter: string
+) => {
+  for (const skipWord of SKIP_IMPORT_KEYWORDS_AFTER) {
+    if (
+      textAfter.includes(skipWord) &&
+      !IMPORT_SEPARATOR.includes(characterBefore) &&
+      characterBefore !== ' '
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+export const getShouldSkipCompletion = (
+  context: InlineCompletionContext,
+  disableAuto: boolean
+) => {
+  const editor = window.activeTextEditor
+  if (!editor) return true
+  const document = editor.document
+  const cursorPosition = editor.selection.active
+  const lineEndPosition = document.lineAt(cursorPosition.line).range.end
+  const textAfterRange = new Range(cursorPosition, lineEndPosition)
+  const textBeforeRange = new Range(cursorPosition, new Position(0, 0))
+  const textAfter = document.getText(textAfterRange)
+  const textBefore = document.getText(textBeforeRange)
+  const characterBefore = textBefore.at(-1) as string
+  if (getSkipVariableDeclataion(characterBefore, textAfter)) return true
+  if (getSkipImportDeclaration(characterBefore, textAfter)) return true
+
+  return (
+    context.triggerKind === InlineCompletionTriggerKind.Automatic && disableAuto
+  )
 }
 
 export const getPrefixSuffix = (
