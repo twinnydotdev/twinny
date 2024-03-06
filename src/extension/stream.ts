@@ -1,22 +1,11 @@
 import { StreamRequest } from '../common/types'
 import { logStreamOptions, safeParseJsonResponse } from './utils'
-import { COMPLETION_TIMEOUT } from '../common/constants'
 
 export async function streamResponse(request: StreamRequest) {
   logStreamOptions(request)
   const { body, options, onData, onEnd, onError, onStart } = request
   const controller = new AbortController()
-
   const { signal } = controller
-
-  const timeoutId = setTimeout(() => {
-    controller.abort()
-  }, COMPLETION_TIMEOUT)
-
-  const cleanup = () => {
-    clearTimeout(timeoutId)
-    controller.abort()
-  }
 
   try {
     const url = `${options.protocol}://${options.hostname}:${options.port}${options.path}`
@@ -85,11 +74,11 @@ export async function streamResponse(request: StreamRequest) {
       if (done) break
     }
 
-    cleanup()
+    controller.abort()
     onEnd?.()
     reader.releaseLock()
   } catch (error: unknown) {
-    cleanup()
+    controller.abort()
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
         onEnd?.()
