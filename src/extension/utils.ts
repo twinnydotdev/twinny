@@ -90,6 +90,7 @@ export const getSkipVariableDeclataion = (
   ) {
     return true
   }
+
   return false
 }
 
@@ -109,6 +110,20 @@ export const getSkipImportDeclaration = (
   return false
 }
 
+export const getCharacterBefore = (index = -1): string => {
+  const editor = window.activeTextEditor
+  if (!editor) return ''
+  const document = editor.document
+  const cursorPosition = editor.selection.active
+  const textBeforeRange = new Range(cursorPosition, new Position(0, 0))
+  const textBefore = document.getText(textBeforeRange)
+  const characterBefore = textBefore.at(index) as string
+  if (!characterBefore.trim()) {
+    return getCharacterBefore(index - 1)
+  }
+  return characterBefore
+}
+
 export const getShouldSkipCompletion = (
   context: InlineCompletionContext,
   disableAuto: boolean
@@ -119,10 +134,8 @@ export const getShouldSkipCompletion = (
   const cursorPosition = editor.selection.active
   const lineEndPosition = document.lineAt(cursorPosition.line).range.end
   const textAfterRange = new Range(cursorPosition, lineEndPosition)
-  const textBeforeRange = new Range(cursorPosition, new Position(0, 0))
   const textAfter = document.getText(textAfterRange)
-  const textBefore = document.getText(textBeforeRange)
-  const characterBefore = textBefore.at(-1) as string
+  const characterBefore = getCharacterBefore()
   if (getSkipVariableDeclataion(characterBefore, textAfter)) return true
   if (getSkipImportDeclaration(characterBefore, textAfter)) return true
 

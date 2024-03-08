@@ -208,7 +208,7 @@ export class CompletionFormatter {
       )
     )
 
-    const score = this._completion.score(textAfter)
+    const score = textAfter.score(this._completion)
 
     if (score > 0.5) this._completion = ''
 
