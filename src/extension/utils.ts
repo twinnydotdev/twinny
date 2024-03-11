@@ -119,7 +119,9 @@ export const getCharacterBefore = (index = -1): string => {
   const textBefore = document.getText(textBeforeRange)
   const characterBefore = textBefore.at(index) as string
 
-  if (!characterBefore) return 'skip'
+  if (characterBefore === undefined) {
+    return SKIP_DECLARATION_SYMBOLS[0]
+  }
 
   if (!characterBefore.trim()) {
     return getCharacterBefore(index - 1)
