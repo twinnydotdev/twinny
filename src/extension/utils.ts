@@ -311,11 +311,11 @@ export const getParserForFile = async (filePath: string) => {
 
 export const getDocumentSplitChunks = async (
   content: string,
-  parser: Parser
+  parser: Parser,
+  commnetStart?: string
 ): Promise<string[]> => {
   const tree = parser.parse(content)
 
-  // Function to recursively search for node types
   const findNodes = (
     node: Parser.SyntaxNode,
     types: string[]
@@ -332,23 +332,22 @@ export const getDocumentSplitChunks = async (
 
   const targetedNodes = findNodes(tree.rootNode, TARGET_EXPORT_NODES)
 
-  const seenChunks: string[] = [] // To track seen chunks and avoid duplicates
+  const seenChunks: string[] = []
   const chunks = targetedNodes
     .map((node: Parser.SyntaxNode) => {
       const startLine = node.startPosition.row
-      const endLine = node.endPosition.row + 1 // +1 to include the end line
+      const endLine = node.endPosition.row + 1
       const chunk = content
         .split('\n')
         .slice(startLine, endLine)
+        .map((line: string) => `${commnetStart}${line}`)
         .join('\n')
         .trim()
 
-      if (getIsDuplicateChunk(chunk, seenChunks)) {
-        return '' // Skip duplicates
-      } else {
-        seenChunks.push(chunk.trim().toLowerCase()) // Add to seen list
-        return chunk
-      }
+      if (getIsDuplicateChunk(chunk, seenChunks)) return ''
+
+      seenChunks.push(chunk.trim().toLowerCase())
+      return chunk
     })
     .filter((chunk: string) => chunk !== '')
 
@@ -365,22 +364,34 @@ export const getParsedContext = async (
   const language =
     supportedLanguages[document.languageId as keyof typeof supportedLanguages]
 
+  const lang = language?.langName ? `\n//Language: ${language.langName}` : ''
+
   if (parser && language) {
     const documentChunks = await getDocumentSplitChunks(
       document.getText(),
-      parser
+      parser,
+      language.syntaxComments?.singleLine
     )
 
     const documentContext = documentChunks
       .map((docString) => docString)
       .join('\n')
 
-    fileChunks.push(`// File: ${filePath}
-// Language: ${language.langName}
-// Content: \n ${documentContext}`)
+    if (!documentContext.trim()) return ''
+
+    const chunk = `\n//File: ${filePath} ${lang} \n${documentContext}`
+
+    fileChunks.push(chunk)
   }
 
   return fileChunks
+}
+
+export const getCommentedSnipped = (snippet: string, comment?: string) => {
+  return snippet
+    .split('\n')
+    .map((line) => `${comment || '//'}${line}`)
+    .join('\n')
 }
 
 export const getAverageLineContext = (
@@ -393,6 +404,12 @@ export const getAverageLineContext = (
   }[]
 ) => {
   const fileChunks = []
+
+  const language =
+    supportedLanguages[document.languageId as keyof typeof supportedLanguages]
+
+  const lang = language?.langName ? `\n//Language: ${language.langName}` : ''
+
   if (lineCount > MAX_CONTEXT_LINE_COUNT) {
     const averageLine =
       activeLines.reduce((acc, curr) => acc + curr.line, 0) / activeLines.length
@@ -404,15 +421,21 @@ export const getAverageLineContext = (
       Math.min(lineCount, Math.ceil(averageLine || 0) + 100),
       0
     )
-    fileChunks.push(`
-// File: ${filePath}
-// Content: \n ${document.getText(new Range(start, end))}
-    `)
+
+    const snippet = getCommentedSnipped(
+      document.getText(new Range(start, end)),
+      language?.syntaxComments?.singleLine
+    )
+
+    const rangeContext = `\n//File: ${filePath} ${lang} \n${snippet}`
+    fileChunks.push(rangeContext)
   } else {
-    fileChunks.push(`
-// File: ${filePath}
-// Content: \n ${document.getText()}
-    `)
+    const snippet = getCommentedSnipped(
+      document.getText(),
+      language?.syntaxComments?.singleLine
+    )
+    const fileContext = `\n// File: ${filePath} ${lang} \n${snippet}`
+    fileChunks.push(fileContext)
   }
   return fileChunks
 }
@@ -465,9 +488,8 @@ export const getFileInteractionContext = async (
     const parser = await getParserForFile(filePath)
 
     if (parser) {
-      fileChunks = fileChunks.concat(
-        await getParsedContext(parser, document, filePath)
-      )
+      const context = await getParsedContext(parser, document, filePath)
+      fileChunks = fileChunks.concat(context)
       continue
     }
 

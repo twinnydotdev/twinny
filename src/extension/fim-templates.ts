@@ -22,7 +22,7 @@ export const getFimPromptTemplateLLama = ({
         languageId?.syntaxComments?.end || ''
       }`
     : ''
-  const heading = header ? header : ''
+  const heading = header && fileContext ? header : ''
 
   return `<PRE>${fileContext} \n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
@@ -40,7 +40,7 @@ export const getDefaultFimPromptTemplate = ({
   const fileContext = useFileContext
     ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
     : ''
-  const heading = header ? header : ''
+    const heading = header && fileContext ? header : ''
   return `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
@@ -57,7 +57,7 @@ export const getFimPromptTemplateDeepseek = ({
   const fileContext = useFileContext
     ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
     : ''
-  const heading = header ? header : ''
+    const heading = header && fileContext ? header : ''
   return `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
 }
 
@@ -69,7 +69,7 @@ export const getFimPromptTemplateStableCode = ({
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const fileContext = useFileContext ? context : ''
-  const heading = header ? header : ''
+  const heading = header && fileContext ? header : ''
   return `<fim_prefix>${fileContext}\n${heading}${prefix}<fim_suffix>${suffix}<fim_middle>`
 }
 

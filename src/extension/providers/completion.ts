@@ -29,7 +29,6 @@ import {
 import { getFimPrompt, getStopWords } from '../fim-templates'
 import {
   LINE_BREAK_REGEX,
-  MAX_CONTEXT_LINE_COUNT,
 } from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
