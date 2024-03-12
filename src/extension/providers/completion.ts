@@ -9,7 +9,6 @@ import {
   StatusBarItem,
   window,
   InlineCompletionContext,
-  Uri,
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
@@ -233,55 +232,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   public onError = () => {
     this._abortController?.abort()
     this._statusBar.text = '🤖'
-  }
-
-
-  private async getFileInteractionContext() {
-    const interactions = this._fileInteractionCache.getAll()
-    const currentFileName = this._document?.fileName || ''
-
-    const fileChunks: string[] = []
-    for (const interaction of interactions) {
-      const filePath = interaction.name
-
-      if (filePath.toString().match('.git')) {
-        continue
-      }
-
-      const uri = Uri.file(filePath)
-
-      if (currentFileName === filePath) continue
-
-      const activeLines = interaction.activeLines
-
-      const document = await workspace.openTextDocument(uri)
-      const lineCount = document.lineCount
-
-      if (lineCount > MAX_CONTEXT_LINE_COUNT) {
-        const averageLine =
-          activeLines.reduce((acc, curr) => acc + curr.line, 0) /
-          activeLines.length
-        const start = new Position(
-          Math.max(0, Math.ceil(averageLine || 0) - 100),
-          0
-        )
-        const end = new Position(
-          Math.min(lineCount, Math.ceil(averageLine || 0) + 100),
-          0
-        )
-        fileChunks.push(`
-// File: ${filePath}
-// Content: \n ${document.getText(new Range(start, end))}
-        `)
-      } else {
-        fileChunks.push(`
-// File: ${filePath}
-// Content: \n ${document.getText()}
-        `)
-      }
-    }
-
-    return fileChunks.join('\n')
   }
 
   private removeStopWords() {
