@@ -297,7 +297,9 @@ export const getParserForFile = async (filePath: string) => {
   const extension = path.extname(filePath).slice(1)
   const language = WASM_LANGAUAGES[extension]
 
-  if (!language) return null
+  logger.log(`Using parser for ${language}`)
+
+  if (!language) return undefined
 
   const wasmPath = path.join(
     __dirname,

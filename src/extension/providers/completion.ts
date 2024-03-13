@@ -12,7 +12,7 @@ import {
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
-import { getShouldSkipCompletion } from '../utils'
+import { getParserForFile, getShouldSkipCompletion } from '../utils'
 import {
   getFileInteractionContext,
   getFimDataFromProvider,
@@ -35,6 +35,7 @@ import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
+import Parser from 'web-tree-sitter'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -62,6 +63,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _nonce = 0
   private _numLineContext = this._config.get('contextLength') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
+  private _parser: Parser | undefined
   private _port = this._config.get('fimApiPort') as number
   private _position: Position | null
   private _statusBar: StatusBarItem
@@ -80,6 +82,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._lock = new AsyncLock()
     this._logger = new Logger()
     this._position = null
+    this._parser = undefined
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
   }
@@ -98,6 +101,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._nonce = this._nonce + 1
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
+    this._parser = await getParserForFile(document.uri.fsPath)
     const prefixSuffix = getPrefixSuffix(
       this._numLineContext,
       document,
@@ -278,7 +282,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (!editor || !this._position) return []
 
-    const insertText = new CompletionFormatter(editor).format(this._completion)
+    const insertText = new CompletionFormatter(editor, this._parser).format(this._completion)
 
     if (this._cacheEnabled) cache.setCache(prefixSuffix, insertText)
 

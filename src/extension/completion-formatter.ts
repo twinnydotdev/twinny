@@ -1,7 +1,13 @@
 import { Position, Range, TextEditor } from 'vscode'
 
-import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
+import {
+  CLOSING_BRACKETS,
+  OPENING_BRACKETS,
+  QUOTES,
+  TARGET_EXPORT_NODES
+} from '../common/constants'
 import { Bracket } from '../common/types'
+import Parser from 'web-tree-sitter'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
@@ -14,11 +20,15 @@ export class CompletionFormatter {
   private _charAfterCursor: string
   private _editor: TextEditor
   private _cursorPosition: Position
+  private _filePath: string
+  private _parser?: Parser
 
-  constructor(editor: TextEditor) {
+  constructor(editor: TextEditor, parser?: Parser) {
     this._editor = editor
+    this._parser = parser
     this._cursorPosition = this._editor.selection.active
     const document = editor.document
+    this._filePath = document?.uri.fsPath
     const lineEndPosition = document.lineAt(this._cursorPosition.line).range.end
     const textAfterRange = new Range(this._cursorPosition, lineEndPosition)
     this._lineText = this._editor.document.lineAt(
@@ -47,7 +57,7 @@ export class CompletionFormatter {
   private matchCompletionBrackets = (): CompletionFormatter => {
     let accumulatedCompletion = ''
     const openBrackets: Bracket[] = []
-    for (const character of this._originalCompletion) {
+    for (const character of this._completion) {
       if (OPENING_BRACKETS.includes(character)) {
         openBrackets.push(character)
       }
@@ -215,6 +225,40 @@ export class CompletionFormatter {
     return this
   }
 
+  private getSnippets(rootNode: Parser.SyntaxNode | undefined): string {
+    if (!rootNode) return ''
+
+    const findNodes = (
+      node: Parser.SyntaxNode,
+      types: string[]
+    ): Parser.SyntaxNode[] => {
+      let nodes = []
+      if (types.includes(node.type)) {
+        nodes.push(node)
+      }
+      for (const child of node.children) {
+        nodes = nodes.concat(findNodes(child, types))
+      }
+      return nodes
+    }
+
+    const targetedNodes = findNodes(rootNode, TARGET_EXPORT_NODES)
+
+    const errorFreeSnippets = targetedNodes
+      .filter((n) => !n.hasError())
+      .map((n) => n.text)
+
+    if (!errorFreeSnippets.length) return this._completion
+
+    return errorFreeSnippets[0]
+  }
+
+  private parseCompletion() {
+    const parsed = this._parser?.parse(this._completion)
+    this._completion = this.getSnippets(parsed?.rootNode)
+    return this
+  }
+
   private getCompletion = () => {
     if (this._completion.trim().length === 0) {
       this._completion = ''
@@ -230,10 +274,11 @@ export class CompletionFormatter {
   }
 
   public format = (completion: string): string => {
-    this._completion = ''
+    this._completion = completion
     this._normalisedCompletion = this.normalise(completion)
     this._originalCompletion = completion
-    const infillText = this.matchCompletionBrackets()
+    const infillText = this.parseCompletion()
+      .matchCompletionBrackets()
       .preventDuplicateLines()
       .removeDuplicateQuotes()
       .removeUnnecessaryMiddleQuote()
