@@ -15,8 +15,11 @@ import AsyncLock from 'async-lock'
 import 'string_score'
 import { getFimDataFromProvider, getPrefixSuffix, getShouldSkipCompletion } from '../utils'
 import { cache } from '../cache'
-import { supportedLanguages } from '../../common/languages'
+import { CodeLanguage, CodeLanguageDetails, supportedLanguages } from '../../common/languages'
 import {
+  FimFileContext,
+  FimFileMetadata,
+  FimFileSnippet,
   PrefixSuffix,
   ResolvedInlineCompletion,
   StreamRequestOptions,
@@ -32,6 +35,64 @@ import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
+
+class FileMetadata implements FimFileMetadata {
+  constructor(
+    readonly lang_id: CodeLanguage,
+    readonly lang: CodeLanguageDetails,
+    readonly uri: Uri
+  ) {}
+
+  toString() {
+    const {lang_id, lang, uri} = this
+    const comment_start = lang.syntaxComments?.start || '';
+    const comment_end = lang.syntaxComments?.end || '';
+
+    const language = `${
+      comment_start
+    } Language: ${lang?.langName} (${lang_id}) ${
+      comment_end
+    }`
+
+    const path = `${
+      comment_start
+    } File uri: ${uri.toString()} (${lang_id}) ${
+      comment_end
+    }`
+
+    return `\n${language}\n${path}\n`;
+  }
+}
+
+// Todo: this needs to be used
+class FileSnippet extends FileMetadata implements FimFileSnippet {
+  constructor(
+    lang_id: CodeLanguage,
+    lang: CodeLanguageDetails,
+    uri: Uri,
+    readonly range: Range,
+    readonly content: string
+  ) {
+    super(lang_id, lang, uri);
+  }
+
+  toString() {
+    const comment_start = this.lang.syntaxComments?.start || '';
+    const comment_end = this.lang.syntaxComments?.end || '';
+
+    return `
+${comment_start} File: ${this.uri.toString()} ${comment_end}
+${comment_start} Content: ${comment_end}
+${this.content}
+    `
+  }
+}
+
+class FileContext extends Array<FileSnippet> implements FimFileContext {
+  toString() {
+    return this.join('\n')
+  }
+}
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -156,7 +217,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       model: this._fimModel,
       numPredictChat: this._numPredictFim,
       temperature: this._temperature,
-      keepAlive: this._keepAlive
+      keepAlive: this._keepAlive,
+      raw: true
     })
 
     const requestOptions: StreamRequestOptions = {
@@ -234,21 +296,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const lang =
       supportedLanguages[languageId as keyof typeof supportedLanguages]
 
-    if (!lang) {
-      return ''
+    if (!languageId || !lang) {
+      return;
     }
 
-    const language = `${lang.syntaxComments?.start || ''} Language: ${
-      lang?.langName
-    } (${languageId}) ${lang.syntaxComments?.end || ''}`
-
-    const path = `${
-      lang.syntaxComments?.start || ''
-    } File uri: ${uri.toString()} (${languageId}) ${
-      lang.syntaxComments?.end || ''
-    }`
-
-    return `\n${language}\n${path}\n`
+    return new FileMetadata(languageId as CodeLanguage, lang, uri);
   }
 
   private async getFileInteractionContext() {
@@ -330,9 +382,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const interactionContext = await this.getFileInteractionContext()
 
     const prompt = getFimPrompt(this._fimModel, this._fimTemplateFormat, {
+      file: this.getPromptHeader(language, this._document.uri),
       context: interactionContext || '',
       prefixSuffix,
-      header: this.getPromptHeader(language, this._document.uri),
       useFileContext: this._useFileContext,
       language: language
     })

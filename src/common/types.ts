@@ -1,5 +1,5 @@
-import { InlineCompletionItem, InlineCompletionList } from 'vscode'
-import { CodeLanguageDetails } from './languages'
+import { InlineCompletionItem, InlineCompletionList, Range, Uri } from 'vscode'
+import { CodeLanguage, CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from './constants'
 
 export interface StreamBodyBase {
@@ -13,6 +13,7 @@ export interface StreamOptionsOllama extends StreamBodyBase {
   keep_alive?: string | number
   messages?: MessageType[] | MessageRoleContent
   prompt: string
+  raw?: boolean
   options: Record<string, unknown>
 }
 
@@ -106,9 +107,26 @@ export interface ChatTemplateData {
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
 
+export interface FimFileMetadata {
+  readonly lang_id: CodeLanguage
+  readonly lang: CodeLanguageDetails
+  readonly uri: Uri
+
+  toString() : string
+}
+
+export interface FimFileSnippet extends FimFileMetadata {
+  readonly range: Range,
+  readonly content: string
+}
+
+export interface FimFileContext extends Array<FimFileMetadata> {
+  toString() : string
+}
+
 export interface FimPromptTemplate {
+  file?: FimFileMetadata
   context: string
-  header: string
   prefixSuffix: PrefixSuffix
   useFileContext: boolean
   language?: string

@@ -85,7 +85,8 @@ export const FIM_TEMPLATE_FORMAT = {
   deepseek: 'deepseek',
   llama: 'llama',
   stableCode: 'stable-code',
-  starcoder: 'starcoder'
+  starcoder: 'starcoder',
+  starcoder2: 'starcoder2'
 }
 
 export const STOP_LLAMA = ['<EOT>']
@@ -96,6 +97,14 @@ export const STOP_DEEPSEEK = [
   '<｜fim▁end｜>',
   '<END>',
   '<｜end▁of▁sentence｜>'
+]
+
+export const STOP_STARCODER2 = [
+  "<fim_prefix>",
+  "<fim_suffix>",
+  "<fim_middle>",
+  "<|endoftext|>",
+  "<file_sep>"
 ]
 
 export const STOP_STABLECODE = ['<|endoftext|>']

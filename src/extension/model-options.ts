@@ -15,6 +15,7 @@ export function createStreamRequestBody(
     model: string
     messages?: MessageRoleContent[]
     keepAlive?: string | number
+    raw?: boolean
   }
 ): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
@@ -24,6 +25,7 @@ export function createStreamRequestBody(
         model: options.model,
         prompt,
         stream: true,
+        raw: options.raw,
         messages: options.messages,
         keep_alive: options.keepAlive,
         options: {
