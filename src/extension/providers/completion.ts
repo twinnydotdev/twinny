@@ -27,9 +27,7 @@ import {
   StreamResponse
 } from '../../common/types'
 import { getFimPrompt, getStopWords } from '../fim-templates'
-import {
-  LINE_BREAK_REGEX,
-} from '../../common/constants'
+import { LINE_BREAK_REGEX } from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
@@ -40,6 +38,7 @@ import Parser from 'web-tree-sitter'
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
   private _abortController: AbortController | null
+  private _acceptedLastCompletion = false
   private _apiHostname = this._config.get('apiHostname') as string
   private _apiPath = this._config.get('fimApiPath') as string
   private _apiProvider = this._config.get('apiProvider') as string
@@ -58,6 +57,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _linesGenerated = 0
   private _lock: AsyncLock
+  private _lastCompletionText = ''
   private _logger: Logger
   private _maxLines = this._config.get('maxLines') as number
   private _nonce = 0
@@ -87,13 +87,30 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._fileInteractionCache = fileInteractionCache
   }
 
+  public getLastCompletion() {
+    return this._lastCompletionText
+  }
+
+  public setAcceptedLastCompletion(value: boolean) {
+    this._acceptedLastCompletion = value
+  }
+
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
-    if (getShouldSkipCompletion(context, this._disableAuto) || !editor || !this._enabled) return
+    if (
+      getShouldSkipCompletion(context, this._disableAuto) ||
+      !editor ||
+      !this._enabled
+      || this._acceptedLastCompletion
+    ) {
+      console.log('skip')
+      return
+    }
+
     this._document = document
     this._position = position
     this._chunkCount = 0
@@ -137,7 +154,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   options: requestOptions,
                   onStart: (controller) => this.onStart(controller),
                   onEnd: () => this.onEnd(prefixSuffix, _resolve),
-                  onData: (data) => this.onData(data, prefixSuffix, _resolve),
+                  onData: (data) => this.onData(data, _resolve),
                   onError: this.onError
                 })
               } catch (error) {
@@ -183,34 +200,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private onData(
     data: StreamResponse | undefined,
-    prefixSuffix: PrefixSuffix,
     done: (completion: ResolvedInlineCompletion) => void
   ) {
     try {
       const completionData = getFimDataFromProvider(this._apiProvider, data)
       if (completionData === undefined) return done([])
-
       this._completion = this._completion + completionData
-      this._chunkCount = this._chunkCount + 1
-
-      if (this.getIsSingleLineCompletion(completionData)) {
-        this._logger.log(
-          `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        this._abortController?.abort()
-        return done(this.triggerInlineCompletion(prefixSuffix))
-      }
-
-      if (LINE_BREAK_REGEX.exec(completionData)) this._linesGenerated++
-
-      if (this.getMaxLinesReached()) {
-        this._logger.log(
-          `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        this.removeStopWords()
-        this._abortController?.abort()
-        return done(this.triggerInlineCompletion(prefixSuffix))
-      }
     } catch (e) {
       console.error(e)
     }
@@ -264,12 +259,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private async getPrompt(prefixSuffix: PrefixSuffix) {
     if (!this._document || !this._position) return ''
     const language = this._document.languageId
-    const interactionContext = await getFileInteractionContext(this._fileInteractionCache, this._document)
+    const interactionContext = await getFileInteractionContext(
+      this._fileInteractionCache,
+      this._document
+    )
     const prompt = getFimPrompt(this._fimModel, this._fimTemplateFormat, {
       context: interactionContext || '',
       prefixSuffix,
       header: getPromptHeader(language, this._document.uri),
-      useFileContext: this._useFileContext,
+      useFileContext: this._useFileContext
     })
 
     return prompt
@@ -282,7 +280,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (!editor || !this._position) return []
 
-    const insertText = new CompletionFormatter(editor, this._parser).format(this._completion)
+    const insertText = new CompletionFormatter(
+      editor,
+      this._parser
+    ).getFormattedCompletion(this._completion)
 
     if (this._cacheEnabled) cache.setCache(prefixSuffix, insertText)
 
@@ -293,6 +294,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     )
 
     this._statusBar.text = '🤖'
+    this._lastCompletionText = insertText
 
     return [
       new InlineCompletionItem(

@@ -14,12 +14,12 @@ suite('Completion formatter', () => {
     const document = await vscode.workspace.openTextDocument()
     editor = await vscode.window.showTextDocument(document)
     const completionFormatter = new CompletionFormatter(editor)
-    assert.strictEqual(completionFormatter.format('{\n\n'), '{')
-    assert.strictEqual(completionFormatter.format('{'), '{')
-    assert.strictEqual(completionFormatter.format('})'), '})')
-    assert.strictEqual(completionFormatter.format('}'), '}')
-    assert.strictEqual(completionFormatter.format('\n\n\n}'), '}')
-    assert.strictEqual(completionFormatter.format('{{\n\n\n'), '{{')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('{\n\n'), '{')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('{'), '{')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('})'), '})')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('}'), '}')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('\n\n\n}'), '}')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('{{\n\n\n'), '{{')
   })
 
   test('removes duplicate closing bracket', async () => {
@@ -31,7 +31,7 @@ suite('Completion formatter', () => {
     editor.selection = new vscode.Selection(position, position)
     const completionFormatter = new CompletionFormatter(editor)
     assert.ok(editor, 'Editor should be defined')
-    assert.strictEqual(completionFormatter.format('\')'), '\'')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('\')'), '\'')
   })
 
   test('removes duplicate closing quote', async () => {
@@ -43,7 +43,7 @@ suite('Completion formatter', () => {
     editor.selection = new vscode.Selection(position, position)
     const completionFormatter = new CompletionFormatter(editor)
     assert.ok(editor, 'Editor should be defined')
-    assert.strictEqual(completionFormatter.format('word\')}'), 'word')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('word\')}'), 'word')
   })
 
   test('skips completion in the middle of the word', async () => {
@@ -55,6 +55,6 @@ suite('Completion formatter', () => {
     editor.selection = new vscode.Selection(position, position)
     const completionFormatter = new CompletionFormatter(editor)
     assert.ok(editor, 'Editor should be defined')
-    assert.strictEqual(completionFormatter.format('word smithery!'), '')
+    assert.strictEqual(completionFormatter.getFormattedCompletion('word smithery!'), '')
   })
 })

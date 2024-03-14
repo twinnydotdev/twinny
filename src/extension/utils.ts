@@ -32,9 +32,9 @@ import {
   SKIP_DECLARATION_SYMBOLS,
   SKIP_IMPORT_KEYWORDS_AFTER,
   PROVIDER_NAMES,
-  TARGET_EXPORT_NODES,
+  PARSEABLE_NODES,
   WASM_LANGAUAGES,
-  MAX_CONTEXT_LINE_COUNT
+  MAX_CONTEXT_LINE_COUNT,
 } from '../common/constants'
 import { Logger } from '../common/logger'
 import Parser from 'web-tree-sitter'
@@ -77,7 +77,7 @@ export const getIsSingleBracket = (completion: string) =>
   completion.length === 1 && getIsBracket(completion)
 
 export const getIsOnlyBrackets = (completion: string) => {
-  if (completion.length === 0) return false
+  if (completion?.length === 0) return false
 
   for (const char of completion) {
     if (!getIsBracket(char)) {
@@ -332,7 +332,7 @@ export const getDocumentSplitChunks = async (
     return nodes
   }
 
-  const targetedNodes = findNodes(tree.rootNode, TARGET_EXPORT_NODES)
+  const targetedNodes = findNodes(tree.rootNode, PARSEABLE_NODES)
 
   const seenChunks: string[] = []
   const chunks = targetedNodes
@@ -503,6 +503,7 @@ export const getFileInteractionContext = async (
   return fileChunks.join('\n')
 }
 
-const getIsDuplicateChunk = (chunk: string, chunks: string[] = []): boolean => {
+
+export const getIsDuplicateChunk = (chunk: string, chunks: string[] = []): boolean => {
   return chunks.includes(chunk.trim().toLowerCase())
 }

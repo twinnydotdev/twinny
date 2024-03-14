@@ -1,3 +1,4 @@
+import { window } from 'vscode'
 import { InteractionItem } from '../common/types'
 import { LRUCache } from './cache'
 
@@ -7,6 +8,7 @@ export class FileInteractionCache {
   private _sessionStartTime: Date | null = null
   private _sessionPauseTime: Date | null = null
   private _inactivityTimeout: ReturnType<typeof setTimeout> | null = null
+  private _editorState: string | undefined
   private readonly _inactivityThreshold = 5 * 60 * 1000 // 5 minutes
 
   constructor() {
@@ -54,7 +56,7 @@ export class FileInteractionCache {
         visits: b?.visits || 0,
         sessionLength: b?.sessionLength || 0,
         lastVisited: b?.lastVisited || 0,
-        activeLines: b?.activeLines || [],
+        activeLines: b?.activeLines || []
       }))
       .sort((a, b) => {
         const recencyA = Date.now() - (a.lastVisited || 0)
@@ -75,6 +77,19 @@ export class FileInteractionCache {
 
   getCurrentFile(): string | null {
     return this._currentFile
+  }
+
+  setCurrentEditorState() {
+    this._editorState = this.getCurrentEditorState()
+  }
+
+  getCurrentEditorState() {
+    return window.activeTextEditor?.document
+      .getText()
+      .split('\n')
+      .join('')
+      .replace(/\s+/gm, '')
+      .replace(' ', '')
   }
 
   incrementVisits() {

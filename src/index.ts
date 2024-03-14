@@ -32,12 +32,11 @@ export async function activate(context: ExtensionContext) {
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
-  const completionProvider = new CompletionProvider(statusBar, fileInteractionCache)
-  const sidebarProvider = new SidebarProvider(
+  const completionProvider = new CompletionProvider(
     statusBar,
-    context,
-    templateDir,
+    fileInteractionCache
   )
+  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
 
   templateProvider.init()
 
@@ -147,6 +146,11 @@ export async function activate(context: ExtensionContext) {
     statusBar
   )
 
+  window.onDidChangeTextEditorSelection(() => {
+    console.log('set false')
+    delayExecution(() => completionProvider.setAcceptedLastCompletion(false), 100)
+  })
+
   context.subscriptions.push(
     workspace.onDidCloseTextDocument((document) => {
       const filePath = document.uri.fsPath
@@ -159,7 +163,12 @@ export async function activate(context: ExtensionContext) {
       fileInteractionCache.incrementVisits()
     }),
     workspace.onDidChangeTextDocument((e) => {
+      const lastCompletion = completionProvider.getLastCompletion()
       const changes = e.contentChanges[0]
+      if (changes.text && lastCompletion && changes.text === lastCompletion) {
+        completionProvider.setAcceptedLastCompletion(true)
+      }
+
       if (!changes) return
       const currentLine = changes.range.start.line
       const currentCharacter = changes.range.start.character

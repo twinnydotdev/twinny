@@ -21,6 +21,7 @@ export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ['=', ':']
 export const IMPORT_SEPARATOR = [',', '{']
 export const SKIP_IMPORT_KEYWORDS_AFTER = ['from', 'as', 'import']
+export const SKIP_TOKEN = '#####skip#####'
 
 export const MESSAGE_NAME = {
   twinnyAcceptSolution: 'twinny-accept-solution',
@@ -51,7 +52,7 @@ export const MESSAGE_NAME = {
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
   twinnySetOllamaModel: 'twinny-set-ollama-model',
   twinnySetConfigValue: 'twinny-set-config-value',
-  twinnyGetConfigValue: 'twinny-get-config-value',
+  twinnyGetConfigValue: 'twinny-get-config-value'
 }
 
 export const MESSAGE_KEY = {
@@ -71,7 +72,8 @@ export const SETTING_KEY = {
 
 export const CONTEXT_NAME = {
   twinnyGeneratingText: 'twinnyGeneratingText',
-  twinnyManageTemplates: 'twinnyManageTemplates'
+  twinnyManageTemplates: 'twinnyManageTemplates',
+  lastEditorState: 'lastEditorState'
 }
 
 export const UI_TABS = {
@@ -200,18 +202,81 @@ export const WASM_LANGAUAGES: { [key: string]: string } = {
   toml: 'toml'
 }
 
-export const TARGET_EXPORT_NODES = [
+export const PARSEABLE_NODES = [
   'export_statement',
+  'import_statement',
+  'function_declaration',
+  'class_declaration',
+  'variable_declaration',
+  'import_declaration',
   'export_declaration',
-  'export_default_declaration',
   'export_named_declaration',
-  'export_all_declaration',
-  'export_from_declaration',
-  'export_named_specifier',
-  'export_namespace_specifier',
-  'export_default_specifier',
-  'export_namespace_declaration',
-  'export_from_specifier',
-  'export_from_default_specifier',
-  'export_from_namespace_specifier'
+  'export_default_declaration',
+  'lexical_declaration',
+  'if_statement',
+  'for_statement',
+  'for_in_statement',
+  'for_of_statement',
+  'while_statement',
+  'do_while_statement',
+  'switch_statement',
+  'try_statement',
+  'catch_clause',
+  'finally_clause',
+  'return_statement',
+  'break_statement',
+  'continue_statement',
+  'throw_statement',
+  'array_expression',
+  'object_expression',
+  'arrow_function',
+  'function_expression',
+  'call_expression',
+  'new_expression',
+  'assignment_expression',
+  'binary_expression',
+  'template_string',
+  'conditional_expression',
+  'yield_expression',
+  'type_alias_declaration',
+  'interface_declaration',
+  'enum_declaration',
+  'module_declaration',
+  'namespace_declaration',
+  'type_assertion_expression',
+  'type_annotation',
+  'decorator',
+  'block_statement',
+  'expression_statement',
+  'empty_statement',
+  'spread_element',
+  'rest_element',
+  'template_literal',
+  'tagged_template_expression',
+  'await_expression',
+  'async_function_declaration',
+  'async_arrow_function',
+  'jsx_element',
+  'jsx_fragment',
+  'import_specifier',
+  'import_namespace_specifier',
+  'import_expression',
+  'shorthand_property_identifier_pattern',
+  'computed_property_name',
+  'export_clause',
+  'import_clause',
+  'default_parameter',
+  'parenthesized_expression',
+  'sequence_expression',
+  'binary_pattern',
+  'destructuring_pattern',
+  'object_pattern',
+  'object',
+  'array',
+  'array_pattern',
+  'assignment_pattern',
+  'optional_parameter',
+  'property_identifier',
+  'member_expression',
+  'literal_pattern'
 ]
