@@ -35,9 +35,11 @@ import {
   PARSEABLE_NODES,
   WASM_LANGAUAGES,
   MAX_CONTEXT_LINE_COUNT,
+  OPENING_BRACKETS,
+  CLOSING_BRACKETS
 } from '../common/constants'
 import { Logger } from '../common/logger'
-import Parser from 'web-tree-sitter'
+import Parser, { SyntaxNode } from 'web-tree-sitter'
 import { FileInteractionCache } from './file-interaction'
 
 const logger = new Logger()
@@ -503,7 +505,71 @@ export const getFileInteractionContext = async (
   return fileChunks.join('\n')
 }
 
-
-export const getIsDuplicateChunk = (chunk: string, chunks: string[] = []): boolean => {
+export const getIsDuplicateChunk = (
+  chunk: string,
+  chunks: string[] = []
+): boolean => {
   return chunks.includes(chunk.trim().toLowerCase())
+}
+
+function getNodeAtPosition(
+  rootNode: SyntaxNode,
+  position: Position
+): SyntaxNode | null {
+  let foundNode: SyntaxNode | null = null
+
+  // Define a recursive function to search for the node
+  function searchNode(node: SyntaxNode): boolean {
+    // Check if the position is within the node's range
+    if (
+      position.line + 1 >= node.startPosition.row + 1 &&
+      position.line + 1 <= node.endPosition.row + 1
+    ) {
+      foundNode = node // Update foundNode with the current node
+      // Iterate through the children of the current node to search deeper
+      for (const child of node.children) {
+        if (searchNode(child)) {
+          break // Stop searching if the most specific node is found
+        }
+      }
+      return true // Indicates that the node contains the position
+    }
+    return false // Indicates that the node does not contain the position
+  }
+
+  // Start the search with the root node
+  searchNode(rootNode)
+
+  return foundNode // Return the most specific node found
+}
+
+function getIsMultiLineByNode(node: Parser.SyntaxNode | null): boolean {
+  if (
+    node?.type === 'statement_block' ||
+    (node?.type === 'block' &&
+      OPENING_BRACKETS.includes(node.text.at(0) as string) &&
+      CLOSING_BRACKETS.includes(node.text.at(-1) as string))
+  ) {
+    return true
+  } else {
+    return false
+  }
+}
+
+export const getIsMultiLineCompletion = (
+  rootNode: Parser.SyntaxNode | undefined
+) => {
+  const editor = window.activeTextEditor
+
+  if (!editor) return false
+
+  if (rootNode?.children.length === 1) {
+    return true
+  }
+  const node = getNodeAtPosition(
+    rootNode as Parser.SyntaxNode,
+    editor.selection.active
+  )
+
+  return getIsMultiLineByNode(node)
 }

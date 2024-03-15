@@ -8,11 +8,15 @@ import {
   workspace,
   StatusBarItem,
   window,
-  InlineCompletionContext,
+  InlineCompletionContext
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
-import { getParserForFile, getShouldSkipCompletion } from '../utils'
+import {
+  getIsMultiLineCompletion,
+  getParserForFile,
+  getShouldSkipCompletion
+} from '../utils'
 import {
   getFileInteractionContext,
   getFimDataFromProvider,
@@ -54,6 +58,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _fileInteractionCache: FileInteractionCache
   private _fimModel = this._config.get('fimModelName') as string
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
+  private _isMultiLineCompletion = false
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _linesGenerated = 0
   private _lock: AsyncLock
@@ -104,8 +109,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (
       getShouldSkipCompletion(context, this._disableAuto) ||
       !editor ||
-      !this._enabled
-      || this._acceptedLastCompletion
+      !this._enabled ||
+      this._acceptedLastCompletion
     ) {
       console.log('skip')
       return
@@ -124,6 +129,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       document,
       position
     )
+
+    const parsed = this._parser?.parse(this._document.getText())
+
+    this._isMultiLineCompletion = getIsMultiLineCompletion(parsed?.rootNode)
 
     if (this.isMiddleWord(prefixSuffix)) {
       return []
@@ -154,7 +163,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   options: requestOptions,
                   onStart: (controller) => this.onStart(controller),
                   onEnd: () => this.onEnd(prefixSuffix, _resolve),
-                  onData: (data) => this.onData(data, _resolve),
+                  onData: (data) => this.onData(data, prefixSuffix, _resolve),
                   onError: this.onError
                 })
               } catch (error) {
@@ -170,6 +179,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private isMiddleWord(prefixSuffix: PrefixSuffix) {
     const { prefix, suffix } = prefixSuffix
+    if (!prefix || !suffix) return false
     return (
       /\w/.test(prefix.at(-1) as string) && /\w/.test(suffix.at(0) as string)
     )
@@ -200,12 +210,21 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private onData(
     data: StreamResponse | undefined,
+    prefixSuffix: PrefixSuffix,
     done: (completion: ResolvedInlineCompletion) => void
   ) {
     try {
       const completionData = getFimDataFromProvider(this._apiProvider, data)
       if (completionData === undefined) return done([])
       this._completion = this._completion + completionData
+
+      if (!this._isMultiLineCompletion) {
+        this._logger.log(
+          `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
+        )
+        this._abortController?.abort()
+        return done(this.triggerInlineCompletion(prefixSuffix))
+      }
     } catch (e) {
       console.error(e)
     }

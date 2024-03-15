@@ -124,6 +124,10 @@ export class CompletionFormatter {
     this._completion = completion
     this._normalisedCompletion = this.normalise(completion)
     this._originalCompletion = completion
+    const parsedCompletion = this.getCompletionCandidate()
+    if (completion) {
+      return parsedCompletion
+    }
     return this.manuallyParseCompletion().getCompletion()
   }
 }
