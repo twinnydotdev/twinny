@@ -25,7 +25,7 @@ export const getLanguageMatch = (
       : languageId
   }
 
-  return 'javascript'
+  return 'auto'
 }
 
 export const getCompletionContent = (message: ServerMessage) => {
