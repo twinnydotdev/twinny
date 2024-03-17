@@ -9,11 +9,15 @@ import {
   StatusBarItem,
   window,
   Uri,
-  InlineCompletionContext,
+  InlineCompletionContext
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
-import { getFimDataFromProvider, getPrefixSuffix, getShouldSkipCompletion } from '../utils'
+import {
+  getFimDataFromProvider,
+  getPrefixSuffix,
+  getShouldSkipCompletion
+} from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
 import {
@@ -25,13 +29,20 @@ import {
 import { getFimPrompt, getStopWords } from '../fim-templates'
 import {
   LINE_BREAK_REGEX,
-  MAX_CONTEXT_LINE_COUNT,
+  MAX_CONTEXT_LINE_COUNT
 } from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
+import {
+  getIsMultiLineCompletion,
+  getLineBreakCount,
+  getNodeAtPosition,
+  getParserForFile
+} from '../../webview/utils'
+import Parser, { SyntaxNode } from 'web-tree-sitter'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -59,9 +70,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _nonce = 0
   private _numLineContext = this._config.get('contextLength') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
+  private _parser: Parser | undefined
   private _port = this._config.get('fimApiPort') as number
   private _position: Position | null
   private _statusBar: StatusBarItem
+  private _isMultiLineCompletion = false
   private _stopWords = getStopWords(this._fimModel, this._fimTemplateFormat)
   private _temperature = this._config.get('temperature') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
@@ -87,7 +100,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
-    if (getShouldSkipCompletion(context, this._disableAuto) || !editor || !this._enabled) return
+    if (
+      getShouldSkipCompletion(context, this._disableAuto) ||
+      !editor ||
+      !this._enabled
+    )
+      return
     this._document = document
     this._position = position
     this._chunkCount = 0
@@ -100,6 +118,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       document,
       position
     )
+
+    this._parser = await getParserForFile(this._document.uri.fsPath)
+    const tree = this._parser?.parse(document.getText())
+    const node = getNodeAtPosition(tree, position)
+    this._isMultiLineCompletion = getIsMultiLineCompletion(node)
 
     if (this.isMiddleWord(prefixSuffix)) {
       return []
@@ -186,7 +209,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._completion = this._completion + completionData
       this._chunkCount = this._chunkCount + 1
 
-      if (this.getIsSingleLineCompletion(completionData)) {
+      if (
+        this.getIsSingleLineCompletion(completionData) &&
+        !this._isMultiLineCompletion
+      ) {
         this._logger.log(
           `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
         )
@@ -194,15 +220,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         return done(this.triggerInlineCompletion(prefixSuffix))
       }
 
-      if (LINE_BREAK_REGEX.exec(completionData)) this._linesGenerated++
-
-      if (this.getMaxLinesReached()) {
-        this._logger.log(
-          `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        this.removeStopWords()
-        this._abortController?.abort()
-        return done(this.triggerInlineCompletion(prefixSuffix))
+      if (this._chunkCount % 10 === 0 && this._isMultiLineCompletion) {
+        const tree = this._parser?.parse(this._completion)
+        if (!tree?.rootNode.hasError && tree?.rootNode.children.length) {
+          const firstChild = tree && (tree.rootNode.children[0] as SyntaxNode)
+          if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
+            this._completion = firstChild.text
+            this._abortController?.abort()
+            return done(this.triggerInlineCompletion(prefixSuffix))
+          }
+        }
       }
     } catch (e) {
       console.error(e)
