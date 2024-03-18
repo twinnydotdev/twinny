@@ -36,13 +36,14 @@ import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
+import { getLineBreakCount } from '../../webview/utils'
+import Parser, { SyntaxNode } from 'web-tree-sitter'
 import {
   getIsMultiLineCompletion,
-  getLineBreakCount,
   getNodeAtPosition,
-  getParserForFile
-} from '../../webview/utils'
-import Parser, { SyntaxNode } from 'web-tree-sitter'
+  getParserForFile,
+  injectCompletionToNode
+} from '../parser-utils'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -54,6 +55,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
   private _chunkCount = 0
   private _completion = ''
+  private _validCompletion = ''
+  private _currentNode: SyntaxNode | null
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
   private _disableAuto = this._config.get('disableAutoSuggest') as boolean
@@ -78,7 +81,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _stopWords = getStopWords(this._fimModel, this._fimTemplateFormat)
   private _temperature = this._config.get('temperature') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
-  private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
+  private _useMultiLineCompletions = this._config.get(
+    'useMultiLineCompletions'
+  ) as boolean
   private _useTls = this._config.get('useTls') as boolean
 
   constructor(
@@ -92,6 +97,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._position = null
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
+    this._currentNode = null
   }
 
   public async provideInlineCompletionItems(
@@ -121,8 +127,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     this._parser = await getParserForFile(this._document.uri.fsPath)
     const tree = this._parser?.parse(document.getText())
-    const node = getNodeAtPosition(tree, position)
-    this._isMultiLineCompletion = getIsMultiLineCompletion(node)
+    this._currentNode = getNodeAtPosition(tree, position)
+    this._isMultiLineCompletion = getIsMultiLineCompletion(this._currentNode)
 
     if (this.isMiddleWord(prefixSuffix)) {
       return []
@@ -197,6 +203,37 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { requestOptions, requestBody }
   }
 
+  private setValidCompletion() {
+    if (this._chunkCount % 4 === 0 && this._isMultiLineCompletion) {
+      const completionTree = this._parser?.parse(this._completion)
+      const appendedCompletion = injectCompletionToNode(
+        this._currentNode,
+        this._completion
+      )
+      const appendedTree = this._parser?.parse(appendedCompletion || '')
+      if (
+        !completionTree?.rootNode.hasError &&
+        completionTree?.rootNode.children.length
+      ) {
+        const firstChild =
+          completionTree && (completionTree.rootNode.children[0] as SyntaxNode)
+        if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
+          this._validCompletion = firstChild.text
+        }
+      }
+      if (
+        !appendedTree?.rootNode.hasError &&
+        appendedTree?.rootNode.children.length
+      ) {
+        const firstChild =
+          appendedTree && (appendedTree.rootNode.children[0] as SyntaxNode)
+        if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
+          this._validCompletion = completionTree?.rootNode.text || ''
+        }
+      }
+    }
+  }
+
   private onData(
     data: StreamResponse | undefined,
     prefixSuffix: PrefixSuffix,
@@ -220,16 +257,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         return done(this.triggerInlineCompletion(prefixSuffix))
       }
 
-      if (this._chunkCount % 10 === 0 && this._isMultiLineCompletion) {
-        const tree = this._parser?.parse(this._completion)
-        if (!tree?.rootNode.hasError && tree?.rootNode.children.length) {
-          const firstChild = tree && (tree.rootNode.children[0] as SyntaxNode)
-          if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
-            this._completion = firstChild.text
-            this._abortController?.abort()
-            return done(this.triggerInlineCompletion(prefixSuffix))
-          }
-        }
+      if (this._currentNode?.childCount === 2) {
+        injectCompletionToNode(this._currentNode, this._completion)
+      }
+
+      this.setValidCompletion()
+
+      if (this._chunkCount > this._numPredictFim) {
+        this._completion = this._validCompletion
+        return done(this.triggerInlineCompletion(prefixSuffix))
       }
     } catch (e) {
       console.error(e)
@@ -332,19 +368,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private getContainsStopWord() {
-    return this._stopWords.some((stopSequence) =>
-      this._completion.includes(stopSequence)
-    )
-  }
-
-  private getMaxLinesReached() {
-    return this._linesGenerated > this._maxLines || this.getContainsStopWord()
-  }
-
   private getIsSingleLineCompletion(completionString: string) {
     return (
-      !this._useMultiLine &&
+      !this._useMultiLineCompletions &&
       this._chunkCount > 1 &&
       LINE_BREAK_REGEX.test(completionString)
     )
@@ -412,7 +438,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._port = this._config.get('fimApiPort') as number
     this._temperature = this._config.get('temperature') as number
     this._useFileContext = this._config.get('useFileContext') as boolean
-    this._useMultiLine = this._config.get('useMultiLineCompletions') as boolean
+    this._useMultiLineCompletions = this._config.get(
+      'useMultiLineCompletions'
+    ) as boolean
     this._useTls = this._config.get('useTls') as boolean
     this._logger.updateConfig()
   }

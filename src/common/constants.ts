@@ -200,18 +200,21 @@ export const WASM_LANGAUAGES: { [key: string]: string } = {
   toml: 'toml'
 }
 
-export const MULTI_LINE_CANIDATES = [
+export const MULTI_LINE_NODE_TYPE = [
+  // typescript
   'statement_block',
   'formal_parameters',
   'named_imports',
   'function_definition',
-  'def',
-  'const',
-  'class',
-  'object'
+  // react
+  'jsx_opening_element',
+  'jsx_self_closing_element',
+  'jsx_element',
+  'jsx_closing_element'
 ]
 
 export const DECLARATION_TYPE = [
+  // typescript
   'var',
   'let',
   'const',
@@ -220,9 +223,7 @@ export const DECLARATION_TYPE = [
   'class',
   'interface',
   'type',
-  'typealias',
   'enum',
-  'typeparam',
-  'def',
-  'def_statement'
+  // python
+  'def'
 ]
