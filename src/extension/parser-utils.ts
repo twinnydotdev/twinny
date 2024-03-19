@@ -101,8 +101,7 @@ export const getIsEmptyMultiLineBlock = (node: SyntaxNode | null): boolean => {
   const isOnlyBrackets = getIsOnlyBrackets(
     node.children.map((n) => n.text).join('')
   )
-  const isPossibleCandidate = node.text.split('\n').length <= 5
-  return isMultiLineType && (isOnlyBrackets || isPossibleCandidate)
+  return isMultiLineType && (isOnlyBrackets || !node.hasError)
 }
 
 export const getOpenAndCloseBracketMatchJsx = (node: SyntaxNode | null) => {
