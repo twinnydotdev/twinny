@@ -27,6 +27,7 @@ import {
   EXTENSION_NAME,
   IMPORT_SEPARATOR,
   PROVIDER_NAMES,
+  QUOTES,
   SKIP_DECLARATION_SYMBOLS,
   SKIP_IMPORT_KEYWORDS_AFTER
 } from '../common/constants'
@@ -187,6 +188,31 @@ export const getPrefixSuffix = (
     prefix: document.getText(prefixRange),
     suffix: document.getText(suffixRange)
   }
+}
+
+export const isCursorInEmptyString = () => {
+  const editor = window.activeTextEditor
+  if (!editor) return false
+
+  const position = editor.selection.active
+  const lineText = editor.document.lineAt(position.line).text
+
+  const charBefore = lineText
+    .substring(0, position.character)
+    .split('')
+    .reverse()
+    .find((char) => QUOTES.includes(char))
+  const charAfter = lineText
+    .substring(position.character)
+    .split('')
+    .find((char) => QUOTES.includes(char))
+
+  return (
+    charBefore &&
+    charAfter &&
+    charBefore === charAfter &&
+    QUOTES.includes(charBefore)
+  )
 }
 
 export const getTheme = () => {

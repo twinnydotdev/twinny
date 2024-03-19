@@ -206,6 +206,9 @@ export const MULTI_LINE_NODE_TYPE = [
   'formal_parameters',
   'named_imports',
   'function_definition',
+  'object',
+  'object_pattern',
+  'object_type',
   // react
   'jsx_opening_element',
   'jsx_self_closing_element',

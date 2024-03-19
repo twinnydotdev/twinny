@@ -1,4 +1,4 @@
-import Parser, { SyntaxNode, Tree } from 'web-tree-sitter'
+import Parser, { SyntaxNode } from 'web-tree-sitter'
 import {
   DECLARATION_TYPE,
   MULTI_LINE_NODE_TYPE,
@@ -7,7 +7,6 @@ import {
 import { Position, window } from 'vscode'
 import path from 'path'
 import { getIsOnlyBrackets } from './utils'
-import { getLineBreakCount } from '../webview/utils'
 import { Logger } from '../common/logger'
 const logger = new Logger()
 
@@ -102,10 +101,11 @@ export const getIsEmptyMultiLineBlock = (node: SyntaxNode | null): boolean => {
   const isOnlyBrackets = getIsOnlyBrackets(
     node.children.map((n) => n.text).join('')
   )
-  return isMultiLineType && isOnlyBrackets
+  const isPossibleCandidate = node.text.split('\n').length <= 5
+  return isMultiLineType && (isOnlyBrackets || isPossibleCandidate)
 }
 
-export const getOpenAndCloseBracketMatch = (node: SyntaxNode | null) => {
+export const getOpenAndCloseBracketMatchJsx = (node: SyntaxNode | null) => {
   const firstNode = node?.children[0]
   const lastNode = node?.children[node?.childCount - 1]
   if (!firstNode || !lastNode) return
@@ -128,17 +128,6 @@ export const getIsDeclarationType = (node: SyntaxNode) => {
   )
 }
 
-export const getCompletionNodeCandidate = (tree: Tree) => {
-  let validCompltion = '' as string
-  if (!tree?.rootNode.hasError && tree?.rootNode.children.length) {
-    const firstChild = tree && (tree.rootNode.children[0] as SyntaxNode)
-    if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
-      validCompltion = firstChild.text
-    }
-  }
-  return validCompltion
-}
-
 export const injectCompletionToNode = (
   node: SyntaxNode | null,
   completion: string
@@ -153,11 +142,11 @@ export const injectCompletionToNode = (
     .join(` ${completion} `)
 }
 
-export const getIsMultiLineCompletion = (node: SyntaxNode | null) => {
+export const getIsMultiLineCompletionNode = (node: SyntaxNode | null) => {
   if (!node) return false
 
   return (
-    getOpenAndCloseBracketMatch(node) ||
+    getOpenAndCloseBracketMatchJsx(node) ||
     getIsDeclarationType(node) ||
     getIsEmptyMultiLineBlock(node) ||
     getIsNodeWithErrorDeclaration(node) ||

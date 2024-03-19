@@ -16,7 +16,8 @@ import 'string_score'
 import {
   getFimDataFromProvider,
   getPrefixSuffix,
-  getShouldSkipCompletion
+  getShouldSkipCompletion,
+  isCursorInEmptyString
 } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
@@ -39,7 +40,7 @@ import { FileInteractionCache } from '../file-interaction'
 import { getLineBreakCount } from '../../webview/utils'
 import Parser, { SyntaxNode } from 'web-tree-sitter'
 import {
-  getIsMultiLineCompletion,
+  getIsMultiLineCompletionNode,
   getNodeAtPosition,
   getParserForFile,
   injectCompletionToNode
@@ -66,10 +67,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _fimModel = this._config.get('fimModelName') as string
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _keepAlive = this._config.get('keepAlive') as string | number
-  private _linesGenerated = 0
   private _lock: AsyncLock
   private _logger: Logger
-  private _maxLines = this._config.get('maxLines') as number
   private _nonce = 0
   private _numLineContext = this._config.get('contextLength') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
@@ -115,7 +114,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._document = document
     this._position = position
     this._chunkCount = 0
-    this._linesGenerated = 0
     this._nonce = this._nonce + 1
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
@@ -128,7 +126,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._parser = await getParserForFile(this._document.uri.fsPath)
     const tree = this._parser?.parse(document.getText())
     this._currentNode = getNodeAtPosition(tree, position)
-    this._isMultiLineCompletion = getIsMultiLineCompletion(this._currentNode)
+    const isInMiddleOfString = isCursorInEmptyString()
+    const isMultiLineCompletionNode = getIsMultiLineCompletionNode(
+      this._currentNode
+    )
+    this._isMultiLineCompletion =
+      isMultiLineCompletionNode && !isInMiddleOfString
 
     if (this.isMiddleWord(prefixSuffix)) {
       return []
@@ -247,12 +250,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._chunkCount = this._chunkCount + 1
 
       if (
-        this.getIsSingleLineCompletion(completionData) &&
-        !this._isMultiLineCompletion
+        !this._isMultiLineCompletion &&
+        this._chunkCount >= 1 &&
+        LINE_BREAK_REGEX.test(this._completion)
       ) {
         this._logger.log(
           `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
         )
+        this.removeStopWords()
         this._abortController?.abort()
         return done(this.triggerInlineCompletion(prefixSuffix))
       }
@@ -265,6 +270,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
       if (this._chunkCount > this._numPredictFim) {
         this._completion = this._validCompletion
+        this.removeStopWords()
         return done(this.triggerInlineCompletion(prefixSuffix))
       }
     } catch (e) {
@@ -368,14 +374,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private getIsSingleLineCompletion(completionString: string) {
-    return (
-      !this._useMultiLineCompletions &&
-      this._chunkCount > 1 &&
-      LINE_BREAK_REGEX.test(completionString)
-    )
-  }
-
   private async getPrompt(prefixSuffix: PrefixSuffix) {
     if (!this._document || !this._position) return ''
 
@@ -432,7 +430,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._fimModel = this._config.get('fimModelName') as string
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._keepAlive = this._config.get('keepAlive') as string | number
-    this._maxLines = this._config.get('maxLines') as number
     this._numLineContext = this._config.get('contextLength') as number
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._port = this._config.get('fimApiPort') as number
