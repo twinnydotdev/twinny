@@ -137,7 +137,7 @@ If using Llama the model must support the Llama special tokens.
 
 ## Workspace context
 
-In the settings there is an option called `useFileContext` this will keep track of sessions, keystrokes, visits and recency of visited files in the current workspace.  This can be enabled to help improve the quality of completions, it's turned off by default but I'm considering turning this on by default in the next release.
+In the settings there is an option called `useFileContext` this will keep track of sessions, keystrokes, visits and recency of visited files in the current workspace.  This can be enabled to help improve the quality of completions, it's turned off by default.
 
 ## Known issues
 
