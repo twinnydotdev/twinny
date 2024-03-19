@@ -190,9 +190,13 @@ export const getPrefixSuffix = (
   }
 }
 
-export const isCursorInEmptyString = () => {
+export const getBeforeAndAfter = (matcher: (char: string) => boolean) => {
   const editor = window.activeTextEditor
-  if (!editor) return false
+  if (!editor)
+    return {
+      charBefore: '',
+      charAfter: ''
+    }
 
   const position = editor.selection.active
   const lineText = editor.document.lineAt(position.line).text
@@ -201,18 +205,33 @@ export const isCursorInEmptyString = () => {
     .substring(0, position.character)
     .split('')
     .reverse()
-    .find((char) => QUOTES.includes(char))
+    .find(matcher)
+
   const charAfter = lineText
     .substring(position.character)
     .split('')
-    .find((char) => QUOTES.includes(char))
+    .find(matcher)
 
-  return (
-    charBefore &&
-    charAfter &&
-    charBefore === charAfter &&
-    QUOTES.includes(charBefore)
+  return {
+    charBefore,
+    charAfter
+  }
+}
+
+export const isMiddleWord = () => {
+  const { charBefore, charAfter } = getBeforeAndAfter((char: string) => {
+    return /\w/.test(char)
+  })
+
+  return charBefore && charAfter && QUOTES?.includes(charAfter)
+}
+
+export const isCursorInEmptyString = () => {
+  const { charBefore, charAfter } = getBeforeAndAfter((char) =>
+    QUOTES.includes(char)
   )
+
+  return charBefore && charAfter
 }
 
 export const getTheme = () => {

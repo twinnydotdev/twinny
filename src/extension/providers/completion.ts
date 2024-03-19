@@ -17,7 +17,8 @@ import {
   getFimDataFromProvider,
   getPrefixSuffix,
   getShouldSkipCompletion,
-  isCursorInEmptyString
+  isCursorInEmptyString,
+  isMiddleWord as getIsMiddleOfWord
 } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
@@ -49,6 +50,7 @@ import {
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
   private _abortController: AbortController | null
+  private _acceptedLastCompletion = false
   private _apiHostname = this._config.get('apiHostname') as string
   private _apiPath = this._config.get('fimApiPath') as string
   private _apiProvider = this._config.get('apiProvider') as string
@@ -67,6 +69,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _fimModel = this._config.get('fimModelName') as string
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _keepAlive = this._config.get('keepAlive') as string | number
+  private _lastCompletionText = ''
+  private _lastCompletionIsMultiLine = false
   private _lock: AsyncLock
   private _logger: Logger
   private _nonce = 0
@@ -133,7 +137,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._isMultiLineCompletion =
       isMultiLineCompletionNode && !isInMiddleOfString
 
-    if (this.isMiddleWord(prefixSuffix)) {
+    const isMultiLineAndAcceptedLast =
+      this._lastCompletionIsMultiLine && this._acceptedLastCompletion
+
+    if (getIsMiddleOfWord() || isMultiLineAndAcceptedLast) {
       return []
     }
 
@@ -176,11 +183,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private isMiddleWord(prefixSuffix: PrefixSuffix) {
-    const { prefix, suffix } = prefixSuffix
-    return (
-      /\w/.test(prefix.at(-1) as string) && /\w/.test(suffix.at(0) as string)
-    )
+  public getLastCompletion = () => this._lastCompletionText
+
+  public getLastCompletionWasMultiLine = () => this._lastCompletionIsMultiLine
+
+  public setAcceptedLastCompletion(value: boolean) {
+    this._acceptedLastCompletion = value
+  }
+
+  public abortCompletion() {
+    this._abortController?.abort()
   }
 
   private buildStreamRequest(prompt: string) {
@@ -250,8 +262,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._chunkCount = this._chunkCount + 1
 
       if (
-        !this._useMultiLineCompletions &&
-        this._chunkCount >= 1 &&
+        (!this._useMultiLineCompletions || !this._isMultiLineCompletion) &&
+        this._chunkCount >= 2 &&
         LINE_BREAK_REGEX.test(this._completion)
       ) {
         this._logger.log(
@@ -274,6 +286,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       ) {
         this._completion = this._validCompletion
         this.removeStopWords()
+        this._abortController?.abort()
         return done(this.triggerInlineCompletion(prefixSuffix))
       }
     } catch (e) {
@@ -412,6 +425,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     )
 
     this._statusBar.text = '🤖'
+    this._lastCompletionText = insertText
+    this._lastCompletionIsMultiLine = this._isMultiLineCompletion
 
     return [
       new InlineCompletionItem(

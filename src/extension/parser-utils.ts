@@ -8,6 +8,7 @@ import { Position, window } from 'vscode'
 import path from 'path'
 import { getIsOnlyBrackets } from './utils'
 import { Logger } from '../common/logger'
+import { getLineBreakCount } from '../webview/utils'
 const logger = new Logger()
 
 export const getParserForFile = async (
@@ -76,7 +77,8 @@ export function getNodeAtPosition(
 
 const getIsErrorWithLexicalDeclaration = (node: SyntaxNode) => {
   if (!node.hasError && node.text === '') return false
-  return node.type === 'lexical_declaration' && node.hasError
+  const lineCount = getLineBreakCount(node.text)
+  return node.type === 'lexical_declaration' && node.hasError && lineCount === 1
 }
 
 const getIsEmptyJsxNode = (node: SyntaxNode) => {
@@ -122,9 +124,10 @@ export const getIsEmptyMultiLineNode = (node: SyntaxNode) => {
 }
 
 export const getIsDeclarationType = (node: SyntaxNode) => {
-  return (
-    DECLARATION_TYPE.includes(node.text) || DECLARATION_TYPE.includes(node.type)
-  )
+  if (DECLARATION_TYPE.includes(node.text) || DECLARATION_TYPE.includes(node.type)) {
+    return true
+  }
+  return false
 }
 
 export const injectCompletionToNode = (
