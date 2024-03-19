@@ -250,7 +250,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._chunkCount = this._chunkCount + 1
 
       if (
-        !this._isMultiLineCompletion &&
+        !this._useMultiLineCompletions &&
         this._chunkCount >= 1 &&
         LINE_BREAK_REGEX.test(this._completion)
       ) {
