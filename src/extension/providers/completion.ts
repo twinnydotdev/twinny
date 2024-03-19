@@ -268,7 +268,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
       this.setValidCompletion()
 
-      if (this._chunkCount > this._numPredictFim) {
+      if (
+        this._chunkCount > this._numPredictFim &&
+        this._validCompletion.trim().length
+      ) {
         this._completion = this._validCompletion
         this.removeStopWords()
         return done(this.triggerInlineCompletion(prefixSuffix))
