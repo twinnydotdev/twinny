@@ -141,6 +141,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._lastCompletionIsMultiLine && this._acceptedLastCompletion
 
     if (getIsMiddleOfWord() || isMultiLineAndAcceptedLast) {
+      this._statusBar.text = '🤖'
       return []
     }
 
@@ -193,6 +194,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   public abortCompletion() {
     this._abortController?.abort()
+    this._statusBar.text = '🤖'
   }
 
   private buildStreamRequest(prompt: string) {
