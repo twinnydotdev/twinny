@@ -9,11 +9,16 @@ import {
   StatusBarItem,
   window,
   Uri,
-  InlineCompletionContext,
+  InlineCompletionContext
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
-import { getFimDataFromProvider, getPrefixSuffix, getShouldSkipCompletion } from '../utils'
+import {
+  getFimDataFromProvider,
+  getPrefixSuffix,
+  getShouldSkipCompletion,
+  isCursorInEmptyString
+} from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
 import {
@@ -25,13 +30,21 @@ import {
 import { getFimPrompt, getStopWords } from '../fim-templates'
 import {
   LINE_BREAK_REGEX,
-  MAX_CONTEXT_LINE_COUNT,
+  MAX_CONTEXT_LINE_COUNT
 } from '../../common/constants'
 import { streamResponse } from '../stream'
 import { createStreamRequestBody } from '../model-options'
 import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
+import { getLineBreakCount } from '../../webview/utils'
+import Parser, { SyntaxNode } from 'web-tree-sitter'
+import {
+  getIsMultiLineCompletionNode,
+  getNodeAtPosition,
+  getParserForFile,
+  injectCompletionToNode
+} from '../parser-utils'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -43,6 +56,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
   private _chunkCount = 0
   private _completion = ''
+  private _validCompletion = ''
+  private _currentNode: SyntaxNode | null
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
   private _disableAuto = this._config.get('disableAutoSuggest') as boolean
@@ -52,20 +67,22 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _fimModel = this._config.get('fimModelName') as string
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _keepAlive = this._config.get('keepAlive') as string | number
-  private _linesGenerated = 0
   private _lock: AsyncLock
   private _logger: Logger
-  private _maxLines = this._config.get('maxLines') as number
   private _nonce = 0
   private _numLineContext = this._config.get('contextLength') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
+  private _parser: Parser | undefined
   private _port = this._config.get('fimApiPort') as number
   private _position: Position | null
   private _statusBar: StatusBarItem
+  private _isMultiLineCompletion = false
   private _stopWords = getStopWords(this._fimModel, this._fimTemplateFormat)
   private _temperature = this._config.get('temperature') as number
   private _useFileContext = this._config.get('useFileContext') as boolean
-  private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
+  private _useMultiLineCompletions = this._config.get(
+    'useMultiLineCompletions'
+  ) as boolean
   private _useTls = this._config.get('useTls') as boolean
 
   constructor(
@@ -79,6 +96,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._position = null
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
+    this._currentNode = null
   }
 
   public async provideInlineCompletionItems(
@@ -87,11 +105,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
-    if (getShouldSkipCompletion(context, this._disableAuto) || !editor || !this._enabled) return
+    if (
+      getShouldSkipCompletion(context, this._disableAuto) ||
+      !editor ||
+      !this._enabled
+    )
+      return
     this._document = document
     this._position = position
     this._chunkCount = 0
-    this._linesGenerated = 0
     this._nonce = this._nonce + 1
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
@@ -100,6 +122,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       document,
       position
     )
+
+    this._parser = await getParserForFile(this._document.uri.fsPath)
+    const tree = this._parser?.parse(document.getText())
+    this._currentNode = getNodeAtPosition(tree, position)
+    const isInMiddleOfString = isCursorInEmptyString()
+    const isMultiLineCompletionNode = getIsMultiLineCompletionNode(
+      this._currentNode
+    )
+    this._isMultiLineCompletion =
+      isMultiLineCompletionNode && !isInMiddleOfString
 
     if (this.isMiddleWord(prefixSuffix)) {
       return []
@@ -174,6 +206,37 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { requestOptions, requestBody }
   }
 
+  private setValidCompletion() {
+    if (this._chunkCount % 4 === 0 && this._isMultiLineCompletion) {
+      const completionTree = this._parser?.parse(this._completion)
+      const appendedCompletion = injectCompletionToNode(
+        this._currentNode,
+        this._completion
+      )
+      const appendedTree = this._parser?.parse(appendedCompletion || '')
+      if (
+        !completionTree?.rootNode.hasError &&
+        completionTree?.rootNode.children.length
+      ) {
+        const firstChild =
+          completionTree && (completionTree.rootNode.children[0] as SyntaxNode)
+        if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
+          this._validCompletion = firstChild.text
+        }
+      }
+      if (
+        !appendedTree?.rootNode.hasError &&
+        appendedTree?.rootNode.children.length
+      ) {
+        const firstChild =
+          appendedTree && (appendedTree.rootNode.children[0] as SyntaxNode)
+        if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
+          this._validCompletion = completionTree?.rootNode.text || ''
+        }
+      }
+    }
+  }
+
   private onData(
     data: StreamResponse | undefined,
     prefixSuffix: PrefixSuffix,
@@ -186,22 +249,28 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._completion = this._completion + completionData
       this._chunkCount = this._chunkCount + 1
 
-      if (this.getIsSingleLineCompletion(completionData)) {
+      if (
+        !this._useMultiLineCompletions &&
+        this._chunkCount >= 1 &&
+        LINE_BREAK_REGEX.test(this._completion)
+      ) {
         this._logger.log(
           `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
         )
+        this.removeStopWords()
         this._abortController?.abort()
         return done(this.triggerInlineCompletion(prefixSuffix))
       }
 
-      if (LINE_BREAK_REGEX.exec(completionData)) this._linesGenerated++
+      if (this._currentNode?.childCount === 2) {
+        injectCompletionToNode(this._currentNode, this._completion)
+      }
 
-      if (this.getMaxLinesReached()) {
-        this._logger.log(
-          `Streaming response end due to max lines or EOT ${this._nonce} \nCompletion: ${this._completion}`
-        )
+      this.setValidCompletion()
+
+      if (this._chunkCount > this._numPredictFim) {
+        this._completion = this._validCompletion
         this.removeStopWords()
-        this._abortController?.abort()
         return done(this.triggerInlineCompletion(prefixSuffix))
       }
     } catch (e) {
@@ -305,24 +374,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private getContainsStopWord() {
-    return this._stopWords.some((stopSequence) =>
-      this._completion.includes(stopSequence)
-    )
-  }
-
-  private getMaxLinesReached() {
-    return this._linesGenerated > this._maxLines || this.getContainsStopWord()
-  }
-
-  private getIsSingleLineCompletion(completionString: string) {
-    return (
-      !this._useMultiLine &&
-      this._chunkCount > 1 &&
-      LINE_BREAK_REGEX.test(completionString)
-    )
-  }
-
   private async getPrompt(prefixSuffix: PrefixSuffix) {
     if (!this._document || !this._position) return ''
 
@@ -379,13 +430,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._fimModel = this._config.get('fimModelName') as string
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._keepAlive = this._config.get('keepAlive') as string | number
-    this._maxLines = this._config.get('maxLines') as number
     this._numLineContext = this._config.get('contextLength') as number
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._port = this._config.get('fimApiPort') as number
     this._temperature = this._config.get('temperature') as number
     this._useFileContext = this._config.get('useFileContext') as boolean
-    this._useMultiLine = this._config.get('useMultiLineCompletions') as boolean
+    this._useMultiLineCompletions = this._config.get(
+      'useMultiLineCompletions'
+    ) as boolean
     this._useTls = this._config.get('useTls') as boolean
     this._logger.updateConfig()
   }

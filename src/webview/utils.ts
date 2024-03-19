@@ -1,4 +1,6 @@
-import { EMPTY_MESAGE } from '../common/constants'
+import {
+  EMPTY_MESAGE,
+} from '../common/constants'
 import { CodeLanguage, supportedLanguages } from '../common/languages'
 import { LanguageType, ServerMessage } from '../common/types'
 
@@ -58,3 +60,5 @@ export const getModelShortName = (name: string) => {
   }
   return name
 }
+
+export const getLineBreakCount = (str: string) => str.split('\n').length
