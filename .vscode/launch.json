@@ -11,13 +11,11 @@
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
-        "--user-data-dir=vscode-test",
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--disable-extensions",
-        "--profile-temp"
+				"${workspaceFolder}/example"
       ],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
-      "preLaunchTask": "npm: watch"
+      "preLaunchTask": "${defaultBuildTask}"
     },
     {
       "name": "Extension Tests",
