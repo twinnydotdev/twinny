@@ -5,6 +5,7 @@ import {
   Position,
   Range,
   TextDocument,
+  extensions,
   window,
 } from 'vscode'
 
@@ -358,6 +359,32 @@ export function safeParseJsonResponse(
   } catch (e) {
     return undefined
   }
+}
+
+export const getGitChanges = async () => {
+  let diffString = ''
+  const gitExtension = extensions.getExtension('vscode.git')
+  if (!gitExtension) {
+    console.log('Git extension is not available')
+    return ''
+  }
+
+  await gitExtension.activate()
+  if (!gitExtension.exports.getAPI) {
+    console.log('Git API is not available')
+    return ''
+  }
+
+  const api = gitExtension.exports.getAPI(1)
+  if (api && api.repositories.length > 0) {
+    const repo = api.repositories[0]
+    const diff: string[] = await repo.getDiff()
+    diffString = diff.join('')
+  } else {
+    return ''
+  }
+
+  return diffString
 }
 
 export const logStreamOptions = (opts: StreamRequest) => {

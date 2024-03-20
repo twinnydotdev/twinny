@@ -215,11 +215,12 @@ export class ChatService {
 
   private buildTemplatePrompt = async (
     template: string,
-    language: CodeLanguageDetails
+    language: CodeLanguageDetails,
+    context?: string
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
-    const selectionContext = editor?.document.getText(selection) || ''
+    const selectionContext = editor?.document.getText(selection) || context || ''
     const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
       template,
       {
@@ -277,7 +278,7 @@ export class ChatService {
     return this.streamResponse({ requestBody, requestOptions })
   }
 
-  public async streamTemplateCompletion(promptTemplate: string) {
+  public async streamTemplateCompletion(promptTemplate: string, context?: string) {
     const { language } = getLanguage()
     this._completion = ''
     this._promptTemplate = promptTemplate
@@ -288,7 +289,8 @@ export class ChatService {
     })
     const { prompt, selection } = await this.buildTemplatePrompt(
       promptTemplate,
-      language
+      language,
+      context,
     )
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinngAddMessage,

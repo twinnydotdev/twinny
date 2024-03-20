@@ -65,6 +65,20 @@ For code refactoring, use markdown with code formatting.
   `
   },
   {
+    name: 'commit-message',
+    template: `Only Generate short and concise commit messages.
+      Do not explain your response.
+
+      Answer in a markdown codeblock under 50 characters.
+
+      Here is the unidiff: \`\`\`{{code}}\`\`\`
+
+      \`\`\`
+      <commit message goes here>
+      \`\`\`
+    `
+  },
+  {
     name: 'chat',
     template: `{{#if (eq messages.length 1)}}
 {{{systemMessage}}}
