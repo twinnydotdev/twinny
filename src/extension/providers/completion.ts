@@ -108,6 +108,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     position: Position,
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
+    this._completion = ''
+    this._validCompletion = ''
     const editor = window.activeTextEditor
     if (
       getShouldSkipCompletion(context, this._disableAuto) ||
@@ -158,7 +160,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
       this._debouncer = setTimeout(() => {
         this._lock.acquire('completion', () => {
-          this._completion = ''
           return new Promise(
             (_resolve: (completion: ResolvedInlineCompletion) => void) => {
               const { requestBody, requestOptions } =
