@@ -267,7 +267,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       if (
         (!this._useMultiLineCompletions || !this._isMultiLineCompletion) &&
         this._chunkCount >= 2 &&
-        LINE_BREAK_REGEX.test(this._completion)
+        LINE_BREAK_REGEX.test(this._completion.trimStart())
       ) {
         this._logger.log(
           `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
