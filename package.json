@@ -356,26 +356,32 @@
           "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny should stop at logical line breaks.",
           "required": true
         },
-        "twinny.keepAlive": {
+        "twinny.enableSubsequentCompletions": {
           "order": 19,
+          "type": "boolean",
+          "default": false,
+          "description": "Enable this setting to allow twinny to keep making subsequent completion requests to the API after the last completion request was accepted."
+        },
+        "twinny.keepAlive": {
+          "order": 20,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.useTls": {
-          "order": 20,
+          "order": 21,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
         "twinny.apiBearerToken": {
-          "order": 21,
+          "order": 22,
           "type": "string",
           "default": "",
           "description": "Bearer token for secure API authentication."
         },
         "twinny.enableLogging": {
-          "order": 22,
+          "order": 23,
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"

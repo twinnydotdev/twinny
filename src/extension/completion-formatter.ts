@@ -2,6 +2,7 @@ import { Position, Range, TextEditor } from 'vscode'
 
 import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
 import { Bracket } from '../common/types'
+import { getNoTextBeforeOrAfter } from './utils'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
@@ -210,7 +211,7 @@ export class CompletionFormatter {
 
     const score = textAfter.score(this._completion)
 
-    if (score > 0.5) this._completion = ''
+    if (score > 0.6) this._completion = ''
 
     return this
   }
@@ -220,6 +221,36 @@ export class CompletionFormatter {
       this._completion = ''
     }
     return this._completion
+  }
+
+  private trimSingleWord = () => {
+    if (/^ [^ ]+$/.test(this._completion)) {
+      this._completion = this._completion.trim()
+    }
+    return this
+  }
+
+  private ignoreContextCompletionAtStartOrEnd = () => {
+    const isNoTextBeforeOrAfter = getNoTextBeforeOrAfter()
+
+    const contextMatch = this._normalisedCompletion.match(
+      /\/\*\s*Language:\s*(.*)\s*\*\//
+    )
+    const extenstionContext = this._normalisedCompletion.match(
+      /\/\*\s*File extension:\s*(.*)\s*\*\//
+    )
+
+    const commentMatch = this._normalisedCompletion.match(/\/\*\s*\*\//)
+
+    if (
+      isNoTextBeforeOrAfter &&
+      (contextMatch || extenstionContext || commentMatch)
+    ) {
+      this._completion = ''
+      return this
+    }
+
+    return this
   }
 
   public debug() {
@@ -242,6 +273,8 @@ export class CompletionFormatter {
       .removeDuplicateText()
       .skipMiddleOfWord()
       .skipSimilarCompletions()
+      .ignoreContextCompletionAtStartOrEnd()
+      .trimSingleWord()
       .getCompletion()
     return infillText
   }

@@ -87,6 +87,7 @@ export const getSkipVariableDeclataion = (
   if (
     SKIP_DECLARATION_SYMBOLS.includes(characterBefore.trim()) &&
     textAfter.length &&
+    !textAfter.at(0) as unknown as string === '?' &&
     !getIsOnlyBrackets(textAfter)
   ) {
     return true
@@ -302,6 +303,18 @@ export const getFimDataFromProvider = (
 
 export function isStreamWithDataPrefix(stringBuffer: string) {
   return stringBuffer.startsWith('data:')
+}
+
+export const getNoTextBeforeOrAfter = () => {
+  const editor = window.activeTextEditor
+  const cursorPosition = editor?.selection.active
+  if (!cursorPosition) return
+  const lastLinePosition = new Position(cursorPosition.line, editor.document.lineCount)
+  const textAfterRange = new Range(cursorPosition, lastLinePosition)
+  const textAfter = editor?.document.getText(textAfterRange)
+  const textBeforeRange = new Range(new Position(0, 0), cursorPosition)
+  const textBefore = editor?.document.getText(textBeforeRange)
+  return !textAfter || !textBefore
 }
 
 export function safeParseJsonResponse(
