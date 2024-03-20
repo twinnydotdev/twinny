@@ -52,7 +52,6 @@ export const MESSAGE_NAME = {
   twinnySetOllamaModel: 'twinny-set-ollama-model',
   twinnySetConfigValue: 'twinny-set-config-value',
   twinnyGetConfigValue: 'twinny-get-config-value',
-  twinnyGetGitChanges: 'twinny-get-git-changes',
 }
 
 export const MESSAGE_KEY = {
