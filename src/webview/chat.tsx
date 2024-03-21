@@ -90,8 +90,6 @@ export const Chat = () => {
         {
           role: BOT_NAME,
           content: getCompletionContent(message),
-          type: message.value.type,
-          language: message.value.data
         }
       ]
       global.vscode.postMessage({
@@ -205,8 +203,7 @@ export const Chat = () => {
           {
             role: USER_NAME,
             content: input,
-            type: 'chat'
-          }
+           }
         ]
       } as ClientMessage)
       setMessages((prev) => [
@@ -329,7 +326,7 @@ export const Chat = () => {
                 <DisabledSelectionIcon />
               )}
             </VSCodeButton>
-            <VSCodeBadge>Selected characters: {selection?.length}</VSCodeBadge>
+            <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           {apiProvider === ApiProviders.Ollama && (
             <VSCodeButton

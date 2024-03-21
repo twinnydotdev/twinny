@@ -1,31 +1,7 @@
-import { MessageRoleContent, MessageType, StreamRequest, StreamBodyOpenAI } from '../common/types'
+import { StreamRequest } from '../common/types'
 import { logStreamOptions, safeParseJsonResponse } from './utils'
 
-
-
-
-function deleteLanguageFromMessages(messages: MessageType[] | MessageRoleContent | undefined)
-{
-  // check if messages is MessageType[] -- role does not have a language property
-  if (Array.isArray(messages)) {
-    messages.forEach(element => {
-      delete element.language;  
-    });
-  }
-
-}
-
 export async function streamResponse(request: StreamRequest) {
-
-  // check if request.body is of type StreamBodyOpenAI
-  if ((request.body as StreamBodyOpenAI).messages){
-    // delete language from request body as is not really part of the OpenAI specification 
-    deleteLanguageFromMessages((request.body as StreamBodyOpenAI).messages)
-  }
-
-
-
-
   logStreamOptions(request)
   const { body, options, onData, onEnd, onError, onStart } = request
   const controller = new AbortController()
