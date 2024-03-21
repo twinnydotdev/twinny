@@ -192,6 +192,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   public abortCompletion() {
+    this._completion = ''
     this._abortController?.abort()
     this._statusBar.text = '🤖'
   }
