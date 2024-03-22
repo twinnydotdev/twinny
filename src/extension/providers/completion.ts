@@ -72,6 +72,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _lastCompletionText = ''
+  private _lastCompletionMultiline = false
   private _lock: AsyncLock
   private _logger: Logger
   private _nonce = 0
@@ -193,6 +194,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   public getLastCompletion = () => this._lastCompletionText
+  public getLastCompletionMultiLine = () => this._lastCompletionMultiline
 
   public setAcceptedLastCompletion(value: boolean) {
     this._acceptedLastCompletion = value
@@ -446,6 +448,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     this._statusBar.text = '🤖'
     this._lastCompletionText = insertText
+    this._lastCompletionMultiline = this._isMultiLineCompletion
 
     return [
       new InlineCompletionItem(

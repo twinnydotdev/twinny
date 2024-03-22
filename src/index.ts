@@ -161,11 +161,14 @@ export async function activate(context: ExtensionContext) {
       const changes = e.contentChanges[0]
       if (!changes) return
       const lastCompletion = completionProvider.getLastCompletion()
+      const isLastCompltionMultiline =
+        completionProvider.getLastCompletionMultiLine()
 
       if (
         changes.text &&
         lastCompletion &&
-        changes.text === lastCompletion
+        changes.text === lastCompletion &&
+        isLastCompltionMultiline
       ) {
         completionProvider.setAcceptedLastCompletion(true)
       }
