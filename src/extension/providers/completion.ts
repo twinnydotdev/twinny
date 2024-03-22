@@ -436,23 +436,23 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (!editor || !this._position) return []
 
-    const insertText = new CompletionFormatter(editor).format(this._completion)
+    const completionText = new CompletionFormatter(editor).format(this._completion)
 
-    if (this._cacheEnabled) cache.setCache(prefixSuffix, insertText)
+    if (this._cacheEnabled) cache.setCache(prefixSuffix, completionText)
 
     this._logger.log(
       `\n Inline completion triggered: Formatted completion: ${JSON.stringify(
-        insertText
+        completionText
       )}\n`
     )
 
     this._statusBar.text = '🤖'
-    this._lastCompletionText = insertText
+    this._lastCompletionText = completionText
     this._lastCompletionMultiline = this._isMultiLineCompletion
 
     return [
       new InlineCompletionItem(
-        insertText,
+        completionText,
         new Range(this._position, this._position)
       )
     ]
@@ -473,6 +473,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._fimModel = this._config.get('fimModelName') as string
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._keepAlive = this._config.get('keepAlive') as string | number
+    this._maxLines = this._config.get('maxLines') as number
     this._numLineContext = this._config.get('contextLength') as number
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._port = this._config.get('fimApiPort') as number

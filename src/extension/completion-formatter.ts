@@ -223,9 +223,14 @@ export class CompletionFormatter {
     return this._completion
   }
 
-  private trimSingleWord = () => {
-    if (/^ [^ ]+$/.test(this._completion)) {
-      this._completion = this._completion.trim()
+  private trimStart = () => {
+    const firstNonSpaceIndex = this._completion.search(/\S/)
+
+    if (
+      firstNonSpaceIndex > 0 &&
+      this._cursorPosition.character <= firstNonSpaceIndex
+    ) {
+      this._completion = this._completion.trimStart()
     }
     return this
   }
@@ -274,7 +279,7 @@ export class CompletionFormatter {
       .skipMiddleOfWord()
       .skipSimilarCompletions()
       .ignoreContextCompletionAtStartOrEnd()
-      .trimSingleWord()
+      .trimStart()
       .getCompletion()
     return infillText
   }
