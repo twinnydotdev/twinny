@@ -128,13 +128,21 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const isLastCompletionAccepted =
       this._acceptedLastCompletion && !this._enableSubsequentCompletions
 
+    const prefixSuffix = getPrefixSuffix(
+      this._numLineContext,
+      document,
+      position
+    )
+
+
     if (
       getIsMiddleOfWord() ||
       isLastCompletionAccepted ||
       this._lastCompletionMultiline
     ) {
       this._statusBar.text = '🤖'
-      return []
+      this._completion = this._lastCompletionText
+      return this.triggerInlineCompletion(prefixSuffix)
     }
 
     if (
@@ -152,11 +160,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._nonce = this._nonce + 1
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
-    const prefixSuffix = getPrefixSuffix(
-      this._numLineContext,
-      document,
-      position
-    )
 
     this.getIsMultiLineCompletion(position)
     const prompt = await this.getPrompt(prefixSuffix)
