@@ -128,7 +128,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const isLastCompletionAccepted =
       this._acceptedLastCompletion && !this._enableSubsequentCompletions
 
-    if (getIsMiddleOfWord() || isLastCompletionAccepted) {
+    if (getIsMiddleOfWord() || isLastCompletionAccepted || this._lastCompletionMultiline) {
       this._statusBar.text = '🤖'
       return []
     }
