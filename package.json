@@ -327,61 +327,70 @@
         "twinny.useMultiLineCompletions": {
           "order": 14,
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Use multiline completions"
         },
-        "twinny.useFileContext": {
+        "twinny.maxLines": {
+          "dependencies": {
+            "twinny.useMultiLineCompletions": true
+          },
           "order": 15,
+          "type": "number",
+          "default": 20,
+          "description": "Maximum number of lines to use for multi line completions. Applicable only when useMultiLineCompletions is enabled."
+        },
+        "twinny.useFileContext": {
+          "order": 16,
           "type": "boolean",
           "default": false,
           "description": "Enables scanning of neighbouring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
-          "order": 16,
+          "order": 17,
           "type": "boolean",
           "default": false,
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 17,
+          "order": 18,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for chat completions.",
           "required": true
         },
         "twinny.numPredictFim": {
-          "order": 18,
+          "order": 19,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny should stop at logical line breaks.",
           "required": true
         },
         "twinny.enableSubsequentCompletions": {
-          "order": 19,
+          "order": 20,
           "type": "boolean",
           "default": true,
           "description": "Enable this setting to allow twinny to keep making subsequent completion requests to the API after the last completion request was accepted."
         },
         "twinny.keepAlive": {
-          "order": 20,
+          "order": 21,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.useTls": {
-          "order": 21,
+          "order": 22,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption for API connections."
         },
         "twinny.apiBearerToken": {
-          "order": 22,
+          "order": 23,
           "type": "string",
           "default": "",
           "description": "Bearer token for secure API authentication."
         },
         "twinny.enableLogging": {
-          "order": 23,
+          "order": 24,
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"

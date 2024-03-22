@@ -46,8 +46,8 @@ export function getNodeAtPosition(
 
   function searchNode(node: SyntaxNode): boolean {
     if (
-      position.line + 1 >= node.startPosition.row + 1 &&
-      position.line + 1 <= node.endPosition.row + 1
+      position.line >= node.startPosition.row &&
+      position.line <= node.endPosition.row
     ) {
       foundNode = node
       for (const child of node.children) {
@@ -132,7 +132,7 @@ export const getIsDeclarationType = (node: SyntaxNode) => {
 }
 
 export const injectCompletionToNode = (
-  node: SyntaxNode | null,
+  node: SyntaxNode | undefined | null,
   completion: string
 ) => {
   if (!node || !completion) {
