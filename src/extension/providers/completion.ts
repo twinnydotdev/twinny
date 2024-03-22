@@ -473,6 +473,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._fimModel = this._config.get('fimModelName') as string
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._keepAlive = this._config.get('keepAlive') as string | number
+    this._maxLines = this._config.get('maxLines') as number
     this._numLineContext = this._config.get('contextLength') as number
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._port = this._config.get('fimApiPort') as number
