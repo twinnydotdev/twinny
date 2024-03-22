@@ -210,6 +210,7 @@ export const MULTI_LINE_NODE_TYPE = [
   'object_pattern',
   'object_type',
   'interface_body',
+  'class_body',
   // react
   'jsx_opening_element',
   'jsx_self_closing_element',

@@ -64,9 +64,7 @@ export function getNodeAtPosition(
   const vistedNodeWithError = visitedNodes.find((n) => n.hasError)
   const treeNodeWithError = tree.rootNode.children.find((n) => n.hasError)
 
-  if (treeNodeWithError) {
-    return treeNodeWithError
-  }
+  if (treeNodeWithError) return treeNodeWithError
 
   if (vistedNodeWithError && vistedNodeWithError.text.split('\n')) {
     return vistedNodeWithError
@@ -124,7 +122,10 @@ export const getIsEmptyMultiLineNode = (node: SyntaxNode) => {
 }
 
 export const getIsDeclarationType = (node: SyntaxNode) => {
-  if (DECLARATION_TYPE.includes(node.text) || DECLARATION_TYPE.includes(node.type)) {
+  if (
+    DECLARATION_TYPE.includes(node.text) ||
+    DECLARATION_TYPE.includes(node.type)
+  ) {
     return true
   }
   return false
@@ -137,9 +138,17 @@ export const injectCompletionToNode = (
   if (!node || !completion) {
     return ''
   }
-  return node.text
-    .split('\n')
-    .map((node: string) => node.trim())
+
+  const parts = node.text.split('\n')
+
+  const lastPart = parts[parts.length - 1]
+
+  if (DECLARATION_TYPE.includes(lastPart)) {
+    parts.pop()
+  }
+
+  return parts
+    .map((text: string) => text.trim())
     .filter(Boolean)
     .join(` ${completion} `)
 }

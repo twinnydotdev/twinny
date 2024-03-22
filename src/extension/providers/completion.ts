@@ -58,14 +58,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
   private _chunkCount = 0
   private _completion = ''
-  private _validCompletion = ''
   private _currentNode: SyntaxNode | null
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
   private _disableAuto = this._config.get('disableAutoSuggest') as boolean
   private _document: TextDocument | null
   private _enabled = this._config.get('enabled')
-  private _enableSubsequentCompletions = this._config.get('enableSubsequentCompletions') as boolean
+  private _enableSubsequentCompletions = this._config.get(
+    'enableSubsequentCompletions'
+  ) as boolean
   private _fileInteractionCache: FileInteractionCache
   private _fimModel = this._config.get('fimModelName') as string
   private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
@@ -103,20 +104,43 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._currentNode = null
   }
 
+  public getIsMultiLineCompletion = async (position: Position) => {
+    if (!this._document) return
+    this._parser = await getParserForFile(this._document.uri.fsPath)
+    const tree = this._parser?.parse(this._document.getText())
+    this._currentNode = getNodeAtPosition(tree, position)
+    const isInMiddleOfString = isCursorInEmptyString()
+    const isMultiLineCompletionNode = getIsMultiLineCompletionNode(
+      this._currentNode
+    )
+    this._isMultiLineCompletion =
+      isMultiLineCompletionNode && !isInMiddleOfString
+  }
+
   public async provideInlineCompletionItems(
     document: TextDocument,
     position: Position,
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
-    this._completion = ''
-    this._validCompletion = ''
     const editor = window.activeTextEditor
+
+    const isLastCompletionAccepted =
+      this._acceptedLastCompletion && !this._enableSubsequentCompletions
+
+    if (getIsMiddleOfWord() || isLastCompletionAccepted) {
+      this._statusBar.text = '🤖'
+      return []
+    }
+
     if (
       getShouldSkipCompletion(context, this._disableAuto) ||
       !editor ||
       !this._enabled
-    )
+    ) {
       return
+    }
+
+    this._completion = ''
     this._document = document
     this._position = position
     this._chunkCount = 0
@@ -129,24 +153,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       position
     )
 
-    this._parser = await getParserForFile(this._document.uri.fsPath)
-    const tree = this._parser?.parse(document.getText())
-    this._currentNode = getNodeAtPosition(tree, position)
-    const isInMiddleOfString = isCursorInEmptyString()
-    const isMultiLineCompletionNode = getIsMultiLineCompletionNode(
-      this._currentNode
-    )
-    this._isMultiLineCompletion =
-      isMultiLineCompletionNode && !isInMiddleOfString
-
-    const isLastCompletionAccepted =
-      this._acceptedLastCompletion && !this._enableSubsequentCompletions
-
-    if (getIsMiddleOfWord() || isLastCompletionAccepted) {
-      this._statusBar.text = '🤖'
-      return []
-    }
-
+    this.getIsMultiLineCompletion(position)
     const prompt = await this.getPrompt(prefixSuffix)
     const cachedCompletion = cache.getCache(prefixSuffix)
 
@@ -193,7 +200,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   public abortCompletion() {
     this._completion = ''
-    this._abortController?.abort()
+    // this._abortController?.abort()
     this._statusBar.text = '🤖'
   }
 
@@ -220,34 +227,53 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { requestOptions, requestBody }
   }
 
-  private setValidCompletion() {
-    if (this._chunkCount % 4 === 0 && this._isMultiLineCompletion) {
-      const completionTree = this._parser?.parse(this._completion)
-      const appendedCompletion = injectCompletionToNode(
-        this._currentNode,
-        this._completion
-      )
-      const appendedTree = this._parser?.parse(appendedCompletion || '')
-      if (
-        !completionTree?.rootNode.hasError &&
-        completionTree?.rootNode.children.length
-      ) {
-        const firstChild =
-          completionTree && (completionTree.rootNode.children[0] as SyntaxNode)
-        if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
-          this._validCompletion = firstChild.text
+  private finaliseCompletion(
+    prefixSuffix: PrefixSuffix,
+    done: (completion: ResolvedInlineCompletion) => void
+  ) {
+    this._completion = this.removeStopWords(this._completion)
+    this._abortController?.abort()
+    return done(this.triggerInlineCompletion(prefixSuffix))
+  }
+
+  private findValidCompletion(
+    prefixSuffix: PrefixSuffix,
+    done: (completion: ResolvedInlineCompletion) => void
+  ) {
+    const minLineBreaks = 3
+    const parseChunksAt = 8
+    try {
+      if (this._chunkCount % parseChunksAt === 0) {
+        const completionTree = this._parser?.parse(
+          this.removeStopWords(this._completion)
+        )
+        if (
+          completionTree &&
+          !completionTree?.rootNode.hasError &&
+          this._isMultiLineCompletion &&
+          getLineBreakCount(completionTree.rootNode.text) >= minLineBreaks
+        ) {
+          this._completion = completionTree.rootNode.text
+          return this.finaliseCompletion(prefixSuffix, done)
+        }
+
+        const appendedCompletion = this.removeStopWords(
+          injectCompletionToNode(this._currentNode, this._completion)
+        )
+        const appendedTree = this._parser?.parse(appendedCompletion || '')
+        if (
+          completionTree &&
+          appendedTree &&
+          !appendedTree?.rootNode.hasError &&
+          getLineBreakCount(appendedTree.rootNode.text) >= minLineBreaks &&
+          this._isMultiLineCompletion
+        ) {
+          this._completion = completionTree.rootNode.text
+          return this.finaliseCompletion(prefixSuffix, done)
         }
       }
-      if (
-        !appendedTree?.rootNode.hasError &&
-        appendedTree?.rootNode.children.length
-      ) {
-        const firstChild =
-          appendedTree && (appendedTree.rootNode.children[0] as SyntaxNode)
-        if (!firstChild.hasError && getLineBreakCount(firstChild.text) > 2) {
-          this._validCompletion = completionTree?.rootNode.text || ''
-        }
-      }
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -271,25 +297,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._logger.log(
           `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
         )
-        this.removeStopWords()
-        this._abortController?.abort()
-        return done(this.triggerInlineCompletion(prefixSuffix))
+        return this.finaliseCompletion(prefixSuffix, done)
       }
 
       if (this._currentNode?.childCount === 2) {
         injectCompletionToNode(this._currentNode, this._completion)
       }
 
-      this.setValidCompletion()
+      this.findValidCompletion(prefixSuffix, done)
 
-      if (
-        this._chunkCount > this._numPredictFim &&
-        this._validCompletion.trim().length
-      ) {
-        this._completion = this._validCompletion
-        this.removeStopWords()
-        this._abortController?.abort()
-        return done(this.triggerInlineCompletion(prefixSuffix))
+      if (this._chunkCount > this._numPredictFim) {
+        return this.finaliseCompletion(prefixSuffix, done)
       }
     } catch (e) {
       console.error(e)
@@ -302,14 +320,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private onEnd(
     prefixSuffix: PrefixSuffix,
-    resolve: (comlpetion: ResolvedInlineCompletion) => void
+    done: (comlpetion: ResolvedInlineCompletion) => void
   ) {
     this._logger.log(
       `Streaming response end due to request end ${this._nonce} \nCompletion: ${this._completion}`
     )
-    this.removeStopWords()
-    this._abortController?.abort()
-    resolve(this.triggerInlineCompletion(prefixSuffix))
+    return this.finaliseCompletion(prefixSuffix, done)
   }
 
   public onError = () => {
@@ -386,10 +402,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return fileChunks.join('\n')
   }
 
-  private removeStopWords() {
-    this._stopWords.forEach((stopWord) => {
-      this._completion = this._completion.split(stopWord).join('')
-    })
+  private removeStopWords(completion: string) {
+    let filteredCompletion = ''
+    this._stopWords.forEach(
+      (stopWord) => (filteredCompletion = completion.split(stopWord).join(''))
+    )
+    return filteredCompletion
   }
 
   private async getPrompt(prefixSuffix: PrefixSuffix) {
@@ -446,7 +464,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._config = workspace.getConfiguration('twinny')
     this._debounceWait = this._config.get('debounceWait') as number
     this._disableAuto = this._config.get('disableAutoSuggest') as boolean
-    this._enableSubsequentCompletions = this._config.get('enableSubsequentCompletions') as boolean
+    this._enableSubsequentCompletions = this._config.get(
+      'enableSubsequentCompletions'
+    ) as boolean
     this._fimModel = this._config.get('fimModelName') as string
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._keepAlive = this._config.get('keepAlive') as string | number
