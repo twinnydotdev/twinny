@@ -131,28 +131,6 @@ export const getIsDeclarationType = (node: SyntaxNode) => {
   return false
 }
 
-export const injectCompletionToNode = (
-  node: SyntaxNode | undefined | null,
-  completion: string
-) => {
-  if (!node || !completion) {
-    return ''
-  }
-
-  const parts = node.text.split('\n')
-
-  const lastPart = parts[parts.length - 1]
-
-  if (DECLARATION_TYPE.includes(lastPart)) {
-    parts.pop()
-  }
-
-  return parts
-    .map((text: string) => text.trim())
-    .filter(Boolean)
-    .join(` ${completion} `)
-}
-
 export const getIsMultiLineCompletionNode = (node: SyntaxNode | null) => {
   if (!node) return false
 
