@@ -134,7 +134,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       position
     )
 
-
     if (
       getIsMiddleOfWord() ||
       isLastCompletionAccepted ||

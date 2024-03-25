@@ -98,7 +98,7 @@ export const STOP_DEEPSEEK = [
   '<｜end▁of▁sentence｜>'
 ]
 
-export const STOP_STABLECODE = ['<|endoftext|>']
+export const STOP_STARCODER = ['<|endoftext|>']
 
 export const API_PROVIDER: ApiProviders = {
   ollama: {
