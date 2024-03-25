@@ -17,8 +17,8 @@ import {
   getFimDataFromProvider,
   getPrefixSuffix,
   getShouldSkipCompletion,
-  isCursorInEmptyString,
-  isMiddleWord as getIsMiddleOfWord
+  getIsMultiLineCompletion,
+  getIsMiddleWord
 } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
@@ -43,7 +43,7 @@ import Parser, { SyntaxNode } from 'web-tree-sitter'
 import {
   getIsMultiLineCompletionNode,
   getNodeAtPosition,
-  getParserForFile,
+  getParserForFile
 } from '../parser-utils'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
@@ -110,12 +110,12 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._parser = await getParserForFile(this._document.uri.fsPath)
     const tree = this._parser?.parse(this._document.getText())
     this._currentNode = getNodeAtPosition(tree, position)
-    const isInMiddleOfString = isCursorInEmptyString()
+    const isMultilineCompletion = getIsMultiLineCompletion()
     const isMultiLineCompletionNode = getIsMultiLineCompletionNode(
       this._currentNode
     )
     this._isMultiLineCompletion =
-      isMultiLineCompletionNode && !isInMiddleOfString
+      isMultiLineCompletionNode && isMultilineCompletion
   }
 
   public async provideInlineCompletionItems(
@@ -134,9 +134,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       position
     )
 
-
     if (
-      getIsMiddleOfWord() ||
+      getIsMiddleWord() ||
       isLastCompletionAccepted ||
       this._lastCompletionMultiline
     ) {
@@ -439,7 +438,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (!editor || !this._position) return []
 
-    const completionText = new CompletionFormatter(editor).format(this._completion)
+    const completionText = new CompletionFormatter(editor).format(
+      this._completion
+    )
 
     if (this._cacheEnabled) cache.setCache(prefixSuffix, completionText)
 

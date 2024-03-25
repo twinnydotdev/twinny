@@ -25,11 +25,9 @@ import {
   ALL_BRACKETS,
   API_PROVIDER,
   EXTENSION_NAME,
-  IMPORT_SEPARATOR,
   PROVIDER_NAMES,
   QUOTES,
   SKIP_DECLARATION_SYMBOLS,
-  SKIP_IMPORT_KEYWORDS_AFTER
 } from '../common/constants'
 import { Logger } from '../common/logger'
 
@@ -85,50 +83,16 @@ export const getSkipVariableDeclataion = (
   textAfter: string
 ) => {
   if (
+    characterBefore &&
     SKIP_DECLARATION_SYMBOLS.includes(characterBefore.trim()) &&
     textAfter.length &&
-    !textAfter.at(0) as unknown as string === '?' &&
+    (!textAfter.at(0) as unknown as string) === '?' &&
     !getIsOnlyBrackets(textAfter)
   ) {
     return true
   }
 
   return false
-}
-
-export const getSkipImportDeclaration = (
-  characterBefore: string,
-  textAfter: string
-) => {
-  for (const skipWord of SKIP_IMPORT_KEYWORDS_AFTER) {
-    if (
-      textAfter.includes(skipWord) &&
-      !IMPORT_SEPARATOR.includes(characterBefore) &&
-      characterBefore !== ' '
-    ) {
-      return true
-    }
-  }
-  return false
-}
-
-export const getCharacterBefore = (index = -1): string => {
-  const editor = window.activeTextEditor
-  if (!editor) return ''
-  const document = editor.document
-  const cursorPosition = editor.selection.active
-  const textBeforeRange = new Range(cursorPosition, new Position(0, 0))
-  const textBefore = document.getText(textBeforeRange)
-  const characterBefore = textBefore.at(index) as string
-
-  if (characterBefore === undefined) {
-    return SKIP_DECLARATION_SYMBOLS[0]
-  }
-
-  if (!characterBefore.trim()) {
-    return getCharacterBefore(index - 1)
-  }
-  return characterBefore
 }
 
 export const getShouldSkipCompletion = (
@@ -142,9 +106,11 @@ export const getShouldSkipCompletion = (
   const lineEndPosition = document.lineAt(cursorPosition.line).range.end
   const textAfterRange = new Range(cursorPosition, lineEndPosition)
   const textAfter = document.getText(textAfterRange)
-  const characterBefore = getCharacterBefore()
-  if (getSkipVariableDeclataion(characterBefore, textAfter)) return true
-  if (getSkipImportDeclaration(characterBefore, textAfter)) return true
+  const { charBefore } = getBeforeAndAfter()
+
+  if (getSkipVariableDeclataion(charBefore, textAfter)){
+    return true
+  }
 
   return (
     context.triggerKind === InlineCompletionTriggerKind.Automatic && disableAuto
@@ -191,7 +157,7 @@ export const getPrefixSuffix = (
   }
 }
 
-export const getBeforeAndAfter = (matcher: (char: string) => boolean) => {
+export const getBeforeAndAfter = () => {
   const editor = window.activeTextEditor
   if (!editor)
     return {
@@ -204,14 +170,11 @@ export const getBeforeAndAfter = (matcher: (char: string) => boolean) => {
 
   const charBefore = lineText
     .substring(0, position.character)
+    .trim()
     .split('')
-    .reverse()
-    .find(matcher)
+    .reverse()[0]
 
-  const charAfter = lineText
-    .substring(position.character)
-    .split('')
-    .find(matcher)
+  const charAfter = lineText.substring(position.character).trim().split('')[0]
 
   return {
     charBefore,
@@ -219,20 +182,28 @@ export const getBeforeAndAfter = (matcher: (char: string) => boolean) => {
   }
 }
 
-export const isMiddleWord = () => {
-  const { charBefore, charAfter } = getBeforeAndAfter((char: string) => {
-    return /\w/.test(char)
-  })
+export const getIsMiddleWord = () => {
+  const { charBefore, charAfter } = getBeforeAndAfter()
 
-  return charBefore && charAfter && QUOTES?.includes(charAfter)
+  return (
+    charBefore && charAfter && /\w/.test(charBefore) && /\w/.test(charAfter)
+  )
+}
+
+export const getHasLineTextBeforeAndAfter = () => {
+  const { charBefore, charAfter } = getBeforeAndAfter()
+
+  return charBefore && charAfter
 }
 
 export const isCursorInEmptyString = () => {
-  const { charBefore, charAfter } = getBeforeAndAfter((char) =>
-    QUOTES.includes(char)
-  )
+  const { charBefore, charAfter } = getBeforeAndAfter()
 
-  return charBefore && charAfter
+  return QUOTES.includes(charBefore) && QUOTES.includes(charAfter)
+}
+
+export const getIsMultiLineCompletion = () => {
+  return !getHasLineTextBeforeAndAfter() && !isCursorInEmptyString()
 }
 
 export const getTheme = () => {
@@ -309,7 +280,10 @@ export const getNoTextBeforeOrAfter = () => {
   const editor = window.activeTextEditor
   const cursorPosition = editor?.selection.active
   if (!cursorPosition) return
-  const lastLinePosition = new Position(cursorPosition.line, editor.document.lineCount)
+  const lastLinePosition = new Position(
+    cursorPosition.line,
+    editor.document.lineCount
+  )
   const textAfterRange = new Range(cursorPosition, lastLinePosition)
   const textAfter = editor?.document.getText(textAfterRange)
   const textBeforeRange = new Range(new Position(0, 0), cursorPosition)

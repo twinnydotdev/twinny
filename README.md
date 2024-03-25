@@ -122,7 +122,7 @@ For FIM completions, you need to use LLM models called "base models". Unlike ins
 If using Llama the model must support the Llama special tokens. 
 
 - For computers with a good GPU, use: `deepseek-coder:base` or `codellama-code` (or any other good model that is optimised for code completions).
-- For slower computers or computers using only CPU, use `stable-code:3b-code-q4_0` (or any other small base model).
+- For slower computers or computers using only CPU, use `deepseek-coder:1.3b-base-q4_1` (or any other small base model).
   
 
 ## Keyboard shortcuts
