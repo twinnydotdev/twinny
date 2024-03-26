@@ -109,6 +109,7 @@ export class CompletionFormatter {
 
     return this
   }
+
   private isCursorAtMiddleOfWord() {
     return (
       this._charAfterCursor &&

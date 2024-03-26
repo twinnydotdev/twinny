@@ -199,37 +199,3 @@ export const WASM_LANGAUAGES: { [key: string]: string } = {
   rdl: 'systemrdl',
   toml: 'toml'
 }
-
-export const MULTI_LINE_NODE_TYPE = [
-  // typescript
-  'statement_block',
-  'formal_parameters',
-  'named_imports',
-  'function_definition',
-  'object',
-  'object_pattern',
-  'object_type',
-  'interface_body',
-  'class_body',
-  'export_statement',
-  // react
-  'jsx_opening_element',
-  'jsx_self_closing_element',
-  'jsx_element',
-  'jsx_closing_element'
-]
-
-export const DECLARATION_TYPE = [
-  // typescript
-  'var',
-  'let',
-  'const',
-  'function',
-  'export',
-  'class',
-  'interface',
-  'type',
-  'enum',
-  // python
-  'def'
-]

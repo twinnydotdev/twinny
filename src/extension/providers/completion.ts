@@ -18,7 +18,8 @@ import {
   getPrefixSuffix,
   getShouldSkipCompletion,
   getIsMultiLineCompletion,
-  getIsMiddleWord
+  getIsMiddleWord,
+  getCurrentLineText
 } from '../utils'
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
@@ -39,12 +40,8 @@ import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
 import { getLineBreakCount } from '../../webview/utils'
-import Parser, { SyntaxNode } from 'web-tree-sitter'
-import {
-  getIsMultiLineCompletionNode,
-  getNodeAtPosition,
-  getParserForFile
-} from '../parser-utils'
+import Parser from 'web-tree-sitter'
+import { getParserForFile } from '../parser-utils'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -57,7 +54,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
   private _chunkCount = 0
   private _completion = ''
-  private _currentNode: SyntaxNode | null
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
   private _disableAuto = this._config.get('disableAutoSuggest') as boolean
@@ -102,20 +98,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._position = null
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
-    this._currentNode = null
-  }
-
-  public getIsMultiLineCompletion = async (position: Position) => {
-    if (!this._document) return
-    this._parser = await getParserForFile(this._document.uri.fsPath)
-    const tree = this._parser?.parse(this._document.getText())
-    this._currentNode = getNodeAtPosition(tree, position)
-    const isMultilineCompletion = getIsMultiLineCompletion()
-    const isMultiLineCompletionNode = getIsMultiLineCompletionNode(
-      this._currentNode
-    )
-    this._isMultiLineCompletion =
-      isMultiLineCompletionNode && isMultilineCompletion
   }
 
   public async provideInlineCompletionItems(
@@ -160,7 +142,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
 
-    this.getIsMultiLineCompletion(position)
+    this._isMultiLineCompletion = getIsMultiLineCompletion()
+    this._parser = await getParserForFile(this._document.uri.fsPath)
     const prompt = await this.getPrompt(prefixSuffix)
     const cachedCompletion = cache.getCache(prefixSuffix)
 
@@ -245,17 +228,21 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return done(this.triggerInlineCompletion(prefixSuffix))
   }
 
-  private getMultiLineCompletion() {
+  private getParseableCompletion() {
     const minLineBreaks = 3
-    const maxLineBreaks = this._maxLines
-    const parseChunksAt = 15
+    const parseChunksAt = 10
 
     if (this._chunkCount % parseChunksAt !== 0) {
       return ''
     }
 
-    const completionTree = this._parser?.parse(
-      this.removeStopWords(this._completion)
+    const lineText = getCurrentLineText(this._position)
+    const lineTextLength = lineText.length
+
+    if (!this._parser) return
+
+    const completionTree = this._parser.parse(
+      this.removeStopWords(`${lineText}${this._completion}`)
     )
 
     if (!completionTree) return ''
@@ -266,22 +253,20 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     const lineBreakCount = getLineBreakCount(completionNode.text)
 
-    if (lineBreakCount >= maxLineBreaks) {
+    if (lineBreakCount >= this._maxLines) {
       return this._completion
     }
 
-    let candidate
-    if (
-      completionTree &&
-      this._isMultiLineCompletion &&
-      lineBreakCount >= minLineBreaks &&
-      !completionNode.hasError &&
-      completionNode.text
-    ) {
-      candidate = completionNode.text || ''
+    let candidate = ''
+    const node = completionNode.children[0]
+
+    if (lineBreakCount >= minLineBreaks && !node.hasError) {
+      candidate = node.text
     }
 
-    return candidate || ''
+    candidate = candidate.slice(lineTextLength)
+
+    return candidate
   }
 
   private onData(
@@ -307,12 +292,19 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         return this.resolveCompletion(prefixSuffix, done)
       }
 
-      const parsableMultilineCompletion = this.getMultiLineCompletion()
+      const parseableCompletion = this.getParseableCompletion()
 
-      if (parsableMultilineCompletion) {
-        this._completion = parsableMultilineCompletion
+      if (parseableCompletion) {
+        this._completion = parseableCompletion
         return this.resolveCompletion(prefixSuffix, done)
       }
+
+      const lineBreakCount = getLineBreakCount(this._completion)
+
+      if (lineBreakCount >= this._maxLines) {
+        return this.resolveCompletion(prefixSuffix, done)
+      }
+
     } catch (e) {
       console.error(e)
     }

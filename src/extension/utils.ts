@@ -190,6 +190,15 @@ export const getIsMiddleWord = () => {
   )
 }
 
+export const getCurrentLineText = (position: Position | null) => {
+  const editor = window.activeTextEditor
+  if (!editor || !position) return ''
+
+  const lineText = editor.document.lineAt(position.line).text
+
+  return lineText
+}
+
 export const getHasLineTextBeforeAndAfter = () => {
   const { charBefore, charAfter } = getBeforeAndAfter()
 
