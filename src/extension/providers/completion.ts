@@ -281,8 +281,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return node ? node.text.slice(lineTextLength).trimStart() : ''
   }
 
-
-
   private onData(
     data: StreamResponse | undefined,
     prefixSuffix: PrefixSuffix,
