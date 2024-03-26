@@ -41,7 +41,7 @@ import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
 import { getLineBreakCount } from '../../webview/utils'
 import Parser from 'web-tree-sitter'
-import { getParserForFile } from '../parser-utils'
+import { getNodeContainsSyntaxError, getParserForFile, validateJSX } from '../parser-utils'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -228,43 +228,60 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return done(this.triggerInlineCompletion(prefixSuffix))
   }
 
-  private getParseableCompletion() {
+  private getParseableCompletion(): string {
     const minLineBreaks = 3
-    const parseChunksAt = 10
 
-    if (this._chunkCount % parseChunksAt !== 0) {
+    if (this._chunkCount % 1 !== 0) {
       return ''
     }
 
     const lineText = getCurrentLineText(this._position)
     const lineTextLength = lineText.trim().length
 
-    if (!this._parser) return
+    if (!this._parser) {
+      return ''
+    }
 
     const completionTree = this._parser.parse(
       this.removeStopWords(`${lineText}${this._completion}`)
     )
 
-    if (!completionTree) return ''
+    if (!completionTree) {
+      return ''
+    }
 
-    const completionNode = completionTree?.rootNode
+    const completionNode = completionTree.rootNode
 
-    if (!completionNode?.text) return ''
+    if (!completionNode.text) {
+      return ''
+    }
 
     const lineBreakCount = getLineBreakCount(completionNode.text)
+
+    if (lineBreakCount < minLineBreaks) {
+      return ''
+    }
 
     if (lineBreakCount >= this._maxLines) {
       return this._completion
     }
 
-    const node = completionNode.children[0]
+    const nodeContainsSyntaxError = getNodeContainsSyntaxError(completionNode)
+    const node = completionNode.firstChild
+    const isValidJsx = validateJSX(this._completion)
 
-    if (lineBreakCount >= minLineBreaks && !node.hasError) {
-      return node.text.slice(lineTextLength)
+    if (isValidJsx && lineBreakCount > minLineBreaks) {
+      return this._completion
     }
 
-    return ''
+    if (nodeContainsSyntaxError || (lineBreakCount < minLineBreaks && !isValidJsx)) {
+      return ''
+    }
+
+    return node ? node.text.slice(lineTextLength).trimStart() : ''
   }
+
+
 
   private onData(
     data: StreamResponse | undefined,

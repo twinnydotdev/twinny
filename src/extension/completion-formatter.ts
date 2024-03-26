@@ -51,9 +51,7 @@ export class CompletionFormatter {
     for (const character of this._originalCompletion) {
       if (OPENING_BRACKETS.includes(character)) {
         openBrackets.push(character)
-      }
-
-      if (CLOSING_BRACKETS.includes(character)) {
+      } else if (CLOSING_BRACKETS.includes(character)) {
         if (
           openBrackets.length &&
           this.isMatchingPair(openBrackets.at(-1), character)

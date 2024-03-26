@@ -414,6 +414,7 @@
   },
   "devDependencies": {
     "@types/async-lock": "^1.4.2",
+    "@types/babel__core": "^7.20.5",
     "@types/glob": "^8.1.0",
     "@types/handlebars": "^4.1.0",
     "@types/mocha": "^10.0.6",
@@ -441,6 +442,8 @@
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
+    "@babel/core": "^7.24.3",
+    "@babel/preset-react": "^7.24.1",
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
