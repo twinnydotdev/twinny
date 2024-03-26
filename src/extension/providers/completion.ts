@@ -293,15 +293,20 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
       if (parseableCompletion) {
         this._completion = parseableCompletion
+        this._logger.log(
+          `Streaming response end due to parseable completion ${this._nonce} \nCompletion: ${this._completion}`
+        )
         return this.resolveCompletion(prefixSuffix, done)
       }
 
       const lineBreakCount = getLineBreakCount(this._completion)
 
       if (lineBreakCount >= this._maxLines) {
+        this._logger.log(
+          `Streaming response end due to max lines ${this._nonce} \nCompletion: ${this._completion}`
+        )
         return this.resolveCompletion(prefixSuffix, done)
       }
-
     } catch (e) {
       console.error(e)
     }
@@ -316,7 +321,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     done: (comlpetion: ResolvedInlineCompletion) => void
   ) {
     this._logger.log(
-      `Streaming response end due to request end ${this._nonce} \nCompletion: ${this._completion}`
+      `Streaming response end due to server response end ${this._nonce} \nCompletion: ${this._completion}\n\n`
     )
     return this.resolveCompletion(prefixSuffix, done)
   }
@@ -420,32 +425,40 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return prompt
   }
 
+  private logCompletion(formattedCompletion: string) {
+    this._logger.log(`
+      *** Twinny completion triggered for file: ${this._document?.uri} ***\n
+      Original completion: ${this._completion}\n
+      Formatted completion: ${formattedCompletion}\n
+      Multiline: ${this._isMultiLineCompletion}\n
+      Max Lines: ${this._maxLines}\n
+      Use file context: ${this._useFileContext}\n
+      Completed lines count ${getLineBreakCount(formattedCompletion)}\n
+    `)
+  }
+
   private triggerInlineCompletion(
     prefixSuffix: PrefixSuffix
   ): InlineCompletionItem[] {
     const editor = window.activeTextEditor
 
-  if (!editor || !this._position) return []
+    if (!editor || !this._position) return []
 
-    const completionText = new CompletionFormatter(editor).format(
+    const formattedCompletion = new CompletionFormatter(editor).format(
       this._completion
     )
 
-    if (this._cacheEnabled) cache.setCache(prefixSuffix, completionText)
+    if (this._cacheEnabled) cache.setCache(prefixSuffix, formattedCompletion)
 
-    this._logger.log(
-      `\n Inline completion triggered: Formatted completion: ${JSON.stringify(
-        completionText
-      )}\n`
-    )
+    this.logCompletion(formattedCompletion)
 
     this._statusBar.text = '🤖'
-    this._lastCompletionText = completionText
+    this._lastCompletionText = formattedCompletion
     this._lastCompletionMultiline = this._isMultiLineCompletion
 
     return [
       new InlineCompletionItem(
-        completionText,
+        formattedCompletion,
         new Range(this._position, this._position)
       )
     ]
