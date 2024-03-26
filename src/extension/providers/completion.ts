@@ -236,13 +236,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return ''
     }
 
-    const lineText = getCurrentLineText(this._position)
-    const lineTextLength = lineText.length
-
     if (!this._parser) return
 
     const completionTree = this._parser.parse(
-      this.removeStopWords(`${lineText}${this._completion}`)
+      this.removeStopWords(this._completion)
     )
 
     if (!completionTree) return ''
@@ -257,16 +254,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return this._completion
     }
 
-    let candidate = ''
     const node = completionNode.children[0]
 
     if (lineBreakCount >= minLineBreaks && !node.hasError) {
-      candidate = node.text
+      return node.text
     }
 
-    candidate = candidate.slice(lineTextLength)
-
-    return candidate
+    return ''
   }
 
   private onData(
@@ -428,7 +422,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   ): InlineCompletionItem[] {
     const editor = window.activeTextEditor
 
-    if (!editor || !this._position) return []
+  if (!editor || !this._position) return []
 
     const completionText = new CompletionFormatter(editor).format(
       this._completion
