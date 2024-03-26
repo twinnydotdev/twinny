@@ -444,6 +444,7 @@
   "dependencies": {
     "@babel/core": "^7.24.3",
     "@babel/preset-react": "^7.24.1",
+    "@babel/preset-typescript": "^7.24.1",
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",

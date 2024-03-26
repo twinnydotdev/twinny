@@ -41,7 +41,10 @@ export const getNodeContainsSyntaxError = (node: SyntaxNode): boolean => {
 export const validateJSX = (jsxString: string) => {
   try {
     transform(`<>${jsxString}</>`, {
-      presets: [require('@babel/preset-react')]
+      presets: [
+        require('@babel/preset-react'),
+        require('@babel/preset-typescript')
+      ]
     })
     return true
   } catch (error) {
