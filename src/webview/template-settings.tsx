@@ -48,10 +48,9 @@ export const TemplateSettings = () => {
   useEffect(() => {
     if (selectedTemplatesContext !== undefined) {
       return setSelectedTemplates(selectedTemplatesContext)
-    } else {
-      setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
     }
-  }, [selectedTemplatesContext])
+    setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
+  }, [selectedTemplatesContext.length])
 
   return (
     <>
@@ -61,7 +60,7 @@ export const TemplateSettings = () => {
       </p>
       {templates &&
         templates.map((templateName: string) => (
-          <div className={styles.templateCheckbox}>
+          <div key={templateName} className={styles.templateCheckbox}>
             <label htmlFor={templateName}>
               <VSCodeCheckbox
                 id={templateName}
