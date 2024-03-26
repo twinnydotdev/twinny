@@ -24,7 +24,9 @@ import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
   API_PROVIDER,
+  CLOSING_BRACKETS,
   EXTENSION_NAME,
+  OPENING_BRACKETS,
   PROVIDER_NAMES,
   QUOTES,
   SKIP_DECLARATION_SYMBOLS
@@ -64,13 +66,43 @@ export const getIsBracket = (char: string): char is Bracket => {
   return ALL_BRACKETS.includes(char as Bracket)
 }
 
-export const getIsSingleBracket = (completion: string) =>
-  completion.length === 1 && getIsBracket(completion)
+export const getIsClosingBracket = (char: string): char is Bracket => {
+  return CLOSING_BRACKETS.includes(char as Bracket)
+}
 
-export const getIsOnlyBrackets = (completion: string) => {
-  if (completion.length === 0) return false
+export const getIsOpeningBracket = (char: string): char is Bracket => {
+  return OPENING_BRACKETS.includes(char as Bracket)
+}
 
-  for (const char of completion) {
+export const getIsSingleBracket = (chars: string) =>
+  chars?.length === 1 && getIsBracket(chars)
+
+export const getIsOnlyOpeningBrackets = (chars: string) => {
+  if (!chars || !chars.length) return false
+
+  for (const char of chars) {
+    if (!getIsOpeningBracket(char)) {
+      return false
+    }
+  }
+  return true
+}
+
+export const getIsOnlyClosingBrackets = (chars: string) => {
+  if (!chars || !chars.length) return false
+
+  for (const char of chars) {
+    if (!getIsClosingBracket(char)) {
+      return false
+    }
+  }
+  return true
+}
+
+export const getIsOnlyBrackets = (chars: string) => {
+  if (!chars || !chars.length) return false
+
+  for (const char of chars) {
     if (!getIsBracket(char)) {
       return false
     }
@@ -211,7 +243,38 @@ export const isCursorInEmptyString = () => {
   return QUOTES.includes(charBefore) && QUOTES.includes(charAfter)
 }
 
+export const getNextLineIsClosingBracket = () => {
+  const editor = window.activeTextEditor
+  if (!editor) return false
+  const position = editor.selection.active
+  const nextLineText = editor.document
+    .lineAt(Math.min(position.line + 1, editor.document.lineCount -1))
+    .text.trim()
+  return getIsOnlyClosingBrackets(nextLineText)
+}
+
+export const getPreviousLineIsOpeningBracket = () => {
+  const editor = window.activeTextEditor
+  if (!editor) return false
+  const position = editor.selection.active
+  const previousLineCharacter = editor.document
+    .lineAt(Math.max(position.line - 1, 0))
+    .text.trim()
+    .split('')
+    .reverse()[0]
+  return getIsOnlyOpeningBrackets(previousLineCharacter)
+}
+
 export const getIsMultiLineCompletion = () => {
+  const nextLineIsClosingBracket = getNextLineIsClosingBracket()
+  const previousLineIsOpeningBracket = getPreviousLineIsOpeningBracket()
+  if (
+    previousLineIsOpeningBracket &&
+    nextLineIsClosingBracket &&
+    !getHasLineTextBeforeAndAfter()
+  ) {
+    return true
+  }
   return !getHasLineTextBeforeAndAfter() && !isCursorInEmptyString()
 }
 
