@@ -183,6 +183,13 @@ export const Chat = () => {
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyStopGeneration
     } as ClientMessage)
+    setCompletion(null)
+    setLoading(false)
+    generatingRef.current = false
+    setTimeout(() => {
+      chatRef.current?.focus()
+      stopRef.current = false
+    }, 200)
   }
 
   const handleSubmitForm = (input: string) => {
@@ -238,6 +245,7 @@ export const Chat = () => {
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     chatRef.current?.focus()
+    scrollBottom()
     return () => {
       window.removeEventListener('message', messageEventHandler)
     }
