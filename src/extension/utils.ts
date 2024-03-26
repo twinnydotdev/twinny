@@ -27,7 +27,7 @@ import {
   EXTENSION_NAME,
   PROVIDER_NAMES,
   QUOTES,
-  SKIP_DECLARATION_SYMBOLS,
+  SKIP_DECLARATION_SYMBOLS
 } from '../common/constants'
 import { Logger } from '../common/logger'
 
@@ -108,7 +108,7 @@ export const getShouldSkipCompletion = (
   const textAfter = document.getText(textAfterRange)
   const { charBefore } = getBeforeAndAfter()
 
-  if (getSkipVariableDeclataion(charBefore, textAfter)){
+  if (getSkipVariableDeclataion(charBefore, textAfter)) {
     return true
   }
 
@@ -242,6 +242,8 @@ export const getChatDataFromProvider = (
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
         : ''
+    case ApiProviders.Oobabooga:
+      return data?.choices[0].text
     case ApiProviders.LlamaCpp:
       return data?.content
     default:
