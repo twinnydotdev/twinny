@@ -2,7 +2,7 @@ import { Position, Range, TextEditor } from 'vscode'
 
 import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
 import { Bracket } from '../common/types'
-import { getIsOnlyBrackets, getNoTextBeforeOrAfter } from './utils'
+import { getNoTextBeforeOrAfter } from './utils'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
@@ -170,7 +170,6 @@ export class CompletionFormatter {
   private preventDuplicateLines = (): CompletionFormatter => {
     const lineCount = this._editor.document.lineCount
     let nextLineIndex = this._cursorPosition.line + 1
-    if (getIsOnlyBrackets(this._normalisedCompletion)) return this
     while (
       nextLineIndex < this._cursorPosition.line + 3 &&
       nextLineIndex < lineCount
