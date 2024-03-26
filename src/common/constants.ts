@@ -123,7 +123,7 @@ export const API_PROVIDER: ApiProviders = {
   },
   oobabooga: {
     fimApiPath: '/v1/completions',
-    chatApiPath: '/v1/chat/completions',
+    chatApiPath: '/v1/completions',
     port: 5000
   }
 }
