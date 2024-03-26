@@ -236,10 +236,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return ''
     }
 
+    const lineText = getCurrentLineText(this._position)
+    const lineTextLength = lineText.trim().length
+
     if (!this._parser) return
 
     const completionTree = this._parser.parse(
-      this.removeStopWords(this._completion)
+      this.removeStopWords(`${lineText}${this._completion}`)
     )
 
     if (!completionTree) return ''
@@ -257,7 +260,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const node = completionNode.children[0]
 
     if (lineBreakCount >= minLineBreaks && !node.hasError) {
-      return node.text
+      return node.text.slice(lineTextLength)
     }
 
     return ''
