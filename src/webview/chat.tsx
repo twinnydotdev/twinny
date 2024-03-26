@@ -183,13 +183,6 @@ export const Chat = () => {
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyStopGeneration
     } as ClientMessage)
-    handleCompletionEnd({
-      type: MESSAGE_KEY.chatMessage,
-      value: {
-        completion: completion?.content || '',
-        type: MESSAGE_KEY.chatMessage
-      }
-    })
   }
 
   const handleSubmitForm = (input: string) => {
