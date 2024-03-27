@@ -147,7 +147,8 @@ export const ApiProviders = {
   OllamaWebUi: 'ollamawebui',
   LlamaCpp: 'llamacpp',
   LMStudio: 'lmstudio',
-  Oobabooga: 'oobabooga'
+  Oobabooga: 'oobabooga',
+  Other: 'other'
 } as const
 
 export interface OllamaModel {

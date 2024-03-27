@@ -239,7 +239,8 @@
             "ollama",
             "llamacpp",
             "lmstudio",
-            "oobabooga"
+            "oobabooga",
+            "other"
           ],
           "default": "ollama",
           "description": "The API provider to use (sets the paths and port automatically to defaults)."

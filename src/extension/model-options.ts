@@ -38,10 +38,10 @@ export function createStreamRequestBody(
         temperature: options.temperature,
         n_predict: options.numPredictChat
       }
+    case ApiProviders.Other:
     default:
       return {
         model: options.model,
-        prompt,
         stream: true,
         max_tokens: options.numPredictChat,
         messages: options.messages,
