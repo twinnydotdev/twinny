@@ -208,7 +208,7 @@ export const Chat = () => {
       } as ClientMessage)
       setMessages((prev) => [
         ...(prev || []),
-        { role: USER_NAME, content: input, type: '' }
+        { role: USER_NAME, content: input }
       ])
       if (isAutoScrolledEnabled) scrollBottom()
     }
