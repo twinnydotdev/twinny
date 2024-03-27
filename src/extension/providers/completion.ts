@@ -183,7 +183,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   public getLastCompletion = () => this._lastCompletionText
-  public getLastCompletionMultiLine = () => this._lastCompletionMultiline
 
   public setAcceptedLastCompletion(value: boolean) {
     this._acceptedLastCompletion = value
@@ -230,7 +229,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private getParseableCompletion() {
     const minLineBreaks = 3
-    const parseChunksAt = 10
+    const parseChunksAt = 20
 
     if (this._chunkCount % parseChunksAt !== 0) {
       return ''
