@@ -24,6 +24,7 @@ import {
 import { TemplateProvider } from './extension/template-provider'
 import { ServerMessage } from './common/types'
 import { FileInteractionCache } from './extension/file-interaction'
+import { getLineBreakCount } from './webview/utils'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
@@ -161,17 +162,15 @@ export async function activate(context: ExtensionContext) {
       const changes = e.contentChanges[0]
       if (!changes) return
       const lastCompletion = completionProvider.getLastCompletion()
-      const isLastCompltionMultiline =
-        completionProvider.getLastCompletionMultiLine()
-
-      if (
-        changes.text &&
-        lastCompletion &&
-        changes.text === lastCompletion &&
-        isLastCompltionMultiline
-      ) {
-        completionProvider.setAcceptedLastCompletion(true)
-      }
+      const isLastCompltionMultiline = getLineBreakCount(lastCompletion) > 1
+      completionProvider.setAcceptedLastCompletion(
+        !!(
+          changes.text &&
+          lastCompletion &&
+          changes.text === lastCompletion &&
+          isLastCompltionMultiline
+        )
+      )
       const currentLine = changes.range.start.line
       const currentCharacter = changes.range.start.character
       fileInteractionCache.incrementStrokes(currentLine, currentCharacter)
