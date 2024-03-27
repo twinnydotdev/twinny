@@ -2,7 +2,8 @@ import { Position, Range, TextEditor } from 'vscode'
 
 import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
 import { Bracket } from '../common/types'
-import { getNoTextBeforeOrAfter } from './utils'
+import { getLanguage, getNoTextBeforeOrAfter } from './utils'
+import { supportedLanguages } from '../common/languages'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
@@ -259,6 +260,53 @@ export class CompletionFormatter {
     return this
   }
 
+  public preventQuotationCompletions(): this {
+    const language = getLanguage()
+    const languageId =
+      supportedLanguages[language.languageId as keyof typeof supportedLanguages]
+
+    if (this._normalisedCompletion.startsWith('// File:')) {
+      this._completion = ''
+      return this
+    }
+
+    if (!languageId || !languageId.syntaxComments) {
+      return this
+    }
+
+    if (!languageId.syntaxComments?.start) {
+      return this
+    }
+
+    const comments = `${languageId.syntaxComments?.start}${languageId.syntaxComments?.end}`
+    const score = this._normalisedCompletion.score(comments, 0.1)
+    if (this._normalisedCompletion.startsWith(comments) || score > 0.2) {
+      this._completion = ''
+      return this
+    }
+
+    const completionLines: string[] = []
+    for (const line of this._completion.split('\n')) {
+      const startsWithComment = line.startsWith(languageId.syntaxComments.start)
+      const includesCommentReference =
+        /\bLanguage:\s*(.*)\b/.test(line) ||
+        /\bFile:\s*(.*)\b/.test(line) ||
+        /\bEnd:\s*(.*)\b/.test(line)
+      const isComment = line === languageId.syntaxComments.start
+      const skip = (startsWithComment && includesCommentReference) || isComment
+      if (!skip) {
+        completionLines.push(line)
+      }
+    }
+
+    if (completionLines.length) {
+      this._completion = completionLines.join('\n')
+      return this
+    }
+
+    return this
+  }
+
   public debug() {
     console.log(`text after: ${this._textAfterCursor}`)
     console.log(`original completion: ${this._originalCompletion}`)
@@ -271,6 +319,7 @@ export class CompletionFormatter {
     this._normalisedCompletion = this.normalise(completion)
     this._originalCompletion = completion
     const infillText = this.matchCompletionBrackets()
+      .preventQuotationCompletions()
       .preventDuplicateLines()
       .removeDuplicateQuotes()
       .removeUnnecessaryMiddleQuote()
