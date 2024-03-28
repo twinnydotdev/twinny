@@ -26,9 +26,9 @@ export class TemplateProvider {
       const exists = fs.existsSync(this._basePath)
       if (!exists) {
         fs.mkdirSync(this._basePath, { recursive: true })
-        this.copyDefaultTemplates()
         console.log(`The folder ${this._basePath} has been created`)
       }
+      this.copyDefaultTemplates()
     } catch (err) {
       console.error(`Failed to create the basePath ${this._basePath}`, err)
     }
@@ -38,7 +38,9 @@ export class TemplateProvider {
     try {
       defaultTemplates.forEach(({ name, template }) => {
         const destFile = path.join(this._basePath, name)
-        fs.writeFileSync(`${destFile}.hbs`, template, 'utf8')
+        if (!fs.existsSync(`${destFile}.hbs`)) {
+          fs.writeFileSync(`${destFile}.hbs`, template, 'utf8')
+        }
       })
     } catch (e) {
       console.log(`Problem creating default templates "${this._basePath}`)

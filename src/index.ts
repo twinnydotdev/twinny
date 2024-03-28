@@ -12,7 +12,7 @@ import * as vscode from 'vscode'
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
-import { delayExecution, setApiDefaults } from './extension/utils'
+import { delayExecution } from './extension/utils'
 import { setContext } from './extension/context'
 import {
   CONTEXT_NAME,
@@ -35,7 +35,8 @@ export async function activate(context: ExtensionContext) {
   const fileInteractionCache = new FileInteractionCache()
   const completionProvider = new CompletionProvider(
     statusBar,
-    fileInteractionCache
+    fileInteractionCache,
+    templateProvider
   )
   const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
 
@@ -187,7 +188,6 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) return
-      if (event.affectsConfiguration('twinny.apiProvider')) setApiDefaults()
       completionProvider.updateConfig()
     })
   )

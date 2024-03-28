@@ -6,7 +6,7 @@ import { ChatService } from '../chat-service'
 import {
   ClientMessage,
   MessageType,
-  OllamaModel,
+  ApiModel,
   ServerMessage
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
@@ -117,14 +117,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public fetchOllamaModels = async () => {
-    const models = await this._ollamaService?.fetchModels()
-    if (!models) return
-    this.view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnyFetchOllamaModels,
-      value: {
-        data: models.models
-      }
-    } as ServerMessage<OllamaModel[]>)
+    try {
+      const models = await this._ollamaService?.fetchModels()
+      if (!models) return
+      this.view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnyFetchOllamaModels,
+        value: {
+          data: models.models
+        }
+      } as ServerMessage<ApiModel[]>)
+    } catch (e) {
+      return
+    }
   }
 
   public listTemplates = () => {

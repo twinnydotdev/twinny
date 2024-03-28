@@ -1,6 +1,6 @@
 import { StatusBarItem, WebviewView, commands, window, workspace } from 'vscode'
 
-import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER_NAME } from '../common/constants'
+import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER } from '../common/constants'
 import {
   StreamResponse,
   StreamBodyBase,
@@ -208,7 +208,7 @@ export class ChatService {
       await this._templateProvider?.renderTemplate<ChatTemplateData>('chat', {
         code: selectionContext || '',
         messages,
-        role: USER_NAME
+        role: USER
       })
     return prompt || ''
   }

@@ -7,15 +7,15 @@ import { supportedLanguages } from '../common/languages'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
+  private _charAfterCursor: string
+  private _charBeforeCursor: string
   private _completion = ''
+  private _cursorPosition: Position
+  private _editor: TextEditor
+  private _lineText: string
   private _normalisedCompletion = ''
   private _originalCompletion = ''
   private _textAfterCursor: string
-  private _lineText: string
-  private _charBeforeCursor: string
-  private _charAfterCursor: string
-  private _editor: TextEditor
-  private _cursorPosition: Position
 
   constructor(editor: TextEditor) {
     this._editor = editor
@@ -111,57 +111,49 @@ export class CompletionFormatter {
     return this
   }
 
-  private isCursorAtMiddleOfWord() {
-    return (
+  private isCursorAtMiddleOfWord(): boolean {
+    return Boolean(
       this._charAfterCursor &&
-      /\w/.test(this._charBeforeCursor) &&
-      /\w/.test(this._charAfterCursor)
+        /\w/.test(this._charBeforeCursor) &&
+        /\w/.test(this._charAfterCursor)
     )
   }
 
   private removeUnnecessaryMiddleQuote(): CompletionFormatter {
-    const startsWithQuote = QUOTES.includes(this._completion[0])
-    const endsWithQuote = QUOTES.includes(this._completion.at(-1) as string)
-
-    if (startsWithQuote && this.isCursorAtMiddleOfWord()) {
-      this._completion = this._completion.substring(1)
+    const isCursorAtMiddle = this.isCursorAtMiddleOfWord()
+    if (isCursorAtMiddle) {
+      if (QUOTES.includes(this._completion[0])) {
+        this._completion = this._completion.substring(1)
+      }
+      if (QUOTES.includes(this._completion.at(-1) as string)) {
+        this._completion = this._completion.slice(0, -1)
+      }
     }
-
-    if (endsWithQuote && this.isCursorAtMiddleOfWord()) {
-      this._completion = this._completion.slice(0, -1)
-    }
-
     return this
   }
 
   private removeDuplicateQuotes = () => {
+    const trimmedCharAfterCursor = this._characterAfterCursor.trim()
+    const lastCharOfCompletion = this._completion.at(-1) as string
+
     if (
-      this._characterAfterCursor.trim() &&
-      this._characterAfterCursor.trim().length &&
+      trimmedCharAfterCursor &&
       (this._normalisedCompletion.endsWith('\',') ||
         this._normalisedCompletion.endsWith('",') ||
         (this._normalisedCompletion.endsWith('`,') &&
-          QUOTES.includes(this._characterAfterCursor)))
+          QUOTES.includes(trimmedCharAfterCursor)))
     ) {
       this._completion = this._completion.slice(0, -2)
-    }
-
-    if (
-      this._normalisedCompletion.endsWith(
-        '\'' ||
-          this._normalisedCompletion.endsWith('"') ||
-          this._normalisedCompletion.endsWith('`')
-      ) &&
-      (this._characterAfterCursor === '"' ||
-        this._characterAfterCursor === '\'' ||
-        this._characterAfterCursor === '`')
+    } else if (
+      (this._normalisedCompletion.endsWith('\'') ||
+        this._normalisedCompletion.endsWith('"') ||
+        this._normalisedCompletion.endsWith('`')) &&
+      QUOTES.includes(trimmedCharAfterCursor)
     ) {
       this._completion = this._completion.slice(0, -1)
-    }
-
-    if (
-      QUOTES.includes(this._completion.at(-1) as string) &&
-      this._characterAfterCursor === (this._completion.at(-1) as string)
+    } else if (
+      QUOTES.includes(lastCharOfCompletion) &&
+      trimmedCharAfterCursor === lastCharOfCompletion
     ) {
       this._completion = this._completion.slice(0, -1)
     }
@@ -203,17 +195,18 @@ export class CompletionFormatter {
     return this
   }
 
-  private skipSimilarCompletions = () => {
-    const textAfter = this._editor.document.getText(
+  private skipSimilarCompletions = (): this => {
+    const { document } = this._editor
+    const textAfter = document.getText(
       new Range(
         this._cursorPosition,
-        this._editor.document.lineAt(this._cursorPosition.line).range.end
+        document.lineAt(this._cursorPosition.line).range.end
       )
     )
 
-    const score = textAfter.score(this._completion)
-
-    if (score > 0.6) this._completion = ''
+    if (textAfter.score(this._completion) > 0.6) {
+      this._completion = ''
+    }
 
     return this
   }
@@ -270,38 +263,37 @@ export class CompletionFormatter {
       return this
     }
 
-    if (!languageId || !languageId.syntaxComments) {
+    // Check if syntaxComments is defined before proceeding
+    if (
+      !languageId ||
+      !languageId.syntaxComments ||
+      !languageId.syntaxComments.start
+    ) {
       return this
     }
 
-    if (!languageId.syntaxComments?.start) {
-      return this
-    }
-
-    const comments = `${languageId.syntaxComments?.start}${languageId.syntaxComments?.end}`
+    const comments = `${languageId.syntaxComments.start}${
+      languageId.syntaxComments.end ?? ''
+    }`
     const score = this._normalisedCompletion.score(comments, 0.1)
     if (this._normalisedCompletion.startsWith(comments) || score > 0.2) {
       this._completion = ''
       return this
     }
 
-    const completionLines: string[] = []
-    for (const line of this._completion.split('\n')) {
+    if (!languageId || !languageId.syntaxComments) return this
+
+    const completionLines = this._completion.split('\n').filter((line) => {
       const startsWithComment = line.startsWith(languageId.syntaxComments.start)
-      const includesCommentReference =
-        /\bLanguage:\s*(.*)\b/.test(line) ||
-        /\bFile:\s*(.*)\b/.test(line) ||
-        /\bEnd:\s*(.*)\b/.test(line)
-      const isComment = line === languageId.syntaxComments.start
-      const skip = (startsWithComment && includesCommentReference) || isComment
-      if (!skip) {
-        completionLines.push(line)
-      }
-    }
+      const includesCommentReference = /\b(Language|File|End):\s*(.*)\b/.test(
+        line
+      )
+      const isComment = line === languageId.syntaxComments.start // Non-null assertion used here
+      return !(startsWithComment && includesCommentReference) && !isComment
+    })
 
     if (completionLines.length) {
       this._completion = completionLines.join('\n')
-      return this
     }
 
     return this

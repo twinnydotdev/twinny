@@ -10,11 +10,11 @@ import {
 
 import { Selection } from './selection'
 import {
-  BOT_NAME,
+  ASSISTANT,
   MESSAGE_KEY,
   MESSAGE_NAME,
   SETTING_KEY,
-  USER_NAME
+  USER
 } from '../common/constants'
 
 import {
@@ -34,7 +34,6 @@ import {
 
 import { Suggestions } from './suggestions'
 import {
-  ApiProviders,
   ClientMessage,
   MessageType,
   ServerMessage
@@ -88,8 +87,8 @@ export const Chat = () => {
       const update = [
         ...(prev || []),
         {
-          role: BOT_NAME,
-          content: getCompletionContent(message),
+          role: ASSISTANT,
+          content: getCompletionContent(message)
         }
       ]
       global.vscode.postMessage({
@@ -119,7 +118,7 @@ export const Chat = () => {
     setMessages((prev) => [
       ...(prev || []),
       {
-        role: USER_NAME,
+        role: USER,
         content: message.value.completion as string
       }
     ])
@@ -133,7 +132,7 @@ export const Chat = () => {
     generatingRef.current = true
     setLoading(false)
     setCompletion({
-      role: BOT_NAME,
+      role: ASSISTANT,
       content: getCompletionContent(message),
       type: message.value.type,
       language: message.value.data,
@@ -201,15 +200,12 @@ export const Chat = () => {
         data: [
           ...(messages || []),
           {
-            role: USER_NAME,
-            content: input,
-           }
+            role: USER,
+            content: input
+          }
         ]
       } as ClientMessage)
-      setMessages((prev) => [
-        ...(prev || []),
-        { role: USER_NAME, content: input }
-      ])
+      setMessages((prev) => [...(prev || []), { role: USER, content: input }])
       if (isAutoScrolledEnabled) scrollBottom()
     }
   }
@@ -281,7 +277,7 @@ export const Chat = () => {
                 theme={theme}
                 message={{
                   ...completion,
-                  role: BOT_NAME
+                  role: ASSISTANT
                 }}
               />
             </>
@@ -295,7 +291,7 @@ export const Chat = () => {
           onSelect={scrollBottom}
           language={language}
         />
-        {showModelSelect && <ModelSelect />}
+        {showModelSelect && <ModelSelect apiProvider={apiProvider as string} />}
         <div className={styles.chatOptions}>
           <div>
             <VSCodeButton
@@ -314,7 +310,7 @@ export const Chat = () => {
               appearance="icon"
               onClick={handleScrollBottom}
             >
-              <ScrollDownIcon/>
+              <ScrollDownIcon />
             </VSCodeButton>
             <VSCodeButton
               title="Toggle selection preview"
@@ -329,15 +325,13 @@ export const Chat = () => {
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
-          {apiProvider === ApiProviders.Ollama && (
-            <VSCodeButton
-              title="Select active models"
-              appearance="icon"
-              onClick={handleToggleModelSelection}
-            >
-              <span className={styles.textIcon}>🤖</span>
-            </VSCodeButton>
-          )}
+          <VSCodeButton
+            title="Select active models"
+            appearance="icon"
+            onClick={handleToggleModelSelection}
+          >
+            <span className={styles.textIcon}>🤖</span>
+          </VSCodeButton>
         </div>
         <form>
           <div className={styles.chatBox}>

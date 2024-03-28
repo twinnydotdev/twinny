@@ -95,6 +95,13 @@ export interface TemplateData extends Record<string, string | undefined> {
   code: string
   language: string
 }
+export interface FimTemplateData extends Record<string, string | undefined> {
+  context: string
+  fileName: string
+  prefix: string
+  suffix: string
+  systemMessage: string
+}
 
 export interface ChatTemplateData {
   systemMessage?: string
@@ -148,10 +155,10 @@ export const ApiProviders = {
   LlamaCpp: 'llamacpp',
   LMStudio: 'lmstudio',
   Oobabooga: 'oobabooga',
-  Other: 'other'
+  LiteLLM: 'litellm'
 } as const
 
-export interface OllamaModel {
+export interface ApiModel {
   parent_model: string
   format: string
   family: string
@@ -163,8 +170,8 @@ export interface OllamaModel {
   size: number
 }
 
-export interface OllamaModels {
-  models: OllamaModel[]
+export interface ApiModels {
+  models: ApiModel[]
 }
 
 export type ResolvedInlineCompletion = InlineCompletionItem[]
