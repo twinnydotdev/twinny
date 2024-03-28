@@ -86,7 +86,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _temperature = this._config.get('temperature') as number
   private _templateProvider: TemplateProvider
   private _useFileContext = this._config.get('useFileContext') as boolean
-  private _useMultiLine = this._config.get('useMultiLine') as boolean
+  private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
   private _useTls = this._config.get('useTls') as boolean
   private _usingFimTemplate = false
 
@@ -517,7 +517,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._port = this._config.get('fimApiPort') as number
     this._temperature = this._config.get('temperature') as number
     this._useFileContext = this._config.get('useFileContext') as boolean
-    this._useMultiLine = this._config.get('useMultiLine') as boolean
+    this._useMultiLine = this._config.get('useMultiLineCompletions') as boolean
     this._useTls = this._config.get('useTls') as boolean
     this._logger.updateConfig()
   }

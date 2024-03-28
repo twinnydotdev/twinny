@@ -186,7 +186,7 @@ export class ChatService {
       }
 
       const detailsString = detailsToAppend.length
-        ? `\n\n${detailsToAppend.join('; ')}`
+        ? `\n\n${detailsToAppend.join('\n')}\n`
         : ''
 
       const updatedLastMessage = {
@@ -194,7 +194,7 @@ export class ChatService {
         content: `${lastMessage.content}${detailsString}`
       }
 
-      messages.splice(messages.length - 1, 1, updatedLastMessage)
+      messages[messages.length - 1] = updatedLastMessage
     }
 
     return [systemMessage, ...messages]
