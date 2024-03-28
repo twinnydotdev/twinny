@@ -186,7 +186,7 @@ export class ChatService {
       }
 
       const detailsString = detailsToAppend.length
-        ? `\n\n${detailsToAppend.join('\n')}\n`
+        ? `\n\n${detailsToAppend.join(': ')}`
         : ''
 
       const updatedLastMessage = {
