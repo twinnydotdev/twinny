@@ -297,6 +297,7 @@ export const getChatDataFromProvider = (
       return data?.choices[0].text
     case ApiProviders.LlamaCpp:
       return data?.content
+    case ApiProviders.LiteLLM:
     default:
       if (data?.choices[0].delta.content === 'undefined') {
         return ''
