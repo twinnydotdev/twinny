@@ -263,7 +263,6 @@ export class CompletionFormatter {
       return this
     }
 
-    // Check if syntaxComments is defined before proceeding
     if (
       !languageId ||
       !languageId.syntaxComments ||
