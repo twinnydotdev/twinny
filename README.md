@@ -41,7 +41,7 @@ Through the side bar, have a conversation with your model and get explanations a
 
 #### Other features 
 
-- Works online or offline.
+- Works online or offline
 - Highly configurable api endpoints for fim and chat
 - Conforms to the OpenAI API standard
 - Single or multiline fill-in-middle completions
