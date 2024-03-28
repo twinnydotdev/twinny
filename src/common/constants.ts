@@ -1,9 +1,8 @@
 import { defaultTemplates } from '../extension/templates'
-import { ApiProviders } from './types'
 
 export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
-export const BOT_NAME = 'assistant'
-export const USER_NAME = 'user'
+export const ASSISTANT = 'assistant'
+export const USER = 'user'
 export const TWINNY = '🤖 twinny'
 export const YOU = '👤 You'
 export const EMPTY_MESAGE = 'Sorry, I don’t understand. Please try again.'
@@ -85,7 +84,8 @@ export const FIM_TEMPLATE_FORMAT = {
   deepseek: 'deepseek',
   llama: 'llama',
   stableCode: 'stable-code',
-  starcoder: 'starcoder'
+  starcoder: 'starcoder',
+  custom: 'custom-template'
 }
 
 export const STOP_LLAMA = ['<EOT>']
@@ -99,36 +99,6 @@ export const STOP_DEEPSEEK = [
 ]
 
 export const STOP_STARCODER = ['<|endoftext|>']
-
-export const API_PROVIDER: ApiProviders = {
-  ollama: {
-    fimApiPath: '/api/generate',
-    chatApiPath: '/v1/chat/completions',
-    port: 11434
-  },
-  ollamawebui: {
-    fimApiPath: '/ollama/api/generate',
-    chatApiPath: '/ollama/v1/chat/completions',
-    port: 8080
-  },
-  llamacpp: {
-    fimApiPath: '/completion',
-    chatApiPath: '/completion',
-    port: 8080
-  },
-  lmstudio: {
-    fimApiPath: '/v1/completions',
-    chatApiPath: '/v1/chat/completions',
-    port: 1234
-  },
-  oobabooga: {
-    fimApiPath: '/v1/completions',
-    chatApiPath: '/v1/completions',
-    port: 5000
-  }
-}
-
-export const PROVIDER_NAMES = Object.keys(API_PROVIDER)
 
 export const DEFAULT_TEMPLATE_NAMES = defaultTemplates.map(({ name }) => name)
 

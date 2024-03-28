@@ -5,14 +5,13 @@ Are you fed up of all of those so called "free" Copilot alternatives with paywal
 Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for **Visual Studio Code** and any compatible editors (like VSCodium) designed to work seamlessly with: 
 
 - [Ollama](https://github.com/jmorganca/ollama)
-- [Ollama Web UI](https://github.com/ollama-webui/ollama-webui)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui)
 - [LM Studio](https://github.com/lmstudio-ai)
-
-Like Github Copilot but 100% free and private.
-
-
+- [LiteLLM](https://github.com/BerriAI/litellm)
+- [Ollama Web UI](https://github.com/ollama-webui/ollama-webui)
+- 
+Like Github Copilot but 100% free!
 
 <div align="center">
     <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny">
@@ -41,6 +40,9 @@ Through the side bar, have a conversation with your model and get explanations a
 
 #### Other features 
 
+- Works online or offline.
+- Highly configurable api endpoints for fim and chat
+- Conforms to the OpenAI API standard
 - Single or multiline fill-in-middle completions
 - Customisable prompt templates to add context to completions
 - Easy installation via vscode extensions marketplace or by downloading and running a binary directly
@@ -49,14 +51,14 @@ Through the side bar, have a conversation with your model and get explanations a
 - Accept code solutions directly to editor
 - Create new documents from code blocks
 - Copy generated code solution blocks
-- Chat history preserved per workspace 
+- Chat history preserved per workspace
 
 ## 🚀 Getting Started
 
 ### With Ollama
 
 1. Install the VS code extension [link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) (or if [VSCodium](https://open-vsx.org/extension/rjmacarthy/twinny))
-2. Install [ollama](https://ollama.com/)
+2. Twinny is configured to use Ollama by default as the backend, you can install Ollama here: [ollama](https://ollama.com/)
 3. Choose your model from the [library](https://ollama.com/library) (eg: `codellama:7b`)
 
 ```sh
@@ -69,34 +71,30 @@ You should see the 🤖 icon indicating that twinny is ready to use.
 
 5. See [Keyboard shortcuts](#keyboard-shortcuts) to start using while coding 🎉
 
-### With llama.cpp / LM Studio / Oobabooga
+### With llama.cpp / LM Studio / Oobabooga / LiteLLM or any other provider.
 
 1. Install the VS code extension [link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) (or if [VSCodium](https://open-vsx.org/extension/rjmacarthy/twinny))
-2. Get [llama.cpp](https://github.com/ggerganov/llama.cpp) / LM Studio / Oobabooga
+2. Get [llama.cpp](https://github.com/ggerganov/llama.cpp) / LM Studio / Oobabooga / LiteLLM
 3. Download and run the model locally using the chosen provider
-
 4. Open VS code (if already open a restart might be needed) and press `ctr + shift + T` to open the side panel.
-
 5. From the top ⚙️ icon open the settings page and in the `Api Provider` panel change from `ollama` to `llamacpp` (or others respectively).
-6. In the left panel you should see the 🤖 icon indicating that twinny is ready to use.
-
-5. See [Keyboard shortcuts](#keyboard-shortcuts) to start using while coding 🎉
+6. Update the settings for chat provider, port and hostname etc to be the correct. Please adjust carefully for other providers.
+7. In the left panel you should see the 🤖 icon indicating that twinny is ready to use.
+8. See [Keyboard shortcuts](#keyboard-shortcuts) to start using while coding 🎉
 
 ### With other providers
 
-Twinny supports the OpenAI API specification so in theory any provider should work as long as it supports the specification. 
+Twinny supports the OpenAI API specification so in theory any provider should work as long as it supports the specification.
+
+The easiest way to use OpenAI API through twinny is to use LiteLLM as your procvider as a local proxy, it works seamlessly if configured correctly.
 
 If you find that isn't the case please [open an issue](https://github.com/rjmacarthy/twinny/issues/new/choose) with details of how you are having problems.
-
-
 
 #### Note!
 
 When choosing an API provider the port and API path names will be updated automatically based on the provider you choose to use. These options can also be set manually.
 
 The option for chat model name and fim model name are only applicable to Ollama and Oobabooga providers.
-
-
 
 ## Model support
 
@@ -114,7 +112,6 @@ All instruct models should work for chat generations, but the templates might ne
 
 - For computers with a good GPU, use: `deepseek-coder:6.7b-base-q5_K_M` (or any other good instruct model).
   
-
 ### **Models for FIM (fill in the middle) completions**
 
 For FIM completions, you need to use LLM models called "base models". Unlike instruct models, base models will only try to complete your prompt. They are not designed to answer questions.
@@ -145,6 +142,7 @@ In the settings there is an option called `useFileContext` this will keep track 
 - Sometimes a restart of vscode is required for new settings to take effect, please open an issue if you are having problems with this.
 - Using file context often causes unreliable completions for FIM because small models get confused when provided with more than one file context.
 - See open issues on github to see any known issues that are not yet fixed.
+- LiteLLM fim template needs invetigation
   
 
 If you have a problem with Twinny or have any suggestions please report them on github issues.  Please include your vscode version and OS details in your issue.

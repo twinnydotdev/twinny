@@ -3,7 +3,7 @@ import { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-import { BOT_NAME, MESSAGE_NAME } from '../common/constants'
+import { ASSISTANT, MESSAGE_NAME } from '../common/constants'
 
 import styles from './index.module.css'
 import { LanguageType, Theme, ThemeType } from '../common/types'
@@ -51,7 +51,7 @@ export const CodeBlock = (props: CodeBlockProps) => {
         style={theme === Theme.Dark ? vscDarkPlus : vs}
         language={lang || 'auto'}
       />
-      {role === BOT_NAME && (
+      {role === ASSISTANT && (
         <>
           <div className={styles.codeOptions}>
             <VSCodeButton

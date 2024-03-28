@@ -1,14 +1,11 @@
 import {
   ColorThemeKind,
-  ConfigurationTarget,
   InlineCompletionContext,
   InlineCompletionTriggerKind,
   Position,
   Range,
   TextDocument,
-  commands,
   window,
-  workspace
 } from 'vscode'
 
 import {
@@ -23,11 +20,8 @@ import {
 import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
-  API_PROVIDER,
   CLOSING_BRACKETS,
-  EXTENSION_NAME,
   OPENING_BRACKETS,
-  PROVIDER_NAMES,
   QUOTES,
   SKIP_DECLARATION_SYMBOLS
 } from '../common/constants'
@@ -289,21 +283,6 @@ export const getTheme = () => {
   }
 }
 
-export const setApiDefaults = () => {
-  const config = workspace.getConfiguration('twinny')
-
-  const provider = config.get('apiProvider') as string
-
-  if (PROVIDER_NAMES.includes(provider)) {
-    const { fimApiPath, chatApiPath, port } = API_PROVIDER[provider]
-    config.update('fimApiPath', fimApiPath, ConfigurationTarget.Global)
-    config.update('chatApiPath', chatApiPath, ConfigurationTarget.Global)
-    config.update('chatApiPort', port, ConfigurationTarget.Global)
-    config.update('fimApiPort', port, ConfigurationTarget.Global)
-    commands.executeCommand('workbench.action.openSettings', EXTENSION_NAME)
-  }
-}
-
 export const getChatDataFromProvider = (
   provider: string,
   data: StreamResponse | undefined
@@ -337,6 +316,8 @@ export const getFimDataFromProvider = (
       return data?.response
     case ApiProviders.LlamaCpp:
       return data?.content
+    case ApiProviders.LiteLLM:
+      return data?.choices[0].delta.content
     default:
       if (!data?.choices.length) return
       if (data?.choices[0].text === 'undefined') {

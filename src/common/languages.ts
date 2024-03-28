@@ -37,7 +37,7 @@ export type CodeLanguage =
 export type CodeLanguageDetails = {
   fileExtensions: string[]
   filenamePatterns?: string[]
-  syntaxComments?: { start: string; end?: string }
+  syntaxComments: { start: string; end?: string }
   derivedFrom?: CodeLanguage
   langName?: string
 }
@@ -97,7 +97,8 @@ export const supportedLanguages: {
   },
   json: {
     langName: 'JSON',
-    fileExtensions: ['.json', '.jsonl', '.geojson']
+    fileExtensions: ['.json', '.jsonl', '.geojson'],
+    syntaxComments: { start: '', end: ''}
   },
   jsx: {
     langName: 'JSX',

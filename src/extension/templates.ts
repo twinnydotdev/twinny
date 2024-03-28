@@ -82,5 +82,13 @@ The language is {{../language}}
   {{/if}}
 {{/each}}
   `
+  },
+  {
+    name: 'fim',
+    template: '<PRE>{{{prefix}}} <SUF> {{{suffix}}} <MID>'
+  },
+  {
+    name: 'fim-system',
+    template: ''
   }
 ]

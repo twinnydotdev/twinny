@@ -60,5 +60,5 @@ export class LRUCache<T = string> {
     this.set(key, completion)
   }
 }
-export const cache = new LRUCache(50)
 
+export const cache = new LRUCache(50)

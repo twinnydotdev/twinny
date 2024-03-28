@@ -1,6 +1,6 @@
 import { workspace } from 'vscode'
 import { Logger } from '../common/logger'
-import { OllamaModels } from '../common/types'
+import { ApiModels } from '../common/types'
 
 export class OllamaService {
   private logger : Logger
@@ -19,8 +19,8 @@ export class OllamaService {
     this._baseUrl = `${protocol}://${this._apiHostname}:${port}`
   }
 
-  public fetchModels = async (): Promise<OllamaModels> => {
-    const res = await fetch(this._baseUrl + '/api/tags')
+  public fetchModels = async (resource = '/api/tags'): Promise<ApiModels> => {
+    const res = await fetch(this._baseUrl + resource)
     if (!res.ok) {
       this.logger.error(new Error(`${res.status}`))
       throw Error('Failed to get ollama models')

@@ -4,7 +4,7 @@ import { MESSAGE_KEY, MESSAGE_NAME, SETTING_KEY } from '../common/constants'
 import {
   ClientMessage,
   LanguageType,
-  OllamaModel,
+  ApiModel,
   ServerMessage,
   ThemeType
 } from '../common/types'
@@ -168,13 +168,13 @@ export const useConfigurationSetting = (key: string) => {
   return { configurationSetting }
 }
 
-export const useOllamaModels = () => {
-  const [models, setModels] = useState<OllamaModel[] | undefined>([])
+export const useModels = () => {
+  const [models, setModels] = useState<ApiModel[] | undefined>([])
   const [chatModelName, setChatModel] = useState<string>()
   const [fimModelName, setFimModel] = useState<string>()
   const configValueKeys = [SETTING_KEY.chatModelName, SETTING_KEY.fimModelName]
   const handler = (event: MessageEvent) => {
-    const message: ServerMessage<OllamaModel[]> = event.data
+    const message: ServerMessage<ApiModel[]> = event.data
     if (message?.type === MESSAGE_NAME.twinnyFetchOllamaModels) {
       setModels(message?.value.data)
     }
