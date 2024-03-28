@@ -10,7 +10,8 @@ Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion
 - [LM Studio](https://github.com/lmstudio-ai)
 - [LiteLLM](https://github.com/BerriAI/litellm)
 - [Ollama Web UI](https://github.com/ollama-webui/ollama-webui)
-- 
+
+
 Like Github Copilot but 100% free!
 
 <div align="center">
