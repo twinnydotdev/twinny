@@ -159,7 +159,7 @@ export const getStopWordsChosen = (format: string) => {
 }
 
 export const getStopWords = (fimModel: string, format: string) => {
-  if (format === FIM_TEMPLATE_FORMAT.automatic) {
+  if (format === FIM_TEMPLATE_FORMAT.automatic || format === FIM_TEMPLATE_FORMAT.custom) {
     return getStopWordsAuto(fimModel)
   }
   return getStopWordsChosen(format)

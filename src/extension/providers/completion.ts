@@ -37,7 +37,7 @@ import {
   MAX_CONTEXT_LINE_COUNT
 } from '../../common/constants'
 import { streamResponse } from '../stream'
-import { createStreamRequestBodyFim } from '../model-options'
+import { createStreamRequestBodyFim } from '../provider-options'
 import { Logger } from '../../common/logger'
 import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
@@ -411,9 +411,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private removeStopWords(completion: string) {
-    let filteredCompletion = ''
+    let filteredCompletion = completion
     this._stopWords.forEach(
-      (stopWord) => (filteredCompletion = completion.split(stopWord).join(''))
+      (stopWord) => {
+        filteredCompletion = filteredCompletion.split(stopWord).join('')
+      }
     )
     return filteredCompletion
   }

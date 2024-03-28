@@ -316,6 +316,8 @@ export const getFimDataFromProvider = (
       return data?.response
     case ApiProviders.LlamaCpp:
       return data?.content
+    case ApiProviders.LiteLLM:
+      return data?.choices[0].delta.content
     default:
       if (!data?.choices.length) return
       if (data?.choices[0].text === 'undefined') {

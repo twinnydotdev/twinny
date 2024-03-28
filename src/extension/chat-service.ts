@@ -15,7 +15,7 @@ import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from '../common/languages'
 import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
-import { createStreamRequestBody } from './model-options'
+import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 
 export class ChatService {

@@ -1,3 +1,4 @@
+import { USER } from '../common/constants'
 import {
   MessageRoleContent,
   ApiProviders,
@@ -83,7 +84,7 @@ export function createStreamRequestBodyFim(
     case ApiProviders.LiteLLM:
     default:
       return {
-        prompt,
+        messages: [{ content: prompt, role: USER }],
         model: options.model,
         stream: true,
         max_tokens: options.numPredictChat,
