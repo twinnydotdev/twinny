@@ -161,26 +161,22 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
       this._debouncer = setTimeout(() => {
         this._lock.acquire('completion', () => {
-          return new Promise(
-            (_resolve: (completion: ResolvedInlineCompletion) => void) => {
-              const { requestBody, requestOptions } =
-                this.buildStreamRequest(prompt)
+          const { requestBody, requestOptions } =
+            this.buildStreamRequest(prompt)
 
-              try {
-                streamResponse({
-                  body: requestBody,
-                  options: requestOptions,
-                  onStart: (controller) => this.onStart(controller),
-                  onEnd: () => this.onEnd(prefixSuffix, _resolve),
-                  onData: (data) => this.onData(data, prefixSuffix, _resolve),
-                  onError: this.onError
-                })
-              } catch (error) {
-                this.onError()
-                reject([])
-              }
-            }
-          ).then(resolve, reject)
+          try {
+            streamResponse({
+              body: requestBody,
+              options: requestOptions,
+              onStart: (controller) => this.onStart(controller),
+              onEnd: () => this.onEnd(prefixSuffix, resolve),
+              onData: (data) => this.onData(data, resolve),
+              onError: this.onError
+            })
+          } catch (error) {
+            this.onError()
+            reject([])
+          }
         })
       }, this._debounceWait)
     })
@@ -275,7 +271,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private onData(
     data: StreamResponse | undefined,
-    prefixSuffix: PrefixSuffix,
     done: (completion: ResolvedInlineCompletion) => void
   ) {
     try {
@@ -296,7 +291,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._logger.log(
           `Streaming response end due to line break ${this._nonce} \nCompletion: ${this._completion}`
         )
-        return this.resolveCompletion(prefixSuffix, done)
+        return this._abortController?.abort()
       }
 
       const parseableCompletion = this.getParseableCompletion()
@@ -306,7 +301,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._logger.log(
           `Streaming response end due to parseable completion ${this._nonce} \nCompletion: ${this._completion}`
         )
-        return this.resolveCompletion(prefixSuffix, done)
+        return this._abortController?.abort()
       }
 
       const lineBreakCount = getLineBreakCount(this._completion)
@@ -315,7 +310,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._logger.log(
           `Streaming response end due to max lines ${this._nonce} \nCompletion: ${this._completion}`
         )
-        return this.resolveCompletion(prefixSuffix, done)
+        return this._abortController?.abort()
       }
     } catch (e) {
       console.error(e)
