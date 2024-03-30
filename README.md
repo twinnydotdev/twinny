@@ -87,19 +87,17 @@ You should see the 🤖 icon indicating that twinny is ready to use.
 
 Twinny supports the OpenAI API specification so in theory any provider should work as long as it supports the specification.
 
-The easiest way to use OpenAI API through twinny is to use LiteLLM as your procvider as a local proxy, it works seamlessly if configured correctly.
+The easiest way to use OpenAI API through twinny is to use LiteLLM as your provider as a local proxy, it works seamlessly if configured correctly.
 
 If you find that isn't the case please [open an issue](https://github.com/rjmacarthy/twinny/issues/new/choose) with details of how you are having problems.
 
 #### Note!
 
-When choosing an API provider the port and API path names will be updated automatically based on the provider you choose to use. These options can also be set manually.
-
 The option for chat model name and fim model name are only applicable to Ollama and Oobabooga providers.
 
 ## Model support
 
-Twinny works with any model as long as it can run on your machine and it exposes a OpenAI API compliant endpoint.
+Twinny chat works with any model as long as it can run on your machine or in the cloud and it exposes a OpenAI API compliant endpoint.
 
 Choosing a model is influenced a lot by the machine it will be running, a smaller model will give you a faster response but with a loss in accuracy. 
 
