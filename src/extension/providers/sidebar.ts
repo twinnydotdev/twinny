@@ -123,7 +123,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this.view?.webview.postMessage({
         type: MESSAGE_NAME.twinnyFetchOllamaModels,
         value: {
-          data: models.models
+          data: models
         }
       } as ServerMessage<ApiModel[]>)
     } catch (e) {

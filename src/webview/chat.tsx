@@ -13,12 +13,10 @@ import {
   ASSISTANT,
   MESSAGE_KEY,
   MESSAGE_NAME,
-  SETTING_KEY,
   USER
 } from '../common/constants'
 
 import {
-  useConfigurationSetting,
   useLanguage,
   useSelection,
   useTheme,
@@ -56,9 +54,7 @@ export const Chat = () => {
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const [showModelSelect, setShowModelSelect] = useState<boolean>(false)
-  const { configurationSetting: apiProvider } = useConfigurationSetting(
-    SETTING_KEY.apiProvider
-  )
+
 
   const markdownRef = useRef<HTMLDivElement>(null)
   const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
@@ -291,7 +287,7 @@ export const Chat = () => {
           onSelect={scrollBottom}
           language={language}
         />
-        {showModelSelect && <ModelSelect apiProvider={apiProvider as string} />}
+        {showModelSelect && <ModelSelect />}
         <div className={styles.chatOptions}>
           <div>
             <VSCodeButton
