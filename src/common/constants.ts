@@ -65,7 +65,8 @@ export const MESSAGE_KEY = {
 export const SETTING_KEY = {
   fimModelName: 'fimModelName',
   chatModelName: 'chatModelName',
-  apiProvider: 'apiProvider'
+  apiProvider: 'apiProvider',
+  apiProviderFim: 'apiProviderFim'
 }
 
 export const CONTEXT_NAME = {
