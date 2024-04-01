@@ -109,7 +109,13 @@ export class ChatService {
       CONTEXT_NAME.twinnyGeneratingText,
       false
     )
-    if (onEnd) return onEnd(this._completion)
+    if (onEnd) {
+      onEnd(this._completion)
+      this._view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnyOnEnd,
+      } as ServerMessage)
+      return
+    }
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {

@@ -31,7 +31,8 @@ import {
   OPENING_BRACKETS,
   QUOTES,
   QUOTES_REGEX,
-  SKIP_DECLARATION_SYMBOLS
+  SKIP_DECLARATION_SYMBOLS,
+  TWINNY
 } from '../common/constants'
 import { Logger } from '../common/logger'
 
@@ -392,18 +393,11 @@ export const getGitChanges = async (): Promise<string> => {
 }
 
 export const getTerminal = async (): Promise<Terminal | undefined> => {
-  const activeTerminal = window.activeTerminal
-  if (activeTerminal) {
-    return activeTerminal
-  }
-  const terminals = window.terminals
-  const items = terminals.map((t) => ({
-    label: `name: ${t.name}`,
-    terminal: t
-  }))
-
-  const item = await window.showQuickPick(items)
-  return item ? item.terminal : undefined
+  const twinnyTerminal = window.terminals.find((t) => t.name === TWINNY)
+  if (twinnyTerminal) return twinnyTerminal
+  const terminal = window.createTerminal({ name: TWINNY })
+  terminal.show()
+  return terminal
 }
 
 export const getTerminalExists = (): boolean => {

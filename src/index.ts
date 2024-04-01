@@ -143,12 +143,12 @@ export async function activate(context: ExtensionContext) {
       'twinny.sendTerminalText',
       async (commitMessage: string) => {
         const terminal = await getTerminal()
-        terminal?.sendText(getSanitizedCommitMessage(commitMessage))
+        terminal?.sendText(getSanitizedCommitMessage(commitMessage), false)
       }
     ),
     commands.registerCommand('twinny.getGitCommitMessage', () => {
       commands.executeCommand('twinny.sidebar.focus')
-      delayExecution(() => sidebarProvider.getGitCommitMessage())
+      delayExecution(() => sidebarProvider.getGitCommitMessage(), 400)
     }),
     commands.registerCommand('twinny.newChat', () => {
       sidebarProvider.setTwinnyWorkspaceContext({

@@ -70,6 +70,8 @@ export const Chat = () => {
   const selection = useSelection(scrollBottom)
 
   const handleCompletionEnd = (message: ServerMessage) => {
+    if (!message.value) return
+
     setMessages((prev) => {
       const update = [
         ...(prev || []),
