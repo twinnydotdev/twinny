@@ -70,30 +70,30 @@ export const Chat = () => {
   const selection = useSelection(scrollBottom)
 
   const handleCompletionEnd = (message: ServerMessage) => {
-    if (!message.value) return
-
-    setMessages((prev) => {
-      const update = [
-        ...(prev || []),
-        {
-          role: ASSISTANT,
-          content: getCompletionContent(message)
-        }
-      ]
-      global.vscode.postMessage({
-        type: MESSAGE_NAME.twinnySetWorkspaceContext,
-        key: MESSAGE_KEY.lastConversation,
-        data: update
-      } as ClientMessage<MessageType[]>)
-      return update
-    })
+    if (message.value) {
+      setMessages((prev) => {
+        const update = [
+          ...(prev || []),
+          {
+            role: ASSISTANT,
+            content: getCompletionContent(message)
+          }
+        ]
+        global.vscode.postMessage({
+          type: MESSAGE_NAME.twinnySetWorkspaceContext,
+          key: MESSAGE_KEY.lastConversation,
+          data: update
+        } as ClientMessage<MessageType[]>)
+        return update
+      })
+      setTimeout(() => {
+        chatRef.current?.focus()
+        stopRef.current = false
+      }, 200)
+    }
     setCompletion(null)
     setLoading(false)
     generatingRef.current = false
-    setTimeout(() => {
-      chatRef.current?.focus()
-      stopRef.current = false
-    }, 200)
   }
 
   const handleAddTemplateMessage = (message: ServerMessage) => {
