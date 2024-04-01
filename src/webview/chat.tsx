@@ -23,7 +23,6 @@ import {
 import {
   DisabledAutoScrollIcon,
   EnabledAutoScrollIcon,
-  ScrollDownIcon,
 } from './icons'
 
 import { Suggestions } from './suggestions'
@@ -292,7 +291,7 @@ export const Chat = () => {
             </VSCodeButton>
             <VSCodeButton
               onClick={handleGetGitChanges}
-              title="Generate commit message"
+              title="Generate commit message from staged changes"
               appearance="icon"
             >
               <span className='codicon codicon-git-pull-request'></span>
@@ -302,9 +301,8 @@ export const Chat = () => {
               appearance="icon"
               onClick={handleScrollBottom}
             >
-              <ScrollDownIcon />
+              <span className='codicon codicon-arrow-down'></span>
             </VSCodeButton>
-            <span className='codicon codicon-arrow-down'></span>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           <VSCodeButton

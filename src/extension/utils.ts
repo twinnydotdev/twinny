@@ -5,9 +5,13 @@ import {
   Position,
   Range,
   TextDocument,
-  extensions,
   window,
+  workspace
 } from 'vscode'
+import * as util from 'util'
+import { exec } from 'child_process'
+
+const execAsync = util.promisify(exec)
 
 import {
   Theme,
@@ -243,7 +247,7 @@ export const getNextLineIsClosingBracket = () => {
   if (!editor) return false
   const position = editor.selection.active
   const nextLineText = editor.document
-    .lineAt(Math.min(position.line + 1, editor.document.lineCount -1))
+    .lineAt(Math.min(position.line + 1, editor.document.lineCount - 1))
     .text.trim()
   return getIsOnlyClosingBrackets(nextLineText)
 }
@@ -361,30 +365,27 @@ export function safeParseJsonResponse(
   }
 }
 
-export const getGitChanges = async () => {
-  let diffString = ''
-  const gitExtension = extensions.getExtension('vscode.git')
-  if (!gitExtension) {
-    console.log('Git extension is not available')
-    return ''
-  }
-
-  await gitExtension.activate()
-  if (!gitExtension.exports.getAPI) {
-    console.log('Git API is not available')
-    return ''
-  }
-
-  const api = gitExtension.exports.getAPI(1)
-  if (api && api.repositories.length > 0) {
-    const repo = api.repositories[0]
-    const diff: string[] = await repo.getDiff()
-    diffString = diff.join('')
+export const getCurrentWorkspacePath = (): string | undefined => {
+  if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
+    const workspaceFolder = workspace.workspaceFolders[0]
+    return workspaceFolder.uri.fsPath
   } else {
+    window.showInformationMessage('No workspace is open.')
+    return undefined
+  }
+}
+
+export const getGitChanges = async (): Promise<string> => {
+  try {
+    const path = getCurrentWorkspacePath()
+    const { stdout } = await execAsync('git diff --cached', {
+      cwd: path
+    })
+    return stdout
+  } catch (error) {
+    console.error('Error executing git command:', error)
     return ''
   }
-
-  return diffString
 }
 
 export const logStreamOptions = (opts: StreamRequest) => {

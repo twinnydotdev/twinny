@@ -1,6 +1,11 @@
 import * as vscode from 'vscode'
 
-import { getGitChanges as getChangedUnidiff, getLanguage, getTextSelection, getTheme } from '../utils'
+import {
+  getGitChanges,
+  getLanguage,
+  getTextSelection,
+  getTheme
+} from '../utils'
 import { MESSAGE_KEY, MESSAGE_NAME } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -100,13 +105,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public getGitCommitMessage = async () => {
-    const unidiff = await getChangedUnidiff()
-    if (!unidiff?.length) return
+    const diff = await getGitChanges()
+    if (!diff.length) {
+      vscode.window.showInformationMessage(
+        'No changes found in the current workspace.'
+      )
+      return
+    }
     this.setTwinnyWorkspaceContext({
       key: MESSAGE_KEY.lastConversation,
       data: []
     })
-    this.chatService?.streamTemplateCompletion('commit-message', unidiff)
+    this.chatService?.streamTemplateCompletion('commit-message', diff)
   }
 
   public getConfigurationValue = (data: ClientMessage) => {
