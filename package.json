@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.10.7",
+  "version": "3.10.8",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -139,6 +139,10 @@
         "title": "Stop generation"
       },
       {
+        "command": "twinny.getGitCommitMessage",
+        "title": "Generate git commit message"
+      },
+      {
         "command": "twinny.disable",
         "title": "Disable twinny",
         "shortTitle": "Disable twinny"
@@ -194,6 +198,10 @@
         "key": "CTRL+SHIFT+/",
         "command": "twinny.stopGeneration",
         "when": "twinnyGeneratingText"
+      },
+      {
+        "key": "ctrl+shift+t ctrl+shift+g",
+        "command": "twinny.getGitCommitMessage"
       }
     ],
     "viewsContainers": {

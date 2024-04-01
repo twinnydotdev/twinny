@@ -4,9 +4,15 @@ import {
   InlineCompletionTriggerKind,
   Position,
   Range,
+  Terminal,
   TextDocument,
   window,
+  workspace
 } from 'vscode'
+import * as util from 'util'
+import { exec } from 'child_process'
+
+const execAsync = util.promisify(exec)
 
 import {
   Theme,
@@ -21,9 +27,12 @@ import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
+  LINE_BREAK_REGEX,
   OPENING_BRACKETS,
   QUOTES,
-  SKIP_DECLARATION_SYMBOLS
+  QUOTES_REGEX,
+  SKIP_DECLARATION_SYMBOLS,
+  TWINNY
 } from '../common/constants'
 import { Logger } from '../common/logger'
 
@@ -242,7 +251,7 @@ export const getNextLineIsClosingBracket = () => {
   if (!editor) return false
   const position = editor.selection.active
   const nextLineText = editor.document
-    .lineAt(Math.min(position.line + 1, editor.document.lineCount -1))
+    .lineAt(Math.min(position.line + 1, editor.document.lineCount - 1))
     .text.trim()
   return getIsOnlyClosingBrackets(nextLineText)
 }
@@ -358,6 +367,54 @@ export function safeParseJsonResponse(
   } catch (e) {
     return undefined
   }
+}
+
+export const getCurrentWorkspacePath = (): string | undefined => {
+  if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
+    const workspaceFolder = workspace.workspaceFolders[0]
+    return workspaceFolder.uri.fsPath
+  } else {
+    window.showInformationMessage('No workspace is open.')
+    return undefined
+  }
+}
+
+export const getGitChanges = async (): Promise<string> => {
+  try {
+    const path = getCurrentWorkspacePath()
+    const { stdout } = await execAsync('git diff --cached', {
+      cwd: path
+    })
+    return stdout
+  } catch (error) {
+    console.error('Error executing git command:', error)
+    return ''
+  }
+}
+
+export const getTerminal = async (): Promise<Terminal | undefined> => {
+  const twinnyTerminal = window.terminals.find((t) => t.name === TWINNY)
+  if (twinnyTerminal) return twinnyTerminal
+  const terminal = window.createTerminal({ name: TWINNY })
+  terminal.show()
+  return terminal
+}
+
+export const getTerminalExists = (): boolean => {
+  if (window.terminals.length === 0) {
+    window.showErrorMessage('No active terminals')
+    return false
+  }
+  return true
+}
+
+export const getSanitizedCommitMessage = (commitMessage: string) => {
+  const sanitizedMessage = commitMessage
+    .replace(QUOTES_REGEX, '')
+    .replace(LINE_BREAK_REGEX, '')
+    .trim()
+
+  return `git commit -m "${sanitizedMessage}"`
 }
 
 export const logStreamOptions = (opts: StreamRequest) => {

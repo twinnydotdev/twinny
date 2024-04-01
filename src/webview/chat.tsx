@@ -8,7 +8,6 @@ import {
   VSCodeBadge
 } from '@vscode/webview-ui-toolkit/react'
 
-import { Selection } from './selection'
 import {
   ASSISTANT,
   MESSAGE_KEY,
@@ -17,7 +16,6 @@ import {
 } from '../common/constants'
 
 import {
-  useLanguage,
   useSelection,
   useTheme,
   useWorkSpaceContext
@@ -25,9 +23,6 @@ import {
 import {
   DisabledAutoScrollIcon,
   EnabledAutoScrollIcon,
-  DisabledSelectionIcon,
-  EnabledSelectionIcon,
-  ScrollDownIcon
 } from './icons'
 
 import { Suggestions } from './suggestions'
@@ -45,17 +40,13 @@ import styles from './index.module.css'
 const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
-  const [isSelectionVisible, setIsSelectionVisible] = useState<boolean>(false)
   const generatingRef = useRef(false)
   const stopRef = useRef(false)
   const theme = useTheme()
-  const language = useLanguage()
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const [showModelSelect, setShowModelSelect] = useState<boolean>(false)
-
-
   const markdownRef = useRef<HTMLDivElement>(null)
   const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
   const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
@@ -79,6 +70,8 @@ export const Chat = () => {
   const selection = useSelection(scrollBottom)
 
   const handleCompletionEnd = (message: ServerMessage) => {
+    if (!message.value) return
+
     setMessages((prev) => {
       const update = [
         ...(prev || []),
@@ -220,14 +213,16 @@ export const Chat = () => {
     })
   }
 
+  const handleGetGitChanges = () => {
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyGetGitChanges,
+    } as ClientMessage)
+  }
+
   const handleScrollBottom = () => {
     if (markdownRef.current) {
       markdownRef.current.scrollTop = markdownRef.current.scrollHeight
     }
-  }
-
-  const handleToggleSelection = () => {
-    setIsSelectionVisible((prev) => !prev)
   }
 
   const handleToggleModelSelection = () => {
@@ -282,11 +277,6 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
-        <Selection
-          isVisible={isSelectionVisible}
-          onSelect={scrollBottom}
-          language={language}
-        />
         {showModelSelect && <ModelSelect />}
         <div className={styles.chatOptions}>
           <div>
@@ -302,22 +292,18 @@ export const Chat = () => {
               )}
             </VSCodeButton>
             <VSCodeButton
+              onClick={handleGetGitChanges}
+              title="Generate commit message from staged changes"
+              appearance="icon"
+            >
+              <span className='codicon codicon-git-pull-request'></span>
+            </VSCodeButton>
+            <VSCodeButton
               title="Scroll down to the bottom"
               appearance="icon"
               onClick={handleScrollBottom}
             >
-              <ScrollDownIcon />
-            </VSCodeButton>
-            <VSCodeButton
-              title="Toggle selection preview"
-              appearance="icon"
-              onClick={handleToggleSelection}
-            >
-              {isSelectionVisible ? (
-                <EnabledSelectionIcon />
-              ) : (
-                <DisabledSelectionIcon />
-              )}
+              <span className='codicon codicon-arrow-down'></span>
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>

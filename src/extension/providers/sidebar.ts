@@ -1,6 +1,11 @@
 import * as vscode from 'vscode'
 
-import { getLanguage, getTextSelection, getTheme } from '../utils'
+import {
+  getGitChanges,
+  getLanguage,
+  getTextSelection,
+  getTheme
+} from '../utils'
 import { MESSAGE_KEY, MESSAGE_NAME } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -91,9 +96,31 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [MESSAGE_NAME.twinnyTextSelection]: this.getSelectedText,
           [MESSAGE_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
           [MESSAGE_NAME.twinnySetConfigValue]: this.setConfigurationValue,
-          [MESSAGE_NAME.twinnyGetConfigValue]: this.getConfigurationValue
+          [MESSAGE_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
+          [MESSAGE_NAME.twinnyGetGitChanges]: this.getGitCommitMessage
         }
         eventHandlers[message.type as string]?.(message)
+      }
+    )
+  }
+
+  public getGitCommitMessage = async () => {
+    const diff = await getGitChanges()
+    if (!diff.length) {
+      vscode.window.showInformationMessage(
+        'No changes found in the current workspace.'
+      )
+      return
+    }
+    this.setTwinnyWorkspaceContext({
+      key: MESSAGE_KEY.lastConversation,
+      data: []
+    })
+    this.chatService?.streamTemplateCompletion(
+      'commit-message',
+      diff,
+      (completion: string) => {
+        vscode.commands.executeCommand('twinny.sendTerminalText', completion)
       }
     )
   }

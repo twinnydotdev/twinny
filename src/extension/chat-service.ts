@@ -80,10 +80,14 @@ export class ChatService {
     return { requestOptions, requestBody }
   }
 
-  private onStreamData = (streamResponse: StreamResponse | undefined) => {
+  private onStreamData = (
+    streamResponse: StreamResponse | undefined,
+    onEnd?: (completion: string) => void
+  ) => {
     try {
       const data = getChatDataFromProvider(this._apiProvider, streamResponse)
       this._completion = this._completion + data
+      if (onEnd) return
       this._view?.webview.postMessage({
         type: MESSAGE_NAME.twinnyOnCompletion,
         value: {
@@ -98,13 +102,20 @@ export class ChatService {
     }
   }
 
-  private onStreamEnd = () => {
+  private onStreamEnd = (onEnd?: (completion: string) => void) => {
     this._statusBar.text = '🤖'
     commands.executeCommand(
       'setContext',
       CONTEXT_NAME.twinnyGeneratingText,
       false
     )
+    if (onEnd) {
+      onEnd(this._completion)
+      this._view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnyOnEnd,
+      } as ServerMessage)
+      return
+    }
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnEnd,
       value: {
@@ -126,7 +137,6 @@ export class ChatService {
   }
 
   private onStreamStart = (controller: AbortController) => {
-    this._statusBar.text = '$(loading~spin)'
     this._controller = controller
     commands.executeCommand(
       'setContext',
@@ -215,11 +225,13 @@ export class ChatService {
 
   private buildTemplatePrompt = async (
     template: string,
-    language: CodeLanguageDetails
+    language: CodeLanguageDetails,
+    context?: string
   ) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
-    const selectionContext = editor?.document.getText(selection) || ''
+    const selectionContext =
+      editor?.document.getText(selection) || context || ''
     const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
       template,
       {
@@ -232,16 +244,19 @@ export class ChatService {
 
   private streamResponse({
     requestBody,
-    requestOptions
+    requestOptions,
+    onEnd
   }: {
     requestBody: StreamBodyBase
     requestOptions: StreamRequestOptions
+    onEnd?: (completion: string) => void
   }) {
     return streamResponse({
       body: requestBody,
       options: requestOptions,
-      onData: this.onStreamData,
-      onEnd: this.onStreamEnd,
+      onData: (streamResponse: StreamResponse | undefined) =>
+        this.onStreamData(streamResponse, onEnd),
+      onEnd: () => this.onStreamEnd(onEnd),
       onStart: this.onStreamStart,
       onError: this.onStreamError
     })
@@ -277,26 +292,31 @@ export class ChatService {
     return this.streamResponse({ requestBody, requestOptions })
   }
 
-  public async streamTemplateCompletion(promptTemplate: string) {
+  public async streamTemplateCompletion(
+    promptTemplate: string,
+    context?: string,
+    onEnd?: (completion: string) => void
+  ) {
     const { language } = getLanguage()
     this._completion = ''
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
     this.focusChatTab()
+    const { prompt, selection } = await this.buildTemplatePrompt(
+      promptTemplate,
+      language,
+      context
+    )
+    this._statusBar.text = '$(loading~spin)'
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinnyOnLoading
     })
-    const { prompt, selection } = await this.buildTemplatePrompt(
-      promptTemplate,
-      language
-    )
     this._view?.webview.postMessage({
       type: MESSAGE_NAME.twinngAddMessage,
       value: {
         completion:
           kebabToSentence(promptTemplate) + '\n\n' + '```\n' + selection,
-        data: getLanguage(),
-        type: this._promptTemplate
+        data: getLanguage()
       }
     } as ServerMessage)
     const messageRoleContent = await this.buildMesageRoleContent(
@@ -312,7 +332,7 @@ export class ChatService {
       prompt,
       messageRoleContent
     )
-    return this.streamResponse({ requestBody, requestOptions })
+    return this.streamResponse({ requestBody, requestOptions, onEnd })
   }
 
   private updateConfig() {

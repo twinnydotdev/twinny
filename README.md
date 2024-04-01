@@ -46,6 +46,7 @@ Through the side bar, have a conversation with your model and get explanations a
 - Conforms to the OpenAI API standard
 - Single or multiline fill-in-middle completions
 - Customisable prompt templates to add context to completions
+- Generate git commit messages from staged changes (CTRL+SHIFT+T CTRL+SHIFT+G)
 - Easy installation via vscode extensions marketplace or by downloading and running a binary directly
 - Customisable settings to change API provider, model name, port number and path 
 - Ollama, llamacpp, oobabooga and LM Studio API compatible
@@ -123,13 +124,13 @@ If using Llama the model must support the Llama special tokens.
 
 ## Keyboard shortcuts
 
-| Shortcut                     | Description                              |
-| ---------------------------- | ---------------------------------------- |
-| `ALT+\`                      | Trigger inline code completion           |
-| `CTRL+SHIFT+/`               | Stop the inline code generation          | 
-| `Tab`                        | Accept the inline code generated         |
-| `CTRL+SHIFT+t`               | Open twinny sidebar                      |
-
+| Shortcut                     | Description                                  |
+| ---------------------------- | ---------------------------------------------|
+| `ALT+\`                      | Trigger inline code completion               |
+| `CTRL+SHIFT+/`               | Stop the inline code generation              | 
+| `Tab`                        | Accept the inline code generated             |
+| `CTRL+SHIFT+t`               | Open twinny sidebar                          |
+| `CTRL+SHIFT+t CTRL+SHIT+g`   | Generate commit messages from staged changes |
 
 ## Workspace context
 

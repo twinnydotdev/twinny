@@ -65,6 +65,20 @@ For code refactoring, use markdown with code formatting.
   `
   },
   {
+    name: 'commit-message',
+    template: `You are an agent who generates concise git commit messages.
+Only reply with one line of text.
+
+- Answer under 100 characters.
+
+E.g "Added a new feature"
+
+Here is the unidiff: \`\`\`{{code}}\`\`\`
+
+<commit message goes here>
+    `
+  },
+  {
     name: 'chat',
     template: `{{#if (eq messages.length 1)}}
 {{{systemMessage}}}

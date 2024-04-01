@@ -12,7 +12,11 @@ import * as vscode from 'vscode'
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
-import { delayExecution } from './extension/utils'
+import {
+  delayExecution,
+  getTerminal,
+  getSanitizedCommitMessage
+} from './extension/utils'
 import { setContext } from './extension/context'
 import {
   CONTEXT_NAME,
@@ -135,6 +139,17 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_NAME
       )
     }),
+    commands.registerCommand(
+      'twinny.sendTerminalText',
+      async (commitMessage: string) => {
+        const terminal = await getTerminal()
+        terminal?.sendText(getSanitizedCommitMessage(commitMessage), false)
+      }
+    ),
+    commands.registerCommand('twinny.getGitCommitMessage', () => {
+      commands.executeCommand('twinny.sidebar.focus')
+      delayExecution(() => sidebarProvider.getGitCommitMessage(), 400)
+    }),
     commands.registerCommand('twinny.newChat', () => {
       sidebarProvider.setTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation,
@@ -144,6 +159,7 @@ export async function activate(context: ExtensionContext) {
         key: MESSAGE_KEY.lastConversation
       })
     }),
+
     window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),
     statusBar
   )
