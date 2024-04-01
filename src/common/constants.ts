@@ -16,6 +16,7 @@ export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
+export const QUOTES_REGEX = /["'`]/g
 export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ['=']
 export const IMPORT_SEPARATOR = [',', '{']

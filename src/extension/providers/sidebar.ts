@@ -116,7 +116,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       key: MESSAGE_KEY.lastConversation,
       data: []
     })
-    this.chatService?.streamTemplateCompletion('commit-message', diff)
+    this.chatService?.streamTemplateCompletion(
+      'commit-message',
+      diff,
+      (completion: string) => {
+        vscode.commands.executeCommand('twinny.sendTerminalText', completion)
+      }
+    )
   }
 
   public getConfigurationValue = (data: ClientMessage) => {

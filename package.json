@@ -139,6 +139,10 @@
         "title": "Stop generation"
       },
       {
+        "command": "twinny.getGitCommitMessage",
+        "title": "Generate git commit message"
+      },
+      {
         "command": "twinny.disable",
         "title": "Disable twinny",
         "shortTitle": "Disable twinny"
@@ -194,6 +198,10 @@
         "key": "CTRL+SHIFT+/",
         "command": "twinny.stopGeneration",
         "when": "twinnyGeneratingText"
+      },
+      {
+        "key": "ctrl+shift+t ctrl+shift+g",
+        "command": "twinny.getGitCommitMessage"
       }
     ],
     "viewsContainers": {

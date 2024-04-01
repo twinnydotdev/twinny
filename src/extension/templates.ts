@@ -67,15 +67,13 @@ For code refactoring, use markdown with code formatting.
   {
     name: 'commit-message',
     template: `You are an agent who generates git commit messages.
-      Do not explain your response.
+      Do not explain your response, reply in text only for terminal usage.
 
       Answer in a markdown codeblock under 100 characters.
 
       Here is the unidiff: \`\`\`{{code}}\`\`\`
 
-      \`\`\`
       <commit message goes here>
-      \`\`\`
     `
   },
   {

@@ -4,6 +4,7 @@ import {
   InlineCompletionTriggerKind,
   Position,
   Range,
+  Terminal,
   TextDocument,
   window,
   workspace
@@ -26,8 +27,10 @@ import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
+  LINE_BREAK_REGEX,
   OPENING_BRACKETS,
   QUOTES,
+  QUOTES_REGEX,
   SKIP_DECLARATION_SYMBOLS
 } from '../common/constants'
 import { Logger } from '../common/logger'
@@ -386,6 +389,38 @@ export const getGitChanges = async (): Promise<string> => {
     console.error('Error executing git command:', error)
     return ''
   }
+}
+
+export const getTerminal = async (): Promise<Terminal | undefined> => {
+  const activeTerminal = window.activeTerminal
+  if (activeTerminal) {
+    return activeTerminal
+  }
+  const terminals = window.terminals
+  const items = terminals.map((t) => ({
+    label: `name: ${t.name}`,
+    terminal: t
+  }))
+
+  const item = await window.showQuickPick(items)
+  return item ? item.terminal : undefined
+}
+
+export const getTerminalExists = (): boolean => {
+  if (window.terminals.length === 0) {
+    window.showErrorMessage('No active terminals')
+    return false
+  }
+  return true
+}
+
+export const getSanitizedCommitMessage = (commitMessage: string) => {
+  const sanitizedMessage = commitMessage
+    .replace(QUOTES_REGEX, '')
+    .replace(LINE_BREAK_REGEX, '')
+    .trim()
+
+  return `git commit -m "${sanitizedMessage}"`
 }
 
 export const logStreamOptions = (opts: StreamRequest) => {
