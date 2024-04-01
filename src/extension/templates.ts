@@ -66,14 +66,16 @@ For code refactoring, use markdown with code formatting.
   },
   {
     name: 'commit-message',
-    template: `You are an agent who generates git commit messages.
-      Do not explain your response, reply in text only for terminal usage.
+    template: `You are an agent who generates concise git commit messages.
+Only reply with one line of text.
 
-      Answer in a markdown codeblock under 100 characters.
+- Answer under 100 characters.
 
-      Here is the unidiff: \`\`\`{{code}}\`\`\`
+E.g "Added a new feature"
 
-      <commit message goes here>
+Here is the unidiff: \`\`\`{{code}}\`\`\`
+
+<commit message goes here>
     `
   },
   {
