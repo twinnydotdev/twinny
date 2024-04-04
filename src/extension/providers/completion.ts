@@ -267,7 +267,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private onEnd(
     prefixSuffix: PrefixSuffix,
-    done: (comlpetion: ResolvedInlineCompletion) => void
+    done: (completion: ResolvedInlineCompletion) => void
   ) {
     return done(this.triggerInlineCompletion(prefixSuffix))
   }
