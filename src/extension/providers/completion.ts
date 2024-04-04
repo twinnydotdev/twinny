@@ -390,10 +390,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return prompt
   }
 
-  private logCompletion(completion: string, formattedCompletion: string) {
+  private logCompletion(formattedCompletion: string) {
     this._logger.log(`
       *** Twinny completion triggered for file: ${this._document?.uri} ***\n
-      Original completion: ${completion}\n
+      Original completion: ${this._completion}\n
       Formatted completion: ${formattedCompletion}\n
       Max Lines: ${this._maxLines}\n
       Use file context: ${this._useFileContext}\n
@@ -409,9 +409,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (!editor || !this._position) return []
 
+
+
     const formattedCompletion = new CompletionFormatter(editor).format(
       this.removeStopWords(this._completion)
     )
+
+    this.logCompletion(formattedCompletion)
 
     if (this._cacheEnabled) cache.setCache(prefixSuffix, formattedCompletion)
 
