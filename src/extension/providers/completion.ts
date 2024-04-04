@@ -9,7 +9,8 @@ import {
   StatusBarItem,
   window,
   Uri,
-  InlineCompletionContext
+  InlineCompletionContext,
+  InlineCompletionTriggerKind
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
@@ -58,7 +59,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _completion = ''
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
-  private _disableAuto = this._config.get('disableAutoSuggest') as boolean
+  private _disableAutoSuggest = this._config.get(
+    'disableAutoSuggest'
+  ) as boolean
   private _document: TextDocument | null
   private _enabled = this._config.get('enabled')
   private _enableSubsequent = this._config.get('enableSubsequent') as boolean
@@ -117,11 +120,19 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     )
 
     if (
+      context.triggerKind === InlineCompletionTriggerKind.Invoke &&
+      !this._disableAutoSuggest
+    ) {
+      this._completion = this._lastCompletionText
+      return this.triggerInlineCompletion(prefixSuffix)
+    }
+
+    if (
       !this._enabled ||
       !editor ||
       isLastCompletionAccepted ||
       this._lastCompletionMultiline ||
-      getShouldSkipCompletion(context, this._disableAuto) ||
+      getShouldSkipCompletion(context, this._disableAutoSuggest) ||
       getIsMiddleWord()
     ) {
       this._statusBar.text = '🤖'
@@ -392,13 +403,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private logCompletion(formattedCompletion: string) {
     this._logger.log(`
-      *** Twinny completion triggered for file: ${this._document?.uri} ***\n
-      Original completion: ${this._completion}\n
-      Formatted completion: ${formattedCompletion}\n
-      Max Lines: ${this._maxLines}\n
-      Use file context: ${this._useFileContext}\n
-      Completed lines count ${getLineBreakCount(formattedCompletion)}\n
-      Using custom FIM template fim.bhs?: ${this._usingFimTemplate}
+*** Twinny completion triggered for file: ${this._document?.uri} ***
+Original completion: ${this._completion}
+Formatted completion: ${formattedCompletion}
+Max Lines: ${this._maxLines}
+Use file context: ${this._useFileContext}
+Completed lines count ${getLineBreakCount(formattedCompletion)}
+Using custom FIM template fim.bhs?: ${this._usingFimTemplate}
     `)
   }
 
@@ -440,7 +451,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._cacheEnabled = this._config.get('enableCompletionCache') as boolean
     this._config = workspace.getConfiguration('twinny')
     this._debounceWait = this._config.get('debounceWait') as number
-    this._disableAuto = this._config.get('disableAutoSuggest') as boolean
+    this._disableAutoSuggest = this._config.get('disableAutoSuggest') as boolean
     this._enableSubsequent = this._config.get('enableSubsequent') as boolean
     this._fimModel = this._config.get('fimModelName') as string
     this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
