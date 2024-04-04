@@ -200,7 +200,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       prompt,
       {
         model: this._fimModel,
-        numPredictChat: this._numPredictFim,
+        numPredictFim: this._numPredictFim,
         temperature: this._temperature,
         keepAlive: this._keepAlive
       }

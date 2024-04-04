@@ -56,7 +56,7 @@ export function createStreamRequestBodyFim(
   prompt: string,
   options: {
     temperature: number
-    numPredictChat: number
+    numPredictFim: number
     model: string
     keepAlive?: string | number
   }
@@ -71,15 +71,22 @@ export function createStreamRequestBodyFim(
         keep_alive: options.keepAlive,
         options: {
           temperature: options.temperature,
-          num_predict: options.numPredictChat
+          num_predict: options.numPredictFim
         }
+      }
+    case ApiProviders.LMStudio:
+      return {
+        prompt,
+        stream: true,
+        temperature: options.temperature,
+        n_predict: options.numPredictFim
       }
     case ApiProviders.LlamaCpp:
       return {
         prompt,
         stream: true,
         temperature: options.temperature,
-        n_predict: options.numPredictChat
+        n_predict: options.numPredictFim
       }
     case ApiProviders.LiteLLM:
     default:
@@ -87,7 +94,7 @@ export function createStreamRequestBodyFim(
         messages: [{ content: prompt, role: USER }],
         model: options.model,
         stream: true,
-        max_tokens: options.numPredictChat,
+        max_tokens: options.numPredictFim,
         temperature: options.temperature
       }
   }
