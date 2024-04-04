@@ -409,8 +409,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (!editor || !this._position) return []
 
-
-
     const formattedCompletion = new CompletionFormatter(editor).format(
       this.removeStopWords(this._completion)
     )
