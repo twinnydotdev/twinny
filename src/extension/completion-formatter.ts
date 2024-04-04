@@ -161,11 +161,11 @@ export class CompletionFormatter {
     return this
   }
 
-  private preventDuplicateLines = (): CompletionFormatter => {
+  private preventDuplicateLine = (): CompletionFormatter => {
     const lineCount = this._editor.document.lineCount
     let nextLineIndex = this._cursorPosition.line + 1
     while (
-      nextLineIndex < this._cursorPosition.line + 3 &&
+      nextLineIndex < this._cursorPosition.line + 1 &&
       nextLineIndex < lineCount
     ) {
       const line = this._editor.document.lineAt(nextLineIndex)
@@ -265,7 +265,7 @@ export class CompletionFormatter {
         line
       )
       const isComment = line.startsWith(languageId.syntaxComments.start)
-      return !(startsWithComment && includesCommentReference) && !isComment && line.length
+      return !(startsWithComment && includesCommentReference) && !isComment
     })
 
     if (completionLines.length) {
@@ -288,7 +288,7 @@ export class CompletionFormatter {
     this._originalCompletion = completion
     const infillText = this.matchCompletionBrackets()
       .preventQuotationCompletions()
-      .preventDuplicateLines()
+      .preventDuplicateLine()
       .removeDuplicateQuotes()
       .removeUnnecessaryMiddleQuote()
       .ignoreBlankLines()
