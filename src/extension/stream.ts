@@ -45,9 +45,7 @@ export async function streamResponse(request: StreamRequest) {
               buffer = buffer.substring(position + 1)
               try {
                 const json = safeParseJsonResponse(line)
-                if (json) {
-                  onData(json)
-                }
+                if (json) onData(json)
               } catch (e) {
                 onError?.(new Error('Error parsing JSON data from event'))
               }

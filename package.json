@@ -357,8 +357,8 @@
         "twinny.useMultiLineCompletions": {
           "order": 16,
           "type": "boolean",
-          "default": true,
-          "description": "Use multiline completions"
+          "default": false,
+          "description": "Use multiline completions (Can be inaccurate)."
         },
         "twinny.maxLines": {
           "dependencies": {

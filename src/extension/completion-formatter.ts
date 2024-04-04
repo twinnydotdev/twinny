@@ -2,7 +2,7 @@ import { Position, Range, TextEditor } from 'vscode'
 
 import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
 import { Bracket } from '../common/types'
-import { getLanguage, getNoTextBeforeOrAfter } from './utils'
+import { getLanguage } from './utils'
 import { supportedLanguages } from '../common/languages'
 
 export class CompletionFormatter {
@@ -230,29 +230,6 @@ export class CompletionFormatter {
     return this
   }
 
-  private ignoreContextCompletionAtStartOrEnd = () => {
-    const isNoTextBeforeOrAfter = getNoTextBeforeOrAfter()
-
-    const contextMatch = this._normalisedCompletion.match(
-      /\/\*\s*Language:\s*(.*)\s*\*\//
-    )
-    const extenstionContext = this._normalisedCompletion.match(
-      /\/\*\s*File extension:\s*(.*)\s*\*\//
-    )
-
-    const commentMatch = this._normalisedCompletion.match(/\/\*\s*\*\//)
-
-    if (
-      isNoTextBeforeOrAfter &&
-      (contextMatch || extenstionContext || commentMatch)
-    ) {
-      this._completion = ''
-      return this
-    }
-
-    return this
-  }
-
   public preventQuotationCompletions(): this {
     const language = getLanguage()
     const languageId =
@@ -275,7 +252,7 @@ export class CompletionFormatter {
       languageId.syntaxComments.end ?? ''
     }`
     const score = this._normalisedCompletion.score(comments, 0.1)
-    if (this._normalisedCompletion.startsWith(comments) || score > 0.2) {
+    if (this._normalisedCompletion.startsWith(comments) || score > 0.3) {
       this._completion = ''
       return this
     }
@@ -287,8 +264,8 @@ export class CompletionFormatter {
       const includesCommentReference = /\b(Language|File|End):\s*(.*)\b/.test(
         line
       )
-      const isComment = line === languageId.syntaxComments.start // Non-null assertion used here
-      return !(startsWithComment && includesCommentReference) && !isComment
+      const isComment = line.startsWith(languageId.syntaxComments.start)
+      return !(startsWithComment && includesCommentReference) && !isComment && line.length
     })
 
     if (completionLines.length) {
@@ -319,7 +296,6 @@ export class CompletionFormatter {
       .removeDuplicateText()
       .skipMiddleOfWord()
       .skipSimilarCompletions()
-      .ignoreContextCompletionAtStartOrEnd()
       .trimStart()
       .getCompletion()
     return infillText
