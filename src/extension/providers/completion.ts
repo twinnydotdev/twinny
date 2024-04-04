@@ -139,7 +139,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       return
     }
 
-    this._completion = ''
     this._document = document
     this._position = position
     this._chunkCount = 0
@@ -482,6 +481,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar.text = '🤖'
     this._lastCompletionText = formattedCompletion
     this._lastCompletionMultiline = this._isMultiLineCompletion
+    this._completion = ''
 
     return [
       new InlineCompletionItem(
