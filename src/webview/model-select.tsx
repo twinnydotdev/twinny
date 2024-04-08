@@ -36,9 +36,9 @@ export const ModelSelect = () => {
   const isOllamaFim = apiProviderFim === ApiProviders.Ollama
 
   return (
-    <div className={styles.modelSelect}>
+    <div className={styles.twinnyForm}>
       {!isOllamaChat ? (
-        <form className={styles.modelSelect}>
+        <form className={styles.twinnyForm}>
           <div>
             <label>Chat</label>
             <VSCodeTextField
@@ -63,7 +63,7 @@ export const ModelSelect = () => {
         </div>
       )}
       {!isOllamaFim ? (
-        <form className={styles.modelSelect}>
+        <form className={styles.twinnyForm}>
           <div>
             <label>Fill-in-middle</label>
             <VSCodeTextField

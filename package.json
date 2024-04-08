@@ -84,27 +84,32 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders"
+        },
+        {
+          "command": "twinny.manageProviders",
+          "group": "navigation@1",
+          "when": "view == twinny.sidebar"
         },
         {
           "command": "twinny.manageTemplates",
-          "group": "navigation@1",
+          "group": "navigation@2",
           "when": "view == twinny.sidebar"
         },
         {
           "command": "twinny.templates",
           "when": "view == twinny.sidebar",
-          "group": "navigation@2"
+          "group": "navigation@3"
         },
         {
           "command": "twinny.newChat",
           "when": "view == twinny.sidebar",
-          "group": "navigation@3"
+          "group": "navigation@4"
         },
         {
           "command": "twinny.settings",
           "when": "view == twinny.sidebar",
-          "group": "navigation@4"
+          "group": "navigation@5"
         }
       ]
     },
@@ -177,6 +182,12 @@
         "icon": "$(files)"
       },
       {
+        "command": "twinny.manageProviders",
+        "shortTitle": "Manage twinny providers",
+        "title": "Manage twinny providers",
+        "icon": "$(plug)"
+      },
+      {
         "command": "twinny.openChat",
         "shortTitle": "Back to chat view",
         "title": "Back to chat view",
@@ -233,129 +244,36 @@
           "default": true,
           "description": "Activates or deactivates the Twinny extension."
         },
-        "twinny.apiHostname": {
-          "order": 1,
-          "type": "string",
-          "default": "0.0.0.0",
-          "description": "Hostname for chat completion API.",
-          "required": true
-        },
-        "twinny.apiFimHostname": {
-          "order": 2,
-          "type": "string",
-          "default": "0.0.0.0",
-          "description": "Hostname for FIM completion API.",
-          "required": true
-        },
-        "twinny.apiProvider": {
-          "order": 3,
-          "type": "string",
-          "enum": [
-            "ollama",
-            "llamacpp",
-            "lmstudio",
-            "oobabooga",
-            "litellm"
-          ],
-          "default": "ollama",
-          "description": "API Chat provider."
-        },
-        "twinny.apiProviderFim": {
-          "order": 4,
-          "type": "string",
-          "enum": [
-            "ollama",
-            "llamacpp",
-            "lmstudio",
-            "oobabooga",
-            "litellm"
-          ],
-          "default": "ollama",
-          "description": "API FIM provider."
-        },
-        "twinny.chatApiPath": {
-          "order": 5,
-          "type": "string",
-          "default": "/v1/chat/completions",
-          "description": "Endpoint path for chat completions.",
-          "required": true
-        },
-        "twinny.chatApiPort": {
-          "order": 6,
-          "type": "number",
-          "default": 11434,
-          "description": "The API port usually `11434` for Ollama and `8080` for llama.cpp (May differ depending on API configuration)",
-          "required": true
-        },
-        "twinny.fimApiPort": {
-          "order": 7,
-          "type": "number",
-          "default": 11434,
-          "description": "The API port usually `11434` for Ollama and `8080` for llama.cpp (May differ depending on API configuration)",
-          "required": true
-        },
-        "twinny.fimApiPath": {
-          "order": 8,
-          "type": "string",
-          "default": "/api/generate",
-          "description": "Endpoint path for FIM completions.",
-          "required": true
-        },
-        "twinny.chatModelName": {
-          "order": 9,
-          "type": "string",
-          "default": "codellama:7b-instruct",
-          "description": "Model identifier for chat completions. Applicable only for Ollama and Oobabooga API."
-        },
-        "twinny.fimModelName": {
-          "order": 10,
-          "type": "string",
-          "default": "codellama:7b-code",
-          "description": "Model identifier for FIM completions. Applicable only for Ollama and Oobabooga API."
-        },
-        "twinny.fimTemplateFormat": {
-          "order": 11,
-          "type": "string",
-          "enum": [
-            "automatic",
-            "stable-code",
-            "codellama",
-            "deepseek",
-            "starcoder",
-            "custom-template"
-          ],
-          "default": "automatic",
-          "description": "The prompt format to be used for FIM completions. Overrides automatic detection."
-        },
+
         "twinny.disableAutoSuggest": {
-          "order": 12,
+          "order": 1,
           "type": "boolean",
           "default": false,
           "description": "Disables automatic suggestions, manual trigger (default shortcut Alt+\\)."
         },
         "twinny.contextLength": {
-          "order": 13,
+          "order": 2,
           "type": "number",
           "default": 100,
           "description": "Defines the number of lines before and after the current line to include in FIM prompts.",
           "required": true
         },
         "twinny.debounceWait": {
-          "order": 14,
+          "order": 3,
           "type": "number",
           "default": 300,
           "description": "Delay in milliseconds before triggering the next completion.",
           "required": true
         },
         "twinny.temperature": {
-          "order": 15,
+          "order": 4,
           "type": "number",
           "default": 0.2,
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
         "twinny.useMultiLineCompletions": {
-          "order": 16,
+          "order": 5,
           "type": "boolean",
           "default": false,
           "description": "Use multiline completions (Can be inaccurate)."
@@ -364,63 +282,51 @@
           "dependencies": {
             "twinny.useMultiLineCompletions": true
           },
-          "order": 17,
+          "order": 6,
           "type": "number",
-          "default": 20,
+          "default": 7,
           "description": "Maximum number of lines to use for multi line completions. Applicable only when useMultiLineCompletions is enabled."
         },
         "twinny.useFileContext": {
-          "order": 18,
+          "order": 8,
           "type": "boolean",
           "default": false,
           "description": "Enables scanning of neighbouring documents to enhance completion prompts. (Experimental)"
         },
         "twinny.enableCompletionCache": {
-          "order": 19,
+          "order": 9,
           "type": "boolean",
           "default": false,
           "description": "Caches FIM completions for identical prompts to enhance performance."
         },
         "twinny.numPredictChat": {
-          "order": 20,
+          "order": 10,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for chat completions.",
           "required": true
         },
         "twinny.numPredictFim": {
-          "order": 21,
+          "order": 11,
           "type": "number",
           "default": 512,
           "description": "Maximum token limit for FIM completions. Set to -1 for no limit. Twinny should stop at logical line breaks.",
           "required": true
         },
         "twinny.enableSubsequentCompletions": {
-          "order": 22,
+          "order": 12,
           "type": "boolean",
           "default": true,
           "description": "Enable this setting to allow twinny to keep making subsequent completion requests to the API after the last completion request was accepted."
         },
         "twinny.keepAlive": {
-          "order": 23,
+          "order": 13,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
-        "twinny.useTls": {
-          "order": 24,
-          "type": "boolean",
-          "default": false,
-          "description": "Enables TLS encryption for API connections."
-        },
-        "twinny.apiBearerToken": {
-          "order": 25,
-          "type": "string",
-          "default": "",
-          "description": "Bearer token for secure API authentication."
-        },
         "twinny.enableLogging": {
-          "order": 26,
+          "order": 14,
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"
@@ -451,6 +357,7 @@
     "@types/react-dom": "^18.2.18",
     "@types/react-syntax-highlighter": "^15.5.11",
     "@types/string_score": "^0.1.31",
+    "@types/uuid": "^9.0.8",
     "@types/vscode": "^1.70.0",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
@@ -486,6 +393,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0",
-    "string_score": "^0.1.22"
+    "string_score": "^0.1.22",
+    "uuid": "^9.0.1"
   }
 }

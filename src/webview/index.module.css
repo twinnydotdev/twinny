@@ -154,11 +154,11 @@ pre code {
   margin-top: 20px;
 }
 
-.modelSelect {
+.twinnyForm {
   width: 100%;
 }
 
-.modelSelect div {
+.twinnyForm div {
   margin-bottom: 10px;
   display: flex;
   flex-direction: column;
@@ -167,4 +167,18 @@ pre code {
 .textIcon {
   font-size: 1.15rem;
   transform: translateY(-6px);
+}
+
+.providerSelector {
+  display: flex;
+  width: 100%;
+  gap: 3px;
+}
+
+.providerSelector vscode-dropdown {
+  width: 100%;
+}
+
+.providerSelector > div {
+  width: 50%;
 }

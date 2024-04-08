@@ -174,13 +174,14 @@ export interface ApiModels {
   models: ApiModel[]
 }
 
-export type ResolvedInlineCompletion = InlineCompletionItem[]
-| InlineCompletionList
-| PromiseLike<
-    InlineCompletionItem[] | InlineCompletionList | null | undefined
-  >
-| null
-| undefined
+export type ResolvedInlineCompletion =
+  | InlineCompletionItem[]
+  | InlineCompletionList
+  | PromiseLike<
+      InlineCompletionItem[] | InlineCompletionList | null | undefined
+    >
+  | null
+  | undefined
 
 export interface InteractionItem {
   keyStrokes: number | null | undefined
@@ -192,4 +193,16 @@ export interface InteractionItem {
     line: number
     character: number
   }[]
+}
+
+export interface InferenceProvider {
+  apiBaseUrl?: string
+  apiHostname?: string
+  apiKey?: string
+  apiPath?: string
+  apiPort?: number
+  apiProtocol?: string
+  modelName?: string
+  name: string
+  type: (typeof ApiProviders)[keyof typeof ApiProviders]
 }

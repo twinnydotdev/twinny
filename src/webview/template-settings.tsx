@@ -54,7 +54,7 @@ export const TemplateSettings = () => {
 
   return (
     <>
-      <h4>Template settings</h4>
+      <h3>Template settings</h3>
       <p>
         Select the templates you want to use in the chat interface.
       </p>
