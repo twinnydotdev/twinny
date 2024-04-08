@@ -288,7 +288,7 @@ export const Chat = () => {
                 <div>Chat</div>
                 <VSCodeDropdown
                   value={chatProvider?.id}
-                  name="provider"
+                  name='provider'
                   onChange={handleChangeChatProvider}
                 >
                   {Object.values(getFimProvidersByType('chat'))
@@ -304,7 +304,7 @@ export const Chat = () => {
                 <div>Fill-in-middle</div>
                 <VSCodeDropdown
                   value={fimProvider?.id}
-                  name="provider"
+                  name='provider'
                   onChange={handleChangeFimProvider}
                 >
                   {Object.values(getFimProvidersByType('fim'))
@@ -331,7 +331,7 @@ export const Chat = () => {
           ))}
           {loading && (
             <div className={styles.loading}>
-              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
+              <VSCodeProgressRing aria-label='Loading'></VSCodeProgressRing>
             </div>
           )}
           {!!completion && (
@@ -353,8 +353,8 @@ export const Chat = () => {
           <div>
             <VSCodeButton
               onClick={handleToggleAutoScroll}
-              title="Toggle auto scroll on/off"
-              appearance="icon"
+              title='Toggle auto scroll on/off'
+              appearance='icon'
             >
               {isAutoScrolledEnabled ? (
                 <EnabledAutoScrollIcon />
@@ -364,23 +364,23 @@ export const Chat = () => {
             </VSCodeButton>
             <VSCodeButton
               onClick={handleGetGitChanges}
-              title="Generate commit message from staged changes"
-              appearance="icon"
+              title='Generate commit message from staged changes'
+              appearance='icon'
             >
-              <span className="codicon codicon-git-pull-request"></span>
+              <span className='codicon codicon-git-pull-request'></span>
             </VSCodeButton>
             <VSCodeButton
-              title="Scroll down to the bottom"
-              appearance="icon"
+              title='Scroll down to the bottom'
+              appearance='icon'
               onClick={handleScrollBottom}
             >
-              <span className="codicon codicon-arrow-down"></span>
+              <span className='codicon codicon-arrow-down'></span>
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           <VSCodeButton
-            title="Select active models"
-            appearance="icon"
+            title='Select active models'
+            appearance='icon'
             onClick={handleToggleProviderSelection}
           >
             <span className={styles.textIcon}>🤖</span>
@@ -391,7 +391,7 @@ export const Chat = () => {
             <VSCodeTextArea
               ref={chatRef}
               disabled={generatingRef.current}
-              placeholder="Message twinny"
+              placeholder='Message twinny'
               value={inputText}
               className={styles.chatInput}
               rows={4}
@@ -415,18 +415,18 @@ export const Chat = () => {
           <div className={styles.send}>
             {generatingRef.current && (
               <VSCodeButton
-                type="button"
-                appearance="icon"
+                type='button'
+                appearance='icon'
                 onClick={handleStopGeneration}
-                aria-label="Stop generation"
+                aria-label='Stop generation'
               >
-                <span className="codicon codicon-debug-stop"></span>
+                <span className='codicon codicon-debug-stop'></span>
               </VSCodeButton>
             )}
             <VSCodeButton
               disabled={generatingRef.current}
               onClick={() => handleSubmitForm(inputText)}
-              appearance="primary"
+              appearance='primary'
             >
               Send message
             </VSCodeButton>
