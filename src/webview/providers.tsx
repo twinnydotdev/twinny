@@ -301,7 +301,6 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             <label htmlFor="apiKey">API key</label>
           </div>
           <VSCodeTextField
-            required
             onChange={handleChange}
             name="apiKey"
             value={formState.apiKey || ''}
