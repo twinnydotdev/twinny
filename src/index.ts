@@ -177,6 +177,9 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.getTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation
       })
+      sidebarProvider.view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnyStopGeneration,
+      } as ServerMessage<string>)
     }),
 
     window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),

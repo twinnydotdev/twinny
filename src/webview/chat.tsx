@@ -6,15 +6,11 @@ import {
   VSCodePanelView,
   VSCodeProgressRing,
   VSCodeBadge,
-  VSCodeDropdown,
-  VSCodeOption,
-  VSCodeDivider
 } from '@vscode/webview-ui-toolkit/react'
 
 import { ASSISTANT, MESSAGE_KEY, MESSAGE_NAME, USER } from '../common/constants'
 
 import {
-  useProviders,
   useSelection,
   useTheme,
   useWorkSpaceContext
@@ -24,21 +20,14 @@ import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from './icons'
 import { Suggestions } from './suggestions'
 import { ClientMessage, MessageType, ServerMessage } from '../common/types'
 import { Message } from './message'
-import { getCompletionContent, getModelShortName } from './utils'
+import { getCompletionContent } from './utils'
 import styles from './index.module.css'
+import { ProviderSelect } from './provider-select'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
-  const {
-    getFimProvidersByType,
-    setActiveChatProvider,
-    setActiveFimProvider,
-    providers,
-    chatProvider,
-    fimProvider
-  } = useProviders()
   const generatingRef = useRef(false)
   const stopRef = useRef(false)
   const theme = useTheme()
@@ -161,6 +150,7 @@ export const Chat = () => {
       case MESSAGE_NAME.twinnyStopGeneration: {
         setCompletion(null)
         generatingRef.current = false
+        setLoading(false)
         chatRef.current?.focus()
         setTimeout(() => {
           stopRef.current = false
@@ -217,6 +207,17 @@ export const Chat = () => {
     })
   }
 
+  const handleToggleProviderSelection = () => {
+    setShowProviders((prev) => {
+      global.vscode.postMessage({
+        type: MESSAGE_NAME.twinnySetWorkspaceContext,
+        key: MESSAGE_KEY.showProviders,
+        data: !prev
+      } as ClientMessage)
+      return !prev
+    })
+  }
+
   const handleGetGitChanges = () => {
     global.vscode.postMessage({
       type: MESSAGE_NAME.twinnyGetGitChanges
@@ -227,31 +228,6 @@ export const Chat = () => {
     if (markdownRef.current) {
       markdownRef.current.scrollTop = markdownRef.current.scrollHeight
     }
-  }
-
-  const handleChangeChatProvider = (e: unknown): void => {
-    const event = e as React.ChangeEvent<HTMLSelectElement>
-    const value = event.target.value
-    const provider = providers[value]
-    setActiveChatProvider(provider)
-  }
-
-  const handleChangeFimProvider = (e: unknown): void => {
-    const event = e as React.ChangeEvent<HTMLSelectElement>
-    const value = event.target.value
-    const provider = providers[value]
-    setActiveFimProvider(provider)
-  }
-
-  const handleToggleProviderSelection = () => {
-    setShowProviders((prev) => {
-      global.vscode.postMessage({
-        type: MESSAGE_NAME.twinnySetWorkspaceContext,
-        key: MESSAGE_KEY.showProviders,
-        data: !prev
-      } as ClientMessage)
-      return !prev
-    })
   }
 
   useEffect(() => {
@@ -267,8 +243,6 @@ export const Chat = () => {
     if (autoScrollContext !== undefined)
       setIsAutoScrolledEnabled(autoScrollContext)
 
-    console.log('autoScrollContext', autoScrollContext)
-
     if (showProvidersContext !== undefined)
       setShowProviders(showProvidersContext)
 
@@ -276,53 +250,12 @@ export const Chat = () => {
       return setMessages(lastConversation)
     }
     setMessages([])
-  }, [lastConversation, autoScrollContext])
+  }, [lastConversation, autoScrollContext, showProvidersContext])
 
   return (
     <VSCodePanelView>
       <div className={styles.container}>
-        {showProviders && (
-          <>
-            <div className={styles.providerSelector}>
-              <div>
-                <div>Chat</div>
-                <VSCodeDropdown
-                  value={chatProvider?.id}
-                  name='provider'
-                  onChange={handleChangeChatProvider}
-                >
-                  {Object.values(getFimProvidersByType('chat'))
-                    .sort((a, b) => a.modelName.localeCompare(b.modelName))
-                    .map((provider, index) => (
-                      <VSCodeOption key={index} value={provider.id}>
-                        {getModelShortName(provider.modelName || '')}
-                      </VSCodeOption>
-                    ))}
-                </VSCodeDropdown>
-              </div>
-              <div>
-                <div>Fill-in-middle</div>
-                <VSCodeDropdown
-                  value={fimProvider?.id}
-                  name='provider'
-                  onChange={handleChangeFimProvider}
-                >
-                  {Object.values(getFimProvidersByType('fim'))
-                  .sort((a, b) => a.modelName.localeCompare(b.modelName))
-                  .map(
-                    (provider, index) => (
-                      <VSCodeOption key={index} value={provider.id}>
-                        {getModelShortName(provider.modelName || '')}
-                      </VSCodeOption>
-                    )
-                  )}
-                </VSCodeDropdown>
-              </div>
-            </div>
-            <VSCodeDivider />
-          </>
-        )}
-
+        {showProviders && <ProviderSelect />}
         <div className={styles.markdown} ref={markdownRef}>
           {messages?.map((message, index) => (
             <div key={`message-${index}`}>
@@ -331,7 +264,7 @@ export const Chat = () => {
           ))}
           {loading && (
             <div className={styles.loading}>
-              <VSCodeProgressRing aria-label='Loading'></VSCodeProgressRing>
+              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
             </div>
           )}
           {!!completion && (
@@ -353,8 +286,8 @@ export const Chat = () => {
           <div>
             <VSCodeButton
               onClick={handleToggleAutoScroll}
-              title='Toggle auto scroll on/off'
-              appearance='icon'
+              title="Toggle auto scroll on/off"
+              appearance="icon"
             >
               {isAutoScrolledEnabled ? (
                 <EnabledAutoScrollIcon />
@@ -364,23 +297,23 @@ export const Chat = () => {
             </VSCodeButton>
             <VSCodeButton
               onClick={handleGetGitChanges}
-              title='Generate commit message from staged changes'
-              appearance='icon'
+              title="Generate commit message from staged changes"
+              appearance="icon"
             >
-              <span className='codicon codicon-git-pull-request'></span>
+              <span className="codicon codicon-git-pull-request"></span>
             </VSCodeButton>
             <VSCodeButton
-              title='Scroll down to the bottom'
-              appearance='icon'
+              title="Scroll down to the bottom"
+              appearance="icon"
               onClick={handleScrollBottom}
             >
-              <span className='codicon codicon-arrow-down'></span>
+              <span className="codicon codicon-arrow-down"></span>
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           <VSCodeButton
-            title='Select active models'
-            appearance='icon'
+            title="Select active providers"
+            appearance="icon"
             onClick={handleToggleProviderSelection}
           >
             <span className={styles.textIcon}>🤖</span>
@@ -391,7 +324,7 @@ export const Chat = () => {
             <VSCodeTextArea
               ref={chatRef}
               disabled={generatingRef.current}
-              placeholder='Message twinny'
+              placeholder="Message twinny"
               value={inputText}
               className={styles.chatInput}
               rows={4}
@@ -415,18 +348,18 @@ export const Chat = () => {
           <div className={styles.send}>
             {generatingRef.current && (
               <VSCodeButton
-                type='button'
-                appearance='icon'
+                type="button"
+                appearance="icon"
                 onClick={handleStopGeneration}
-                aria-label='Stop generation'
+                aria-label="Stop generation"
               >
-                <span className='codicon codicon-debug-stop'></span>
+                <span className="codicon codicon-debug-stop"></span>
               </VSCodeButton>
             )}
             <VSCodeButton
               disabled={generatingRef.current}
               onClick={() => handleSubmitForm(inputText)}
-              appearance='primary'
+              appearance="primary"
             >
               Send message
             </VSCodeButton>

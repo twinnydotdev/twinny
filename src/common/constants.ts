@@ -122,6 +122,7 @@ export const DEFAULT_PROVIDER_FORM_VALUES = {
   apiPort: 11434,
   apiProtocol: 'http',
   id: '',
+  label: '',
   modelName: '',
   name: '',
   provider: 'ollama',

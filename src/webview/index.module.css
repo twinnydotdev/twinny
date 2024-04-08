@@ -168,17 +168,3 @@ pre code {
   font-size: 1.15rem;
   transform: translateY(-6px);
 }
-
-.providerSelector {
-  display: flex;
-  width: 100%;
-  gap: 3px;
-}
-
-.providerSelector vscode-dropdown {
-  width: 100%;
-}
-
-.providerSelector > div {
-  width: 50%;
-}

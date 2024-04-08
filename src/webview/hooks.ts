@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 
-import { MESSAGE_KEY, MESSAGE_NAME, SETTING_KEY } from '../common/constants'
+import { MESSAGE_KEY, MESSAGE_NAME } from '../common/constants'
 import {
   ClientMessage,
   LanguageType,
-  ApiModel,
   ServerMessage,
   ThemeType
 } from '../common/types'
@@ -281,59 +280,4 @@ export const useConfigurationSetting = (key: string) => {
   }, [key])
 
   return { configurationSetting }
-}
-
-export const useModels = () => {
-  const [models, setModels] = useState<ApiModel[] | undefined>([])
-  const [chatModelName, setChatModel] = useState<string>()
-  const [fimModelName, setFimModel] = useState<string>()
-  const configValueKeys = [SETTING_KEY.chatModelName, SETTING_KEY.fimModelName]
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<ApiModel[]> = event.data
-    if (message?.type === MESSAGE_NAME.twinnyFetchOllamaModels) {
-      setModels(message?.value.data)
-    }
-    if (
-      message?.type === MESSAGE_NAME.twinnyGetConfigValue &&
-      message.value.type === SETTING_KEY.chatModelName
-    ) {
-      setChatModel(message?.value.data as string | undefined)
-    }
-    if (
-      message?.type === MESSAGE_NAME.twinnyGetConfigValue &&
-      message.value.type === SETTING_KEY.fimModelName
-    ) {
-      setFimModel(message?.value.data as string | undefined)
-    }
-    return () => window.removeEventListener('message', handler)
-  }
-
-  const saveModel = (model: string) => (type: string) => {
-    global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnySetConfigValue,
-      key: type,
-      data: model
-    } as ClientMessage<string>)
-    if (type === SETTING_KEY.chatModelName) {
-      setChatModel(model)
-    }
-    if (type === SETTING_KEY.fimModelName) {
-      setFimModel(model)
-    }
-  }
-
-  useEffect(() => {
-    configValueKeys.forEach((key: string) => {
-      global.vscode.postMessage({
-        type: MESSAGE_NAME.twinnyGetConfigValue,
-        key
-      })
-    })
-    global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnyFetchOllamaModels
-    })
-    window.addEventListener('message', handler)
-  }, [])
-
-  return { models, setModels, saveModel, chatModelName, fimModelName }
 }

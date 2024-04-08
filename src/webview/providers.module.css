@@ -1,34 +1,38 @@
+.providersHeader {
+  display: flex;
+  gap: 3px;
+}
+
 .provider {
-  position: relative;
-  padding: 10px;
+  padding: 5px;
   border-radius: 5px;
   background: var(--vscode-inputOption-hoverBackground);
   border: 1px solid var(--vscode-editorWidget-border);
-  margin-bottom: 5px;
+  margin: 5px 0;
+}
+
+.providerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.providerHeader h4 {
+  margin: 0;
 }
 
 .providerDetails {
-  gap: 10px;
-  align-items: center;
-  max-width: 80%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, auto);
+  gap: 5px;
   overflow: hidden;
 }
 
 .providerDetails > div {
   text-wrap: nowrap;
   text-overflow: ellipsis;
-}
-
-.providerActions {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-}
-
-.providerHeader {
-  display: flex;
-  gap: 3px;
-  margin-bottom: 10px;
 }
 
 .providerForm {
@@ -51,4 +55,17 @@
 
 .providerHeader svg {
   width: 20px;
+}
+
+.providerSelector {
+  width: 100%;
+  gap: 3px;
+}
+
+.providerSelector vscode-dropdown {
+  width: 100%;
+}
+
+.providerSelector > div {
+  width: 100%;
 }

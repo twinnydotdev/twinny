@@ -23,6 +23,7 @@ export interface TwinnyProvider {
   apiPort: number
   apiProtocol: string
   id: string
+  label: string
   modelName: string
   provider: string
   type: string
@@ -44,8 +45,7 @@ export class ProviderManager {
     this._context = context
     this._webviewView = webviewView
     this.setUpEventListeners()
-    this.addDefaultChatProvider()
-    this.addDefaultFimProvider()
+    this.addDefaultProviders()
   }
 
   setUpEventListeners() {
@@ -93,41 +93,52 @@ export class ProviderManager {
 
   getDefaultChatProvider() {
     return {
-      id: uuidv4(),
-      provider: ApiProviders.Ollama,
-      type: 'chat',
-      modelName: 'codellama:7b-instruct',
       apiHostname: '0.0.0.0',
-      apiPort: 11434,
       apiPath: '/v1/chat/completions',
-      apiProtocol: 'http'
+      apiPort: 11434,
+      apiProtocol: 'http',
+      id: uuidv4(),
+      label: 'Ollama 7B Chat',
+      modelName: 'codellama:7b-instruct',
+      provider: ApiProviders.Ollama,
+      type: 'chat'
     } as TwinnyProvider
   }
 
   getDefaultFimProvider() {
     return {
-      id: uuidv4(),
-      provider: ApiProviders.Ollama,
-      type: 'fim',
-      modelName: 'codellama:7b-code',
       apiHostname: '0.0.0.0',
-      apiPort: 11434,
       apiPath: '/api/generate',
+      apiPort: 11434,
       apiProtocol: 'http',
       fimTemplate: FIM_TEMPLATE_FORMAT.codellama,
+      label: 'Ollama 7B FIM',
+      id: uuidv4(),
+      modelName: 'codellama:7b-code',
+      provider: ApiProviders.Ollama,
+      type: 'fim'
     } as TwinnyProvider
   }
 
-  addDefaultChatProvider(): void {
-    if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_KEY)) {
-      this.addDefaultProvider(this.getDefaultChatProvider())
-    }
+  addDefaultProviders() {
+    this.addDefaultChatProvider()
+    this.addDefaultFimProvider()
   }
 
-  addDefaultFimProvider(): void {
-    if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_KEY)) {
-      this.addDefaultProvider(this.getDefaultFimProvider())
+  addDefaultChatProvider(): TwinnyProvider {
+    const provider = this.getDefaultChatProvider()
+    if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_KEY)) {
+      this.addDefaultProvider(provider)
     }
+    return provider
+  }
+
+  addDefaultFimProvider(): TwinnyProvider {
+    const provider = this.getDefaultFimProvider()
+    if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_KEY)) {
+      this.addDefaultProvider(provider)
+    }
+    return provider
   }
 
   addDefaultProvider(provider: TwinnyProvider): void {
@@ -166,6 +177,7 @@ export class ProviderManager {
         data: provider
       }
     })
+    return provider
   }
 
   getActiveFimProvider() {
@@ -178,6 +190,7 @@ export class ProviderManager {
         data: provider
       }
     })
+    return provider
   }
 
   setActiveChatProvider(provider?: TwinnyProvider) {
@@ -204,7 +217,7 @@ export class ProviderManager {
   copyProvider(provider?: TwinnyProvider) {
     if (!provider) return
     provider.id = uuidv4()
-    provider.modelName = `${provider.modelName}-copy`
+    provider.label = `${provider.label}-copy`
     this.addProvider(provider)
   }
 
@@ -218,9 +231,13 @@ export class ProviderManager {
 
   updateProvider(provider?: TwinnyProvider) {
     const providers = this.getProviders() || {}
+    const activeFimProvider = this.getActiveFimProvider()
+    const activeChatProvider = this.getActiveChatProvider()
     if (!provider) return
     providers[provider.id] = provider
     this._context.globalState.update(INFERENCE_PROVIDERS_KEY, providers)
+    if (provider.id === activeFimProvider?.id) this.setActiveFimProvider(provider)
+    if (provider.id === activeChatProvider?.id) this.setActiveChatProvider(provider)
     this.getAllProviders()
   }
 
@@ -228,11 +245,11 @@ export class ProviderManager {
     this._context.globalState.update(INFERENCE_PROVIDERS_KEY, undefined)
     this._context.globalState.update(ACTIVE_CHAT_PROVIDER_KEY, undefined)
     this._context.globalState.update(ACTIVE_FIM_PROVIDER_KEY, undefined)
-    this.addDefaultChatProvider()
-    this.addDefaultFimProvider()
+    const chatProvider = this.addDefaultChatProvider()
+    const fimProvider = this.addDefaultFimProvider()
     this.focusProviderTab()
-    this.setActiveChatProvider(this.getDefaultChatProvider())
-    this.setActiveFimProvider(this.getDefaultFimProvider())
+    this.setActiveChatProvider(chatProvider)
+    this.setActiveFimProvider(fimProvider)
     this.getAllProviders()
   }
 }
