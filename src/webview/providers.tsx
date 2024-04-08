@@ -292,7 +292,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             onChange={handleChange}
             name="apiPath"
             value={formState.apiPath}
-            placeholder='Enter an API path e.g "/api/generate" or "/v1/chat/completions"'
+            placeholder='e.g "/api/generate" or "/v1/chat/completions"'
           ></VSCodeTextField>
         </div>
 
