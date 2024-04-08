@@ -40,7 +40,8 @@ export async function activate(context: ExtensionContext) {
   const completionProvider = new CompletionProvider(
     statusBar,
     fileInteractionCache,
-    templateProvider
+    templateProvider,
+    context,
   )
   const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
 
@@ -107,6 +108,19 @@ export async function activate(context: ExtensionContext) {
         true
       )
     }),
+    commands.registerCommand('twinny.manageProviders', async () => {
+      commands.executeCommand(
+        'setContext',
+        CONTEXT_NAME.twinnyManageProviders,
+        true
+      )
+      sidebarProvider.view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnySetTab,
+        value: {
+          data: UI_TABS.providers
+        }
+      } as ServerMessage<string>)
+    }),
     commands.registerCommand('twinny.manageTemplates', async () => {
       commands.executeCommand(
         'setContext',
@@ -124,6 +138,11 @@ export async function activate(context: ExtensionContext) {
       commands.executeCommand(
         'setContext',
         CONTEXT_NAME.twinnyManageTemplates,
+        false
+      )
+      commands.executeCommand(
+        'setContext',
+        CONTEXT_NAME.twinnyManageProviders,
         false
       )
       sidebarProvider.view?.webview.postMessage({
@@ -158,6 +177,9 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.getTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation
       })
+      sidebarProvider.view?.webview.postMessage({
+        type: MESSAGE_NAME.twinnyStopGeneration,
+      } as ServerMessage<string>)
     }),
 
     window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),

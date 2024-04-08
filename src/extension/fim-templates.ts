@@ -22,8 +22,7 @@ export const getFimPromptTemplateLLama = ({
         languageId?.syntaxComments?.end || ''
       }`
     : ''
-  const heading = header ? header : ''
-
+  const heading = useFileContext && header ? header : ''
   return `<PRE>${fileContext} \n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
@@ -40,7 +39,7 @@ export const getDefaultFimPromptTemplate = ({
   const fileContext = useFileContext
     ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
     : ''
-  const heading = header ? header : ''
+  const heading = useFileContext && header ? header : ''
   return `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
@@ -57,7 +56,7 @@ export const getFimPromptTemplateDeepseek = ({
   const fileContext = useFileContext
     ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
     : ''
-  const heading = header ? header : ''
+  const heading = useFileContext && header ? header : ''
   return `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
 }
 
@@ -159,7 +158,10 @@ export const getStopWordsChosen = (format: string) => {
 }
 
 export const getStopWords = (fimModel: string, format: string) => {
-  if (format === FIM_TEMPLATE_FORMAT.automatic || format === FIM_TEMPLATE_FORMAT.custom) {
+  if (
+    format === FIM_TEMPLATE_FORMAT.automatic ||
+    format === FIM_TEMPLATE_FORMAT.custom
+  ) {
     return getStopWordsAuto(fimModel)
   }
   return getStopWordsChosen(format)

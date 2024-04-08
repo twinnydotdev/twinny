@@ -52,7 +52,7 @@ export const MESSAGE_NAME = {
   twinnySetOllamaModel: 'twinny-set-ollama-model',
   twinnySetConfigValue: 'twinny-set-config-value',
   twinnyGetConfigValue: 'twinny-get-config-value',
-  twinnyGetGitChanges: 'twinny-get-git-changes',
+  twinnyGetGitChanges: 'twinny-get-git-changes'
 }
 
 export const MESSAGE_KEY = {
@@ -61,7 +61,8 @@ export const MESSAGE_KEY = {
   downloadCancelled: 'downloadCancelled',
   lastConversation: 'lastConversation',
   selectedTemplates: 'selectedTemplates',
-  selection: 'selection'
+  selection: 'selection',
+  showProviders: 'showProviders',
 }
 
 export const SETTING_KEY = {
@@ -73,12 +74,14 @@ export const SETTING_KEY = {
 
 export const CONTEXT_NAME = {
   twinnyGeneratingText: 'twinnyGeneratingText',
-  twinnyManageTemplates: 'twinnyManageTemplates'
+  twinnyManageTemplates: 'twinnyManageTemplates',
+  twinnyManageProviders: 'twinnyManageProviders'
 }
 
 export const UI_TABS = {
   chat: 'chat',
-  templates: 'templates'
+  templates: 'templates',
+  providers: 'providers'
 }
 
 export const FIM_TEMPLATE_FORMAT = {
@@ -110,6 +113,29 @@ export const DEFAULT_ACTION_TEMPLATES = [
   'add-tests',
   'add-types',
   'explain'
+]
+
+export const DEFAULT_PROVIDER_FORM_VALUES = {
+  apiHostname: '0.0.0.0',
+  apiKey: '',
+  apiPath: '',
+  apiPort: 11434,
+  apiProtocol: 'http',
+  id: '',
+  label: '',
+  modelName: '',
+  name: '',
+  provider: 'ollama',
+  type: 'chat'
+}
+
+export const FIM_TEMPLATE_TYPE = [
+  'automatic',
+  'stable-code',
+  'codellama',
+  'deepseek',
+  'starcoder',
+  'custom-template'
 ]
 
 export const WASM_LANGAUAGES: { [key: string]: string } = {

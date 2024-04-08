@@ -1,0 +1,71 @@
+.providersHeader {
+  display: flex;
+  gap: 3px;
+}
+
+.provider {
+  padding: 5px;
+  border-radius: 5px;
+  background: var(--vscode-inputOption-hoverBackground);
+  border: 1px solid var(--vscode-editorWidget-border);
+  margin: 5px 0;
+}
+
+.providerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.providerHeader h4 {
+  margin: 0;
+}
+
+.providerDetails {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, auto);
+  gap: 5px;
+  overflow: hidden;
+}
+
+.providerDetails > div {
+  text-wrap: nowrap;
+  text-overflow: ellipsis;
+}
+
+.providerForm {
+  width: 100%;
+}
+
+.providerForm div {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.providerFormButtons {
+  display: flex;
+  flex-direction: row !important;
+  justify-content: flex-end;
+  align-self: flex-end;
+  gap: 5px;
+}
+
+.providerHeader svg {
+  width: 20px;
+}
+
+.providerSelector {
+  width: 100%;
+  gap: 3px;
+}
+
+.providerSelector vscode-dropdown {
+  width: 100%;
+}
+
+.providerSelector > div {
+  width: 100%;
+}

@@ -16,6 +16,7 @@ import {
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
+import { ProviderManager } from '../provider-manager'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _context: vscode.ExtensionContext
@@ -23,6 +24,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private _templateDir: string
   private _templateProvider: TemplateProvider
   private _ollamaService: OllamaService | undefined = undefined
+  private _providerManager: ProviderManager | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
 
@@ -42,9 +44,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this.chatService = new ChatService(
       this._statusBar,
       this._templateDir,
+      this._context,
       webviewView
     )
     this.view = webviewView
+
+    this._providerManager = new ProviderManager(this._context, this.view)
 
     webviewView.webview.options = {
       enableScripts: true,

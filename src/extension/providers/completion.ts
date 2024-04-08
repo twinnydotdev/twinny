@@ -10,7 +10,8 @@ import {
   window,
   Uri,
   InlineCompletionContext,
-  InlineCompletionTriggerKind
+  InlineCompletionTriggerKind,
+  ExtensionContext
 } from 'vscode'
 import AsyncLock from 'async-lock'
 import 'string_score'
@@ -43,31 +44,23 @@ import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
 import { getLineBreakCount } from '../../webview/utils'
 import { TemplateProvider } from '../template-provider'
+import { ACTIVE_FIM_PROVIDER_KEY, TwinnyProvider } from '../provider-manager'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
   private _abortController: AbortController | null
   private _acceptedLastCompletion = false
-  private _apiDefaultHostName = this._config.get('apiHostname') as string
-  private _apiFimHostname = this._config.get('apiFimHostname') as string
-  private _apiPath = this._config.get('fimApiPath') as string
-  private _apiProviderDefault = this._config.get('apiProvider') as string
-  private _apiProviderFim = this._config.get('apiProviderFim') as string
-  private _bearerToken = this._config.get('apiBearerToken') as string
   private _cacheEnabled = this._config.get('enableCompletionCache') as boolean
   private _chunkCount = 0
   private _completion = ''
   private _debouncer: NodeJS.Timeout | undefined
   private _debounceWait = this._config.get('debounceWait') as number
-  private _disableAutoSuggest = this._config.get(
-    'disableAutoSuggest'
-  ) as boolean
+  private _disableAuto = this._config.get('disableAutoSuggest') as boolean
   private _document: TextDocument | null
   private _enabled = this._config.get('enabled')
   private _enableSubsequent = this._config.get('enableSubsequent') as boolean
+  private _extensionContext: ExtensionContext
   private _fileInteractionCache: FileInteractionCache
-  private _fimModel = this._config.get('fimModelName') as string
-  private _fimTemplateFormat = this._config.get('fimTemplateFormat') as string
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _lastCompletionMultiline = false
   private _lastCompletionText = ''
@@ -77,21 +70,19 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _nonce = 0
   private _numLineContext = this._config.get('contextLength') as number
   private _numPredictFim = this._config.get('numPredictFim') as number
-  private _port = this._config.get('fimApiPort') as number
   private _position: Position | null
   private _statusBar: StatusBarItem
-  private _stopWords = getStopWords(this._fimModel, this._fimTemplateFormat)
   private _temperature = this._config.get('temperature') as number
   private _templateProvider: TemplateProvider
   private _useFileContext = this._config.get('useFileContext') as boolean
   private _useMultiLine = this._config.get('useMultiLineCompletions') as boolean
-  private _useTls = this._config.get('useTls') as boolean
   private _usingFimTemplate = false
 
   constructor(
     statusBar: StatusBarItem,
     fileInteractionCache: FileInteractionCache,
-    templateProvider: TemplateProvider
+    templateProvider: TemplateProvider,
+    extentionContext: ExtensionContext
   ) {
     this._abortController = null
     this._document = null
@@ -101,6 +92,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
     this._templateProvider = templateProvider
+    this._extensionContext = extentionContext
   }
 
   public async provideInlineCompletionItems(
@@ -121,7 +113,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     if (
       context.triggerKind === InlineCompletionTriggerKind.Invoke &&
-      !this._disableAutoSuggest
+      !this._disableAuto
     ) {
       this._completion = this._lastCompletionText
       return this.triggerInlineCompletion(prefixSuffix)
@@ -132,7 +124,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       !editor ||
       isLastCompletionAccepted ||
       this._lastCompletionMultiline ||
-      getShouldSkipCompletion(context, this._disableAutoSuggest) ||
+      getShouldSkipCompletion(context, this._disableAuto) ||
       getIsMiddleWord()
     ) {
       this._statusBar.text = '🤖'
@@ -157,9 +149,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
       this._debouncer = setTimeout(() => {
-        this._lock.acquire('completion', () => {
-          const { requestBody, requestOptions } =
-            this.buildStreamRequest(prompt)
+        this._lock.acquire('twinny.completion', () => {
+          const request = this.buildStreamRequest(prompt)
+          if (!request || !prompt) return
+          const { requestBody, requestOptions } = request
 
           try {
             streamResponse({
@@ -196,26 +189,25 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private buildStreamRequest(prompt: string) {
-    const requestBody = createStreamRequestBodyFim(
-      this._apiProviderFim || this._apiProviderDefault,
-      prompt,
-      {
-        model: this._fimModel,
-        numPredictFim: this._numPredictFim,
-        temperature: this._temperature,
-        keepAlive: this._keepAlive
-      }
-    )
+    const provider = this.getFimProvider()
+    if (!provider) return
+
+    const requestBody = createStreamRequestBodyFim(provider.provider, prompt, {
+      model: provider.modelName,
+      numPredictFim: this._numPredictFim,
+      temperature: this._temperature,
+      keepAlive: this._keepAlive
+    })
 
     const requestOptions: StreamRequestOptions = {
-      hostname: this._apiFimHostname || this._apiDefaultHostName,
-      port: this._port,
-      path: this._apiPath,
-      protocol: this._useTls ? 'https' : 'http',
+      hostname: provider.apiHostname,
+      port: Number(provider.apiPort),
+      path: provider.apiPath,
+      protocol: provider.apiProtocol,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this._bearerToken}`
+        Authorization: `Bearer ${provider.apiKey}`
       }
     }
 
@@ -223,11 +215,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private onData(data: StreamResponse | undefined): string {
+    const provider = this.getFimProvider()
+    if (!provider) return ''
     try {
-      const completionData = getFimDataFromProvider(
-        this._apiProviderFim || this._apiProviderDefault,
-        data
-      )
+      const completionData = getFimDataFromProvider(provider.provider, data)
       if (completionData === undefined) return ''
 
       this._completion = this._completion + completionData
@@ -357,21 +348,34 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return fileChunks.join('\n')
   }
 
+  private getFimProvider = () => {
+    const provider = this._extensionContext.globalState.get<TwinnyProvider>(
+      ACTIVE_FIM_PROVIDER_KEY
+    )
+    return provider
+  }
+
   private removeStopWords(completion: string) {
+    const provider = this.getFimProvider()
+    if (!provider) return completion
+    const template = provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
     let filteredCompletion = completion
-    this._stopWords.forEach((stopWord) => {
+    const stopWords = getStopWords(provider.modelName, template)
+    stopWords.forEach((stopWord) => {
       filteredCompletion = filteredCompletion.split(stopWord).join('')
     })
     return filteredCompletion
   }
 
   private async getPrompt(prefixSuffix: PrefixSuffix) {
-    if (!this._document || !this._position) return ''
+    const provider = this.getFimProvider()
+    if (!provider) return ''
+    if (!this._document || !this._position || !provider) return ''
 
     const language = this._document.languageId
     const interactionContext = await this.getFileInteractionContext()
 
-    if (this._fimTemplateFormat === FIM_TEMPLATE_FORMAT.custom) {
+    if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
       const systemMessage =
         await this._templateProvider.readSystemMessageTemplate('fim-system.hbs')
 
@@ -390,7 +394,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       }
     }
 
-    const prompt = getFimPrompt(this._fimModel, this._fimTemplateFormat, {
+    const template = provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
+
+    const prompt = getFimPrompt(provider.modelName, template, {
       context: interactionContext || '',
       prefixSuffix,
       header: this.getPromptHeader(language, this._document.uri),
@@ -442,28 +448,18 @@ Using custom FIM template fim.bhs?: ${this._usingFimTemplate}
   }
 
   public updateConfig() {
-    this._apiFimHostname = this._config.get('apiFimHostname') as string
-    this._apiDefaultHostName = this._config.get('apiHostname') as string
-    this._apiPath = this._config.get('fimApiPath') as string
-    this._apiProviderDefault = this._config.get('apiProvider') as string
-    this._apiProviderFim = this._config.get('apiProviderFim') as string
-    this._bearerToken = this._config.get('apiBearerToken') as string
     this._cacheEnabled = this._config.get('enableCompletionCache') as boolean
     this._config = workspace.getConfiguration('twinny')
     this._debounceWait = this._config.get('debounceWait') as number
-    this._disableAutoSuggest = this._config.get('disableAutoSuggest') as boolean
+    this._disableAuto = this._config.get('disableAutoSuggest') as boolean
     this._enableSubsequent = this._config.get('enableSubsequent') as boolean
-    this._fimModel = this._config.get('fimModelName') as string
-    this._fimTemplateFormat = this._config.get('fimTemplateFormat') as string
     this._keepAlive = this._config.get('keepAlive') as string | number
     this._maxLines = this._config.get('maxLines') as number
     this._numLineContext = this._config.get('contextLength') as number
     this._numPredictFim = this._config.get('numPredictFim') as number
-    this._port = this._config.get('fimApiPort') as number
     this._temperature = this._config.get('temperature') as number
     this._useFileContext = this._config.get('useFileContext') as boolean
     this._useMultiLine = this._config.get('useMultiLineCompletions') as boolean
-    this._useTls = this._config.get('useTls') as boolean
     this._logger.updateConfig()
   }
 }

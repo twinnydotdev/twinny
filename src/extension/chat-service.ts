@@ -1,4 +1,11 @@
-import { StatusBarItem, WebviewView, commands, window, workspace } from 'vscode'
+import {
+  StatusBarItem,
+  WebviewView,
+  commands,
+  window,
+  workspace,
+  ExtensionContext
+} from 'vscode'
 
 import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER } from '../common/constants'
 import {
@@ -17,34 +24,31 @@ import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
+import { ACTIVE_CHAT_PROVIDER_KEY, TwinnyProvider } from './provider-manager'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
-  private _apiHostname = this._config.get('apiHostname') as string
-  private _apiPath = this._config.get('chatApiPath') as string
-  private _apiProvider = this._config.get('apiProvider') as string
-  private _bearerToken = this._config.get('apiBearerToken') as string
-  private _chatModel = this._config.get('chatModelName') as string
   private _completion = ''
   private _controller?: AbortController
+  private _extensionContext?: ExtensionContext
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
-  private _port = this._config.get('chatApiPort') as string
   private _promptTemplate = ''
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
-  private _useTls = this._config.get('useTls') as boolean
   private _view?: WebviewView
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
+    extensionContext: ExtensionContext,
     view?: WebviewView
   ) {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
+    this._extensionContext = extensionContext
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
@@ -53,24 +57,35 @@ export class ChatService {
     })
   }
 
+  private getProvider = () => {
+    const provider = this._extensionContext?.globalState.get<TwinnyProvider>(
+      ACTIVE_CHAT_PROVIDER_KEY
+    )
+    return provider
+  }
+
   private buildStreamRequest(
     prompt: string,
     messages?: MessageType[] | MessageRoleContent[]
   ) {
+    const provider = this.getProvider()
+
+    if (!provider) return
+
     const requestOptions: StreamRequestOptions = {
-      hostname: this._apiHostname,
-      port: this._port,
-      path: this._apiPath,
-      protocol: this._useTls ? 'https' : 'http',
+      hostname: provider.apiHostname,
+      port: Number(provider.apiPort),
+      path: provider.apiPath,
+      protocol: provider.apiProtocol,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this._bearerToken}`
+        Authorization: `Bearer ${provider.apiKey}`
       }
     }
 
-    const requestBody = createStreamRequestBody(this._apiProvider, prompt, {
-      model: this._chatModel,
+    const requestBody = createStreamRequestBody(provider.provider, prompt, {
+      model: provider.modelName,
       numPredictChat: this._numPredictChat,
       temperature: this._temperature,
       messages,
@@ -84,8 +99,11 @@ export class ChatService {
     streamResponse: StreamResponse | undefined,
     onEnd?: (completion: string) => void
   ) => {
+    const provider = this.getProvider()
+    if (!provider) return
+
     try {
-      const data = getChatDataFromProvider(this._apiProvider, streamResponse)
+      const data = getChatDataFromProvider(provider.provider, streamResponse)
       this._completion = this._completion + data
       if (onEnd) return
       this._view?.webview.postMessage({
@@ -112,7 +130,7 @@ export class ChatService {
     if (onEnd) {
       onEnd(this._completion)
       this._view?.webview.postMessage({
-        type: MESSAGE_NAME.twinnyOnEnd,
+        type: MESSAGE_NAME.twinnyOnEnd
       } as ServerMessage)
       return
     }
@@ -285,10 +303,9 @@ export class ChatService {
     this.sendEditorLanguage()
     const messageRoleContent = await this.buildMesageRoleContent(messages)
     const prompt = await this.buildChatPrompt(messages)
-    const { requestBody, requestOptions } = this.buildStreamRequest(
-      prompt,
-      messageRoleContent
-    )
+    const request = this.buildStreamRequest(prompt, messageRoleContent)
+    if (!request) return
+    const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions })
   }
 
@@ -328,22 +345,15 @@ export class ChatService {
       ],
       language
     )
-    const { requestBody, requestOptions } = this.buildStreamRequest(
-      prompt,
-      messageRoleContent
-    )
+    const request = this.buildStreamRequest(prompt, messageRoleContent)
+    if (!request) return
+    const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions, onEnd })
   }
 
   private updateConfig() {
     this._config = workspace.getConfiguration('twinny')
     this._temperature = this._config.get('temperature') as number
-    this._chatModel = this._config.get('chatModelName') as string
-    this._apiPath = this._config.get('chatApiPath') as string
-    this._port = this._config.get('chatApiPort') as string
-    this._apiHostname = this._config.get('apiHostname') as string
-    this._apiProvider = this._config.get('apiProvider') as string
     this._keepAlive = this._config.get('keepAlive') as string | number
-    this._useTls = this._config.get('useTls') as boolean
   }
 }

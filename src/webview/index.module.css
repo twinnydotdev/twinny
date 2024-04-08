@@ -154,11 +154,11 @@ pre code {
   margin-top: 20px;
 }
 
-.modelSelect {
+.twinnyForm {
   width: 100%;
 }
 
-.modelSelect div {
+.twinnyForm div {
   margin-bottom: 10px;
   display: flex;
   flex-direction: column;
