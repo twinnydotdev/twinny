@@ -1,6 +1,6 @@
 import { ExtensionContext, WebviewView } from 'vscode'
 import { ApiProviders, ClientMessage, ServerMessage } from '../common/types'
-import { UI_TABS } from '../common/constants'
+import { FIM_TEMPLATE_FORMAT, UI_TABS } from '../common/constants'
 import { v4 as uuidv4 } from 'uuid'
 
 export const PROVIDER_MESSAGE_TYPE = {
@@ -114,7 +114,7 @@ export class ProviderManager {
       apiPort: 11434,
       apiPath: '/api/generate',
       apiProtocol: 'http',
-      fimTemplate: 'automatic'
+      fimTemplate: FIM_TEMPLATE_FORMAT.codellama,
     } as TwinnyProvider
   }
 
