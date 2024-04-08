@@ -302,15 +302,11 @@ export const getChatDataFromProvider = (
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
         : ''
-    case ApiProviders.Oobabooga:
-      return data?.choices[0].text
     case ApiProviders.LlamaCpp:
       return data?.content
     case ApiProviders.LiteLLM:
     default:
-      if (data?.choices[0].delta.content === 'undefined') {
-        return ''
-      }
+      if (data?.choices[0].delta.content === 'undefined') return ''
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
         : ''
