@@ -24,6 +24,11 @@ Like Github Copilot but 100% free!
     </p>
 </div>
 
+## Latest version v3.11.0
+
+The twinny extension has received an update, bringing it to version 3.11.0. This release is categorized as a minor update, as it may potentially break existing configurations. 
+
+One of the key changes in this version is the way API settings are handled. Instead of configuring API settings within the twinny extension itself, providers are now managed through the extension's provider settings. This change streamlines the process of switching between different models, providers, and APIs without the need to access the extension settings directly.
 
 ## Main features
 
@@ -37,7 +42,7 @@ Get AI based suggestions in real time. While coding you can let twinny autocompl
 
 Through the side bar, have a conversation with your model and get explanations about a function, ask it to write tests, ask for a refactor and much more.
 
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/679bd283-28e9-47ff-9165-84dfe293c56a" width="760"/>
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/4a506a90-b1f0-48bc-a8b0-975d94f3b04c" width="760"/>
 
 #### Other features 
 
