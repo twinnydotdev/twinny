@@ -91,6 +91,7 @@ export const FIM_TEMPLATE_FORMAT = {
   llama: 'llama',
   stableCode: 'stable-code',
   starcoder: 'starcoder',
+  codegemma: 'codegemma',
   custom: 'custom-template'
 }
 
@@ -105,6 +106,8 @@ export const STOP_DEEPSEEK = [
 ]
 
 export const STOP_STARCODER = ['<|endoftext|>']
+
+export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
 
 export const DEFAULT_TEMPLATE_NAMES = defaultTemplates.map(({ name }) => name)
 
@@ -128,15 +131,6 @@ export const DEFAULT_PROVIDER_FORM_VALUES = {
   provider: 'ollama',
   type: 'chat'
 }
-
-export const FIM_TEMPLATE_TYPE = [
-  'automatic',
-  'stable-code',
-  'codellama',
-  'deepseek',
-  'starcoder',
-  'custom-template'
-]
 
 export const WASM_LANGAUAGES: { [key: string]: string } = {
   cpp: 'cpp',

@@ -14,7 +14,7 @@ import styles from './providers.module.css'
 import { TwinnyProvider } from '../extension/provider-manager'
 import {
   DEFAULT_PROVIDER_FORM_VALUES,
-  FIM_TEMPLATE_TYPE
+  FIM_TEMPLATE_FORMAT,
 } from '../common/constants'
 
 export const Providers = () => {
@@ -223,7 +223,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
               onChange={handleChangeDropdown}
               value={formState.fimTemplate}
             >
-              {FIM_TEMPLATE_TYPE.map((type, index) => (
+              {Object.values(FIM_TEMPLATE_FORMAT).map((type, index) => (
                 <VSCodeOption key={index} value={type || 'automatic'}>
                   {type}
                 </VSCodeOption>
