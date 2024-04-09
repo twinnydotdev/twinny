@@ -55,3 +55,10 @@ export const kebabToSentence = (kebabStr: string) => {
 }
 
 export const getLineBreakCount = (str: string) => str.split('\n').length
+
+export const getModelShortName = (name: string) => {
+  if (name.length > 32) {
+    return `${name.substring(0, 15)}...${name.substring(name.length - 16)}`
+  }
+  return name
+}

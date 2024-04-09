@@ -318,14 +318,34 @@
           "default": true,
           "description": "Enable this setting to allow twinny to keep making subsequent completion requests to the API after the last completion request was accepted."
         },
-        "twinny.keepAlive": {
+        "twinny.ollamaHostname": {
           "order": 13,
+          "type": "string",
+          "default": "0.0.0.0",
+          "description": "Hostname for Ollama API.",
+          "required": true
+        },
+        "twinny.ollamaApiPort": {
+          "order": 14,
+          "type": "number",
+          "default": 11434,
+          "description": "The API port usually `11434`",
+          "required": false
+        },
+        "twinny.keepAlive": {
+          "order": 15,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
+        "twinny.ollamaUseTls": {
+          "order": 25,
+          "type": "boolean",
+          "default": false,
+          "description": "Enables TLS encryption Ollama API connections."
+        },
         "twinny.enableLogging": {
-          "order": 14,
+          "order": 26,
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { MESSAGE_KEY, MESSAGE_NAME } from '../common/constants'
 import {
+  ApiModel,
   ClientMessage,
   LanguageType,
   ServerMessage,
@@ -280,4 +281,24 @@ export const useConfigurationSetting = (key: string) => {
   }, [key])
 
   return { configurationSetting }
+}
+
+export const useOllamaModels = () => {
+  const [models, setModels] = useState<ApiModel[] | undefined>([])
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<ApiModel[]> = event.data
+    if (message?.type === MESSAGE_NAME.twinnyFetchOllamaModels) {
+      setModels(message?.value.data)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: MESSAGE_NAME.twinnyFetchOllamaModels
+    })
+    window.addEventListener('message', handler)
+  }, [])
+
+  return { models }
 }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { useProviders } from './hooks'
+import { useOllamaModels, useProviders } from './hooks'
 import {
   VSCodeButton,
   VSCodeDivider,
@@ -16,6 +16,7 @@ import {
   DEFAULT_PROVIDER_FORM_VALUES,
   FIM_TEMPLATE_FORMAT,
 } from '../common/constants'
+import { ModelSelect } from './model-select'
 
 export const Providers = () => {
   const [showForm, setShowForm] = React.useState(false)
@@ -60,8 +61,8 @@ export const Providers = () => {
             <div>
               <div className={styles.providersHeader}>
                 <VSCodeButton onClick={handleAdd}>Add Provider</VSCodeButton>
-                <VSCodeButton appearance='secondary' onClick={handleReset}>
-                  <i className='codicon codicon-refresh' />
+                <VSCodeButton appearance="secondary" onClick={handleReset}>
+                  <i className="codicon codicon-refresh" />
                   Reset Providers
                 </VSCodeButton>
               </div>
@@ -71,28 +72,28 @@ export const Providers = () => {
                     <h4>{provider.label}</h4>
                     <div className={styles.providerActions}>
                       <VSCodeButton
-                        appearance='icon'
-                        title='Edit provider'
-                        aria-label='Edit provider'
+                        appearance="icon"
+                        title="Edit provider"
+                        aria-label="Edit provider"
                         onClick={() => handleEdit(provider)}
                       >
-                        <i className='codicon codicon-edit' />
+                        <i className="codicon codicon-edit" />
                       </VSCodeButton>
                       <VSCodeButton
-                        appearance='icon'
-                        title='Copy provider'
-                        aria-label='Copy provider'
+                        appearance="icon"
+                        title="Copy provider"
+                        aria-label="Copy provider"
                         onClick={() => handleCopy(provider)}
                       >
-                        <i className='codicon codicon-copy' />
+                        <i className="codicon codicon-copy" />
                       </VSCodeButton>
                       <VSCodeButton
-                        appearance='icon'
-                        title='Delete provider'
-                        aria-label='Delete provider'
+                        appearance="icon"
+                        title="Delete provider"
+                        aria-label="Delete provider"
                         onClick={() => handleDelete(provider)}
                       >
-                        <i className='codicon codicon-trash' />
+                        <i className="codicon codicon-trash" />
                       </VSCodeButton>
                     </div>
                   </div>
@@ -147,6 +148,7 @@ interface ProviderFormProps {
 
 function ProviderForm({ onClose, provider }: ProviderFormProps) {
   const isEditing = provider !== undefined
+  const { models } = useOllamaModels()
   const { saveProvider, updateProvider } = useProviders()
   const [formState, setFormState] = React.useState<TwinnyProvider>(
     provider || DEFAULT_PROVIDER_FORM_VALUES
@@ -185,11 +187,11 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
       <form onSubmit={handleSubmit} className={styles.providerForm}>
         <div>
           <div>
-            <label htmlFor='label'>Label*</label>
+            <label htmlFor="label">Label*</label>
           </div>
           <VSCodeTextField
             required
-            name='label'
+            name="label"
             onChange={handleChange}
             value={formState.label}
             placeholder='Applicable for some providers like "Ollama"'
@@ -198,10 +200,10 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
         <div>
           <div>
-            <label htmlFor='type'>Type*</label>
+            <label htmlFor="type">Type*</label>
           </div>
           <VSCodeDropdown
-            name='type'
+            name="type"
             onChange={handleChangeDropdown}
             value={formState.type}
           >
@@ -216,10 +218,10 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
         {formState.type === 'fim' && (
           <div>
             <div>
-              <label htmlFor='type'>Fim Template*</label>
+              <label htmlFor="type">Fim Template*</label>
             </div>
             <VSCodeDropdown
-              name='fimTemplate'
+              name="fimTemplate"
               onChange={handleChangeDropdown}
               value={formState.fimTemplate}
             >
@@ -234,10 +236,10 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
         <div>
           <div>
-            <label htmlFor='provider'>Provider*</label>
+            <label htmlFor="provider">Provider*</label>
           </div>
           <VSCodeDropdown
-            name='provider'
+            name="provider"
             onChange={handleChangeDropdown}
             value={formState.provider}
           >
@@ -251,10 +253,10 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
         <div>
           <div>
-            <label htmlFor='apiProtocol'>Protocol*</label>
+            <label htmlFor="apiProtocol">Protocol*</label>
           </div>
           <VSCodeDropdown
-            name='apiProtocol'
+            name="apiProtocol"
             onChange={handleChangeDropdown}
             value={formState.apiProtocol}
           >
@@ -266,27 +268,39 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
           </VSCodeDropdown>
         </div>
 
-        <div>
+        {formState.provider === ApiProviders.Ollama && models?.length && (
+          <ModelSelect
+            models={models}
+            model={formState.modelName}
+            setModel={(model: string) => {
+              setFormState({ ...formState, modelName: model })
+            }}
+          />
+        )}
+
+        {formState.provider !== ApiProviders.Ollama && (
           <div>
-            <label htmlFor='modelName'>Model name*</label>
+            <div>
+              <label htmlFor="modelName">Model name*</label>
+            </div>
+            <VSCodeTextField
+              required
+              name="modelName"
+              onChange={handleChange}
+              value={formState.modelName}
+              placeholder='Applicable for some providers like "Ollama"'
+            ></VSCodeTextField>
           </div>
-          <VSCodeTextField
-            required
-            name='modelName'
-            onChange={handleChange}
-            value={formState.modelName}
-            placeholder='Applicable for some providers like "Ollama"'
-          ></VSCodeTextField>
-        </div>
+        )}
 
         <div>
           <div>
-            <label htmlFor='apiHostname'>Hostname*</label>
+            <label htmlFor="apiHostname">Hostname*</label>
           </div>
           <VSCodeTextField
             required
             onChange={handleChange}
-            name='apiHostname'
+            name="apiHostname"
             value={formState.apiHostname}
             placeholder='Enter a hostname e.g "localhost"'
           ></VSCodeTextField>
@@ -294,12 +308,12 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
         <div>
           <div>
-            <label htmlFor='apiPort'>Port*</label>
+            <label htmlFor="apiPort">Port*</label>
           </div>
           <VSCodeTextField
             required
             onChange={handleChange}
-            name='apiPort'
+            name="apiPort"
             value={formState.apiPort.toString()}
             placeholder='Enter a port e.g "11434"'
           ></VSCodeTextField>
@@ -307,12 +321,12 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
         <div>
           <div>
-            <label htmlFor='apiPath'>API path*</label>
+            <label htmlFor="apiPath">API path*</label>
           </div>
           <VSCodeTextField
             required
             onChange={handleChange}
-            name='apiPath'
+            name="apiPath"
             value={formState.apiPath}
             placeholder='e.g "/api/generate" or "/v1/chat/completions"'
           ></VSCodeTextField>
@@ -320,21 +334,21 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
         <div>
           <div>
-            <label htmlFor='apiKey'>API key</label>
+            <label htmlFor="apiKey">API key</label>
           </div>
           <VSCodeTextField
             onChange={handleChange}
-            name='apiKey'
+            name="apiKey"
             value={formState.apiKey || ''}
-            placeholder='Enter an API key'
+            placeholder="Enter an API key"
           ></VSCodeTextField>
         </div>
 
         <div className={styles.providerFormButtons}>
-          <VSCodeButton appearance='primary' type='submit'>
+          <VSCodeButton appearance="primary" type="submit">
             Save
           </VSCodeButton>
-          <VSCodeButton appearance='secondary' onClick={handleCancel}>
+          <VSCodeButton appearance="secondary" onClick={handleCancel}>
             Cancel
           </VSCodeButton>
         </div>
