@@ -132,15 +132,6 @@ export const DEFAULT_PROVIDER_FORM_VALUES = {
   type: 'chat'
 }
 
-export const FIM_TEMPLATE_TYPE = [
-  'automatic',
-  'stable-code',
-  'codellama',
-  'deepseek',
-  'starcoder',
-  'custom-template'
-]
-
 export const WASM_LANGAUAGES: { [key: string]: string } = {
   cpp: 'cpp',
   hpp: 'cpp',

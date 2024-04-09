@@ -3,7 +3,7 @@ import {
   STOP_DEEPSEEK,
   STOP_LLAMA,
   STOP_STARCODER,
-  STOP_CODEGEMMA,
+  STOP_CODEGEMMA
 } from '../common/constants'
 import { supportedLanguages } from '../common/languages'
 import { FimPromptTemplate } from '../common/types'
@@ -74,19 +74,9 @@ export const getFimPromptTemplateStableCode = ({
 }
 
 export const getFimPromptTemplateCodegemma = ({
-  context,
-  header,
-  useFileContext,
-  prefixSuffix,
-  language
+  prefixSuffix
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  const languageId =
-    supportedLanguages[language as keyof typeof supportedLanguages]
-  const fileContext = useFileContext
-    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
-    : ''
-  const heading = header ? header : ''
   return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
 }
 
