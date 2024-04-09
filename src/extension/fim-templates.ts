@@ -2,7 +2,8 @@ import {
   FIM_TEMPLATE_FORMAT,
   STOP_DEEPSEEK,
   STOP_LLAMA,
-  STOP_STARCODER
+  STOP_STARCODER,
+  STOP_CODEGEMMA,
 } from '../common/constants'
 import { supportedLanguages } from '../common/languages'
 import { FimPromptTemplate } from '../common/types'
@@ -72,6 +73,23 @@ export const getFimPromptTemplateStableCode = ({
   return `<fim_prefix>${fileContext}\n${heading}${prefix}<fim_suffix>${suffix}<fim_middle>`
 }
 
+export const getFimPromptTemplateCodegemma = ({
+  context,
+  header,
+  useFileContext,
+  prefixSuffix,
+  language
+}: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
+  const languageId =
+    supportedLanguages[language as keyof typeof supportedLanguages]
+  const fileContext = useFileContext
+    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
+    : ''
+  const heading = header ? header : ''
+  return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+}
+
 function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
   if (
     fimModel.includes(FIM_TEMPLATE_FORMAT.codellama) ||
@@ -91,6 +109,10 @@ function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
     return getFimPromptTemplateStableCode(args)
   }
 
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.codegemma)) {
+    return getFimPromptTemplateCodegemma(args)
+  }
+
   return getDefaultFimPromptTemplate(args)
 }
 
@@ -108,6 +130,10 @@ function getFimTemplateChosen(format: string, args: FimPromptTemplate) {
     format === FIM_TEMPLATE_FORMAT.starcoder
   ) {
     return getFimPromptTemplateStableCode(args)
+  }
+
+  if (format === FIM_TEMPLATE_FORMAT.codegemma) {
+    return getFimPromptTemplateCodegemma(args)
   }
 
   return getDefaultFimPromptTemplate(args)
@@ -143,6 +169,10 @@ export const getStopWordsAuto = (fimModel: string) => {
     return ['<|endoftext|>']
   }
 
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.codegemma)) {
+    return STOP_CODEGEMMA
+  }
+
   return STOP_LLAMA
 }
 
@@ -154,6 +184,7 @@ export const getStopWordsChosen = (format: string) => {
     format === FIM_TEMPLATE_FORMAT.starcoder
   )
     return STOP_STARCODER
+  if (format === FIM_TEMPLATE_FORMAT.codegemma) return STOP_CODEGEMMA
   return STOP_LLAMA
 }
 
