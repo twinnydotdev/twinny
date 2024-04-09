@@ -69,7 +69,8 @@ Through the side bar, have a conversation with your model and get explanations a
 3. Choose your model from the [library](https://ollama.com/library) (eg: `codellama:7b`)
 
 ```sh
-ollama run codellama:7b
+ollama run codellama:7b-instruct
+ollama run codellama:7b-code
 ```
 
 4. Open VS code (if already open a restart might be needed) and press `ctr + shift + T` to open the side panel.
