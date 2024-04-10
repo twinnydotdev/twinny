@@ -165,7 +165,7 @@ export class CompletionFormatter {
     const lineCount = this._editor.document.lineCount
     let nextLineIndex = this._cursorPosition.line + 1
     while (
-      nextLineIndex < this._cursorPosition.line + 1 &&
+      nextLineIndex < this._cursorPosition.line + 3 &&
       nextLineIndex < lineCount
     ) {
       const line = this._editor.document.lineAt(nextLineIndex)
