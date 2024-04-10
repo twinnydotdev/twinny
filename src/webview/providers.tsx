@@ -181,6 +181,8 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
     onClose()
   }
 
+  const hasOllamaModels = !!models?.length
+
   return (
     <>
       <VSCodeDivider />
@@ -268,7 +270,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
           </VSCodeDropdown>
         </div>
 
-        {formState.provider === ApiProviders.Ollama && models?.length && (
+        {formState.provider === ApiProviders.Ollama && hasOllamaModels && (
           <ModelSelect
             models={models}
             model={formState.modelName}
