@@ -85,12 +85,12 @@ Here is the unidiff: \`\`\`{{code}}\`\`\`
 {{/if}}
 {{#each messages}}
   {{#if (eq this.role 'user')}}
-[INST] {{{this.content}}}
+{{{this.content}}}
     {{#if ../code}}
 \`\`\`{{{../code}}}\`\`\`
     {{/if}} {{#if ../language}}
 The language is {{../language}}
-{{/if}}[/INST]
+{{/if}}
   {{else}}
 {{{this.content}}}
   {{/if}}
