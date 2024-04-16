@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm'
 import CodeBlock from './code-block'
 
 import styles from './index.module.css'
-import { MessageType, ThemeType } from '../common/types'
+import { Message as MessageType, ThemeType } from '../common/types'
 import React from 'react'
 import { ASSISTANT, TWINNY, YOU } from '../common/constants'
 

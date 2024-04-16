@@ -1,6 +1,6 @@
 import { USER } from '../common/constants'
 import {
-  MessageRoleContent,
+  Message,
   ApiProviders,
   StreamBodyBase,
   StreamBodyOpenAI,
@@ -14,7 +14,7 @@ export function createStreamRequestBody(
     temperature: number
     numPredictChat: number
     model: string
-    messages?: MessageRoleContent[]
+    messages?: Message[]
     keepAlive?: string | number
   }
 ): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {

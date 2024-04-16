@@ -170,6 +170,7 @@ export async function activate(context: ExtensionContext) {
       delayExecution(() => sidebarProvider.getGitCommitMessage(), 400)
     }),
     commands.registerCommand('twinny.newChat', () => {
+      sidebarProvider.storeLastConversation()
       sidebarProvider.setTwinnyWorkspaceContext({
         key: MESSAGE_KEY.lastConversation,
         data: []

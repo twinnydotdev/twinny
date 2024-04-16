@@ -11,13 +11,13 @@ export interface StreamBodyBase {
 export interface StreamOptionsOllama extends StreamBodyBase {
   model: string
   keep_alive?: string | number
-  messages?: MessageType[] | MessageRoleContent
+  messages?: Message[] | Message
   prompt: string
   options: Record<string, unknown>
 }
 
 export interface StreamBodyOpenAI extends StreamBodyBase {
-  messages?: MessageType[] | MessageRoleContent
+  messages?: Message[] | Message
   max_tokens: number
 }
 
@@ -54,7 +54,7 @@ export interface LanguageType {
   languageId: string | undefined
 }
 
-export interface ClientMessage<T = string | boolean | MessageType[]> {
+export interface ClientMessage<T = string | boolean | Message[]> {
   data?: T
   type?: string
   key?: string
@@ -70,7 +70,7 @@ export interface ServerMessage<T = LanguageType> {
     type: string
   }
 }
-export interface MessageType {
+export interface Message {
   role: string
   content: string | undefined
   type?: string
@@ -78,7 +78,11 @@ export interface MessageType {
   error?: boolean
 }
 
-export type MessageRoleContent = Pick<MessageType, 'role' | 'content'>
+export interface Conversation {
+  id: string
+  title: string
+  messages: Message[]
+}
 
 export const Theme = {
   Light: 'Light',
@@ -106,7 +110,7 @@ export interface FimTemplateData extends Record<string, string | undefined> {
 export interface ChatTemplateData {
   systemMessage?: string
   role: string
-  messages: MessageType[]
+  messages: Message[]
   code: string
   language?: string
 }

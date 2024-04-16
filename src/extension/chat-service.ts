@@ -12,10 +12,9 @@ import {
   StreamResponse,
   StreamBodyBase,
   ServerMessage,
-  MessageType,
   TemplateData,
   ChatTemplateData,
-  MessageRoleContent,
+  Message,
   StreamRequestOptions
 } from '../common/types'
 import { getChatDataFromProvider, getLanguage } from './utils'
@@ -66,7 +65,7 @@ export class ChatService {
 
   private buildStreamRequest(
     prompt: string,
-    messages?: MessageType[] | MessageRoleContent[]
+    messages?: Message[] | Message[]
   ) {
     const provider = this.getProvider()
 
@@ -187,9 +186,9 @@ export class ChatService {
   }
 
   private buildMesageRoleContent = async (
-    messages: MessageType[],
+    messages: Message[],
     language?: CodeLanguageDetails
-  ): Promise<MessageRoleContent[]> => {
+  ): Promise<Message[]> => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
@@ -228,7 +227,7 @@ export class ChatService {
     return [systemMessage, ...messages]
   }
 
-  private buildChatPrompt = async (messages: MessageType[]) => {
+  private buildChatPrompt = async (messages: Message[]) => {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection) || ''
@@ -298,7 +297,7 @@ export class ChatService {
     } as ServerMessage<string>)
   }
 
-  public async streamChatCompletion(messages: MessageType[]) {
+  public async streamChatCompletion(messages: Message[]) {
     this._completion = ''
     this.sendEditorLanguage()
     const messageRoleContent = await this.buildMesageRoleContent(messages)

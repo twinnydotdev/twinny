@@ -18,7 +18,7 @@ import {
 import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from './icons'
 
 import { Suggestions } from './suggestions'
-import { ClientMessage, MessageType, ServerMessage } from '../common/types'
+import { ClientMessage, Message as MessageType, ServerMessage } from '../common/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
 import styles from './index.module.css'

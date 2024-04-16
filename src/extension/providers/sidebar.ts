@@ -10,13 +10,14 @@ import { MESSAGE_KEY, MESSAGE_NAME } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
   ClientMessage,
-  MessageType,
+  Message,
   ApiModel,
-  ServerMessage
+  ServerMessage,
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
+import { ConversationHistory } from '../conversation-history'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _context: vscode.ExtensionContext
@@ -24,7 +25,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private _templateDir: string
   private _templateProvider: TemplateProvider
   private _ollamaService: OllamaService | undefined = undefined
-  private _providerManager: ProviderManager | undefined = undefined
+  private _conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
 
@@ -48,8 +49,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       webviewView
     )
     this.view = webviewView
-
-    this._providerManager = new ProviderManager(this._context, this.view)
+    new ProviderManager(this._context, this.view)
+    this._conversationHistory = new ConversationHistory(this._context, this.view)
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -81,9 +82,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
 
     webviewView.webview.onDidReceiveMessage(
-      (
-        message: ClientMessage<string | boolean> & ClientMessage<MessageType[]>
-      ) => {
+      (message: ClientMessage<string | boolean> & ClientMessage<Message[]>) => {
         const eventHandlers = {
           [MESSAGE_NAME.twinnyAcceptSolution]: this.acceptSolution,
           [MESSAGE_NAME.twinnyChatMessage]: this.streamChatCompletion,
@@ -184,7 +183,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     )
   }
 
-  public streamChatCompletion = (data: ClientMessage<MessageType[]>) => {
+  public streamChatCompletion = (data: ClientMessage<Message[]>) => {
     this.chatService?.streamChatCompletion(data.data || [])
   }
 
@@ -249,6 +248,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       `${MESSAGE_NAME.twinnyGlobalContext}-${data.key}`,
       data.data
     )
+  }
+
+  public storeLastConversation = () => {
+    const lastConversation: Message[] | undefined =
+      this._context?.workspaceState.get(
+        `${MESSAGE_NAME.twinnyWorkspaceContext}-${MESSAGE_KEY.lastConversation}`
+      )
+    this._conversationHistory?.saveConversation(lastConversation)
   }
 
   public getTwinnyWorkspaceContext = (data: ClientMessage) => {
