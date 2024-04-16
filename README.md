@@ -164,3 +164,12 @@ This project is under MIT licence, please read the [LICENSE](https://github.com/
 ## Disclaimer
 
 This plugin is provided "as is" and is under active development.  This means that at times it may not work fully as expected.
+
+## Star history
+
+<picture>
+ <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date&theme=dark" />
+ <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date" />
+ <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date" />
+</picture>
+
