@@ -82,6 +82,7 @@ export function createStreamRequestBodyFim(
         n_predict: options.numPredictFim
       }
     case ApiProviders.LlamaCpp:
+    case ApiProviders.Oobabooga:
       return {
         prompt,
         stream: true,
@@ -89,13 +90,19 @@ export function createStreamRequestBodyFim(
         n_predict: options.numPredictFim
       }
     case ApiProviders.LiteLLM:
-    default:
       return {
         messages: [{ content: prompt, role: USER }],
         model: options.model,
         stream: true,
         max_tokens: options.numPredictFim,
         temperature: options.temperature
+      }
+    default:
+      return {
+        prompt,
+        stream: true,
+        temperature: options.temperature,
+        n_predict: options.numPredictFim
       }
   }
 }
