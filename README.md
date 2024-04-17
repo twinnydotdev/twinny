@@ -48,6 +48,7 @@ Through the side bar, have a conversation with your model and get explanations a
 
 - Works online or offline
 - Highly configurable api endpoints for fim and chat
+- All chat conversations preserved
 - Conforms to the OpenAI API standard
 - Single or multiline fill-in-middle completions
 - Customisable prompt templates to add context to completions
@@ -58,7 +59,6 @@ Through the side bar, have a conversation with your model and get explanations a
 - Accept code solutions directly to editor
 - Create new documents from code blocks
 - Copy generated code solution blocks
-- Chat history preserved per workspace
 
 ## 🚀 Getting Started
 
