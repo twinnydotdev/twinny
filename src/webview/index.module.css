@@ -1,10 +1,21 @@
 vscode-panel-view {
   flex-direction: column;
   padding: 0;
+  line-height: 1.5em;
 }
 
 vscode-text-area {
   width: 100%;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 500;
+}
+
+pre {
+  border-radius: 4px;
+  background-color: var(--vscode-editor-background);
+  border-color: var(--vscode-editor-background);
 }
 
 code {
@@ -34,15 +45,35 @@ pre code {
   overflow-x: hidden;
 }
 
-.message {
-  border-radius: 2px;
+.title {
+  margin: 0;
   margin-bottom: 10px;
-  margin-top: 5px;
+  color: var(--vscode-textPreformat-foreground);
+  font-weight: 500;
+  min-height: 20px;
 }
 
-.bot {
-  background: var(--panel-view-border);
-  padding: 1px 10px;
+.message {
+  padding: 10px;
+  border-top: solid 1px var(--divider-background)
+}
+
+.message:first-child {
+  border-top: none;
+}
+
+.message p {
+  margin: 0;
+}
+
+.messageRole  {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.userMessage {
+  background-color: var(--vscode-editorWidget-background);
 }
 
 .loading {

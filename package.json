@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.11.5",
+  "version": "3.11.7",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -84,7 +84,7 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory "
         },
         {
           "command": "twinny.manageProviders",
@@ -102,14 +102,19 @@
           "group": "navigation@3"
         },
         {
-          "command": "twinny.newChat",
+          "command": "twinny.conversationHistory",
           "when": "view == twinny.sidebar",
           "group": "navigation@4"
         },
         {
-          "command": "twinny.settings",
+          "command": "twinny.newChat",
           "when": "view == twinny.sidebar",
           "group": "navigation@5"
+        },
+        {
+          "command": "twinny.settings",
+          "when": "view == twinny.sidebar",
+          "group": "navigation@6"
         }
       ]
     },
@@ -162,6 +167,12 @@
         "shortTitle": "twinny settings",
         "title": "Open twinny settings",
         "icon": "$(gear)"
+      },
+      {
+        "command": "twinny.conversationHistory",
+        "shortTitle": "twinny conversation history",
+        "title": "Open twinny conversation history",
+        "icon": "$(history)"
       },
       {
         "command": "twinny.newChat",

@@ -1,4 +1,4 @@
-import { MESSAGE_KEY, MESSAGE_NAME } from '../common/constants'
+import { WORKSPACE_STORAGE_KEY, EVENT_NAME } from '../common/constants'
 import cn from 'classnames'
 
 import styles from './index.module.css'
@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 const global = globalThis as any
 export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
   const templateContext = useWorkSpaceContext<string[]>(
-    MESSAGE_KEY.selectedTemplates
+    WORKSPACE_STORAGE_KEY.selectedTemplates
   )
   const { templates, saveTemplates } = useTemplates()
   const [suggestions, setSuggestions] = useState<string[]>()
@@ -19,7 +19,7 @@ export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
     if (isDisabled) return
 
     global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnyClickSuggestion,
+      type: EVENT_NAME.twinnyClickSuggestion,
       data: message
     })
   }

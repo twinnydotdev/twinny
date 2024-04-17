@@ -1,7 +1,6 @@
 import {
   VSCodeDropdown,
   VSCodeOption,
-  VSCodeDivider
 } from '@vscode/webview-ui-toolkit/react'
 
 import styles from './providers.module.css'
@@ -32,42 +31,39 @@ export const ProviderSelect = () => {
   }
 
   return (
-    <>
-      <div className={styles.providerSelector}>
-        <div>
-          <div>Chat</div>
-          <VSCodeDropdown
-            value={chatProvider?.id}
-            name="provider"
-            onChange={handleChangeChatProvider}
-          >
-            {Object.values(getFimProvidersByType('chat'))
-              .sort((a, b) => a.modelName.localeCompare(b.modelName))
-              .map((provider, index) => (
-                <VSCodeOption key={index} value={provider.id}>
-                  {`${provider.label} (${provider.provider})`}
-                </VSCodeOption>
-              ))}
-          </VSCodeDropdown>
-        </div>
-        <div>
-          <div>Fill-in-middle</div>
-          <VSCodeDropdown
-            value={fimProvider?.id}
-            name="provider"
-            onChange={handleChangeFimProvider}
-          >
-            {Object.values(getFimProvidersByType('fim'))
-              .sort((a, b) => a.modelName.localeCompare(b.modelName))
-              .map((provider, index) => (
-                <VSCodeOption key={index} value={provider.id}>
-                  {`${provider.label} (${provider.provider})`}
-                </VSCodeOption>
-              ))}
-          </VSCodeDropdown>
-        </div>
+    <div className={styles.providerSelector}>
+      <div>
+        <div>Chat</div>
+        <VSCodeDropdown
+          value={chatProvider?.id}
+          name="provider"
+          onChange={handleChangeChatProvider}
+        >
+          {Object.values(getFimProvidersByType('chat'))
+            .sort((a, b) => a.modelName.localeCompare(b.modelName))
+            .map((provider, index) => (
+              <VSCodeOption key={index} value={provider.id}>
+                {`${provider.label} (${provider.provider})`}
+              </VSCodeOption>
+            ))}
+        </VSCodeDropdown>
       </div>
-      <VSCodeDivider />
-    </>
+      <div>
+        <div>Fill-in-middle</div>
+        <VSCodeDropdown
+          value={fimProvider?.id}
+          name="provider"
+          onChange={handleChangeFimProvider}
+        >
+          {Object.values(getFimProvidersByType('fim'))
+            .sort((a, b) => a.modelName.localeCompare(b.modelName))
+            .map((provider, index) => (
+              <VSCodeOption key={index} value={provider.id}>
+                {`${provider.label} (${provider.provider})`}
+              </VSCodeOption>
+            ))}
+        </VSCodeDropdown>
+      </div>
+    </div>
   )
 }

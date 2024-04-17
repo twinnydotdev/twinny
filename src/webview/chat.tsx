@@ -5,12 +5,18 @@ import {
   VSCodeTextArea,
   VSCodePanelView,
   VSCodeProgressRing,
-  VSCodeBadge,
+  VSCodeBadge
 } from '@vscode/webview-ui-toolkit/react'
 
-import { ASSISTANT, MESSAGE_KEY, MESSAGE_NAME, USER } from '../common/constants'
+import {
+  ASSISTANT,
+  WORKSPACE_STORAGE_KEY,
+  EVENT_NAME,
+  USER
+} from '../common/constants'
 
 import {
+  useConversationHistory,
   useSelection,
   useTheme,
   useWorkSpaceContext
@@ -18,7 +24,11 @@ import {
 import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from './icons'
 
 import { Suggestions } from './suggestions'
-import { ClientMessage, MessageType, ServerMessage } from '../common/types'
+import {
+  ClientMessage,
+  Message as MessageType,
+  ServerMessage
+} from '../common/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
 import styles from './index.module.css'
@@ -35,9 +45,11 @@ export const Chat = () => {
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
-  const autoScrollContext = useWorkSpaceContext<boolean>(MESSAGE_KEY.autoScroll)
+  const autoScrollContext = useWorkSpaceContext<boolean>(
+    WORKSPACE_STORAGE_KEY.autoScroll
+  )
   const showProvidersContext = useWorkSpaceContext<boolean>(
-    MESSAGE_KEY.showProviders
+    WORKSPACE_STORAGE_KEY.showProviders
   )
   const [showProviders, setShowProviders] = useState<boolean | undefined>(
     showProvidersContext || false
@@ -45,9 +57,9 @@ export const Chat = () => {
   const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
     boolean | undefined
   >(autoScrollContext)
-  const lastConversation = useWorkSpaceContext<MessageType[]>(
-    MESSAGE_KEY.lastConversation
-  )
+  const { conversation, saveLastConversation, setActiveConversation } =
+    useConversationHistory()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chatRef = useRef<any>(null) // TODO: type...
 
@@ -65,19 +77,18 @@ export const Chat = () => {
   const handleCompletionEnd = (message: ServerMessage) => {
     if (message.value) {
       setMessages((prev) => {
-        const update = [
+        const messages = [
           ...(prev || []),
           {
             role: ASSISTANT,
             content: getCompletionContent(message)
           }
         ]
-        global.vscode.postMessage({
-          type: MESSAGE_NAME.twinnySetWorkspaceContext,
-          key: MESSAGE_KEY.lastConversation,
-          data: update
-        } as ClientMessage<MessageType[]>)
-        return update
+        saveLastConversation({
+          ...conversation,
+          messages: messages
+        })
+        return messages
       })
       setTimeout(() => {
         chatRef.current?.focus()
@@ -131,27 +142,29 @@ export const Chat = () => {
   const messageEventHandler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     switch (message.type) {
-      case MESSAGE_NAME.twinngAddMessage: {
+      case EVENT_NAME.twinngAddMessage: {
         handleAddTemplateMessage(message)
         break
       }
-      case MESSAGE_NAME.twinnyOnCompletion: {
+      case EVENT_NAME.twinnyOnCompletion: {
         handleCompletionMessage(message)
         break
       }
-      case MESSAGE_NAME.twinnyOnLoading: {
+      case EVENT_NAME.twinnyOnLoading: {
         handleLoadingMessage()
         break
       }
-      case MESSAGE_NAME.twinnyOnEnd: {
+      case EVENT_NAME.twinnyOnEnd: {
         handleCompletionEnd(message)
         break
       }
-      case MESSAGE_NAME.twinnyStopGeneration: {
+      case EVENT_NAME.twinnyStopGeneration: {
         setCompletion(null)
         generatingRef.current = false
         setLoading(false)
         chatRef.current?.focus()
+        setActiveConversation(undefined)
+        setMessages([])
         setTimeout(() => {
           stopRef.current = false
         }, 1000)
@@ -163,10 +176,11 @@ export const Chat = () => {
     stopRef.current = true
     generatingRef.current = false
     global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnyStopGeneration
+      type: EVENT_NAME.twinnyStopGeneration
     } as ClientMessage)
     setCompletion(null)
     setLoading(false)
+    setMessages([])
     generatingRef.current = false
     setTimeout(() => {
       chatRef.current?.focus()
@@ -179,7 +193,7 @@ export const Chat = () => {
       setLoading(true)
       setInputText('')
       global.vscode.postMessage({
-        type: MESSAGE_NAME.twinnyChatMessage,
+        type: EVENT_NAME.twinnyChatMessage,
         data: [
           ...(messages || []),
           {
@@ -196,8 +210,8 @@ export const Chat = () => {
   const handleToggleAutoScroll = () => {
     setIsAutoScrolledEnabled((prev) => {
       global.vscode.postMessage({
-        type: MESSAGE_NAME.twinnySetWorkspaceContext,
-        key: MESSAGE_KEY.autoScroll,
+        type: EVENT_NAME.twinnySetWorkspaceContext,
+        key: WORKSPACE_STORAGE_KEY.autoScroll,
         data: !prev
       } as ClientMessage)
 
@@ -210,8 +224,8 @@ export const Chat = () => {
   const handleToggleProviderSelection = () => {
     setShowProviders((prev) => {
       global.vscode.postMessage({
-        type: MESSAGE_NAME.twinnySetWorkspaceContext,
-        key: MESSAGE_KEY.showProviders,
+        type: EVENT_NAME.twinnySetWorkspaceContext,
+        key: WORKSPACE_STORAGE_KEY.showProviders,
         data: !prev
       } as ClientMessage)
       return !prev
@@ -220,7 +234,7 @@ export const Chat = () => {
 
   const handleGetGitChanges = () => {
     global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnyGetGitChanges
+      type: EVENT_NAME.twinnyGetGitChanges
     } as ClientMessage)
   }
 
@@ -246,21 +260,24 @@ export const Chat = () => {
     if (showProvidersContext !== undefined)
       setShowProviders(showProvidersContext)
 
-    if (lastConversation?.length) {
-      return setMessages(lastConversation)
+    if (conversation?.messages?.length) {
+      return setMessages(conversation.messages)
     }
-    setMessages([])
-  }, [lastConversation, autoScrollContext, showProvidersContext])
+  }, [conversation?.id, autoScrollContext, showProvidersContext])
 
   return (
     <VSCodePanelView>
       <div className={styles.container}>
-        {showProviders && <ProviderSelect />}
+        <h4 className={styles.title}>
+          {conversation?.title ? (
+            <span>{conversation?.title}</span>
+          ) : (
+            generatingRef.current && <span>New conversation...</span>
+          )}
+        </h4>
         <div className={styles.markdown} ref={markdownRef}>
-          {messages?.map((message, index) => (
-            <div key={`message-${index}`}>
-              <Message message={message} theme={theme} />
-            </div>
+          {messages?.map((message) => (
+            <Message message={message} theme={theme} />
           ))}
           {loading && (
             <div className={styles.loading}>
@@ -268,20 +285,19 @@ export const Chat = () => {
             </div>
           )}
           {!!completion && (
-            <>
-              <Message
-                theme={theme}
-                message={{
-                  ...completion,
-                  role: ASSISTANT
-                }}
-              />
-            </>
+            <Message
+              theme={theme}
+              message={{
+                ...completion,
+                role: ASSISTANT
+              }}
+            />
           )}
         </div>
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
+        {showProviders && <ProviderSelect />}
         <div className={styles.chatOptions}>
           <div>
             <VSCodeButton
@@ -311,13 +327,25 @@ export const Chat = () => {
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
-          <VSCodeButton
-            title="Select active providers"
-            appearance="icon"
-            onClick={handleToggleProviderSelection}
-          >
-            <span className={styles.textIcon}>🤖</span>
-          </VSCodeButton>
+          <div>
+            {generatingRef.current && (
+              <VSCodeButton
+                type="button"
+                appearance="icon"
+                onClick={handleStopGeneration}
+                aria-label="Stop generation"
+              >
+                <span className="codicon codicon-debug-stop"></span>
+              </VSCodeButton>
+            )}
+            <VSCodeButton
+              title="Select active providers"
+              appearance="icon"
+              onClick={handleToggleProviderSelection}
+            >
+              <span className={styles.textIcon}>🤖</span>
+            </VSCodeButton>
+          </div>
         </div>
         <form>
           <div className={styles.chatBox}>
@@ -344,25 +372,6 @@ export const Chat = () => {
                 setInputText(event.target.value)
               }}
             />
-          </div>
-          <div className={styles.send}>
-            {generatingRef.current && (
-              <VSCodeButton
-                type="button"
-                appearance="icon"
-                onClick={handleStopGeneration}
-                aria-label="Stop generation"
-              >
-                <span className="codicon codicon-debug-stop"></span>
-              </VSCodeButton>
-            )}
-            <VSCodeButton
-              disabled={generatingRef.current}
-              onClick={() => handleSubmitForm(inputText)}
-              appearance="primary"
-            >
-              Send message
-            </VSCodeButton>
           </div>
         </form>
       </div>

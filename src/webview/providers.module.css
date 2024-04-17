@@ -1,3 +1,18 @@
+.providerSelector {
+  width: 100%;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.providerSelector vscode-dropdown {
+  width: 100%;
+}
+
+.providerSelector > div {
+  width: 100%;
+}
+
+
 .providersHeader {
   display: flex;
   gap: 3px;
@@ -55,17 +70,4 @@
 
 .providerHeader svg {
   width: 20px;
-}
-
-.providerSelector {
-  width: 100%;
-  gap: 3px;
-}
-
-.providerSelector vscode-dropdown {
-  width: 100%;
-}
-
-.providerSelector > div {
-  width: 100%;
 }

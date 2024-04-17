@@ -3,7 +3,7 @@ import { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
-import { ASSISTANT, MESSAGE_NAME } from '../common/constants'
+import { ASSISTANT, EVENT_NAME } from '../common/constants'
 
 import styles from './index.module.css'
 import { LanguageType, Theme, ThemeType } from '../common/types'
@@ -32,14 +32,14 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   const handleNewDocument = () => {
     global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnyNewDocument,
+      type: EVENT_NAME.twinnyNewDocument,
       data: String(children).replace(/^\n/, '')
     })
   }
 
   const handleAccept = () => {
     global.vscode.postMessage({
-      type: MESSAGE_NAME.twinnyAcceptSolution,
+      type: EVENT_NAME.twinnyAcceptSolution,
       data: String(children).replace(/^\n/, '')
     })
   }

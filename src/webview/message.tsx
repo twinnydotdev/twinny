@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm'
 import CodeBlock from './code-block'
 
 import styles from './index.module.css'
-import { MessageType, ThemeType } from '../common/types'
+import { Message as MessageType, ThemeType } from '../common/types'
 import React from 'react'
 import { ASSISTANT, TWINNY, YOU } from '../common/constants'
 
@@ -17,14 +17,15 @@ export const Message = ({ message, theme }: MessageProps) => {
   if (!message?.content) {
     return null
   }
+
   return (
     <>
-      <b>{message.role === ASSISTANT ? TWINNY : YOU}</b>
       <div
         className={`${styles.message} ${
-          message?.role === ASSISTANT ? styles.bot : ''
+          message?.role === ASSISTANT ? styles.assistantMessage : styles.userMessage
         }`}
       >
+        <span className={styles.messageRole}>{message.role === ASSISTANT ? TWINNY : YOU}</span>
         <Markdown
           remarkPlugins={[remarkGfm]}
           components={{

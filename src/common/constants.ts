@@ -22,19 +22,23 @@ export const SKIP_DECLARATION_SYMBOLS = ['=']
 export const IMPORT_SEPARATOR = [',', '{']
 export const SKIP_IMPORT_KEYWORDS_AFTER = ['from', 'as', 'import']
 
-export const MESSAGE_NAME = {
+export const EVENT_NAME = {
+  twinngAddMessage: 'twinny-add-message',
   twinnyAcceptSolution: 'twinny-accept-solution',
   twinnyChat: 'twinny-chat',
   twinnyChatMessage: 'twinny-chat-message',
   twinnyClickSuggestion: 'twinny-click-suggestion',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
+  twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
+  twinnyGetConfigValue: 'twinny-get-config-value',
+  twinnyGetGitChanges: 'twinny-get-git-changes',
   twinnyGlobalContext: 'twinny-global-context',
+  twinnyHideBackButton: 'twinny-hide-back-button',
   twinnyListTemplates: 'twinny-list-templates',
   twinnyManageTemplates: 'twinny-manage-templates',
   twinnyNewDocument: 'twinny-new-document',
   twinnyNotification: 'twinny-notification',
   twinnyOnCompletion: 'twinny-on-completion',
-  twinngAddMessage: 'twinny-add-message',
   twinnyOnEnd: 'twinny-on-end',
   twinnyOnLoading: 'twinny-on-loading',
   twinnyOpenDiff: 'twinny-open-diff',
@@ -42,46 +46,96 @@ export const MESSAGE_NAME = {
   twinnySendLanguage: 'twinny-send-language',
   twinnySendSystemMessage: 'twinny-send-system-message',
   twinnySendTheme: 'twinny-send-theme',
+  twinnySetConfigValue: 'twinny-set-config-value',
   twinnySetGlobalContext: 'twinny-set-global-context',
+  twinnySetOllamaModel: 'twinny-set-ollama-model',
   twinnySetTab: 'twinny-set-tab',
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
-  twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
-  twinnySetOllamaModel: 'twinny-set-ollama-model',
-  twinnySetConfigValue: 'twinny-set-config-value',
-  twinnyGetConfigValue: 'twinny-get-config-value',
-  twinnyGetGitChanges: 'twinny-get-git-changes'
 }
 
-export const MESSAGE_KEY = {
+export const TWINNY_COMMAND_NAME = {
+  enable: 'twinny.enable',
+  disable: 'twinny.disable',
+  explain: 'twinny.explain',
+  addTypes: 'twinny.addTypes',
+  refactor: 'twinny.refactor',
+  generateDocs: 'twinny.generateDocs',
+  addTests: 'twinny.addTests',
+  templateCompletion: 'twinny.templateCompletion',
+  stopGeneration: 'twinny.stopGeneration',
+  templates: 'twinny.templates',
+  manageProviders: 'twinny.manageProviders',
+  conversationHistory: 'twinny.conversationHistory',
+  manageTemplates: 'twinny.manageTemplates',
+  hideBackButton: 'twinny.hideBackButton',
+  openChat: 'twinny.openChat',
+  settings: 'twinny.settings',
+  sendTerminalText: 'twinny.sendTerminalText',
+  getGitCommitMessage: 'twinny.getGitCommitMessage',
+  newChat: 'twinny.newChat',
+  focusSidebar: 'twinny.sidebar.focus',
+};
+
+export const CONVERSATION_EVENT_NAME = {
+  saveConversation: 'twinny.save-conversation',
+  getConversations: 'twinny.get-conversations',
+  setActiveConversation: 'twinny.set-active-conversation',
+  getActiveConversation: 'twinny.get-active-conversation',
+  saveLastConversation: 'twinny.save-last-conversation',
+  removeConversation: 'twinny.remove-conversation',
+}
+
+export const PROVIDER_EVENT_NAME = {
+  addProvider: 'twinny.add-provider',
+  getActiveChatProvider: 'twinny.get-active-provider',
+  getActiveFimProvider: 'twinny.get-active-fim-provider',
+  getAllProviders: 'twinny.get-providers',
+  removeProvider: 'twinny.remove-provider',
+  setActiveChatProvider: 'twinny.set-active-chat-provider',
+  setActiveFimProvider: 'twinny.set-active-fim-provider',
+  updateProvider: 'twinny.update-provider',
+  focusProviderTab: 'twinny.focus-provider-tab',
+  copyProvider: 'twinny.copy-provider',
+  resetProvidersToDefaults: 'twinny.reset-providers-to-defaults'
+}
+
+export const CONVERSATION_STORAGE_KEY = 'twinny.conversations'
+export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
+export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
+export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
+export const INFERENCE_PROVIDERS_STORAGE_KEY = 'twinny.inference-providers'
+
+export const WORKSPACE_STORAGE_KEY = {
   autoScroll: 'autoScroll',
   chatMessage: 'chatMessage',
   downloadCancelled: 'downloadCancelled',
-  lastConversation: 'lastConversation',
   selectedTemplates: 'selectedTemplates',
   selection: 'selection',
-  showProviders: 'showProviders',
+  showProviders: 'showProviders'
 }
 
-export const SETTING_KEY = {
+export const EXTENSION_SETTING_KEY = {
   fimModelName: 'fimModelName',
   chatModelName: 'chatModelName',
   apiProvider: 'apiProvider',
   apiProviderFim: 'apiProviderFim'
 }
 
-export const CONTEXT_NAME = {
+export const EXTENSION_CONTEXT_NAME = {
   twinnyGeneratingText: 'twinnyGeneratingText',
   twinnyManageTemplates: 'twinnyManageTemplates',
-  twinnyManageProviders: 'twinnyManageProviders'
+  twinnyManageProviders: 'twinnyManageProviders',
+  twinnyConversationHistory: 'twinnyConversationHistory'
 }
 
-export const UI_TABS = {
+export const WEBUI_TABS = {
   chat: 'chat',
   templates: 'templates',
-  providers: 'providers'
+  providers: 'providers',
+  history: 'history'
 }
 
 export const FIM_TEMPLATE_FORMAT = {
@@ -131,6 +185,11 @@ export const DEFAULT_PROVIDER_FORM_VALUES = {
   provider: 'ollama',
   type: 'chat'
 }
+
+export const TITLE_GENERATION_PROMPT_MESAGE = `
+  Generate a title for this conversation in under 10 words.
+  It show not contain any special characters, spaces or quotes.
+`
 
 export const WASM_LANGAUAGES: { [key: string]: string } = {
   cpp: 'cpp',
