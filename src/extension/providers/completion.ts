@@ -33,6 +33,7 @@ import {
 } from '../../common/types'
 import { getFimPrompt, getStopWords } from '../fim-templates'
 import {
+  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   FIM_TEMPLATE_FORMAT,
   LINE_BREAK_REGEX,
   MAX_CONTEXT_LINE_COUNT
@@ -44,7 +45,7 @@ import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
 import { getLineBreakCount } from '../../webview/utils'
 import { TemplateProvider } from '../template-provider'
-import { ACTIVE_FIM_PROVIDER_STORAGE_KEY, TwinnyProvider } from '../provider-manager'
+import { TwinnyProvider } from '../provider-manager'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')

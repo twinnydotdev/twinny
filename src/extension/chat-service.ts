@@ -11,7 +11,8 @@ import {
   EXTENSION_CONTEXT_NAME,
   EVENT_NAME,
   WEBUI_TABS,
-  USER
+  USER,
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY
 } from '../common/constants'
 import {
   StreamResponse,
@@ -28,7 +29,7 @@ import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
-import { ACTIVE_CHAT_PROVIDER_STORAGE_KEY, TwinnyProvider } from './provider-manager'
+import { TwinnyProvider } from './provider-manager'
 import { ConversationHistory } from './conversation-history'
 
 export class ChatService {
