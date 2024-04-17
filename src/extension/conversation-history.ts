@@ -9,15 +9,18 @@ import {
 } from '../common/types'
 import { v4 as uuidv4 } from 'uuid'
 import { createStreamRequestBody } from './provider-options'
-import { ACTIVE_CHAT_PROVIDER_KEY, TwinnyProvider } from './provider-manager'
+import { TwinnyProvider } from './provider-manager'
 import { streamResponse } from './stream'
 import { getChatDataFromProvider } from './utils'
-import { CONVERSATION_EVENT_NAME, TITLE_GENERATION_PROMPT_MESAGE } from '../common/constants'
+import {
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ACTIVE_CONVERSATION_STORAGE_KEY,
+  CONVERSATION_EVENT_NAME,
+  CONVERSATION_STORAGE_KEY,
+  TITLE_GENERATION_PROMPT_MESAGE
+} from '../common/constants'
 
 type Conversations = Record<string, Conversation> | undefined
-
-export const CONVERSATION_KEY = 'twinny.conversations'
-export const ACTIVE_CONVERSATION_KEY = 'twinny.active-conversation'
 
 export class ConversationHistory {
   private _context: ExtensionContext
@@ -96,7 +99,7 @@ export class ConversationHistory {
 
   private getProvider = () => {
     return this._context?.globalState.get<TwinnyProvider>(
-      ACTIVE_CHAT_PROVIDER_KEY
+      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
   }
 
@@ -151,22 +154,21 @@ export class ConversationHistory {
   }
 
   getConversations(): Conversations {
-    const conversations =
-      this._context.globalState.get<Record<string, Conversation>>(
-        CONVERSATION_KEY
-      )
+    const conversations = this._context.globalState.get<
+      Record<string, Conversation>
+    >(CONVERSATION_STORAGE_KEY)
     return conversations
   }
 
   resetConversation() {
-    this._context.globalState.update(ACTIVE_CONVERSATION_KEY, undefined)
+    this._context.globalState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
     this.setActiveConversation(undefined)
   }
 
   updateConversation(conversation: Conversation) {
     const conversations = this.getConversations() || {}
     if (!conversation.id) return
-    this._context.globalState.update(CONVERSATION_KEY, {
+    this._context.globalState.update(CONVERSATION_STORAGE_KEY, {
       ...conversations,
       [conversation.id]: conversation
     })
@@ -174,7 +176,10 @@ export class ConversationHistory {
   }
 
   setActiveConversation(conversation: Conversation | undefined) {
-    this._context.globalState.update(ACTIVE_CONVERSATION_KEY, conversation)
+    this._context.globalState.update(
+      ACTIVE_CONVERSATION_STORAGE_KEY,
+      conversation
+    )
     this._webviewView?.webview.postMessage({
       type: CONVERSATION_EVENT_NAME.getActiveConversation,
       value: {
@@ -186,7 +191,7 @@ export class ConversationHistory {
 
   getActiveConversation() {
     const conversation: Conversation | undefined =
-      this._context.globalState.get(ACTIVE_CONVERSATION_KEY)
+      this._context.globalState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
     this.setActiveConversation(conversation)
     return conversation
   }
@@ -195,7 +200,9 @@ export class ConversationHistory {
     const conversations = this.getConversations() || {}
     if (!conversation?.id) return
     delete conversations[conversation.id]
-    this._context.globalState.update(CONVERSATION_KEY, { ...conversations })
+    this._context.globalState.update(CONVERSATION_STORAGE_KEY, {
+      ...conversations
+    })
     this.setActiveConversation(undefined)
     this.getAllConversations()
   }
@@ -216,7 +223,7 @@ export class ConversationHistory {
       messages: conversation.messages
     }
     conversations[id] = newConversation
-    this._context.globalState.update(CONVERSATION_KEY, conversations)
+    this._context.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
     this.setActiveConversation(newConversation)
   }
 }

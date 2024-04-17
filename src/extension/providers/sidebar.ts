@@ -6,7 +6,7 @@ import {
   getTextSelection,
   getTheme
 } from '../utils'
-import { WORKSPACE_STORAGE_KEY, EVENT_NAME } from '../../common/constants'
+import { WORKSPACE_STORAGE_KEY, EVENT_NAME, TWINNY_COMMAND_NAME } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
   ClientMessage,
@@ -292,7 +292,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private twinnyHideBackButton() {
-    vscode.commands.executeCommand('twinny.hideBackButton')
+    vscode.commands.executeCommand(TWINNY_COMMAND_NAME.hideBackButton)
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {

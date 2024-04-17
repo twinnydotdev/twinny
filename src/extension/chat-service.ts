@@ -28,7 +28,7 @@ import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
-import { ACTIVE_CHAT_PROVIDER_KEY, TwinnyProvider } from './provider-manager'
+import { ACTIVE_CHAT_PROVIDER_STORAGE_KEY, TwinnyProvider } from './provider-manager'
 import { ConversationHistory } from './conversation-history'
 
 export class ChatService {
@@ -67,7 +67,7 @@ export class ChatService {
 
   private getProvider = () => {
     const provider = this._extensionContext?.globalState.get<TwinnyProvider>(
-      ACTIVE_CHAT_PROVIDER_KEY
+      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
     return provider
   }

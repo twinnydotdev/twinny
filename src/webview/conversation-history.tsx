@@ -11,8 +11,11 @@ interface ConversationHistoryProps {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
-  const { conversations, setActiveConversation, removeConversation } =
-    useConversationHistory()
+  const {
+    conversations: savedConversations,
+    setActiveConversation,
+    removeConversation
+  } = useConversationHistory()
 
   const handleSetConversation = (conversation: Conversation) => {
     setActiveConversation(conversation)
@@ -30,14 +33,13 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
     removeConversation(conversation)
   }
 
-  const convos = Object.values(conversations).reverse()
-
+  const conversations = Object.values(savedConversations).reverse()
 
   return (
     <div>
       <h3>Conversation history</h3>
-      {convos.length ? (
-        convos.map((conversation) => (
+      {conversations.length ? (
+        conversations.map((conversation) => (
           <div
             onClick={() => handleSetConversation(conversation)}
             className={styles.conversation}

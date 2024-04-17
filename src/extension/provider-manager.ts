@@ -1,6 +1,13 @@
 import { ExtensionContext, WebviewView } from 'vscode'
 import { ApiProviders, ClientMessage, ServerMessage } from '../common/types'
-import { FIM_TEMPLATE_FORMAT, PROVIDER_EVENT_NAME, WEBUI_TABS } from '../common/constants'
+import {
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+  FIM_TEMPLATE_FORMAT,
+  INFERENCE_PROVIDERS_STORAGE_KEY,
+  PROVIDER_EVENT_NAME,
+  WEBUI_TABS
+} from '../common/constants'
 import { v4 as uuidv4 } from 'uuid'
 
 export interface TwinnyProvider {
@@ -16,10 +23,6 @@ export interface TwinnyProvider {
   apiKey?: string
   fimTemplate?: string
 }
-
-export const ACTIVE_CHAT_PROVIDER_KEY = 'twinny.active-chat-provider'
-export const ACTIVE_FIM_PROVIDER_KEY = 'twinny.active-fim-provider'
-export const INFERENCE_PROVIDERS_KEY = 'twinny.inference-providers'
 
 type Providers = Record<string, TwinnyProvider> | undefined
 
@@ -113,7 +116,7 @@ export class ProviderManager {
 
   addDefaultChatProvider(): TwinnyProvider {
     const provider = this.getDefaultChatProvider()
-    if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_KEY)) {
+    if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
       this.addDefaultProvider(provider)
     }
     return provider
@@ -121,7 +124,7 @@ export class ProviderManager {
 
   addDefaultFimProvider(): TwinnyProvider {
     const provider = this.getDefaultFimProvider()
-    if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_KEY)) {
+    if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_STORAGE_KEY)) {
       this.addDefaultProvider(provider)
     }
     return provider
@@ -129,9 +132,15 @@ export class ProviderManager {
 
   addDefaultProvider(provider: TwinnyProvider): void {
     if (provider.type === 'chat') {
-      this._context.globalState.update(ACTIVE_CHAT_PROVIDER_KEY, provider)
+      this._context.globalState.update(
+        ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+        provider
+      )
     } else {
-      this._context.globalState.update(ACTIVE_FIM_PROVIDER_KEY, provider)
+      this._context.globalState.update(
+        ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+        provider
+      )
     }
     this.addProvider(provider)
   }
@@ -139,7 +148,7 @@ export class ProviderManager {
   getProviders(): Providers {
     const providers = this._context.globalState.get<
       Record<string, TwinnyProvider>
-    >(INFERENCE_PROVIDERS_KEY)
+    >(INFERENCE_PROVIDERS_STORAGE_KEY)
     return providers
   }
 
@@ -155,7 +164,7 @@ export class ProviderManager {
 
   getActiveChatProvider() {
     const provider = this._context.globalState.get<TwinnyProvider>(
-      ACTIVE_CHAT_PROVIDER_KEY
+      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
     this._webviewView.webview.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveChatProvider,
@@ -168,7 +177,7 @@ export class ProviderManager {
 
   getActiveFimProvider() {
     const provider = this._context.globalState.get<TwinnyProvider>(
-      ACTIVE_FIM_PROVIDER_KEY
+      ACTIVE_FIM_PROVIDER_STORAGE_KEY
     )
     this._webviewView.webview.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveFimProvider,
@@ -181,13 +190,13 @@ export class ProviderManager {
 
   setActiveChatProvider(provider?: TwinnyProvider) {
     if (!provider) return
-    this._context.globalState.update(ACTIVE_CHAT_PROVIDER_KEY, provider)
+    this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, provider)
     return this.getActiveChatProvider()
   }
 
   setActiveFimProvider(provider?: TwinnyProvider) {
     if (!provider) return
-    this._context.globalState.update(ACTIVE_FIM_PROVIDER_KEY, provider)
+    this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, provider)
     return this.getActiveFimProvider()
   }
 
@@ -196,7 +205,7 @@ export class ProviderManager {
     if (!provider) return
     provider.id = uuidv4()
     providers[provider.id] = provider
-    this._context.globalState.update(INFERENCE_PROVIDERS_KEY, providers)
+    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
     this.getAllProviders()
   }
 
@@ -211,7 +220,7 @@ export class ProviderManager {
     const providers = this.getProviders() || {}
     if (!provider) return
     delete providers[provider.id]
-    this._context.globalState.update(INFERENCE_PROVIDERS_KEY, providers)
+    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
     this.getAllProviders()
   }
 
@@ -221,16 +230,21 @@ export class ProviderManager {
     const activeChatProvider = this.getActiveChatProvider()
     if (!provider) return
     providers[provider.id] = provider
-    this._context.globalState.update(INFERENCE_PROVIDERS_KEY, providers)
-    if (provider.id === activeFimProvider?.id) this.setActiveFimProvider(provider)
-    if (provider.id === activeChatProvider?.id) this.setActiveChatProvider(provider)
+    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
+    if (provider.id === activeFimProvider?.id)
+      this.setActiveFimProvider(provider)
+    if (provider.id === activeChatProvider?.id)
+      this.setActiveChatProvider(provider)
     this.getAllProviders()
   }
 
   resetProvidersToDefaults(): void {
-    this._context.globalState.update(INFERENCE_PROVIDERS_KEY, undefined)
-    this._context.globalState.update(ACTIVE_CHAT_PROVIDER_KEY, undefined)
-    this._context.globalState.update(ACTIVE_FIM_PROVIDER_KEY, undefined)
+    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, undefined)
+    this._context.globalState.update(
+      ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+      undefined
+    )
+    this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
     const chatProvider = this.addDefaultChatProvider()
     const fimProvider = this.addDefaultFimProvider()
     this.focusProviderTab()

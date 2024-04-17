@@ -44,7 +44,7 @@ import { CompletionFormatter } from '../completion-formatter'
 import { FileInteractionCache } from '../file-interaction'
 import { getLineBreakCount } from '../../webview/utils'
 import { TemplateProvider } from '../template-provider'
-import { ACTIVE_FIM_PROVIDER_KEY, TwinnyProvider } from '../provider-manager'
+import { ACTIVE_FIM_PROVIDER_STORAGE_KEY, TwinnyProvider } from '../provider-manager'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -350,7 +350,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private getFimProvider = () => {
     const provider = this._extensionContext.globalState.get<TwinnyProvider>(
-      ACTIVE_FIM_PROVIDER_KEY
+      ACTIVE_FIM_PROVIDER_STORAGE_KEY
     )
     return provider
   }

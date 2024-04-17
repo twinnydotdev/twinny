@@ -102,6 +102,11 @@ export const PROVIDER_EVENT_NAME = {
   resetProvidersToDefaults: 'twinny.reset-providers-to-defaults'
 }
 
+export const CONVERSATION_STORAGE_KEY = 'twinny.conversations'
+export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
+export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
+export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
+export const INFERENCE_PROVIDERS_STORAGE_KEY = 'twinny.inference-providers'
 
 export const WORKSPACE_STORAGE_KEY = {
   autoScroll: 'autoScroll',
