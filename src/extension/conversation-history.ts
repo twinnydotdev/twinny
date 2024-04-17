@@ -1,7 +1,9 @@
 import { ExtensionContext, WebviewView, workspace } from 'vscode'
 import {
+  ClientMessage,
   Conversation,
   Message,
+  ServerMessage,
   StreamBodyBase,
   StreamRequestOptions
 } from '../common/types'
@@ -10,18 +12,16 @@ import { createStreamRequestBody } from './provider-options'
 import { ACTIVE_CHAT_PROVIDER_KEY, TwinnyProvider } from './provider-manager'
 import { streamResponse } from './stream'
 import { getChatDataFromProvider } from './utils'
+import { CONVERSATION_EVENT_NAME, TITLE_GENERATION_PROMPT_MESAGE } from '../common/constants'
 
 type Conversations = Record<string, Conversation> | undefined
 
-export const HISTORY_MESSAGE_TYPE = {
-  saveConversation: 'twinny.save-conversation'
-}
-
 export const CONVERSATION_KEY = 'twinny.conversations'
+export const ACTIVE_CONVERSATION_KEY = 'twinny.active-conversation'
 
 export class ConversationHistory {
-  _context: ExtensionContext
-  _webviewView: WebviewView
+  private _context: ExtensionContext
+  private _webviewView: WebviewView
   private _config = workspace.getConfiguration('twinny')
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _temperature = this._config.get('temperature') as number
@@ -30,15 +30,34 @@ export class ConversationHistory {
   constructor(context: ExtensionContext, webviewView: WebviewView) {
     this._context = context
     this._webviewView = webviewView
-    this._context.globalState.update(CONVERSATION_KEY, {})
+    this.setUpEventListeners()
   }
 
-  getConversations(): Conversations {
-    const conversations =
-      this._context.globalState.get<Record<string, Conversation>>(
-        CONVERSATION_KEY
-      )
-    return conversations
+  setUpEventListeners() {
+    this._webviewView.webview.onDidReceiveMessage(
+      (message: ClientMessage<Conversation>) => {
+        this.handleMessage(message)
+      }
+    )
+  }
+
+  handleMessage(message: ClientMessage<Conversation>) {
+    const { type } = message
+    switch (type) {
+      case CONVERSATION_EVENT_NAME.getConversations:
+        return this.getAllConversations()
+      case CONVERSATION_EVENT_NAME.getActiveConversation:
+        return this.getActiveConversation()
+      case CONVERSATION_EVENT_NAME.setActiveConversation:
+        return this.setActiveConversation(message.data)
+      case CONVERSATION_EVENT_NAME.removeConversation:
+        return this.removeConversation(message.data)
+      case CONVERSATION_EVENT_NAME.saveConversation:
+        if (!message.data) return
+        return this.saveConversation(message.data)
+      default:
+      // do nothing
+    }
   }
 
   streamConversationTitle({
@@ -106,8 +125,7 @@ export class ConversationHistory {
         ...messages,
         {
           role: 'user',
-          content:
-            'Consider the history of this chat and generate a good title for it.'
+          content: TITLE_GENERATION_PROMPT_MESAGE
         }
       ],
       keepAlive: this._keepAlive
@@ -116,25 +134,89 @@ export class ConversationHistory {
     return { requestOptions, requestBody }
   }
 
-  async getConversationTitle(
-    conversation: Message[],
-    id: string
-  ): Promise<string> {
-    const request = this.buildStreamRequest(conversation)
+  async getConversationTitle(messages: Message[], id: string): Promise<string> {
+    const request = this.buildStreamRequest(messages)
     if (!request) return id
     return await this.streamConversationTitle(request)
   }
 
-  async saveConversation(messages: Message[] | undefined) {
+  getAllConversations() {
     const conversations = this.getConversations() || {}
-    if (!messages?.length) return
+    this._webviewView.webview.postMessage({
+      type: CONVERSATION_EVENT_NAME.getConversations,
+      value: {
+        data: conversations
+      }
+    })
+  }
+
+  getConversations(): Conversations {
+    const conversations =
+      this._context.globalState.get<Record<string, Conversation>>(
+        CONVERSATION_KEY
+      )
+    return conversations
+  }
+
+  resetConversation() {
+    this._context.globalState.update(ACTIVE_CONVERSATION_KEY, undefined)
+    this.setActiveConversation(undefined)
+  }
+
+  updateConversation(conversation: Conversation) {
+    const conversations = this.getConversations() || {}
+    if (!conversation.id) return
+    this._context.globalState.update(CONVERSATION_KEY, {
+      ...conversations,
+      [conversation.id]: conversation
+    })
+    this.setActiveConversation(conversation)
+  }
+
+  setActiveConversation(conversation: Conversation | undefined) {
+    this._context.globalState.update(ACTIVE_CONVERSATION_KEY, conversation)
+    this._webviewView?.webview.postMessage({
+      type: CONVERSATION_EVENT_NAME.getActiveConversation,
+      value: {
+        data: conversation
+      }
+    } as ServerMessage<Conversation>)
+    this.getAllConversations()
+  }
+
+  getActiveConversation() {
+    const conversation: Conversation | undefined =
+      this._context.globalState.get(ACTIVE_CONVERSATION_KEY)
+    this.setActiveConversation(conversation)
+    return conversation
+  }
+
+  removeConversation(conversation?: Conversation) {
+    const conversations = this.getConversations() || {}
+    if (!conversation?.id) return
+    delete conversations[conversation.id]
+    this._context.globalState.update(CONVERSATION_KEY, { ...conversations })
+    this.setActiveConversation(undefined)
+    this.getAllConversations()
+  }
+
+  async saveConversation(conversation: Conversation) {
+    const activeConversation = this.getActiveConversation()
+    if (activeConversation)
+      return this.updateConversation({
+        ...activeConversation,
+        messages: conversation.messages
+      })
+    const conversations = this.getConversations() || {}
+    if (!conversation.messages.length) return
     const id = uuidv4()
-    const conversation: Conversation = {
+    const newConversation: Conversation = {
       id,
-      title: await this.getConversationTitle(messages, id),
-      messages
+      title: await this.getConversationTitle(conversation.messages, id),
+      messages: conversation.messages
     }
-    conversations[conversation.id] = conversation
+    conversations[id] = newConversation
     this._context.globalState.update(CONVERSATION_KEY, conversations)
+    this.setActiveConversation(newConversation)
   }
 }

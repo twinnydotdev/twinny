@@ -7,7 +7,12 @@ import {
   ExtensionContext
 } from 'vscode'
 
-import { CONTEXT_NAME, MESSAGE_NAME, UI_TABS, USER } from '../common/constants'
+import {
+  EXTENSION_CONTEXT_NAME,
+  EVENT_NAME,
+  WEBUI_TABS,
+  USER
+} from '../common/constants'
 import {
   StreamResponse,
   StreamBodyBase,
@@ -24,6 +29,7 @@ import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 import { ACTIVE_CHAT_PROVIDER_KEY, TwinnyProvider } from './provider-manager'
+import { ConversationHistory } from './conversation-history'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -36,18 +42,21 @@ export class ChatService {
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
+  private _conversationHistory: ConversationHistory | undefined
   private _view?: WebviewView
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
     extensionContext: ExtensionContext,
-    view?: WebviewView
+    conversationHistory: ConversationHistory | undefined,
+    view: WebviewView
   ) {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
     this._extensionContext = extensionContext
+    this._conversationHistory = conversationHistory
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
@@ -63,10 +72,7 @@ export class ChatService {
     return provider
   }
 
-  private buildStreamRequest(
-    prompt: string,
-    messages?: Message[] | Message[]
-  ) {
+  private buildStreamRequest(prompt: string, messages?: Message[] | Message[]) {
     const provider = this.getProvider()
 
     if (!provider) return
@@ -106,7 +112,7 @@ export class ChatService {
       this._completion = this._completion + data
       if (onEnd) return
       this._view?.webview.postMessage({
-        type: MESSAGE_NAME.twinnyOnCompletion,
+        type: EVENT_NAME.twinnyOnCompletion,
         value: {
           completion: this._completion.trimStart(),
           data: getLanguage(),
@@ -123,18 +129,18 @@ export class ChatService {
     this._statusBar.text = '🤖'
     commands.executeCommand(
       'setContext',
-      CONTEXT_NAME.twinnyGeneratingText,
+      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
     if (onEnd) {
       onEnd(this._completion)
       this._view?.webview.postMessage({
-        type: MESSAGE_NAME.twinnyOnEnd
+        type: EVENT_NAME.twinnyOnEnd
       } as ServerMessage)
       return
     }
     this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnyOnEnd,
+      type: EVENT_NAME.twinnyOnEnd,
       value: {
         completion: this._completion.trimStart(),
         data: getLanguage(),
@@ -145,7 +151,7 @@ export class ChatService {
 
   private onStreamError = (error: Error) => {
     this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnyOnEnd,
+      type: EVENT_NAME.twinnyOnEnd,
       value: {
         error: true,
         errorMessage: error.message
@@ -157,11 +163,11 @@ export class ChatService {
     this._controller = controller
     commands.executeCommand(
       'setContext',
-      CONTEXT_NAME.twinnyGeneratingText,
+      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       true
     )
     this._view?.webview.onDidReceiveMessage((data: { type: string }) => {
-      if (data.type === MESSAGE_NAME.twinnyStopGeneration) {
+      if (data.type === EVENT_NAME.twinnyStopGeneration) {
         this._controller?.abort()
       }
     })
@@ -172,11 +178,11 @@ export class ChatService {
     this._statusBar.text = '🤖'
     commands.executeCommand(
       'setContext',
-      CONTEXT_NAME.twinnyGeneratingText,
+      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       true
     )
     this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnyOnEnd,
+      type: EVENT_NAME.twinnyOnEnd,
       value: {
         completion: this._completion.trimStart(),
         data: getLanguage(),
@@ -281,7 +287,7 @@ export class ChatService {
 
   private sendEditorLanguage = () => {
     this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnySendLanguage,
+      type: EVENT_NAME.twinnySendLanguage,
       value: {
         data: getLanguage()
       }
@@ -290,9 +296,9 @@ export class ChatService {
 
   private focusChatTab = () => {
     this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnySetTab,
+      type: EVENT_NAME.twinnySetTab,
       value: {
-        data: UI_TABS.chat
+        data: WEBUI_TABS.chat
       }
     } as ServerMessage<string>)
   }
@@ -311,30 +317,35 @@ export class ChatService {
   public async streamTemplateCompletion(
     promptTemplate: string,
     context?: string,
-    onEnd?: (completion: string) => void
+    onEnd?: (completion: string) => void,
+    skipMessage?: boolean
   ) {
+    this._statusBar.text = '$(loading~spin)'
     const { language } = getLanguage()
     this._completion = ''
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
-    this.focusChatTab()
     const { prompt, selection } = await this.buildTemplatePrompt(
       promptTemplate,
       language,
       context
     )
-    this._statusBar.text = '$(loading~spin)'
-    this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinnyOnLoading
-    })
-    this._view?.webview.postMessage({
-      type: MESSAGE_NAME.twinngAddMessage,
-      value: {
-        completion:
-          kebabToSentence(promptTemplate) + '\n\n' + '```\n' + selection,
-        data: getLanguage()
-      }
-    } as ServerMessage)
+
+    if (!skipMessage) {
+      this.focusChatTab()
+      this._view?.webview.postMessage({
+        type: EVENT_NAME.twinnyOnLoading
+      })
+      this._view?.webview.postMessage({
+        type: EVENT_NAME.twinngAddMessage,
+        value: {
+          completion:
+            kebabToSentence(promptTemplate) + '\n\n' + '```\n' + selection,
+          data: getLanguage()
+        }
+      } as ServerMessage)
+    }
+
     const messageRoleContent = await this.buildMesageRoleContent(
       [
         {

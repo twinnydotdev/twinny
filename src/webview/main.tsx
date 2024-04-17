@@ -2,21 +2,22 @@ import { useEffect, useState } from 'react'
 import { Chat } from './chat'
 import { TemplateSettings } from './template-settings'
 import { ServerMessage } from '../common/types'
-import { MESSAGE_NAME, UI_TABS } from '../common/constants'
+import { EVENT_NAME, WEBUI_TABS } from '../common/constants'
 import { Providers } from './providers'
+import { ConversationHistory } from './conversation-history'
 
 const tabs: Record<string, JSX.Element> = {
-  [UI_TABS.chat]: <Chat />,
-  [UI_TABS.templates]: <TemplateSettings />,
-  [UI_TABS.providers]: <Providers />
+  [WEBUI_TABS.chat]: <Chat />,
+  [WEBUI_TABS.templates]: <TemplateSettings />,
+  [WEBUI_TABS.providers]: <Providers />
 }
 
 export const Main = () => {
-  const [tab, setTab] = useState<string | undefined>(UI_TABS.chat)
+  const [tab, setTab] = useState<string | undefined>(WEBUI_TABS.chat)
 
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<string | undefined> = event.data
-    if (message?.type === MESSAGE_NAME.twinnySetTab) {
+    if (message?.type === EVENT_NAME.twinnySetTab) {
       setTab(message?.value.data)
     }
     return () => window.removeEventListener('message', handler)
@@ -27,6 +28,10 @@ export const Main = () => {
 
   if (!tab) {
     return null
+  }
+
+  if (tab === WEBUI_TABS.history) {
+    return <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
   }
 
   const element: JSX.Element = tabs[tab]

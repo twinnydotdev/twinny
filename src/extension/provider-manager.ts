@@ -1,21 +1,7 @@
 import { ExtensionContext, WebviewView } from 'vscode'
 import { ApiProviders, ClientMessage, ServerMessage } from '../common/types'
-import { FIM_TEMPLATE_FORMAT, UI_TABS } from '../common/constants'
+import { FIM_TEMPLATE_FORMAT, PROVIDER_EVENT_NAME, WEBUI_TABS } from '../common/constants'
 import { v4 as uuidv4 } from 'uuid'
-
-export const PROVIDER_MESSAGE_TYPE = {
-  addProvider: 'twinny.add-provider',
-  getActiveChatProvider: 'twinny.get-active-provider',
-  getActiveFimProvider: 'twinny.get-active-fim-provider',
-  getAllProviders: 'twinny.get-providers',
-  removeProvider: 'twinny.remove-provider',
-  setActiveChatProvider: 'twinny.set-active-chat-provider',
-  setActiveFimProvider: 'twinny.set-active-fim-provider',
-  updateProvider: 'twinny.update-provider',
-  focusProviderTab: 'twinny.focus-provider-tab',
-  copyProvider: 'twinny.copy-provider',
-  resetProvidersToDefaults: 'twinny.reset-providers-to-defaults'
-}
 
 export interface TwinnyProvider {
   apiHostname: string
@@ -59,34 +45,34 @@ export class ProviderManager {
   handleMessage(message: ClientMessage<TwinnyProvider>) {
     const { data: provider } = message
     switch (message.type) {
-      case PROVIDER_MESSAGE_TYPE.addProvider:
+      case PROVIDER_EVENT_NAME.addProvider:
         return this.addProvider(provider)
-      case PROVIDER_MESSAGE_TYPE.removeProvider:
+      case PROVIDER_EVENT_NAME.removeProvider:
         return this.removeProvider(provider)
-      case PROVIDER_MESSAGE_TYPE.updateProvider:
+      case PROVIDER_EVENT_NAME.updateProvider:
         return this.updateProvider(provider)
-      case PROVIDER_MESSAGE_TYPE.getActiveChatProvider:
+      case PROVIDER_EVENT_NAME.getActiveChatProvider:
         return this.getActiveChatProvider()
-      case PROVIDER_MESSAGE_TYPE.getActiveFimProvider:
+      case PROVIDER_EVENT_NAME.getActiveFimProvider:
         return this.getActiveFimProvider()
-      case PROVIDER_MESSAGE_TYPE.setActiveChatProvider:
+      case PROVIDER_EVENT_NAME.setActiveChatProvider:
         return this.setActiveChatProvider(provider)
-      case PROVIDER_MESSAGE_TYPE.setActiveFimProvider:
+      case PROVIDER_EVENT_NAME.setActiveFimProvider:
         return this.setActiveFimProvider(provider)
-      case PROVIDER_MESSAGE_TYPE.copyProvider:
+      case PROVIDER_EVENT_NAME.copyProvider:
         return this.copyProvider(provider)
-      case PROVIDER_MESSAGE_TYPE.getAllProviders:
+      case PROVIDER_EVENT_NAME.getAllProviders:
         return this.getAllProviders()
-      case PROVIDER_MESSAGE_TYPE.resetProvidersToDefaults:
+      case PROVIDER_EVENT_NAME.resetProvidersToDefaults:
         return this.resetProvidersToDefaults()
     }
   }
 
   public focusProviderTab = () => {
     this._webviewView?.webview.postMessage({
-      type: PROVIDER_MESSAGE_TYPE.focusProviderTab,
+      type: PROVIDER_EVENT_NAME.focusProviderTab,
       value: {
-        data: UI_TABS.providers
+        data: WEBUI_TABS.providers
       }
     } as ServerMessage<string>)
   }
@@ -160,7 +146,7 @@ export class ProviderManager {
   getAllProviders() {
     const providers = this.getProviders() || {}
     this._webviewView.webview.postMessage({
-      type: PROVIDER_MESSAGE_TYPE.getAllProviders,
+      type: PROVIDER_EVENT_NAME.getAllProviders,
       value: {
         data: providers
       }
@@ -172,7 +158,7 @@ export class ProviderManager {
       ACTIVE_CHAT_PROVIDER_KEY
     )
     this._webviewView.webview.postMessage({
-      type: PROVIDER_MESSAGE_TYPE.getActiveChatProvider,
+      type: PROVIDER_EVENT_NAME.getActiveChatProvider,
       value: {
         data: provider
       }
@@ -185,7 +171,7 @@ export class ProviderManager {
       ACTIVE_FIM_PROVIDER_KEY
     )
     this._webviewView.webview.postMessage({
-      type: PROVIDER_MESSAGE_TYPE.getActiveFimProvider,
+      type: PROVIDER_EVENT_NAME.getActiveFimProvider,
       value: {
         data: provider
       }

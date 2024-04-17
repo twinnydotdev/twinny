@@ -1,6 +1,6 @@
 import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
 import { useTemplates, useWorkSpaceContext } from './hooks'
-import { DEFAULT_ACTION_TEMPLATES, MESSAGE_KEY } from '../common/constants'
+import { DEFAULT_ACTION_TEMPLATES, WORKSPACE_STORAGE_KEY } from '../common/constants'
 import { useEffect, useState } from 'react'
 import { kebabToSentence } from './utils'
 
@@ -10,7 +10,7 @@ export const TemplateSettings = () => {
   const { templates, saveTemplates } = useTemplates()
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const selectedTemplatesContext =
-    useWorkSpaceContext<string[]>(MESSAGE_KEY.selectedTemplates) || []
+    useWorkSpaceContext<string[]>(WORKSPACE_STORAGE_KEY.selectedTemplates) || []
 
   const handleTemplateClick = (
     e: React.MouseEvent<HTMLInputElement, MouseEvent>

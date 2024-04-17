@@ -1,0 +1,11 @@
+.conversation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-radius: 5px;
+  background: var(--vscode-inputOption-hoverBackground);
+  border: 1px solid var(--vscode-editorWidget-border);
+  margin: 5px 0;
+  cursor: pointer;
+}

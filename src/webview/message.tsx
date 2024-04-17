@@ -17,14 +17,15 @@ export const Message = ({ message, theme }: MessageProps) => {
   if (!message?.content) {
     return null
   }
+
   return (
     <>
-      <b>{message.role === ASSISTANT ? TWINNY : YOU}</b>
       <div
         className={`${styles.message} ${
-          message?.role === ASSISTANT ? styles.bot : ''
+          message?.role === ASSISTANT ? styles.assistantMessage : styles.userMessage
         }`}
       >
+        <span className={styles.messageRole}>{message.role === ASSISTANT ? TWINNY : YOU}</span>
         <Markdown
           remarkPlugins={[remarkGfm]}
           components={{
