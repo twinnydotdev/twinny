@@ -1,8 +1,8 @@
 # twinny
 
-Are you fed up of all of those so called "free" Copilot alternatives with paywalls and signups? Fear not my developer friend! 
+Tired of the so-called "free" Copilot alternatives that are filled with paywalls and signups? Look no further, developer friend!
 
-Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion plugin for **Visual Studio Code** and any compatible editors (like VSCodium) designed to work seamlessly with: 
+**Twinny** is your definitive, no-nonsense AI code completion plugin for **Visual Studio Code** and compatible editors like VSCodium. It's designed to integrate seamlessly with various tools and frameworks:
 
 - [Ollama](https://github.com/jmorganca/ollama)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
@@ -11,62 +11,54 @@ Twinny is the most no-nonsense locally hosted (or api hosted) AI code completion
 - [LiteLLM](https://github.com/BerriAI/litellm)
 - [Ollama Web UI](https://github.com/ollama-webui/ollama-webui)
 
-
-Like Github Copilot but 100% free!
+Like Github Copilot but **100% free**!
 
 <div align="center">
     <a href="https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny">
       <img src="https://code.visualstudio.com/assets/images/code-stable.png" height="50" />
     </a>
     <p>
-      Install twinny on the <br/> 
-      Visual Studio Code extension marketplace
+      Install Twinny on the Visual Studio Code extension marketplace.
     </p>
 </div>
 
-## Latest version v3.11.0
+## Main Features
 
-The twinny extension has received an update, bringing it to version 3.11.0. This release is categorized as a minor update, as it may potentially break existing configurations. 
+### Fill in the Middle Code Completion
 
-One of the key changes in this version is the way API settings are handled. Instead of configuring API settings within the twinny extension itself, providers are now managed through the extension's provider settings. This change streamlines the process of switching between different models, providers, and APIs without the need to access the extension settings directly.
+Get AI-based suggestions in real time. Let Twinny autocomplete your code as you type.
 
-## Main features
+![Fill in the Middle Example](https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b)
 
-#### Fill in the middle code completion
+### Chat with AI About Your Code
 
-Get AI based suggestions in real time. While coding you can let twinny autocomplete the code as you are typing.
+Discuss your code via the sidebar: get function explanations, generate tests, request refactoring, and more.
 
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/69f567c0-2700-4474-b621-6099255bc87b" width="760"/>
+![AI Chat Example](https://github.com/rjmacarthy/twinny/assets/5537428/4a506a90-b1f0-48bc-a8b0-975d94f3b04c)
 
-#### Chat with AI about your code
+### Additional Features
 
-Through the side bar, have a conversation with your model and get explanations about a function, ask it to write tests, ask for a refactor and much more.
-
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/4a506a90-b1f0-48bc-a8b0-975d94f3b04c" width="760"/>
-
-#### Other features 
-
-- Works online or offline
-- Highly configurable api endpoints for fim and chat
-- All chat conversations preserved
+- Operates online or offline
+- Highly customizable API endpoints for FIM and chat
+- Chat conversations are preserved
 - Conforms to the OpenAI API standard
-- Single or multiline fill-in-middle completions
-- Customisable prompt templates to add context to completions
-- Generate git commit messages from staged changes (CTRL+SHIFT+T CTRL+SHIFT+G)
-- Easy installation via vscode extensions marketplace or by downloading and running a binary directly
-- Customisable settings to change API provider, model name, port number and path 
-- Ollama, llamacpp, oobabooga and LM Studio API compatible
-- Accept code solutions directly to editor
-- Create new documents from code blocks
-- Copy generated code solution blocks
+- Supports single or multiline fill-in-middle completions
+- Customizable prompt templates
+- Generate git commit messages from staged changes (`CTRL+SHIFT+T CTRL+SHIFT+G`)
+- Easy installation via the Visual Studio Code extensions marketplace
+- Customizable settings for API provider, model name, port number, and path
+- Compatible with Ollama, llama.cpp, oobabooga, and LM Studio APIs
+- Accepts code solutions directly in the editor
+- Creates new documents from code blocks
+- Copies generated code solution blocks
 
 ## 🚀 Getting Started
 
-### With Ollama
+### Setup with Ollama (Recommended)
 
-1. Install the VS code extension [link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) (or if [VSCodium](https://open-vsx.org/extension/rjmacarthy/twinny))
-2. Twinny is configured to use Ollama by default as the backend, you can install Ollama here: [ollama](https://ollama.com/)
-3. Choose your model from the [library](https://ollama.com/library) (eg: `codellama:7b`)
+1. Install the VS Code extension [here](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) or [VSCodium here](https://open-vsx.org/extension/rjmacarthy/twinny).
+2. Set up Ollama as the backend by default: [Install Ollama](https://ollama.com/)
+3. Select your model from the [Ollama library](https://ollama.com/library) (e.g., `codellama:7b-instruct` for chats and `codellama:7b-code` for auto complete).
 
 ```sh
 ollama run codellama:7b-instruct
@@ -79,97 +71,66 @@ You should see the 🤖 icon indicating that twinny is ready to use.
 
 5. See [Keyboard shortcuts](#keyboard-shortcuts) to start using while coding 🎉
 
-### With llama.cpp / LM Studio / Oobabooga / LiteLLM or any other provider.
+### Setup with Other Providers llama.cpp / LM Studio / Oobabooga / LiteLLM or any other provider
 
-1. Install the VS code extension [link](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) (or if [VSCodium](https://open-vsx.org/extension/rjmacarthy/twinny))
-2. Get [llama.cpp](https://github.com/ggerganov/llama.cpp) / LM Studio / Oobabooga / LiteLLM
-3. Download and run the model locally using the chosen provider
-4. Open VS code (if already open a restart might be needed) and press `ctr + shift + T` to open the side panel.
-5. From the top ⚙️ icon open the settings page and in the `Api Provider` panel change from `ollama` to `llamacpp` (or others respectively).
-6. Update the settings for chat provider, port and hostname etc to be the correct. Please adjust carefully for other providers.
-7. In the left panel you should see the 🤖 icon indicating that twinny is ready to use.
-8. See [Keyboard shortcuts](#keyboard-shortcuts) to start using while coding 🎉
+For setups with llama.cpp, LM Studio, Oobabooga, LiteLLM, or any other provider, you can find more details on provider configurations and functionalities [here in providers.md](https://github.com/rjmacarthy/twinny/blob/main/docs/providers.md).
 
-### With other providers
+1. Install the VS Code extension [here](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny).
+2. Obtain and run your chosen model locally using the provider's setup instructions.
+3. Restart VS Code if necessary and press `CTRL + SHIFT + T` to open the side panel.
+4. At the top of the extension, click the 🔌 (plug) icon to configure your FIM and chat endpoints in the providers tab.
+5. It is recommended to use separate models for FIM and chat as they are optimized for different tasks.
+6. Update the provider settings for chat, including provider, port, and hostname to correctly connect to your chat model.
+7. After setup, the 🤖 icon should appear in the sidebar, indicating that Twinny is ready for use.
+8. Results may vary from provider to provider especailly if using the same model for chat and FIM interchangeably.
 
-Twinny supports the OpenAI API specification so in theory any provider should work as long as it supports the specification.
+### With Non-Local API Providers e.g, OpenAI GPT-4 and Anthropic Claude
 
-The easiest way to use OpenAI API through twinny is to use LiteLLM as your provider as a local proxy, it works seamlessly if configured correctly.
+Twinny supports OpenAI API-compliant providers.
 
-If you find that isn't the case please [open an issue](https://github.com/rjmacarthy/twinny/issues/new/choose) with details of how you are having problems.
+1. Use LiteLLM as your local proxy for the best compatibility.
+2. If there are any issues, please [open an issue](https://github.com/rjmacarthy/twinny/issues/new/choose) on GitHub with details.
 
-#### Note!
+### Model Support
 
-The option for chat model name and fim model name are only applicable to Ollama and Oobabooga providers.
+**Models for Chat:**
+- For powerful machines: `deepseek-coder:6.7b-base-q5_K_M` or `codellama:7b-instruct`.
+- For less powerful setups, choose a smaller instruct model for quicker responses, albeit with less accuracy.
 
-## Model support
+**Models for FIM Completions:**
+- High performance: `deepseek-coder:base` or `codellama:7b-code`.
+- Lower performance: `deepseek-coder:1.3b-base-q4_1` for CPU-only setups.
 
-Twinny chat works with any model as long as it can run on your machine or in the cloud and it exposes a OpenAI API compliant endpoint.
+## Keyboard Shortcuts
 
-Choosing a model is influenced a lot by the machine it will be running, a smaller model will give you a faster response but with a loss in accuracy. 
+| Shortcut                 | Description                                      |
+| -------------------------| -------------------------------------------------|
+| `ALT+\`                  | Trigger inline code completion                   |
+| `CTRL+SHIFT+/`           | Stop the inline code generation                  | 
+| `Tab`                    | Accept the inline code generated                 |
+| `CTRL+SHIFT+T`           | Open Twinny sidebar                              |
+| `CTRL+SHIFT+T CTRL+SHIFT+G` | Generate commit messages from staged changes   |
 
-There are two functionalities that twinny are expecting from a model: 
+## Workspace Context
 
-### **Models for Chat**
+Enable `useFileContext` in settings to improve completion quality by tracking sessions and file access patterns. This is off by default to ensure performance.
 
-Among LLM models, there are models called "instruct models", which are designed for a question & answer mode of chat. 
+## Known Issues
 
-All instruct models should work for chat generations, but the templates might need editing if using something other than codellama (they need to be updated with the special tokens).
-
-- For computers with a good GPU, use: `deepseek-coder:6.7b-base-q5_K_M` (or any other good instruct model).
-  
-### **Models for FIM (fill in the middle) completions**
-
-For FIM completions, you need to use LLM models called "base models". Unlike instruct models, base models will only try to complete your prompt. They are not designed to answer questions.
-
-If using Llama the model must support the Llama special tokens. 
-
-- For computers with a good GPU, use: `deepseek-coder:base` or `codellama-code` (or any other good model that is optimised for code completions).
-- For slower computers or computers using only CPU, use `deepseek-coder:1.3b-base-q4_1` (or any other small base model).
-  
-
-## Keyboard shortcuts
-
-| Shortcut                     | Description                                  |
-| ---------------------------- | ---------------------------------------------|
-| `ALT+\`                      | Trigger inline code completion               |
-| `CTRL+SHIFT+/`               | Stop the inline code generation              | 
-| `Tab`                        | Accept the inline code generated             |
-| `CTRL+SHIFT+t`               | Open twinny sidebar                          |
-| `CTRL+SHIFT+t CTRL+SHIT+g`   | Generate commit messages from staged changes |
-
-## Workspace context
-
-In the settings there is an option called `useFileContext` this will keep track of sessions, keystrokes, visits and recency of visited files in the current workspace.  This can be enabled to help improve the quality of completions, it's turned off by default.
-
-## Known issues
-
-- If the server settings are incorrectly set chat and fim completion will not work, if this is the case please open an issue with your error message.
-- Sometimes a restart of vscode is required for new settings to take effect, please open an issue if you are having problems with this.
-- Using file context often causes unreliable completions for FIM because small models get confused when provided with more than one file context.
-- See open issues on github to see any known issues that are not yet fixed.
-- LiteLLM fim template needs invetigation
-  
-
-If you have a problem with Twinny or have any suggestions please report them on github issues.  Please include your vscode version and OS details in your issue.
+Visit the GitHub [issues page](https://github.com/rjmacarthy/twinny/issues) for known problems and troubleshooting.
 
 ## Contributing
 
-We are actively looking for contributors who want to help improve the project, if you are interested in helping out please reach out on [twitter](https://x.com/rjmacarthy).
-
-Contributions are welcome please open an issue describing your changes and open a pull request when ready.
-
-This project is under MIT licence, please read the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) file for more information.
+Interested in contributing? Reach out on [Twitter](https://x.com/rjmacarthy), describe your changes in an issue, and submit a PR when ready. Twinny is open-source under the MIT license. See the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) for more details.
 
 ## Disclaimer
 
-This plugin is provided "as is" and is under active development.  This means that at times it may not work fully as expected.
+Twinny is actively developed and provided "as is". Functionality may vary between updates.
 
-## Star history
+## Star History
 
 <picture>
  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date&theme=dark" />
  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date" />
  <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date" />
 </picture>
-
