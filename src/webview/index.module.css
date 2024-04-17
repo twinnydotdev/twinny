@@ -51,6 +51,8 @@ pre code {
   color: var(--vscode-textPreformat-foreground);
   font-weight: 500;
   min-height: 20px;
+  max-height: 40px;
+  overflow: hidden;
 }
 
 .message {

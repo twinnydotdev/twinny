@@ -225,5 +225,6 @@ export class ConversationHistory {
     conversations[id] = newConversation
     this._context.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
     this.setActiveConversation(newConversation)
+    this._title = ''
   }
 }
