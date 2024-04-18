@@ -188,7 +188,7 @@ export const DEFAULT_PROVIDER_FORM_VALUES = {
 
 export const TITLE_GENERATION_PROMPT_MESAGE = `
   Generate a title for this conversation in under 10 words.
-  It should not contain any special characters, spaces or quotes.
+  It should not contain any special characters or quotes.
 `
 
 export const WASM_LANGAUAGES: { [key: string]: string } = {

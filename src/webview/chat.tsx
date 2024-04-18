@@ -270,7 +270,7 @@ export const Chat = () => {
       <div className={styles.container}>
         <h4 className={styles.title}>
           {conversation?.title ? (
-            <span>{conversation?.title}</span>
+            <span>{conversation?.title.substring(0, 100)}...</span>
           ) : (
             generatingRef.current && <span>New conversation...</span>
           )}
