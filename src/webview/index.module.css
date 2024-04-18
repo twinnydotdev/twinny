@@ -97,13 +97,35 @@ pre code {
   justify-content: center;
 }
 
-.chatbox,
-.send {
+.chatBox {
   margin-top: 7px;
+  position: relative;
 }
 
 .chatInput {
   border-radius: 5px;
+  box-sizing: border-box;
+  position: relative;
+  color: var(--input-foreground);
+  background: var(--input-background);
+  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  font-size: var(--type-ramp-base-font-size);
+  line-height: var(--type-ramp-base-line-height);
+  padding: calc(var(--design-unit) * 2px + 1px);
+  width: 100%;
+  min-width: var(--input-min-width);
+  font-family: var(--vscode-font-family);
+  resize: none;
+  overflow: hidden;
+}
+
+.chatSubmit {
+  position: absolute;
+  bottom: 7px;
+  right: 5px;
+  cursor: pointer;
+  padding: 5px;
+  background-color: var(--input-background);
 }
 
 .chatOptions {

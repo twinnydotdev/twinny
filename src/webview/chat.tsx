@@ -15,7 +15,7 @@ import {
   USER
 } from '../common/constants'
 
-import {
+import useAutosizeTextArea, {
   useConversationHistory,
   useSelection,
   useTheme,
@@ -62,6 +62,7 @@ export const Chat = () => {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chatRef = useRef<any>(null) // TODO: type...
+  useAutosizeTextArea(chatRef, inputText)
 
   const scrollBottom = () => {
     if (!isAutoScrolledEnabled) return
@@ -269,11 +270,9 @@ export const Chat = () => {
     <VSCodePanelView>
       <div className={styles.container}>
         <h4 className={styles.title}>
-          {conversation?.title ? (
-            conversation?.title
-          ) : (
-            generatingRef.current && <span>New conversation</span>
-          )}
+          {conversation?.title
+            ? conversation?.title
+            : generatingRef.current && <span>New conversation</span>}
         </h4>
         <div className={styles.markdown} ref={markdownRef}>
           {messages?.map((message) => (
@@ -349,13 +348,13 @@ export const Chat = () => {
         </div>
         <form>
           <div className={styles.chatBox}>
-            <VSCodeTextArea
+            <textarea
               ref={chatRef}
               disabled={generatingRef.current}
               placeholder="Message twinny"
+              rows={1}
               value={inputText}
               className={styles.chatInput}
-              rows={4}
               onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
                 const target = e.target as HTMLTextAreaElement
                 if (e.key === 'Enter' && !e.ctrlKey) {
@@ -372,6 +371,13 @@ export const Chat = () => {
                 setInputText(event.target.value)
               }}
             />
+            <div
+              role="button"
+              onClick={() => handleSubmitForm(inputText)}
+              className={styles.chatSubmit}
+            >
+              <span className="codicon codicon-send"></span>
+            </div>
           </div>
         </form>
       </div>
