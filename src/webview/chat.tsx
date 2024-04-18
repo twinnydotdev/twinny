@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   VSCodeButton,
-  VSCodeTextArea,
   VSCodePanelView,
   VSCodeProgressRing,
   VSCodeBadge
@@ -60,8 +59,7 @@ export const Chat = () => {
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chatRef = useRef<any>(null) // TODO: type...
+  const chatRef = useRef<HTMLTextAreaElement>(null)
   useAutosizeTextArea(chatRef, inputText)
 
   const scrollBottom = () => {

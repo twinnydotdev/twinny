@@ -382,9 +382,12 @@ export const useOllamaModels = () => {
   return { models }
 }
 
-const useAutosizeTextArea = (chatRef: any, value: string) => {
+const useAutosizeTextArea = (
+  chatRef: React.RefObject<HTMLTextAreaElement> | null,
+  value: string
+) => {
   useEffect(() => {
-    if (chatRef) {
+    if (chatRef?.current) {
       chatRef.current.style.height = '0px'
       const scrollHeight = chatRef.current.scrollHeight
       chatRef.current.style.height = `${scrollHeight + 5}px`
