@@ -270,9 +270,9 @@ export const Chat = () => {
       <div className={styles.container}>
         <h4 className={styles.title}>
           {conversation?.title ? (
-            <span>{conversation?.title.substring(0, 100)}...</span>
+            conversation?.title.substring(0, 60)
           ) : (
-            generatingRef.current && <span>New conversation...</span>
+            generatingRef.current && <span>New conversation</span>
           )}
         </h4>
         <div className={styles.markdown} ref={markdownRef}>

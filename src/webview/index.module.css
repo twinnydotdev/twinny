@@ -8,7 +8,12 @@ vscode-text-area {
   width: 100%;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 500;
 }
 
@@ -50,14 +55,16 @@ pre code {
   margin-bottom: 10px;
   color: var(--vscode-textPreformat-foreground);
   font-weight: 500;
-  min-height: 20px;
-  max-height: 40px;
+  height: 30px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
   overflow: hidden;
 }
 
 .message {
   padding: 10px;
-  border-top: solid 1px var(--divider-background)
+  border-top: solid 1px var(--divider-background);
 }
 
 .message:first-child {
@@ -68,7 +75,7 @@ pre code {
   margin: 0;
 }
 
-.messageRole  {
+.messageRole {
   display: block;
   margin-bottom: 6px;
   font-weight: 600;
