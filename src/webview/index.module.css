@@ -48,18 +48,25 @@ pre code {
   flex-grow: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-top: 20px;
 }
 
 .title {
-  margin: 0;
-  margin-bottom: 10px;
+  background-color: var(--vscode-diffEditor-unchangedRegionBackground);
   color: var(--vscode-textPreformat-foreground);
+  display: block;
   font-weight: 500;
   height: 30px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
+  left: 10px;
+  margin-bottom: 10px;
+  margin: 0;
   overflow: hidden;
+  position: absolute;
+  text-overflow: ellipsis;
+  top: 0;
+  white-space: nowrap;
+  width: calc(100% - 20px);
+  z-index: 2;
 }
 
 .message {
