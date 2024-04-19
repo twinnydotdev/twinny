@@ -76,6 +76,7 @@ export function createStreamRequestBodyFim(
       }
     case ApiProviders.LMStudio:
       return {
+        model: options.model,
         prompt,
         stream: true,
         temperature: options.temperature,
