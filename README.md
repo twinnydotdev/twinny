@@ -34,7 +34,7 @@ Get AI-based suggestions in real time. Let Twinny autocomplete your code as you 
 
 Discuss your code via the sidebar: get function explanations, generate tests, request refactoring, and more.
 
-![AI Chat Example](https://github.com/rjmacarthy/twinny/assets/5537428/4a506a90-b1f0-48bc-a8b0-975d94f3b04c)
+<img src="https://github.com/rjmacarthy/twinny/assets/5537428/a5c5bb34-60f6-41f6-8226-c62cf4c17c1d" width="760"/>
 
 ### Additional Features
 
