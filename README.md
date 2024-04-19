@@ -9,7 +9,7 @@ Tired of the so-called "free" Copilot alternatives that are filled with paywalls
 - [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui)
 - [LM Studio](https://github.com/lmstudio-ai)
 - [LiteLLM](https://github.com/BerriAI/litellm)
-- [Ollama Web UI](https://github.com/ollama-webui/ollama-webui)
+- [Open WebUI](https://github.com/open-webui/open-webui)
 
 Like Github Copilot but **100% free**!
 
