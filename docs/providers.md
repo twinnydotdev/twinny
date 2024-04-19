@@ -19,21 +19,23 @@ These example configurations serve as a starting point. Individual adjustments m
 - **Path:** `/v1/chat/completions`
 - **Model Name:** `codellama:7b-instruct` or any effective instruct model
 
-### Ollama Web UI
+### Open WebUI
+
+Open WebUI can be used a proxy API for twinny, simply configure the endpoint to match what is served by OpenWeb UI.
 
 #### FIM (Auto-complete)
 
 - **Hostname:** `localhost`
-- **Port:** `11434`
-- **Path:** `/ollama/api/generate`
+- **Port:** Check documentation
+- **Path:** Check documentation
 - **Model Name:** `codellama:7b-code`
 - **FIM Template:** Use the template corresponding to your model, similar to the desktop configuration.
 
 #### Chat Configuration
 
 - **Hostname:** `localhost`
-- **Port:** `11434`
-- **Path:** `/ollama/v1/chat/completions`
+- **Port:** Check documentation
+- **Path:** Check documentation
 - **Model Name:** `codellama:7b-instruct` or another reliable instruct model
 
 ### LM Studio
