@@ -1,6 +1,4 @@
-import {
-  EMPTY_MESAGE,
-} from '../common/constants'
+import { EMPTY_MESAGE } from '../common/constants'
 import { CodeLanguage, supportedLanguages } from '../common/languages'
 import { LanguageType, ServerMessage } from '../common/types'
 
@@ -57,8 +55,8 @@ export const kebabToSentence = (kebabStr: string) => {
 export const getLineBreakCount = (str: string) => str.split('\n').length
 
 export const getModelShortName = (name: string) => {
-  if (name.length > 32) {
-    return `${name.substring(0, 15)}...${name.substring(name.length - 16)}`
+  if (name.length > 25) {
+    return `${name.substring(0, 10)}...${name.substring(name.length - 10)}`
   }
   return name
 }

@@ -17,19 +17,14 @@ export const ModelSelect = ({ model, models, setModel }: Props) => {
   }
 
   return (
-    <div>
-      <div>
-        <label htmlFor="modelName">Model name*</label>
-      </div>
-      <VSCodeDropdown onChange={handleOnChange} value={model}>
-        {models?.map((model, index) => {
-          return (
-            <option value={model.name} key={`${index}`}>
-              {getModelShortName(model.name)}
-            </option>
-          )
-        })}
-      </VSCodeDropdown>
-    </div>
+    <VSCodeDropdown onChange={handleOnChange} value={model}>
+      {models?.map((model, index) => {
+        return (
+          <option value={model.name} key={`${index}`}>
+            {getModelShortName(model.name)}
+          </option>
+        )
+      })}
+    </VSCodeDropdown>
   )
 }

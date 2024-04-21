@@ -43,7 +43,7 @@ export const ProviderSelect = () => {
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>
-                {`${provider.label} (${provider.provider})`}
+                {`${provider.label} (${provider.modelName})`}
               </VSCodeOption>
             ))}
         </VSCodeDropdown>
@@ -59,7 +59,7 @@ export const ProviderSelect = () => {
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>
-                {`${provider.label} (${provider.provider})`}
+                {`${provider.label} (${provider.modelName})`}
               </VSCodeOption>
             ))}
         </VSCodeDropdown>

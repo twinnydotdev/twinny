@@ -14,13 +14,16 @@ import styles from './providers.module.css'
 import { TwinnyProvider } from '../extension/provider-manager'
 import {
   DEFAULT_PROVIDER_FORM_VALUES,
-  FIM_TEMPLATE_FORMAT,
+  FIM_TEMPLATE_FORMAT
 } from '../common/constants'
 import { ModelSelect } from './model-select'
 
 export const Providers = () => {
   const [showForm, setShowForm] = React.useState(false)
   const [provider, setProvider] = React.useState<TwinnyProvider | undefined>()
+  const { models } = useOllamaModels()
+  const hasOllamaModels = !!models?.length
+  const { updateProvider } = useProviders()
   const { providers, removeProvider, copyProvider, resetProviders } =
     useProviders()
 
@@ -50,6 +53,19 @@ export const Providers = () => {
     resetProviders()
   }
 
+  const handleSetModel = (provider: TwinnyProvider, model: string) => {
+    updateProvider({
+      ...provider,
+      modelName: model
+    })
+  }
+
+  const handleChange = (provider: TwinnyProvider, e: unknown) => {
+    const event = e as unknown as React.ChangeEvent<HTMLInputElement>
+    const { value } = event.target
+    handleSetModel(provider, value)
+  }
+
   return (
     <div>
       <h3>Providers</h3>
@@ -69,7 +85,27 @@ export const Providers = () => {
               {Object.values(providers).map((provider, index) => (
                 <div className={styles.provider} key={index}>
                   <div className={styles.providerHeader}>
-                    <h4>{provider.label}</h4>
+                    {provider.provider === ApiProviders.Ollama &&
+                      hasOllamaModels && (
+                        <ModelSelect
+                          models={models}
+                          model={provider.modelName}
+                          setModel={(model: string) =>
+                            handleSetModel(provider, model)
+                          }
+                        />
+                      )}
+                    {provider.provider !== ApiProviders.Ollama && (
+                      <VSCodeTextField
+                        required
+                        name="modelName"
+                        onChange={(e) => {
+                          handleChange(provider, e)
+                        }}
+                        value={provider.modelName}
+                        placeholder='Applicable for some providers like "Ollama"'
+                      ></VSCodeTextField>
+                    )}
                     <div className={styles.providerActions}>
                       <VSCodeButton
                         appearance="icon"
@@ -100,6 +136,9 @@ export const Providers = () => {
                   <VSCodeDivider />
                   <div className={styles.providerDetails}>
                     <div>
+                      <b>Label:</b> {provider.label}
+                    </div>
+                    <div>
                       <b>Provider:</b> {provider.provider}
                     </div>
                     <div>
@@ -110,9 +149,6 @@ export const Providers = () => {
                         <b>Fim Template:</b> {provider.fimTemplate}
                       </div>
                     )}
-                    <div>
-                      <b>Model:</b> {provider.modelName}
-                    </div>
                     <div>
                       <b>Hostname:</b> {provider.apiHostname}
                     </div>
@@ -271,13 +307,18 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
         </div>
 
         {formState.provider === ApiProviders.Ollama && hasOllamaModels && (
-          <ModelSelect
-            models={models}
-            model={formState.modelName}
-            setModel={(model: string) => {
-              setFormState({ ...formState, modelName: model })
-            }}
-          />
+          <div>
+            <div>
+              <label htmlFor="apiHostname">Model name*</label>
+            </div>
+            <ModelSelect
+              models={models}
+              model={formState.modelName}
+              setModel={(model: string) => {
+                setFormState({ ...formState, modelName: model })
+              }}
+            />
+          </div>
         )}
 
         {formState.provider !== ApiProviders.Ollama && (

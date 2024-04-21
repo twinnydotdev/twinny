@@ -39,7 +39,7 @@ export class LRUCache<T = string> {
   }
 
   normalize(src: string): string {
-    return src.split('\n').join('').replace(/\s+/gm, '').replace(' ', '')
+    return src.split('\n').join('').replace(/\s+/g, '').replace(/\s/g, '')
   }
 
   getKey(prefixSuffix: PrefixSuffix): string {
