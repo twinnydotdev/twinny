@@ -212,7 +212,7 @@
         "when": "editorTextFocus && !editorReadonly"
       },
       {
-        "key": "CTRL+SHIFT+t",
+        "key": "CTRL+SHIFT+Z CTRL+SHIFT+T",
         "command": "twinny.sidebar.focus",
         "when": "editorTextFocus && !editorReadonly"
       },
@@ -222,7 +222,7 @@
         "when": "twinnyGeneratingText"
       },
       {
-        "key": "ctrl+shift+t ctrl+shift+g",
+        "key": "CTRL+SHIFT+Z CTRL+SHIFT+G",
         "command": "twinny.getGitCommitMessage"
       }
     ],
