@@ -235,21 +235,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return { requestOptions, requestBody }
   }
 
-  hasIndent(str: string) {
-    const lines = str.split('\n')
-    for (const line of lines) {
-      if (line.trim().length > 0) {
-        // Skip empty lines
-        if (line.startsWith(' ') || line.startsWith('\t')) {
-          return true // Indentation found
-        } else {
-          return false // Line without indentation found
-        }
-      }
-    }
-    return false // No indented lines found
-  }
-
   private onData(data: StreamResponse | undefined): string {
     const provider = this.getFimProvider()
     if (!provider) return ''
