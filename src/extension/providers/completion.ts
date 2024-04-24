@@ -278,39 +278,47 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         return this._completion
       }
 
-      if (this._nodeAtPosition) {
-        const takeFirst =
-          MULTILINE_OUTSIDE.includes(this._nodeAtPosition?.type) ||
-          (MULTILINE_INSIDE.includes(this._nodeAtPosition?.type) &&
-            this._nodeAtPosition?.childCount > 2)
+      try {
+        if (this._nodeAtPosition) {
+          const takeFirst =
+            MULTILINE_OUTSIDE.includes(this._nodeAtPosition?.type) ||
+            (MULTILINE_INSIDE.includes(this._nodeAtPosition?.type) &&
+              this._nodeAtPosition?.childCount > 2)
 
-        const lineText = getCurrentLineText(this._position) || ''
-        if (!this._parser) return ''
+          const lineText = getCurrentLineText(this._position) || ''
+          if (!this._parser) return ''
 
-        const { rootNode } = this._parser.parse(
-          `${lineText}${this._completion}`
-        )
-        const { hasError } = rootNode
+          // TODO: Rethink as can cause vscode to hang when parser throws error.
+          const { rootNode } = this._parser.parse(
+            `${lineText}${this._completion}`
+          )
 
-        if (
-          this._parser &&
-          this._nodeAtPosition &&
-          this._isMultilineCompletion &&
-          this._chunkCount >= 2 &&
-          takeFirst &&
-          !hasError
-        ) {
+          const { hasError } = rootNode
+
           if (
-            MULTI_LINE_DELIMITERS.some((delimiter) =>
-              this._completion.endsWith(delimiter)
-            )
+            this._parser &&
+            this._nodeAtPosition &&
+            this._isMultilineCompletion &&
+            this._chunkCount >= 2 &&
+            takeFirst &&
+            !hasError
           ) {
-            this._logger.log(
-              `Streaming response end due to delimiter ${this._nonce} \nCompletion: ${this._completion}`
-            )
-            return this._completion
+            if (
+              MULTI_LINE_DELIMITERS.some((delimiter) =>
+                this._completion.endsWith(delimiter)
+              )
+            ) {
+              this._logger.log(
+                `Streaming response end due to delimiter ${this._nonce} \nCompletion: ${this._completion}`
+              )
+              return this._completion
+            }
           }
         }
+      } catch (e) {
+        // Currently doesnt catch
+        console.error(e)
+        this.abortCompletion()
       }
 
       if (getLineBreakCount(this._completion) >= this._maxLines) {
