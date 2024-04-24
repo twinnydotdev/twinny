@@ -4,6 +4,7 @@ import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
 import { Bracket } from '../common/types'
 import { getLanguage } from './utils'
 import { supportedLanguages } from '../common/languages'
+import { getLineBreakCount } from '../webview/utils'
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
@@ -235,7 +236,7 @@ export class CompletionFormatter {
     const languageId =
       supportedLanguages[language.languageId as keyof typeof supportedLanguages]
 
-    if (this._normalisedCompletion.startsWith('// File:')) {
+    if (this._normalisedCompletion.startsWith('// File:') || this._normalisedCompletion === '//') {
       this._completion = ''
       return this
     }
@@ -248,16 +249,11 @@ export class CompletionFormatter {
       return this
     }
 
-    const comments = `${languageId.syntaxComments.start}${
-      languageId.syntaxComments.end ?? ''
-    }`
-    const score = this._normalisedCompletion.score(comments, 0.1)
-    if (this._normalisedCompletion.startsWith(comments) || score > 0.3) {
-      this._completion = ''
-      return this
-    }
-
     if (!languageId || !languageId.syntaxComments) return this
+
+    const lineCount = getLineBreakCount(this._completion)
+
+    if (lineCount > 1) return this
 
     const completionLines = this._completion.split('\n').filter((line) => {
       const startsWithComment = line.startsWith(languageId.syntaxComments.start)

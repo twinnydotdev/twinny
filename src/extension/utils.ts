@@ -28,6 +28,7 @@ import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
   LINE_BREAK_REGEX,
+  MULTILINE_TYPES,
   OPENING_BRACKETS,
   QUOTES,
   QUOTES_REGEX,
@@ -35,6 +36,7 @@ import {
   TWINNY
 } from '../common/constants'
 import { Logger } from '../common/logger'
+import { SyntaxNode } from 'web-tree-sitter'
 
 const logger = new Logger()
 
@@ -132,7 +134,7 @@ export const getSkipVariableDeclataion = (
 
 export const getShouldSkipCompletion = (
   context: InlineCompletionContext,
-  disableAuto: boolean
+  autoSuggestEnabled: boolean
 ) => {
   const editor = window.activeTextEditor
   if (!editor) return true
@@ -148,7 +150,8 @@ export const getShouldSkipCompletion = (
   }
 
   return (
-    context.triggerKind === InlineCompletionTriggerKind.Automatic && disableAuto
+    context.triggerKind === InlineCompletionTriggerKind.Automatic &&
+    !autoSuggestEnabled
   )
 }
 
@@ -217,7 +220,7 @@ export const getBeforeAndAfter = () => {
   }
 }
 
-export const getIsMiddleWord = () => {
+export const getIsMiddleOfString = () => {
   const { charBefore, charAfter } = getBeforeAndAfter()
 
   return (
@@ -268,17 +271,21 @@ export const getPreviousLineIsOpeningBracket = () => {
   return getIsOnlyOpeningBrackets(previousLineCharacter)
 }
 
-export const getIsMultiLineCompletion = () => {
-  const nextLineIsClosingBracket = getNextLineIsClosingBracket()
-  const previousLineIsOpeningBracket = getPreviousLineIsOpeningBracket()
-  if (
-    previousLineIsOpeningBracket &&
-    nextLineIsClosingBracket &&
-    !getHasLineTextBeforeAndAfter()
-  ) {
-    return true
-  }
-  return !getHasLineTextBeforeAndAfter() && !isCursorInEmptyString()
+export const getIsMultilineCompletion = ({
+  node,
+  prefixSuffix
+}: {
+  node: SyntaxNode | null
+  prefixSuffix: PrefixSuffix | null
+}) => {
+  if (!node) return false
+
+  const isMultilineCompletion =
+    !getHasLineTextBeforeAndAfter() &&
+    !isCursorInEmptyString() &&
+    MULTILINE_TYPES.includes(node.type)
+
+  return !!(isMultilineCompletion || !prefixSuffix?.suffix.trim())
 }
 
 export const getTheme = () => {
