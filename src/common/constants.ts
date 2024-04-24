@@ -278,7 +278,7 @@ export const MULTILINE_INSIDE = [
 
 export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 
-export const MULTILINE_DELIMTERS = ['\n\n', '\r\n\r\n']
+export const MULTI_LINE_DELIMITERS = ['\n\n', '\r\n\r\n']
 
 export const MULTI_LINE_REACT = [
   'jsx_closing_element',

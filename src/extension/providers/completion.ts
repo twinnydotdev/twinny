@@ -40,7 +40,7 @@ import {
   LINE_BREAK_REGEX,
   MAX_CONTEXT_LINE_COUNT,
   MIN_COMPLETION_CHUNKS,
-  MULTILINE_DELIMTERS,
+  MULTI_LINE_DELIMITERS,
   MULTILINE_INSIDE,
   MULTILINE_OUTSIDE
 } from '../../common/constants'
@@ -290,7 +290,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           !hasError
         ) {
           if (
-            MULTILINE_DELIMTERS.some((delimiter) =>
+            MULTI_LINE_DELIMITERS.some((delimiter) =>
               this._completion.endsWith(delimiter)
             )
           ) {
