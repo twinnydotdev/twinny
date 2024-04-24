@@ -289,7 +289,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           if (!this._parser) return ''
 
           if (providerFimData.includes('\n')) {
-            console.log('parse')
             const { rootNode } = this._parser.parse(
               `${lineText}${this._completion}`
             )
