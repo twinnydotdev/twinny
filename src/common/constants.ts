@@ -53,7 +53,7 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context',
+  twinnyWorkspaceContext: 'twinny-workspace-context'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -76,8 +76,8 @@ export const TWINNY_COMMAND_NAME = {
   sendTerminalText: 'twinny.sendTerminalText',
   getGitCommitMessage: 'twinny.getGitCommitMessage',
   newChat: 'twinny.newChat',
-  focusSidebar: 'twinny.sidebar.focus',
-};
+  focusSidebar: 'twinny.sidebar.focus'
+}
 
 export const CONVERSATION_EVENT_NAME = {
   saveConversation: 'twinny.save-conversation',
@@ -85,7 +85,7 @@ export const CONVERSATION_EVENT_NAME = {
   setActiveConversation: 'twinny.set-active-conversation',
   getActiveConversation: 'twinny.get-active-conversation',
   saveLastConversation: 'twinny.save-last-conversation',
-  removeConversation: 'twinny.remove-conversation',
+  removeConversation: 'twinny.remove-conversation'
 }
 
 export const PROVIDER_EVENT_NAME = {
@@ -251,3 +251,35 @@ export const WASM_LANGAUAGES: { [key: string]: string } = {
   rdl: 'systemrdl',
   toml: 'toml'
 }
+
+export const MULTILINE_OUTSIDE = [
+  'class_body',
+  'interface_body',
+  'interface',
+  'class',
+  'program',
+  'identifier',
+  'export'
+]
+
+export const MULTILINE_INSIDE = [
+  'body',
+  'export_statement',
+  'formal_parameters',
+  'function_definition',
+  'jsx_closing_element',
+  'jsx_element',
+  'jsx_element',
+  'jsx_opening_element',
+  'jsx_self_closing_element',
+  'named_imports',
+  'object_pattern',
+  'object_type',
+  'object',
+  'parenthesized_expression',
+  'statement_block'
+]
+
+export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
+
+export const MULTILINE_DELIMTERS = ['\n\n', '\r\n\r\n']

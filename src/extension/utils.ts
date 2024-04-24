@@ -28,6 +28,7 @@ import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
   LINE_BREAK_REGEX,
+  MULTILINE_TYPES,
   OPENING_BRACKETS,
   QUOTES,
   QUOTES_REGEX,
@@ -35,6 +36,7 @@ import {
   TWINNY
 } from '../common/constants'
 import { Logger } from '../common/logger'
+import { SyntaxNode } from 'web-tree-sitter'
 
 const logger = new Logger()
 
@@ -268,17 +270,17 @@ export const getPreviousLineIsOpeningBracket = () => {
   return getIsOnlyOpeningBrackets(previousLineCharacter)
 }
 
-export const getIsMultiLineCompletion = () => {
-  const nextLineIsClosingBracket = getNextLineIsClosingBracket()
-  const previousLineIsOpeningBracket = getPreviousLineIsOpeningBracket()
-  if (
-    previousLineIsOpeningBracket &&
-    nextLineIsClosingBracket &&
-    !getHasLineTextBeforeAndAfter()
-  ) {
-    return true
-  }
-  return !getHasLineTextBeforeAndAfter() && !isCursorInEmptyString()
+export const getIsMultilineCompletion = (
+  node: SyntaxNode | null,
+  prefixSuffix: PrefixSuffix | null
+) => {
+  if (!node) return false
+  const isMultilineCompletion =
+    (!getHasLineTextBeforeAndAfter() &&
+      !isCursorInEmptyString() &&
+      MULTILINE_TYPES.includes(node.type)) ||
+    !prefixSuffix?.suffix.trim()
+  return isMultilineCompletion
 }
 
 export const getTheme = () => {
