@@ -288,35 +288,36 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           const lineText = getCurrentLineText(this._position) || ''
           if (!this._parser) return ''
 
-          // TODO: Rethink as can cause vscode to hang when parser throws error.
-          const { rootNode } = this._parser.parse(
-            `${lineText}${this._completion}`
-          )
+          if (providerFimData.includes('\n')) {
+            console.log('parse')
+            const { rootNode } = this._parser.parse(
+              `${lineText}${this._completion}`
+            )
 
-          const { hasError } = rootNode
+            const { hasError } = rootNode
 
-          if (
-            this._parser &&
-            this._nodeAtPosition &&
-            this._isMultilineCompletion &&
-            this._chunkCount >= 2 &&
-            takeFirst &&
-            !hasError
-          ) {
             if (
-              MULTI_LINE_DELIMITERS.some((delimiter) =>
-                this._completion.endsWith(delimiter)
-              )
+              this._parser &&
+              this._nodeAtPosition &&
+              this._isMultilineCompletion &&
+              this._chunkCount >= 2 &&
+              takeFirst &&
+              !hasError
             ) {
-              this._logger.log(
-                `Streaming response end due to delimiter ${this._nonce} \nCompletion: ${this._completion}`
-              )
-              return this._completion
+              if (
+                MULTI_LINE_DELIMITERS.some((delimiter) =>
+                  this._completion.endsWith(delimiter)
+                )
+              ) {
+                this._logger.log(
+                  `Streaming response end due to delimiter ${this._nonce} \nCompletion: ${this._completion}`
+                )
+                return this._completion
+              }
             }
           }
         }
-      } catch (e) {
-        // Currently doesnt catch
+      } catch (e) { // Currently doesnt catch when parser fucks up
         console.error(e)
         this.abortCompletion()
       }
