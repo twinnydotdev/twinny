@@ -39,6 +39,7 @@ import {
   FIM_TEMPLATE_FORMAT,
   LINE_BREAK_REGEX,
   MAX_CONTEXT_LINE_COUNT,
+  MAX_EMPTY_COMPLETION_CHARS,
   MIN_COMPLETION_CHUNKS,
   MULTI_LINE_DELIMITERS,
   MULTILINE_INSIDE,
@@ -243,6 +244,16 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
       this._completion = this._completion + providerFimData
       this._chunkCount = this._chunkCount + 1
+
+      if (
+        this._completion.length > MAX_EMPTY_COMPLETION_CHARS &&
+        this._completion.trim().length === 0
+      ) {
+        this.abortCompletion()
+        this._logger.log(
+          `Streaming response end as llm in empty completion loop:  ${this._nonce}`
+        )
+      }
 
       if (
         !this._multilineCompletionsEnabled &&

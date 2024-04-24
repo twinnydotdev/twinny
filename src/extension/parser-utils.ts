@@ -31,8 +31,8 @@ export const getParser = async (
     'tree-sitter-wasms',
     `tree-sitter-${language}.wasm`
   )
-  const Language = await Parser.Language.load(wasmPath)
-  parser.setLanguage(Language)
+  const parserLanguage = await Parser.Language.load(wasmPath)
+  parser.setLanguage(parserLanguage)
 
   return parser
 }

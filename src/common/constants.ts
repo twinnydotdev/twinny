@@ -22,6 +22,7 @@ export const SKIP_DECLARATION_SYMBOLS = ['=']
 export const IMPORT_SEPARATOR = [',', '{']
 export const SKIP_IMPORT_KEYWORDS_AFTER = ['from', 'as', 'import']
 export const MIN_COMPLETION_CHUNKS = 2
+export const MAX_EMPTY_COMPLETION_CHARS = 250
 
 export const EVENT_NAME = {
   twinngAddMessage: 'twinny-add-message',
