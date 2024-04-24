@@ -255,11 +255,11 @@
           "default": true,
           "description": "Activates or deactivates the Twinny extension."
         },
-        "twinny.disableAutoSuggest": {
+        "twinny.autoSuggestEnabled": {
           "order": 1,
           "type": "boolean",
-          "default": false,
-          "description": "Disables automatic suggestions, manual trigger (default shortcut Alt+\\)."
+          "default": true,
+          "description": "Enable automatic completion suggestions, manual trigger (default shortcut Alt+\\)."
         },
         "twinny.contextLength": {
           "order": 2,
@@ -282,20 +282,20 @@
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
-        "twinny.useMultilineCompletions": {
+        "twinny.multilineCompletionsEnabled": {
           "order": 5,
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Use multiline completions (Can be inaccurate)."
         },
         "twinny.maxLines": {
           "dependencies": {
-            "twinny.useMultilineCompletions": true
+            "twinny.multilineCompletionsEnabled": true
           },
           "order": 6,
           "type": "number",
           "default": 30,
-          "description": "Maximum number of lines to use for multi line completions. Applicable only when useMultilineCompletions is enabled."
+          "description": "Maximum number of lines to use for multi line completions. Applicable only when multilineCompletionsEnabled is enabled."
         },
         "twinny.useFileContext": {
           "order": 8,
@@ -303,7 +303,7 @@
           "default": false,
           "description": "Enables scanning of neighbouring documents to enhance completion prompts. (Experimental)"
         },
-        "twinny.enableCompletionCache": {
+        "twinny.completionCacheEnabled": {
           "order": 9,
           "type": "boolean",
           "default": false,

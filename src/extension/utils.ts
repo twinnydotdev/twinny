@@ -134,7 +134,7 @@ export const getSkipVariableDeclataion = (
 
 export const getShouldSkipCompletion = (
   context: InlineCompletionContext,
-  disableAuto: boolean
+  autoSuggestEnabled: boolean
 ) => {
   const editor = window.activeTextEditor
   if (!editor) return true
@@ -150,7 +150,8 @@ export const getShouldSkipCompletion = (
   }
 
   return (
-    context.triggerKind === InlineCompletionTriggerKind.Automatic && disableAuto
+    context.triggerKind === InlineCompletionTriggerKind.Automatic &&
+    !autoSuggestEnabled
   )
 }
 
@@ -219,7 +220,7 @@ export const getBeforeAndAfter = () => {
   }
 }
 
-export const getIsMiddleWord = () => {
+export const getIsMiddleOfString = () => {
   const { charBefore, charAfter } = getBeforeAndAfter()
 
   return (
@@ -270,17 +271,21 @@ export const getPreviousLineIsOpeningBracket = () => {
   return getIsOnlyOpeningBrackets(previousLineCharacter)
 }
 
-export const getIsMultilineCompletion = (
-  node: SyntaxNode | null,
+export const getIsMultilineCompletion = ({
+  node,
+  prefixSuffix
+}: {
+  node: SyntaxNode | null
   prefixSuffix: PrefixSuffix | null
-) => {
+}) => {
   if (!node) return false
+
   const isMultilineCompletion =
-    (!getHasLineTextBeforeAndAfter() &&
-      !isCursorInEmptyString() &&
-      MULTILINE_TYPES.includes(node.type)) ||
-    !prefixSuffix?.suffix.trim()
-  return isMultilineCompletion
+    !getHasLineTextBeforeAndAfter() &&
+    !isCursorInEmptyString() &&
+    MULTILINE_TYPES.includes(node.type)
+
+  return !!(isMultilineCompletion || !prefixSuffix?.suffix.trim())
 }
 
 export const getTheme = () => {

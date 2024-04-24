@@ -21,6 +21,7 @@ export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ['=']
 export const IMPORT_SEPARATOR = [',', '{']
 export const SKIP_IMPORT_KEYWORDS_AFTER = ['from', 'as', 'import']
+export const MIN_COMPLETION_CHUNKS = 2
 
 export const EVENT_NAME = {
   twinngAddMessage: 'twinny-add-message',
@@ -267,11 +268,6 @@ export const MULTILINE_INSIDE = [
   'export_statement',
   'formal_parameters',
   'function_definition',
-  'jsx_closing_element',
-  'jsx_element',
-  'jsx_element',
-  'jsx_opening_element',
-  'jsx_self_closing_element',
   'named_imports',
   'object_pattern',
   'object_type',
@@ -283,3 +279,11 @@ export const MULTILINE_INSIDE = [
 export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 
 export const MULTILINE_DELIMTERS = ['\n\n', '\r\n\r\n']
+
+export const MULTI_LINE_REACT = [
+  'jsx_closing_element',
+  'jsx_element',
+  'jsx_element',
+  'jsx_opening_element',
+  'jsx_self_closing_element',
+]

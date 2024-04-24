@@ -7,7 +7,7 @@ import { Logger } from '../common/logger'
 import { Position } from 'vscode'
 const logger = new Logger()
 
-export const getParserForFile = async (
+export const getParser = async (
   filePath: string
 ): Promise<Parser | undefined> => {
   await Parser.init()
