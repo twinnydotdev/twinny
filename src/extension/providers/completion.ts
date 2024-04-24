@@ -459,7 +459,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   public setAcceptedLastCompletion(value: boolean) {
     this._acceptedLastCompletion = value
-    this._lastCompletionMultiline = value
+    this._lastCompletionMultiline = getLineBreakCount(this._completion) > 1
   }
 
   public abortCompletion() {
