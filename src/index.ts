@@ -218,7 +218,7 @@ export async function activate(context: ExtensionContext) {
     workspace.onDidChangeTextDocument((e) => {
       const changes = e.contentChanges[0]
       if (!changes) return
-      const lastCompletion = completionProvider.getLastCompletion()
+      const lastCompletion = completionProvider.lastCompletionText
       const isLastCompltionMultiline = getLineBreakCount(lastCompletion) > 1
       completionProvider.setAcceptedLastCompletion(
         !!(

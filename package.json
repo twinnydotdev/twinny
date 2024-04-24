@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.11.20",
+  "version": "3.11.23",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -255,11 +255,11 @@
           "default": true,
           "description": "Activates or deactivates the Twinny extension."
         },
-        "twinny.disableAutoSuggest": {
+        "twinny.autoSuggestEnabled": {
           "order": 1,
           "type": "boolean",
-          "default": false,
-          "description": "Disables automatic suggestions, manual trigger (default shortcut Alt+\\)."
+          "default": true,
+          "description": "Enable automatic completion suggestions, manual trigger (default shortcut Alt+\\)."
         },
         "twinny.contextLength": {
           "order": 2,
@@ -282,20 +282,20 @@
           "description": "Sets the model's creativity level (temperature) for generating completions.",
           "required": true
         },
-        "twinny.useMultiLineCompletions": {
+        "twinny.multilineCompletionsEnabled": {
           "order": 5,
           "type": "boolean",
-          "default": false,
-          "description": "Use multiline completions (Can be inaccurate)."
+          "default": true,
+          "description": "Experimental feature: enables the generation of multi-line completions."
         },
         "twinny.maxLines": {
           "dependencies": {
-            "twinny.useMultiLineCompletions": true
+            "twinny.multilineCompletionsEnabled": true
           },
           "order": 6,
           "type": "number",
-          "default": 7,
-          "description": "Maximum number of lines to use for multi line completions. Applicable only when useMultiLineCompletions is enabled."
+          "default": 30,
+          "description": "Maximum number of lines to use for multi line completions. Applicable only when multilineCompletionsEnabled is enabled."
         },
         "twinny.useFileContext": {
           "order": 8,
@@ -303,7 +303,7 @@
           "default": false,
           "description": "Enables scanning of neighbouring documents to enhance completion prompts. (Experimental)"
         },
-        "twinny.enableCompletionCache": {
+        "twinny.completionCacheEnabled": {
           "order": 9,
           "type": "boolean",
           "default": false,
