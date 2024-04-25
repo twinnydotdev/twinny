@@ -44,7 +44,7 @@ Discuss your code via the sidebar: get function explanations, generate tests, re
 - Conforms to the OpenAI API standard
 - Supports single or multiline fill-in-middle completions
 - Customizable prompt templates
-- Generate git commit messages from staged changes (`CTRL+SHIFT+T CTRL+SHIFT+G`)
+- Generate git commit messages from staged changes
 - Easy installation via the Visual Studio Code extensions marketplace
 - Customizable settings for API provider, model name, port number, and path
 - Compatible with Ollama, llama.cpp, oobabooga, and LM Studio APIs
