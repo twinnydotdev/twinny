@@ -8,68 +8,87 @@ import {
 import { supportedLanguages } from '../common/languages'
 import { FimPromptTemplate } from '../common/types'
 
-export const getFimPromptTemplateLLama = ({
-  context,
-  header,
-  useFileContext,
-  prefixSuffix,
-  language
-}: FimPromptTemplate) => {
-  const { prefix, suffix } = prefixSuffix
+const getFileContext = (
+  fileContextEnabled: boolean,
+  context: string,
+  language: string | undefined,
+  header: string
+) => {
   const languageId =
     supportedLanguages[language as keyof typeof supportedLanguages]
-  const fileContext = useFileContext
+  const fileContext = fileContextEnabled
     ? `${languageId?.syntaxComments?.start || ''}${context}${
         languageId?.syntaxComments?.end || ''
       }`
     : ''
-  const heading = useFileContext && header ? header : ''
+  return { heading: header ?? '', fileContext }
+}
+
+export const getFimPromptTemplateLLama = ({
+  context,
+  header,
+  fileContextEnabled,
+  prefixSuffix,
+  language
+}: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
+  const { fileContext, heading } = getFileContext(
+    fileContextEnabled,
+    context,
+    language,
+    header
+  )
   return `<PRE>${fileContext} \n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
 export const getDefaultFimPromptTemplate = ({
   context,
   header,
-  useFileContext,
+  fileContextEnabled,
   prefixSuffix,
   language
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  const languageId =
-    supportedLanguages[language as keyof typeof supportedLanguages]
-  const fileContext = useFileContext
-    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
-    : ''
-  const heading = useFileContext && header ? header : ''
+  const { fileContext, heading } = getFileContext(
+    fileContextEnabled,
+    context,
+    language,
+    header
+  )
   return `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
 export const getFimPromptTemplateDeepseek = ({
   context,
   header,
-  useFileContext,
+  fileContextEnabled,
   prefixSuffix,
   language
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  const languageId =
-    supportedLanguages[language as keyof typeof supportedLanguages]
-  const fileContext = useFileContext
-    ? `${languageId?.syntaxComments?.start}${context}${languageId?.syntaxComments?.end}`
-    : ''
-  const heading = useFileContext && header ? header : ''
+  const { fileContext, heading } = getFileContext(
+    fileContextEnabled,
+    context,
+    language,
+    header
+  )
   return `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
 }
 
 export const getFimPromptTemplateStableCode = ({
   context,
   header,
-  useFileContext,
-  prefixSuffix
+  fileContextEnabled,
+  prefixSuffix,
+  language
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  const fileContext = useFileContext ? context : ''
-  const heading = header ? header : ''
+  const { fileContext, heading } = getFileContext(
+    fileContextEnabled,
+    context,
+    language,
+    header
+  )
   return `<fim_prefix>${fileContext}\n${heading}${prefix}<fim_suffix>${suffix}<fim_middle>`
 }
 

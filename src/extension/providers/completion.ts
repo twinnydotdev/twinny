@@ -96,7 +96,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider: TemplateProvider
-  private _useFileContext = this._config.get('useFileContext') as boolean
+  private _fileContextEnabled = this._config.get('fileContextEnabled') as boolean
   private _usingFimTemplate = false
 
   constructor(
@@ -464,7 +464,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         context: fileInteractionContext || '',
         prefixSuffix,
         header: this.getPromptHeader(documentLanguage, this._document.uri),
-        useFileContext: this._useFileContext,
+        fileContextEnabled: this._fileContextEnabled,
         language: documentLanguage
       }
     )
@@ -493,7 +493,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       Original completion: ${this._completion}
       Formatted completion: ${formattedCompletion}
       Max Lines: ${this._maxLines}
-      Use file context: ${this._useFileContext}
+      Use file context: ${this._fileContextEnabled}
       Completed lines count ${getLineBreakCount(formattedCompletion)}
       Using custom FIM template fim.bhs?: ${this._usingFimTemplate}
     `.trim()
@@ -542,7 +542,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._numLineContext = this._config.get('contextLength') as number
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._temperature = this._config.get('temperature') as number
-    this._useFileContext = this._config.get('useFileContext') as boolean
+    this._fileContextEnabled = this._config.get('fileContextEnabled') as boolean
     this._multilineCompletionsEnabled = this._config.get(
       'multilineCompletionsEnabled'
     ) as boolean

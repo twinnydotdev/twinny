@@ -113,7 +113,7 @@ Twinny supports OpenAI API-compliant providers.
 
 ## Workspace Context
 
-Enable `useFileContext` in settings to improve completion quality by tracking sessions and file access patterns. This is off by default to ensure performance.
+Enable `fileContextEnabled` in settings to improve completion quality by tracking sessions and file access patterns. This is off by default to ensure performance.
 
 ## Known Issues
 

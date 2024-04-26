@@ -121,7 +121,7 @@ export interface FimPromptTemplate {
   context: string
   header: string
   prefixSuffix: PrefixSuffix
-  useFileContext: boolean
+  fileContextEnabled: boolean
   language?: string
 }
 

@@ -297,7 +297,7 @@
           "default": 30,
           "description": "Maximum number of lines to use for multi line completions. Applicable only when multilineCompletionsEnabled is enabled."
         },
-        "twinny.useFileContext": {
+        "twinny.fileContextEnabled": {
           "order": 8,
           "type": "boolean",
           "default": false,
