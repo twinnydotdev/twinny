@@ -6,7 +6,11 @@ import {
   getTextSelection,
   getTheme
 } from '../utils'
-import { WORKSPACE_STORAGE_KEY, EVENT_NAME, TWINNY_COMMAND_NAME } from '../../common/constants'
+import {
+  WORKSPACE_STORAGE_KEY,
+  EVENT_NAME,
+  TWINNY_COMMAND_NAME
+} from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
   ClientMessage,
@@ -32,7 +36,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   constructor(
     statusBar: vscode.StatusBarItem,
     context: vscode.ExtensionContext,
-    templateDir: string,
+    templateDir: string
   ) {
     this._statusBar = statusBar
     this._context = context
@@ -162,7 +166,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public fetchOllamaModels = async () => {
     try {
       const models = await this._ollamaService?.fetchModels()
-      if (!models) return
+      if (!models?.length) {
+        return
+      }
       this.view?.webview.postMessage({
         type: EVENT_NAME.twinnyFetchOllamaModels,
         value: {

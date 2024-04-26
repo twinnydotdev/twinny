@@ -219,6 +219,40 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
   const hasOllamaModels = !!models?.length
 
+  const getModelInput = () => {
+    if (formState.provider === ApiProviders.Ollama && hasOllamaModels) {
+      return (
+        <>
+          <div>
+            <label htmlFor="modelName">Model name*</label>
+          </div>
+          <ModelSelect
+            models={models}
+            model={formState.modelName}
+            setModel={(model: string) => {
+              setFormState({ ...formState, modelName: model })
+            }}
+          />
+        </>
+      )
+    }
+
+    return (
+      <>
+        <div>
+          <label htmlFor="modelName">Model name*</label>
+        </div>
+        <VSCodeTextField
+          required
+          name="modelName"
+          onChange={handleChange}
+          value={formState.modelName}
+          placeholder='Applicable for some providers like "Ollama"'
+        ></VSCodeTextField>
+      </>
+    )
+  }
+
   return (
     <>
       <VSCodeDivider />
@@ -232,7 +266,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             name="label"
             onChange={handleChange}
             value={formState.label}
-            placeholder='Applicable for some providers like "Ollama"'
+            placeholder='Just for your reference'
           ></VSCodeTextField>
         </div>
 
@@ -306,35 +340,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
           </VSCodeDropdown>
         </div>
 
-        {formState.provider === ApiProviders.Ollama && hasOllamaModels && (
-          <div>
-            <div>
-              <label htmlFor="apiHostname">Model name*</label>
-            </div>
-            <ModelSelect
-              models={models}
-              model={formState.modelName}
-              setModel={(model: string) => {
-                setFormState({ ...formState, modelName: model })
-              }}
-            />
-          </div>
-        )}
-
-        {formState.provider !== ApiProviders.Ollama && (
-          <div>
-            <div>
-              <label htmlFor="modelName">Model name*</label>
-            </div>
-            <VSCodeTextField
-              required
-              name="modelName"
-              onChange={handleChange}
-              value={formState.modelName}
-              placeholder='Applicable for some providers like "Ollama"'
-            ></VSCodeTextField>
-          </div>
-        )}
+        {getModelInput()}
 
         <div>
           <div>
