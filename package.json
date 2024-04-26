@@ -158,7 +158,7 @@
         "shortTitle": "Disable twinny"
       },
       {
-        "command": "twinny.showSidebar",
+        "command": "twinny.sidebar.focus",
         "shortTitle": "Enable twinny sidebar",
         "title": "Enable twinny sidebar"
       },
