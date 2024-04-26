@@ -305,7 +305,7 @@ export const getChatDataFromProvider = (
 ) => {
   switch (provider) {
     case ApiProviders.Ollama:
-    case ApiProviders.OllamaWebUi:
+    case ApiProviders.OpenWebUI:
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
         : ''
@@ -326,6 +326,7 @@ export const getFimDataFromProvider = (
 ) => {
   switch (provider) {
     case ApiProviders.Ollama:
+    case ApiProviders.OpenWebUI:
       return data?.response
     case ApiProviders.LlamaCpp:
       return data?.content

@@ -20,7 +20,7 @@ export function createStreamRequestBody(
 ): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case ApiProviders.Ollama:
-    case ApiProviders.OllamaWebUi:
+    case ApiProviders.OpenWebUI:
       return {
         model: options.model,
         prompt,
@@ -63,7 +63,7 @@ export function createStreamRequestBodyFim(
 ): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case ApiProviders.Ollama:
-    case ApiProviders.OllamaWebUi:
+    case ApiProviders.OpenWebUI:
       return {
         model: options.model,
         prompt,

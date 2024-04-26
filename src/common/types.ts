@@ -154,12 +154,12 @@ export interface UiTabs {
 }
 
 export const ApiProviders = {
-  Ollama: 'ollama',
-  OllamaWebUi: 'ollamawebui',
+  LiteLLM: 'litellm',
   LlamaCpp: 'llamacpp',
   LMStudio: 'lmstudio',
+  Ollama: 'ollama',
   Oobabooga: 'oobabooga',
-  LiteLLM: 'litellm'
+  OpenWebUI: 'openwebui',
 } as const
 
 export interface ApiModel {
