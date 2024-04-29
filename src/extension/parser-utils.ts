@@ -14,6 +14,8 @@ export const getParser = async (
   const newFileExtension = path.extname(filePath).slice(1)
   const language = WASM_LANGAUAGES[newFileExtension]
 
+  if (!language) return undefined
+
   if (newFileExtension === fileExtension && parser) return parser
 
   fileExtension = newFileExtension
