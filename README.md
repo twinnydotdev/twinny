@@ -123,6 +123,14 @@ Visit the GitHub [issues page](https://github.com/rjmacarthy/twinny/issues) for 
 
 Interested in contributing? Reach out on [Twitter](https://x.com/rjmacarthy), describe your changes in an issue, and submit a PR when ready. Twinny is open-source under the MIT license. See the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) for more details.
 
+## Support Twinny
+
+Thanks for using Twinny! 
+
+This project is and will always be free and open source. If you find it helpful, please consider showing your appreciation with a small donation <3
+
+Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
+
 ## Disclaimer
 
 Twinny is actively developed and provided "as is". Functionality may vary between updates.
