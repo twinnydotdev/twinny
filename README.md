@@ -77,7 +77,7 @@ For setups with llama.cpp, LM Studio, Oobabooga, LiteLLM, or any other provider,
 
 1. Install the VS Code extension [here](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny).
 2. Obtain and run your chosen model locally using the provider's setup instructions.
-3. Restart VS Code if necessary and press `CTRL + SHIFT + T` to open the side panel.
+3. Restart VS Code if necessary and press `CTRL+SHIFT+Z CTRL+SHIFT+T` to open the side panel.
 4. At the top of the extension, click the 🔌 (plug) icon to configure your FIM and chat endpoints in the providers tab.
 5. It is recommended to use separate models for FIM and chat as they are optimized for different tasks.
 6. Update the provider settings for chat, including provider, port, and hostname to correctly connect to your chat model.
