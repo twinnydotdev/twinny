@@ -5,7 +5,8 @@ import {
   Message,
   ServerMessage,
   StreamBodyBase,
-  StreamRequestOptions
+  StreamRequestOptions,
+  StreamResponse
 } from '../common/types'
 import { v4 as uuidv4 } from 'uuid'
 import { createStreamRequestBody } from './provider-options'
@@ -83,7 +84,7 @@ export class ConversationHistory {
           onData: (streamResponse) => {
             const data = getChatDataFromProvider(
               provider.provider,
-              streamResponse
+              streamResponse as StreamResponse
             )
             this._title = this._title + data
           },

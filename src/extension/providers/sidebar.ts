@@ -22,6 +22,7 @@ import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
 import { ConversationHistory } from '../conversation-history'
+import { EmbeddingDatabase } from '../embeddings'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _context: vscode.ExtensionContext
@@ -32,17 +33,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
+  private _db: EmbeddingDatabase | undefined
 
   constructor(
     statusBar: vscode.StatusBarItem,
     context: vscode.ExtensionContext,
-    templateDir: string
+    templateDir: string,
+    db: EmbeddingDatabase | undefined
   ) {
     this._statusBar = statusBar
     this._context = context
     this._templateDir = templateDir
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
+    if (db) {
+      this._db = db
+    }
     return this
   }
 
@@ -53,8 +59,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this._statusBar,
       this._templateDir,
       this._context,
-      this.conversationHistory,
-      webviewView
+      webviewView,
+      this._db,
     )
     this.conversationHistory = new ConversationHistory(this._context, this.view)
     new ProviderManager(this._context, this.view)
@@ -110,11 +116,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnySetConfigValue]: this.setConfigurationValue,
           [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
           [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
-          [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton
+          [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
+          [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
+  }
+
+  public embedDocuments = async () => {
+    const dirs = vscode.workspace.workspaceFolders
+    if (!dirs?.length) {
+      vscode.window.showErrorMessage('No project open')
+      return
+    }
+    if (!this._db) return
+    for (const dir of dirs) {
+      (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
+    }
   }
 
   public setTab(tab: ClientMessage) {
