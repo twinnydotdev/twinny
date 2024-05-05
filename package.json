@@ -343,20 +343,27 @@
           "description": "The API port usually `11434`",
           "required": false
         },
-        "twinny.keepAlive": {
+        "twinny.embeddingModel": {
           "order": 15,
+          "type": "string",
+          "default": "codellama:7b",
+          "description": "The embedding model to use",
+          "required": false
+        },
+        "twinny.keepAlive": {
+          "order": 16,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.ollamaUseTls": {
-          "order": 25,
+          "order": 17,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption Ollama API connections."
         },
         "twinny.enableLogging": {
-          "order": 26,
+          "order": 18,
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"
@@ -408,6 +415,7 @@
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
+    "@lancedb/vectordb-linux-x64-gnu": "^0.4.10",
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
@@ -424,6 +432,7 @@
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0",
     "string_score": "^0.1.22",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "vectordb": "^0.4.10"
   }
 }

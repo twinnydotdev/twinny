@@ -196,7 +196,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               onEnd: () => this.onEnd(resolve),
               onError: this.onError,
               onData: (data) => {
-                const completion = this.onData(data)
+                const completion = this.onData(data as StreamResponse)
                 if (completion) {
                   this._abortController?.abort()
                 }

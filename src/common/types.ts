@@ -98,6 +98,7 @@ export interface TemplateData extends Record<string, string | undefined> {
   systemMessage?: string
   code: string
   language: string
+  similarCode: string | undefined
 }
 export interface FimTemplateData extends Record<string, string | undefined> {
   context: string
@@ -146,7 +147,7 @@ export interface StreamRequest {
   onEnd?: () => void
   onStart?: (controller: AbortController) => void
   onError?: (error: Error) => void
-  onData: (streamResponse: StreamResponse | undefined) => void
+  onData: <T = StreamResponse>(streamResponse:  T) => void
 }
 
 export interface UiTabs {
@@ -209,4 +210,16 @@ export interface InferenceProvider {
   modelName?: string
   name: string
   type: (typeof ApiProviders)[keyof typeof ApiProviders]
+}
+
+export type Embedding = {
+  embedding: number[]
+}
+
+export type EmbeddedDocument = {
+  id: string
+  chunk: string
+  vector: number[] | undefined
+  relevant?: boolean
+  isFilePath?: boolean
 }

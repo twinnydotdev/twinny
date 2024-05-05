@@ -23,6 +23,7 @@ const extensionConfig = {
   },
   externals: {
     vscode: 'commonjs vscode',
+    vectordb: 'commonjs2 vectordb',
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js']

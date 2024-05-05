@@ -12,5 +12,5 @@
 		"noUnusedParameters": true,
     "esModuleInterop": true
 	},
-  "exclude": ["node_modules", ".vscode-test"]
+  "exclude": ["node_modules", ".vscode-test", "out", "scripts", "webpack.config.js", "assets"]
 }

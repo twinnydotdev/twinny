@@ -301,7 +301,7 @@ export const getTheme = () => {
 
 export const getChatDataFromProvider = (
   provider: string,
-  data: StreamResponse | undefined
+  data: StreamResponse
 ) => {
   switch (provider) {
     case ApiProviders.Ollama:
