@@ -4,6 +4,7 @@ export const EXTENSION_NAME = '@ext:rjmacarthy.twinny'
 export const ASSISTANT = 'assistant'
 export const USER = 'user'
 export const TWINNY = '🤖 twinny'
+export const SYSTEM = 'system'
 export const YOU = '👤 You'
 export const EMPTY_MESAGE = 'Sorry, I don’t understand. Please try again.'
 export const MODEL_ERROR = 'Sorry, something went wrong...'
@@ -59,55 +60,55 @@ export const EVENT_NAME = {
 }
 
 export const TWINNY_COMMAND_NAME = {
-  enable: 'twinny.enable',
-  disable: 'twinny.disable',
-  explain: 'twinny.explain',
-  addTypes: 'twinny.addTypes',
-  refactor: 'twinny.refactor',
-  generateDocs: 'twinny.generateDocs',
   addTests: 'twinny.addTests',
-  templateCompletion: 'twinny.templateCompletion',
-  stopGeneration: 'twinny.stopGeneration',
-  templates: 'twinny.templates',
-  manageProviders: 'twinny.manageProviders',
+  addTypes: 'twinny.addTypes',
   conversationHistory: 'twinny.conversationHistory',
-  manageTemplates: 'twinny.manageTemplates',
-  hideBackButton: 'twinny.hideBackButton',
-  openChat: 'twinny.openChat',
-  settings: 'twinny.settings',
-  sendTerminalText: 'twinny.sendTerminalText',
+  disable: 'twinny.disable',
+  enable: 'twinny.enable',
+  explain: 'twinny.explain',
+  focusSidebar: 'twinny.sidebar.focus',
+  generateDocs: 'twinny.generateDocs',
   getGitCommitMessage: 'twinny.getGitCommitMessage',
+  hideBackButton: 'twinny.hideBackButton',
+  manageProviders: 'twinny.manageProviders',
+  manageTemplates: 'twinny.manageTemplates',
   newChat: 'twinny.newChat',
-  focusSidebar: 'twinny.sidebar.focus'
+  openChat: 'twinny.openChat',
+  refactor: 'twinny.refactor',
+  sendTerminalText: 'twinny.sendTerminalText',
+  settings: 'twinny.settings',
+  stopGeneration: 'twinny.stopGeneration',
+  templateCompletion: 'twinny.templateCompletion',
+  templates: 'twinny.templates'
 }
 
 export const CONVERSATION_EVENT_NAME = {
-  saveConversation: 'twinny.save-conversation',
-  getConversations: 'twinny.get-conversations',
-  setActiveConversation: 'twinny.set-active-conversation',
   getActiveConversation: 'twinny.get-active-conversation',
+  getConversations: 'twinny.get-conversations',
+  removeConversation: 'twinny.remove-conversation',
+  saveConversation: 'twinny.save-conversation',
   saveLastConversation: 'twinny.save-last-conversation',
-  removeConversation: 'twinny.remove-conversation'
+  setActiveConversation: 'twinny.set-active-conversation'
 }
 
 export const PROVIDER_EVENT_NAME = {
   addProvider: 'twinny.add-provider',
+  copyProvider: 'twinny.copy-provider',
+  focusProviderTab: 'twinny.focus-provider-tab',
   getActiveChatProvider: 'twinny.get-active-provider',
   getActiveFimProvider: 'twinny.get-active-fim-provider',
   getAllProviders: 'twinny.get-providers',
   removeProvider: 'twinny.remove-provider',
+  resetProvidersToDefaults: 'twinny.reset-providers-to-defaults',
   setActiveChatProvider: 'twinny.set-active-chat-provider',
   setActiveFimProvider: 'twinny.set-active-fim-provider',
-  updateProvider: 'twinny.update-provider',
-  focusProviderTab: 'twinny.focus-provider-tab',
-  copyProvider: 'twinny.copy-provider',
-  resetProvidersToDefaults: 'twinny.reset-providers-to-defaults'
+  updateProvider: 'twinny.update-provider'
 }
 
-export const CONVERSATION_STORAGE_KEY = 'twinny.conversations'
-export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
 export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
+export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
 export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
+export const CONVERSATION_STORAGE_KEY = 'twinny.conversations'
 export const INFERENCE_PROVIDERS_STORAGE_KEY = 'twinny.inference-providers'
 
 export const WORKSPACE_STORAGE_KEY = {
@@ -120,35 +121,35 @@ export const WORKSPACE_STORAGE_KEY = {
 }
 
 export const EXTENSION_SETTING_KEY = {
-  fimModelName: 'fimModelName',
-  chatModelName: 'chatModelName',
   apiProvider: 'apiProvider',
-  apiProviderFim: 'apiProviderFim'
+  apiProviderFim: 'apiProviderFim',
+  chatModelName: 'chatModelName',
+  fimModelName: 'fimModelName'
 }
 
 export const EXTENSION_CONTEXT_NAME = {
+  twinnyConversationHistory: 'twinnyConversationHistory',
   twinnyGeneratingText: 'twinnyGeneratingText',
-  twinnyManageTemplates: 'twinnyManageTemplates',
   twinnyManageProviders: 'twinnyManageProviders',
-  twinnyConversationHistory: 'twinnyConversationHistory'
+  twinnyManageTemplates: 'twinnyManageTemplates'
 }
 
 export const WEBUI_TABS = {
   chat: 'chat',
-  templates: 'templates',
+  history: 'history',
   providers: 'providers',
-  history: 'history'
+  templates: 'templates'
 }
 
 export const FIM_TEMPLATE_FORMAT = {
   automatic: 'automatic',
+  codegemma: 'codegemma',
   codellama: 'codellama',
+  custom: 'custom-template',
   deepseek: 'deepseek',
   llama: 'llama',
   stableCode: 'stable-code',
-  starcoder: 'starcoder',
-  codegemma: 'codegemma',
-  custom: 'custom-template'
+  starcoder: 'starcoder'
 }
 
 export const STOP_LLAMA = ['<EOT>']
@@ -286,5 +287,5 @@ export const MULTI_LINE_REACT = [
   'jsx_element',
   'jsx_element',
   'jsx_opening_element',
-  'jsx_self_closing_element',
+  'jsx_self_closing_element'
 ]

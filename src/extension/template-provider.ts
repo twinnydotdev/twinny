@@ -3,7 +3,7 @@ import * as Handlebars from 'handlebars'
 import * as path from 'path'
 import { DefaultTemplate } from '../common/types'
 import { defaultTemplates } from './templates'
-import { DEFAULT_TEMPLATE_NAMES } from '../common/constants'
+import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from '../common/constants'
 
 export class TemplateProvider {
   private _basePath: string
@@ -103,7 +103,7 @@ export class TemplateProvider {
   }
 
   private filterSystemTemplates = (filterName: string) => {
-    return filterName !== 'chat' && filterName.includes('system') === false
+    return filterName !== 'chat' && filterName.includes(SYSTEM) === false
   }
 
   public listTemplates(): string[] {

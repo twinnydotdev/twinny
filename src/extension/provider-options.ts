@@ -9,7 +9,6 @@ import {
 
 export function createStreamRequestBody(
   provider: string,
-  prompt: string,
   options: {
     temperature: number
     numPredictChat: number
@@ -23,7 +22,6 @@ export function createStreamRequestBody(
     case ApiProviders.OpenWebUI:
       return {
         model: options.model,
-        prompt,
         stream: true,
         messages: options.messages,
         keep_alive: options.keepAlive,
@@ -31,13 +29,6 @@ export function createStreamRequestBody(
           temperature: options.temperature,
           num_predict: options.numPredictChat
         }
-      }
-    case ApiProviders.LlamaCpp:
-      return {
-        prompt,
-        stream: true,
-        temperature: options.temperature,
-        n_predict: options.numPredictChat
       }
     case ApiProviders.LiteLLM:
     default:

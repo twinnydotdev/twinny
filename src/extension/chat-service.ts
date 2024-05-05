@@ -11,15 +11,15 @@ import {
   EXTENSION_CONTEXT_NAME,
   EVENT_NAME,
   WEBUI_TABS,
-  USER,
-  ACTIVE_CHAT_PROVIDER_STORAGE_KEY
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  SYSTEM,
+  USER
 } from '../common/constants'
 import {
   StreamResponse,
   StreamBodyBase,
   ServerMessage,
   TemplateData,
-  ChatTemplateData,
   Message,
   StreamRequestOptions
 } from '../common/types'
@@ -73,7 +73,7 @@ export class ChatService {
     return provider
   }
 
-  private buildStreamRequest(prompt: string, messages?: Message[] | Message[]) {
+  private buildStreamRequest(messages?: Message[] | Message[]) {
     const provider = this.getProvider()
 
     if (!provider) return
@@ -90,7 +90,7 @@ export class ChatService {
       }
     }
 
-    const requestBody = createStreamRequestBody(provider.provider, prompt, {
+    const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
       numPredictChat: this._numPredictChat,
       temperature: this._temperature,
@@ -192,61 +192,6 @@ export class ChatService {
     } as ServerMessage)
   }
 
-  private buildMesageRoleContent = async (
-    messages: Message[],
-    language?: CodeLanguageDetails
-  ): Promise<Message[]> => {
-    const editor = window.activeTextEditor
-    const selection = editor?.selection
-    const selectionContext = editor?.document.getText(selection) || ''
-    const systemMessage = {
-      role: 'system',
-      content: await this._templateProvider?.readSystemMessageTemplate(
-        this._promptTemplate
-      )
-    }
-
-    if (messages.length > 0 && (language || selectionContext)) {
-      const lastMessage = messages[messages.length - 1]
-
-      const detailsToAppend = []
-
-      if (language?.langName) {
-        detailsToAppend.push(`Language: ${language.langName}`)
-      }
-
-      if (selectionContext) {
-        detailsToAppend.push(`Selection: ${selectionContext}`)
-      }
-
-      const detailsString = detailsToAppend.length
-        ? `\n\n${detailsToAppend.join(': ')}`
-        : ''
-
-      const updatedLastMessage = {
-        ...lastMessage,
-        content: `${lastMessage.content}${detailsString}`
-      }
-
-      messages[messages.length - 1] = updatedLastMessage
-    }
-
-    return [systemMessage, ...messages]
-  }
-
-  private buildChatPrompt = async (messages: Message[]) => {
-    const editor = window.activeTextEditor
-    const selection = editor?.selection
-    const selectionContext = editor?.document.getText(selection) || ''
-    const prompt =
-      await this._templateProvider?.renderTemplate<ChatTemplateData>('chat', {
-        code: selectionContext || '',
-        messages,
-        role: USER
-      })
-    return prompt || ''
-  }
-
   private buildTemplatePrompt = async (
     template: string,
     language: CodeLanguageDetails,
@@ -307,9 +252,30 @@ export class ChatService {
   public async streamChatCompletion(messages: Message[]) {
     this._completion = ''
     this.sendEditorLanguage()
-    const messageRoleContent = await this.buildMesageRoleContent(messages)
-    const prompt = await this.buildChatPrompt(messages)
-    const request = this.buildStreamRequest(prompt, messageRoleContent)
+    const editor = window.activeTextEditor
+    const selection = editor?.selection
+    const selectionContext = editor?.document.getText(selection)
+
+    const systemMessage = {
+      role: SYSTEM,
+      content: await this._templateProvider?.readSystemMessageTemplate(
+        this._promptTemplate
+      )
+    }
+
+    const conversation = [
+      systemMessage,
+      ...messages,
+    ]
+
+    if (selectionContext) {
+      conversation.push({
+        role: USER,
+        content: `Use this code as a context for the next response: ${selectionContext}`
+      })
+    }
+
+    const request = this.buildStreamRequest(conversation)
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions })
@@ -347,16 +313,20 @@ export class ChatService {
       } as ServerMessage)
     }
 
-    const messageRoleContent = await this.buildMesageRoleContent(
-      [
-        {
-          content: prompt,
-          role: 'user'
-        }
-      ],
-      language
-    )
-    const request = this.buildStreamRequest(prompt, messageRoleContent)
+    const systemMessage = {
+      role: SYSTEM,
+      content: await this._templateProvider?.readSystemMessageTemplate(
+        this._promptTemplate
+      )
+    }
+
+    const request = this.buildStreamRequest([
+      systemMessage,
+      {
+        role: USER,
+        content: prompt
+      }
+    ])
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions, onEnd })
