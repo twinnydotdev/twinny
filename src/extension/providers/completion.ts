@@ -448,7 +448,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           suffix: prefixSuffix.suffix,
           systemMessage,
           context: fileInteractionContext,
-          fileName: this._document.uri.fsPath
+          fileName: this._document.uri.fsPath,
+          language: documentLanguage,
         })
 
       if (fimTemplate) {
