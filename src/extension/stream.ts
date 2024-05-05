@@ -87,7 +87,7 @@ export async function streamResponse(request: StreamRequest) {
   }
 }
 
-export async function streamEmbedding(request: StreamRequest) {
+export async function fetchEmbedding(request: StreamRequest) {
   const { body, options, onData } = request
   const controller = new AbortController()
 
