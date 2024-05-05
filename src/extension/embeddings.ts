@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import Parser from 'web-tree-sitter'
 import * as vscode from 'vscode'
-import { streamEmbedding } from './stream'
+import { fetchEmbedding } from './stream'
 import * as lancedb from 'vectordb'
 import { EmbeddedDocument, StreamOptionsOllama, StreamRequestOptions, Embedding } from '../common/types'
 import { ACTIVE_CHAT_PROVIDER_STORAGE_KEY, EMBEDDING_IGNORE_LIST, WASM_LANGAUAGES } from '../common/constants'
@@ -60,7 +60,7 @@ export class EmbeddingDatabase {
     }
 
     return new Promise<number[]>((resolve) => {
-      streamEmbedding({
+      fetchEmbedding({
         body: requestBody,
         options: requestOptions,
         onData: (response) => {
