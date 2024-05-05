@@ -14,7 +14,8 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   const {
     conversations: savedConversations,
     setActiveConversation,
-    removeConversation
+    removeConversation,
+    clearAllConversations
   } = useConversationHistory()
 
   const handleSetConversation = (conversation: Conversation) => {
@@ -33,11 +34,16 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
     removeConversation(conversation)
   }
 
+  const handleClearAllConversations = () => clearAllConversations()
+
   const conversations = Object.values(savedConversations).reverse()
 
   return (
     <div>
       <h3>Conversation history</h3>
+      <VSCodeButton appearance="primary" onClick={handleClearAllConversations}>
+        Clear conversations
+      </VSCodeButton>
       {conversations.length ? (
         conversations.map((conversation) => (
           <div

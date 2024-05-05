@@ -331,6 +331,12 @@ export const useConversationHistory = () => {
     } as ClientMessage<Conversation>)
   }
 
+  const clearAllConversations = () => {
+    global.vscode.postMessage({
+      type: CONVERSATION_EVENT_NAME.clearAllConversations
+    } as ClientMessage<string>)
+  }
+
   const handler = (event: MessageEvent) => {
     const message = event.data
     if (message.value?.data) {
@@ -357,7 +363,8 @@ export const useConversationHistory = () => {
     getConversations,
     removeConversation,
     saveLastConversation,
-    setActiveConversation
+    clearAllConversations,
+    setActiveConversation,
   }
 }
 

@@ -58,6 +58,8 @@ export class ConversationHistory {
       case CONVERSATION_EVENT_NAME.saveConversation:
         if (!message.data) return
         return this.saveConversation(message.data)
+      case CONVERSATION_EVENT_NAME.clearAllConversations:
+        return this.clearAllConversations()
       default:
       // do nothing
     }
@@ -205,6 +207,11 @@ export class ConversationHistory {
     })
     this.setActiveConversation(undefined)
     this.getAllConversations()
+  }
+
+  clearAllConversations() {
+    this._context.globalState.update(CONVERSATION_STORAGE_KEY, {})
+    this.setActiveConversation(undefined)
   }
 
   async saveConversation(conversation: Conversation) {

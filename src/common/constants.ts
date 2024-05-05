@@ -88,7 +88,8 @@ export const CONVERSATION_EVENT_NAME = {
   removeConversation: 'twinny.remove-conversation',
   saveConversation: 'twinny.save-conversation',
   saveLastConversation: 'twinny.save-last-conversation',
-  setActiveConversation: 'twinny.set-active-conversation'
+  setActiveConversation: 'twinny.set-active-conversation',
+  clearAllConversations: 'twinny.clear-all-conversations'
 }
 
 export const PROVIDER_EVENT_NAME = {
