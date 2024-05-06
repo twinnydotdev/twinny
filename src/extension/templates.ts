@@ -1,5 +1,3 @@
-import { SYSTEM } from '../common/constants';
-
 export const defaultTemplates = [
   {
     name: 'explain',
@@ -60,7 +58,7 @@ Always format responses with Markdown for code blocks with the language prefix e
   `.trim()
   },
   {
-    name: SYSTEM,
+    name: 'system',
     template: `You are a helpful, respectful and honest coding assistant.
 Always reply with using markdown.
 For code refactoring, use markdown with code formatting.
