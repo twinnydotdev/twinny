@@ -380,7 +380,6 @@
   },
   "devDependencies": {
     "@types/async-lock": "^1.4.2",
-    "@types/glob": "^8.1.0",
     "@types/handlebars": "^4.1.0",
     "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
@@ -399,6 +398,7 @@
     "glob": "^10.3.10",
     "mocha": "^10.3.0",
     "ncp": "^2.0.0",
+    "rimraf": "^5.0.5",
     "style-loader": "^3.3.3",
     "tree-sitter-wasms": "^0.1.7",
     "ts-loader": "^9.5.1",
