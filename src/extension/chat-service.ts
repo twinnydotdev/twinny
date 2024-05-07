@@ -32,9 +32,6 @@ import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
 import { EmbeddingDatabase } from './embeddings'
 
-interface SimilarDocuments {
-  [key: string]: string
-}
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
   private _completion = ''
@@ -69,19 +66,19 @@ export class ChatService {
     })
   }
 
-  private async getSimilarCodeChunks(code: string) {
-    if (!this._db) return
+  private async getSimilarChunks(text: string | undefined) {
+    if (!this._db || !text) return
     if (await this._db.hasEmbeddingTable()) {
-      const embedding = await this._db.fetchModelEmbedding(code)
+      const embedding = await this._db.fetchModelEmbedding(text)
       const documents = (await this._db.getDocuments(embedding, 2)) || []
 
       const codeChunks =
         documents
-          ?.map(({ chunk }: { chunk: string }) =>
+          ?.map(({ content }: { content: string }) =>
             `
               Context Code:
               \`\`\`
-              ${chunk}
+              ${content}
               \`\`\`
             `.trim()
           )
@@ -219,7 +216,6 @@ export class ChatService {
     } as ServerMessage)
   }
 
-
   private buildTemplatePrompt = async (
     template: string,
     language: CodeLanguageDetails,
@@ -230,7 +226,7 @@ export class ChatService {
     const selectionContext =
       editor?.document.getText(selection) || context || ''
 
-    const similarCode = await this.getSimilarCodeChunks(selectionContext)
+    const similarCode = await this.getSimilarChunks(selectionContext)
 
     const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
       template,
@@ -295,15 +291,27 @@ export class ChatService {
       )
     }
 
-    const conversation = [
-      systemMessage,
-      ...messages,
-    ]
+    const lastMessage = messages[messages.length - 1]
+
+    const similarCode = await this.getSimilarChunks(lastMessage.content)
+
+    const conversation = [systemMessage, ...messages]
 
     if (selectionContext) {
+      conversation.push(
+        {
+          role: USER,
+          content: `Use this code as a context for the next response: ${selectionContext}`
+        },
+        {
+          role: USER,
+          content: `Use this similar code as a context for the next response if it is relevant: ${similarCode}`
+        }
+      )
+    } else if (similarCode) {
       conversation.push({
         role: USER,
-        content: `Use this code as a context for the next response: ${selectionContext}`
+        content: `Use this similar code as a context for the next response if it is relevant: ${similarCode}`
       })
     }
 

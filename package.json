@@ -346,7 +346,7 @@
         "twinny.embeddingModel": {
           "order": 15,
           "type": "string",
-          "default": "codellama:7b",
+          "default": "mxbai-embed-large",
           "description": "The embedding model to use",
           "required": false
         },
@@ -388,6 +388,7 @@
   "devDependencies": {
     "@types/async-lock": "^1.4.2",
     "@types/handlebars": "^4.1.0",
+    "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
@@ -423,6 +424,7 @@
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
+    "minimatch": "^9.0.4",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

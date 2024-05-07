@@ -218,8 +218,8 @@ export type Embedding = {
 
 export type EmbeddedDocument = {
   id: string
-  chunk: string
+  filePath: string
+  fileName: string
+  content: string
   vector: number[] | undefined
-  relevant?: boolean
-  isFilePath?: boolean
 }

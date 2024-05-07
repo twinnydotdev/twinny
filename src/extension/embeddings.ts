@@ -1,12 +1,24 @@
 import fs from 'fs'
 import path from 'path'
-import Parser from 'web-tree-sitter'
 import * as vscode from 'vscode'
 import { fetchEmbedding } from './stream'
 import * as lancedb from 'vectordb'
-import { EmbeddedDocument, StreamOptionsOllama, StreamRequestOptions, Embedding } from '../common/types'
-import { ACTIVE_CHAT_PROVIDER_STORAGE_KEY, EMBEDDING_IGNORE_LIST, WASM_LANGAUAGES } from '../common/constants'
+import { minimatch } from 'minimatch'
+
+import {
+  EmbeddedDocument,
+  StreamOptionsOllama,
+  StreamRequestOptions,
+  Embedding
+} from '../common/types'
+import {
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  EMBEDDING_IGNORE_LIST
+} from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
+import { getLineBreakCount } from '../webview/utils'
+import { getParser } from './parser-utils'
+import { randomUUID } from 'crypto'
 
 const CONTEXT_TABLE_NAME = 'test-contexts' // TODO: Name of workspace
 
@@ -75,9 +87,27 @@ export class EmbeddingDatabase {
     const dirents = await fs.promises.readdir(dirPath, {
       withFileTypes: true
     })
+    const gitIgnoredFiles = this.readGitIgnoreFile()
+    const submodules = this.readGitSubmodulesFile()
+
     for (const dirent of dirents) {
       const fullPath = path.join(dirPath, dirent.name)
       if (this.getIgnoreDirectory(dirent.name)) continue
+
+      if (submodules?.some((submodule) => fullPath.includes(submodule))) {
+        continue
+      }
+
+      if (
+        gitIgnoredFiles?.some(
+          (pattern) =>
+            minimatch(fullPath, pattern, { dot: true }) &&
+            !pattern.startsWith('!')
+        )
+      ) {
+        continue
+      }
+
       if (dirent.isDirectory()) {
         filePaths = filePaths.concat(await this.getAllFilePaths(fullPath))
       } else if (dirent.isFile()) {
@@ -104,13 +134,16 @@ export class EmbeddingDatabase {
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, 'utf-8')
           const chunks = await this.getDocumentSplitChunks(content, filePath)
+          const fileName = path.basename(filePath)
 
           for (const chunk of chunks) {
             const vector = await this.fetchModelEmbedding(chunk)
             if (this.getIsDuplicateChunk(chunk, chunks)) return
             const fullContext: EmbeddedDocument = {
-              id: filePath,
-              chunk: `${filePath}\n\n${chunk}`,
+              id: randomUUID(),
+              filePath,
+              fileName,
+              content: `${filePath}\n\n${chunk}`,
               vector
             }
             this._fileContentContexts.push(fullContext)
@@ -159,6 +192,7 @@ export class EmbeddingDatabase {
       const table = await this._db?.openTable(tableName)
       const docs: EmbeddedDocument[] | undefined = await table
         ?.search(vector)
+        .where('fileName LIKE \'get-link%\'')
         .limit(limit)
         .execute()
       return docs
@@ -167,69 +201,93 @@ export class EmbeddingDatabase {
     }
   }
 
-  private async getParserForFile(filePath: string): Promise<Parser | null> {
-    await Parser.init()
-    const parser = new Parser()
-    const extension = path.extname(filePath).slice(1)
-
-    if (!WASM_LANGAUAGES[extension]) {
-      return null
-    }
-
-    const wasmPath = path.join(
-      __dirname,
-      'tree-sitter-wasms',
-      `tree-sitter-${WASM_LANGAUAGES[extension]}.wasm`
-    )
-    const Language = await Parser.Language.load(wasmPath)
-    parser.setLanguage(Language)
-    return parser
-  }
-
   private async getDocumentSplitChunks(
     content: string,
     filePath: string
   ): Promise<string[]> {
-    const parser = await this.getParserForFile(filePath)
+    const parser = await getParser(filePath)
 
-    if (!parser) return []
-
-    const tree = parser.parse(content)
-
-    const positionToIndex = (line: number, column: number) => {
-      let index = 0
-      let currentLine = 0
-
-      while (currentLine < line) {
-        index = content.indexOf('\n', index) + 1
-        if (index === 0) break
-        currentLine++
-      }
-
-      return index + column
+    if (!parser) {
+      return []
     }
 
-    const chunks = tree.rootNode.children
-      .map((node) => {
-        const start = positionToIndex(
-          node.startPosition.row,
-          node.startPosition.column
-        )
-        const end = positionToIndex(
-          node.endPosition.row,
-          node.endPosition.column
-        )
-        const chunk = content.substring(start, end).trim()
+    const tree = parser.parse(content)
+    const chunks: string[] = []
+    let chunk = ''
 
-        return chunk
-      })
-      .filter((chunk) => chunk !== '')
+    for (const child of tree.rootNode.children) {
+      if (!child.text) {
+        continue
+      }
+
+      const childLineBreakCount = getLineBreakCount(child.text)
+
+      if (childLineBreakCount > 100) {
+        const lines = child.text.split('\n')
+        const overlap = 20
+        for (let i = 0; i < lines.length; i += 100 - overlap) {
+          const subChunk = lines.slice(i, i + 100).join('\n')
+          chunks.push(subChunk)
+        }
+        continue
+      }
+
+      chunk = (chunk + '\n' + child.text).trimStart()
+      const chunkLineBreakCount = getLineBreakCount(chunk)
+
+      if (chunkLineBreakCount >= 100) {
+        chunks.push(chunk)
+        chunk = ''
+      }
+    }
+
+    if (chunk.trim() !== '') {
+      chunks.push(chunk)
+    }
 
     return chunks
   }
 
   private getIsDuplicateChunk(chunk: string, chunks: string[]): boolean {
     return chunks.includes(chunk.trim().toLowerCase())
+  }
+
+  private readGitIgnoreFile(): string[] | undefined {
+    try {
+      const folders = vscode.workspace.workspaceFolders
+      if (!folders || folders.length === 0) return undefined
+      const rootPath = folders[0].uri.fsPath
+      if (!rootPath) return undefined
+      const gitIgnoreFilePath = path.join(rootPath, '.gitignore')
+      if (!fs.existsSync(gitIgnoreFilePath)) return undefined
+      const ignoreFileContent = fs.readFileSync(gitIgnoreFilePath).toString()
+      return ignoreFileContent.split('\n').filter((line: string) => line !== '')
+    } catch (e) {
+      return undefined
+    }
+  }
+
+  private readGitSubmodulesFile(): string[] | undefined {
+    try {
+      const folders = vscode.workspace.workspaceFolders
+      if (!folders || folders.length === 0) return undefined
+      const rootPath = folders[0].uri.fsPath
+      if (!rootPath) return undefined
+      const gitSubmodulesFilePath = path.join(rootPath, '.gitmodules')
+      if (!fs.existsSync(gitSubmodulesFilePath)) return undefined
+      const submodulesFileContent = fs
+        .readFileSync(gitSubmodulesFilePath)
+        .toString()
+      const submodulePaths: string[] = []
+      submodulesFileContent.split('\n').forEach((line: string) => {
+        if (line.startsWith('\tpath = ')) {
+          submodulePaths.push(line.slice(8))
+        }
+      })
+      return submodulePaths
+    } catch (e) {
+      return undefined
+    }
   }
 
   private getIgnoreDirectory(fileName: string): boolean {
