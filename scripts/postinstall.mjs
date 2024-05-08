@@ -57,20 +57,6 @@ async function downloadAndInstallLanceDB() {
 
   await new Promise((resolve, reject) => {
     ncp(
-      path.join(__dirname, '../node_modules/vectordb'),
-      path.join(__dirname, '../out/node_modules/vectordb'),
-      (error) => {
-        if (error) {
-          reject(error)
-        } else {
-          resolve()
-        }
-      }
-    )
-  })
-
-  await new Promise((resolve, reject) => {
-    ncp(
       path.join(__dirname, `../node_modules/${binaryName}`),
       target,
       (error) => {
