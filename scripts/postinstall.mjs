@@ -8,6 +8,7 @@ import os from 'os'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+const outDir = path.join(__dirname, '../out')
 const targetDir = path.join(__dirname, '../out/tree-sitter-wasms')
 fs.mkdirSync(targetDir, { recursive: true })
 
@@ -34,20 +35,53 @@ fs.copyFileSync(
 )
 
 
-function downloadAndInstallLanceDB() {
+async function downloadAndInstallLanceDB() {
   const platform = os.platform()
   const arch = os.arch()
   let binaryName
 
   if (platform === 'linux' && arch === 'x64') {
-    binaryName = '@lancedb/vectordb-linux-x64-gnu@0.4.10'
+    binaryName = '@lancedb/vectordb-linux-x64-gnu'
   } else if (platform === 'darwin' && arch === 'arm64') {
     binaryName = '@lancedb/vectordb-darwin-arm64'
   }
 
   if (binaryName) {
     execSync(`npm install ${binaryName}`, { stdio: 'inherit' })
+    // shameful hack
+    execSync(`cd ${outDir} && npm i vectordb`)
   }
+
+  const target = path.join(__dirname, `../out/node_modules/${binaryName}`)
+  fs.mkdirSync(target, { recursive: true })
+
+  await new Promise((resolve, reject) => {
+    ncp(
+      path.join(__dirname, '../node_modules/vectordb'),
+      path.join(__dirname, '../out/node_modules/vectordb'),
+      (error) => {
+        if (error) {
+          reject(error)
+        } else {
+          resolve()
+        }
+      }
+    )
+  })
+
+  await new Promise((resolve, reject) => {
+    ncp(
+      path.join(__dirname, `../node_modules/${binaryName}`),
+      target,
+      (error) => {
+        if (error) {
+          reject(error)
+        } else {
+          resolve()
+        }
+      }
+    )
+  })
 }
 
 downloadAndInstallLanceDB()

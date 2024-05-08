@@ -416,7 +416,7 @@
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
-    "@lancedb/vectordb-linux-x64-gnu": "^0.4.10",
+    "@lancedb/vectordb-linux-x64-gnu": "^0.4.18",
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
