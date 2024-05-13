@@ -24,7 +24,9 @@ export function createStreamRequestBody(
         model: options.model,
         stream: true,
         messages: options.messages,
-        keep_alive: options.keepAlive,
+        keep_alive: options.keepAlive === '-1'
+          ? -1
+          : options.keepAlive,
         options: {
           temperature: options.temperature,
           num_predict: options.numPredictChat
@@ -59,7 +61,9 @@ export function createStreamRequestBodyFim(
         model: options.model,
         prompt,
         stream: true,
-        keep_alive: options.keepAlive,
+        keep_alive: options.keepAlive === '-1'
+          ? -1
+          : options.keepAlive,
         options: {
           temperature: options.temperature,
           num_predict: options.numPredictFim
