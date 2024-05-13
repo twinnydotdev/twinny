@@ -141,7 +141,7 @@ export class FileInteractionCache {
   }
 
   put(filePath: string): void {
-    this._currentFile = filePath.replace('.git', '')
+    this._currentFile = filePath.replace('.git', '').replace('.hg', '')
     const fileExtension = this._currentFile.split('.').pop()
     if (this._interactions.get(this._currentFile)) return
     if (this._currentFile.includes('.') && fileExtension) {
