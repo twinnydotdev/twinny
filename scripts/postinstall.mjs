@@ -13,33 +13,6 @@ const outDir = path.join(__dirname, '../out')
 rimrafSync(outDir)
 fs.mkdirSync(outDir, { recursive: true })
 
-async function installTreeSitter() {
-  const targetDir = path.join(__dirname, '../out/tree-sitter-wasms')
-  fs.mkdirSync(targetDir, { recursive: true })
-
-  await new Promise((resolve, reject) => {
-    ncp(
-      path.join(__dirname, '../node_modules/tree-sitter-wasms/out'),
-      targetDir,
-      (error) => {
-        if (error) {
-          reject(error)
-        } else {
-          resolve()
-        }
-      }
-    )
-  })
-
-  const wasmTargetDir = path.join(__dirname, '../out')
-  fs.mkdirSync(wasmTargetDir, { recursive: true })
-
-  fs.copyFileSync(
-    path.join(__dirname, '../node_modules/web-tree-sitter/tree-sitter.wasm'),
-    path.join(__dirname, '../out/tree-sitter.wasm')
-  )
-}
-
 async function installLanceDb() {
   const platform = os.platform()
   const arch = os.arch()
@@ -53,8 +26,7 @@ async function installLanceDb() {
 
   if (binaryName) {
     execSync(`npm install ${binaryName}`, { stdio: 'inherit' })
-    // shameful hack
-    execSync(`cd ${outDir} && npm i vectordb`)
+    execSync(`cd ${outDir} && npm i vectordb`) // shameful hack
   }
 
   const target = path.join(__dirname, `../out/node_modules/${binaryName}`)
@@ -75,8 +47,5 @@ async function installLanceDb() {
   })
 }
 
-(function () {
-  installTreeSitter()
-  installLanceDb()
-})()
+installLanceDb()
 

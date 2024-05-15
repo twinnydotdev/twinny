@@ -31,6 +31,7 @@ import { TemplateProvider } from './extension/template-provider'
 import { ServerMessage } from './common/types'
 import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
+import { Reranker } from './extension/reranker'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
@@ -39,6 +40,7 @@ export async function activate(context: ExtensionContext) {
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
+  new Reranker('mixedbread_ai_mxbai_rerank_base_v1')
 
   const homeDir = os.homedir()
   const dbDir = path.join(homeDir, '.twinny/embeddings')
