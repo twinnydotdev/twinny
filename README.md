@@ -2,8 +2,6 @@
 
 Free and private AI extension for Visual Studio Code.
 
-**Twinny** is your definitive, no-nonsense AI code completion plugin for **Visual Studio Code** and compatible editors like VSCodium. It's designed to integrate seamlessly with various tools and frameworks:
-
 - [Ollama](https://github.com/jmorganca/ollama)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [oobabooga/text-generation-webui](https://github.com/oobabooga/text-generation-webui)
