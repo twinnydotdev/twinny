@@ -41,22 +41,8 @@ export const getFimPromptTemplateLLama = ({
   return `<PRE>${fileContext} \n${heading}${prefix} <SUF> ${suffix} <MID>`
 }
 
-export const getDefaultFimPromptTemplate = ({
-  context,
-  header,
-  fileContextEnabled,
-  prefixSuffix,
-  language
-}: FimPromptTemplate) => {
-  const { prefix, suffix } = prefixSuffix
-  const { fileContext, heading } = getFileContext(
-    fileContextEnabled,
-    context,
-    language,
-    header
-  )
-  return `<PRE> ${fileContext}\n${heading}${prefix} <SUF> ${suffix} <MID>`
-}
+export const getDefaultFimPromptTemplate = (args: FimPromptTemplate) =>
+  getFimPromptTemplateLLama(args)
 
 export const getFimPromptTemplateDeepseek = ({
   context,
@@ -75,7 +61,7 @@ export const getFimPromptTemplateDeepseek = ({
   return `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
 }
 
-export const getFimPromptTemplateStableCode = ({
+export const getFimPromptTemplateOther = ({
   context,
   header,
   fileContextEnabled,
@@ -92,13 +78,6 @@ export const getFimPromptTemplateStableCode = ({
   return `<fim_prefix>${fileContext}\n${heading}${prefix}<fim_suffix>${suffix}<fim_middle>`
 }
 
-export const getFimPromptTemplateCodegemma = ({
-  prefixSuffix
-}: FimPromptTemplate) => {
-  const { prefix, suffix } = prefixSuffix
-  return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
-}
-
 function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
   if (
     fimModel.includes(FIM_TEMPLATE_FORMAT.codellama) ||
@@ -113,13 +92,11 @@ function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
 
   if (
     fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode) ||
-    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder)
+    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder) ||
+    fimModel.includes(FIM_TEMPLATE_FORMAT.codeqwen) ||
+    fimModel.includes(FIM_TEMPLATE_FORMAT.codegemma)
   ) {
-    return getFimPromptTemplateStableCode(args)
-  }
-
-  if (fimModel.includes(FIM_TEMPLATE_FORMAT.codegemma)) {
-    return getFimPromptTemplateCodegemma(args)
+    return getFimPromptTemplateOther(args)
   }
 
   return getDefaultFimPromptTemplate(args)
@@ -136,13 +113,11 @@ function getFimTemplateChosen(format: string, args: FimPromptTemplate) {
 
   if (
     format === FIM_TEMPLATE_FORMAT.stableCode ||
-    format === FIM_TEMPLATE_FORMAT.starcoder
+    format === FIM_TEMPLATE_FORMAT.starcoder ||
+    format === FIM_TEMPLATE_FORMAT.codegemma ||
+    format === FIM_TEMPLATE_FORMAT.codeqwen
   ) {
-    return getFimPromptTemplateStableCode(args)
-  }
-
-  if (format === FIM_TEMPLATE_FORMAT.codegemma) {
-    return getFimPromptTemplateCodegemma(args)
+    return getFimPromptTemplateOther(args)
   }
 
   return getDefaultFimPromptTemplate(args)

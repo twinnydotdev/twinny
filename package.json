@@ -365,18 +365,18 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "webpack",
-    "watch": "webpack --watch",
-    "package": "webpack --mode production --devtool hidden-source-map",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "build": "webpack",
+    "build-tests": "tsc -p . --outDir out",
     "lint": "eslint src --ext ts",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "postinstall": "node scripts/postinstall.mjs",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "test": "node ./out/test/runTest.js",
     "vscode:package": "npm exec vsce package",
+    "vscode:prepublish": "npm run package",
     "vscode:publish": "npm exec vsce publish",
-    "postinstall": "node scripts/postinstall.mjs"
+    "watch-tests": "tsc -p . -w --outDir out",
+    "watch": "webpack --watch"
   },
   "devDependencies": {
     "@types/async-lock": "^1.4.2",

@@ -146,11 +146,12 @@ export const FIM_TEMPLATE_FORMAT = {
   automatic: 'automatic',
   codegemma: 'codegemma',
   codellama: 'codellama',
+  codeqwen: 'codeqwen',
   custom: 'custom-template',
   deepseek: 'deepseek',
   llama: 'llama',
   stableCode: 'stable-code',
-  starcoder: 'starcoder'
+  starcoder: 'starcoder',
 }
 
 export const STOP_LLAMA = ['<EOT>']
