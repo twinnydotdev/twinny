@@ -98,8 +98,8 @@ export interface TemplateData extends Record<string, string | undefined> {
   systemMessage?: string
   code: string
   language: string
-  similarCode: string | undefined
 }
+
 export interface FimTemplateData extends Record<string, string | undefined> {
   context: string
   fileName: string
@@ -217,9 +217,7 @@ export type Embedding = {
 }
 
 export type EmbeddedDocument = {
-  id: string
-  filePath: string
-  fileName: string
   content: string
   vector: number[] | undefined
+  file?: string
 }

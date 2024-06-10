@@ -57,7 +57,7 @@ export const EVENT_NAME = {
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
-  twinnyEmbedDocuments: 'twinny-embed-documents',
+  twinnyEmbedDocuments: 'twinny-embed-documents'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -152,7 +152,7 @@ export const FIM_TEMPLATE_FORMAT = {
   deepseek: 'deepseek',
   llama: 'llama',
   stableCode: 'stable-code',
-  starcoder: 'starcoder',
+  starcoder: 'starcoder'
 }
 
 export const STOP_LLAMA = ['<EOT>']
@@ -361,7 +361,7 @@ export const EMBEDDING_IGNORE_LIST = [
   'vagrantfile',
   'webpack.config.js',
   'yarn.lock',
-  'yml',
+  'yml'
 ]
 
 export const MULTILINE_OUTSIDE = [
@@ -398,3 +398,12 @@ export const MULTI_LINE_REACT = [
   'jsx_opening_element',
   'jsx_self_closing_element'
 ]
+
+export const IGNORE_EMBDDING_NODES = [
+  'lexical_declaration',
+  'import_declaration',
+  'export_declaration',
+]
+
+export const MINIMUM_RERANK_SCORE = 0.05
+export const MINIMUM_FILE_PATH_SCORE = 0.01

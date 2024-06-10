@@ -1,9 +1,7 @@
 import Parser, { SyntaxNode } from 'web-tree-sitter'
 import { WASM_LANGAUAGES } from '../common/constants'
 import path from 'path'
-import { Logger } from '../common/logger'
 import { Position } from 'vscode'
-const logger = new Logger()
 
 let parser: Parser
 let fileExtension = ''
@@ -24,8 +22,6 @@ export const getParser = async (
     await Parser.init()
 
     parser = new Parser()
-
-    logger.log(`Using parser for ${language}`)
 
     if (!language) return undefined
 

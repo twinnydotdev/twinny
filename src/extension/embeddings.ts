@@ -16,20 +16,21 @@ import {
   EMBEDDING_IGNORE_LIST
 } from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
-import { getLineBreakCount } from '../webview/utils'
-import { getParser } from './parser-utils'
-import { randomUUID } from 'crypto'
-
-const CONTEXT_TABLE_NAME = 'test-contexts' // TODO: Name of workspace
+import { getDocumentSplitChunks } from './utils'
+import { IntoVector } from '@lancedb/lancedb/dist/arrow'
 
 export class EmbeddingDatabase {
   private _config = vscode.workspace.getConfiguration('twinny')
   private _bearerToken = this._config.get('apiBearerToken') as string
   private _embeddingModel = this._config.get('embeddingModel') as string
-  private _fileContentContexts: EmbeddedDocument[] = []
+  private _documents: EmbeddedDocument[] = []
+  private _filePaths: EmbeddedDocument[] = []
   private _db: lancedb.Connection | null = null
   private _dbPath: string
   private _extensionContext?: vscode.ExtensionContext
+  private _workspaceName = vscode.workspace.name || ''
+  private _documentTableName = `${this._workspaceName}-documents`
+  private _filePathTableName = `${this._workspaceName}-file-paths`
 
   constructor(dbPath: string, extensionContext: vscode.ExtensionContext) {
     this._dbPath = dbPath
@@ -133,20 +134,22 @@ export class EmbeddingDatabase {
       async (progress) => {
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, 'utf-8')
-          const chunks = await this.getDocumentSplitChunks(content, filePath)
-          const fileName = path.basename(filePath)
+          const chunks = await getDocumentSplitChunks(content, filePath)
+          const filePathEmbedding = await this.fetchModelEmbedding(filePath)
+
+          this._filePaths.push({
+            content: filePath,
+            vector: filePathEmbedding
+          })
 
           for (const chunk of chunks) {
-            const vector = await this.fetchModelEmbedding(chunk)
-            if (this.getIsDuplicateChunk(chunk, chunks)) return
-            const fullContext: EmbeddedDocument = {
-              id: randomUUID(),
-              filePath,
-              fileName,
-              content: `${filePath}\n\n${chunk}`,
-              vector
-            }
-            this._fileContentContexts.push(fullContext)
+            const vector = await this.fetchModelEmbedding(filePath)
+            if (this.getIsDuplicateItem(chunk, chunks)) return
+            this._documents.push({
+              content: chunk,
+              file: filePath,
+              vector: vector
+            })
           }
 
           processedFiles++
@@ -169,87 +172,51 @@ export class EmbeddingDatabase {
   }
 
   public async populateDatabase() {
-    const tableNames = await this._db?.tableNames()
-    if (!tableNames?.includes(CONTEXT_TABLE_NAME)) {
-      await this._db?.createTable(CONTEXT_TABLE_NAME, this._fileContentContexts)
-      return
+    try {
+      const tableNames = await this._db?.tableNames()
+      if (!tableNames?.includes(this._workspaceName)) {
+        await this._db?.createTable(this._documentTableName, this._documents)
+        await this._db?.createTable(this._filePathTableName, this._filePaths)
+        return
+      }
+      this._documents.length = 0
+      this._filePaths.length = 0
+    } catch (e) {
+      console.log('Error populating database', e)
     }
-    const contextTable = await this._db?.openTable(CONTEXT_TABLE_NAME)
-    await contextTable?.add(this._fileContentContexts)
   }
 
-  public async hasEmbeddingTable(): Promise<boolean | undefined> {
+  public async hasEmbeddingTable(name: string): Promise<boolean | undefined> {
     const tableNames = await this._db?.tableNames()
-    return tableNames?.includes(CONTEXT_TABLE_NAME)
+    return tableNames?.includes(name)
   }
 
   public async getDocuments(
-    vector: number[] | undefined,
+    vector: IntoVector,
     limit: number,
-    tableName = CONTEXT_TABLE_NAME
+    tableName: string,
+    where?: string,
   ): Promise<EmbeddedDocument[] | undefined> {
     try {
       const table = await this._db?.openTable(tableName)
-      const docs: EmbeddedDocument[] | undefined = await table
-        ?.search(vector)
-        .where('fileName LIKE \'get-link%\'')
-        .limit(limit)
-        .execute()
-      return docs
+      const query = await table?.search(vector).limit(limit)
+
+      if (where) query?.where(where)
+
+      return query?.execute()
     } catch (e) {
       return undefined
     }
   }
 
-  private async getDocumentSplitChunks(
-    content: string,
-    filePath: string
-  ): Promise<string[]> {
-    const parser = await getParser(filePath)
-
-    if (!parser) {
-      return []
-    }
-
-    const tree = parser.parse(content)
-    const chunks: string[] = []
-    let chunk = ''
-
-    for (const child of tree.rootNode.children) {
-      if (!child.text) {
-        continue
-      }
-
-      const childLineBreakCount = getLineBreakCount(child.text)
-
-      if (childLineBreakCount > 100) {
-        const lines = child.text.split('\n')
-        const overlap = 20
-        for (let i = 0; i < lines.length; i += 100 - overlap) {
-          const subChunk = lines.slice(i, i + 100).join('\n')
-          chunks.push(subChunk)
-        }
-        continue
-      }
-
-      chunk = (chunk + '\n' + child.text).trimStart()
-      const chunkLineBreakCount = getLineBreakCount(chunk)
-
-      if (chunkLineBreakCount >= 100) {
-        chunks.push(chunk)
-        chunk = ''
-      }
-    }
-
-    if (chunk.trim() !== '') {
-      chunks.push(chunk)
-    }
-
-    return chunks
+  public async getDocumentByFilePath (filePath: string) {
+    const content = await fs.promises.readFile(filePath, 'utf-8')
+    const contentSnippet = content?.slice(0, 500)
+    return contentSnippet
   }
 
-  private getIsDuplicateChunk(chunk: string, chunks: string[]): boolean {
-    return chunks.includes(chunk.trim().toLowerCase())
+  private getIsDuplicateItem(item: string, collection: string[]): boolean {
+    return collection.includes(item.trim().toLowerCase())
   }
 
   private readGitIgnoreFile(): string[] | undefined {

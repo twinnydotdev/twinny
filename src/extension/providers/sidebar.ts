@@ -331,6 +331,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       'codicon.css'
     )
 
+
+    const css = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._context.extensionUri, 'out', 'sidebar.css')
+    )
+
     const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)
 
     const nonce = getNonce()
@@ -339,6 +344,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     <html lang="en">
     <head>
         <link href="${codiconCssWebviewUri}" rel="stylesheet">
+        <link href="${css}" rel="stylesheet">
         <meta charset="UTF-8">
 				<meta
           http-equiv="Content-Security-Policy"
@@ -355,7 +361,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     </head>
     <body>
         <div id="root"></div>
-        <script nonce="${nonce}" src="${scriptUri}"></script>
+        <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
     </body>
     </html>`
   }

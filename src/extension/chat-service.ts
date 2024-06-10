@@ -6,6 +6,7 @@ import {
   workspace,
   ExtensionContext
 } from 'vscode'
+import * as path from 'path'
 
 import {
   EXTENSION_CONTEXT_NAME,
@@ -13,7 +14,9 @@ import {
   WEBUI_TABS,
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   SYSTEM,
-  USER
+  USER,
+  MINIMUM_RERANK_SCORE,
+  MINIMUM_FILE_PATH_SCORE
 } from '../common/constants'
 import {
   StreamResponse,
@@ -21,7 +24,8 @@ import {
   ServerMessage,
   TemplateData,
   Message,
-  StreamRequestOptions
+  StreamRequestOptions,
+  EmbeddedDocument
 } from '../common/types'
 import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from '../common/languages'
@@ -31,6 +35,7 @@ import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
 import { EmbeddingDatabase } from './embeddings'
+import { Reranker } from './reranker'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -45,6 +50,8 @@ export class ChatService {
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
   private _db?: EmbeddingDatabase
+  private _reranker: Reranker
+  private _documents: EmbeddedDocument[] = []
 
   constructor(
     statusBar: StatusBarItem,
@@ -56,6 +63,7 @@ export class ChatService {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
+    this._reranker = new Reranker(extensionContext)
     this._extensionContext = extensionContext
     this._db = db
     workspace.onDidChangeConfiguration((event) => {
@@ -66,22 +74,88 @@ export class ChatService {
     })
   }
 
-  private async getSimilarChunks(text: string | undefined) {
-    if (!this._db || !text) return
-    if (await this._db.hasEmbeddingTable()) {
+  private async getRelevantFilePaths(text: string | undefined) {
+    if (!this._db || !text || !workspace.name) return
+    const table = `${workspace.name}-file-paths`
+    if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
-      const documents = (await this._db.getDocuments(embedding, 2)) || []
+
+      if (!embedding) return
+
+      const filePaths =
+        (await this._db.getDocuments(
+          embedding,
+          5,
+          `${workspace.name}-file-paths`
+        )) || []
+
+      if (!filePaths.length) {
+        return
+      }
+
+      return filePaths
+    }
+    return []
+  }
+
+  private async rerankFilePaths(
+    text: string | undefined,
+    filePaths: string[] | undefined
+  ) {
+    if (!this._db || !text || !workspace.name || !filePaths?.length) return []
+
+    const fileNames = filePaths?.map((filePath) => path.basename(filePath))
+
+    const scores = await this._reranker.rerank(text, fileNames)
+
+    if (!scores) return []
+
+    const relevantFilePaths =
+      filePaths
+        ?.map((filePath, index) =>
+          scores[index] > MINIMUM_FILE_PATH_SCORE ? filePath : ''
+        )
+        .filter(Boolean) || []
+
+    return relevantFilePaths
+  }
+
+  private async getRelevantCodeChunks(
+    text: string | undefined,
+    filePaths: string[]
+  ) {
+    if (!this._db || !text || !workspace.name) return
+    const table = `${workspace.name}-documents`
+    if (await this._db.hasEmbeddingTable(table)) {
+      const embedding = await this._db.fetchModelEmbedding(text)
+
+      if (!embedding) return
+
+      this._documents =
+        (await this._db.getDocuments(
+          embedding,
+          3,
+          `${workspace.name}-documents`,
+          filePaths.length ? `file IN ("${filePaths.join('","')}")` : ''
+        )) || []
+
+      const scores = await this._reranker.rerank(
+        text,
+        this._documents.map((item) =>
+          `
+          ${item.file}
+        `.trim()
+        )
+      )
+
+      if (!scores) return ''
 
       const codeChunks =
-        documents
-          ?.map(({ content }: { content: string }) =>
-            `
-              Context Code:
-              \`\`\`
-              ${content}
-              \`\`\`
-            `.trim()
+        this._documents
+          ?.map(({ content }, index) =>
+            scores[index] > MINIMUM_RERANK_SCORE ? content : null
           )
+          .filter(Boolean)
           .join('\n\n')
           .trim() || ''
 
@@ -226,14 +300,11 @@ export class ChatService {
     const selectionContext =
       editor?.document.getText(selection) || context || ''
 
-    const similarCode = await this.getSimilarChunks(selectionContext)
-
     const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
       template,
       {
         code: selectionContext || '',
-        language: language?.langName || 'unknown',
-        similarCode
+        language: language?.langName || 'unknown'
       }
     )
     return { prompt: prompt || '', selection: selectionContext }
@@ -283,6 +354,8 @@ export class ChatService {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext = editor?.document.getText(selection)
+    const lastMessage = messages[messages.length - 1]
+    const text = lastMessage.content
 
     const systemMessage = {
       role: SYSTEM,
@@ -291,27 +364,49 @@ export class ChatService {
       )
     }
 
-    const lastMessage = messages[messages.length - 1]
+    const relevantFiles = await this.getRelevantFilePaths(text)
 
-    const similarCode = await this.getSimilarChunks(lastMessage.content)
+    const rerankedFilePaths = await this.rerankFilePaths(
+      text,
+      relevantFiles?.map((f) => f.content)
+    )
+
+    let relevantCodeChunks = await this.getRelevantCodeChunks(
+      text,
+      rerankedFilePaths
+    )
+
+    if (rerankedFilePaths.length && !relevantCodeChunks) {
+      const promises = []
+      for (const file of rerankedFilePaths) {
+        promises.push(this._db?.getDocumentByFilePath(file))
+      }
+
+      relevantCodeChunks = (await Promise.all(promises)).join('\n')
+    }
 
     const conversation = [systemMessage, ...messages]
 
     if (selectionContext) {
-      conversation.push(
-        {
-          role: USER,
-          content: `Use this code as a context for the next response: ${selectionContext}`
-        },
-        {
-          role: USER,
-          content: `Use this similar code as a context for the next response if it is relevant: ${similarCode}`
-        }
-      )
-    } else if (similarCode) {
       conversation.push({
         role: USER,
-        content: `Use this similar code as a context for the next response if it is relevant: ${similarCode}`
+        content: `This is the code that the user is selecting: ${selectionContext}`
+      })
+    }
+
+    if (relevantFiles?.length) {
+      conversation.push({
+        role: USER,
+        content: `These files are relevant to the user's query: ${relevantFiles
+          ?.map((f) => f.content)
+          .join(', ')}`
+      })
+    }
+
+    if (relevantCodeChunks) {
+      conversation.push({
+        role: USER,
+        content: `These are the relevant code chunks, use them only if you are sure they are relevant to the user's query: ${relevantCodeChunks}`
       })
     }
 
@@ -360,13 +455,25 @@ export class ChatService {
       )
     }
 
-    const request = this.buildStreamRequest([
+    const conversation = [
       systemMessage,
       {
         role: USER,
         content: prompt
       }
-    ])
+    ]
+
+    // const similarCode = await this.getRelevantCodeChunks(prompt)
+
+    // if (similarCode) {
+    //   conversation.push({
+    //     role: USER,
+    //     content: `Use this similar code as a context for the next response if it is relevant: ${similarCode}`
+    //   })
+    // }
+
+    const request = this.buildStreamRequest(conversation)
+
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions, onEnd })
