@@ -15,8 +15,8 @@ import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   SYSTEM,
   USER,
-  MINIMUM_RERANK_SCORE,
-  MINIMUM_FILE_PATH_SCORE
+  RELEVANT_FILE_COUNT,
+  RELEVANT_CODE_COUNT
 } from '../common/constants'
 import {
   StreamResponse,
@@ -44,6 +44,7 @@ export class ChatService {
   private _extensionContext?: ExtensionContext
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
+  private _rerankProbability = this._config.get('rerankProbability') as number
   private _promptTemplate = ''
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
@@ -74,7 +75,7 @@ export class ChatService {
     })
   }
 
-  private async getRelevantFilePaths(text: string | undefined) {
+  private async getRelevantFiles(text: string | undefined) {
     if (!this._db || !text || !workspace.name) return
     const table = `${workspace.name}-file-paths`
     if (await this._db.hasEmbeddingTable(table)) {
@@ -85,7 +86,7 @@ export class ChatService {
       const filePaths =
         (await this._db.getDocuments(
           embedding,
-          5,
+          RELEVANT_FILE_COUNT,
           `${workspace.name}-file-paths`
         )) || []
 
@@ -93,12 +94,15 @@ export class ChatService {
         return
       }
 
-      return filePaths
+      return await this.rerankFiles(
+        text,
+        filePaths?.map((f) => f.content)
+      )
     }
     return []
   }
 
-  private async rerankFilePaths(
+  private async rerankFiles(
     text: string | undefined,
     filePaths: string[] | undefined
   ) {
@@ -113,18 +117,18 @@ export class ChatService {
     const relevantFilePaths =
       filePaths
         ?.map((filePath, index) =>
-          scores[index] > MINIMUM_FILE_PATH_SCORE ? filePath : ''
+          scores[index] > this._rerankProbability ? filePath : ''
         )
         .filter(Boolean) || []
 
     return relevantFilePaths
   }
 
-  private async getRelevantCodeChunks(
+  private async getRelevantCode(
     text: string | undefined,
-    filePaths: string[]
+    filePaths: string[] | undefined
   ) {
-    if (!this._db || !text || !workspace.name) return
+    if (!this._db || !text || !workspace.name || !filePaths?.length) return
     const table = `${workspace.name}-documents`
     if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
@@ -134,7 +138,7 @@ export class ChatService {
       this._documents =
         (await this._db.getDocuments(
           embedding,
-          3,
+          RELEVANT_CODE_COUNT,
           `${workspace.name}-documents`,
           filePaths.length ? `file IN ("${filePaths.join('","')}")` : ''
         )) || []
@@ -153,7 +157,7 @@ export class ChatService {
       const codeChunks =
         this._documents
           ?.map(({ content }, index) =>
-            scores[index] > MINIMUM_RERANK_SCORE ? content : null
+            scores[index] > this._rerankProbability ? content : null
           )
           .filter(Boolean)
           .join('\n\n')
@@ -353,7 +357,7 @@ export class ChatService {
     this.sendEditorLanguage()
     const editor = window.activeTextEditor
     const selection = editor?.selection
-    const selectionContext = editor?.document.getText(selection)
+    const userSelection = editor?.document.getText(selection)
     const lastMessage = messages[messages.length - 1]
     const text = lastMessage.content
 
@@ -364,49 +368,41 @@ export class ChatService {
       )
     }
 
-    const relevantFiles = await this.getRelevantFilePaths(text)
+    const relevantFiles = await this.getRelevantFiles(text)
 
-    const rerankedFilePaths = await this.rerankFilePaths(
-      text,
-      relevantFiles?.map((f) => f.content)
-    )
+    let relevantCode = await this.getRelevantCode(text, relevantFiles)
 
-    let relevantCodeChunks = await this.getRelevantCodeChunks(
-      text,
-      rerankedFilePaths
-    )
-
-    if (rerankedFilePaths.length && !relevantCodeChunks) {
+    if (relevantFiles?.length && !relevantCode) {
       const promises = []
-      for (const file of rerankedFilePaths) {
+      for (const file of relevantFiles) {
         promises.push(this._db?.getDocumentByFilePath(file))
       }
 
-      relevantCodeChunks = (await Promise.all(promises)).join('\n')
+      relevantCode = (await Promise.all(promises)).join('\n')
     }
 
     const conversation = [systemMessage, ...messages]
 
-    if (selectionContext) {
+    if (userSelection) {
       conversation.push({
         role: USER,
-        content: `This is the code that the user is selecting: ${selectionContext}`
+        content: `This is the code that the user is selecting: ${userSelection}`
       })
     }
 
     if (relevantFiles?.length) {
       conversation.push({
         role: USER,
-        content: `These files are relevant to the user's query: ${relevantFiles
-          ?.map((f) => f.content)
-          .join(', ')}`
+        content: `Here are some files which might or might not be relevant, decide for yourself and reply with the correct answer: ${relevantFiles.join(
+          ', '
+        )}`
       })
     }
 
-    if (relevantCodeChunks) {
+    if (relevantCode) {
       conversation.push({
         role: USER,
-        content: `These are the relevant code chunks, use them only if you are sure they are relevant to the user's query: ${relevantCodeChunks}`
+        content: `Here is the code that might be relevant, decide for yourself and reply with the correct answer: ${relevantCode}`
       })
     }
 
@@ -455,6 +451,19 @@ export class ChatService {
       )
     }
 
+    const relevantFiles = await this.getRelevantFiles(selection)
+
+    let relevantCode = await this.getRelevantCode(selection, relevantFiles)
+
+    if (relevantFiles?.length && !relevantCode) {
+      const promises = []
+      for (const file of relevantFiles) {
+        promises.push(this._db?.getDocumentByFilePath(file))
+      }
+
+      relevantCode = (await Promise.all(promises)).join('\n')
+    }
+
     const conversation = [
       systemMessage,
       {
@@ -463,14 +472,21 @@ export class ChatService {
       }
     ]
 
-    // const similarCode = await this.getRelevantCodeChunks(prompt)
+    if (relevantFiles?.length) {
+      conversation.push({
+        role: USER,
+        content: `If these files are not relevant to the user's question, please ignore them: ${relevantFiles.join(
+          ', '
+        )}`
+      })
+    }
 
-    // if (similarCode) {
-    //   conversation.push({
-    //     role: USER,
-    //     content: `Use this similar code as a context for the next response if it is relevant: ${similarCode}`
-    //   })
-    // }
+    if (relevantCode) {
+      conversation.push({
+        role: USER,
+        content: `If this code is not relevant to the user's question, please ignore it: ${relevantCode}`
+      })
+    }
 
     const request = this.buildStreamRequest(conversation)
 

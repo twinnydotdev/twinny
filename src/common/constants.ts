@@ -405,5 +405,5 @@ export const IGNORE_EMBDDING_NODES = [
   'export_declaration',
 ]
 
-export const MINIMUM_RERANK_SCORE = 0.05
-export const MINIMUM_FILE_PATH_SCORE = 0.01
+export const RELEVANT_FILE_COUNT = 5
+export const RELEVANT_CODE_COUNT = 5
