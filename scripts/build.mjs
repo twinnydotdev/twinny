@@ -26,7 +26,7 @@ import cssModulesPlugin from 'esbuild-css-modules-plugin'
             to: './out/ort-wasm-simd.wasm'
           },
           {
-            from: './node_modules/tree-sitter-wasms/out/**/*',
+            from: './node_modules/tree-sitter-wasms/out/**/*.wasm',
             to: './out/tree-sitter-wasms'
           },
           {

@@ -367,6 +367,12 @@
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"
+        },
+        "twinny.rerankProbability": {
+          "order": 19,
+          "type": "number",
+          "default": 0.05,
+          "description": "Minimum rerank probability for embedding context."
         }
       }
     }

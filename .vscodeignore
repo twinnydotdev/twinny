@@ -9,3 +9,8 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+scripts
+.github
+docs
+target
+.vscode-test.json
