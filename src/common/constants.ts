@@ -108,6 +108,7 @@ export const PROVIDER_EVENT_NAME = {
 }
 
 export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
+export const ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY = 'twinny.active-embeddings-provider'
 export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
 export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
 export const CONVERSATION_STORAGE_KEY = 'twinny.conversations'
@@ -256,6 +257,7 @@ export const WASM_LANGAUAGES: { [key: string]: string } = {
   toml: 'toml'
 }
 
+// TODO: We could have an extendable regex for this
 export const EMBEDDING_IGNORE_LIST = [
   '__mocks__',
   '__tests__',
@@ -347,6 +349,8 @@ export const EMBEDDING_IGNORE_LIST = [
   'scripts',
   'storybook-static',
   'svg',
+  'target',
+  'test-results',
   'temp',
   'test',
   'Test',

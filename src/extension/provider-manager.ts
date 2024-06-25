@@ -2,6 +2,7 @@ import { ExtensionContext, WebviewView } from 'vscode'
 import { ApiProviders, ClientMessage, ServerMessage } from '../common/types'
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   FIM_TEMPLATE_FORMAT,
   INFERENCE_PROVIDERS_STORAGE_KEY,
@@ -94,6 +95,20 @@ export class ProviderManager {
     } as TwinnyProvider
   }
 
+  getDefaultEmbeddingsProvider() {
+    return {
+      apiHostname: '0.0.0.0',
+      apiPath: '/v1/embeddings',
+      apiPort: 11434,
+      apiProtocol: 'http',
+      id: uuidv4(),
+      label: 'Ollama Embedding',
+      modelName: 'all-minilm:latest',
+      provider: ApiProviders.Ollama,
+      type: 'embedding'
+    } as TwinnyProvider
+  }
+
   getDefaultFimProvider() {
     return {
       apiHostname: '0.0.0.0',
@@ -125,6 +140,16 @@ export class ProviderManager {
   addDefaultFimProvider(): TwinnyProvider {
     const provider = this.getDefaultFimProvider()
     if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_STORAGE_KEY)) {
+      this.addDefaultProvider(provider)
+    }
+    return provider
+  }
+
+  addDefaultEmbeddingsProvider(): TwinnyProvider {
+    const provider = this.getDefaultEmbeddingsProvider()
+    if (
+      !this._context.globalState.get(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY)
+    ) {
       this.addDefaultProvider(provider)
     }
     return provider
@@ -188,6 +213,19 @@ export class ProviderManager {
     return provider
   }
 
+  getActiveEmbeddingsProvider() {
+    const provider = this._context.globalState.get<TwinnyProvider>(
+      ACTIVE_FIM_PROVIDER_STORAGE_KEY
+    )
+    this._webviewView.webview.postMessage({
+      type: PROVIDER_EVENT_NAME.getActiveFimProvider,
+      value: {
+        data: provider
+      }
+    })
+    return provider
+  }
+
   setActiveChatProvider(provider?: TwinnyProvider) {
     if (!provider) return
     this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, provider)
@@ -198,6 +236,15 @@ export class ProviderManager {
     if (!provider) return
     this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, provider)
     return this.getActiveFimProvider()
+  }
+
+  setActiveEmbeddingsProvider(provider?: TwinnyProvider) {
+    if (!provider) return
+    this._context.globalState.update(
+      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+      provider
+    )
+    return this.getActiveEmbeddingsProvider()
   }
 
   addProvider(provider?: TwinnyProvider) {
@@ -244,12 +291,18 @@ export class ProviderManager {
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
       undefined
     )
+    this._context.globalState.update(
+      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+      undefined
+    )
     this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
     const chatProvider = this.addDefaultChatProvider()
     const fimProvider = this.addDefaultFimProvider()
+    const embeddingsProvider = this.addDefaultEmbeddingsProvider()
     this.focusProviderTab()
     this.setActiveChatProvider(chatProvider)
     this.setActiveFimProvider(fimProvider)
+    this.setActiveEmbeddingsProvider(embeddingsProvider)
     this.getAllProviders()
   }
 }

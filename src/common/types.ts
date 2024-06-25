@@ -2,13 +2,13 @@ import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from './constants'
 
-export interface StreamBodyBase {
+export interface RequestBodyBase {
   stream: boolean
   n_predict?: number
   temperature?: number
 }
 
-export interface StreamOptionsOllama extends StreamBodyBase {
+export interface RequestOptionsOllama extends RequestBodyBase {
   model: string
   keep_alive?: string | number
   messages?: Message[] | Message
@@ -16,7 +16,7 @@ export interface StreamOptionsOllama extends StreamBodyBase {
   options: Record<string, unknown>
 }
 
-export interface StreamBodyOpenAI extends StreamBodyBase {
+export interface StreamBodyOpenAI extends RequestBodyBase {
   messages?: Message[] | Message
   max_tokens: number
 }
@@ -142,7 +142,7 @@ export interface StreamRequestOptions {
 }
 
 export interface StreamRequest {
-  body: StreamBodyBase | StreamBodyOpenAI
+  body: RequestBodyBase | StreamBodyOpenAI
   options: StreamRequestOptions
   onEnd?: () => void
   onStart?: (controller: AbortController) => void

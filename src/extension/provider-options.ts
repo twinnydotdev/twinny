@@ -2,9 +2,9 @@ import { USER } from '../common/constants'
 import {
   Message,
   ApiProviders,
-  StreamBodyBase,
+  RequestBodyBase,
   StreamBodyOpenAI,
-  StreamOptionsOllama
+  RequestOptionsOllama
 } from '../common/types'
 
 export function createStreamRequestBody(
@@ -16,7 +16,7 @@ export function createStreamRequestBody(
     messages?: Message[]
     keepAlive?: string | number
   }
-): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
+): RequestBodyBase | RequestOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case ApiProviders.Ollama:
     case ApiProviders.OpenWebUI:
@@ -53,7 +53,7 @@ export function createStreamRequestBodyFim(
     model: string
     keepAlive?: string | number
   }
-): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
+): RequestBodyBase | RequestOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case ApiProviders.Ollama:
     case ApiProviders.OpenWebUI:

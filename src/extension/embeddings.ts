@@ -7,12 +7,12 @@ import { minimatch } from 'minimatch'
 
 import {
   EmbeddedDocument,
-  StreamOptionsOllama,
-  StreamRequestOptions,
+  RequestOptionsOllama,
+  StreamRequestOptions as RequestOptions,
   Embedding
 } from '../common/types'
 import {
-  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   EMBEDDING_IGNORE_LIST
 } from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
@@ -41,26 +41,24 @@ export class EmbeddingDatabase {
     this._db = await lancedb.connect(this._dbPath)
   }
 
-  private getProvider = () => {
-    const provider = this._extensionContext?.globalState.get<TwinnyProvider>(
-      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
+  private getProvider = () =>
+    this._extensionContext?.globalState.get<TwinnyProvider>(
+      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
     )
-    return provider
-  }
 
   public async fetchModelEmbedding(content: string) {
     const provider = this.getProvider()
 
     if (!provider) return
 
-    const requestBody: StreamOptionsOllama = {
+    const requestBody: RequestOptionsOllama = {
       model: this._embeddingModel,
       prompt: content,
       stream: false,
       options: {}
     }
 
-    const requestOptions: StreamRequestOptions = {
+    const requestOptions: RequestOptions = {
       hostname: provider.apiHostname,
       port: provider.apiPort,
       path: '/api/embeddings',
@@ -195,7 +193,7 @@ export class EmbeddingDatabase {
     vector: IntoVector,
     limit: number,
     tableName: string,
-    where?: string,
+    where?: string
   ): Promise<EmbeddedDocument[] | undefined> {
     try {
       const table = await this._db?.openTable(tableName)
@@ -209,7 +207,7 @@ export class EmbeddingDatabase {
     }
   }
 
-  public async getDocumentByFilePath (filePath: string) {
+  public async getDocumentByFilePath(filePath: string) {
     const content = await fs.promises.readFile(filePath, 'utf-8')
     const contentSnippet = content?.slice(0, 500)
     return contentSnippet

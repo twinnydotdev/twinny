@@ -266,7 +266,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             name="label"
             onChange={handleChange}
             value={formState.label}
-            placeholder='Just for your reference'
+            placeholder="Just for your reference"
           ></VSCodeTextField>
         </div>
 
@@ -279,9 +279,9 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             onChange={handleChangeDropdown}
             value={formState.type}
           >
-            {['chat', 'fim'].map((type, index) => (
+            {['chat', 'fim', 'embedding'].map((type, index) => (
               <VSCodeOption key={index} value={type}>
-                {type === 'chat' ? 'Chat' : 'FIM'}
+                {type}
               </VSCodeOption>
             ))}
           </VSCodeDropdown>

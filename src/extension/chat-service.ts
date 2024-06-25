@@ -20,7 +20,7 @@ import {
 } from '../common/constants'
 import {
   StreamResponse,
-  StreamBodyBase,
+  RequestBodyBase,
   ServerMessage,
   TemplateData,
   Message,
@@ -128,19 +128,23 @@ export class ChatService {
     text: string | undefined,
     filePaths: string[] | undefined
   ) {
-    if (!this._db || !text || !workspace.name || !filePaths?.length) return
+    if (!this._db || !text || !workspace.name) return
     const table = `${workspace.name}-documents`
     if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
 
       if (!embedding) return
 
+      const query = filePaths?.length
+        ? `file IN ("${filePaths.join('","')}")`
+        : ''
+
       this._documents =
         (await this._db.getDocuments(
           embedding,
           RELEVANT_CODE_COUNT,
           `${workspace.name}-documents`,
-          filePaths.length ? `file IN ("${filePaths.join('","')}")` : ''
+          query
         )) || []
 
       const scores = await this._reranker.rerank(
@@ -319,7 +323,7 @@ export class ChatService {
     requestOptions,
     onEnd
   }: {
-    requestBody: StreamBodyBase
+    requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
     onEnd?: (completion: string) => void
   }) {
