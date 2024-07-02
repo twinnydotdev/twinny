@@ -56,6 +56,7 @@
     "name": "rjmacarthy"
   },
   "main": "./out/index.js",
+  "browser": "./out/index.js",
   "contributes": {
     "menus": {
       "editor/context": [
