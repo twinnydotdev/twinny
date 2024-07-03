@@ -27,7 +27,7 @@
     "vscode-extension"
   ],
   "repository": {
-    "url": "https://github.com/rjmacarthy/twinny"
+    "url": "https://github.com/twinnydotdev/twinny"
   },
   "license": "MIT",
   "publisher": "rjmacarthy",
@@ -35,7 +35,7 @@
     "vscode": "^1.84.0"
   },
   "bugs": {
-    "url": "https://github.com/rjmacarthy/twinny/issues"
+    "url": "https://github.com/twinnydotdev/twinny/issues"
   },
   "categories": [
     "Programming Languages",
