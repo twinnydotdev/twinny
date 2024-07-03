@@ -11,7 +11,7 @@ Free and private AI extension for Visual Studio Code.
 
 ## 🚀 Getting Started
 
-Visit the [quick start guide](https://rjmacarthy.github.io/twinny-docs/general/quick-start/) to get started.
+Visit the [quick start guide](https://twinnydotdev.github.io/twinny-docs/general/quick-start/) to get started.
 
 ## Main Features
 
