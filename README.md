@@ -49,7 +49,7 @@ Visit the GitHub [issues page](https://github.com/rjmacarthy/twinny/issues) for 
 
 ## Contributing
 
-Interested in contributing? Reach out on [Twitter](https://x.com/rjmacarthy), describe your changes in an issue, and submit a PR when ready. Twinny is open-source under the MIT license. See the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) for more details.
+Interested in contributing? Reach out on [Twitter](https://x.com/twinnydotdev), describe your changes in an issue, and submit a PR when ready. Twinny is open-source under the MIT license. See the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) for more details.
 
 ## Support Twinny
 
