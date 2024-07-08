@@ -360,7 +360,7 @@ export const Chat = () => {
 
                   handleSubmitForm(target.value)
                 } else if (e.ctrlKey && e.key === 'Enter') {
-                  setInputText(`${target.value}\n`)
+                setInputText(`${target.value}\n`)
                 }
               }}
               onChange={(e) => {

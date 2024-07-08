@@ -1,0 +1,10 @@
+declare module '@lancedb/vectordb-linux-x64-gnu';
+declare module 'hypercore';
+declare module 'hyperswarm';
+declare module 'hyperdrive';
+declare module 'hyperbee';
+declare module 'localdrive';
+declare module 'corestore';
+declare module 'debounceify';
+declare module 'b4a';
+declare module 'pear-stdio';

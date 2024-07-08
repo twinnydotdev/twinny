@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Chat } from './chat'
-import { TemplateSettings } from './template-settings'
+import { Settings } from './settings'
 import { ServerMessage } from '../common/types'
 import { EVENT_NAME, WEBUI_TABS } from '../common/constants'
 import { Providers } from './providers'
@@ -8,7 +8,7 @@ import { ConversationHistory } from './conversation-history'
 
 const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.chat]: <Chat />,
-  [WEBUI_TABS.templates]: <TemplateSettings />,
+  [WEBUI_TABS.settings]: <Settings />,
   [WEBUI_TABS.providers]: <Providers />
 }
 

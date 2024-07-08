@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import Hyperdrive from 'hyperdrive'
 
 import {
   getGitChanges,
@@ -9,7 +10,8 @@ import {
 import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
-  TWINNY_COMMAND_NAME
+  TWINNY_COMMAND_NAME,
+  WEBUI_TABS
 } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -22,6 +24,8 @@ import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
 import { ConversationHistory } from '../conversation-history'
+import { CoreWriter } from '../../core/write'
+import { CoreReader } from '../../core/read'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _context: vscode.ExtensionContext
@@ -32,6 +36,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
+  private _reader?: CoreReader | undefined
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -43,17 +48,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._templateDir = templateDir
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
+
     return this
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView
+    this._reader = new CoreReader(this.view)
 
     this.chatService = new ChatService(
       this._statusBar,
       this._templateDir,
       this._context,
-      this.conversationHistory,
       webviewView
     )
     this.conversationHistory = new ConversationHistory(this._context, this.view)
@@ -110,11 +116,52 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnySetConfigValue]: this.setConfigurationValue,
           [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
           [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
-          [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton
+          [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
+          [EVENT_NAME.twinnyOpenDrive]: this.openDriveKey,
+          [EVENT_NAME.twinnyConnectDrive]: this.connectDrive
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
+  }
+
+  public connectDrive = async (drive: typeof Hyperdrive) => {
+    this._reader?.init(drive.data.driveKey, drive.data.discoveryKey)
+  }
+
+  private focusChatTab = () => {
+    this.view?.webview.postMessage({
+      type: EVENT_NAME.twinnySetTab,
+      value: {
+        data: WEBUI_TABS.chat
+      }
+    } as ServerMessage<string>)
+  }
+
+  public remoteRequest(prompt: string) {
+    this.focusChatTab()
+    this._reader?.read(prompt)
+  }
+
+  public openDriveKey = async () => {
+    const writer = new CoreWriter(this._context)
+    await writer.init()
+    const drive = writer.getDrive()
+    if (!drive) return
+    const key = drive.key.toString('hex')
+    const discoveryKey = drive.discoveryKey.toString('hex')
+    this.view?.webview.postMessage({
+      type: EVENT_NAME.twinnySendDriveKey,
+      value: {
+        data: {
+          key,
+          discoveryKey
+        }
+      }
+    } as ServerMessage<{
+      key: string
+      discoveryKey: string
+    }>)
   }
 
   public setTab(tab: ClientMessage) {
@@ -312,6 +359,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       'codicon.css'
     )
 
+    const css = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._context.extensionUri, 'out', 'sidebar.css')
+    )
+
     const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)
 
     const nonce = getNonce()
@@ -320,6 +371,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     <html lang="en">
     <head>
         <link href="${codiconCssWebviewUri}" rel="stylesheet">
+        <link href="${css}" rel="stylesheet">
         <meta charset="UTF-8">
 				<meta
           http-equiv="Content-Security-Policy"
@@ -336,7 +388,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     </head>
     <body>
         <div id="root"></div>
-        <script nonce="${nonce}" src="${scriptUri}"></script>
+        <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
     </body>
     </html>`
   }

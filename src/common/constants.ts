@@ -31,6 +31,7 @@ export const EVENT_NAME = {
   twinnyChat: 'twinny-chat',
   twinnyChatMessage: 'twinny-chat-message',
   twinnyClickSuggestion: 'twinny-click-suggestion',
+  twinnyEmbedDocuments: 'twinny-embed-documents',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
   twinnyGetConfigValue: 'twinny-get-config-value',
@@ -45,7 +46,10 @@ export const EVENT_NAME = {
   twinnyOnEnd: 'twinny-on-end',
   twinnyOnLoading: 'twinny-on-loading',
   twinnyOpenDiff: 'twinny-open-diff',
+  twinnyOpenDrive: 'twinny-open-drive',
+  twinnyConnectDrive: 'twinny-connect-drive',
   twinnyOpenSettings: 'twinny-open-settings',
+  twinnySendDriveKey: 'twinny-send-drive-key',
   twinnySendLanguage: 'twinny-send-language',
   twinnySendSystemMessage: 'twinny-send-system-message',
   twinnySendTheme: 'twinny-send-theme',
@@ -56,7 +60,7 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context'
+  twinnyWorkspaceContext: 'twinny-workspace-context',
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -66,6 +70,7 @@ export const TWINNY_COMMAND_NAME = {
   disable: 'twinny.disable',
   enable: 'twinny.enable',
   explain: 'twinny.explain',
+  remoteRequest: 'twinny.remoteRequest',
   focusSidebar: 'twinny.sidebar.focus',
   generateDocs: 'twinny.generateDocs',
   getGitCommitMessage: 'twinny.getGitCommitMessage',
@@ -139,7 +144,7 @@ export const WEBUI_TABS = {
   chat: 'chat',
   history: 'history',
   providers: 'providers',
-  templates: 'templates'
+  settings: 'templates'
 }
 
 export const FIM_TEMPLATE_FORMAT = {
@@ -151,7 +156,7 @@ export const FIM_TEMPLATE_FORMAT = {
   deepseek: 'deepseek',
   llama: 'llama',
   stableCode: 'stable-code',
-  starcoder: 'starcoder',
+  starcoder: 'starcoder'
 }
 
 export const STOP_LLAMA = ['<EOT>']
@@ -222,8 +227,6 @@ export const WASM_LANGAUAGES: { [key: string]: string } = {
   cts: 'typescript',
   tsx: 'tsx',
   vue: 'vue',
-  yaml: 'yaml',
-  yml: 'yaml',
   elm: 'elm',
   js: 'javascript',
   jsx: 'javascript',

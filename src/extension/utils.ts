@@ -29,6 +29,7 @@ import {
   CLOSING_BRACKETS,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
+  NORMALIZE_REGEX,
   OPENING_BRACKETS,
   QUOTES,
   QUOTES_REGEX,
@@ -37,6 +38,7 @@ import {
 } from '../common/constants'
 import { Logger } from '../common/logger'
 import { SyntaxNode } from 'web-tree-sitter'
+import { getParser } from './parser-utils'
 
 const logger = new Logger()
 
@@ -301,7 +303,7 @@ export const getTheme = () => {
 
 export const getChatDataFromProvider = (
   provider: string,
-  data: StreamResponse | undefined
+  data: StreamResponse
 ) => {
   switch (provider) {
     case ApiProviders.Ollama:
@@ -373,6 +375,16 @@ export function safeParseJsonResponse(
   }
 }
 
+export function safeParseJsonStringBuffer(
+  stringBuffer: string
+): unknown | undefined {
+  try {
+    return JSON.parse(stringBuffer.replace(NORMALIZE_REGEX, ''))
+  } catch (e) {
+    return undefined
+  }
+}
+
 export const getCurrentWorkspacePath = (): string | undefined => {
   if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
     const workspaceFolder = workspace.workspaceFolders[0]
@@ -419,6 +431,49 @@ export const getSanitizedCommitMessage = (commitMessage: string) => {
     .trim()
 
   return `git commit -m "${sanitizedMessage}"`
+}
+
+export const getNormalisedText = (text: string) =>
+  text.replace(NORMALIZE_REGEX, ' ')
+
+export async function getDocumentSplitChunks(
+  content: string,
+  filePath: string,
+  chunkSize = 500
+): Promise<string[]> {
+  const parser = await getParser(filePath)
+
+  if (!parser) return []
+
+  const tree = parser.parse(content)
+  const chunks: string[] = []
+
+  function getSplitChunks(node: SyntaxNode): void {
+    for (const child of node.children) {
+      if (child.text.length > 100) {
+        getSplitChunks(child)
+        continue
+      }
+      chunks.push(child.text)
+    }
+  }
+
+  getSplitChunks(tree.rootNode)
+
+  const finalChunks = []
+  let buffer = ''
+  for (const chunk of chunks) {
+    if (buffer.length + chunk.length < chunkSize) {
+      buffer += chunk + ' '
+    } else {
+      finalChunks.push(buffer.trim())
+      buffer = chunk + ' '
+    }
+  }
+
+
+
+  return finalChunks
 }
 
 export const logStreamOptions = (opts: StreamRequest) => {

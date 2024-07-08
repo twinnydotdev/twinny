@@ -3,3 +3,9 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+models
+
+
+# Added by cargo
+
+/target

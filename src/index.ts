@@ -59,6 +59,13 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.disable, () => {
       statusBar.hide()
     }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.remoteRequest, () => {
+      const editor = window.activeTextEditor
+      const selection = editor?.selection
+      const prompt = editor?.document.getText(selection)
+      if (!prompt) return
+      sidebarProvider.remoteRequest(prompt)
+    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.explain, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
@@ -144,7 +151,7 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.view?.webview.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
-          data: WEBUI_TABS.templates
+          data: WEBUI_TABS.settings
         }
       } as ServerMessage<string>)
     }),

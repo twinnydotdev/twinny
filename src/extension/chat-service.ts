@@ -13,7 +13,7 @@ import {
   WEBUI_TABS,
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   SYSTEM,
-  USER
+  USER,
 } from '../common/constants'
 import {
   StreamResponse,
@@ -21,7 +21,8 @@ import {
   ServerMessage,
   TemplateData,
   Message,
-  StreamRequestOptions
+  StreamRequestOptions,
+  EmbeddedDocument
 } from '../common/types'
 import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from '../common/languages'
@@ -30,7 +31,7 @@ import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
-import { ConversationHistory } from './conversation-history'
+import { Reranker } from './reranker'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -39,25 +40,26 @@ export class ChatService {
   private _extensionContext?: ExtensionContext
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
+  private _rerankProbability = this._config.get('rerankProbability') as number
   private _promptTemplate = ''
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
-  private _conversationHistory: ConversationHistory | undefined
   private _view?: WebviewView
+  private _reranker: Reranker
+  private _documents: EmbeddedDocument[] = []
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
     extensionContext: ExtensionContext,
-    conversationHistory: ConversationHistory | undefined,
-    view: WebviewView
+    view: WebviewView,
   ) {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
+    this._reranker = new Reranker(extensionContext)
     this._extensionContext = extensionContext
-    this._conversationHistory = conversationHistory
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
@@ -102,7 +104,7 @@ export class ChatService {
   }
 
   private onStreamData = (
-    streamResponse: StreamResponse | undefined,
+    streamResponse: StreamResponse,
     onEnd?: (completion: string) => void
   ) => {
     const provider = this.getProvider()
@@ -201,6 +203,7 @@ export class ChatService {
     const selection = editor?.selection
     const selectionContext =
       editor?.document.getText(selection) || context || ''
+
     const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
       template,
       {
@@ -223,8 +226,8 @@ export class ChatService {
     return streamResponse({
       body: requestBody,
       options: requestOptions,
-      onData: (streamResponse: StreamResponse | undefined) =>
-        this.onStreamData(streamResponse, onEnd),
+      onData: (streamResponse) =>
+        this.onStreamData(streamResponse as StreamResponse, onEnd),
       onEnd: () => this.onStreamEnd(onEnd),
       onStart: this.onStreamStart,
       onError: this.onStreamError
@@ -254,7 +257,7 @@ export class ChatService {
     this.sendEditorLanguage()
     const editor = window.activeTextEditor
     const selection = editor?.selection
-    const selectionContext = editor?.document.getText(selection)
+    const userSelection = editor?.document.getText(selection)
 
     const systemMessage = {
       role: SYSTEM,
@@ -263,15 +266,12 @@ export class ChatService {
       )
     }
 
-    const conversation = [
-      systemMessage,
-      ...messages,
-    ]
+    const conversation = [systemMessage, ...messages]
 
-    if (selectionContext) {
+    if (userSelection) {
       conversation.push({
         role: USER,
-        content: `Use this code as a context for the next response: ${selectionContext}`
+        content: `This is the code that the user is selecting: ${userSelection}`
       })
     }
 
@@ -320,13 +320,16 @@ export class ChatService {
       )
     }
 
-    const request = this.buildStreamRequest([
+    const conversation = [
       systemMessage,
       {
         role: USER,
         content: prompt
       }
-    ])
+    ]
+
+    const request = this.buildStreamRequest(conversation)
+
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions, onEnd })

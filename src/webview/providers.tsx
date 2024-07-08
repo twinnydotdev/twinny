@@ -8,18 +8,24 @@ import {
   VSCodePanelView,
   VSCodeTextField
 } from '@vscode/webview-ui-toolkit/react'
-import { ApiProviders } from '../common/types'
+import { ApiProviders, ClientMessage } from '../common/types'
 
 import styles from './providers.module.css'
 import { TwinnyProvider } from '../extension/provider-manager'
 import {
   DEFAULT_PROVIDER_FORM_VALUES,
+  EVENT_NAME,
   FIM_TEMPLATE_FORMAT
 } from '../common/constants'
 import { ModelSelect } from './model-select'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 export const Providers = () => {
   const [showForm, setShowForm] = React.useState(false)
+  const [showP2PForm, setShowP2PForm] = React.useState(false)
+  const [driveKey, setDriveKey] = React.useState('')
+  const [discoveryKey, setDiscoveryKey] = React.useState('')
   const [provider, setProvider] = React.useState<TwinnyProvider | undefined>()
   const { models } = useOllamaModels()
   const hasOllamaModels = !!models?.length
@@ -34,6 +40,11 @@ export const Providers = () => {
   const handleAdd = () => {
     setProvider(undefined)
     setShowForm(true)
+  }
+
+  const handleAddP2P = () => {
+    setProvider(undefined)
+    setShowP2PForm(true)
   }
 
   const handleEdit = (provider: TwinnyProvider) => {
@@ -66,6 +77,55 @@ export const Providers = () => {
     handleSetModel(provider, value)
   }
 
+  const handleChangeDriveKey = (e: unknown) => {
+    const event = e as unknown as React.ChangeEvent<HTMLInputElement>
+    const { value } = event.target
+    setDriveKey(value)
+  }
+
+  const handleChangeDiscoveryKey = (e: unknown) => {
+    const event = e as unknown as React.ChangeEvent<HTMLInputElement>
+    const { value } = event.target
+    setDiscoveryKey(value)
+  }
+
+  const handleConnectToDrive = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyConnectDrive,
+      data: {
+        driveKey,
+        discoveryKey
+      }
+    } as ClientMessage<any>)
+  }
+
+  if (showP2PForm) {
+    return (
+      <VSCodePanelView>
+        <>
+          <div>
+            <label htmlFor="driveKey">Drive key*</label>
+          </div>
+          <VSCodeTextField
+            required
+            name="driveKey"
+            onChange={handleChangeDriveKey}
+            value={driveKey}
+          ></VSCodeTextField>
+          <VSCodeTextField
+            required
+            name="discoveryKey"
+            onChange={handleChangeDiscoveryKey}
+            value={discoveryKey}
+          ></VSCodeTextField>
+          <VSCodeButton onClick={handleConnectToDrive}>
+            Add P2P Provider
+          </VSCodeButton>
+        </>
+      </VSCodePanelView>
+    )
+  }
+
   return (
     <div>
       <h3>Providers</h3>
@@ -77,6 +137,9 @@ export const Providers = () => {
             <div>
               <div className={styles.providersHeader}>
                 <VSCodeButton onClick={handleAdd}>Add Provider</VSCodeButton>
+                <VSCodeButton onClick={handleAddP2P}>
+                  Add P2P Provider
+                </VSCodeButton>
                 <VSCodeButton appearance="secondary" onClick={handleReset}>
                   <i className="codicon codicon-refresh" />
                   Reset Providers
@@ -266,7 +329,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             name="label"
             onChange={handleChange}
             value={formState.label}
-            placeholder='Just for your reference'
+            placeholder="Just for your reference"
           ></VSCodeTextField>
         </div>
 
