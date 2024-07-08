@@ -112,6 +112,9 @@ export const Providers = () => {
             onChange={handleChangeDriveKey}
             value={driveKey}
           ></VSCodeTextField>
+          <div>
+            <label htmlFor="driveKey">Discovery key*</label>
+          </div>
           <VSCodeTextField
             required
             name="discoveryKey"

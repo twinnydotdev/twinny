@@ -24,8 +24,8 @@ import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
 import { ConversationHistory } from '../conversation-history'
-import { CoreWriter } from '../../core/write'
-import { CoreReader } from '../../core/read'
+import { PeerToPeerWriter as P2PWriter } from '../../p2p/writer'
+import { PeerToPeerReader } from '../../p2p/reader'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _context: vscode.ExtensionContext
@@ -36,7 +36,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
-  private _reader?: CoreReader | undefined
+  private _p2pWriter: P2PWriter
+  private _reader?: PeerToPeerReader | undefined
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -48,13 +49,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._templateDir = templateDir
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
-
+    this._p2pWriter = new P2PWriter(this._context)
     return this
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView
-    this._reader = new CoreReader(this.view)
+    this._reader = new PeerToPeerReader(this.view)
 
     this.chatService = new ChatService(
       this._statusBar,
@@ -117,7 +118,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
           [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
           [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
-          [EVENT_NAME.twinnyOpenDrive]: this.openDriveKey,
+          [EVENT_NAME.twinnyOpenDrive]: this.openP2PWriter,
           [EVENT_NAME.twinnyConnectDrive]: this.connectDrive
         }
         eventHandlers[message.type as string]?.(message)
@@ -143,10 +144,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._reader?.read(prompt)
   }
 
-  public openDriveKey = async () => {
-    const writer = new CoreWriter(this._context)
-    await writer.init()
-    const drive = writer.getDrive()
+  public openP2PWriter = async () => {
+    await this._p2pWriter.init()
+    const drive = this._p2pWriter.getDrive()
     if (!drive) return
     const key = drive.key.toString('hex')
     const discoveryKey = drive.discoveryKey.toString('hex')

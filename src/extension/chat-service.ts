@@ -22,7 +22,6 @@ import {
   TemplateData,
   Message,
   StreamRequestOptions,
-  EmbeddedDocument
 } from '../common/types'
 import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from '../common/languages'
@@ -31,7 +30,6 @@ import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
-import { Reranker } from './reranker'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -40,14 +38,11 @@ export class ChatService {
   private _extensionContext?: ExtensionContext
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
-  private _rerankProbability = this._config.get('rerankProbability') as number
   private _promptTemplate = ''
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
-  private _reranker: Reranker
-  private _documents: EmbeddedDocument[] = []
 
   constructor(
     statusBar: StatusBarItem,
@@ -58,7 +53,6 @@ export class ChatService {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
-    this._reranker = new Reranker(extensionContext)
     this._extensionContext = extensionContext
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {

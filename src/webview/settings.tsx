@@ -60,12 +60,6 @@ export const Settings = () => {
     setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
   }, [selectedTemplatesContext.length])
 
-  const handleEmbedDocuments = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyEmbedDocuments
-    } as ClientMessage<string[]>)
-  }
-
   const handleNewP2PKey = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyOpenDrive
@@ -74,7 +68,7 @@ export const Settings = () => {
 
   return (
     <>
-      <h3>Template settings</h3>
+      <h3>Additional settings</h3>
       <p>Select the templates you want to use in the chat interface.</p>
       {templates &&
         templates.map((templateName: string) => (
@@ -96,14 +90,6 @@ export const Settings = () => {
         onClick={handleResetTemplates}
       >
         Reset to default
-      </VSCodeButton>
-      <h4>Embedding options</h4>
-      <p>Click the button below to embed all documents in this workspace.</p>
-      <VSCodeButton
-        onClick={handleEmbedDocuments}
-        className={styles.embedDocumentsButton}
-      >
-        Embed Documents
       </VSCodeButton>
       <h4>Generate P2P Key</h4>
       <p>Click the button below to generate a P2P Beam.</p>

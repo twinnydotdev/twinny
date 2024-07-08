@@ -12,7 +12,7 @@ import { getLanguage } from '../extension/utils'
 import { EVENT_NAME } from '../common/constants'
 import { ServerMessage } from '../common/types'
 
-export class CoreReader {
+export class PeerToPeerReader {
   store: typeof Corestore
   database: typeof Localdrive
   drive: typeof Hyperdrive

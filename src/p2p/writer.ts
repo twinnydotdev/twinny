@@ -16,7 +16,7 @@ import {
   safeParseJsonStringBuffer
 } from '../extension/utils'
 
-export class CoreWriter {
+export class PeerToPeerWriter {
   store: typeof Corestore
   local: typeof Localdrive
   drive: typeof Hyperdrive
@@ -31,14 +31,30 @@ export class CoreWriter {
   _completion = ''
 
   constructor(context: ExtensionContext) {
+    this._extensionContext = context
+  }
+
+  clean = async () => {
+    if (this.swarm) {
+      await this.swarm.destroy()
+    }
+    if (this.drive) {
+      await this.drive.close()
+    }
+    if (this.store) {
+      await this.store.close()
+    }
+    if (this.local) {
+      await this.local.close()
+    }
+  }
+
+  init = async () => {
+    await this.clean()
     this.store = new Corestore(path.join(__dirname, 'core', 'write'))
     this.local = new Localdrive(this.localPath)
     this.drive = new Hyperdrive(this.store)
     this.swarm = new Hyperswarm()
-    this._extensionContext = context
-  }
-
-  init = async () => {
     await this.drive.ready()
     await this.sync()
     const discovery = this.swarm.join(this.drive.discoveryKey)
@@ -129,13 +145,13 @@ export class CoreWriter {
 
           writeFileSync(filePath, this._completion)
 
-          this.sync()
         } catch (error) {
           console.error('Error parsing JSON:', error)
           return
         }
       },
       onEnd: () => {
+        this.sync()
         this._completion = ''
       }
     })
