@@ -164,7 +164,7 @@ export const STOP_DEEPSEEK = [
   '<｜end▁of▁sentence｜>'
 ]
 
-export const STOP_STARCODER = ['<|endoftext|>']
+export const STOP_STARCODER = ['<|endoftext|>', '<file_sep>']
 
 export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
 
