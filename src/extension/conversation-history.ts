@@ -141,6 +141,9 @@ export class ConversationHistory {
   }
 
   async getConversationTitle(messages: Message[], id: string): Promise<string> {
+    if (this._config.p2pDriveKey && this._config.p2pDiscoveryKey) {
+      return ''
+    }
     const request = this.buildStreamRequest(messages)
     if (!request) return id
     return await this.streamConversationTitle(request)

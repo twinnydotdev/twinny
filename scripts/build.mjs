@@ -22,21 +22,17 @@ import cssModulesPlugin from 'esbuild-css-modules-plugin'
         resolveFrom: 'cwd',
         assets: [
           {
-            from: './node_modules/onnxruntime-web/dist/ort-wasm-simd.wasm',
-            to: './out/ort-wasm-simd.wasm'
-          },
-          {
             from: './node_modules/tree-sitter-wasms/out/**/*.wasm',
             to: './out/tree-sitter-wasms'
-          },
-          {
-            from: './models/**/*',
-            to: './out/models',
           },
           {
             from: './node_modules/web-tree-sitter/tree-sitter.wasm',
             to: './out/tree-sitter.wasm'
           },
+          {
+            from: './node_modules/udx-native',
+            to: './out/node_modules/udx-native'
+          }
         ],
         watch: true,
       }),
@@ -45,7 +41,7 @@ import cssModulesPlugin from 'esbuild-css-modules-plugin'
 
   const webConfig = {
     bundle: true,
-    external: ['vscode', 'esbuild', 'sodium-native', 'b4a', 'fsctl', 'hyperdht', 'hyperswarm'],
+    external: ['vscode'],
     entryPoints: ['src/webview/index.tsx'],
     outfile: 'out/sidebar.js',
     sourcemap: true,

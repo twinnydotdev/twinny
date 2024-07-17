@@ -30,7 +30,10 @@ import { ServerMessage } from './common/types'
 import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
 
+console.log('p2p')
+
 export async function activate(context: ExtensionContext) {
+  console.log('Electron version:', process.versions.electron);
   setContext(context)
   const config = workspace.getConfiguration('twinny')
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
@@ -64,7 +67,6 @@ export async function activate(context: ExtensionContext) {
       const selection = editor?.selection
       const prompt = editor?.document.getText(selection)
       if (!prompt) return
-      sidebarProvider.remoteRequest(prompt)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.explain, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)

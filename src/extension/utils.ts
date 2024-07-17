@@ -385,6 +385,15 @@ export function safeParseJsonStringBuffer(
   }
 }
 
+export function safeParseJson(data: string) {
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return undefined;
+  }
+}
+
+
 export const getCurrentWorkspacePath = (): string | undefined => {
   if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
     const workspaceFolder = workspace.workspaceFolders[0]

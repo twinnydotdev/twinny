@@ -1,21 +1,16 @@
 import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
-import { useDrive, useTemplates, useWorkSpaceContext } from './hooks'
+import { useTemplates, useWorkSpaceContext } from './hooks'
 import {
   DEFAULT_ACTION_TEMPLATES,
-  EVENT_NAME,
   WORKSPACE_STORAGE_KEY
 } from '../common/constants'
 import { useEffect, useState } from 'react'
 import { kebabToSentence } from './utils'
 
 import styles from './index.module.css'
-import { ClientMessage } from '../common/types'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 export const Settings = () => {
   const { templates, saveTemplates } = useTemplates()
-  const { drive } = useDrive()
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const selectedTemplatesContext =
     useWorkSpaceContext<string[]>(WORKSPACE_STORAGE_KEY.selectedTemplates) || []
@@ -60,12 +55,6 @@ export const Settings = () => {
     setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
   }, [selectedTemplatesContext.length])
 
-  const handleNewP2PKey = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyOpenDrive
-    } as ClientMessage<string[]>)
-  }
-
   return (
     <>
       <h3>Additional settings</h3>
@@ -91,23 +80,6 @@ export const Settings = () => {
       >
         Reset to default
       </VSCodeButton>
-      <h4>Generate P2P Key</h4>
-      <p>Click the button below to generate a P2P Beam.</p>
-      <VSCodeButton
-        onClick={handleNewP2PKey}
-        className={styles.embedDocumentsButton}
-      >
-        Generate beam
-      </VSCodeButton>
-      {!!drive && (
-        <>
-          <h4>Your P2P Key</h4>
-          <p>This is your P2P Key. Share it with others to connect.</p>
-          <small>{drive.key}</small>
-          <br />
-          <small>{drive.discoveryKey}</small>
-        </>
-      )}
     </>
   )
 }

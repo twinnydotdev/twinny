@@ -31,6 +31,9 @@ export interface StreamResponse {
   created_at: string
   response: string
   content: string
+  message: {
+    content: string
+  }
   done: boolean
   context: number[]
   total_duration: number
@@ -39,6 +42,7 @@ export interface StreamResponse {
   prompt_eval_duration: number
   eval_count: number
   eval_duration: number
+  type? : string
   choices: [
     {
       text: string
@@ -220,4 +224,14 @@ export type EmbeddedDocument = {
   content: string
   vector: number[] | undefined
   file?: string
+}
+
+export interface Peer {
+  publicKey: Buffer;
+  write: (value: string) => boolean;
+  on: (key: string, cb: (data: Buffer) => void) => void;
+  once: (key: string, cb: (data: Buffer) => void) => void;
+  writable: boolean;
+  key: string;
+  discovery_key: string;
 }

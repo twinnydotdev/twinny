@@ -389,24 +389,6 @@ export const useOllamaModels = () => {
   return { models }
 }
 
-export const useDrive = () => {
-  const [drive, setDrive] = useState<any | undefined>('')
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<string> = event.data
-    if (message?.type === EVENT_NAME.twinnySendDriveKey) {
-      setDrive(message?.value.data)
-    }
-    return () => window.removeEventListener('message', handler)
-  }
-
-  useEffect(() => {
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
-  }, [])
-
-  return { drive }
-}
-
 const useAutosizeTextArea = (
   chatRef: React.RefObject<HTMLTextAreaElement> | null,
   value: string

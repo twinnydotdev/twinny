@@ -7,4 +7,3 @@ declare module 'localdrive';
 declare module 'corestore';
 declare module 'debounceify';
 declare module 'b4a';
-declare module 'pear-stdio';

@@ -47,7 +47,7 @@ export const EVENT_NAME = {
   twinnyOnLoading: 'twinny-on-loading',
   twinnyOpenDiff: 'twinny-open-diff',
   twinnyOpenDrive: 'twinny-open-drive',
-  twinnyConnectDrive: 'twinny-connect-drive',
+  initaliseP2PReader: 'twinny-connect-drive',
   twinnyOpenSettings: 'twinny-open-settings',
   twinnySendDriveKey: 'twinny-send-drive-key',
   twinnySendLanguage: 'twinny-send-language',
@@ -294,3 +294,15 @@ export const MULTI_LINE_REACT = [
   'jsx_opening_element',
   'jsx_self_closing_element'
 ]
+
+export const serverMessageKeys = {
+  inference: 'inference',
+  join: 'join',
+  leave: 'leave',
+  providerDetails: 'providerDetails',
+  reportCompletion: 'reportCompletion',
+  requestProvider: 'requestProvider',
+  sessionValid: 'sessionValid',
+  verifySession: 'verifySession',
+  heartbeat: 'heartbeat',
+};

@@ -1,5 +1,4 @@
 import * as vscode from 'vscode'
-import Hyperdrive from 'hyperdrive'
 
 import {
   getGitChanges,
@@ -11,7 +10,8 @@ import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   TWINNY_COMMAND_NAME,
-  WEBUI_TABS
+  WEBUI_TABS,
+  serverMessageKeys
 } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -24,10 +24,10 @@ import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
 import { ConversationHistory } from '../conversation-history'
-import { PeerToPeerWriter as P2PWriter } from '../../p2p/writer'
-import { PeerToPeerReader } from '../../p2p/reader'
+import { SymmetryService } from '../p2p-service'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
+  private _config = vscode.workspace.getConfiguration('twinny')
   private _context: vscode.ExtensionContext
   private _statusBar: vscode.StatusBarItem
   private _templateDir: string
@@ -36,8 +36,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
-  private _p2pWriter: P2PWriter
-  private _reader?: PeerToPeerReader | undefined
+  private _p2pService?: SymmetryService | undefined
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -49,13 +48,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._templateDir = templateDir
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
-    this._p2pWriter = new P2PWriter(this._context)
+
     return this
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView
-    this._reader = new PeerToPeerReader(this.view)
+
+    if (this._config.p2pDriveKey && this._config.p2pDiscoveryKey) {
+      this._p2pService = new SymmetryService(this.view)
+      this._p2pService.connect(this._config.symmetryServerKey)
+    }
+
 
     this.chatService = new ChatService(
       this._statusBar,
@@ -118,16 +122,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
           [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
           [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
-          [EVENT_NAME.twinnyOpenDrive]: this.openP2PWriter,
-          [EVENT_NAME.twinnyConnectDrive]: this.connectDrive
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
-  }
-
-  public connectDrive = async (drive: typeof Hyperdrive) => {
-    this._reader?.init(drive.data.driveKey, drive.data.discoveryKey)
   }
 
   private focusChatTab = () => {
@@ -137,31 +135,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         data: WEBUI_TABS.chat
       }
     } as ServerMessage<string>)
-  }
-
-  public remoteRequest(prompt: string) {
-    this.focusChatTab()
-    this._reader?.read(prompt)
-  }
-
-  public openP2PWriter = async () => {
-    await this._p2pWriter.init()
-    const drive = this._p2pWriter.getDrive()
-    if (!drive) return
-    const key = drive.key.toString('hex')
-    const discoveryKey = drive.discoveryKey.toString('hex')
-    this.view?.webview.postMessage({
-      type: EVENT_NAME.twinnySendDriveKey,
-      value: {
-        data: {
-          key,
-          discoveryKey
-        }
-      }
-    } as ServerMessage<{
-      key: string
-      discoveryKey: string
-    }>)
   }
 
   public setTab(tab: ClientMessage) {
@@ -249,6 +222,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public streamChatCompletion = (data: ClientMessage<Message[]>) => {
+    if (this._p2pService?.isConnectedToProvider()) {
+      return this._p2pService?.request({
+        key: serverMessageKeys.inference,
+        data: data.data
+      })
+    }
     this.chatService?.streamChatCompletion(data.data || [])
   }
 

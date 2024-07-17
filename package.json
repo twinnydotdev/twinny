@@ -382,6 +382,18 @@
           "type": "number",
           "default": 0.05,
           "description": "Minimum rerank probability for embedding context."
+        },
+        "twinny.symmetryModelName": {
+          "order": 20,
+          "type": "string",
+          "default": "llama3:8b",
+          "description": "The symmetry model name."
+        },
+        "twinny.symmetryServerKey": {
+          "order": 21,
+          "type": "string",
+          "description": "The symmetry server key.",
+          "default": "ebb8642fe5d7931a51e3d5c5e562f39d85c932faa956a2ca389c9da84b90ac7b"
         }
       }
     }
@@ -398,7 +410,8 @@
     "vscode:prepublish": "npm run package",
     "vscode:publish": "npm exec vsce publish",
     "watch-tests": "tsc -p . -w --outDir out",
-    "watch": "node scripts/build.mjs --watch"
+    "watch": "node scripts/build.mjs --watch",
+    "rebuild-native": "npm rebuild udx-native --update-binary --runtime=electron --target=29.4.0 --dist-url=https://electronjs.org/headers"
   },
   "devDependencies": {
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
@@ -465,7 +478,7 @@
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0",
     "string_score": "^0.1.22",
-    "toxe": "^1.1.0",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "vsce": "^2.15.0"
   }
 }

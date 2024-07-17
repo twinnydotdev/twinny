@@ -91,12 +91,15 @@ export const Providers = () => {
 
   const handleConnectToDrive = () => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyConnectDrive,
+      type: EVENT_NAME.initaliseP2PReader,
       data: {
         driveKey,
         discoveryKey
       }
-    } as ClientMessage<any>)
+    } as ClientMessage<{
+      driveKey: string,
+      discoveryKey: string
+    }>)
   }
 
   if (showP2PForm) {
@@ -112,6 +115,7 @@ export const Providers = () => {
             onChange={handleChangeDriveKey}
             value={driveKey}
           ></VSCodeTextField>
+          <br/>
           <div>
             <label htmlFor="driveKey">Discovery key*</label>
           </div>
