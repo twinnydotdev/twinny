@@ -406,11 +406,10 @@
     "pretest": "npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",
     "vscode:package": "npm exec vsce package",
-    "vscode:prepublish": "npm run package && npm run copy-native-modules",
+    "vscode:prepublish": "npm run package",
     "vscode:publish": "npm exec vsce publish",
     "watch-tests": "tsc -p . -w --outDir out",
-    "watch": "node scripts/build.mjs --watch",
-    "copy-native-modules": "node scripts/copy-native-modules.js"
+    "watch": "node scripts/build.mjs --watch"
   },
   "devDependencies": {
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
@@ -462,8 +461,6 @@
     "hypercore": "^10.37.7",
     "hyperdrive": "^11.8.1",
     "hyperswarm": "^4.7.15",
-    "lightningcss": "^1.25.1",
-    "lightningcss-win32-x64-msvc": "^1.25.1",
     "localdrive": "^1.11.4",
     "minimatch": "^9.0.4",
     "node-polyfill-webpack-plugin": "^3.0.0",
