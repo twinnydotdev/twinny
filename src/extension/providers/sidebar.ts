@@ -55,11 +55,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView
 
-    if (this._config.p2pDriveKey && this._config.p2pDiscoveryKey) {
+    if (this._config.symmetryServerKey) {
       this._p2pService = new SymmetryService(this.view)
       this._p2pService.connect(this._config.symmetryServerKey)
     }
-
 
     this.chatService = new ChatService(
       this._statusBar,

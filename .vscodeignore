@@ -14,3 +14,14 @@ scripts
 docs
 target
 .vscode-test.json
+!out/node_modules/**
+
+!node_modules/udx-native/**
+!node_modules/sodium-native/**
+!node_modules/b4a/**
+!node_modules/node-gyp-build/**
+!node_modules/streamx/**
+!node_modules/queue-tick/**
+!node_modules/queue-tick/**
+!node_modules/text-decoder/**
+!node_modules/fast-fifo/**

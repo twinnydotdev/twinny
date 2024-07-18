@@ -9,6 +9,7 @@ import {
 import * as path from 'path'
 import * as os from 'os'
 import * as vscode from 'vscode'
+import './native'; 
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
@@ -29,8 +30,6 @@ import { TemplateProvider } from './extension/template-provider'
 import { ServerMessage } from './common/types'
 import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
-
-console.log('p2p')
 
 export async function activate(context: ExtensionContext) {
   console.log('Electron version:', process.versions.electron);
