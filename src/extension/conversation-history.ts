@@ -18,8 +18,13 @@ import {
   ACTIVE_CONVERSATION_STORAGE_KEY,
   CONVERSATION_EVENT_NAME,
   CONVERSATION_STORAGE_KEY,
+  EXTENSION_SESSION_NAME,
+  symmetryEmitterKeys,
+  symmetryMessages,
   TITLE_GENERATION_PROMPT_MESAGE
 } from '../common/constants'
+import { SessionManager } from './session-manager'
+import { SymmetryService } from './symmetry-service'
 
 type Conversations = Record<string, Conversation> | undefined
 
@@ -30,10 +35,19 @@ export class ConversationHistory {
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _temperature = this._config.get('temperature') as number
   private _title = ''
+  private _sessionManager: SessionManager
+  private _symmetryService: SymmetryService
 
-  constructor(context: ExtensionContext, webviewView: WebviewView) {
+  constructor(
+    context: ExtensionContext,
+    webviewView: WebviewView,
+    sessionManager: SessionManager,
+    symmetryService: SymmetryService
+  ) {
     this._context = context
     this._webviewView = webviewView
+    this._sessionManager = sessionManager
+    this._symmetryService = symmetryService
     this.setUpEventListeners()
   }
 
@@ -41,6 +55,22 @@ export class ConversationHistory {
     this._webviewView.webview.onDidReceiveMessage(
       (message: ClientMessage<Conversation>) => {
         this.handleMessage(message)
+      }
+    )
+
+    this._symmetryService.on(
+      symmetryEmitterKeys.conversationTitle,
+      (completion: string) => {
+        const activeConversation = this.getActiveConversation()
+        this._webviewView?.webview.postMessage({
+          type: CONVERSATION_EVENT_NAME.getActiveConversation,
+          value: {
+            data: {
+              ...activeConversation,
+              title: completion
+            }
+          }
+        } as ServerMessage<Conversation>)
       }
     )
   }
@@ -140,12 +170,9 @@ export class ConversationHistory {
     return { requestOptions, requestBody }
   }
 
-  async getConversationTitle(messages: Message[], id: string): Promise<string> {
-    if (this._config.p2pDriveKey && this._config.p2pDiscoveryKey) {
-      return ''
-    }
+  async getConversationTitle(messages: Message[]): Promise<string> {
     const request = this.buildStreamRequest(messages)
-    if (!request) return id
+    if (!request) return ''
     return await this.streamConversationTitle(request)
   }
 
@@ -225,12 +252,39 @@ export class ConversationHistory {
         ...activeConversation,
         messages: conversation.messages
       })
-    const conversations = this.getConversations() || {}
-    if (!conversation.messages.length) return
+
+    if (!conversation.messages.length || conversation.messages.length > 2)
+      return
+
+    if (
+      this._sessionManager.get(EXTENSION_SESSION_NAME.twinnySymmetryConnected)
+    ) {
+      this._symmetryService?.write({
+        key: symmetryMessages.inference,
+        data: {
+          messages: [
+            ...conversation.messages,
+            {
+              role: 'user',
+              content: TITLE_GENERATION_PROMPT_MESAGE
+            }
+          ],
+          key: symmetryEmitterKeys.conversationTitle
+        }
+      })
+    } else {
+      this._title = await this.getConversationTitle(conversation.messages)
+      this.saveConversationEnd(conversation)
+    }
+  }
+
+  private saveConversationEnd(conversation: Conversation) {
     const id = uuidv4()
+    const conversations = this.getConversations()
+    if (!conversations) return
     const newConversation: Conversation = {
       id,
-      title: await this.getConversationTitle(conversation.messages, id),
+      title: this._title || '',
       messages: conversation.messages
     }
     conversations[id] = newConversation

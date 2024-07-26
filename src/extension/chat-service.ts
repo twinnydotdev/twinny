@@ -14,6 +14,7 @@ import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   SYSTEM,
   USER,
+  symmetryEmitterKeys
 } from '../common/constants'
 import {
   StreamResponse,
@@ -21,7 +22,7 @@ import {
   ServerMessage,
   TemplateData,
   Message,
-  StreamRequestOptions,
+  StreamRequestOptions
 } from '../common/types'
 import { getChatDataFromProvider, getLanguage } from './utils'
 import { CodeLanguageDetails } from '../common/languages'
@@ -30,6 +31,7 @@ import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
+import { SymmetryService } from './symmetry-service'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -43,22 +45,39 @@ export class ChatService {
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
+  private _symmetryService?: SymmetryService
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
     extensionContext: ExtensionContext,
     view: WebviewView,
+    symmetryService: SymmetryService
   ) {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
     this._extensionContext = extensionContext
+    this._symmetryService = symmetryService
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
       }
       this.updateConfig()
+    })
+
+    this.setupSymmetryListeners()
+  }
+
+  private setupSymmetryListeners() {
+    this._symmetryService?.on(symmetryEmitterKeys.inference, (completion: string) => {
+      this._view?.webview.postMessage({
+        type: EVENT_NAME.twinnyOnCompletion,
+        value: {
+          completion: completion.trimStart(),
+          data: getLanguage()
+        }
+      } as ServerMessage)
     })
   }
 

@@ -1,0 +1,38 @@
+.symmetryPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.statusSection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.connected {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+.disconnected {
+  color: #f44336;
+  font-weight: bold;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.buttonContainer {
+  display: flex;
+  justify-content: flex-start;
+}

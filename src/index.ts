@@ -13,6 +13,7 @@ import * as vscode from 'vscode'
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
+import { SessionManager } from './extension/session-manager'
 import {
   delayExecution,
   getTerminal,
@@ -32,13 +33,14 @@ import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
 
 export async function activate(context: ExtensionContext) {
-  console.log('Electron version:', process.versions.electron);
+  console.log('Electron version:', process.versions.electron)
   setContext(context)
   const config = workspace.getConfiguration('twinny')
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
+  const sessionManager = new SessionManager()
 
   const completionProvider = new CompletionProvider(
     statusBar,
@@ -46,7 +48,12 @@ export async function activate(context: ExtensionContext) {
     templateProvider,
     context
   )
-  const sidebarProvider = new SidebarProvider(statusBar, context, templateDir)
+  const sidebarProvider = new SidebarProvider(
+    statusBar,
+    context,
+    templateDir,
+    sessionManager
+  )
 
   templateProvider.init()
 
@@ -130,19 +137,38 @@ export async function activate(context: ExtensionContext) {
         }
       } as ServerMessage<string>)
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.conversationHistory, async () => {
-      commands.executeCommand(
-        'setContext',
-        EXTENSION_CONTEXT_NAME.twinnyConversationHistory,
-        true
-      )
-      sidebarProvider.view?.webview.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        value: {
-          data: WEBUI_TABS.history
-        }
-      } as ServerMessage<string>)
-    }),
+    commands.registerCommand(
+      TWINNY_COMMAND_NAME.twinnySymmetryTab,
+      async () => {
+        commands.executeCommand(
+          'setContext',
+          EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
+          true
+        )
+        sidebarProvider.view?.webview.postMessage({
+          type: EVENT_NAME.twinnySetTab,
+          value: {
+            data: WEBUI_TABS.symmetry
+          }
+        } as ServerMessage<string>)
+      }
+    ),
+    commands.registerCommand(
+      TWINNY_COMMAND_NAME.conversationHistory,
+      async () => {
+        commands.executeCommand(
+          'setContext',
+          EXTENSION_CONTEXT_NAME.twinnyConversationHistory,
+          true
+        )
+        sidebarProvider.view?.webview.postMessage({
+          type: EVENT_NAME.twinnySetTab,
+          value: {
+            data: WEBUI_TABS.history
+          }
+        } as ServerMessage<string>)
+      }
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageTemplates, async () => {
       commands.executeCommand(
         'setContext',
@@ -165,6 +191,11 @@ export async function activate(context: ExtensionContext) {
       commands.executeCommand(
         'setContext',
         EXTENSION_CONTEXT_NAME.twinnyConversationHistory,
+        false
+      )
+      commands.executeCommand(
+        'setContext',
+        EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
         false
       )
       commands.executeCommand(
@@ -200,12 +231,12 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.conversationHistory?.resetConversation()
       delayExecution(() => sidebarProvider.getGitCommitMessage(), 400)
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.newChat, () => {
+    commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
       sidebarProvider.conversationHistory?.resetConversation()
+      sidebarProvider.newConversation()
       sidebarProvider.view?.webview.postMessage({
         type: EVENT_NAME.twinnyStopGeneration
       } as ServerMessage<string>)
-
     }),
 
     window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),

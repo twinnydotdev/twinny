@@ -235,3 +235,13 @@ export interface Peer {
   key: string;
   discovery_key: string;
 }
+
+export interface SymmetryClientMessage<T = unknown> {
+  key: string;
+  data?: T;
+}
+
+export interface InferenceRequest {
+  key: string;
+  messages: Message[];
+}

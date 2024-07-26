@@ -36,8 +36,12 @@ export const EVENT_NAME = {
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
   twinnyGetConfigValue: 'twinny-get-config-value',
   twinnyGetGitChanges: 'twinny-get-git-changes',
+  twinnyConnectSymmetry: 'twinny-connect-symmetry',
+  twinnyDisconnectSymmetry: 'twinny-disconnect-symmetry',
   twinnyGlobalContext: 'twinny-global-context',
   twinnyHideBackButton: 'twinny-hide-back-button',
+  twinnySetSessionContext: 'twinny-set-session-context',
+  twinnySessionContext: 'twinny-session-context',
   twinnyListTemplates: 'twinny-list-templates',
   twinnyManageTemplates: 'twinny-manage-templates',
   twinnyNewDocument: 'twinny-new-document',
@@ -46,10 +50,6 @@ export const EVENT_NAME = {
   twinnyOnEnd: 'twinny-on-end',
   twinnyOnLoading: 'twinny-on-loading',
   twinnyOpenDiff: 'twinny-open-diff',
-  twinnyOpenDrive: 'twinny-open-drive',
-  initaliseP2PReader: 'twinny-connect-drive',
-  twinnyOpenSettings: 'twinny-open-settings',
-  twinnySendDriveKey: 'twinny-send-drive-key',
   twinnySendLanguage: 'twinny-send-language',
   twinnySendSystemMessage: 'twinny-send-system-message',
   twinnySendTheme: 'twinny-send-theme',
@@ -61,12 +61,15 @@ export const EVENT_NAME = {
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
+  twinnyConnectedToSymmetry: 'twinny-connected-to-symmetry',
+  twinnyDisConnectedFromSymmetry : 'twinny-disconnected-from-symmetry',
 }
 
 export const TWINNY_COMMAND_NAME = {
   addTests: 'twinny.addTests',
   addTypes: 'twinny.addTypes',
   conversationHistory: 'twinny.conversationHistory',
+  twinnySymmetryTab: 'twinny.symmetry',
   disable: 'twinny.disable',
   enable: 'twinny.enable',
   explain: 'twinny.explain',
@@ -77,7 +80,7 @@ export const TWINNY_COMMAND_NAME = {
   hideBackButton: 'twinny.hideBackButton',
   manageProviders: 'twinny.manageProviders',
   manageTemplates: 'twinny.manageTemplates',
-  newChat: 'twinny.newChat',
+  newConversation: 'twinny.newConversation',
   openChat: 'twinny.openChat',
   refactor: 'twinny.refactor',
   sendTerminalText: 'twinny.sendTerminalText',
@@ -135,16 +138,22 @@ export const EXTENSION_SETTING_KEY = {
 
 export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: 'twinnyConversationHistory',
+  twinnySymmetryTab: 'twinnySymmetryTab',
   twinnyGeneratingText: 'twinnyGeneratingText',
   twinnyManageProviders: 'twinnyManageProviders',
-  twinnyManageTemplates: 'twinnyManageTemplates'
+  twinnyManageTemplates: 'twinnyManageTemplates',
+}
+
+export const EXTENSION_SESSION_NAME = {
+  twinnySymmetryConnected: 'twinnySymmetryConnected'
 }
 
 export const WEBUI_TABS = {
   chat: 'chat',
   history: 'history',
   providers: 'providers',
-  settings: 'templates'
+  settings: 'templates',
+  symmetry: 'symmetry'
 }
 
 export const FIM_TEMPLATE_FORMAT = {
@@ -295,14 +304,21 @@ export const MULTI_LINE_REACT = [
   'jsx_self_closing_element'
 ]
 
-export const serverMessageKeys = {
+export const symmetryMessages = {
+  heartbeat: 'heartbeat',
   inference: 'inference',
+  inferenceEnd: 'inferenceEnd',
   join: 'join',
   leave: 'leave',
+  newConversation: 'newConversation',
   providerDetails: 'providerDetails',
   reportCompletion: 'reportCompletion',
   requestProvider: 'requestProvider',
   sessionValid: 'sessionValid',
   verifySession: 'verifySession',
-  heartbeat: 'heartbeat',
 };
+
+export const symmetryEmitterKeys = {
+  inference: 'inference',
+  conversationTitle: 'conversationTitle',
+}

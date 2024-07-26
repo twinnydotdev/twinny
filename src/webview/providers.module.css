@@ -82,3 +82,21 @@
 .providerHeader svg {
   width: 20px;
 }
+
+.symmetryPanel p {
+  margin: 10px 0;
+}
+
+.buttonContainer {
+  margin-top: 10px;
+}
+
+.checkBox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.divider {
+  margin: 10px 0;
+}

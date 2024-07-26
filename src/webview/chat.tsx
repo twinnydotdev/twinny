@@ -11,7 +11,8 @@ import {
   ASSISTANT,
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
-  USER
+  USER,
+  symmetryEmitterKeys
 } from '../common/constants'
 
 import useAutosizeTextArea, {
@@ -83,6 +84,11 @@ export const Chat = () => {
             content: getCompletionContent(message)
           }
         ]
+
+        if (message.value.type === symmetryEmitterKeys.conversationTitle) {
+          return messages
+        }
+
         saveLastConversation({
           ...conversation,
           messages: messages
