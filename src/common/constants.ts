@@ -316,7 +316,7 @@ export const symmetryMessages = {
   requestProvider: 'requestProvider',
   sessionValid: 'sessionValid',
   verifySession: 'verifySession',
-};
+} as const
 
 export const symmetryEmitterKeys = {
   inference: 'inference',

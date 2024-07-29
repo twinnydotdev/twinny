@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 
 import {
+  createSymmetryMessage,
   getGitChanges,
   getLanguage,
   getTextSelection,
@@ -19,7 +20,8 @@ import {
   ClientMessage,
   Message,
   ApiModel,
-  ServerMessage
+  ServerMessage,
+  InferenceRequest
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
@@ -77,7 +79,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this._context,
       this.view,
       this._sessionManager,
-      this._symmetryService,
+      this._symmetryService
     )
     new ProviderManager(this._context, this.view)
 
@@ -243,13 +245,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       EXTENSION_SESSION_NAME.twinnySymmetryConnected
     )
     if (twinnySymmetryConnected) {
-      return this._symmetryService?.write({
-        key: symmetryEmitterKeys.inference,
-        data: {
+      return this._symmetryService?.write(
+        createSymmetryMessage<InferenceRequest>(symmetryMessages.inference, {
           messages: data.data || [],
           key: symmetryEmitterKeys.inference
-        }
-      })
+        })
+      )
     }
     this.chatService?.streamChatCompletion(data.data || [])
   }
@@ -348,9 +349,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public newConversation() {
-    this._symmetryService?.write({
-      key: symmetryMessages.newConversation
-    })
+    this._symmetryService?.write(
+      createSymmetryMessage(
+        symmetryMessages.newConversation
+      )
+    )
   }
 
   public destroyStream = () => {

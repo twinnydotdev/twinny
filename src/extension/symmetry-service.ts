@@ -4,14 +4,18 @@ import Hyperswarm from 'hyperswarm'
 import crypto from 'hypercore-crypto'
 
 import b4a from 'b4a'
-import { safeParseJson, safeParseJsonResponse } from './utils'
+import {
+  createSymmetryMessage,
+  safeParseJson,
+  safeParseJsonResponse
+} from './utils'
 import { getChatDataFromProvider } from './utils'
 import {
   StreamResponse,
   ServerMessage,
   Peer,
-  SymmetryClientMessage as SymmetryMessage,
-  InferenceRequest
+  SymmetryMessage,
+  SymmetryConnection
 } from '../common/types'
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -31,7 +35,6 @@ export class SymmetryService extends EventEmitter {
   private _completion = ''
   private _providerSwarm: undefined | typeof Hyperswarm
   private _serverSwarm: undefined | typeof Hyperswarm
-  private _discoveryKey: undefined | string
   private _sessionManager: SessionManager
   private _providerPeer: undefined | Peer
   private _context: ExtensionContext
@@ -61,30 +64,26 @@ export class SymmetryService extends EventEmitter {
     this._serverSwarm.flush()
     this._serverSwarm.on('connection', (peer: Peer) => {
       peer.write(
-        JSON.stringify({
-          key: symmetryMessages.requestProvider,
-          data: {
-            modelName: this._config.symmetryModelName
-          }
+        createSymmetryMessage(symmetryMessages.requestProvider, {
+          modelName: this._config.symmetryModelName
         })
       )
       peer.on('data', (message: Buffer) => {
-        const data = safeParseJson(message.toString())
+        const data = safeParseJson<SymmetryMessage<SymmetryConnection>>(
+          message.toString()
+        )
         if (data && data.key) {
           switch (data?.key) {
             case symmetryMessages.providerDetails:
               peer.write(
-                JSON.stringify({
-                  key: symmetryMessages.verifySession,
-                  data: {
-                    sessionToken: data?.data?.sessionToken
-                  }
-                })
+                createSymmetryMessage(
+                  symmetryMessages.verifySession,
+                  data.data?.sessionToken
+                )
               )
               break
             case symmetryMessages.sessionValid:
-              this._discoveryKey = data?.data?.discoveryKey
-              this.connectToProvider()
+              this.connectToProvider(data.data)
           }
         }
       })
@@ -105,13 +104,13 @@ export class SymmetryService extends EventEmitter {
     }
 
     this.view?.webview.postMessage({
-      type: EVENT_NAME.twinnyDisConnectedFromSymmetry,
+      type: EVENT_NAME.twinnyDisConnectedFromSymmetry
     } as ServerMessage)
   }
 
-  public connectToProvider = async () => {
+  public connectToProvider = async (message: SymmetryConnection) => {
     this._providerSwarm = new Hyperswarm()
-    this._providerSwarm.join(b4a.from(this._discoveryKey, 'hex'), {
+    this._providerSwarm.join(b4a.from(message.discoveryKey, 'hex'), {
       client: true,
       server: false
     })
@@ -120,7 +119,10 @@ export class SymmetryService extends EventEmitter {
       this._providerPeer = peer
       this.providerListeners(peer)
       this.view?.webview.postMessage({
-        type: EVENT_NAME.twinnyConnectedToSymmetry
+        type: EVENT_NAME.twinnyConnectedToSymmetry,
+        data: {
+          modelName: message.modelName
+        }
       })
       this._sessionManager?.set(
         EXTENSION_SESSION_NAME.twinnySymmetryConnected,
@@ -196,7 +198,7 @@ export class SymmetryService extends EventEmitter {
     }
   }
 
-  public write(message: SymmetryMessage<InferenceRequest>) {
-    this._providerPeer?.write(JSON.stringify(message))
+  public write(message: string) {
+    this._providerPeer?.write(message)
   }
 }

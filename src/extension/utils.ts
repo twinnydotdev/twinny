@@ -21,7 +21,8 @@ import {
   StreamResponse,
   StreamRequest,
   PrefixSuffix,
-  Bracket
+  Bracket,
+  ServerMessageKey
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
@@ -385,7 +386,7 @@ export function safeParseJsonStringBuffer(
   }
 }
 
-export function safeParseJson(data: string) {
+export function safeParseJson<T>(data: string): T | undefined  {
   try {
     return JSON.parse(data);
   } catch (e) {
@@ -431,6 +432,10 @@ export const getTerminalExists = (): boolean => {
     return false
   }
   return true
+}
+
+export function createSymmetryMessage<T>(key: ServerMessageKey, data?: T): string {
+  return JSON.stringify({ key, data });
 }
 
 export const getSanitizedCommitMessage = (commitMessage: string) => {
@@ -479,8 +484,6 @@ export async function getDocumentSplitChunks(
       buffer = chunk + ' '
     }
   }
-
-
 
   return finalChunks
 }

@@ -12,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { createStreamRequestBody } from './provider-options'
 import { TwinnyProvider } from './provider-manager'
 import { streamResponse } from './stream'
-import { getChatDataFromProvider } from './utils'
+import { createSymmetryMessage, getChatDataFromProvider } from './utils'
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_CONVERSATION_STORAGE_KEY,
@@ -259,9 +259,8 @@ export class ConversationHistory {
     if (
       this._sessionManager.get(EXTENSION_SESSION_NAME.twinnySymmetryConnected)
     ) {
-      this._symmetryService?.write({
-        key: symmetryMessages.inference,
-        data: {
+      this._symmetryService?.write(
+        createSymmetryMessage(symmetryMessages.inference, {
           messages: [
             ...conversation.messages,
             {
@@ -270,8 +269,8 @@ export class ConversationHistory {
             }
           ],
           key: symmetryEmitterKeys.conversationTitle
-        }
-      })
+        })
+      )
     } else {
       this._title = await this.getConversationTitle(conversation.messages)
       this.saveConversationEnd(conversation)

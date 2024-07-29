@@ -1,6 +1,6 @@
 import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
-import { ALL_BRACKETS } from './constants'
+import { ALL_BRACKETS, symmetryMessages } from './constants'
 
 export interface StreamBodyBase {
   stream: boolean
@@ -236,11 +236,18 @@ export interface Peer {
   discovery_key: string;
 }
 
-export interface SymmetryClientMessage<T = unknown> {
+export interface SymmetryMessage<T> {
   key: string;
-  data?: T;
+  data: T;
 }
 
+export type ServerMessageKey = keyof typeof symmetryMessages;
+
+export interface SymmetryConnection {
+  sessionToken?: string
+  discoveryKey?: string
+  modelName?: string
+}
 export interface InferenceRequest {
   key: string;
   messages: Message[];
