@@ -22,8 +22,8 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_SESSION_NAME,
-  symmetryEmitterKeys,
-  symmetryMessages
+  SYMMETRY_EMITTER_KEY,
+  SYMMETRY_DATA_MESSAGE
 } from '../common/constants'
 import { SessionManager } from './session-manager'
 import { TwinnyProvider } from './provider-manager'
@@ -64,7 +64,7 @@ export class SymmetryService extends EventEmitter {
     this._serverSwarm.flush()
     this._serverSwarm.on('connection', (peer: Peer) => {
       peer.write(
-        createSymmetryMessage(symmetryMessages.requestProvider, {
+        createSymmetryMessage(SYMMETRY_DATA_MESSAGE.requestProvider, {
           modelName: this._config.symmetryModelName
         })
       )
@@ -74,15 +74,15 @@ export class SymmetryService extends EventEmitter {
         )
         if (data && data.key) {
           switch (data?.key) {
-            case symmetryMessages.providerDetails:
+            case SYMMETRY_DATA_MESSAGE.providerDetails:
               peer.write(
                 createSymmetryMessage(
-                  symmetryMessages.verifySession,
+                  SYMMETRY_DATA_MESSAGE.verifySession,
                   data.data?.sessionToken
                 )
               )
               break
-            case symmetryMessages.sessionValid:
+            case SYMMETRY_DATA_MESSAGE.sessionValid:
               this.connectToProvider(data.data)
           }
         }
@@ -97,6 +97,7 @@ export class SymmetryService extends EventEmitter {
     )
     if (this._providerSwarm) {
       await this._providerSwarm.leave(this._providerTopic)
+      await this._providerSwarm.destroy()
     }
 
     if (this._serverSwarm) {
@@ -149,7 +150,8 @@ export class SymmetryService extends EventEmitter {
 
       if (!this._emitterKey) return
 
-      if (str.includes(symmetryMessages.inferenceEnd)) this.handleInferenceEnd()
+      if (str.includes(SYMMETRY_DATA_MESSAGE.inferenceEnd))
+        this.handleInferenceEnd()
 
       this.handleIncomingData(chunk, (response: StreamResponse) => {
         const data = getChatDataFromProvider(provider.provider, response)
@@ -168,7 +170,7 @@ export class SymmetryService extends EventEmitter {
     )
     if (!this._completion) return
 
-    if (this._emitterKey === symmetryEmitterKeys.inference) {
+    if (this._emitterKey === SYMMETRY_EMITTER_KEY.inference) {
       this.view?.webview.postMessage({
         type: EVENT_NAME.twinnyOnEnd,
         value: {

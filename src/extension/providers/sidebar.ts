@@ -12,8 +12,8 @@ import {
   EXTENSION_SESSION_NAME,
   EVENT_NAME,
   TWINNY_COMMAND_NAME,
-  symmetryMessages,
-  symmetryEmitterKeys
+  SYMMETRY_DATA_MESSAGE,
+  SYMMETRY_EMITTER_KEY
 } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -40,7 +40,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
-  private _symmetryService?: SymmetryService | undefined
+  public symmetryService?: SymmetryService | undefined
   private _sessionManager: SessionManager
 
   constructor(
@@ -55,14 +55,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._sessionManager = sessionManager
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
-
     return this
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView
 
-    this._symmetryService = new SymmetryService(
+    this.symmetryService = new SymmetryService(
       this.view,
       this._sessionManager,
       this._context
@@ -73,14 +72,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this._templateDir,
       this._context,
       webviewView,
-      this._symmetryService
+      this.symmetryService
     )
     this.conversationHistory = new ConversationHistory(
       this._context,
       this.view,
       this._sessionManager,
-      this._symmetryService
+      this.symmetryService
     )
+
     new ProviderManager(this._context, this.view)
 
     webviewView.webview.options = {
@@ -142,18 +142,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         eventHandlers[message.type as string]?.(message)
       }
     )
-  }
-
-  private connectToSymmetry = () => {
-    if (this._config.symmetryServerKey) {
-      this._symmetryService?.connect(this._config.symmetryServerKey)
-    }
-  }
-
-  private disconnectSymmetry = async () => {
-    if (this._config.symmetryServerKey) {
-      await this._symmetryService?.disconnect()
-    }
   }
 
   public setTab(tab: ClientMessage) {
@@ -241,18 +229,35 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public streamChatCompletion = (data: ClientMessage<Message[]>) => {
-    const twinnySymmetryConnected = this._sessionManager?.get(
+    const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnected
     )
-    if (twinnySymmetryConnected) {
-      return this._symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(symmetryMessages.inference, {
+    if (symmetryConnected) {
+      return this.symmetryService?.write(
+        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
           messages: data.data || [],
-          key: symmetryEmitterKeys.inference
+          key: SYMMETRY_EMITTER_KEY.inference
         })
       )
     }
     this.chatService?.streamChatCompletion(data.data || [])
+  }
+
+  public async streamTemplateCompletion(template: string) {
+    const symmetryConnected = this._sessionManager?.get(
+      EXTENSION_SESSION_NAME.twinnySymmetryConnected
+    )
+    if (symmetryConnected && this.chatService) {
+      const messages = await this.chatService.getTemplateMessages(template)
+
+      return this.symmetryService?.write(
+        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
+          messages,
+          key: SYMMETRY_EMITTER_KEY.inference
+        })
+      )
+    }
+    this.chatService?.streamTemplateCompletion(template)
   }
 
   public getSelectedText = () => {
@@ -349,10 +354,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   public newConversation() {
-    this._symmetryService?.write(
-      createSymmetryMessage(
-        symmetryMessages.newConversation
-      )
+    this.symmetryService?.write(
+      createSymmetryMessage(SYMMETRY_DATA_MESSAGE.newConversation)
     )
   }
 
@@ -361,6 +364,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({
       type: EVENT_NAME.twinnyStopGeneration
     })
+  }
+
+  private connectToSymmetry = () => {
+    if (this._config.symmetryServerKey) {
+      this.symmetryService?.connect(this._config.symmetryServerKey)
+    }
+  }
+
+  private disconnectSymmetry = async () => {
+    if (this._config.symmetryServerKey) {
+      await this.symmetryService?.disconnect()
+    }
   }
 
   private twinnyHideBackButton() {

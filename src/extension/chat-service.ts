@@ -14,7 +14,7 @@ import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   SYSTEM,
   USER,
-  symmetryEmitterKeys
+  SYMMETRY_EMITTER_KEY
 } from '../common/constants'
 import {
   StreamResponse,
@@ -70,15 +70,18 @@ export class ChatService {
   }
 
   private setupSymmetryListeners() {
-    this._symmetryService?.on(symmetryEmitterKeys.inference, (completion: string) => {
-      this._view?.webview.postMessage({
-        type: EVENT_NAME.twinnyOnCompletion,
-        value: {
-          completion: completion.trimStart(),
-          data: getLanguage()
-        }
-      } as ServerMessage)
-    })
+    this._symmetryService?.on(
+      SYMMETRY_EMITTER_KEY.inference,
+      (completion: string) => {
+        this._view?.webview.postMessage({
+          type: EVENT_NAME.twinnyOnCompletion,
+          value: {
+            completion: completion.trimStart(),
+            data: getLanguage()
+          }
+        } as ServerMessage)
+      }
+    )
   }
 
   private getProvider = () => {
@@ -294,12 +297,11 @@ export class ChatService {
     return this.streamResponse({ requestBody, requestOptions })
   }
 
-  public async streamTemplateCompletion(
+  public async getTemplateMessages(
     promptTemplate: string,
     context?: string,
-    onEnd?: (completion: string) => void,
     skipMessage?: boolean
-  ) {
+  ): Promise<Message[]> {
     this._statusBar.text = '$(loading~spin)'
     const { language } = getLanguage()
     this._completion = ''
@@ -333,7 +335,7 @@ export class ChatService {
       )
     }
 
-    const conversation = [
+    const messages = [
       systemMessage,
       {
         role: USER,
@@ -341,7 +343,21 @@ export class ChatService {
       }
     ]
 
-    const request = this.buildStreamRequest(conversation)
+    return messages
+  }
+
+  public async streamTemplateCompletion(
+    promptTemplate: string,
+    context?: string,
+    onEnd?: (completion: string) => void,
+    skipMessage?: boolean
+  ) {
+    const messages = await this.getTemplateMessages(
+      promptTemplate,
+      context,
+      skipMessage
+    )
+    const request = this.buildStreamRequest(messages)
 
     if (!request) return
     const { requestBody, requestOptions } = request

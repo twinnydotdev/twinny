@@ -17,7 +17,7 @@ import { SessionManager } from './extension/session-manager'
 import {
   delayExecution,
   getTerminal,
-  getSanitizedCommitMessage
+  getSanitizedCommitMessage,
 } from './extension/utils'
 import { setContext } from './extension/context'
 import {
@@ -25,10 +25,12 @@ import {
   EXTENSION_NAME,
   EVENT_NAME,
   WEBUI_TABS,
-  TWINNY_COMMAND_NAME
+  TWINNY_COMMAND_NAME,
 } from './common/constants'
 import { TemplateProvider } from './extension/template-provider'
-import { ServerMessage } from './common/types'
+import {
+  ServerMessage
+} from './common/types'
 import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
 
@@ -42,17 +44,20 @@ export async function activate(context: ExtensionContext) {
   const fileInteractionCache = new FileInteractionCache()
   const sessionManager = new SessionManager()
 
-  const completionProvider = new CompletionProvider(
-    statusBar,
-    fileInteractionCache,
-    templateProvider,
-    context
-  )
+
+
   const sidebarProvider = new SidebarProvider(
     statusBar,
     context,
     templateDir,
     sessionManager
+  )
+
+  const completionProvider = new CompletionProvider(
+    statusBar,
+    fileInteractionCache,
+    templateProvider,
+    context,
   )
 
   templateProvider.init()
@@ -68,40 +73,32 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.disable, () => {
       statusBar.hide()
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.remoteRequest, () => {
-      const editor = window.activeTextEditor
-      const selection = editor?.selection
-      const prompt = editor?.document.getText(selection)
-      if (!prompt) return
-    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.explain, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('explain')
-      )
+      delayExecution(() => sidebarProvider?.streamTemplateCompletion('explain'))
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.addTypes, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('add-types')
+        sidebarProvider?.streamTemplateCompletion('add-types')
       )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.refactor, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('refactor')
+        sidebarProvider?.streamTemplateCompletion('refactor')
       )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.generateDocs, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('generate-docs')
+        sidebarProvider?.streamTemplateCompletion('generate-docs')
       )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.addTests, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider.chatService?.streamTemplateCompletion('add-tests')
+        sidebarProvider?.streamTemplateCompletion('add-tests')
       )
     }),
     commands.registerCommand(
@@ -109,7 +106,7 @@ export async function activate(context: ExtensionContext) {
       (template: string) => {
         commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
         delayExecution(() =>
-          sidebarProvider.chatService?.streamTemplateCompletion(template)
+          sidebarProvider?.streamTemplateCompletion(template)
         )
       }
     ),
@@ -238,7 +235,6 @@ export async function activate(context: ExtensionContext) {
         type: EVENT_NAME.twinnyStopGeneration
       } as ServerMessage<string>)
     }),
-
     window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),
     statusBar
   )

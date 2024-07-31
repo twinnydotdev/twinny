@@ -69,11 +69,9 @@ export const TWINNY_COMMAND_NAME = {
   addTests: 'twinny.addTests',
   addTypes: 'twinny.addTypes',
   conversationHistory: 'twinny.conversationHistory',
-  twinnySymmetryTab: 'twinny.symmetry',
   disable: 'twinny.disable',
   enable: 'twinny.enable',
   explain: 'twinny.explain',
-  remoteRequest: 'twinny.remoteRequest',
   focusSidebar: 'twinny.sidebar.focus',
   generateDocs: 'twinny.generateDocs',
   getGitCommitMessage: 'twinny.getGitCommitMessage',
@@ -87,7 +85,8 @@ export const TWINNY_COMMAND_NAME = {
   settings: 'twinny.settings',
   stopGeneration: 'twinny.stopGeneration',
   templateCompletion: 'twinny.templateCompletion',
-  templates: 'twinny.templates'
+  templates: 'twinny.templates',
+  twinnySymmetryTab: 'twinny.symmetry',
 }
 
 export const CONVERSATION_EVENT_NAME = {
@@ -304,7 +303,7 @@ export const MULTI_LINE_REACT = [
   'jsx_self_closing_element'
 ]
 
-export const symmetryMessages = {
+export const SYMMETRY_DATA_MESSAGE = {
   heartbeat: 'heartbeat',
   inference: 'inference',
   inferenceEnd: 'inferenceEnd',
@@ -318,7 +317,7 @@ export const symmetryMessages = {
   verifySession: 'verifySession',
 } as const
 
-export const symmetryEmitterKeys = {
+export const SYMMETRY_EMITTER_KEY = {
   inference: 'inference',
   conversationTitle: 'conversationTitle',
 }

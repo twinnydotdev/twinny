@@ -19,8 +19,8 @@ import {
   CONVERSATION_EVENT_NAME,
   CONVERSATION_STORAGE_KEY,
   EXTENSION_SESSION_NAME,
-  symmetryEmitterKeys,
-  symmetryMessages,
+  SYMMETRY_EMITTER_KEY,
+  SYMMETRY_DATA_MESSAGE,
   TITLE_GENERATION_PROMPT_MESAGE
 } from '../common/constants'
 import { SessionManager } from './session-manager'
@@ -59,7 +59,7 @@ export class ConversationHistory {
     )
 
     this._symmetryService.on(
-      symmetryEmitterKeys.conversationTitle,
+      SYMMETRY_EMITTER_KEY.conversationTitle,
       (completion: string) => {
         const activeConversation = this.getActiveConversation()
         this._webviewView?.webview.postMessage({
@@ -260,7 +260,7 @@ export class ConversationHistory {
       this._sessionManager.get(EXTENSION_SESSION_NAME.twinnySymmetryConnected)
     ) {
       this._symmetryService?.write(
-        createSymmetryMessage(symmetryMessages.inference, {
+        createSymmetryMessage(SYMMETRY_DATA_MESSAGE.inference, {
           messages: [
             ...conversation.messages,
             {
@@ -268,7 +268,7 @@ export class ConversationHistory {
               content: TITLE_GENERATION_PROMPT_MESAGE
             }
           ],
-          key: symmetryEmitterKeys.conversationTitle
+          key: SYMMETRY_EMITTER_KEY.conversationTitle
         })
       )
     } else {

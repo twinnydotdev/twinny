@@ -363,48 +363,35 @@
           "description": "The API port usually `11434`",
           "required": false
         },
-        "twinny.embeddingModel": {
-          "order": 15,
-          "type": "string",
-          "default": "nomic-embed-text",
-          "description": "The embedding model to use (Ollama only)",
-          "required": false
-        },
         "twinny.keepAlive": {
-          "order": 16,
+          "order": 15,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.ollamaUseTls": {
-          "order": 17,
+          "order": 16,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption Ollama API connections."
         },
         "twinny.enableLogging": {
-          "order": 18,
+          "order": 17,
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"
         },
-        "twinny.rerankProbability": {
-          "order": 19,
-          "type": "number",
-          "default": 0.05,
-          "description": "Minimum rerank probability for embedding context."
-        },
         "twinny.symmetryModelName": {
-          "order": 20,
+          "order": 18,
           "type": "string",
-          "default": "llama3:8b",
-          "description": "The symmetry model name."
+          "default": "llama3.1:latest",
+          "description": "The symmetry model name for chat."
         },
         "twinny.symmetryServerKey": {
-          "order": 21,
+          "order": 19,
           "type": "string",
-          "description": "The symmetry server key.",
-          "default": "ebb8642fe5d7931a51e3d5c5e562f39d85c932faa956a2ca389c9da84b90ac7b"
+          "description": "The symmetry master server key.",
+          "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
         }
       }
     }

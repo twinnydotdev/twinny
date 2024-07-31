@@ -1,6 +1,6 @@
 import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
-import { ALL_BRACKETS, symmetryMessages } from './constants'
+import { ALL_BRACKETS, SYMMETRY_DATA_MESSAGE } from './constants'
 
 export interface StreamBodyBase {
   stream: boolean
@@ -216,16 +216,6 @@ export interface InferenceProvider {
   type: (typeof ApiProviders)[keyof typeof ApiProviders]
 }
 
-export type Embedding = {
-  embedding: number[]
-}
-
-export type EmbeddedDocument = {
-  content: string
-  vector: number[] | undefined
-  file?: string
-}
-
 export interface Peer {
   publicKey: Buffer;
   write: (value: string) => boolean;
@@ -241,7 +231,7 @@ export interface SymmetryMessage<T> {
   data: T;
 }
 
-export type ServerMessageKey = keyof typeof symmetryMessages;
+export type ServerMessageKey = keyof typeof SYMMETRY_DATA_MESSAGE;
 
 export interface SymmetryConnection {
   sessionToken?: string
