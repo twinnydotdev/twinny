@@ -62,11 +62,11 @@ export const Symmetry = () => {
           <p>
             To learn more about Symmetry and its current status, visit the{' '}
             <a
-              href="https://twinny.dev/symmetry"
+              href="https://twinnydotdev.github.io/twinny-docs/general/symmetry"
               target="_blank"
               rel="noopener noreferrer"
             >
-              official website
+              the documentation.
             </a>.
           </p>
         </div>
