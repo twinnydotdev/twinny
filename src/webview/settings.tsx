@@ -1,12 +1,15 @@
 import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
 import { useTemplates, useWorkSpaceContext } from './hooks'
-import { DEFAULT_ACTION_TEMPLATES, WORKSPACE_STORAGE_KEY } from '../common/constants'
+import {
+  DEFAULT_ACTION_TEMPLATES,
+  WORKSPACE_STORAGE_KEY
+} from '../common/constants'
 import { useEffect, useState } from 'react'
 import { kebabToSentence } from './utils'
 
 import styles from './index.module.css'
 
-export const TemplateSettings = () => {
+export const Settings = () => {
   const { templates, saveTemplates } = useTemplates()
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const selectedTemplatesContext =
@@ -54,10 +57,8 @@ export const TemplateSettings = () => {
 
   return (
     <>
-      <h3>Template settings</h3>
-      <p>
-        Select the templates you want to use in the chat interface.
-      </p>
+      <h3>Additional settings</h3>
+      <p>Select the templates you want to use in the chat interface.</p>
       {templates &&
         templates.map((templateName: string) => (
           <div key={templateName} className={styles.templateCheckbox}>
@@ -73,7 +74,10 @@ export const TemplateSettings = () => {
             </label>
           </div>
         ))}
-      <VSCodeButton className={styles.resetTemplatesButton} onClick={handleResetTemplates}>
+      <VSCodeButton
+        className={styles.resetTemplatesButton}
+        onClick={handleResetTemplates}
+      >
         Reset to default
       </VSCodeButton>
     </>

@@ -13,7 +13,8 @@ import {
   WEBUI_TABS,
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   SYSTEM,
-  USER
+  USER,
+  SYMMETRY_EMITTER_KEY
 } from '../common/constants'
 import {
   StreamResponse,
@@ -30,7 +31,7 @@ import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
-import { ConversationHistory } from './conversation-history'
+import { SymmetryService } from './symmetry-service'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -43,27 +44,44 @@ export class ChatService {
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
-  private _conversationHistory: ConversationHistory | undefined
   private _view?: WebviewView
+  private _symmetryService?: SymmetryService
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
     extensionContext: ExtensionContext,
-    conversationHistory: ConversationHistory | undefined,
-    view: WebviewView
+    view: WebviewView,
+    symmetryService: SymmetryService
   ) {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
     this._extensionContext = extensionContext
-    this._conversationHistory = conversationHistory
+    this._symmetryService = symmetryService
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
       }
       this.updateConfig()
     })
+
+    this.setupSymmetryListeners()
+  }
+
+  private setupSymmetryListeners() {
+    this._symmetryService?.on(
+      SYMMETRY_EMITTER_KEY.inference,
+      (completion: string) => {
+        this._view?.webview.postMessage({
+          type: EVENT_NAME.twinnyOnCompletion,
+          value: {
+            completion: completion.trimStart(),
+            data: getLanguage()
+          }
+        } as ServerMessage)
+      }
+    )
   }
 
   private getProvider = () => {
@@ -102,7 +120,7 @@ export class ChatService {
   }
 
   private onStreamData = (
-    streamResponse: StreamResponse | undefined,
+    streamResponse: StreamResponse,
     onEnd?: (completion: string) => void
   ) => {
     const provider = this.getProvider()
@@ -201,6 +219,7 @@ export class ChatService {
     const selection = editor?.selection
     const selectionContext =
       editor?.document.getText(selection) || context || ''
+
     const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
       template,
       {
@@ -223,8 +242,8 @@ export class ChatService {
     return streamResponse({
       body: requestBody,
       options: requestOptions,
-      onData: (streamResponse: StreamResponse | undefined) =>
-        this.onStreamData(streamResponse, onEnd),
+      onData: (streamResponse) =>
+        this.onStreamData(streamResponse as StreamResponse, onEnd),
       onEnd: () => this.onStreamEnd(onEnd),
       onStart: this.onStreamStart,
       onError: this.onStreamError
@@ -254,7 +273,7 @@ export class ChatService {
     this.sendEditorLanguage()
     const editor = window.activeTextEditor
     const selection = editor?.selection
-    const selectionContext = editor?.document.getText(selection)
+    const userSelection = editor?.document.getText(selection)
 
     const systemMessage = {
       role: SYSTEM,
@@ -263,15 +282,12 @@ export class ChatService {
       )
     }
 
-    const conversation = [
-      systemMessage,
-      ...messages,
-    ]
+    const conversation = [systemMessage, ...messages]
 
-    if (selectionContext) {
+    if (userSelection) {
       conversation.push({
         role: USER,
-        content: `Use this code as a context for the next response: ${selectionContext}`
+        content: `This is the code that the user is selecting: ${userSelection}`
       })
     }
 
@@ -281,12 +297,11 @@ export class ChatService {
     return this.streamResponse({ requestBody, requestOptions })
   }
 
-  public async streamTemplateCompletion(
+  public async getTemplateMessages(
     promptTemplate: string,
     context?: string,
-    onEnd?: (completion: string) => void,
     skipMessage?: boolean
-  ) {
+  ): Promise<Message[]> {
     this._statusBar.text = '$(loading~spin)'
     const { language } = getLanguage()
     this._completion = ''
@@ -320,13 +335,30 @@ export class ChatService {
       )
     }
 
-    const request = this.buildStreamRequest([
+    const messages = [
       systemMessage,
       {
         role: USER,
         content: prompt
       }
-    ])
+    ]
+
+    return messages
+  }
+
+  public async streamTemplateCompletion(
+    promptTemplate: string,
+    context?: string,
+    onEnd?: (completion: string) => void,
+    skipMessage?: boolean
+  ) {
+    const messages = await this.getTemplateMessages(
+      promptTemplate,
+      context,
+      skipMessage
+    )
+    const request = this.buildStreamRequest(messages)
+
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions, onEnd })

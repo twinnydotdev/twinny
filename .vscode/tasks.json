@@ -6,7 +6,6 @@
 		{
 			"type": "npm",
 			"script": "watch",
-			"problemMatcher": "$ts-webpack-watch",
 			"isBackground": true,
 			"presentation": {
 				"reveal": "never",
@@ -35,6 +34,14 @@
 				"npm: watch-tests"
 			],
 			"problemMatcher": []
+		},
+		{
+			"type": "npm",
+			"script": "build",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "npm: build",
+			"detail": "node scripts/build.mjs"
 		}
 	]
 }

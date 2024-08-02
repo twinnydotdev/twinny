@@ -1,6 +1,6 @@
 import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
-import { ALL_BRACKETS } from './constants'
+import { ALL_BRACKETS, SYMMETRY_DATA_MESSAGE } from './constants'
 
 export interface StreamBodyBase {
   stream: boolean
@@ -31,6 +31,9 @@ export interface StreamResponse {
   created_at: string
   response: string
   content: string
+  message: {
+    content: string
+  }
   done: boolean
   context: number[]
   total_duration: number
@@ -39,6 +42,7 @@ export interface StreamResponse {
   prompt_eval_duration: number
   eval_count: number
   eval_duration: number
+  type? : string
   choices: [
     {
       text: string
@@ -99,6 +103,7 @@ export interface TemplateData extends Record<string, string | undefined> {
   code: string
   language: string
 }
+
 export interface FimTemplateData extends Record<string, string | undefined> {
   context: string
   fileName: string
@@ -146,7 +151,7 @@ export interface StreamRequest {
   onEnd?: () => void
   onStart?: (controller: AbortController) => void
   onError?: (error: Error) => void
-  onData: (streamResponse: StreamResponse | undefined) => void
+  onData: <T = StreamResponse>(streamResponse:  T) => void
 }
 
 export interface UiTabs {
@@ -209,4 +214,31 @@ export interface InferenceProvider {
   modelName?: string
   name: string
   type: (typeof ApiProviders)[keyof typeof ApiProviders]
+}
+
+export interface Peer {
+  publicKey: Buffer;
+  write: (value: string) => boolean;
+  on: (key: string, cb: (data: Buffer) => void) => void;
+  once: (key: string, cb: (data: Buffer) => void) => void;
+  writable: boolean;
+  key: string;
+  discovery_key: string;
+}
+
+export interface SymmetryMessage<T> {
+  key: string;
+  data: T;
+}
+
+export type ServerMessageKey = keyof typeof SYMMETRY_DATA_MESSAGE;
+
+export interface SymmetryConnection {
+  sessionToken?: string
+  discoveryKey?: string
+  modelName?: string
+}
+export interface InferenceRequest {
+  key: string;
+  messages: Message[];
 }

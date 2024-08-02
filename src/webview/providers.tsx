@@ -266,7 +266,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             name="label"
             onChange={handleChange}
             value={formState.label}
-            placeholder='Just for your reference'
+            placeholder="Just for your reference"
           ></VSCodeTextField>
         </div>
 

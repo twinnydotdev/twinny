@@ -21,7 +21,8 @@ import {
   StreamResponse,
   StreamRequest,
   PrefixSuffix,
-  Bracket
+  Bracket,
+  ServerMessageKey
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
@@ -29,6 +30,7 @@ import {
   CLOSING_BRACKETS,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
+  NORMALIZE_REGEX,
   OPENING_BRACKETS,
   QUOTES,
   QUOTES_REGEX,
@@ -301,7 +303,7 @@ export const getTheme = () => {
 
 export const getChatDataFromProvider = (
   provider: string,
-  data: StreamResponse | undefined
+  data: StreamResponse
 ) => {
   switch (provider) {
     case ApiProviders.Ollama:
@@ -373,6 +375,25 @@ export function safeParseJsonResponse(
   }
 }
 
+export function safeParseJsonStringBuffer(
+  stringBuffer: string
+): unknown | undefined {
+  try {
+    return JSON.parse(stringBuffer.replace(NORMALIZE_REGEX, ''))
+  } catch (e) {
+    return undefined
+  }
+}
+
+export function safeParseJson<T>(data: string): T | undefined  {
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return undefined;
+  }
+}
+
+
 export const getCurrentWorkspacePath = (): string | undefined => {
   if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
     const workspaceFolder = workspace.workspaceFolders[0]
@@ -412,6 +433,10 @@ export const getTerminalExists = (): boolean => {
   return true
 }
 
+export function createSymmetryMessage<T>(key: ServerMessageKey, data?: T): string {
+  return JSON.stringify({ key, data });
+}
+
 export const getSanitizedCommitMessage = (commitMessage: string) => {
   const sanitizedMessage = commitMessage
     .replace(QUOTES_REGEX, '')
@@ -420,6 +445,9 @@ export const getSanitizedCommitMessage = (commitMessage: string) => {
 
   return `git commit -m "${sanitizedMessage}"`
 }
+
+export const getNormalisedText = (text: string) =>
+  text.replace(NORMALIZE_REGEX, ' ')
 
 export const logStreamOptions = (opts: StreamRequest) => {
   logger.log(

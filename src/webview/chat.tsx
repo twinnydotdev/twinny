@@ -11,7 +11,8 @@ import {
   ASSISTANT,
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
-  USER
+  USER,
+  SYMMETRY_EMITTER_KEY
 } from '../common/constants'
 
 import useAutosizeTextArea, {
@@ -83,6 +84,11 @@ export const Chat = () => {
             content: getCompletionContent(message)
           }
         ]
+
+        if (message.value.type === SYMMETRY_EMITTER_KEY.conversationTitle) {
+          return messages
+        }
+
         saveLastConversation({
           ...conversation,
           messages: messages
@@ -360,7 +366,7 @@ export const Chat = () => {
 
                   handleSubmitForm(target.value)
                 } else if (e.ctrlKey && e.key === 'Enter') {
-                  setInputText(`${target.value}\n`)
+                setInputText(`${target.value}\n`)
                 }
               }}
               onChange={(e) => {

@@ -4,7 +4,8 @@ import {
   CONVERSATION_EVENT_NAME,
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
-  PROVIDER_EVENT_NAME
+  PROVIDER_EVENT_NAME,
+  EXTENSION_SESSION_NAME
 } from '../common/constants'
 import {
   ApiModel,
@@ -57,6 +58,28 @@ export const useGlobalContext = <T>(key: string) => {
       key
     })
 
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  return { context, setContext }
+}
+
+export const useSessionContext = <T>(key: string) => {
+  const [context, setContext] = useState<T>()
+
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage = event.data
+    if (message?.type === `${EVENT_NAME.twinnySessionContext}-${key}`) {
+      setContext(event.data.value)
+    }
+  }
+
+  useEffect(() => {
+    window.addEventListener('message', handler)
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnySessionContext,
+      key
+    })
     return () => window.removeEventListener('message', handler)
   }, [])
 
@@ -364,7 +387,7 @@ export const useConversationHistory = () => {
     removeConversation,
     saveLastConversation,
     clearAllConversations,
-    setActiveConversation,
+    setActiveConversation
   }
 }
 
@@ -400,6 +423,59 @@ const useAutosizeTextArea = (
       chatRef.current.style.height = `${scrollHeight + 5}px`
     }
   }, [chatRef, value])
+}
+
+export const useSymmetryConnection = () => {
+  const [autoConnect, setAutoConnect] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const { context: isConnected, setContext: setIsConnected } =
+    useSessionContext<boolean>(EXTENSION_SESSION_NAME.twinnySymmetryConnected)
+
+  console.log('symmetry connected', isConnected)
+
+  const connectToSymmetry = () => {
+    setConnecting(true)
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyConnectSymmetry
+    } as ClientMessage)
+  }
+
+  const disconnectSymmetry = () => {
+    setConnecting(true)
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyDisconnectSymmetry
+    } as ClientMessage)
+  }
+
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<ApiModel[]> = event.data
+    if (message?.type === EVENT_NAME.twinnyConnectedToSymmetry) {
+      setConnecting(false)
+      setIsConnected(true)
+    }
+    if (message?.type === EVENT_NAME.twinnyDisconnectedFromSymmetry) {
+      setConnecting(false)
+      setIsConnected(false)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+
+  useEffect(() => {
+    if (isConnected !== undefined) {
+      setIsConnected(isConnected)
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  return {
+    connectToSymmetry,
+    disconnectSymmetry,
+    isConnected,
+    autoConnect,
+    setAutoConnect,
+    connecting
+  }
 }
 
 export default useAutosizeTextArea

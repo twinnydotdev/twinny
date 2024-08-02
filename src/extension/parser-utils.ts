@@ -1,9 +1,7 @@
 import Parser, { SyntaxNode } from 'web-tree-sitter'
 import { WASM_LANGAUAGES } from '../common/constants'
 import path from 'path'
-import { Logger } from '../common/logger'
 import { Position } from 'vscode'
-const logger = new Logger()
 
 let parser: Parser
 let fileExtension = ''
@@ -11,32 +9,34 @@ let fileExtension = ''
 export const getParser = async (
   filePath: string
 ): Promise<Parser | undefined> => {
-  const newFileExtension = path.extname(filePath).slice(1)
-  const language = WASM_LANGAUAGES[newFileExtension]
+  try {
+    const newFileExtension = path.extname(filePath).slice(1)
+    const language = WASM_LANGAUAGES[newFileExtension]
 
-  if (!language) return undefined
+    if (!language) return undefined
 
-  if (newFileExtension === fileExtension && parser) return parser
+    if (newFileExtension === fileExtension && parser) return parser
 
-  fileExtension = newFileExtension
+    fileExtension = newFileExtension
 
-  await Parser.init()
+    await Parser.init()
 
-  parser = new Parser()
+    parser = new Parser()
 
-  logger.log(`Using parser for ${language}`)
+    if (!language) return undefined
 
-  if (!language) return undefined
+    const wasmPath = path.join(
+      __dirname,
+      'tree-sitter-wasms',
+      `tree-sitter-${language}.wasm`
+    )
+    const parserLanguage = await Parser.Language.load(wasmPath)
+    parser.setLanguage(parserLanguage)
 
-  const wasmPath = path.join(
-    __dirname,
-    'tree-sitter-wasms',
-    `tree-sitter-${language}.wasm`
-  )
-  const parserLanguage = await Parser.Language.load(wasmPath)
-  parser.setLanguage(parserLanguage)
-
-  return parser
+    return parser
+  } catch (e) {
+    return undefined
+  }
 }
 
 export function getNodeAtPosition(
