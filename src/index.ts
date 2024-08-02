@@ -9,7 +9,6 @@ import {
 import * as path from 'path'
 import * as os from 'os'
 import * as vscode from 'vscode'
-// import './native';
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
