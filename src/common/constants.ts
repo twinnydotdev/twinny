@@ -62,7 +62,7 @@ export const EVENT_NAME = {
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
   twinnyConnectedToSymmetry: 'twinny-connected-to-symmetry',
-  twinnyDisConnectedFromSymmetry : 'twinny-disconnected-from-symmetry',
+  twinnyDisconnectedFromSymmetry : 'twinny-disconnected-from-symmetry',
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -315,6 +315,9 @@ export const SYMMETRY_DATA_MESSAGE = {
   requestProvider: 'requestProvider',
   sessionValid: 'sessionValid',
   verifySession: 'verifySession',
+  disconnect: 'disconnect',
+  ping: 'ping',
+  pong: 'pong',
 } as const
 
 export const SYMMETRY_EMITTER_KEY = {

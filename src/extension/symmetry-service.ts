@@ -29,7 +29,7 @@ import { SessionManager } from './session-manager'
 import { TwinnyProvider } from './provider-manager'
 import { EventEmitter } from 'stream'
 
-export class SymmetryService extends EventEmitter {
+export class Symmetry extends EventEmitter {
   private _config = workspace.getConfiguration('twinny')
   private view: WebviewView | undefined
   private _completion = ''
@@ -37,6 +37,7 @@ export class SymmetryService extends EventEmitter {
   private _serverSwarm: undefined | typeof Hyperswarm
   private _sessionManager: SessionManager
   private _providerPeer: undefined | Peer
+  private _serverPeer: undefined | Peer
   private _context: ExtensionContext
   private _providerTopic: Buffer | undefined
   private _emitterKey = ''
@@ -63,6 +64,7 @@ export class SymmetryService extends EventEmitter {
     this._serverSwarm.join(this._providerTopic, { client: true, server: false })
     this._serverSwarm.flush()
     this._serverSwarm.on('connection', (peer: Peer) => {
+      this._serverPeer = peer
       peer.write(
         createSymmetryMessage(SYMMETRY_DATA_MESSAGE.requestProvider, {
           modelName: this._config.symmetryModelName
@@ -74,6 +76,9 @@ export class SymmetryService extends EventEmitter {
         )
         if (data && data.key) {
           switch (data?.key) {
+            case SYMMETRY_DATA_MESSAGE.ping:
+              this._providerPeer?.write(createSymmetryMessage(SYMMETRY_DATA_MESSAGE.pong));
+              break;
             case SYMMETRY_DATA_MESSAGE.providerDetails:
               peer.write(
                 createSymmetryMessage(
@@ -90,22 +95,15 @@ export class SymmetryService extends EventEmitter {
     })
   }
 
-  public async disconnect() {
+  public disconnect = async () => {
     this._sessionManager.set(
       EXTENSION_SESSION_NAME.twinnySymmetryConnected,
       false
     )
-    if (this._providerSwarm) {
-      await this._providerSwarm.leave(this._providerTopic)
-      await this._providerSwarm.destroy()
-    }
-
-    if (this._serverSwarm) {
-      this._serverSwarm.destroy()
-    }
-
+    this._serverSwarm?.destroy()
+    this._providerSwarm?.destroy()
     this.view?.webview.postMessage({
-      type: EVENT_NAME.twinnyDisConnectedFromSymmetry
+      type: EVENT_NAME.twinnyDisconnectedFromSymmetry
     } as ServerMessage)
   }
 

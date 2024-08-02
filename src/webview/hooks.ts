@@ -453,7 +453,7 @@ export const useSymmetryConnection = () => {
       setConnecting(false)
       setIsConnected(true)
     }
-    if (message?.type === EVENT_NAME.twinnyDisConnectedFromSymmetry) {
+    if (message?.type === EVENT_NAME.twinnyDisconnectedFromSymmetry) {
       setConnecting(false)
       setIsConnected(false)
     }

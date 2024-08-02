@@ -31,7 +31,7 @@ import { streamResponse } from './stream'
 import { createStreamRequestBody } from './provider-options'
 import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
-import { SymmetryService } from './symmetry-service'
+import { Symmetry } from './symmetry-service'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -45,14 +45,14 @@ export class ChatService {
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
-  private _symmetryService?: SymmetryService
+  private _symmetryService?: Symmetry
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
     extensionContext: ExtensionContext,
     view: WebviewView,
-    symmetryService: SymmetryService
+    symmetryService: Symmetry
   ) {
     this._view = view
     this._statusBar = statusBar

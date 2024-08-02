@@ -3,7 +3,6 @@ import { useSymmetryConnection } from './hooks'
 import {
   VSCodeButton,
   VSCodePanelView,
-  VSCodeCheckbox,
   VSCodeLink,
 } from '@vscode/webview-ui-toolkit/react'
 
@@ -14,19 +13,16 @@ export const Symmetry = () => {
     isConnected,
     connectToSymmetry,
     disconnectSymmetry,
-    setAutoConnect,
-    autoConnect,
     connecting
   } = useSymmetryConnection()
 
   const handleConnectSymmetry = () => connectToSymmetry()
   const handleDisconnectSymmetry = () => disconnectSymmetry()
-  const handleAutoConnect = () => setAutoConnect(!autoConnect)
 
   const ConnectionStatus = () => {
     if (connecting) {
       return (
-        <span>Connecting...</span>
+        <span>Connecting, this can take a while sometimes...</span>
       )
     }
 
@@ -42,6 +38,24 @@ export const Symmetry = () => {
       <h3>Symmetry</h3>
       <VSCodePanelView>
         <div className={styles.symmetryPanel}>
+          <div className={styles.statusSection}>
+            <p>
+              Connection status: <ConnectionStatus />
+            </p>
+          </div>
+          <div className={styles.buttonContainer}>
+            {!isConnected ? (
+              <VSCodeButton
+                onClick={handleConnectSymmetry}
+              >
+                {connecting ? 'Connecting...' : 'Connect to Symmetry'}
+              </VSCodeButton>
+            ) : (
+              <VSCodeButton onClick={handleDisconnectSymmetry}>
+                Disconnect from Symmetry
+              </VSCodeButton>
+            )}
+          </div>
           <p>
             Symmetry is the peer-to-peer network for Twinny. It enables users to
             connect with each other and share computational resources, enhancing
@@ -56,33 +70,6 @@ export const Symmetry = () => {
             on how Symmetry integrates with Twinny to create a powerful, decentralized
             computing network.
           </p>
-          <div className={styles.statusSection}>
-            <p>
-              Connection status: <ConnectionStatus />
-            </p>
-          </div>
-          <label htmlFor="auto-connect" className={styles.checkboxLabel}>
-            <VSCodeCheckbox
-              id="auto-connect"
-              name="auto-connect"
-              onChange={handleAutoConnect}
-              checked={autoConnect}
-            />
-            <span>Automatically connect to Symmetry on startup</span>
-          </label>
-          <div className={styles.buttonContainer}>
-            {!isConnected ? (
-              <VSCodeButton
-                onClick={handleConnectSymmetry}
-              >
-                {connecting ? 'Connecting...' : 'Connect to Symmetry'}
-              </VSCodeButton>
-            ) : (
-              <VSCodeButton onClick={handleDisconnectSymmetry}>
-                Disconnect from Symmetry
-              </VSCodeButton>
-            )}
-          </div>
         </div>
       </VSCodePanelView>
     </div>

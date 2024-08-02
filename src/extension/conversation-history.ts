@@ -24,7 +24,7 @@ import {
   TITLE_GENERATION_PROMPT_MESAGE
 } from '../common/constants'
 import { SessionManager } from './session-manager'
-import { SymmetryService } from './symmetry-service'
+import { Symmetry } from './symmetry-service'
 
 type Conversations = Record<string, Conversation> | undefined
 
@@ -36,13 +36,13 @@ export class ConversationHistory {
   private _temperature = this._config.get('temperature') as number
   private _title = ''
   private _sessionManager: SessionManager
-  private _symmetryService: SymmetryService
+  private _symmetryService: Symmetry
 
   constructor(
     context: ExtensionContext,
     webviewView: WebviewView,
     sessionManager: SessionManager,
-    symmetryService: SymmetryService
+    symmetryService: Symmetry
   ) {
     this._context = context
     this._webviewView = webviewView
