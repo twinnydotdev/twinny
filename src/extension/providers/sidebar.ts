@@ -27,7 +27,7 @@ import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
 import { ConversationHistory } from '../conversation-history'
-import { Symmetry } from '../symmetry-service'
+import { SymmetryService } from '../symmetry-service'
 import { SessionManager } from '../session-manager'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -40,7 +40,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
-  public symmetryService?: Symmetry | undefined
+  public symmetryService?: SymmetryService | undefined
   private _sessionManager: SessionManager
 
   constructor(
@@ -61,7 +61,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView
 
-    this.symmetryService = new Symmetry(
+    this.symmetryService = new SymmetryService(
       this.view,
       this._sessionManager,
       this._context

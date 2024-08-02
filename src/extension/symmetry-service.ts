@@ -29,7 +29,7 @@ import { SessionManager } from './session-manager'
 import { TwinnyProvider } from './provider-manager'
 import { EventEmitter } from 'stream'
 
-export class Symmetry extends EventEmitter {
+export class SymmetryService extends EventEmitter {
   private _config = workspace.getConfiguration('twinny')
   private view: WebviewView | undefined
   private _completion = ''

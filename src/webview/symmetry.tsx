@@ -3,27 +3,22 @@ import { useSymmetryConnection } from './hooks'
 import {
   VSCodeButton,
   VSCodePanelView,
-  VSCodeLink,
+  VSCodeDivider,
+  VSCodeBadge
 } from '@vscode/webview-ui-toolkit/react'
 
 import styles from './symmetry.module.css'
 
 export const Symmetry = () => {
-  const {
-    isConnected,
-    connectToSymmetry,
-    disconnectSymmetry,
-    connecting
-  } = useSymmetryConnection()
+  const { isConnected, connectToSymmetry, disconnectSymmetry, connecting } =
+    useSymmetryConnection()
 
   const handleConnectSymmetry = () => connectToSymmetry()
   const handleDisconnectSymmetry = () => disconnectSymmetry()
 
   const ConnectionStatus = () => {
     if (connecting) {
-      return (
-        <span>Connecting, this can take a while sometimes...</span>
-      )
+      return <span>Connecting, this can take a while sometimes...</span>
     }
 
     return (
@@ -35,7 +30,7 @@ export const Symmetry = () => {
 
   return (
     <div className={styles.symmetryContainer}>
-      <h3>Symmetry</h3>
+      <h3>Symmetry <VSCodeBadge>Alpha</VSCodeBadge></h3>
       <VSCodePanelView>
         <div className={styles.symmetryPanel}>
           <div className={styles.statusSection}>
@@ -45,9 +40,7 @@ export const Symmetry = () => {
           </div>
           <div className={styles.buttonContainer}>
             {!isConnected ? (
-              <VSCodeButton
-                onClick={handleConnectSymmetry}
-              >
+              <VSCodeButton onClick={handleConnectSymmetry}>
                 {connecting ? 'Connecting...' : 'Connect to Symmetry'}
               </VSCodeButton>
             ) : (
@@ -56,19 +49,25 @@ export const Symmetry = () => {
               </VSCodeButton>
             )}
           </div>
-          <p>
-            Symmetry is the peer-to-peer network for Twinny. It enables users to
-            connect with each other and share computational resources, enhancing
-            collaboration and distributed processing capabilities.
+          <VSCodeDivider />
+          <p className={styles.alphaNotice}>
+            <strong>Note:</strong> Symmetry is currently in alpha. Connections may be unstable or fail, especially when there are few active providers on the network.
           </p>
           <p>
-            To learn more about Symmetry and its features, visit the{' '}
-            <VSCodeLink href="https://twinny.dev/symmetry" target="_blank" rel="noopener noreferrer">
-              official Symmetry website
-            </VSCodeLink>
-            . There you can find detailed documentation, usage examples, and information
-            on how Symmetry integrates with Twinny to create a powerful, decentralized
-            computing network.
+            Symmetry is the experimental peer-to-peer network for Twinny. It aims to enable users to
+            connect with each other and share computational resources, enhancing
+            collaboration and distributed processing capabilities. As an alpha feature,
+            it may be unreliable or change significantly in future updates.
+          </p>
+          <p>
+            To learn more about Symmetry and its current status, visit the{' '}
+            <a
+              href="https://twinny.dev/symmetry"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              official website
+            </a>.
           </p>
         </div>
       </VSCodePanelView>

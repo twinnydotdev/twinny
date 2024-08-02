@@ -31,7 +31,6 @@ export const EVENT_NAME = {
   twinnyChat: 'twinny-chat',
   twinnyChatMessage: 'twinny-chat-message',
   twinnyClickSuggestion: 'twinny-click-suggestion',
-  twinnyEmbedDocuments: 'twinny-embed-documents',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
   twinnyGetConfigValue: 'twinny-get-config-value',
