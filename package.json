@@ -66,10 +66,6 @@
         },
         {
           "when": "editorTextFocus",
-          "command": "twinny.remoteRequest"
-        },
-        {
-          "when": "editorTextFocus",
           "command": "twinny.refactor"
         },
         {
@@ -132,10 +128,6 @@
       {
         "command": "twinny.explain",
         "title": "Twinny - Explain"
-      },
-      {
-        "command": "twinny.remoteRequest",
-        "title": "Twinny - Remote"
       },
       {
         "command": "twinny.refactor",

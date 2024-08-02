@@ -89,7 +89,3 @@ import { copy } from 'esbuild-plugin-copy';
     await esbuild.build(extensionConfig);
   }
 })()
-
-
-
-
