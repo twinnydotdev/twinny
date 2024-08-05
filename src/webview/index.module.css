@@ -213,7 +213,7 @@ pre code {
   cursor: pointer;
 }
 
-.templateCheckbox label {
+.vscodeCheckbox label {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -237,3 +237,22 @@ pre code {
   font-size: 1.15rem;
   transform: translateY(-6px);
 }
+
+.embeddingOptions {
+  padding-bottom: 10px;
+  width: 100%;
+}
+
+.embeddingOptions > div {
+  width: 100%;
+}
+
+.embeddingOptions vscode-dropdown {
+  width: 100%;
+}
+
+.embeddingOptions .slider {
+  width: 100%;
+}
+
+

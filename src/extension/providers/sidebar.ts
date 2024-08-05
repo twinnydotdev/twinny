@@ -150,24 +150,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
           [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
           [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
-          [EVENT_NAME.twinnySessionContext]: this.getSessionContext
+          [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
   }
 
-  public embedDocuments = async () => {
-    const dirs = vscode.workspace.workspaceFolders
-    if (!dirs?.length) {
-      vscode.window.showErrorMessage('No project open')
-      return
-    }
-    if (!this._db) return
-    for (const dir of dirs) {
-      (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
-    }
-  }
 
   public openSettings() {
     vscode.commands.executeCommand(TWINNY_COMMAND_NAME.settings)
@@ -182,23 +171,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     } as ServerMessage<string>)
   }
 
-  public getGitCommitMessage = async () => {
-    const diff = await getGitChanges()
-    if (!diff.length) {
-      vscode.window.showInformationMessage(
-        'No changes found in the current workspace.'
-      )
+  public embedDocuments = async () => {
+    const dirs = vscode.workspace.workspaceFolders
+    if (!dirs?.length) {
+      vscode.window.showErrorMessage('No project open')
       return
     }
-    this.conversationHistory?.resetConversation()
-    this.chatService?.streamTemplateCompletion(
-      'commit-message',
-      diff,
-      (completion: string) => {
-        vscode.commands.executeCommand('twinny.sendTerminalText', completion)
-      },
-      true
-    )
+    if (!this._db) return
+    for (const dir of dirs) {
+      (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
+    }
   }
 
   public getConfigurationValue = (data: ClientMessage) => {
@@ -361,6 +343,25 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     } as ServerMessage)
   }
 
+  public getGitCommitMessage = async () => {
+    const diff = await getGitChanges()
+    if (!diff.length) {
+      vscode.window.showInformationMessage(
+        'No changes found in the current workspace.'
+      )
+      return
+    }
+    this.conversationHistory?.resetConversation()
+    this.chatService?.streamTemplateCompletion(
+      'commit-message',
+      diff,
+      (completion: string) => {
+        vscode.commands.executeCommand('twinny.sendTerminalText', completion)
+      },
+      true
+    )
+  }
+
   public getSessionContext = (data: ClientMessage) => {
     if (!data.key) return undefined
     this.view?.webview.postMessage({
@@ -397,6 +398,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       value
     })
   }
+
 
   public newConversation() {
     this.symmetryService?.write(

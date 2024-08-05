@@ -4,7 +4,8 @@ import {
   VSCodeButton,
   VSCodePanelView,
   VSCodeProgressRing,
-  VSCodeBadge
+  VSCodeBadge,
+  VSCodeDivider
 } from '@vscode/webview-ui-toolkit/react'
 
 import {
@@ -34,6 +35,7 @@ import { Message } from './message'
 import { getCompletionContent } from './utils'
 import styles from './index.module.css'
 import { ProviderSelect } from './provider-select'
+import { EmbeddingOptions } from './embedding-options'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -47,18 +49,14 @@ export const Chat = () => {
   const [completion, setCompletion] = useState<MessageType | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
   const { symmetryConnection } = useSymmetryConnection()
-  const autoScrollContext = useWorkSpaceContext<boolean>(
-    WORKSPACE_STORAGE_KEY.autoScroll
-  )
-  const showProvidersContext = useWorkSpaceContext<boolean>(
-    WORKSPACE_STORAGE_KEY.showProviders
-  )
-  const [showProviders, setShowProviders] = useState<boolean | undefined>(
-    showProvidersContext || false
-  )
-  const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
-    boolean | undefined
-  >(autoScrollContext)
+  const { context: autoScrollContext, setContext: setAutoScrollContext } =
+    useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.autoScroll)
+  const { context: showProvidersContext, setContext: setShowProvidersContext } =
+    useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showProviders)
+  const {
+    context: showEmbeddingOptionsContext,
+    setContext: setShowEmbeddingOptionsContext
+  } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
 
@@ -66,7 +64,7 @@ export const Chat = () => {
   useAutosizeTextArea(chatRef, inputText)
 
   const scrollBottom = () => {
-    if (!isAutoScrolledEnabled) return
+    if (!autoScrollContext) return
     setTimeout(() => {
       if (markdownRef.current) {
         markdownRef.current.scrollTop = markdownRef.current.scrollHeight
@@ -114,7 +112,7 @@ export const Chat = () => {
     }
     generatingRef.current = true
     setLoading(false)
-    if (isAutoScrolledEnabled) scrollBottom()
+    if (autoScrollContext) scrollBottom()
     setMessages((prev) => [
       ...(prev || []),
       {
@@ -138,12 +136,12 @@ export const Chat = () => {
       language: message.value.data,
       error: message.value.error
     })
-    if (isAutoScrolledEnabled) scrollBottom()
+    if (autoScrollContext) scrollBottom()
   }
 
   const handleLoadingMessage = () => {
     setLoading(true)
-    if (isAutoScrolledEnabled) scrollBottom()
+    if (autoScrollContext) scrollBottom()
   }
 
   const messageEventHandler = (event: MessageEvent) => {
@@ -210,12 +208,12 @@ export const Chat = () => {
         ]
       } as ClientMessage)
       setMessages((prev) => [...(prev || []), { role: USER, content: input }])
-      if (isAutoScrolledEnabled) scrollBottom()
+      if (autoScrollContext) scrollBottom()
     }
   }
 
   const handleToggleAutoScroll = () => {
-    setIsAutoScrolledEnabled((prev) => {
+    setAutoScrollContext((prev) => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
         key: WORKSPACE_STORAGE_KEY.autoScroll,
@@ -229,10 +227,21 @@ export const Chat = () => {
   }
 
   const handleToggleProviderSelection = () => {
-    setShowProviders((prev) => {
+    setShowProvidersContext((prev) => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
         key: WORKSPACE_STORAGE_KEY.showProviders,
+        data: !prev
+      } as ClientMessage)
+      return !prev
+    })
+  }
+
+  const handleToggleEmbeddingOptions = () => {
+    setShowEmbeddingOptionsContext((prev) => {
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnySetWorkspaceContext,
+        key: WORKSPACE_STORAGE_KEY.showEmbeddingOptions,
         data: !prev
       } as ClientMessage)
       return !prev
@@ -258,19 +267,7 @@ export const Chat = () => {
     return () => {
       window.removeEventListener('message', messageEventHandler)
     }
-  }, [isAutoScrolledEnabled])
-
-  useEffect(() => {
-    if (autoScrollContext !== undefined)
-      setIsAutoScrolledEnabled(autoScrollContext)
-
-    if (showProvidersContext !== undefined)
-      setShowProviders(showProvidersContext)
-
-    if (conversation?.messages?.length) {
-      return setMessages(conversation.messages)
-    }
-  }, [conversation?.id, autoScrollContext, showProvidersContext])
+  }, [autoScrollContext])
 
   return (
     <VSCodePanelView>
@@ -302,7 +299,13 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
-        {showProviders && !symmetryConnection && <ProviderSelect />}
+        {showProvidersContext && !symmetryConnection && <ProviderSelect />}
+        {showProvidersContext && showEmbeddingOptionsContext && (
+          <VSCodeDivider />
+        )}
+        {showEmbeddingOptionsContext && !symmetryConnection && (
+          <EmbeddingOptions />
+        )}
         <div className={styles.chatOptions}>
           <div>
             <VSCodeButton
@@ -310,7 +313,7 @@ export const Chat = () => {
               title="Toggle auto scroll on/off"
               appearance="icon"
             >
-              {isAutoScrolledEnabled ? (
+              {autoScrollContext ? (
                 <EnabledAutoScrollIcon />
               ) : (
                 <DisabledAutoScrollIcon />
@@ -344,21 +347,31 @@ export const Chat = () => {
               </VSCodeButton>
             )}
             {!symmetryConnection && (
-              <VSCodeButton
-                title="Select active providers"
-                appearance="icon"
-                onClick={handleToggleProviderSelection}
-              >
-                <span className={styles.textIcon}>🤖</span>
-              </VSCodeButton>
+              <>
+                <VSCodeButton
+                  title="Embedding options"
+                  appearance="icon"
+                  onClick={handleToggleEmbeddingOptions}
+                >
+                  <span className="codicon codicon-database"></span>
+                </VSCodeButton>
+                <VSCodeButton
+                  title="Select active providers"
+                  appearance="icon"
+                  onClick={handleToggleProviderSelection}
+                >
+                  <span className={styles.textIcon}>🤖</span>
+                </VSCodeButton>
+              </>
             )}
             {!!symmetryConnection && (
-              <a href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}>
+              <a
+                href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}
+              >
                 <VSCodeBadge
                   title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
                 >
-                  ⚡️{' '}
-                  {symmetryConnection?.name}
+                  ⚡️ {symmetryConnection?.name}
                 </VSCodeBadge>
               </a>
             )}
@@ -380,7 +393,7 @@ export const Chat = () => {
 
                   handleSubmitForm(target.value)
                 } else if (e.ctrlKey && e.key === 'Enter') {
-                setInputText(`${target.value}\n`)
+                  setInputText(`${target.value}\n`)
                 }
               }}
               onChange={(e) => {

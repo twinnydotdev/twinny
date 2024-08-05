@@ -17,7 +17,8 @@ import {
   USER,
   RELEVANT_FILE_COUNT,
   RELEVANT_CODE_COUNT,
-  SYMMETRY_EMITTER_KEY
+  SYMMETRY_EMITTER_KEY,
+  DEFAULT_RERANK_THRESHOLD
 } from '../common/constants'
 import {
   StreamResponse,
@@ -40,22 +41,21 @@ import { Reranker } from './reranker'
 import { SymmetryService } from './symmetry-service'
 
 export class ChatService {
-  private _config = workspace.getConfiguration('twinny')
   private _completion = ''
+  private _config = workspace.getConfiguration('twinny')
+  private _context?: ExtensionContext
   private _controller?: AbortController
-  private _extensionContext?: ExtensionContext
+  private _db?: EmbeddingDatabase
+  private _documents: EmbeddedDocument[] = []
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
-  private _rerankProbability = this._config.get('rerankProbability') as number
   private _promptTemplate = ''
+  private _reranker: Reranker
   private _statusBar: StatusBarItem
+  private _symmetryService?: SymmetryService
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
-  private _db?: EmbeddingDatabase
-  private _reranker: Reranker
-  private _documents: EmbeddedDocument[] = []
-  private _symmetryService?: SymmetryService
 
   constructor(
     statusBar: StatusBarItem,
@@ -68,8 +68,8 @@ export class ChatService {
     this._view = view
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
-    this._reranker = new Reranker(extensionContext)
-    this._extensionContext = extensionContext
+    this._reranker = new Reranker()
+    this._context = extensionContext
     this._db = db
     this._symmetryService = symmetryService
     workspace.onDidChangeConfiguration((event) => {
@@ -124,11 +124,22 @@ export class ChatService {
     return []
   }
 
+  private getRerankThreshold() {
+    const rerankThresholdContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRerankThreshold}`
+    const rerankThreshold =
+      (this._context?.globalState.get(rerankThresholdContext) as number) ||
+      DEFAULT_RERANK_THRESHOLD
+
+    return rerankThreshold
+  }
+
   private async rerankFiles(
     text: string | undefined,
     filePaths: string[] | undefined
   ) {
     if (!this._db || !text || !workspace.name || !filePaths?.length) return []
+
+    const rerankThreshold = this.getRerankThreshold()
 
     const fileNames = filePaths?.map((filePath) => path.basename(filePath))
 
@@ -139,7 +150,7 @@ export class ChatService {
     const relevantFilePaths =
       filePaths
         ?.map((filePath, index) =>
-          scores[index] > this._rerankProbability ? filePath : ''
+          scores[index] > rerankThreshold ? filePath : ''
         )
         .filter(Boolean) || []
 
@@ -152,6 +163,8 @@ export class ChatService {
   ) {
     if (!this._db || !text || !workspace.name) return
     const table = `${workspace.name}-documents`
+    const rerankThreshold = this.getRerankThreshold()
+
     if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
 
@@ -183,7 +196,7 @@ export class ChatService {
       const codeChunks =
         this._documents
           ?.map(({ content }, index) =>
-            scores[index] > this._rerankProbability ? content : null
+            scores[index] > rerankThreshold ? content : null
           )
           .filter(Boolean)
           .join('\n\n')
@@ -195,7 +208,7 @@ export class ChatService {
   }
 
   private getProvider = () => {
-    const provider = this._extensionContext?.globalState.get<TwinnyProvider>(
+    const provider = this._context?.globalState.get<TwinnyProvider>(
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
     return provider
@@ -378,6 +391,43 @@ export class ChatService {
     } as ServerMessage<string>)
   }
 
+  public async addRagContextIfEnabled(conversation: Message[], text?: string) {
+    const ragContextKey = `${EVENT_NAME.twinnyWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
+
+    const isRagEnabled = this._context?.workspaceState.get(ragContextKey)
+
+    if (isRagEnabled) {
+      const relevantFiles = await this.getRelevantFiles(text)
+
+      let relevantCode = await this.getRelevantCode(text, relevantFiles)
+
+      if (relevantFiles?.length && !relevantCode) {
+        const promises = []
+        for (const file of relevantFiles) {
+          promises.push(this._db?.getDocumentByFilePath(file))
+        }
+
+        relevantCode = (await Promise.all(promises)).join('\n')
+      }
+
+      if (relevantFiles?.length) {
+        conversation.push({
+          role: USER,
+          content: `Here are some files which might or might not be relevant, decide for yourself and reply with the correct answer: ${relevantFiles.join(
+            ', '
+          )}`
+        })
+      }
+
+      if (relevantCode) {
+        conversation.push({
+          role: USER,
+          content: `Here is the code that might be relevant, decide for yourself and reply with the correct answer: ${relevantCode}`
+        })
+      }
+    }
+  }
+
   public async streamChatCompletion(messages: Message[]) {
     this._completion = ''
     this.sendEditorLanguage()
@@ -394,19 +444,6 @@ export class ChatService {
       )
     }
 
-    const relevantFiles = await this.getRelevantFiles(text)
-
-    let relevantCode = await this.getRelevantCode(text, relevantFiles)
-
-    if (relevantFiles?.length && !relevantCode) {
-      const promises = []
-      for (const file of relevantFiles) {
-        promises.push(this._db?.getDocumentByFilePath(file))
-      }
-
-      relevantCode = (await Promise.all(promises)).join('\n')
-    }
-
     const conversation = [systemMessage, ...messages]
 
     if (userSelection) {
@@ -416,21 +453,7 @@ export class ChatService {
       })
     }
 
-    if (relevantFiles?.length) {
-      conversation.push({
-        role: USER,
-        content: `Here are some files which might or might not be relevant, decide for yourself and reply with the correct answer: ${relevantFiles.join(
-          ', '
-        )}`
-      })
-    }
-
-    if (relevantCode) {
-      conversation.push({
-        role: USER,
-        content: `Here is the code that might be relevant, decide for yourself and reply with the correct answer: ${relevantCode}`
-      })
-    }
+    await this.addRagContextIfEnabled(conversation, text)
 
     const request = this.buildStreamRequest(conversation)
     if (!request) return
@@ -476,19 +499,6 @@ export class ChatService {
       )
     }
 
-    const relevantFiles = await this.getRelevantFiles(selection)
-
-    let relevantCode = await this.getRelevantCode(selection, relevantFiles)
-
-    if (relevantFiles?.length && !relevantCode) {
-      const promises = []
-      for (const file of relevantFiles) {
-        promises.push(this._db?.getDocumentByFilePath(file))
-      }
-
-      relevantCode = (await Promise.all(promises)).join('\n')
-    }
-
     const conversation = [
       systemMessage,
       {
@@ -497,21 +507,7 @@ export class ChatService {
       }
     ]
 
-    if (relevantFiles?.length) {
-      conversation.push({
-        role: USER,
-        content: `If these files are not relevant to the user's question, please ignore them: ${relevantFiles.join(
-          ', '
-        )}`
-      })
-    }
-
-    if (relevantCode) {
-      conversation.push({
-        role: USER,
-        content: `If this code is not relevant to the user's question, please ignore it: ${relevantCode}`
-      })
-    }
+    await this.addRagContextIfEnabled(conversation, selection)
 
     return conversation
   }

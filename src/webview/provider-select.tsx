@@ -8,7 +8,7 @@ import { useProviders } from './hooks'
 
 export const ProviderSelect = () => {
   const {
-    getFimProvidersByType,
+    getProvidersByType,
     setActiveChatProvider,
     setActiveFimProvider,
     providers,
@@ -39,7 +39,7 @@ export const ProviderSelect = () => {
           name="provider"
           onChange={handleChangeChatProvider}
         >
-          {Object.values(getFimProvidersByType('chat'))
+          {Object.values(getProvidersByType('chat'))
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>
@@ -55,7 +55,7 @@ export const ProviderSelect = () => {
           name="provider"
           onChange={handleChangeFimProvider}
         >
-          {Object.values(getFimProvidersByType('fim'))
+          {Object.values(getProvidersByType('fim'))
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>

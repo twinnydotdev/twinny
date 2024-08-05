@@ -59,6 +59,8 @@ export class ProviderManager {
         return this.getActiveChatProvider()
       case PROVIDER_EVENT_NAME.getActiveFimProvider:
         return this.getActiveFimProvider()
+      case PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider:
+        return this.getActiveEmbeddingsProvider()
       case PROVIDER_EVENT_NAME.setActiveChatProvider:
         return this.setActiveChatProvider(provider)
       case PROVIDER_EVENT_NAME.setActiveFimProvider:
@@ -104,7 +106,7 @@ export class ProviderManager {
       id: uuidv4(),
       label: 'Ollama Embedding',
       modelName: 'all-minilm:latest',
-      provider: ApiProviders.Ollama,
+      provider: apiProviders.Ollama,
       type: 'embedding'
     } as TwinnyProvider
   }
@@ -215,10 +217,10 @@ export class ProviderManager {
 
   getActiveEmbeddingsProvider() {
     const provider = this._context.globalState.get<TwinnyProvider>(
-      ACTIVE_FIM_PROVIDER_STORAGE_KEY
+      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
     )
     this._webviewView.webview.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveFimProvider,
+      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
       value: {
         data: provider
       }

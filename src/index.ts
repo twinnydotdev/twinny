@@ -45,16 +45,6 @@ export async function activate(context: ExtensionContext) {
   const fileInteractionCache = new FileInteractionCache()
   const sessionManager = new SessionManager()
 
-
-
-  const sidebarProvider = new SidebarProvider(
-    statusBar,
-    context,
-    templateDir,
-    sessionManager,
-    db,
-  )
-
   const homeDir = os.homedir()
   const dbDir = path.join(homeDir, '.twinny/embeddings')
   let db
@@ -66,6 +56,14 @@ export async function activate(context: ExtensionContext) {
     db = new EmbeddingDatabase(dbPath, context)
     await db.connect()
   }
+
+  const sidebarProvider = new SidebarProvider(
+    statusBar,
+    context,
+    templateDir,
+    db,
+    sessionManager,
+  )
 
   const completionProvider = new CompletionProvider(
     statusBar,

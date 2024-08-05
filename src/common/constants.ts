@@ -24,6 +24,7 @@ export const IMPORT_SEPARATOR = [',', '{']
 export const SKIP_IMPORT_KEYWORDS_AFTER = ['from', 'as', 'import']
 export const MIN_COMPLETION_CHUNKS = 2
 export const MAX_EMPTY_COMPLETION_CHARS = 250
+export const DEFAULT_RERANK_THRESHOLD = 0.007
 
 export const EVENT_NAME = {
   twinngAddMessage: 'twinny-add-message',
@@ -31,16 +32,17 @@ export const EVENT_NAME = {
   twinnyChat: 'twinny-chat',
   twinnyChatMessage: 'twinny-chat-message',
   twinnyClickSuggestion: 'twinny-click-suggestion',
+  twinnyConnectedToSymmetry: 'twinny-connected-to-symmetry',
+  twinnyConnectSymmetry: 'twinny-connect-symmetry',
+  twinnyDisconnectedFromSymmetry : 'twinny-disconnected-from-symmetry',
+  twinnyDisconnectSymmetry: 'twinny-disconnect-symmetry',
+  twinnyEmbedDocuments: 'twinny-embed-documents',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
   twinnyGetConfigValue: 'twinny-get-config-value',
   twinnyGetGitChanges: 'twinny-get-git-changes',
-  twinnyConnectSymmetry: 'twinny-connect-symmetry',
-  twinnyDisconnectSymmetry: 'twinny-disconnect-symmetry',
   twinnyGlobalContext: 'twinny-global-context',
   twinnyHideBackButton: 'twinny-hide-back-button',
-  twinnySetSessionContext: 'twinny-set-session-context',
-  twinnySessionContext: 'twinny-session-context',
   twinnyListTemplates: 'twinny-list-templates',
   twinnyManageTemplates: 'twinny-manage-templates',
   twinnyNewDocument: 'twinny-new-document',
@@ -49,20 +51,20 @@ export const EVENT_NAME = {
   twinnyOnEnd: 'twinny-on-end',
   twinnyOnLoading: 'twinny-on-loading',
   twinnyOpenDiff: 'twinny-open-diff',
+  twinnyRerankThresholdChanged: 'twinny-rerank-threshold-changed',
   twinnySendLanguage: 'twinny-send-language',
   twinnySendSystemMessage: 'twinny-send-system-message',
   twinnySendTheme: 'twinny-send-theme',
+  twinnySessionContext: 'twinny-session-context',
   twinnySetConfigValue: 'twinny-set-config-value',
   twinnySetGlobalContext: 'twinny-set-global-context',
   twinnySetOllamaModel: 'twinny-set-ollama-model',
+  twinnySetSessionContext: 'twinny-set-session-context',
   twinnySetTab: 'twinny-set-tab',
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
   twinnyWorkspaceContext: 'twinny-workspace-context',
-  twinnyEmbedDocuments: 'twinny-embed-documents',
-  twinnyConnectedToSymmetry: 'twinny-connected-to-symmetry',
-  twinnyDisconnectedFromSymmetry : 'twinny-disconnected-from-symmetry',
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -104,12 +106,14 @@ export const PROVIDER_EVENT_NAME = {
   copyProvider: 'twinny.copy-provider',
   focusProviderTab: 'twinny.focus-provider-tab',
   getActiveChatProvider: 'twinny.get-active-provider',
+  getActiveEmbeddingsProvider: 'twinny.get-active-embeddings-provider',
   getActiveFimProvider: 'twinny.get-active-fim-provider',
   getAllProviders: 'twinny.get-providers',
   removeProvider: 'twinny.remove-provider',
   resetProvidersToDefaults: 'twinny.reset-providers-to-defaults',
   setActiveChatProvider: 'twinny.set-active-chat-provider',
   setActiveFimProvider: 'twinny.set-active-fim-provider',
+  setActiveEmbeddingsProvider: 'twinny.set-active-embeddings-provider',
   updateProvider: 'twinny.update-provider'
 }
 
@@ -126,7 +130,8 @@ export const WORKSPACE_STORAGE_KEY = {
   downloadCancelled: 'downloadCancelled',
   selectedTemplates: 'selectedTemplates',
   selection: 'selection',
-  showProviders: 'showProviders'
+  showProviders: 'showProviders',
+  showEmbeddingOptions: 'showEmbeddingOptions',
 }
 
 export const EXTENSION_SETTING_KEY = {
@@ -142,7 +147,9 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyGeneratingText: 'twinnyGeneratingText',
   twinnyManageProviders: 'twinnyManageProviders',
   twinnyManageTemplates: 'twinnyManageTemplates',
-}
+  twinnyEnableRag: 'twinnyEnableRag',
+  twinnyRerankThreshold: 'twinnyRerankThreshold',
+} as  const
 
 export const EXTENSION_SESSION_NAME = {
   twinnySymmetryConnection: 'twinnySymmetryConnection'

@@ -13,7 +13,10 @@ import {
 } from '../common/types'
 import {
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
-  EMBEDDING_IGNORE_LIST
+  EMBEDDING_IGNORE_LIST,
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME,
+  DEFAULT_RERANK_THRESHOLD,
 } from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
 import { getDocumentSplitChunks } from './utils'
@@ -35,6 +38,12 @@ export class EmbeddingDatabase {
   constructor(dbPath: string, extensionContext: vscode.ExtensionContext) {
     this._dbPath = dbPath
     this._extensionContext = extensionContext
+    const rerankThresholdContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRerankThreshold}`
+
+    this._extensionContext?.globalState.update(
+      rerankThresholdContext,
+      DEFAULT_RERANK_THRESHOLD
+    )
   }
 
   public async connect() {
@@ -172,11 +181,20 @@ export class EmbeddingDatabase {
   public async populateDatabase() {
     try {
       const tableNames = await this._db?.tableNames()
-      if (!tableNames?.includes(this._workspaceName)) {
+      if (!tableNames?.includes(`${this._workspaceName}-documents`)) {
         await this._db?.createTable(this._documentTableName, this._documents)
+      }
+
+      if (!tableNames?.includes(`${this._workspaceName}-file-paths`)) {
         await this._db?.createTable(this._filePathTableName, this._filePaths)
         return
       }
+
+      // Have to reindex all if the table already exists
+      await this._db?.dropTable(`${this._workspaceName}-documents`)
+      await this._db?.dropTable(`${this._workspaceName}-file-paths`)
+      await this.populateDatabase()
+
       this._documents.length = 0
       this._filePaths.length = 0
     } catch (e) {

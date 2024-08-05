@@ -380,20 +380,14 @@
           "default": true,
           "description": "Enable twinny debug mode"
         },
-        "twinny.rerankProbability": {
-          "order": 19,
-          "type": "number",
-          "default": 0.05,
-          "description": "Minimum rerank probability for embedding context."
-        },
         "twinny.symmetryModelName": {
-          "order": 18,
+          "order": 19,
           "type": "string",
           "default": "llama3.1:latest",
           "description": "The symmetry model name for chat."
         },
         "twinny.symmetryProvider": {
-          "order": 19,
+          "order": 20,
           "type": "string",
           "description": "The symmetry provider type.",
           "enum": [
@@ -407,7 +401,7 @@
           "default": "ollama"
         },
         "twinny.symmetryServerKey": {
-          "order": 20,
+          "order": 21,
           "type": "string",
           "description": "The symmetry master server key.",
           "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
@@ -450,6 +444,7 @@
     "css-loader": "^6.8.1",
     "esbuild": "^0.21.4",
     "esbuild-css-modules-plugin": "^3.1.2",
+    "esbuild-plugin-copy": "^2.1.1",
     "hyperbee": "^2.19.6",
     "jest": "^29.7.0",
     "mocha": "^10.3.0",
@@ -473,11 +468,11 @@
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
+    "hypercore-crypto": "^3.4.2",
+    "hyperswarm": "^4.7.15",
     "minimatch": "^9.0.4",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
-    "hypercore-crypto": "^3.4.2",
-    "hyperswarm": "^4.7.15",
     "pear-stdio": "^1.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

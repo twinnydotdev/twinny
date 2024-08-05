@@ -1,6 +1,5 @@
 import * as ort from 'onnxruntime-web'
 import * as path from 'path'
-import * as vscode from 'vscode'
 import { Toxe } from 'toxe'
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -12,14 +11,10 @@ export const getTransmuter = async () => {
 }
 
 export class Reranker {
-  private _modelPath: string
-  private _context: vscode.ExtensionContext | null
   private _tokenizer: Toxe | null
   private _session: ort.InferenceSession | null
 
-  constructor(context: vscode.ExtensionContext) {
-    this._modelPath = path.join(__dirname, 'models')
-    this._context = context
+  constructor() {
     this._tokenizer = null
     this._session = null
     this.init()

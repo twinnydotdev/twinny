@@ -386,14 +386,13 @@ export function safeParseJsonStringBuffer(
   }
 }
 
-export function safeParseJson<T>(data: string): T | undefined  {
+export function safeParseJson<T>(data: string): T | undefined {
   try {
-    return JSON.parse(data);
+    return JSON.parse(data)
   } catch (e) {
-    return undefined;
+    return undefined
   }
 }
-
 
 export const getCurrentWorkspacePath = (): string | undefined => {
   if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
@@ -434,8 +433,11 @@ export const getTerminalExists = (): boolean => {
   return true
 }
 
-export function createSymmetryMessage<T>(key: ServerMessageKey, data?: T): string {
-  return JSON.stringify({ key, data });
+export function createSymmetryMessage<T>(
+  key: ServerMessageKey,
+  data?: T
+): string {
+  return JSON.stringify({ key, data })
 }
 
 export const getSanitizedCommitMessage = (commitMessage: string) => {
@@ -450,44 +452,47 @@ export const getSanitizedCommitMessage = (commitMessage: string) => {
 export const getNormalisedText = (text: string) =>
   text.replace(NORMALIZE_REGEX, ' ')
 
+function getSplitChunks(chunks: string[], node: SyntaxNode): void {
+  for (const child of node.children) {
+    if (child.text.length > 100) {
+      getSplitChunks(chunks, child)
+      continue
+    }
+    chunks.push(child.text)
+  }
+}
+
 export async function getDocumentSplitChunks(
   content: string,
   filePath: string,
   chunkSize = 500
 ): Promise<string[]> {
-  const parser = await getParser(filePath)
+  try {
+    const parser = await getParser(filePath)
 
-  if (!parser) return []
+    if (!parser) return []
 
-  const tree = parser.parse(content)
-  const chunks: string[] = []
+    const tree = parser.parse(content)
+    const chunks: string[] = []
 
-  function getSplitChunks(node: SyntaxNode): void {
-    for (const child of node.children) {
-      if (child.text.length > 100) {
-        getSplitChunks(child)
-        continue
+    getSplitChunks(chunks, tree.rootNode)
+
+    const finalChunks = []
+    let buffer = ''
+    for (const chunk of chunks) {
+      if (buffer.length + chunk.length < chunkSize) {
+        buffer += chunk + ' '
+      } else {
+        finalChunks.push(buffer.trim())
+        buffer = chunk + ' '
       }
-      chunks.push(child.text)
     }
+
+    return finalChunks
+  } catch {
+    logger.log(`Could not parse file ${filePath}.`)
+    return []
   }
-
-  getSplitChunks(tree.rootNode)
-
-  const finalChunks = []
-  let buffer = ''
-  for (const chunk of chunks) {
-    if (buffer.length + chunk.length < chunkSize) {
-      buffer += chunk + ' '
-    } else {
-      finalChunks.push(buffer.trim())
-      buffer = chunk + ' '
-    }
-  }
-
-
-
-  return finalChunks
 }
 
 export const logStreamOptions = (opts: StreamRequest) => {
