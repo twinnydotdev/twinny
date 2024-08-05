@@ -11,12 +11,14 @@ import {
   ASSISTANT,
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
-  USER
+  USER,
+  SYMMETRY_EMITTER_KEY
 } from '../common/constants'
 
 import useAutosizeTextArea, {
   useConversationHistory,
   useSelection,
+  useSymmetryConnection,
   useTheme,
   useWorkSpaceContext
 } from './hooks'
@@ -44,6 +46,7 @@ export const Chat = () => {
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
+  const { symmetryConnection } = useSymmetryConnection()
   const autoScrollContext = useWorkSpaceContext<boolean>(
     WORKSPACE_STORAGE_KEY.autoScroll
   )
@@ -83,6 +86,11 @@ export const Chat = () => {
             content: getCompletionContent(message)
           }
         ]
+
+        if (message.value.type === SYMMETRY_EMITTER_KEY.conversationTitle) {
+          return messages
+        }
+
         saveLastConversation({
           ...conversation,
           messages: messages
@@ -294,7 +302,7 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
-        {showProviders && <ProviderSelect />}
+        {showProviders && !symmetryConnection && <ProviderSelect />}
         <div className={styles.chatOptions}>
           <div>
             <VSCodeButton
@@ -335,13 +343,25 @@ export const Chat = () => {
                 <span className="codicon codicon-debug-stop"></span>
               </VSCodeButton>
             )}
-            <VSCodeButton
-              title="Select active providers"
-              appearance="icon"
-              onClick={handleToggleProviderSelection}
-            >
-              <span className={styles.textIcon}>🤖</span>
-            </VSCodeButton>
+            {!symmetryConnection && (
+              <VSCodeButton
+                title="Select active providers"
+                appearance="icon"
+                onClick={handleToggleProviderSelection}
+              >
+                <span className={styles.textIcon}>🤖</span>
+              </VSCodeButton>
+            )}
+            {!!symmetryConnection && (
+              <a href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}>
+                <VSCodeBadge
+                  title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
+                >
+                  ⚡️{' '}
+                  {symmetryConnection?.name}
+                </VSCodeBadge>
+              </a>
+            )}
           </div>
         </div>
         <form>

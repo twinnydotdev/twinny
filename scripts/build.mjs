@@ -2,16 +2,15 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 import esbuild from 'esbuild'
 import { copy } from 'esbuild-plugin-copy';
-import cssModulesPlugin from 'esbuild-css-modules-plugin'
+
 
 (async () => {
-
   const extensionConfig = {
     bundle: true,
     entryPoints: ['src/index.ts'],
-    external: ['vscode', 'esbuild', './xhr-sync-worker.js'],
+    external: ['vscode', 'esbuild', './xhr-sync-worker.js', 'sodium-native', 'udx-native', 'b4a'],
     format: 'cjs',
-    outfile: 'out/index.js',
+    outdir: 'out',
     platform: 'node',
     sourcemap: true,
     inject: ['./scripts/meta.js'],
@@ -37,6 +36,45 @@ import cssModulesPlugin from 'esbuild-css-modules-plugin'
             from: './node_modules/web-tree-sitter/tree-sitter.wasm',
             to: './out/tree-sitter.wasm'
           },
+          {
+            from: './node_modules/web-tree-sitter/tree-sitter.wasm',
+            to: './out/tree-sitter.wasm'
+          },
+          {
+            from: './node_modules/udx-native/build/Release/udx.node',
+            to: './out/udx.node'
+          },
+          {
+            from: './node_modules/sodium-native/build/Release/sodium.node',
+            to: './out/sodium.node'
+          },
+          {
+            from: './node_modules/b4a/**',
+            to: './out/node_modules/b4a'
+          },
+          {
+            from: './node_modules/node-gyp-build/**',
+            to: './out/node_modules/node-gyp-build'
+          },
+          {
+            from: './node_modules/streamx/**',
+            to: './out/node_modules/streamx'
+          }
+          ,
+          {
+            from: './node_modules/fast-fifo/**',
+            to: './out/node_modules/fast-fifo'
+          }
+          ,
+          {
+            from: './node_modules/queue-tick/**',
+            to: './out/node_modules/queue-tick'
+          }
+          ,
+          {
+            from: './node_modules/text-decoder/**',
+            to: './out/node_modules/text-decoder'
+          }
         ],
         watch: true,
       }),
@@ -45,11 +83,11 @@ import cssModulesPlugin from 'esbuild-css-modules-plugin'
 
   const webConfig = {
     bundle: true,
-    external: ['vscode', 'esbuild'],
+    external: ['vscode'],
     entryPoints: ['src/webview/index.tsx'],
     outfile: 'out/sidebar.js',
     sourcemap: true,
-    plugins: [cssModulesPlugin()],
+    plugins: [],
   }
 
   const flags = process.argv.slice(2);
@@ -64,7 +102,3 @@ import cssModulesPlugin from 'esbuild-css-modules-plugin'
     await esbuild.build(extensionConfig);
   }
 })()
-
-
-
-

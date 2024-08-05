@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 
 import {
+  createSymmetryMessage,
   getGitChanges,
   getLanguage,
   getTextSelection,
@@ -8,23 +9,34 @@ import {
 } from '../utils'
 import {
   WORKSPACE_STORAGE_KEY,
+  EXTENSION_SESSION_NAME,
   EVENT_NAME,
-  TWINNY_COMMAND_NAME
+  TWINNY_COMMAND_NAME,
+  SYMMETRY_DATA_MESSAGE,
+  SYMMETRY_EMITTER_KEY,
+  SYSTEM
 } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
   ClientMessage,
   Message,
   ApiModel,
-  ServerMessage
+  ServerMessage,
+  InferenceRequest
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
 import { ConversationHistory } from '../conversation-history'
 import { EmbeddingDatabase } from '../embeddings'
+import { SymmetryService } from '../symmetry-service'
+import { SessionManager } from '../session-manager'
+import { Logger } from '../../common/logger'
+
+const logger = new Logger()
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
+  private _config = vscode.workspace.getConfiguration('twinny')
   private _context: vscode.ExtensionContext
   private _statusBar: vscode.StatusBarItem
   private _templateDir: string
@@ -34,16 +46,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
   private _db: EmbeddingDatabase | undefined
+  public symmetryService?: SymmetryService | undefined
+  private _sessionManager: SessionManager
 
   constructor(
     statusBar: vscode.StatusBarItem,
     context: vscode.ExtensionContext,
     templateDir: string,
-    db: EmbeddingDatabase | undefined
+    db: EmbeddingDatabase | undefined,
+    sessionManager: SessionManager
   ) {
     this._statusBar = statusBar
     this._context = context
     this._templateDir = templateDir
+    this._sessionManager = sessionManager
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
     if (db) {
@@ -55,14 +71,27 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView
 
+    this.symmetryService = new SymmetryService(
+      this.view,
+      this._sessionManager,
+      this._context
+    )
+
     this.chatService = new ChatService(
       this._statusBar,
       this._templateDir,
       this._context,
       webviewView,
       this._db,
+      this.symmetryService
     )
-    this.conversationHistory = new ConversationHistory(this._context, this.view)
+    this.conversationHistory = new ConversationHistory(
+      this._context,
+      this.view,
+      this._sessionManager,
+      this.symmetryService
+    )
+
     new ProviderManager(this._context, this.view)
 
     webviewView.webview.options = {
@@ -104,6 +133,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyGlobalContext]: this.getGlobalContext,
           [EVENT_NAME.twinnyListTemplates]: this.listTemplates,
           [EVENT_NAME.twinnySetTab]: this.setTab,
+          [TWINNY_COMMAND_NAME.settings]: this.openSettings,
           [EVENT_NAME.twinnyNewDocument]: this.createNewUntitledDocument,
           [EVENT_NAME.twinnyNotification]: this.sendNotification,
           [EVENT_NAME.twinnySendLanguage]: this.getCurrentLanguage,
@@ -117,7 +147,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
           [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
           [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
-          [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments
+          [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
+          [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
+          [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
+          [EVENT_NAME.twinnySessionContext]: this.getSessionContext
         }
         eventHandlers[message.type as string]?.(message)
       }
@@ -134,6 +167,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     for (const dir of dirs) {
       (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
     }
+  }
+
+  public openSettings() {
+    vscode.commands.executeCommand(TWINNY_COMMAND_NAME.settings)
   }
 
   public setTab(tab: ClientMessage) {
@@ -220,8 +257,52 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     )
   }
 
-  public streamChatCompletion = (data: ClientMessage<Message[]>) => {
+  public streamChatCompletion = async (data: ClientMessage<Message[]>) => {
+    const symmetryConnected = this._sessionManager?.get(
+      EXTENSION_SESSION_NAME.twinnySymmetryConnection
+    )
+    if (symmetryConnected) {
+      const systemMessage = {
+        role: SYSTEM,
+        content: await this._templateProvider?.readSystemMessageTemplate()
+      }
+
+      const messages = [systemMessage, ...data.data as Message[]]
+
+      logger.log(`
+        Using symmetry for inference
+        Messages: ${JSON.stringify(messages)}
+      `)
+
+      return this.symmetryService?.write(
+        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
+          messages,
+          key: SYMMETRY_EMITTER_KEY.inference
+        })
+      )
+    }
     this.chatService?.streamChatCompletion(data.data || [])
+  }
+
+  public async streamTemplateCompletion(template: string) {
+    const symmetryConnected = this._sessionManager?.get(
+      EXTENSION_SESSION_NAME.twinnySymmetryConnection
+    )
+    if (symmetryConnected && this.chatService) {
+      const messages = await this.chatService.getTemplateMessages(template)
+
+      logger.log(`
+        Using symmetry for inference
+        Messages: ${JSON.stringify(messages)}
+      `)
+      return this.symmetryService?.write(
+        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
+          messages,
+          key: SYMMETRY_EMITTER_KEY.inference
+        })
+      )
+    }
+    this.chatService?.streamTemplateCompletion(template)
   }
 
   public getSelectedText = () => {
@@ -280,6 +361,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     } as ServerMessage)
   }
 
+  public getSessionContext = (data: ClientMessage) => {
+    if (!data.key) return undefined
+    this.view?.webview.postMessage({
+      type: `${EVENT_NAME.twinnySessionContext}-${data.key}`,
+      value: this._sessionManager.get(data.key)
+    })
+  }
+
   public setGlobalContext = (data: ClientMessage) => {
     this._context?.globalState.update(
       `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
@@ -309,11 +398,29 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
+  public newConversation() {
+    this.symmetryService?.write(
+      createSymmetryMessage(SYMMETRY_DATA_MESSAGE.newConversation)
+    )
+  }
+
   public destroyStream = () => {
     this.chatService?.destroyStream()
     this.view?.webview.postMessage({
       type: EVENT_NAME.twinnyStopGeneration
     })
+  }
+
+  private connectToSymmetry = () => {
+    if (this._config.symmetryServerKey) {
+      this.symmetryService?.connect(this._config.symmetryServerKey)
+    }
+  }
+
+  private disconnectSymmetry = async () => {
+    if (this._config.symmetryServerKey) {
+      await this.symmetryService?.disconnect()
+    }
   }
 
   private twinnyHideBackButton() {

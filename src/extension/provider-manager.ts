@@ -1,5 +1,5 @@
 import { ExtensionContext, WebviewView } from 'vscode'
-import { ApiProviders, ClientMessage, ServerMessage } from '../common/types'
+import { apiProviders, ClientMessage, ServerMessage } from '../common/types'
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
@@ -90,7 +90,7 @@ export class ProviderManager {
       id: uuidv4(),
       label: 'Ollama 7B Chat',
       modelName: 'codellama:7b-instruct',
-      provider: ApiProviders.Ollama,
+      provider: apiProviders.Ollama,
       type: 'chat'
     } as TwinnyProvider
   }
@@ -119,7 +119,7 @@ export class ProviderManager {
       label: 'Ollama 7B FIM',
       id: uuidv4(),
       modelName: 'codellama:7b-code',
-      provider: ApiProviders.Ollama,
+      provider: apiProviders.Ollama,
       type: 'fim'
     } as TwinnyProvider
   }

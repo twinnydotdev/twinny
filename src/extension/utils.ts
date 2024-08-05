@@ -17,11 +17,12 @@ const execAsync = util.promisify(exec)
 import {
   Theme,
   LanguageType,
-  ApiProviders,
+  apiProviders,
   StreamResponse,
   StreamRequest,
   PrefixSuffix,
-  Bracket
+  Bracket,
+  ServerMessageKey
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
@@ -306,14 +307,14 @@ export const getChatDataFromProvider = (
   data: StreamResponse
 ) => {
   switch (provider) {
-    case ApiProviders.Ollama:
-    case ApiProviders.OpenWebUI:
+    case apiProviders.Ollama:
+    case apiProviders.OpenWebUI:
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
         : ''
-    case ApiProviders.LlamaCpp:
+    case apiProviders.LlamaCpp:
       return data?.content
-    case ApiProviders.LiteLLM:
+    case apiProviders.LiteLLM:
     default:
       if (data?.choices[0].delta.content === 'undefined') return ''
       return data?.choices[0].delta?.content
@@ -327,12 +328,12 @@ export const getFimDataFromProvider = (
   data: StreamResponse | undefined
 ) => {
   switch (provider) {
-    case ApiProviders.Ollama:
-    case ApiProviders.OpenWebUI:
+    case apiProviders.Ollama:
+    case apiProviders.OpenWebUI:
       return data?.response
-    case ApiProviders.LlamaCpp:
+    case apiProviders.LlamaCpp:
       return data?.content
-    case ApiProviders.LiteLLM:
+    case apiProviders.LiteLLM:
       return data?.choices[0].delta.content
     default:
       if (!data?.choices.length) return
@@ -375,6 +376,25 @@ export function safeParseJsonResponse(
   }
 }
 
+export function safeParseJsonStringBuffer(
+  stringBuffer: string
+): unknown | undefined {
+  try {
+    return JSON.parse(stringBuffer.replace(NORMALIZE_REGEX, ''))
+  } catch (e) {
+    return undefined
+  }
+}
+
+export function safeParseJson<T>(data: string): T | undefined  {
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return undefined;
+  }
+}
+
+
 export const getCurrentWorkspacePath = (): string | undefined => {
   if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
     const workspaceFolder = workspace.workspaceFolders[0]
@@ -412,6 +432,10 @@ export const getTerminalExists = (): boolean => {
     return false
   }
   return true
+}
+
+export function createSymmetryMessage<T>(key: ServerMessageKey, data?: T): string {
+  return JSON.stringify({ key, data });
 }
 
 export const getSanitizedCommitMessage = (commitMessage: string) => {

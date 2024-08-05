@@ -11,7 +11,7 @@ Free and private AI extension for Visual Studio Code.
 
 ## 🚀 Getting Started
 
-Visit the [quick start guide](https://rjmacarthy.github.io/twinny-docs/general/quick-start/) to get started.
+Visit the [quick start guide](https://twinnydotdev.github.io/twinny-docs/general/quick-start/) to get started.
 
 ## Main Features
 
@@ -49,7 +49,7 @@ Visit the GitHub [issues page](https://github.com/rjmacarthy/twinny/issues) for 
 
 ## Contributing
 
-Interested in contributing? Reach out on [Twitter](https://x.com/rjmacarthy), describe your changes in an issue, and submit a PR when ready. Twinny is open-source under the MIT license. See the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) for more details.
+Interested in contributing? Reach out on [Twitter](https://x.com/twinnydotdev), describe your changes in an issue, and submit a PR when ready. Twinny is open-source under the MIT license. See the [LICENSE](https://github.com/rjmacarthy/twinny/blob/master/LICENSE) for more details.
 
 ## Support Twinny
 
@@ -62,11 +62,3 @@ Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
 ## Disclaimer
 
 Twinny is actively developed and provided "as is". Functionality may vary between updates.
-
-## Star History
-
-<picture>
- <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date&theme=dark" />
- <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date" />
- <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rjmacarthy/twinny&type=Date" />
-</picture>

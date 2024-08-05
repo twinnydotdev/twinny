@@ -164,12 +164,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._nonce = this._nonce + 1
     this._statusBar.text = '$(loading~spin)'
     this._statusBar.command = 'twinny.stopGeneration'
-
-    this._parser = await getParser(document.uri.fsPath)
-    this._nodeAtPosition = getNodeAtPosition(
-      this._parser?.parse(this._document?.getText()),
-      this._position
-    )
+    await this.tryParseDocument(document)
 
     this._isMultilineCompletion = getIsMultilineCompletion({
       node: this._nodeAtPosition,
@@ -209,6 +204,24 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         })
       }, this._debounceWait)
     })
+  }
+
+  private async tryParseDocument (document: TextDocument) {
+    try {
+      if (!this._position || !this._document) return
+      const parser = await getParser(document.uri.fsPath)
+
+      if (!parser || !parser.parse) return
+
+      this._parser = parser
+
+      this._nodeAtPosition = getNodeAtPosition(
+        this._parser?.parse(this._document.getText()),
+        this._position
+      )
+    } catch (e) {
+      return
+    }
   }
 
   private buildStreamRequest(prompt: string, provider: TwinnyProvider) {

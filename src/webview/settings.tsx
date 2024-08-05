@@ -13,7 +13,7 @@ import { ClientMessage } from '../common/types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
-export const TemplateSettings = () => {
+export const Settings = () => {
   const { templates, saveTemplates } = useTemplates()
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
   const selectedTemplatesContext =
@@ -68,6 +68,7 @@ export const TemplateSettings = () => {
   return (
     <>
       <h3>Template settings</h3>
+      <h3>Additional settings</h3>
       <p>Select the templates you want to use in the chat interface.</p>
       {templates &&
         templates.map((templateName: string) => (

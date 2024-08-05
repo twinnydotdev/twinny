@@ -16,7 +16,8 @@ import {
   SYSTEM,
   USER,
   RELEVANT_FILE_COUNT,
-  RELEVANT_CODE_COUNT
+  RELEVANT_CODE_COUNT,
+  SYMMETRY_EMITTER_KEY
 } from '../common/constants'
 import {
   StreamResponse,
@@ -36,6 +37,7 @@ import { kebabToSentence } from '../webview/utils'
 import { TwinnyProvider } from './provider-manager'
 import { EmbeddingDatabase } from './embeddings'
 import { Reranker } from './reranker'
+import { SymmetryService } from './symmetry-service'
 
 export class ChatService {
   private _config = workspace.getConfiguration('twinny')
@@ -53,13 +55,15 @@ export class ChatService {
   private _db?: EmbeddingDatabase
   private _reranker: Reranker
   private _documents: EmbeddedDocument[] = []
+  private _symmetryService?: SymmetryService
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string,
     extensionContext: ExtensionContext,
     view: WebviewView,
-    db: EmbeddingDatabase | undefined
+    db: EmbeddingDatabase | undefined,
+    symmetryService: SymmetryService
   ) {
     this._view = view
     this._statusBar = statusBar
@@ -67,12 +71,30 @@ export class ChatService {
     this._reranker = new Reranker(extensionContext)
     this._extensionContext = extensionContext
     this._db = db
+    this._symmetryService = symmetryService
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
         return
       }
       this.updateConfig()
     })
+
+    this.setupSymmetryListeners()
+  }
+
+  private setupSymmetryListeners() {
+    this._symmetryService?.on(
+      SYMMETRY_EMITTER_KEY.inference,
+      (completion: string) => {
+        this._view?.webview.postMessage({
+          type: EVENT_NAME.twinnyOnCompletion,
+          value: {
+            completion: completion.trimStart(),
+            data: getLanguage()
+          }
+        } as ServerMessage)
+      }
+    )
   }
 
   private async getRelevantFiles(text: string | undefined) {
@@ -416,12 +438,11 @@ export class ChatService {
     return this.streamResponse({ requestBody, requestOptions })
   }
 
-  public async streamTemplateCompletion(
+  public async getTemplateMessages(
     promptTemplate: string,
     context?: string,
-    onEnd?: (completion: string) => void,
     skipMessage?: boolean
-  ) {
+  ): Promise<Message[]> {
     this._statusBar.text = '$(loading~spin)'
     const { language } = getLanguage()
     this._completion = ''
@@ -492,7 +513,21 @@ export class ChatService {
       })
     }
 
-    const request = this.buildStreamRequest(conversation)
+    return conversation
+  }
+
+  public async streamTemplateCompletion(
+    promptTemplate: string,
+    context?: string,
+    onEnd?: (completion: string) => void,
+    skipMessage?: boolean
+  ) {
+    const messages = await this.getTemplateMessages(
+      promptTemplate,
+      context,
+      skipMessage
+    )
+    const request = this.buildStreamRequest(messages)
 
     if (!request) return
     const { requestBody, requestOptions } = request
