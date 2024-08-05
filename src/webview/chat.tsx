@@ -302,7 +302,7 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
-        {showProviders && <ProviderSelect />}
+        {showProviders && !symmetryConnection && <ProviderSelect />}
         <div className={styles.chatOptions}>
           <div>
             <VSCodeButton
