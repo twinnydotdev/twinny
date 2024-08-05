@@ -22,6 +22,5 @@ target
 !node_modules/node-gyp-build/**
 !node_modules/streamx/**
 !node_modules/queue-tick/**
-!node_modules/queue-tick/**
 !node_modules/text-decoder/**
 !node_modules/fast-fifo/**

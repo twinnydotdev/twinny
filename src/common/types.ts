@@ -158,7 +158,7 @@ export interface UiTabs {
   [key: string]: JSX.Element
 }
 
-export const ApiProviders = {
+export const apiProviders = {
   LiteLLM: 'litellm',
   LlamaCpp: 'llamacpp',
   LMStudio: 'lmstudio',
@@ -213,7 +213,7 @@ export interface InferenceProvider {
   apiProtocol?: string
   modelName?: string
   name: string
-  type: (typeof ApiProviders)[keyof typeof ApiProviders]
+  type: (typeof apiProviders)[keyof typeof apiProviders]
 }
 
 export interface Peer {
@@ -237,6 +237,9 @@ export interface SymmetryConnection {
   sessionToken?: string
   discoveryKey?: string
   modelName?: string
+  name: string;
+  provider: string;
+  id: string;
 }
 export interface InferenceRequest {
   key: string;

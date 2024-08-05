@@ -8,7 +8,7 @@ import {
   VSCodePanelView,
   VSCodeTextField
 } from '@vscode/webview-ui-toolkit/react'
-import { ApiProviders } from '../common/types'
+import { apiProviders } from '../common/types'
 
 import styles from './providers.module.css'
 import { TwinnyProvider } from '../extension/provider-manager'
@@ -85,7 +85,7 @@ export const Providers = () => {
               {Object.values(providers).map((provider, index) => (
                 <div className={styles.provider} key={index}>
                   <div className={styles.providerHeader}>
-                    {provider.provider === ApiProviders.Ollama &&
+                    {provider.provider === apiProviders.Ollama &&
                       hasOllamaModels && (
                         <ModelSelect
                           models={models}
@@ -95,7 +95,7 @@ export const Providers = () => {
                           }
                         />
                       )}
-                    {provider.provider !== ApiProviders.Ollama && (
+                    {provider.provider !== apiProviders.Ollama && (
                       <VSCodeTextField
                         required
                         name="modelName"
@@ -220,7 +220,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
   const hasOllamaModels = !!models?.length
 
   const getModelInput = () => {
-    if (formState.provider === ApiProviders.Ollama && hasOllamaModels) {
+    if (formState.provider === apiProviders.Ollama && hasOllamaModels) {
       return (
         <>
           <div>
@@ -315,7 +315,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             onChange={handleChangeDropdown}
             value={formState.provider}
           >
-            {Object.values(ApiProviders).map((type, index) => (
+            {Object.values(apiProviders).map((type, index) => (
               <VSCodeOption key={index} value={type}>
                 {type}
               </VSCodeOption>

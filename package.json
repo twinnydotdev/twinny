@@ -379,8 +379,22 @@
           "default": "llama3.1:latest",
           "description": "The symmetry model name for chat."
         },
-        "twinny.symmetryServerKey": {
+        "twinny.symmetryProvider": {
           "order": 19,
+          "type": "string",
+          "description": "The symmetry provider type.",
+          "enum": [
+            "litellm",
+            "llamacpp",
+            "lmstudio",
+            "ollama",
+            "oobabooga",
+            "openwebui"
+          ],
+          "default": "ollama"
+        },
+        "twinny.symmetryServerKey": {
+          "order": 20,
           "type": "string",
           "description": "The symmetry master server key.",
           "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"

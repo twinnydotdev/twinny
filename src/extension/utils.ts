@@ -17,7 +17,7 @@ const execAsync = util.promisify(exec)
 import {
   Theme,
   LanguageType,
-  ApiProviders,
+  apiProviders,
   StreamResponse,
   StreamRequest,
   PrefixSuffix,
@@ -306,14 +306,14 @@ export const getChatDataFromProvider = (
   data: StreamResponse
 ) => {
   switch (provider) {
-    case ApiProviders.Ollama:
-    case ApiProviders.OpenWebUI:
+    case apiProviders.Ollama:
+    case apiProviders.OpenWebUI:
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
         : ''
-    case ApiProviders.LlamaCpp:
+    case apiProviders.LlamaCpp:
       return data?.content
-    case ApiProviders.LiteLLM:
+    case apiProviders.LiteLLM:
     default:
       if (data?.choices[0].delta.content === 'undefined') return ''
       return data?.choices[0].delta?.content
@@ -327,12 +327,12 @@ export const getFimDataFromProvider = (
   data: StreamResponse | undefined
 ) => {
   switch (provider) {
-    case ApiProviders.Ollama:
-    case ApiProviders.OpenWebUI:
+    case apiProviders.Ollama:
+    case apiProviders.OpenWebUI:
       return data?.response
-    case ApiProviders.LlamaCpp:
+    case apiProviders.LlamaCpp:
       return data?.content
-    case ApiProviders.LiteLLM:
+    case apiProviders.LiteLLM:
       return data?.choices[0].delta.content
     default:
       if (!data?.choices.length) return

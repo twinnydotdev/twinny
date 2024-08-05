@@ -257,7 +257,7 @@ export class ConversationHistory {
       return
 
     if (
-      this._sessionManager.get(EXTENSION_SESSION_NAME.twinnySymmetryConnected)
+      this._sessionManager.get(EXTENSION_SESSION_NAME.twinnySymmetryConnection)
     ) {
       this._symmetryService?.write(
         createSymmetryMessage(SYMMETRY_DATA_MESSAGE.inference, {

@@ -143,7 +143,7 @@ export const EXTENSION_CONTEXT_NAME = {
 }
 
 export const EXTENSION_SESSION_NAME = {
-  twinnySymmetryConnected: 'twinnySymmetryConnected'
+  twinnySymmetryConnection: 'twinnySymmetryConnection'
 }
 
 export const WEBUI_TABS = {

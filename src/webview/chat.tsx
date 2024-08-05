@@ -18,6 +18,7 @@ import {
 import useAutosizeTextArea, {
   useConversationHistory,
   useSelection,
+  useSymmetryConnection,
   useTheme,
   useWorkSpaceContext
 } from './hooks'
@@ -45,6 +46,7 @@ export const Chat = () => {
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
+  const { symmetryConnection } = useSymmetryConnection()
   const autoScrollContext = useWorkSpaceContext<boolean>(
     WORKSPACE_STORAGE_KEY.autoScroll
   )
@@ -341,13 +343,25 @@ export const Chat = () => {
                 <span className="codicon codicon-debug-stop"></span>
               </VSCodeButton>
             )}
-            <VSCodeButton
-              title="Select active providers"
-              appearance="icon"
-              onClick={handleToggleProviderSelection}
-            >
-              <span className={styles.textIcon}>🤖</span>
-            </VSCodeButton>
+            {!symmetryConnection && (
+              <VSCodeButton
+                title="Select active providers"
+                appearance="icon"
+                onClick={handleToggleProviderSelection}
+              >
+                <span className={styles.textIcon}>🤖</span>
+              </VSCodeButton>
+            )}
+            {!!symmetryConnection && (
+              <a href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}>
+                <VSCodeBadge
+                  title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
+                >
+                  ⚡️{' '}
+                  {symmetryConnection?.name}
+                </VSCodeBadge>
+              </a>
+            )}
           </div>
         </div>
         <form>
@@ -366,7 +380,7 @@ export const Chat = () => {
 
                   handleSubmitForm(target.value)
                 } else if (e.ctrlKey && e.key === 'Enter') {
-                setInputText(`${target.value}\n`)
+                  setInputText(`${target.value}\n`)
                 }
               }}
               onChange={(e) => {

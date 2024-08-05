@@ -13,6 +13,7 @@ import {
   Conversation,
   LanguageType,
   ServerMessage,
+  SymmetryConnection,
   ThemeType
 } from '../common/types'
 import { TwinnyProvider } from '../extension/provider-manager'
@@ -428,10 +429,12 @@ const useAutosizeTextArea = (
 export const useSymmetryConnection = () => {
   const [autoConnect, setAutoConnect] = useState(false)
   const [connecting, setConnecting] = useState(false)
-  const { context: isConnected, setContext: setIsConnected } =
-    useSessionContext<boolean>(EXTENSION_SESSION_NAME.twinnySymmetryConnected)
-
-  console.log('symmetry connected', isConnected)
+  const {
+    context: symmetryConnectionSession,
+    setContext: setSymmetryConnectionSession
+  } = useSessionContext<SymmetryConnection>(
+    EXTENSION_SESSION_NAME.twinnySymmetryConnection
+  )
 
   const connectToSymmetry = () => {
     setConnecting(true)
@@ -448,21 +451,21 @@ export const useSymmetryConnection = () => {
   }
 
   const handler = (event: MessageEvent) => {
-    const message: ServerMessage<ApiModel[]> = event.data
+    const message: ServerMessage<SymmetryConnection> = event.data
     if (message?.type === EVENT_NAME.twinnyConnectedToSymmetry) {
       setConnecting(false)
-      setIsConnected(true)
+      setSymmetryConnectionSession(message.value.data)
     }
     if (message?.type === EVENT_NAME.twinnyDisconnectedFromSymmetry) {
       setConnecting(false)
-      setIsConnected(false)
+      setSymmetryConnectionSession(undefined)
     }
     return () => window.removeEventListener('message', handler)
   }
 
   useEffect(() => {
-    if (isConnected !== undefined) {
-      setIsConnected(isConnected)
+    if (symmetryConnectionSession !== undefined) {
+      setSymmetryConnectionSession(symmetryConnectionSession)
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
@@ -471,10 +474,11 @@ export const useSymmetryConnection = () => {
   return {
     connectToSymmetry,
     disconnectSymmetry,
-    isConnected,
+    isConnected: symmetryConnectionSession !== undefined,
     autoConnect,
     setAutoConnect,
-    connecting
+    connecting,
+    symmetryConnection: symmetryConnectionSession,
   }
 }
 

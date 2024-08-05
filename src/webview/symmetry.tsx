@@ -1,4 +1,3 @@
-import React from 'react'
 import { useSymmetryConnection } from './hooks'
 import {
   VSCodeButton,
@@ -8,13 +7,27 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import styles from './symmetry.module.css'
+import { TWINNY_COMMAND_NAME } from '../common/constants'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 export const Symmetry = () => {
-  const { isConnected, connectToSymmetry, disconnectSymmetry, connecting } =
-    useSymmetryConnection()
+  const {
+    isConnected,
+    connectToSymmetry,
+    disconnectSymmetry,
+    connecting,
+    symmetryConnection
+  } = useSymmetryConnection()
 
   const handleConnectSymmetry = () => connectToSymmetry()
   const handleDisconnectSymmetry = () => disconnectSymmetry()
+
+  const handleOpenSettings = () => {
+    global.vscode.postMessage({
+      type: TWINNY_COMMAND_NAME.settings,
+    });
+  };
 
   const ConnectionStatus = () => {
     if (connecting) {
@@ -30,47 +43,54 @@ export const Symmetry = () => {
 
   return (
     <div className={styles.symmetryContainer}>
-      <h3>Symmetry <VSCodeBadge>Alpha</VSCodeBadge></h3>
-      <VSCodePanelView>
-        <div className={styles.symmetryPanel}>
-          <div className={styles.statusSection}>
-            <p>
-              Connection status: <ConnectionStatus />
-            </p>
-          </div>
-          <div className={styles.buttonContainer}>
-            {!isConnected ? (
-              <VSCodeButton onClick={handleConnectSymmetry}>
-                {connecting ? 'Connecting...' : 'Connect to Symmetry'}
-              </VSCodeButton>
-            ) : (
-              <VSCodeButton onClick={handleDisconnectSymmetry}>
-                Disconnect from Symmetry
-              </VSCodeButton>
-            )}
-          </div>
-          <VSCodeDivider />
-          <p className={styles.alphaNotice}>
-            <strong>Note:</strong> Symmetry is currently in alpha. Connections may be unstable or fail, especially when there are few active providers on the network.
-          </p>
-          <p>
-            Symmetry is the experimental peer-to-peer network for Twinny. It aims to enable users to
-            connect with each other and share computational resources, enhancing
-            collaboration and distributed processing capabilities. As an alpha feature,
-            it may be unreliable or change significantly in future updates.
-          </p>
-          <p>
-            To learn more about Symmetry and its current status, visit the{' '}
-            <a
-              href="https://twinnydotdev.github.io/twinny-docs/general/symmetry"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              the documentation.
-            </a>.
-          </p>
+    <h3>
+      Symmetry <VSCodeBadge>Alpha</VSCodeBadge>
+    </h3>
+    <VSCodePanelView>
+      <div className={styles.symmetryPanel}>
+        <div className={styles.statusSection}>
+          <p>Connection status: <ConnectionStatus /></p>
         </div>
-      </VSCodePanelView>
-    </div>
+
+        {isConnected && (
+          <div className={styles.providerInfo}>
+            <p><b>Provider name:</b> {symmetryConnection?.name}</p>
+            <p><b>Provider model:</b> {symmetryConnection?.modelName}</p>
+            <p><b>Provider type:</b> {symmetryConnection?.provider}</p>
+          </div>
+        )}
+
+        <p>
+          Symmetry is a peer-to-peer AI inference network. It enables users to
+          connect directly and securely with each other. When you connect to
+          Symmetry, the system attempts to match you with a provider based on
+          the <a href='#' onClick={handleOpenSettings}>twinny extension settings</a> for symmetryModelName and symmetryProvider.
+        </p>
+
+        <p>
+          To explore available providers on the Symmetry network or learn how
+          to become a provider yourself, visit the{' '}
+          <a href="https://twinny.dev/symmetry" target="_blank" rel="noopener noreferrer">
+            Symmetry connections page
+          </a>.
+        </p>
+
+        <div className={styles.buttonContainer}>
+          <VSCodeButton onClick={isConnected ? handleDisconnectSymmetry : handleConnectSymmetry}>
+            {connecting ? 'Connecting...' : isConnected ? 'Disconnect from Symmetry' : 'Connect to Symmetry'}
+          </VSCodeButton>
+        </div>
+
+        <VSCodeDivider />
+
+        <p>
+          To learn more about Symmetry, visit the{' '}
+          <a href="https://twinnydotdev.github.io/twinny-docs/general/symmetry" target="_blank" rel="noopener noreferrer">
+            documentation
+          </a>. To adjust Symmetry settings, go to the{' '}
+        </p>
+      </div>
+    </VSCodePanelView>
+  </div>
   )
 }
