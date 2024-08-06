@@ -65,6 +65,26 @@ For code refactoring, use markdown with code formatting.
   `.trim()
   },
   {
+    name: 'relevant-code',
+    template: `
+The following code snippet may be relevant to your query. Please review it and incorporate any pertinent information into your response:
+
+{{{code}}}
+
+If this code is not relevant to the current query, please disregard it and focus on answering based on your general knowledge.
+    `.trim()
+  },
+  {
+    name: 'relevant-files',
+    template: `
+The following file paths may be relevant to your query:
+
+{{{code}}}
+
+Please consider these files in your response if they are pertinent. If they are not relevant to the current query, please disregard them and focus on answering based on your general knowledge.
+    `.trim()
+  },
+  {
     name: 'commit-message',
     template: `You are an agent who generates concise git commit messages.
 Only reply with one line of text.

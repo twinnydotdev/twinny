@@ -10,24 +10,23 @@ ort.env.wasm.numThreads = 1
 const logger = new Logger()
 
 export class Reranker {
-  private _tokenizer: Toxe | null
-  private _session: ort.InferenceSession | null
+  private _tokenizer: Toxe | null = null
+  private _session: ort.InferenceSession | null = null
+  private readonly _modelPath: string
+  private readonly _tokenizerPath: string
 
   constructor() {
-    this._tokenizer = null
-    this._session = null
+    this._modelPath = path.join(__dirname, 'models', 'reranker.onnx')
+    this._tokenizerPath = path.join(__dirname, 'models', 'spm.model')
     this.init()
   }
 
-  public async init() {
+  public async init(): Promise<void> {
     try {
-      await this.loadModel()
-      const modelPath = path.join(__dirname, 'models', 'spm.model')
-      logger.log('Loading tokenizer...')
-      this._tokenizer = new Toxe(modelPath)
-      console.log('Tokenizer loaded')
+      await Promise.all([this.loadModel(), this.loadTokenizer()])
+      logger.log('Reranker initialized successfully')
     } catch (error) {
-      console.error('Error loading tokenizer:', error)
+      console.error(error)
     }
   }
 
@@ -65,25 +64,39 @@ export class Reranker {
 
     const probabilities = Array.prototype.slice.call(data).map(this.sigmoid)
 
-    logger.log(`Reranked samples: \n
-      ${Array.from(new Set(samples))
-        .map((s, i) => `${i + 1}. ${s}: ${probabilities[i].toFixed(3)}`.trim())
-        .join('\n')}
-    `.trim())
+    logger.log(
+      `Reranked samples: \n${this.formatResults(samples, probabilities)}`
+    )
 
     return probabilities
   }
 
-  public async loadModel() {
+  private formatResults(samples: string[], probabilities: number[]): string {
+    return Array.from(new Set(samples))
+      .map((s, i) => `${i + 1}. ${s}: ${probabilities[i].toFixed(3)}`.trim())
+      .join('\n')
+  }
+
+  private async loadModel(): Promise<void> {
     try {
-      const modelPath = path.join(__dirname, 'models', 'reranker.onnx')
-      console.log(`Loading model from ${modelPath}`)
-      this._session = await ort.InferenceSession.create(modelPath, {
+      this._session = await ort.InferenceSession.create(this._modelPath, {
         executionProviders: ['wasm']
       })
-      logger.log(`Model loaded from ${modelPath}`)
-    } catch (e) {
-      console.error('Error loading model', e)
+      logger.log(`Model loaded from ${this._modelPath}`)
+    } catch (error) {
+      console.error('Error loading model:', error)
+      throw error
+    }
+  }
+
+  private async loadTokenizer(): Promise<void> {
+    try {
+      logger.log('Loading tokenizer...')
+      this._tokenizer = new Toxe(this._tokenizerPath)
+      logger.log('Tokenizer loaded')
+    } catch (error) {
+      console.error('Error loading tokenizer:', error)
+      throw error
     }
   }
 }

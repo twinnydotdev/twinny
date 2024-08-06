@@ -7,6 +7,7 @@ import {
   ExtensionContext
 } from 'vscode'
 import * as path from 'path'
+import * as fs from 'fs/promises'
 
 import {
   EXTENSION_CONTEXT_NAME,
@@ -59,6 +60,8 @@ export class ChatService {
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
+  private readonly MAX_FILE_SIZE = 1000000
+  private readonly READ_THRESHOLD = 0.27
 
   constructor(
     statusBar: StatusBarItem,
@@ -100,39 +103,36 @@ export class ChatService {
     )
   }
 
-  private async getRelevantFiles(text: string | undefined) {
-    if (!this._db || !text || !workspace.name) return
+  private async getRelevantFiles(text: string | undefined): Promise<string[]> {
+    if (!this._db || !text || !workspace.name) return []
+
     const table = `${workspace.name}-file-paths`
     if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
 
-      if (!embedding) return
+      if (!embedding) return []
 
       const filePaths =
-        (await this._db.getDocuments(
-          embedding,
-          RELEVANT_FILE_COUNT,
-          `${workspace.name}-file-paths`
-        )) || []
+        (await this._db.getDocuments(embedding, RELEVANT_FILE_COUNT, table)) ||
+        []
 
-      if (!filePaths.length) {
-        return
-      }
+      if (!filePaths.length) return []
 
-      return await this.rerankFiles(
+      return this.rerankFiles(
         text,
-        filePaths?.map((f) => f.content)
+        filePaths.map((f) => f.content)
       )
     }
+
     return []
   }
 
   private getRerankThreshold() {
     const rerankThresholdContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRerankThreshold}`
-    const stored = (this._context?.globalState.get(rerankThresholdContext) as number)
-    const rerankThreshold =
-      stored ||
-      DEFAULT_RERANK_THRESHOLD
+    const stored = this._context?.globalState.get(
+      rerankThresholdContext
+    ) as number
+    const rerankThreshold = stored || DEFAULT_RERANK_THRESHOLD
 
     return rerankThreshold
   }
@@ -145,9 +145,11 @@ export class ChatService {
 
     const rerankThreshold = this.getRerankThreshold()
 
-    logger.log(`
+    logger.log(
+      `
       Reranking threshold: ${rerankThreshold}
-    `.trim())
+    `.trim()
+    )
 
     const fileNames = filePaths?.map((filePath) => path.basename(filePath))
 
@@ -155,63 +157,90 @@ export class ChatService {
 
     if (!scores) return []
 
-    const relevantFilePaths =
-      filePaths
-        ?.map((filePath, index) =>
-          scores[index] > rerankThreshold ? filePath : ''
-        )
-        .filter(Boolean) || []
+    const relevantFilePaths = filePaths
+      ?.map((filePath, index) =>
+        scores[index] > rerankThreshold ? filePath : ''
+      )
+      .filter((_, index) => scores[index] > this.READ_THRESHOLD)
 
     return relevantFilePaths
+  }
+
+  private async readFileContent(
+    filePath: string | undefined
+  ): Promise<string | null> {
+    try {
+      if (!filePath) return ''
+
+      const stats = await fs.stat(filePath)
+
+      if (stats.size > this.MAX_FILE_SIZE) {
+        console.warn(`File ${filePath} exceeds max size. Skipping direct read.`)
+        return null
+      }
+
+      return await fs.readFile(filePath, 'utf-8')
+    } catch (error) {
+      console.error(`Error reading file ${filePath}:`, error)
+      return null
+    }
   }
 
   private async getRelevantCode(
     text: string | undefined,
     filePaths: string[] | undefined
-  ) {
-    if (!this._db || !text || !workspace.name) return
+  ): Promise<string> {
+    if (!this._db || !text || !workspace.name) return ''
+
     const table = `${workspace.name}-documents`
     const rerankThreshold = this.getRerankThreshold()
 
     if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
 
-      if (!embedding) return
+      if (!embedding) return ''
 
       const query = filePaths?.length
         ? `file IN ("${filePaths.join('","')}")`
         : ''
 
-      this._documents =
+      const documents =
         (await this._db.getDocuments(
           embedding,
           RELEVANT_CODE_COUNT,
-          `${workspace.name}-documents`,
+          table,
           query
         )) || []
 
       const scores = await this._reranker.rerank(
         text,
-        this._documents.map((item) =>
-          `
-          ${item.file}
-        `.trim()
-        )
+        documents.map((item) => (item.file ? item.file.trim() : ''))
       )
 
       if (!scores) return ''
 
-      const codeChunks =
-        this._documents
-          ?.map(({ content }, index) =>
-            scores[index] > rerankThreshold ? content : null
-          )
-          .filter(Boolean)
-          .join('\n\n')
-          .trim() || ''
+      // First, try to read highly relevant files directly
+      for (let i = 0; i < documents.length; i++) {
+        if (scores[i] > this.READ_THRESHOLD) {
+          try {
+            const fileContent = await this.readFileContent(documents[i].file)
+            if (fileContent) return fileContent
+          } catch (error) {
+            console.error(`Error reading file ${documents[i].file}:`, error)
+          }
+        }
+      }
+
+      // If direct file reading fails, fall back to chunked content
+      const codeChunks = documents
+        .filter((_, index) => scores[index] > rerankThreshold)
+        .map(({ content }) => content)
+        .join('\n\n')
+        .trim()
 
       return codeChunks
     }
+
     return ''
   }
 
@@ -351,7 +380,7 @@ export class ChatService {
     const selectionContext =
       editor?.document.getText(selection) || context || ''
 
-    const prompt = await this._templateProvider?.renderTemplate<TemplateData>(
+    const prompt = await this._templateProvider?.readTemplate<TemplateData>(
       template,
       {
         code: selectionContext || '',
@@ -399,41 +428,36 @@ export class ChatService {
     } as ServerMessage<string>)
   }
 
-  public async addRagContextIfEnabled(conversation: Message[], text?: string) {
+  public async addRagContextIfEnabled(text?: string): Promise<string | null> {
     const ragContextKey = `${EVENT_NAME.twinnyWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
-
     const isRagEnabled = this._context?.workspaceState.get(ragContextKey)
 
-    if (isRagEnabled) {
-      const relevantFiles = await this.getRelevantFiles(text)
+    if (!isRagEnabled) return null
 
-      let relevantCode = await this.getRelevantCode(text, relevantFiles)
+    const relevantFiles = await this.getRelevantFiles(text)
+    const relevantCode = await this.getRelevantCode(text, relevantFiles)
 
-      if (relevantFiles?.length && !relevantCode) {
-        const promises = []
-        for (const file of relevantFiles) {
-          promises.push(this._db?.getDocumentByFilePath(file))
-        }
+    let combinedContext = ''
 
-        relevantCode = (await Promise.all(promises)).join('\n')
-      }
-
-      if (relevantFiles?.length) {
-        conversation.push({
-          role: USER,
-          content: `Here are some files which might or might not be relevant, decide for yourself and reply with the correct answer: ${relevantFiles.join(
-            ', '
-          )}`
-        })
-      }
-
-      if (relevantCode) {
-        conversation.push({
-          role: USER,
-          content: `Here is the code that might be relevant, decide for yourself and reply with the correct answer: ${relevantCode}`
-        })
-      }
+    if (relevantFiles?.length) {
+      const filesTemplate =
+        await this._templateProvider?.readTemplate<TemplateData>(
+          'relevant-files',
+          { code: relevantFiles.join(', ') }
+        )
+      combinedContext += filesTemplate + '\n\n'
     }
+
+    if (relevantCode) {
+      const codeTemplate =
+        await this._templateProvider?.readTemplate<TemplateData>(
+          'relevant-code',
+          { code: relevantCode }
+        )
+      combinedContext += codeTemplate
+    }
+
+    return combinedContext.trim() || null
   }
 
   public async streamChatCompletion(messages: Message[]) {
@@ -452,18 +476,30 @@ export class ChatService {
       )
     }
 
-    const conversation = [systemMessage, ...messages]
+    let additionalContext = ''
 
     if (userSelection) {
-      conversation.push({
-        role: USER,
-        content: `This is the code that the user is selecting: ${userSelection}`
-      })
+      additionalContext += `Selected Code:\n${userSelection}\n\n`
     }
 
-    await this.addRagContextIfEnabled(conversation, text)
+    const ragContext = await this.addRagContextIfEnabled(text)
+    if (ragContext) {
+      additionalContext += `Additional Context:\n${ragContext}\n\n`
+    }
 
-    const request = this.buildStreamRequest(conversation)
+    const updatedMessages = [systemMessage, ...messages.slice(0, -1)]
+
+    if (additionalContext) {
+      const lastMessageContent = `${text}\n\n${additionalContext.trim()}`
+      updatedMessages.push({
+        role: USER,
+        content: lastMessageContent
+      })
+    } else {
+      updatedMessages.push(lastMessage)
+    }
+
+    const request = this.buildStreamRequest(updatedMessages)
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions })
@@ -479,6 +515,7 @@ export class ChatService {
     this._completion = ''
     this._promptTemplate = promptTemplate
     this.sendEditorLanguage()
+
     const { prompt, selection } = await this.buildTemplatePrompt(
       promptTemplate,
       language,
@@ -507,15 +544,18 @@ export class ChatService {
       )
     }
 
-    const conversation = [
+    const ragContext = await this.addRagContextIfEnabled(selection)
+    const userContent = ragContext
+      ? `${prompt}\n\nAdditional Context:\n${ragContext}`
+      : prompt
+
+    const conversation: Message[] = [
       systemMessage,
       {
         role: USER,
-        content: prompt
+        content: userContent
       }
     ]
-
-    await this.addRagContextIfEnabled(conversation, selection)
 
     return conversation
   }

@@ -415,7 +415,7 @@ export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 
 export const MULTI_LINE_DELIMITERS = ['\n\n', '\r\n\r\n']
 
-export const RELEVANT_FILE_COUNT = 5 // todo make this configurable
+export const RELEVANT_FILE_COUNT = 10 // todo make this configurable
 
 export const RELEVANT_CODE_COUNT = 5 // todo make this configurable
 

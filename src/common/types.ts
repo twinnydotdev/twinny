@@ -99,9 +99,9 @@ export interface DefaultTemplate {
 }
 
 export interface TemplateData extends Record<string, string | undefined> {
-  systemMessage?: string
   code: string
-  language: string
+  systemMessage?: string
+  language?: string
 }
 
 export interface FimTemplateData extends Record<string, string | undefined> {
@@ -244,6 +244,12 @@ export interface SymmetryConnection {
 export interface InferenceRequest {
   key: string;
   messages: Message[];
+}
+
+export interface ChunkOptions {
+  minSize?: number
+  maxSize?: number
+  overlap?: number
 }
 
 export type Embedding = {

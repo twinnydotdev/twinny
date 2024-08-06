@@ -22,7 +22,8 @@ import {
   PrefixSuffix,
   Bracket,
   ServerMessageKey,
-  Message
+  Message,
+  ChunkOptions
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
@@ -452,47 +453,121 @@ export const getSanitizedCommitMessage = (commitMessage: string) => {
 export const getNormalisedText = (text: string) =>
   text.replace(NORMALIZE_REGEX, ' ')
 
-function getSplitChunks(chunks: string[], node: SyntaxNode): void {
-  for (const child of node.children) {
-    if (child.text.length > 100) {
-      getSplitChunks(chunks, child)
-      continue
+function getSplitChunks(node: SyntaxNode, options: ChunkOptions): string[] {
+  const { minSize = 50, maxSize = 500 } = options
+  const chunks: string[] = []
+
+  function traverse(node: SyntaxNode) {
+    if (node.text.length <= maxSize && node.text.length >= minSize) {
+      chunks.push(node.text)
+    } else if (node.children.length > 0) {
+      for (const child of node.children) {
+        traverse(child)
+      }
+    } else if (node.text.length > maxSize) {
+      // If a leaf node is too large, split it manually
+      let start = 0
+      while (start < node.text.length) {
+        const end = Math.min(start + maxSize, node.text.length)
+        chunks.push(node.text.slice(start, end))
+        start = end
+      }
     }
-    chunks.push(child.text)
   }
+
+  traverse(node)
+  return chunks
 }
 
 export async function getDocumentSplitChunks(
   content: string,
   filePath: string,
-  chunkSize = 500
+  options: ChunkOptions = {}
 ): Promise<string[]> {
+  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+
   try {
     const parser = await getParser(filePath)
 
-    if (!parser) return []
+    if (!parser) {
+      logger.log(
+        `No parser available for file ${filePath}. Falling back to simple chunking.`
+      )
+      return simpleChunk(content, { minSize, maxSize, overlap })
+    }
 
     const tree = parser.parse(content)
-    const chunks: string[] = []
+    const chunks = getSplitChunks(tree.rootNode, { minSize, maxSize })
 
-    getSplitChunks(chunks, tree.rootNode)
+    return combineChunks(chunks, { minSize, maxSize, overlap })
+  } catch (error) {
+    console.error(`Error parsing file ${filePath}: ${error}`)
+    return simpleChunk(content, { minSize, maxSize, overlap })
+  }
+}
 
-    const finalChunks = []
-    let buffer = ''
-    for (const chunk of chunks) {
-      if (buffer.length + chunk.length < chunkSize) {
-        buffer += chunk + ' '
+function combineChunks(chunks: string[], options: ChunkOptions): string[] {
+  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+  const result: string[] = []
+  let currentChunk = ''
+
+  for (const chunk of chunks) {
+    if (currentChunk.length + chunk.length > maxSize) {
+      if (currentChunk.length >= minSize) {
+        result.push(currentChunk)
+        currentChunk = chunk
       } else {
-        finalChunks.push(buffer.trim())
-        buffer = chunk + ' '
+        currentChunk += ' ' + chunk
+      }
+    } else {
+      currentChunk += (currentChunk ? ' ' : '') + chunk
+    }
+    if (currentChunk.length >= maxSize - overlap) {
+      result.push(currentChunk)
+      currentChunk = currentChunk.slice(-overlap)
+    }
+  }
+
+  if (currentChunk.length >= minSize) {
+    result.push(currentChunk)
+  }
+
+  return result
+}
+
+function simpleChunk(content: string, options: ChunkOptions): string[] {
+  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+  const chunks: string[] = []
+  let start = 0
+
+  while (start < content.length) {
+    const end = Math.min(start + maxSize, content.length)
+    const chunk = content.slice(start, end)
+
+    try {
+      chunks.push(chunk)
+    } catch (error) {
+      if (
+        error instanceof RangeError &&
+        error.message.includes('Invalid array length')
+      ) {
+        logger.log(
+          'Maximum array size reached. Returning chunks processed so far.'
+        )
+        break
+      } else {
+        throw error
       }
     }
 
-    return finalChunks
-  } catch {
-    logger.log(`Could not parse file ${filePath}.`)
-    return []
+    start = end - overlap > start ? end - overlap : end
+
+    if (end === content.length) break
   }
+
+  return chunks.filter(
+    (chunk, index) => chunk.length >= minSize || index === chunks.length - 1
+  )
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
