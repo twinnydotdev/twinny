@@ -465,7 +465,6 @@ function getSplitChunks(node: SyntaxNode, options: ChunkOptions): string[] {
         traverse(child)
       }
     } else if (node.text.length > maxSize) {
-      // If a leaf node is too large, split it manually
       let start = 0
       while (start < node.text.length) {
         const end = Math.min(start + maxSize, node.text.length)

@@ -219,7 +219,6 @@ export class ChatService {
 
       if (!scores) return ''
 
-      // First, try to read highly relevant files directly
       for (let i = 0; i < documents.length; i++) {
         if (scores[i] > this.READ_THRESHOLD) {
           try {
@@ -231,7 +230,6 @@ export class ChatService {
         }
       }
 
-      // If direct file reading fails, fall back to chunked content
       const codeChunks = documents
         .filter((_, index) => scores[index] > rerankThreshold)
         .map(({ content }) => content)
@@ -506,18 +504,18 @@ export class ChatService {
   }
 
   public async getTemplateMessages(
-    promptTemplate: string,
+    template: string,
     context?: string,
     skipMessage?: boolean
   ): Promise<Message[]> {
     this._statusBar.text = '$(loading~spin)'
     const { language } = getLanguage()
     this._completion = ''
-    this._promptTemplate = promptTemplate
+    this._promptTemplate = template
     this.sendEditorLanguage()
 
     const { prompt, selection } = await this.buildTemplatePrompt(
-      promptTemplate,
+      template,
       language,
       context
     )
@@ -530,8 +528,7 @@ export class ChatService {
       this._view?.webview.postMessage({
         type: EVENT_NAME.twinngAddMessage,
         value: {
-          completion:
-            kebabToSentence(promptTemplate) + '\n\n' + '```\n' + selection,
+          completion: kebabToSentence(template) + '\n\n' + '```\n' + selection,
           data: getLanguage()
         }
       } as ServerMessage)
@@ -544,7 +541,12 @@ export class ChatService {
       )
     }
 
-    const ragContext = await this.addRagContextIfEnabled(selection)
+    let ragContext = undefined
+
+    if (['explain'].includes(template)) {
+      ragContext = await this.addRagContextIfEnabled(selection)
+    }
+
     const userContent = ragContext
       ? `${prompt}\n\nAdditional Context:\n${ragContext}`
       : prompt

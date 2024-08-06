@@ -181,7 +181,6 @@ export class EmbeddingDatabase {
         return
       }
 
-      // Have to reindex all if the table already exists
       await this._db?.dropTable(`${this._workspaceName}-documents`)
       await this._db?.dropTable(`${this._workspaceName}-file-paths`)
       await this.populateDatabase()
