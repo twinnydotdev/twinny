@@ -22,12 +22,14 @@ async function installLanceDb() {
     binaryName = '@lancedb/lancedb-linux-x64-gnu';
   } else if (platform === 'darwin' && arch === 'arm64') {
     binaryName = '@lancedb/lancedb-darwin-arm64';
+  } else if (platform === 'win32' && arch === 'x64') {
+    binaryName = '@lancedb/lancedb-win32-x64-msvc';
   }
 
   const target = path.join(__dirname, `../out/node_modules/${binaryName}`);
+
   fs.mkdirSync(target, { recursive: true });
 
-  // Copy the binary file to the output directory
   await new Promise((resolve, reject) => {
     ncp(
       path.join(__dirname, `../node_modules/${binaryName}`),
