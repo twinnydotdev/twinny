@@ -14,9 +14,6 @@ import {
 import {
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   EMBEDDING_IGNORE_LIST,
-  EVENT_NAME,
-  EXTENSION_CONTEXT_NAME,
-  DEFAULT_RERANK_THRESHOLD,
 } from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
 import { getDocumentSplitChunks } from './utils'
@@ -38,12 +35,6 @@ export class EmbeddingDatabase {
   constructor(dbPath: string, extensionContext: vscode.ExtensionContext) {
     this._dbPath = dbPath
     this._extensionContext = extensionContext
-    const rerankThresholdContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRerankThreshold}`
-
-    this._extensionContext?.globalState.update(
-      rerankThresholdContext,
-      DEFAULT_RERANK_THRESHOLD
-    )
   }
 
   public async connect() {

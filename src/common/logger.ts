@@ -6,7 +6,7 @@ export class Logger {
 
   public log = (message: string) => {
     if (!this._debugEnabled) return
-    console.log(message)
+    console.log(`[twinny] ${message}`)
   }
 
   public error = (err: NodeJS.ErrnoException) => {

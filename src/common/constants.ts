@@ -24,7 +24,7 @@ export const IMPORT_SEPARATOR = [',', '{']
 export const SKIP_IMPORT_KEYWORDS_AFTER = ['from', 'as', 'import']
 export const MIN_COMPLETION_CHUNKS = 2
 export const MAX_EMPTY_COMPLETION_CHARS = 250
-export const DEFAULT_RERANK_THRESHOLD = 0.007
+export const DEFAULT_RERANK_THRESHOLD = 0.2
 
 export const EVENT_NAME = {
   twinngAddMessage: 'twinny-add-message',
@@ -34,7 +34,7 @@ export const EVENT_NAME = {
   twinnyClickSuggestion: 'twinny-click-suggestion',
   twinnyConnectedToSymmetry: 'twinny-connected-to-symmetry',
   twinnyConnectSymmetry: 'twinny-connect-symmetry',
-  twinnyDisconnectedFromSymmetry : 'twinny-disconnected-from-symmetry',
+  twinnyDisconnectedFromSymmetry: 'twinny-disconnected-from-symmetry',
   twinnyDisconnectSymmetry: 'twinny-disconnect-symmetry',
   twinnyEmbedDocuments: 'twinny-embed-documents',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
@@ -64,7 +64,7 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context',
+  twinnyWorkspaceContext: 'twinny-workspace-context'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -88,17 +88,17 @@ export const TWINNY_COMMAND_NAME = {
   stopGeneration: 'twinny.stopGeneration',
   templateCompletion: 'twinny.templateCompletion',
   templates: 'twinny.templates',
-  twinnySymmetryTab: 'twinny.symmetry',
+  twinnySymmetryTab: 'twinny.symmetry'
 }
 
 export const CONVERSATION_EVENT_NAME = {
+  clearAllConversations: 'twinny.clear-all-conversations',
   getActiveConversation: 'twinny.get-active-conversation',
   getConversations: 'twinny.get-conversations',
   removeConversation: 'twinny.remove-conversation',
   saveConversation: 'twinny.save-conversation',
   saveLastConversation: 'twinny.save-last-conversation',
-  setActiveConversation: 'twinny.set-active-conversation',
-  clearAllConversations: 'twinny.clear-all-conversations'
+  setActiveConversation: 'twinny.set-active-conversation'
 }
 
 export const PROVIDER_EVENT_NAME = {
@@ -112,14 +112,15 @@ export const PROVIDER_EVENT_NAME = {
   removeProvider: 'twinny.remove-provider',
   resetProvidersToDefaults: 'twinny.reset-providers-to-defaults',
   setActiveChatProvider: 'twinny.set-active-chat-provider',
-  setActiveFimProvider: 'twinny.set-active-fim-provider',
   setActiveEmbeddingsProvider: 'twinny.set-active-embeddings-provider',
+  setActiveFimProvider: 'twinny.set-active-fim-provider',
   updateProvider: 'twinny.update-provider'
 }
 
 export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
-export const ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY = 'twinny.active-embeddings-provider'
 export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
+export const ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY =
+  'twinny.active-embeddings-provider'
 export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
 export const CONVERSATION_STORAGE_KEY = 'twinny.conversations'
 export const INFERENCE_PROVIDERS_STORAGE_KEY = 'twinny.inference-providers'
@@ -130,8 +131,8 @@ export const WORKSPACE_STORAGE_KEY = {
   downloadCancelled: 'downloadCancelled',
   selectedTemplates: 'selectedTemplates',
   selection: 'selection',
-  showProviders: 'showProviders',
   showEmbeddingOptions: 'showEmbeddingOptions',
+  showProviders: 'showProviders'
 }
 
 export const EXTENSION_SETTING_KEY = {
@@ -143,13 +144,13 @@ export const EXTENSION_SETTING_KEY = {
 
 export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: 'twinnyConversationHistory',
-  twinnySymmetryTab: 'twinnySymmetryTab',
+  twinnyEnableRag: 'twinnyEnableRag',
   twinnyGeneratingText: 'twinnyGeneratingText',
   twinnyManageProviders: 'twinnyManageProviders',
   twinnyManageTemplates: 'twinnyManageTemplates',
-  twinnyEnableRag: 'twinnyEnableRag',
   twinnyRerankThreshold: 'twinnyRerankThreshold',
-} as  const
+  twinnySymmetryTab: 'twinnySymmetryTab'
+}
 
 export const EXTENSION_SESSION_NAME = {
   twinnySymmetryConnection: 'twinnySymmetryConnection'
@@ -218,62 +219,62 @@ export const TITLE_GENERATION_PROMPT_MESAGE = `
 `
 
 export const WASM_LANGAUAGES: { [key: string]: string } = {
-  cpp: 'cpp',
-  hpp: 'cpp',
-  cc: 'cpp',
-  cxx: 'cpp',
-  hxx: 'cpp',
-  cs: 'c_sharp',
+  'php-s': 'php',
+  bash: 'bash',
   c: 'c',
-  h: 'c',
+  cc: 'cpp',
+  cjs: 'javascript',
+  cpp: 'cpp',
+  cs: 'c_sharp',
   css: 'css',
+  cts: 'typescript',
+  cxx: 'cpp',
+  eex: 'embedded_template',
+  el: 'elisp',
+  elm: 'elm',
+  emacs: 'elisp',
+  erb: 'ruby',
+  ex: 'elixir',
+  exs: 'elixir',
+  go: 'go',
+  h: 'c',
+  heex: 'embedded_template',
+  hpp: 'cpp',
+  htm: 'html',
+  html: 'html',
+  hxx: 'cpp',
+  java: 'java',
+  js: 'javascript',
+  json: 'json',
+  jsx: 'javascript',
+  leex: 'embedded_template',
+  lua: 'lua',
+  mjs: 'javascript',
+  ml: 'ocaml',
+  mli: 'ocaml',
+  mts: 'typescript',
+  ocaml: 'ocaml',
   php: 'php',
-  phtml: 'php',
   php3: 'php',
   php4: 'php',
   php5: 'php',
   php7: 'php',
   phps: 'php',
-  'php-s': 'php',
-  bash: 'bash',
-  sh: 'bash',
-  json: 'json',
-  ts: 'typescript',
-  mts: 'typescript',
-  cts: 'typescript',
-  tsx: 'tsx',
-  vue: 'vue',
-  elm: 'elm',
-  js: 'javascript',
-  jsx: 'javascript',
-  mjs: 'javascript',
-  cjs: 'javascript',
+  phtml: 'php',
   py: 'python',
-  pyw: 'python',
   pyi: 'python',
-  el: 'elisp',
-  emacs: 'elisp',
-  ex: 'elixir',
-  exs: 'elixir',
-  go: 'go',
-  eex: 'embedded_template',
-  heex: 'embedded_template',
-  leex: 'embedded_template',
-  html: 'html',
-  htm: 'html',
-  java: 'java',
-  lua: 'lua',
-  ocaml: 'ocaml',
-  ml: 'ocaml',
-  mli: 'ocaml',
+  pyw: 'python',
   ql: 'ql',
+  rb: 'ruby',
+  rdl: 'systemrdl',
   res: 'rescript',
   resi: 'rescript',
-  rb: 'ruby',
-  erb: 'ruby',
   rs: 'rust',
-  rdl: 'systemrdl',
-  toml: 'toml'
+  sh: 'bash',
+  toml: 'toml',
+  ts: 'typescript',
+  tsx: 'tsx',
+  vue: 'vue'
 }
 
 // TODO: We could have an extendable regex for this
@@ -369,8 +370,8 @@ export const EMBEDDING_IGNORE_LIST = [
   'storybook-static',
   'svg',
   'target',
-  'test-results',
   'temp',
+  'test-results',
   'test',
   'Test',
   'tests',
@@ -389,12 +390,12 @@ export const EMBEDDING_IGNORE_LIST = [
 
 export const MULTILINE_OUTSIDE = [
   'class_body',
+  'class',
+  'export',
+  'identifier',
   'interface_body',
   'interface',
-  'class',
-  'program',
-  'identifier',
-  'export'
+  'program'
 ]
 
 export const MULTILINE_INSIDE = [
@@ -414,40 +415,28 @@ export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 
 export const MULTI_LINE_DELIMITERS = ['\n\n', '\r\n\r\n']
 
-export const MULTI_LINE_REACT = [
-  'jsx_closing_element',
-  'jsx_element',
-  'jsx_element',
-  'jsx_opening_element',
-  'jsx_self_closing_element'
-]
+export const RELEVANT_FILE_COUNT = 5 // todo make this configurable
 
-export const IGNORE_EMBDDING_NODES = [
-  'lexical_declaration',
-  'import_declaration',
-  'export_declaration',
-]
+export const RELEVANT_CODE_COUNT = 5 // todo make this configurable
 
-export const RELEVANT_FILE_COUNT = 5
-export const RELEVANT_CODE_COUNT = 5
 export const SYMMETRY_DATA_MESSAGE = {
+  disconnect: 'disconnect',
   heartbeat: 'heartbeat',
   inference: 'inference',
   inferenceEnd: 'inferenceEnd',
   join: 'join',
   leave: 'leave',
   newConversation: 'newConversation',
+  ping: 'ping',
+  pong: 'pong',
   providerDetails: 'providerDetails',
   reportCompletion: 'reportCompletion',
   requestProvider: 'requestProvider',
   sessionValid: 'sessionValid',
-  verifySession: 'verifySession',
-  disconnect: 'disconnect',
-  ping: 'ping',
-  pong: 'pong',
+  verifySession: 'verifySession'
 } as const
 
 export const SYMMETRY_EMITTER_KEY = {
-  inference: 'inference',
   conversationTitle: 'conversationTitle',
+  inference: 'inference'
 }

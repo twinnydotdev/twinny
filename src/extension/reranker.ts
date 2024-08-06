@@ -1,14 +1,13 @@
 import * as ort from 'onnxruntime-web'
 import * as path from 'path'
 import { Toxe } from 'toxe'
+import { Logger } from '../common/logger'
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 ort.env.wasm.numThreads = 1
 
-export const getTransmuter = async () => {
-  return module
-}
+const logger = new Logger()
 
 export class Reranker {
   private _tokenizer: Toxe | null
@@ -24,7 +23,7 @@ export class Reranker {
     try {
       await this.loadModel()
       const modelPath = path.join(__dirname, 'models', 'spm.model')
-      console.log('Loading tokenizer...')
+      logger.log('Loading tokenizer...')
       this._tokenizer = new Toxe(modelPath)
       console.log('Tokenizer loaded')
     } catch (error) {
@@ -66,6 +65,12 @@ export class Reranker {
 
     const probabilities = Array.prototype.slice.call(data).map(this.sigmoid)
 
+    logger.log(`Reranked samples: \n
+      ${Array.from(new Set(samples))
+        .map((s, i) => `${i + 1}. ${s}: ${probabilities[i].toFixed(3)}`.trim())
+        .join('\n')}
+    `.trim())
+
     return probabilities
   }
 
@@ -76,7 +81,7 @@ export class Reranker {
       this._session = await ort.InferenceSession.create(modelPath, {
         executionProviders: ['wasm']
       })
-      console.log(`Model loaded from ${modelPath}`)
+      logger.log(`Model loaded from ${modelPath}`)
     } catch (e) {
       console.error('Error loading model', e)
     }

@@ -249,10 +249,16 @@ pre code {
 
 .embeddingOptions vscode-dropdown {
   width: 100%;
+  margin-bottom: 7px;
 }
 
 .embeddingOptions .slider {
   width: 100%;
+  transform: translateX(-4px);
+}
+
+.embeddingOptions .sliderLabel {
+  transform: translateY(-9px);
 }
 
 

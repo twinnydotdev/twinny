@@ -39,6 +39,9 @@ import { TwinnyProvider } from './provider-manager'
 import { EmbeddingDatabase } from './embeddings'
 import { Reranker } from './reranker'
 import { SymmetryService } from './symmetry-service'
+import { Logger } from '../common/logger'
+
+const logger = new Logger()
 
 export class ChatService {
   private _completion = ''
@@ -126,8 +129,9 @@ export class ChatService {
 
   private getRerankThreshold() {
     const rerankThresholdContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRerankThreshold}`
+    const stored = (this._context?.globalState.get(rerankThresholdContext) as number)
     const rerankThreshold =
-      (this._context?.globalState.get(rerankThresholdContext) as number) ||
+      stored ||
       DEFAULT_RERANK_THRESHOLD
 
     return rerankThreshold
@@ -140,6 +144,10 @@ export class ChatService {
     if (!this._db || !text || !workspace.name || !filePaths?.length) return []
 
     const rerankThreshold = this.getRerankThreshold()
+
+    logger.log(`
+      Reranking threshold: ${rerankThreshold}
+    `.trim())
 
     const fileNames = filePaths?.map((filePath) => path.basename(filePath))
 

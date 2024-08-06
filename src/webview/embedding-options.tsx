@@ -23,8 +23,10 @@ export const EmbeddingOptions = () => {
   const { context: enableRagContext, setContext: setEnableRagContext } =
     useWorkSpaceContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableRag)
 
-  const { context: rerankThreshold, setContext: setRerankThreshold } =
-    useGlobalContext<number>(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold, 0.007)
+  const { context: rerankThreshold = 0.1, setContext: setRerankThreshold } =
+    useGlobalContext<number>(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)
+
+  const embeddingProviders = Object.values(getProvidersByType('embedding'))
 
   const handleEmbedDocuments = () => {
     global.vscode.postMessage({
@@ -57,16 +59,27 @@ export const EmbeddingOptions = () => {
     })
   }
 
+  if (!embeddingProviders) {
+    return (
+      <div className={styles.embeddingOptions}>
+        <p>
+          No providers found for type: 'embedding', please add an embedding
+          provider...
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.embeddingOptions}>
-      <p>
-        <div>Select embedding provider</div>
+      <div>
+        <div>Embedding provider</div>
         <VSCodeDropdown
           value={embeddingProvider?.id}
           name="provider"
           onChange={handleChangeEmbeddingProvider}
         >
-          {Object.values(getProvidersByType('embedding'))
+          {embeddingProviders
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>
@@ -74,34 +87,31 @@ export const EmbeddingOptions = () => {
               </VSCodeOption>
             ))}
         </VSCodeDropdown>
-      </p>
-      <p>
-        <>
-          <div>
-            <label htmlFor="threshold">
-              Rerank probability threshold ({rerankThreshold})
-            </label>
-          </div>
-          <input
-            className={styles.slider}
-            type="range"
-            onChange={handleThresholdChange}
-            id="threshold"
-            name="threshold"
-            min="0.002"
-            max="0.01"
-            value={rerankThreshold}
-            step="0.0002"
-          />
-          <div>
-            <small>
-              The lower the threshold, the more documents will be returned (can
-              be changed at any time).
-            </small>
-          </div>
-        </>
-      </p>
-      <p>
+      </div>
+      <div>
+        <div>
+          <label htmlFor="threshold">
+            Rerank probability threshold ({rerankThreshold})
+          </label>
+        </div>
+        <input
+          className={styles.slider}
+          type="range"
+          onChange={handleThresholdChange}
+          id="threshold"
+          name="threshold"
+          min="0.01"
+          max="0.5"
+          value={rerankThreshold}
+          step="0.01"
+        />
+        <div className={styles.sliderLabel}>
+          <small>
+            The lower the threshold, the more likely a result is to be included.
+          </small>
+        </div>
+      </div>
+      <div>
         <div className={styles.vscodeCheckbox}>
           <label htmlFor="enableRag">
             <VSCodeCheckbox
@@ -110,20 +120,18 @@ export const EmbeddingOptions = () => {
               onClick={handleChangeEnableRag}
               checked={enableRagContext}
             ></VSCodeCheckbox>
-            <span>
-              Enable RAG (Retrival Augmented Generation)
-            </span>
+            <span>Enable retrieval augmented generation (RAG)</span>
           </label>
         </div>
-      </p>
-      <p>
+      </div>
+      <div>
         <VSCodeButton
           onClick={handleEmbedDocuments}
           className={styles.embedDocumentsButton}
         >
           Embed workspace documents
         </VSCodeButton>
-      </p>
+      </div>
     </div>
   )
 }

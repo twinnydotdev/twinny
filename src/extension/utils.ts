@@ -19,10 +19,10 @@ import {
   LanguageType,
   apiProviders,
   StreamResponse,
-  StreamRequest,
   PrefixSuffix,
   Bracket,
-  ServerMessageKey
+  ServerMessageKey,
+  Message
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
@@ -495,13 +495,20 @@ export async function getDocumentSplitChunks(
   }
 }
 
-export const logStreamOptions = (opts: StreamRequest) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const logStreamOptions = (opts: any) => {
   logger.log(
     `
 ***Twinny Stream Debug***\n\
 Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
 Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
 Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
+Number characters in all messages = ${opts.body.messages.reduce(
+      (acc: number, msg: Message) => {
+        return msg.content?.length ? acc + msg.content?.length : 0
+      },
+      0
+    )}\n\n
     `
   )
 }

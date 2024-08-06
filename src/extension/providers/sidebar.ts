@@ -14,7 +14,7 @@ import {
   TWINNY_COMMAND_NAME,
   SYMMETRY_DATA_MESSAGE,
   SYMMETRY_EMITTER_KEY,
-  SYSTEM
+  SYSTEM,
 } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -85,6 +85,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this._db,
       this.symmetryService
     )
+
     this.conversationHistory = new ConversationHistory(
       this._context,
       this.view,
@@ -150,13 +151,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
           [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
           [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
-          [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
+          [EVENT_NAME.twinnySessionContext]: this.getSessionContext
         }
         eventHandlers[message.type as string]?.(message)
       }
     )
   }
-
 
   public openSettings() {
     vscode.commands.executeCommand(TWINNY_COMMAND_NAME.settings)
@@ -249,7 +249,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         content: await this._templateProvider?.readSystemMessageTemplate()
       }
 
-      const messages = [systemMessage, ...data.data as Message[]]
+      const messages = [systemMessage, ...(data.data as Message[])]
 
       logger.log(`
         Using symmetry for inference
@@ -257,10 +257,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       `)
 
       return this.symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
-          messages,
-          key: SYMMETRY_EMITTER_KEY.inference
-        })
+        createSymmetryMessage<InferenceRequest>(
+          SYMMETRY_DATA_MESSAGE.inference,
+          {
+            messages,
+            key: SYMMETRY_EMITTER_KEY.inference
+          }
+        )
       )
     }
     this.chatService?.streamChatCompletion(data.data || [])
@@ -278,10 +281,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         Messages: ${JSON.stringify(messages)}
       `)
       return this.symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
-          messages,
-          key: SYMMETRY_EMITTER_KEY.inference
-        })
+        createSymmetryMessage<InferenceRequest>(
+          SYMMETRY_DATA_MESSAGE.inference,
+          {
+            messages,
+            key: SYMMETRY_EMITTER_KEY.inference
+          }
+        )
       )
     }
     this.chatService?.streamTemplateCompletion(template)
@@ -313,16 +319,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       language: lang.languageId
     })
     await vscode.window.showTextDocument(document)
-  }
-
-  public getGlobalContext = (data: ClientMessage) => {
-    const storedData = this._context?.globalState.get(
-      `${EVENT_NAME.twinnyGlobalContext}-${data.key}`
-    )
-    this.view?.webview.postMessage({
-      type: `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
-      value: storedData
-    })
   }
 
   public getTheme = () => {
@@ -370,6 +366,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
+  public getGlobalContext = (data: ClientMessage) => {
+    const storedData = this._context?.globalState.get(
+      `${EVENT_NAME.twinnyGlobalContext}-${data.key}`
+    )
+    this.view?.webview.postMessage({
+      type: `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
+      value: storedData
+    })
+  }
+
   public setGlobalContext = (data: ClientMessage) => {
     this._context?.globalState.update(
       `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
@@ -398,7 +404,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       value
     })
   }
-
 
   public newConversation() {
     this.symmetryService?.write(
@@ -439,7 +444,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       'assets',
       'codicon.css'
     )
-
 
     const css = webview.asWebviewUri(
       vscode.Uri.joinPath(this._context.extensionUri, 'out', 'sidebar.css')
