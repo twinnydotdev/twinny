@@ -259,5 +259,5 @@ export type Embedding = {
 export type EmbeddedDocument = {
   content: string
   vector: number[] | undefined
-  file?: string
+  file: string
 }

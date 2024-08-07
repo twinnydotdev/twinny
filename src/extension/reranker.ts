@@ -34,41 +34,46 @@ export class Reranker {
     return 1 / (1 + Math.exp(-value))
   }
 
-  public async rerank(sample: string, samples: string[]) {
-    const ids = await this._tokenizer?.encode(sample, samples)
-    if (!ids?.length) return
-    const buffer = new ArrayBuffer(ids.length * 8)
-    const inputIdsBigInt64Array = new BigInt64Array(buffer)
-    const inputIds = ids.map((id) => BigInt(id))
-    inputIdsBigInt64Array.set(inputIds)
+  public async rerank(sample: string, samples: string[]): Promise<number[] | undefined> {
+    const ids = await this._tokenizer?.encode(sample, samples);
+    if (!ids?.length) return undefined;
 
+    const inputIds = ids.map((id) => BigInt(id));
     const inputTensor = new ort.Tensor('int64', BigInt64Array.from(inputIds), [
       samples.length,
       inputIds.length / samples.length
-    ])
+    ]);
 
     const attentionMaskTensor = new ort.Tensor(
       'int64',
       new BigInt64Array(inputIds.length).fill(1n),
       [samples.length, inputIds.length / samples.length]
-    )
+    );
 
     const output = await this._session?.run({
       input_ids: inputTensor,
       attention_mask: attentionMaskTensor
-    })
+    });
 
-    if (!output) return []
+    if (!output) return undefined;
 
-    const data = await output.logits.getData()
+    const data = await output.logits.getData();
+    const logits = Array.prototype.slice.call(data);
 
-    const probabilities = Array.prototype.slice.call(data).map(this.sigmoid)
+    const normalizedProbabilities = this.softmax(logits);
 
     logger.log(
-      `Reranked samples: \n${this.formatResults(samples, probabilities)}`
-    )
+      `Reranked samples: \n${this.formatResults(samples, normalizedProbabilities)}`
+    );
 
-    return probabilities
+    return normalizedProbabilities;
+  }
+
+  private softmax(logits: number[]): number[] {
+    const maxLogit = Math.max(...logits);
+    const scores = logits.map(l => Math.exp(l - maxLogit));
+    const sum = scores.reduce((a, b) => a + b, 0);
+    return scores.map(s => s / sum);
   }
 
   private formatResults(samples: string[], probabilities: number[]): string {

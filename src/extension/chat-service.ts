@@ -61,7 +61,6 @@ export class ChatService {
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
   private readonly MAX_FILE_SIZE = 1000000
-  private readonly READ_THRESHOLD = 0.27
 
   constructor(
     statusBar: StatusBarItem,
@@ -103,7 +102,9 @@ export class ChatService {
     )
   }
 
-  private async getRelevantFiles(text: string | undefined): Promise<string[]> {
+  private async getRelevantFiles(
+    text: string | undefined
+  ): Promise<[string, number][]> {
     if (!this._db || !text || !workspace.name) return []
 
     const table = `${workspace.name}-file-paths`
@@ -157,38 +158,42 @@ export class ChatService {
 
     if (!scores) return []
 
-    const relevantFilePaths = filePaths
-      ?.map((filePath, index) =>
-        scores[index] > rerankThreshold ? filePath : ''
-      )
-      .filter((_, index) => scores[index] > this.READ_THRESHOLD)
+    const fileScorePairs: [string, number][] = filePaths.map(
+      (filePath, index) => {
+        return [filePath, scores[index]]
+      }
+    )
 
-    return relevantFilePaths
+    return fileScorePairs
   }
 
   private async readFileContent(
-    filePath: string | undefined
+    filePath: string | undefined,
+    maxFileSize: number = 5 * 1024
   ): Promise<string | null> {
-    try {
-      if (!filePath) return ''
+    if (!filePath) return null
 
+    try {
       const stats = await fs.stat(filePath)
 
-      if (stats.size > this.MAX_FILE_SIZE) {
-        console.warn(`File ${filePath} exceeds max size. Skipping direct read.`)
+      if (stats.size > maxFileSize) {
         return null
       }
 
-      return await fs.readFile(filePath, 'utf-8')
+      if (stats.size === 0) {
+        return ''
+      }
+
+      const content = await fs.readFile(filePath, 'utf-8')
+      return content
     } catch (error) {
-      console.error(`Error reading file ${filePath}:`, error)
       return null
     }
   }
 
   private async getRelevantCode(
     text: string | undefined,
-    filePaths: string[] | undefined
+    relevantFiles: [string, number][]
   ): Promise<string> {
     if (!this._db || !text || !workspace.name) return ''
 
@@ -200,8 +205,8 @@ export class ChatService {
 
       if (!embedding) return ''
 
-      const query = filePaths?.length
-        ? `file IN ("${filePaths.join('","')}")`
+      const query = relevantFiles?.length
+        ? `file IN ("${relevantFiles.map((file) => file[0]).join('","')}")`
         : ''
 
       const documents =
@@ -212,31 +217,35 @@ export class ChatService {
           query
         )) || []
 
-      const scores = await this._reranker.rerank(
+      const documentScores = await this._reranker.rerank(
         text,
-        documents.map((item) => (item.file ? item.file.trim() : ''))
+        documents.map((item) => (item.content ? item.content.trim() : ''))
       )
 
-      if (!scores) return ''
+      if (!documentScores) return ''
 
-      for (let i = 0; i < documents.length; i++) {
-        if (scores[i] > this.READ_THRESHOLD) {
+      const readThreshould = rerankThreshold
+
+      const readFileChunks = []
+
+      for (let i = 0; i < relevantFiles.length; i++) {
+        if (relevantFiles[i][1] > readThreshould) {
           try {
-            const fileContent = await this.readFileContent(documents[i].file)
-            if (fileContent) return fileContent
+            const fileContent = await this.readFileContent(relevantFiles[i][0])
+            readFileChunks.push(fileContent)
           } catch (error) {
-            console.error(`Error reading file ${documents[i].file}:`, error)
+            console.error(`Error reading file ${relevantFiles[i][0]}:`, error)
           }
         }
       }
 
-      const codeChunks = documents
-        .filter((_, index) => scores[index] > rerankThreshold)
+      const documentChunks = documents
+        .filter((_, index) => documentScores[index] > rerankThreshold)
         .map(({ content }) => content)
+
+      return [readFileChunks.filter(Boolean), documentChunks.filter(Boolean)]
         .join('\n\n')
         .trim()
-
-      return codeChunks
     }
 
     return ''
@@ -441,7 +450,7 @@ export class ChatService {
       const filesTemplate =
         await this._templateProvider?.readTemplate<TemplateData>(
           'relevant-files',
-          { code: relevantFiles.join(', ') }
+          { code: relevantFiles.map((file) => file[0]).join(', ') }
         )
       combinedContext += filesTemplate + '\n\n'
     }

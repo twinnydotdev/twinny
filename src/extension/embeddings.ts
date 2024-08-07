@@ -41,7 +41,7 @@ export class EmbeddingDatabase {
     try {
       this._db = await lancedb.connect(this._dbPath)
     } catch (e) {
-      debugger
+      console.error(e)
     }
   }
 
@@ -141,7 +141,8 @@ export class EmbeddingDatabase {
 
           this._filePaths.push({
             content: filePath,
-            vector: filePathEmbedding
+            vector: filePathEmbedding,
+            file: filePath
           })
 
           for (const chunk of chunks) {

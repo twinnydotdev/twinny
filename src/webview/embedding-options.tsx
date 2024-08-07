@@ -100,8 +100,8 @@ export const EmbeddingOptions = () => {
           onChange={handleThresholdChange}
           id="threshold"
           name="threshold"
-          min="0.01"
-          max="0.5"
+          min="0.05"
+          max="0.15"
           value={rerankThreshold}
           step="0.01"
         />
