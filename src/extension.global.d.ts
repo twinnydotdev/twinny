@@ -1,4 +1,3 @@
-declare module '@lancedb/vectordb-linux-x64-gnu'
 declare module 'hyperswarm'
 declare module 'b4a'
 
