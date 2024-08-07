@@ -87,7 +87,7 @@ export const Symmetry = () => {
           To learn more about Symmetry, visit the{' '}
           <a href="https://twinnydotdev.github.io/twinny-docs/general/symmetry" target="_blank" rel="noopener noreferrer">
             documentation
-          </a>. To adjust Symmetry settings, go to the{' '}
+          </a>.
         </p>
       </div>
     </VSCodePanelView>
