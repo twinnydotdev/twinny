@@ -224,18 +224,9 @@
         "when": "editorTextFocus && !editorReadonly"
       },
       {
-        "key": "CTRL+SHIFT+Z CTRL+SHIFT+T",
-        "command": "twinny.sidebar.focus",
-        "when": "editorTextFocus && !editorReadonly"
-      },
-      {
         "key": "CTRL+SHIFT+/",
         "command": "twinny.stopGeneration",
         "when": "twinnyGeneratingText"
-      },
-      {
-        "key": "CTRL+SHIFT+Z CTRL+SHIFT+G",
-        "command": "twinny.getGitCommitMessage"
       }
     ],
     "viewsContainers": {
