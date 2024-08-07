@@ -13,9 +13,8 @@ import { copy } from 'esbuild-plugin-copy';
     outdir: 'out',
     platform: 'node',
     sourcemap: true,
-    inject: ['./scripts/meta.js'],
-    define: { 'import.meta.url': 'importMetaUrl' },
     loader: { '.node': 'file' },
+    assetNames: '[name]',
     plugins: [
       copy({
         resolveFrom: 'cwd',

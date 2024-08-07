@@ -36,7 +36,6 @@ import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
 
 export async function activate(context: ExtensionContext) {
-  console.log('Electron version:', process.versions.electron)
   setContext(context)
   const config = workspace.getConfiguration('twinny')
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)

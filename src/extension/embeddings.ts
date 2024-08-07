@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import * as vscode from 'vscode'
 import { fetchEmbedding } from './stream'
-import * as lancedb from 'vectordb'
+import * as lancedb from '@lancedb/lancedb'
 import { minimatch } from 'minimatch'
 
 import {
@@ -13,7 +13,7 @@ import {
 } from '../common/types'
 import {
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
-  EMBEDDING_IGNORE_LIST,
+  EMBEDDING_IGNORE_LIST
 } from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
 import { getDocumentSplitChunks } from './utils'
@@ -38,7 +38,11 @@ export class EmbeddingDatabase {
   }
 
   public async connect() {
-    this._db = await lancedb.connect(this._dbPath)
+    try {
+      this._db = await lancedb.connect(this._dbPath)
+    } catch (e) {
+      debugger
+    }
   }
 
   private getProvider = () =>
@@ -206,10 +210,8 @@ export class EmbeddingDatabase {
     try {
       const table = await this._db?.openTable(tableName)
       const query = await table?.search(vector).limit(limit)
-
       if (where) query?.where(where)
-
-      return query?.execute()
+      return query?.toArray()
     } catch (e) {
       return undefined
     }
