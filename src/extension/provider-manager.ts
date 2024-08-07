@@ -164,9 +164,14 @@ export class ProviderManager {
         ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
         provider
       )
-    } else {
+    } else if (provider.type === 'fim') {
       this._context.globalState.update(
         ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+        provider
+      )
+    } else {
+      this._context.globalState.update(
+        ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
         provider
       )
     }
