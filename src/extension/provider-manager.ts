@@ -129,6 +129,7 @@ export class ProviderManager {
   addDefaultProviders() {
     this.addDefaultChatProvider()
     this.addDefaultFimProvider()
+    this.addDefaultEmbeddingsProvider()
   }
 
   addDefaultChatProvider(): TwinnyProvider {
