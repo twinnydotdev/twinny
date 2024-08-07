@@ -40,6 +40,14 @@ import { copy } from 'esbuild-plugin-copy';
             to: './out/node_modules/b4a'
           },
           {
+            from: './node_modules/udx-native/build/Release/udx.node',
+            to: './out/udx.node'
+          },
+          {
+            from: './node_modules/sodium-native/build/Release/sodium.node',
+            to: './out/sodium.node'
+          },
+          {
             from: './node_modules/node-gyp-build/**',
             to: './out/node_modules/node-gyp-build'
           },
