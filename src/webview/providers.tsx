@@ -279,9 +279,9 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             onChange={handleChangeDropdown}
             value={formState.type}
           >
-            {['chat', 'fim'].map((type, index) => (
+            {['chat', 'fim', 'embedding'].map((type, index) => (
               <VSCodeOption key={index} value={type}>
-                {type === 'chat' ? 'Chat' : 'FIM'}
+                {type}
               </VSCodeOption>
             ))}
           </VSCodeDropdown>

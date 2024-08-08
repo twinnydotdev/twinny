@@ -116,7 +116,7 @@ export class TemplateProvider {
     return templateNames
   }
 
-  public async renderTemplate<T extends DefaultTemplate>(
+  public async readTemplate<T extends DefaultTemplate>(
     templateName: string,
     data: T
   ) {

@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.12.6",
+  "version": "3.13.0",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -346,32 +346,39 @@
           "description": "The API port usually `11434`",
           "required": false
         },
-        "twinny.keepAlive": {
+        "twinny.embeddingModel": {
           "order": 15,
+          "type": "string",
+          "default": "nomic-embed-text",
+          "description": "The embedding model to use (Ollama only)",
+          "required": false
+        },
+        "twinny.keepAlive": {
+          "order": 16,
           "type": "string",
           "default": "5m",
           "description": "Keep models in memory by making requests with keep_alive=-1. Applicable only for Ollama API."
         },
         "twinny.ollamaUseTls": {
-          "order": 16,
+          "order": 17,
           "type": "boolean",
           "default": false,
           "description": "Enables TLS encryption Ollama API connections."
         },
         "twinny.enableLogging": {
-          "order": 17,
+          "order": 18,
           "type": "boolean",
           "default": true,
           "description": "Enable twinny debug mode"
         },
         "twinny.symmetryModelName": {
-          "order": 18,
+          "order": 19,
           "type": "string",
           "default": "llama3.1:latest",
           "description": "The symmetry model name for chat."
         },
         "twinny.symmetryProvider": {
-          "order": 19,
+          "order": 20,
           "type": "string",
           "description": "The symmetry provider type.",
           "enum": [
@@ -385,7 +392,7 @@
           "default": "ollama"
         },
         "twinny.symmetryServerKey": {
-          "order": 20,
+          "order": 21,
           "type": "string",
           "description": "The symmetry master server key.",
           "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
@@ -409,7 +416,6 @@
   "devDependencies": {
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
     "@types/async-lock": "^1.4.2",
-    "@types/handlebars": "^4.1.0",
     "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
@@ -420,15 +426,14 @@
     "@types/vscode": "^1.70.0",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
+    "@vscode/test-cli": "^0.0.6",
     "@vscode/test-electron": "^2.3.10",
     "@vscode/vsce": "^2.18.0",
     "copy-webpack-plugin": "^12.0.2",
     "css-loader": "^6.8.1",
     "esbuild": "^0.21.4",
+    "esbuild-css-modules-plugin": "^3.1.2",
     "esbuild-plugin-copy": "^2.1.1",
-    "eslint": "^8.20.0",
-    "glob": "^10.3.10",
-    "hyperbee": "^2.19.6",
     "jest": "^29.7.0",
     "mocha": "^10.3.0",
     "ncp": "^2.0.0",
@@ -437,35 +442,35 @@
     "tree-sitter-wasms": "^0.1.7",
     "ts-loader": "^9.5.1",
     "typescript": "^4.7.4",
-    "vectordb": "^0.5.0",
     "web-tree-sitter": "^0.22.1"
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.5.2",
     "@types/react": "^18.2.46",
     "@vscode/codicons": "^0.0.35",
+    "@vscode/vsce": "^2.31.1",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
     "async-lock": "^1.4.1",
     "b4a": "^1.6.6",
     "classnames": "^2.5.1",
-    "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
+    "handlebars": "^4.7.8",
     "hypercore-crypto": "^3.4.2",
     "hyperswarm": "^4.7.15",
     "minimatch": "^9.0.4",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
     "pear-stdio": "^1.0.1",
-    "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "react-syntax-highlighter": "^15.5.0",
+    "react": "^18.2.0",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0",
     "string_score": "^0.1.22",
-    "uuid": "^9.0.1",
-    "vsce": "^2.15.0"
+    "toxe": "^1.1.0",
+    "uuid": "^9.0.1"
   }
 }

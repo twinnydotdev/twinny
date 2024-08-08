@@ -4,7 +4,7 @@ import {
   Conversation,
   Message,
   ServerMessage,
-  StreamBodyBase,
+  RequestBodyBase,
   StreamRequestOptions,
   StreamResponse
 } from '../common/types'
@@ -100,7 +100,7 @@ export class ConversationHistory {
     requestBody,
     requestOptions
   }: {
-    requestBody: StreamBodyBase
+    requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
     onEnd?: (completion: string) => void
   }): Promise<string> {

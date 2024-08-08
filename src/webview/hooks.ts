@@ -43,17 +43,27 @@ export const useSelection = (onSelect?: () => void) => {
 }
 
 export const useGlobalContext = <T>(key: string) => {
-  const [context, setContext] = useState<T>()
+  const [context, setContextState] = useState<T | undefined>()
 
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     if (message?.type === `${EVENT_NAME.twinnyGlobalContext}-${key}`) {
-      setContext(event.data.value)
+      setContextState(event.data.value)
     }
+  }
+
+  const setContext = (value: T) => {
+    setContextState(value)
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnySetGlobalContext,
+      key,
+      data: value
+    })
   }
 
   useEffect(() => {
     window.addEventListener('message', handler)
+
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyGlobalContext,
       key
@@ -107,7 +117,7 @@ export const useWorkSpaceContext = <T>(key: string) => {
     return () => window.removeEventListener('message', handler)
   }, [])
 
-  return context
+  return { context, setContext }
 }
 
 export const useTheme = () => {
@@ -127,6 +137,25 @@ export const useTheme = () => {
     return () => window.removeEventListener('message', handler)
   }, [])
   return theme
+}
+
+export const useLoading = () => {
+  const [loader, setLoader] = useState<string | undefined>()
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<string> = event.data
+    if (message?.type === EVENT_NAME.twinnySendLoader) {
+      setLoader(message?.value.data)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnySendLoader
+    })
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+  return loader
 }
 
 export const useLanguage = (): LanguageType | undefined => {
@@ -180,6 +209,7 @@ export const useProviders = () => {
   const [providers, setProviders] = useState<Record<string, TwinnyProvider>>({})
   const [chatProvider, setChatProvider] = useState<TwinnyProvider>()
   const [fimProvider, setFimProvider] = useState<TwinnyProvider>()
+  const [embeddingProvider, setEmbeddingProvider] = useState<TwinnyProvider>()
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<
       Record<string, TwinnyProvider> | TwinnyProvider
@@ -200,6 +230,12 @@ export const useProviders = () => {
       if (message.value.data) {
         const provider = message.value.data as TwinnyProvider
         setFimProvider(provider)
+      }
+    }
+    if (message?.type === PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider) {
+      if (message.value.data) {
+        const provider = message.value.data as TwinnyProvider
+        setEmbeddingProvider(provider)
       }
     }
     return () => window.removeEventListener('message', handler)
@@ -240,6 +276,13 @@ export const useProviders = () => {
     } as ClientMessage<TwinnyProvider>)
   }
 
+  const setActiveEmbeddingsProvider = (provider: TwinnyProvider) => {
+    global.vscode.postMessage({
+      type: PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider,
+      data: provider
+    } as ClientMessage<TwinnyProvider>)
+  }
+
   const setActiveChatProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.setActiveChatProvider,
@@ -247,7 +290,7 @@ export const useProviders = () => {
     } as ClientMessage<TwinnyProvider>)
   }
 
-  const getFimProvidersByType = (type: string) => {
+  const getProvidersByType = (type: string) => {
     return Object.values(providers).filter(
       (provider) => provider.type === type
     ) as TwinnyProvider[]
@@ -269,22 +312,27 @@ export const useProviders = () => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveFimProvider
     })
+    global.vscode.postMessage({
+      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider
+    })
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
   }, [])
 
   return {
-    providers,
     chatProvider,
-    fimProvider,
-    saveProvider,
     copyProvider,
-    resetProviders,
-    updateProvider,
+    embeddingProvider,
+    fimProvider,
+    getProvidersByType,
+    providers,
     removeProvider,
-    setActiveFimProvider,
+    resetProviders,
+    saveProvider,
     setActiveChatProvider,
-    getFimProvidersByType
+    setActiveEmbeddingsProvider,
+    setActiveFimProvider,
+    updateProvider
   }
 }
 
@@ -478,7 +526,7 @@ export const useSymmetryConnection = () => {
     autoConnect,
     setAutoConnect,
     connecting,
-    symmetryConnection: symmetryConnectionSession,
+    symmetryConnection: symmetryConnectionSession
   }
 }
 

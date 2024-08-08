@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import {
   VSCodeButton,
   VSCodePanelView,
-  VSCodeProgressRing,
-  VSCodeBadge
+  VSCodeBadge,
+  VSCodeDivider,
 } from '@vscode/webview-ui-toolkit/react'
 
 import {
@@ -12,7 +12,8 @@ import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   USER,
-  SYMMETRY_EMITTER_KEY
+  SYMMETRY_EMITTER_KEY,
+  EXTENSION_CONTEXT_NAME
 } from '../common/constants'
 
 import useAutosizeTextArea, {
@@ -22,7 +23,12 @@ import useAutosizeTextArea, {
   useTheme,
   useWorkSpaceContext
 } from './hooks'
-import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from './icons'
+import {
+  DisabledAutoScrollIcon,
+  DisabledRAGIcon,
+  EnabledAutoScrollIcon,
+  EnabledRAGIcon
+} from './icons'
 
 import { Suggestions } from './suggestions'
 import {
@@ -34,6 +40,8 @@ import { Message } from './message'
 import { getCompletionContent } from './utils'
 import styles from './index.module.css'
 import { ProviderSelect } from './provider-select'
+import { EmbeddingOptions } from './embedding-options'
+import ChatLoader from './chat-loader'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -47,26 +55,25 @@ export const Chat = () => {
   const [completion, setCompletion] = useState<MessageType | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
   const { symmetryConnection } = useSymmetryConnection()
-  const autoScrollContext = useWorkSpaceContext<boolean>(
-    WORKSPACE_STORAGE_KEY.autoScroll
-  )
-  const showProvidersContext = useWorkSpaceContext<boolean>(
-    WORKSPACE_STORAGE_KEY.showProviders
-  )
-  const [showProviders, setShowProviders] = useState<boolean | undefined>(
-    showProvidersContext || false
-  )
-  const [isAutoScrolledEnabled, setIsAutoScrolledEnabled] = useState<
-    boolean | undefined
-  >(autoScrollContext)
+
+  const { context: autoScrollContext, setContext: setAutoScrollContext } =
+    useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.autoScroll)
+  const { context: showProvidersContext, setContext: setShowProvidersContext } =
+    useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showProviders)
+  const {
+    context: showEmbeddingOptionsContext,
+    setContext: setShowEmbeddingOptionsContext
+  } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
+  const { context: enableRagContext, setContext: setEnableRagContext } =
+    useWorkSpaceContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableRag)
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
   useAutosizeTextArea(chatRef, inputText)
 
-  const scrollBottom = () => {
-    if (!isAutoScrolledEnabled) return
+  const scrollToBottom = () => {
+    if (!autoScrollContext) return
     setTimeout(() => {
       if (markdownRef.current) {
         markdownRef.current.scrollTop = markdownRef.current.scrollHeight
@@ -74,7 +81,7 @@ export const Chat = () => {
     }, 200)
   }
 
-  const selection = useSelection(scrollBottom)
+  const selection = useSelection(scrollToBottom)
 
   const handleCompletionEnd = (message: ServerMessage) => {
     if (message.value) {
@@ -114,7 +121,7 @@ export const Chat = () => {
     }
     generatingRef.current = true
     setLoading(false)
-    if (isAutoScrolledEnabled) scrollBottom()
+    scrollToBottom()
     setMessages((prev) => [
       ...(prev || []),
       {
@@ -138,12 +145,12 @@ export const Chat = () => {
       language: message.value.data,
       error: message.value.error
     })
-    if (isAutoScrolledEnabled) scrollBottom()
+    scrollToBottom()
   }
 
   const handleLoadingMessage = () => {
     setLoading(true)
-    if (isAutoScrolledEnabled) scrollBottom()
+    if (autoScrollContext) scrollToBottom()
   }
 
   const messageEventHandler = (event: MessageEvent) => {
@@ -210,29 +217,40 @@ export const Chat = () => {
         ]
       } as ClientMessage)
       setMessages((prev) => [...(prev || []), { role: USER, content: input }])
-      if (isAutoScrolledEnabled) scrollBottom()
+      scrollToBottom()
     }
   }
 
   const handleToggleAutoScroll = () => {
-    setIsAutoScrolledEnabled((prev) => {
+    setAutoScrollContext((prev) => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
         key: WORKSPACE_STORAGE_KEY.autoScroll,
         data: !prev
       } as ClientMessage)
 
-      if (!prev) scrollBottom()
+      if (!prev) scrollToBottom()
 
       return !prev
     })
   }
 
   const handleToggleProviderSelection = () => {
-    setShowProviders((prev) => {
+    setShowProvidersContext((prev) => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
         key: WORKSPACE_STORAGE_KEY.showProviders,
+        data: !prev
+      } as ClientMessage)
+      return !prev
+    })
+  }
+
+  const handleToggleEmbeddingOptions = () => {
+    setShowEmbeddingOptionsContext((prev) => {
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnySetWorkspaceContext,
+        key: WORKSPACE_STORAGE_KEY.showEmbeddingOptions,
         data: !prev
       } as ClientMessage)
       return !prev
@@ -251,22 +269,27 @@ export const Chat = () => {
     }
   }
 
+  const handleToggleRag = (): void => {
+    setEnableRagContext((prev) => {
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnySetWorkspaceContext,
+        key: EXTENSION_CONTEXT_NAME.twinnyEnableRag,
+        data: !prev
+      } as ClientMessage)
+      return !prev
+    })
+  }
+
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     chatRef.current?.focus()
-    scrollBottom()
+    scrollToBottom()
     return () => {
       window.removeEventListener('message', messageEventHandler)
     }
-  }, [isAutoScrolledEnabled])
+  }, [autoScrollContext])
 
   useEffect(() => {
-    if (autoScrollContext !== undefined)
-      setIsAutoScrolledEnabled(autoScrollContext)
-
-    if (showProvidersContext !== undefined)
-      setShowProviders(showProvidersContext)
-
     if (conversation?.messages?.length) {
       return setMessages(conversation.messages)
     }
@@ -284,11 +307,7 @@ export const Chat = () => {
           {messages?.map((message) => (
             <Message message={message} theme={theme} />
           ))}
-          {loading && (
-            <div className={styles.loading}>
-              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
-            </div>
-          )}
+          {loading && <ChatLoader />}
           {!!completion && (
             <Message
               theme={theme}
@@ -302,7 +321,13 @@ export const Chat = () => {
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
-        {showProviders && !symmetryConnection && <ProviderSelect />}
+        {showProvidersContext && !symmetryConnection && <ProviderSelect />}
+        {showProvidersContext && showEmbeddingOptionsContext && (
+          <VSCodeDivider />
+        )}
+        {showEmbeddingOptionsContext && !symmetryConnection && (
+          <EmbeddingOptions />
+        )}
         <div className={styles.chatOptions}>
           <div>
             <VSCodeButton
@@ -310,7 +335,7 @@ export const Chat = () => {
               title="Toggle auto scroll on/off"
               appearance="icon"
             >
-              {isAutoScrolledEnabled ? (
+              {autoScrollContext ? (
                 <EnabledAutoScrollIcon />
               ) : (
                 <DisabledAutoScrollIcon />
@@ -330,6 +355,13 @@ export const Chat = () => {
             >
               <span className="codicon codicon-arrow-down"></span>
             </VSCodeButton>
+            <VSCodeButton
+              title="Toggle RAG context for next message"
+              appearance="icon"
+              onClick={handleToggleRag}
+            >
+            {enableRagContext ? <EnabledRAGIcon /> : <DisabledRAGIcon />}
+            </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           <div>
@@ -344,21 +376,31 @@ export const Chat = () => {
               </VSCodeButton>
             )}
             {!symmetryConnection && (
-              <VSCodeButton
-                title="Select active providers"
-                appearance="icon"
-                onClick={handleToggleProviderSelection}
-              >
-                <span className={styles.textIcon}>🤖</span>
-              </VSCodeButton>
+              <>
+                <VSCodeButton
+                  title="Embedding options"
+                  appearance="icon"
+                  onClick={handleToggleEmbeddingOptions}
+                >
+                  <span className="codicon codicon-database"></span>
+                </VSCodeButton>
+                <VSCodeButton
+                  title="Select active providers"
+                  appearance="icon"
+                  onClick={handleToggleProviderSelection}
+                >
+                  <span className={styles.textIcon}>🤖</span>
+                </VSCodeButton>
+              </>
             )}
             {!!symmetryConnection && (
-              <a href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}>
+              <a
+                href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}
+              >
                 <VSCodeBadge
                   title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
                 >
-                  ⚡️{' '}
-                  {symmetryConnection?.name}
+                  ⚡️ {symmetryConnection?.name}
                 </VSCodeBadge>
               </a>
             )}
@@ -369,7 +411,7 @@ export const Chat = () => {
             <textarea
               ref={chatRef}
               disabled={generatingRef.current}
-              placeholder="Message twinny"
+              placeholder="How can twinny help you today?"
               rows={1}
               value={inputText}
               className={styles.chatInput}

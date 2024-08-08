@@ -14,17 +14,58 @@ h3,
 h4,
 h5,
 h6 {
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.5;
 }
 
+h1 {
+  font-size: 1.75em;
+  margin-bottom: 0.5em;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+h2 {
+  font-size: 1.25em;
+  margin-bottom: 0.5em;
+  font-weight: 400;
+}
+
+h3 {
+  font-size: 1.15em;
+  margin-bottom: 0.5em;
+  font-weight: 400;
+}
+
+h4 {
+  font-size: 1em;
+  margin-bottom: 0.5em;
+  font-weight: 400;
+}
+
+h5 {
+  font-size: 0.8em;
+  margin-bottom: 0.5em;
+  font-weight: 400;
+}
+
+h6 {
+  font-size: 0.7y;
+  margin-bottom: 0.5em;
+  font-weight: 400;
+}
+
+
 pre {
-  border-radius: 4px;
-  background-color: var(--vscode-editor-background);
-  border-color: var(--vscode-editor-background);
+  background-color: var(--vscode-textCodeBlock-background);
+  border-radius: 3px;
+  padding: 8px;
+  overflow-x: auto;
 }
 
 code {
-  white-space: pre-wrap;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
 }
 
 pre code {
@@ -49,13 +90,14 @@ pre code {
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 20px;
+  font-size: 14px;
 }
 
 .title {
   background-color: var(--vscode-diffEditor-unchangedRegionBackground);
   color: var(--vscode-textPreformat-foreground);
   display: block;
-  font-weight: 500;
+  font-weight: 600;
   height: 30px;
   left: 10px;
   margin-bottom: 10px;
@@ -67,11 +109,24 @@ pre code {
   white-space: nowrap;
   width: calc(100% - 20px);
   z-index: 2;
+  font-size: 13px;
+  line-height: 30px;
 }
 
 .message {
+  position: relative;
   padding: 10px;
-  border-top: solid 1px var(--divider-background);
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.message::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
 }
 
 .message:first-child {
@@ -86,10 +141,27 @@ pre code {
   display: block;
   margin-bottom: 6px;
   font-weight: 600;
+  font-size: 12px;
 }
 
 .userMessage {
   background-color: var(--vscode-editorWidget-background);
+  align-self: flex-end;
+}
+
+.userMessage::after {
+  right: 10px;
+  background-color: var(--vscode-editorWidget-background);
+}
+
+.assistantMessage {
+  background-color: var(--vscode-editor-background);
+  align-self: flex-start;
+}
+
+.assistantMessage::after {
+  left: 10px;
+  background-color: var(--vscode-editor-background);
 }
 
 .loading {
@@ -145,6 +217,7 @@ pre code {
   text-overflow: ellipsis;
   max-height: 20px;
   white-space: nowrap;
+  font-size: 11px;
 }
 
 .chatOptions svg {
@@ -194,6 +267,7 @@ pre code {
   margin-bottom: 5px;
   min-height: 40px;
   padding: 0 7px;
+  font-size: 12px;
 }
 
 .suggestion svg {
@@ -213,10 +287,11 @@ pre code {
   cursor: pointer;
 }
 
-.templateCheckbox label {
+.vscodeCheckbox label {
   display: flex;
   align-items: center;
   gap: 5px;
+  font-size: 12px;
 }
 
 .resetTemplatesButton {
@@ -236,4 +311,27 @@ pre code {
 .textIcon {
   font-size: 1.15rem;
   transform: translateY(-6px);
+}
+
+.embeddingOptions {
+  padding-bottom: 10px;
+  width: 100%;
+}
+
+.embeddingOptions > div {
+  width: 100%;
+}
+
+.embeddingOptions vscode-dropdown {
+  width: 100%;
+  margin-bottom: 7px;
+}
+
+.embeddingOptions .slider {
+  width: 100%;
+  transform: translateX(-4px);
+}
+
+.embeddingOptions .sliderLabel {
+  transform: translateY(-9px);
 }

@@ -3,6 +3,7 @@
 import esbuild from 'esbuild'
 import { copy } from 'esbuild-plugin-copy';
 
+
 (async () => {
   const extensionConfig = {
     bundle: true,
@@ -12,9 +13,8 @@ import { copy } from 'esbuild-plugin-copy';
     outdir: 'out',
     platform: 'node',
     sourcemap: true,
-    inject: ['./scripts/meta.js'],
-    define: { 'import.meta.url': 'importMetaUrl' },
     loader: { '.node': 'file' },
+    assetNames: '[name]',
     plugins: [
       copy({
         resolveFrom: 'cwd',
@@ -26,6 +26,14 @@ import { copy } from 'esbuild-plugin-copy';
           {
             from: './node_modules/tree-sitter-wasms/out/**/*.wasm',
             to: './out/tree-sitter-wasms'
+          },
+          {
+            from: './models/**/*',
+            to: './out/models',
+          },
+          {
+            from: './node_modules/web-tree-sitter/tree-sitter.wasm',
+            to: './out/tree-sitter.wasm'
           },
           {
             from: './node_modules/web-tree-sitter/tree-sitter.wasm',

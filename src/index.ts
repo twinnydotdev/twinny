@@ -8,6 +8,8 @@ import {
 } from 'vscode'
 import * as path from 'path'
 import * as os from 'os'
+import * as fs from 'fs'
+import { EmbeddingDatabase } from './extension/embeddings'
 import * as vscode from 'vscode'
 
 import { CompletionProvider } from './extension/providers/completion'
@@ -34,7 +36,6 @@ import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
 
 export async function activate(context: ExtensionContext) {
-  console.log('Electron version:', process.versions.electron)
   setContext(context)
   const config = workspace.getConfiguration('twinny')
   const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
@@ -43,13 +44,24 @@ export async function activate(context: ExtensionContext) {
   const fileInteractionCache = new FileInteractionCache()
   const sessionManager = new SessionManager()
 
+  const homeDir = os.homedir()
+  const dbDir = path.join(homeDir, '.twinny/embeddings')
+  let db
 
+  if (workspace.name) {
+    const dbPath = path.join(dbDir, workspace.name as string)
+
+    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
+    db = new EmbeddingDatabase(dbPath, context)
+    await db.connect()
+  }
 
   const sidebarProvider = new SidebarProvider(
     statusBar,
     context,
     templateDir,
-    sessionManager
+    db,
+    sessionManager,
   )
 
   const completionProvider = new CompletionProvider(

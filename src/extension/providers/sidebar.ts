@@ -5,7 +5,8 @@ import {
   getGitChanges,
   getLanguage,
   getTextSelection,
-  getTheme
+  getTheme,
+  updateLoadingMessage
 } from '../utils'
 import {
   WORKSPACE_STORAGE_KEY,
@@ -14,7 +15,7 @@ import {
   TWINNY_COMMAND_NAME,
   SYMMETRY_DATA_MESSAGE,
   SYMMETRY_EMITTER_KEY,
-  SYSTEM
+  SYSTEM,
 } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -28,6 +29,7 @@ import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
 import { ProviderManager } from '../provider-manager'
 import { ConversationHistory } from '../conversation-history'
+import { EmbeddingDatabase } from '../embeddings'
 import { SymmetryService } from '../symmetry-service'
 import { SessionManager } from '../session-manager'
 import { Logger } from '../../common/logger'
@@ -44,6 +46,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
+  private _db: EmbeddingDatabase | undefined
   public symmetryService?: SymmetryService | undefined
   private _sessionManager: SessionManager
 
@@ -51,6 +54,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     statusBar: vscode.StatusBarItem,
     context: vscode.ExtensionContext,
     templateDir: string,
+    db: EmbeddingDatabase | undefined,
     sessionManager: SessionManager
   ) {
     this._statusBar = statusBar
@@ -59,6 +63,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._sessionManager = sessionManager
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
+    if (db) {
+      this._db = db
+    }
     return this
   }
 
@@ -76,8 +83,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this._templateDir,
       this._context,
       webviewView,
-      this.symmetryService
+      this._db,
+      this._sessionManager,
+      this.symmetryService,
     )
+
     this.conversationHistory = new ConversationHistory(
       this._context,
       this.view,
@@ -140,6 +150,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
           [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
           [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
+          [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
           [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
           [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
           [EVENT_NAME.twinnySessionContext]: this.getSessionContext
@@ -162,23 +173,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     } as ServerMessage<string>)
   }
 
-  public getGitCommitMessage = async () => {
-    const diff = await getGitChanges()
-    if (!diff.length) {
-      vscode.window.showInformationMessage(
-        'No changes found in the current workspace.'
-      )
+  public embedDocuments = async () => {
+    const dirs = vscode.workspace.workspaceFolders
+    if (!dirs?.length) {
+      vscode.window.showErrorMessage('No workspace loaded.')
       return
     }
-    this.conversationHistory?.resetConversation()
-    this.chatService?.streamTemplateCompletion(
-      'commit-message',
-      diff,
-      (completion: string) => {
-        vscode.commands.executeCommand('twinny.sendTerminalText', completion)
-      },
-      true
-    )
+    if (!this._db) return
+    for (const dir of dirs) {
+      (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
+    }
   }
 
   public getConfigurationValue = (data: ClientMessage) => {
@@ -247,7 +251,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         content: await this._templateProvider?.readSystemMessageTemplate()
       }
 
-      const messages = [systemMessage, ...data.data as Message[]]
+      const messages = [systemMessage, ...(data.data as Message[])]
+
+      updateLoadingMessage(this.view, 'Using symmetry for inference...')
 
       logger.log(`
         Using symmetry for inference
@@ -255,10 +261,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       `)
 
       return this.symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
-          messages,
-          key: SYMMETRY_EMITTER_KEY.inference
-        })
+        createSymmetryMessage<InferenceRequest>(
+          SYMMETRY_DATA_MESSAGE.inference,
+          {
+            messages,
+            key: SYMMETRY_EMITTER_KEY.inference
+          }
+        )
       )
     }
     this.chatService?.streamChatCompletion(data.data || [])
@@ -276,10 +285,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         Messages: ${JSON.stringify(messages)}
       `)
       return this.symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(SYMMETRY_DATA_MESSAGE.inference, {
-          messages,
-          key: SYMMETRY_EMITTER_KEY.inference
-        })
+        createSymmetryMessage<InferenceRequest>(
+          SYMMETRY_DATA_MESSAGE.inference,
+          {
+            messages,
+            key: SYMMETRY_EMITTER_KEY.inference
+          }
+        )
       )
     }
     this.chatService?.streamTemplateCompletion(template)
@@ -313,16 +325,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     await vscode.window.showTextDocument(document)
   }
 
-  public getGlobalContext = (data: ClientMessage) => {
-    const storedData = this._context?.globalState.get(
-      `${EVENT_NAME.twinnyGlobalContext}-${data.key}`
-    )
-    this.view?.webview.postMessage({
-      type: `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
-      value: storedData
-    })
-  }
-
   public getTheme = () => {
     this.view?.webview.postMessage({
       type: EVENT_NAME.twinnySendTheme,
@@ -341,11 +343,40 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     } as ServerMessage)
   }
 
+  public getGitCommitMessage = async () => {
+    const diff = await getGitChanges()
+    if (!diff.length) {
+      vscode.window.showInformationMessage(
+        'No changes found in the current workspace.'
+      )
+      return
+    }
+    this.conversationHistory?.resetConversation()
+    this.chatService?.streamTemplateCompletion(
+      'commit-message',
+      diff,
+      (completion: string) => {
+        vscode.commands.executeCommand('twinny.sendTerminalText', completion)
+      },
+      true
+    )
+  }
+
   public getSessionContext = (data: ClientMessage) => {
     if (!data.key) return undefined
     this.view?.webview.postMessage({
       type: `${EVENT_NAME.twinnySessionContext}-${data.key}`,
       value: this._sessionManager.get(data.key)
+    })
+  }
+
+  public getGlobalContext = (data: ClientMessage) => {
+    const storedData = this._context?.globalState.get(
+      `${EVENT_NAME.twinnyGlobalContext}-${data.key}`
+    )
+    this.view?.webview.postMessage({
+      type: `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
+      value: storedData
     })
   }
 

@@ -2,13 +2,13 @@ import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS, SYMMETRY_DATA_MESSAGE } from './constants'
 
-export interface StreamBodyBase {
+export interface RequestBodyBase {
   stream: boolean
   n_predict?: number
   temperature?: number
 }
 
-export interface StreamOptionsOllama extends StreamBodyBase {
+export interface RequestOptionsOllama extends RequestBodyBase {
   model: string
   keep_alive?: string | number
   messages?: Message[] | Message
@@ -16,7 +16,7 @@ export interface StreamOptionsOllama extends StreamBodyBase {
   options: Record<string, unknown>
 }
 
-export interface StreamBodyOpenAI extends StreamBodyBase {
+export interface StreamBodyOpenAI extends RequestBodyBase {
   messages?: Message[] | Message
   max_tokens: number
 }
@@ -99,9 +99,9 @@ export interface DefaultTemplate {
 }
 
 export interface TemplateData extends Record<string, string | undefined> {
-  systemMessage?: string
   code: string
-  language: string
+  systemMessage?: string
+  language?: string
 }
 
 export interface FimTemplateData extends Record<string, string | undefined> {
@@ -146,7 +146,7 @@ export interface StreamRequestOptions {
 }
 
 export interface StreamRequest {
-  body: StreamBodyBase | StreamBodyOpenAI
+  body: RequestBodyBase | StreamBodyOpenAI
   options: StreamRequestOptions
   onEnd?: () => void
   onStart?: (controller: AbortController) => void
@@ -244,4 +244,20 @@ export interface SymmetryConnection {
 export interface InferenceRequest {
   key: string;
   messages: Message[];
+}
+
+export interface ChunkOptions {
+  minSize?: number
+  maxSize?: number
+  overlap?: number
+}
+
+export type Embedding = {
+  embedding: number[]
+}
+
+export type EmbeddedDocument = {
+  content: string
+  vector: number[] | undefined
+  file: string
 }

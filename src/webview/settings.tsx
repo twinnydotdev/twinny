@@ -4,15 +4,13 @@ import {
   DEFAULT_ACTION_TEMPLATES,
   WORKSPACE_STORAGE_KEY
 } from '../common/constants'
-import { useEffect, useState } from 'react'
 import { kebabToSentence } from './utils'
 
 import styles from './index.module.css'
 
 export const Settings = () => {
   const { templates, saveTemplates } = useTemplates()
-  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([])
-  const selectedTemplatesContext =
+  const { context: selectedTemplatesContext, setContext: setSelectedTemplatesContext} =
     useWorkSpaceContext<string[]>(WORKSPACE_STORAGE_KEY.selectedTemplates) || []
 
   const handleTemplateClick = (
@@ -22,21 +20,23 @@ export const Settings = () => {
 
     const template = target.value
 
-    if (selectedTemplates.includes(template)) {
-      if (selectedTemplates.length === 1) {
+    if (selectedTemplatesContext?.includes(template)) {
+      if (selectedTemplatesContext.length === 1) {
         saveTemplates([])
-        setSelectedTemplates([])
+        setSelectedTemplatesContext([])
         return
       }
 
-      return setSelectedTemplates((prev) => {
-        const newValue = prev.filter((item) => item !== template)
+      return setSelectedTemplatesContext((prev) => {
+        const newValue = prev?.filter((item) => item !== template)
+        if (!newValue) return
         saveTemplates(newValue)
         return newValue
       })
     }
 
-    setSelectedTemplates((prev) => {
+    setSelectedTemplatesContext((prev) => {
+      if (!prev) return
       const newValue = [...prev, template]
       saveTemplates(newValue)
       return newValue
@@ -45,30 +45,25 @@ export const Settings = () => {
 
   const handleResetTemplates = () => {
     saveTemplates(DEFAULT_ACTION_TEMPLATES)
-    setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
+    setSelectedTemplatesContext(DEFAULT_ACTION_TEMPLATES)
   }
 
-  useEffect(() => {
-    if (selectedTemplatesContext !== undefined) {
-      return setSelectedTemplates(selectedTemplatesContext)
-    }
-    setSelectedTemplates(DEFAULT_ACTION_TEMPLATES)
-  }, [selectedTemplatesContext.length])
 
   return (
     <>
+      <h3>Template settings</h3>
       <h3>Additional settings</h3>
       <p>Select the templates you want to use in the chat interface.</p>
       {templates &&
         templates.map((templateName: string) => (
-          <div key={templateName} className={styles.templateCheckbox}>
+          <div key={templateName} className={styles.vscodeCheckbox}>
             <label htmlFor={templateName}>
               <VSCodeCheckbox
                 id={templateName}
                 name={templateName}
                 value={templateName}
                 onClick={handleTemplateClick}
-                checked={selectedTemplates.includes(templateName)}
+                checked={selectedTemplatesContext?.includes(templateName)}
               ></VSCodeCheckbox>
               <span key={templateName}>{kebabToSentence(templateName)}</span>
             </label>

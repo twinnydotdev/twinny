@@ -1,22 +1,23 @@
 import { USER } from '../common/constants'
 import {
   Message,
+  RequestBodyBase,
   apiProviders,
-  StreamBodyBase,
   StreamBodyOpenAI,
-  StreamOptionsOllama
+  RequestOptionsOllama
 } from '../common/types'
 
 export function createStreamRequestBody(
   provider: string,
   options: {
+
     temperature: number
     numPredictChat: number
     model: string
     messages?: Message[]
     keepAlive?: string | number
   }
-): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
+): RequestBodyBase | RequestOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case apiProviders.Ollama:
     case apiProviders.OpenWebUI:
@@ -53,7 +54,7 @@ export function createStreamRequestBodyFim(
     model: string
     keepAlive?: string | number
   }
-): StreamBodyBase | StreamOptionsOllama | StreamBodyOpenAI {
+): RequestBodyBase | RequestOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case apiProviders.Ollama:
     case apiProviders.OpenWebUI:

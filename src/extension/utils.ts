@@ -6,6 +6,7 @@ import {
   Range,
   Terminal,
   TextDocument,
+  WebviewView,
   window,
   workspace
 } from 'vscode'
@@ -19,15 +20,18 @@ import {
   LanguageType,
   apiProviders,
   StreamResponse,
-  StreamRequest,
   PrefixSuffix,
   Bracket,
-  ServerMessageKey
+  ServerMessageKey,
+  Message,
+  ChunkOptions,
+  ServerMessage
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
+  EVENT_NAME,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
@@ -39,6 +43,7 @@ import {
 } from '../common/constants'
 import { Logger } from '../common/logger'
 import { SyntaxNode } from 'web-tree-sitter'
+import { getParser } from './parser-utils'
 
 const logger = new Logger()
 
@@ -385,14 +390,13 @@ export function safeParseJsonStringBuffer(
   }
 }
 
-export function safeParseJson<T>(data: string): T | undefined  {
+export function safeParseJson<T>(data: string): T | undefined {
   try {
-    return JSON.parse(data);
+    return JSON.parse(data)
   } catch (e) {
-    return undefined;
+    return undefined
   }
 }
-
 
 export const getCurrentWorkspacePath = (): string | undefined => {
   if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
@@ -433,8 +437,11 @@ export const getTerminalExists = (): boolean => {
   return true
 }
 
-export function createSymmetryMessage<T>(key: ServerMessageKey, data?: T): string {
-  return JSON.stringify({ key, data });
+export function createSymmetryMessage<T>(
+  key: ServerMessageKey,
+  data?: T
+): string {
+  return JSON.stringify({ key, data })
 }
 
 export const getSanitizedCommitMessage = (commitMessage: string) => {
@@ -449,13 +456,148 @@ export const getSanitizedCommitMessage = (commitMessage: string) => {
 export const getNormalisedText = (text: string) =>
   text.replace(NORMALIZE_REGEX, ' ')
 
-export const logStreamOptions = (opts: StreamRequest) => {
+function getSplitChunks(node: SyntaxNode, options: ChunkOptions): string[] {
+  const { minSize = 50, maxSize = 500 } = options
+  const chunks: string[] = []
+
+  function traverse(node: SyntaxNode) {
+    if (node.text.length <= maxSize && node.text.length >= minSize) {
+      chunks.push(node.text)
+    } else if (node.children.length > 0) {
+      for (const child of node.children) {
+        traverse(child)
+      }
+    } else if (node.text.length > maxSize) {
+      let start = 0
+      while (start < node.text.length) {
+        const end = Math.min(start + maxSize, node.text.length)
+        chunks.push(node.text.slice(start, end))
+        start = end
+      }
+    }
+  }
+
+  traverse(node)
+  return chunks
+}
+
+export async function getDocumentSplitChunks(
+  content: string,
+  filePath: string,
+  options: ChunkOptions = {}
+): Promise<string[]> {
+  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+
+  try {
+    const parser = await getParser(filePath)
+
+    if (!parser) {
+      logger.log(
+        `No parser available for file ${filePath}. Falling back to simple chunking.`
+      )
+      return simpleChunk(content, { minSize, maxSize, overlap })
+    }
+
+    const tree = parser.parse(content)
+    const chunks = getSplitChunks(tree.rootNode, { minSize, maxSize })
+
+    return combineChunks(chunks, { minSize, maxSize, overlap })
+  } catch (error) {
+    console.error(`Error parsing file ${filePath}: ${error}`)
+    return simpleChunk(content, { minSize, maxSize, overlap })
+  }
+}
+
+function combineChunks(chunks: string[], options: ChunkOptions): string[] {
+  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+  const result: string[] = []
+  let currentChunk = ''
+
+  for (const chunk of chunks) {
+    if (currentChunk.length + chunk.length > maxSize) {
+      if (currentChunk.length >= minSize) {
+        result.push(currentChunk)
+        currentChunk = chunk
+      } else {
+        currentChunk += ' ' + chunk
+      }
+    } else {
+      currentChunk += (currentChunk ? ' ' : '') + chunk
+    }
+    if (currentChunk.length >= maxSize - overlap) {
+      result.push(currentChunk)
+      currentChunk = currentChunk.slice(-overlap)
+    }
+  }
+
+  if (currentChunk.length >= minSize) {
+    result.push(currentChunk)
+  }
+
+  return result
+}
+
+function simpleChunk(content: string, options: ChunkOptions): string[] {
+  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+  const chunks: string[] = []
+  let start = 0
+
+  while (start < content.length) {
+    const end = Math.min(start + maxSize, content.length)
+    const chunk = content.slice(start, end)
+
+    try {
+      chunks.push(chunk)
+    } catch (error) {
+      if (
+        error instanceof RangeError &&
+        error.message.includes('Invalid array length')
+      ) {
+        logger.log(
+          'Maximum array size reached. Returning chunks processed so far.'
+        )
+        break
+      } else {
+        throw error
+      }
+    }
+
+    start = end - overlap > start ? end - overlap : end
+
+    if (end === content.length) break
+  }
+
+  return chunks.filter(
+    (chunk, index) => chunk.length >= minSize || index === chunks.length - 1
+  )
+}
+
+export const updateLoadingMessage = (
+  view: WebviewView | undefined,
+  message: string
+) => {
+  view?.webview.postMessage({
+    type: EVENT_NAME.twinnySendLoader,
+    value: {
+      data: message
+    }
+  } as ServerMessage<string>)
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const logStreamOptions = (opts: any) => {
   logger.log(
     `
 ***Twinny Stream Debug***\n\
 Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
 Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
 Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
+Number characters in all messages = ${opts.body.messages?.reduce(
+      (acc: number, msg: Message) => {
+        return msg.content?.length ? acc + msg.content?.length : 0
+      },
+      0
+    )}\n\n
     `
   )
 }

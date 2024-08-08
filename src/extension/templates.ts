@@ -1,19 +1,20 @@
+
 export const defaultTemplates = [
   {
     name: 'explain',
     template: `
-Explain the following code;
+Explain the following code concisely:
 {{{code}}}
-Do not waffle on. The language is:
+Focus on key functionality and purpose. The language is:
 {{language}}
   `.trim()
   },
   {
     name: 'refactor',
     template: `
-Refactor the following code without altering its functionality:
+Refactor the following code to improve efficiency or readability without altering its functionality:
 {{{code}}}
-Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
 The language is: {{language}}.
 Do not explain the code in your response.
   `.trim()
@@ -21,9 +22,9 @@ Do not explain the code in your response.
   {
     name: 'add-types',
     template: `
-Add types to the following code, keep the code the same just add the types.
+Add types to the following code, keeping the logic unchanged:
 {{{code}}}
-Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
 The language is: {{language}}.
 Do not explain the code in your response.
   `.trim()
@@ -31,51 +32,71 @@ Do not explain the code in your response.
   {
     name: 'add-tests',
     template: `
-Write unit tests for the following code block:
+Write comprehensive unit tests for the following code block:
 {{{code}}}
-Please use the most popular testing library suitable for the language of the code.
-The language is: {{language}}.
-Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+Use the most popular testing library for {{language}}.
+Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
   `.trim()
   },
   {
     name: 'fix-code',
     template: `
-Fix the following code by adding or removing lines without altering its functionality:
+Fix any errors in the following code without changing its core functionality:
 {{{code}}}
-Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
 The language is: {{language}}.
-Do not explain the code in your response.
+Do not explain the changes in your response.
   `.trim()
   },
   {
     name: 'generate-docs',
     template: `
-Generate documentation for the following code block:
+Generate comprehensive documentation for the following code block:
 {{{code}}}
-Use the most popular documentation tool for the language {{{language}}}. If you don't know infer the tool.
-Always format responses with Markdown for code blocks with the language prefix e.g language-prefix.
+Use the standard documentation format for {{language}}. If unsure, use a widely accepted format.
+Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
   `.trim()
   },
   {
     name: 'system',
     template: `You are a helpful, respectful and honest coding assistant.
-Always reply with using markdown.
-For code refactoring, use markdown with code formatting.
+Always reply using markdown.
+Be clear and concise, prioritizing brevity in your responses.
+For code refactoring, use markdown with appropriate code formatting.
   `.trim()
   },
   {
+    name: 'relevant-code',
+    template: `
+The following code snippet may be relevant to your query. Incorporate pertinent information in your response:
+
+Limit your answer to three sentences.
+
+{{{code}}}
+
+Disregard if not relevant to the current query.
+    `.trim()
+  },
+  {
+    name: 'relevant-files',
+    template: `
+These file paths may be relevant to your query:
+
+{{{code}}}
+
+Consider these in your response if pertinent. Disregard if not relevant.
+    `.trim()
+  },
+  {
     name: 'commit-message',
-    template: `You are an agent who generates concise git commit messages.
-Only reply with one line of text.
+    template: `Generate a concise git commit message.
+Respond with a single line of text, maximum 100 characters.
 
-- Answer under 100 characters.
+Example: "Added a new feature"
 
-E.g "Added a new feature"
+Unidiff: \`\`\`{{code}}\`\`\`
 
-Here is the unidiff: \`\`\`{{code}}\`\`\`
-
-<commit message goes here>
+<commit message>
     `.trim()
   },
   {
