@@ -46,8 +46,10 @@ jobs:
         with:
           path: ./vsix
       - name: Publish to Visual Studio Marketplace
-        uses: HaaLeo/publish-vscode-extension@v1
-        with:
-          pat: ${{ secrets.VS_CODE_MARKETPLACE_TOKEN }}
-          registryUrl: https://marketplace.visualstudio.com
-          extensionFile: ./vsix/**/*.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VS_CODE_MARKETPLACE_TOKEN }}
+        run: |
+          for file in ./vsix/**/*.vsix; do
+            echo "Publishing $file"
+            npx vsce publish --pat "$VSCE_PAT" --packagePath "$file"
+          done
