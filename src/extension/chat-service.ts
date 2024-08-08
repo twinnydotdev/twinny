@@ -456,7 +456,7 @@ export class ChatService {
     if (!isRagEnabled || symmetryConnected)
       return null
 
-    updateLoadingMessage(this._view, 'Exploring knowledge base...')
+    updateLoadingMessage(this._view, 'Exploring knowledge base')
 
     const relevantFiles = await this.getRelevantFiles(text)
     const relevantCode = await this.getRelevantCode(text, relevantFiles)
@@ -522,7 +522,7 @@ export class ChatService {
     } else {
       updatedMessages.push(lastMessage)
     }
-    updateLoadingMessage(this._view, 'Thinking...')
+    updateLoadingMessage(this._view, 'Thinking')
     const request = this.buildStreamRequest(updatedMessages)
     if (!request) return
     const { requestBody, requestOptions } = request
