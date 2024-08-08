@@ -43,6 +43,10 @@ import { copy } from 'esbuild-plugin-copy';
             from: './node_modules/web-tree-sitter/tree-sitter.wasm',
             to: './out/tree-sitter.wasm'
           },
+          {
+            from: './node_modules/@lancedb/lancedb-win32-x64-msvc/lancedb.win32-x64-msvc.node',
+            to: './out/lancedb.win32-x64-msvc.node'
+          }
         ],
         watch: true,
       }),
