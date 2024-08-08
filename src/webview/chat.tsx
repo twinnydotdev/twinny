@@ -3,9 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import {
   VSCodeButton,
   VSCodePanelView,
-  VSCodeProgressRing,
   VSCodeBadge,
-  VSCodeDivider
+  VSCodeDivider,
 } from '@vscode/webview-ui-toolkit/react'
 
 import {
@@ -13,7 +12,8 @@ import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   USER,
-  SYMMETRY_EMITTER_KEY
+  SYMMETRY_EMITTER_KEY,
+  EXTENSION_CONTEXT_NAME
 } from '../common/constants'
 
 import useAutosizeTextArea, {
@@ -23,7 +23,12 @@ import useAutosizeTextArea, {
   useTheme,
   useWorkSpaceContext
 } from './hooks'
-import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from './icons'
+import {
+  DisabledAutoScrollIcon,
+  DisabledRAGIcon,
+  EnabledAutoScrollIcon,
+  EnabledRAGIcon
+} from './icons'
 
 import { Suggestions } from './suggestions'
 import {
@@ -36,6 +41,7 @@ import { getCompletionContent } from './utils'
 import styles from './index.module.css'
 import { ProviderSelect } from './provider-select'
 import { EmbeddingOptions } from './embedding-options'
+import ChatLoader from './chat-loader'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -49,6 +55,7 @@ export const Chat = () => {
   const [completion, setCompletion] = useState<MessageType | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
   const { symmetryConnection } = useSymmetryConnection()
+
   const { context: autoScrollContext, setContext: setAutoScrollContext } =
     useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.autoScroll)
   const { context: showProvidersContext, setContext: setShowProvidersContext } =
@@ -59,11 +66,13 @@ export const Chat = () => {
   } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
+  const { context: enableRagContext, setContext: setEnableRagContext } =
+    useWorkSpaceContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableRag)
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
   useAutosizeTextArea(chatRef, inputText)
 
-  const scrollBottom = () => {
+  const scrollToBottom = () => {
     if (!autoScrollContext) return
     setTimeout(() => {
       if (markdownRef.current) {
@@ -72,7 +81,7 @@ export const Chat = () => {
     }, 200)
   }
 
-  const selection = useSelection(scrollBottom)
+  const selection = useSelection(scrollToBottom)
 
   const handleCompletionEnd = (message: ServerMessage) => {
     if (message.value) {
@@ -112,7 +121,7 @@ export const Chat = () => {
     }
     generatingRef.current = true
     setLoading(false)
-    if (autoScrollContext) scrollBottom()
+    scrollToBottom()
     setMessages((prev) => [
       ...(prev || []),
       {
@@ -136,12 +145,12 @@ export const Chat = () => {
       language: message.value.data,
       error: message.value.error
     })
-    if (autoScrollContext) scrollBottom()
+    scrollToBottom()
   }
 
   const handleLoadingMessage = () => {
     setLoading(true)
-    if (autoScrollContext) scrollBottom()
+    if (autoScrollContext) scrollToBottom()
   }
 
   const messageEventHandler = (event: MessageEvent) => {
@@ -208,7 +217,7 @@ export const Chat = () => {
         ]
       } as ClientMessage)
       setMessages((prev) => [...(prev || []), { role: USER, content: input }])
-      if (autoScrollContext) scrollBottom()
+      scrollToBottom()
     }
   }
 
@@ -220,7 +229,7 @@ export const Chat = () => {
         data: !prev
       } as ClientMessage)
 
-      if (!prev) scrollBottom()
+      if (!prev) scrollToBottom()
 
       return !prev
     })
@@ -260,14 +269,31 @@ export const Chat = () => {
     }
   }
 
+  const handleToggleRag = (): void => {
+    setEnableRagContext((prev) => {
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnySetWorkspaceContext,
+        key: EXTENSION_CONTEXT_NAME.twinnyEnableRag,
+        data: !prev
+      } as ClientMessage)
+      return !prev
+    })
+  }
+
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     chatRef.current?.focus()
-    scrollBottom()
+    scrollToBottom()
     return () => {
       window.removeEventListener('message', messageEventHandler)
     }
   }, [autoScrollContext])
+
+  useEffect(() => {
+    if (conversation?.messages?.length) {
+      return setMessages(conversation.messages)
+    }
+  }, [conversation?.id, autoScrollContext, showProvidersContext])
 
   return (
     <VSCodePanelView>
@@ -281,11 +307,7 @@ export const Chat = () => {
           {messages?.map((message) => (
             <Message message={message} theme={theme} />
           ))}
-          {loading && (
-            <div className={styles.loading}>
-              <VSCodeProgressRing aria-label="Loading"></VSCodeProgressRing>
-            </div>
-          )}
+          {loading && <ChatLoader />}
           {!!completion && (
             <Message
               theme={theme}
@@ -332,6 +354,13 @@ export const Chat = () => {
               onClick={handleScrollBottom}
             >
               <span className="codicon codicon-arrow-down"></span>
+            </VSCodeButton>
+            <VSCodeButton
+              title="Toggle RAG context for next message"
+              appearance="icon"
+              onClick={handleToggleRag}
+            >
+            {enableRagContext ? <EnabledRAGIcon /> : <DisabledRAGIcon />}
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
@@ -382,7 +411,7 @@ export const Chat = () => {
             <textarea
               ref={chatRef}
               disabled={generatingRef.current}
-              placeholder="Message twinny"
+              placeholder="How can twinny help you today?"
               rows={1}
               value={inputText}
               className={styles.chatInput}

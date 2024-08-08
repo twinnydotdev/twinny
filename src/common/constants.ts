@@ -53,6 +53,7 @@ export const EVENT_NAME = {
   twinnyOpenDiff: 'twinny-open-diff',
   twinnyRerankThresholdChanged: 'twinny-rerank-threshold-changed',
   twinnySendLanguage: 'twinny-send-language',
+  twinnySendLoader: 'twinny-send-loader',
   twinnySendSystemMessage: 'twinny-send-system-message',
   twinnySendTheme: 'twinny-send-theme',
   twinnySessionContext: 'twinny-session-context',

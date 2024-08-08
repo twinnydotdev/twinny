@@ -19,7 +19,8 @@ import {
   RELEVANT_FILE_COUNT,
   RELEVANT_CODE_COUNT,
   SYMMETRY_EMITTER_KEY,
-  DEFAULT_RERANK_THRESHOLD
+  DEFAULT_RERANK_THRESHOLD,
+  EXTENSION_SESSION_NAME
 } from '../common/constants'
 import {
   StreamResponse,
@@ -30,7 +31,11 @@ import {
   StreamRequestOptions,
   EmbeddedDocument
 } from '../common/types'
-import { getChatDataFromProvider, getLanguage } from './utils'
+import {
+  getChatDataFromProvider,
+  getLanguage,
+  updateLoadingMessage
+} from './utils'
 import { CodeLanguageDetails } from '../common/languages'
 import { TemplateProvider } from './template-provider'
 import { streamResponse } from './stream'
@@ -41,6 +46,7 @@ import { EmbeddingDatabase } from './embeddings'
 import { Reranker } from './reranker'
 import { SymmetryService } from './symmetry-service'
 import { Logger } from '../common/logger'
+import { SessionManager } from './session-manager'
 
 const logger = new Logger()
 
@@ -60,7 +66,7 @@ export class ChatService {
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
   private _view?: WebviewView
-  private readonly MAX_FILE_SIZE = 1000000
+  private _sessionManager: SessionManager
 
   constructor(
     statusBar: StatusBarItem,
@@ -68,6 +74,7 @@ export class ChatService {
     extensionContext: ExtensionContext,
     view: WebviewView,
     db: EmbeddingDatabase | undefined,
+    sessionManager: SessionManager,
     symmetryService: SymmetryService
   ) {
     this._view = view
@@ -76,6 +83,7 @@ export class ChatService {
     this._reranker = new Reranker()
     this._context = extensionContext
     this._db = db
+    this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('twinny')) {
@@ -435,11 +443,20 @@ export class ChatService {
     } as ServerMessage<string>)
   }
 
-  public async addRagContextIfEnabled(text?: string): Promise<string | null> {
+  public async getRagContext(
+    text?: string,
+  ): Promise<string | null> {
     const ragContextKey = `${EVENT_NAME.twinnyWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
     const isRagEnabled = this._context?.workspaceState.get(ragContextKey)
 
-    if (!isRagEnabled) return null
+    const symmetryConnected = this._sessionManager?.get(
+      EXTENSION_SESSION_NAME.twinnySymmetryConnection
+    )
+
+    if (!isRagEnabled || symmetryConnected)
+      return null
+
+    updateLoadingMessage(this._view, 'Exploring knowledge base...')
 
     const relevantFiles = await this.getRelevantFiles(text)
     const relevantCode = await this.getRelevantCode(text, relevantFiles)
@@ -489,7 +506,7 @@ export class ChatService {
       additionalContext += `Selected Code:\n${userSelection}\n\n`
     }
 
-    const ragContext = await this.addRagContextIfEnabled(text)
+    const ragContext = await this.getRagContext(text)
     if (ragContext) {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
     }
@@ -505,7 +522,7 @@ export class ChatService {
     } else {
       updatedMessages.push(lastMessage)
     }
-
+    updateLoadingMessage(this._view, 'Thinking...')
     const request = this.buildStreamRequest(updatedMessages)
     if (!request) return
     const { requestBody, requestOptions } = request
@@ -553,7 +570,7 @@ export class ChatService {
     let ragContext = undefined
 
     if (['explain'].includes(template)) {
-      ragContext = await this.addRagContextIfEnabled(selection)
+      ragContext = await this.getRagContext(selection)
     }
 
     const userContent = ragContext

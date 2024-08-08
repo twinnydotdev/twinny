@@ -6,6 +6,7 @@ import {
   Range,
   Terminal,
   TextDocument,
+  WebviewView,
   window,
   workspace
 } from 'vscode'
@@ -23,12 +24,14 @@ import {
   Bracket,
   ServerMessageKey,
   Message,
-  ChunkOptions
+  ChunkOptions,
+  ServerMessage
 } from '../common/types'
 import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
+  EVENT_NAME,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
@@ -569,6 +572,18 @@ function simpleChunk(content: string, options: ChunkOptions): string[] {
   )
 }
 
+export const updateLoadingMessage = (
+  view: WebviewView | undefined,
+  message: string
+) => {
+  view?.webview.postMessage({
+    type: EVENT_NAME.twinnySendLoader,
+    value: {
+      data: message
+    }
+  } as ServerMessage<string>)
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logStreamOptions = (opts: any) => {
   logger.log(
@@ -577,7 +592,7 @@ export const logStreamOptions = (opts: any) => {
 Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
 Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
 Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
-Number characters in all messages = ${opts.body.messages.reduce(
+Number characters in all messages = ${opts.body.messages?.reduce(
       (acc: number, msg: Message) => {
         return msg.content?.length ? acc + msg.content?.length : 0
       },

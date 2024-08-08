@@ -2,12 +2,11 @@ import {
   VSCodeButton,
   VSCodeDropdown,
   VSCodeOption,
-  VSCodeCheckbox
 } from '@vscode/webview-ui-toolkit/react'
 
 import { EVENT_NAME, EXTENSION_CONTEXT_NAME } from '../common/constants'
 import { ClientMessage } from '../common/types'
-import { useGlobalContext, useProviders, useWorkSpaceContext } from './hooks'
+import { useGlobalContext, useProviders } from './hooks'
 import styles from './index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,9 +18,6 @@ export const EmbeddingOptions = () => {
     providers,
     setActiveEmbeddingsProvider
   } = useProviders()
-
-  const { context: enableRagContext, setContext: setEnableRagContext } =
-    useWorkSpaceContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableRag)
 
   const { context: rerankThreshold = 0.1, setContext: setRerankThreshold } =
     useGlobalContext<number>(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)
@@ -44,19 +40,6 @@ export const EmbeddingOptions = () => {
     const value = event.target.value
     const provider = providers[value]
     setActiveEmbeddingsProvider(provider)
-  }
-
-  const handleChangeEnableRag = (e: unknown): void => {
-    const event = e as React.ChangeEvent<HTMLInputElement>
-    const value = event.target.checked
-    setEnableRagContext(() => {
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnySetWorkspaceContext,
-        key: EXTENSION_CONTEXT_NAME.twinnyEnableRag,
-        data: value
-      } as ClientMessage)
-      return value
-    })
   }
 
   if (!embeddingProviders) {
@@ -109,19 +92,6 @@ export const EmbeddingOptions = () => {
           <small>
             The lower the threshold, the more likely a result is to be included.
           </small>
-        </div>
-      </div>
-      <div>
-        <div className={styles.vscodeCheckbox}>
-          <label htmlFor="enableRag">
-            <VSCodeCheckbox
-              id="enableRag"
-              name="enableRag"
-              onClick={handleChangeEnableRag}
-              checked={enableRagContext}
-            ></VSCodeCheckbox>
-            <span>Enable retrieval augmented generation (RAG)</span>
-          </label>
         </div>
       </div>
       <div>

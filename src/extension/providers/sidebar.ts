@@ -5,7 +5,8 @@ import {
   getGitChanges,
   getLanguage,
   getTextSelection,
-  getTheme
+  getTheme,
+  updateLoadingMessage
 } from '../utils'
 import {
   WORKSPACE_STORAGE_KEY,
@@ -83,7 +84,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       this._context,
       webviewView,
       this._db,
-      this.symmetryService
+      this._sessionManager,
+      this.symmetryService,
     )
 
     this.conversationHistory = new ConversationHistory(
@@ -174,7 +176,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public embedDocuments = async () => {
     const dirs = vscode.workspace.workspaceFolders
     if (!dirs?.length) {
-      vscode.window.showErrorMessage('No project open')
+      vscode.window.showErrorMessage('No workspace loaded.')
       return
     }
     if (!this._db) return
@@ -250,6 +252,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       }
 
       const messages = [systemMessage, ...(data.data as Message[])]
+
+      updateLoadingMessage(this.view, 'Using symmetry for inference...')
 
       logger.log(`
         Using symmetry for inference

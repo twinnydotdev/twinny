@@ -139,6 +139,25 @@ export const useTheme = () => {
   return theme
 }
 
+export const useLoading = () => {
+  const [loader, setLoader] = useState<string | undefined>()
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<string> = event.data
+    if (message?.type === EVENT_NAME.twinnySendLoader) {
+      setLoader(message?.value.data)
+    }
+    return () => window.removeEventListener('message', handler)
+  }
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnySendLoader
+    })
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+  return loader
+}
+
 export const useLanguage = (): LanguageType | undefined => {
   const [language, setLanguage] = useState<LanguageType | undefined>()
   const handler = (event: MessageEvent) => {
