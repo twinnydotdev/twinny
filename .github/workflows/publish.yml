@@ -7,10 +7,17 @@ on:
       - main
 
 jobs:
-  deploy:
+  build:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: win32-x64
+          - os: macos-latest
+            target: darwin-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -18,14 +25,27 @@ jobs:
         with:
           node-version: 18
       - run: npm ci
-      # - name: Publish to Open VSX Registry
-      #   uses: HaaLeo/publish-vscode-extension@v1
-      #   id: publishToOpenVSX
-      #   with:
-      #     pat: ${{ secrets.OPEN_VSX_TOKEN }}
+      - name: Package Extension
+        run: npx vsce package --target ${{ matrix.target }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: vsix-${{ matrix.target }}
+          path: "*.vsix"
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 18
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
       - name: Publish to Visual Studio Marketplace
         uses: HaaLeo/publish-vscode-extension@v1
         with:
           pat: ${{ secrets.VS_CODE_MARKETPLACE_TOKEN }}
           registryUrl: https://marketplace.visualstudio.com
-          target: win32-x64 linux-x64
+          extensionFile: "**/*.vsix"
