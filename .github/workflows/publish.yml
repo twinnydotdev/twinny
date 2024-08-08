@@ -28,4 +28,3 @@ jobs:
         with:
           pat: ${{ secrets.VS_CODE_MARKETPLACE_TOKEN }}
           registryUrl: https://marketplace.visualstudio.com
-          target: win32-x64 linux-x64
