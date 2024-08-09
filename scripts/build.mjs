@@ -38,15 +38,6 @@ import { copy } from 'esbuild-plugin-copy';
             from: './node_modules/web-tree-sitter/tree-sitter.wasm',
             to: './out/tree-sitter.wasm'
           }
-          ,
-          {
-            from: `./node_modules/sodium-native/prebuilds/${process.platform}-${process.arch}/sodium-native.node`,
-            to: './out/sodium-native.node'
-          },
-          {
-            from: `./node_modules/udx-native/prebuilds/${process.platform}-${process.arch}/udx-native.node`,
-            to: './out/udx-native.node'
-          }
         ],
         watch: true,
       }),
