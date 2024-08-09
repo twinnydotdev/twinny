@@ -3,8 +3,6 @@ import * as path from 'path'
 import { Toxe } from 'toxe'
 import { Logger } from '../common/logger'
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
 ort.env.wasm.numThreads = 1
 
 const logger = new Logger()
@@ -30,50 +28,69 @@ export class Reranker {
     }
   }
 
-  public sigmoid(value: number) {
-    return 1 / (1 + Math.exp(-value))
-  }
+  public async rerank(
+    sample: string,
+    samples: string[]
+  ): Promise<number[] | undefined> {
+    const ids = await this._tokenizer?.encode(sample, samples)
+    if (!ids?.length) return undefined
 
-  public async rerank(sample: string, samples: string[]): Promise<number[] | undefined> {
-    const ids = await this._tokenizer?.encode(sample, samples);
-    if (!ids?.length) return undefined;
-
-    const inputIds = ids.map((id) => BigInt(id));
-    const inputTensor = new ort.Tensor('int64', BigInt64Array.from(inputIds), [
-      samples.length,
-      inputIds.length / samples.length
-    ]);
-
-    const attentionMaskTensor = new ort.Tensor(
-      'int64',
-      new BigInt64Array(inputIds.length).fill(1n),
-      [samples.length, inputIds.length / samples.length]
-    );
+    const inputTensor = this.getInputTensor(ids, samples.length)
+    const attentionMaskTensor = this.getOutputTensor(
+      ids.length,
+      samples.length
+    )
 
     const output = await this._session?.run({
       input_ids: inputTensor,
       attention_mask: attentionMaskTensor
-    });
+    })
 
-    if (!output) return undefined;
+    if (!output) return undefined
 
-    const data = await output.logits.getData();
-    const logits = Array.prototype.slice.call(data);
-
-    const normalizedProbabilities = this.softmax(logits);
+    const logits = await this.getLogits(output)
+    const normalizedProbabilities = this.softmax(logits)
 
     logger.log(
-      `Reranked samples: \n${this.formatResults(samples, normalizedProbabilities)}`
-    );
+      `Reranked samples: \n${this.formatResults(
+        samples,
+        normalizedProbabilities
+      )}`
+    )
+    return normalizedProbabilities
+  }
 
-    return normalizedProbabilities;
+  private getInputTensor(ids: number[], sampleCount: number): ort.Tensor {
+    const inputIds = ids.map(BigInt)
+    return new ort.Tensor('int64', BigInt64Array.from(inputIds), [
+      sampleCount,
+      inputIds.length / sampleCount
+    ])
+  }
+
+  private getOutputTensor(
+    inputLength: number,
+    sampleCount: number
+  ): ort.Tensor {
+    return new ort.Tensor('int64', new BigInt64Array(inputLength).fill(1n), [
+      sampleCount,
+      inputLength / sampleCount
+    ])
+  }
+
+  private async getLogits(
+    output: ort.InferenceSession.OnnxValueMapType
+  ): Promise<number[]> {
+    const data = await output.logits.getData()
+    const logits = Array.prototype.slice.call(data)
+    return logits
   }
 
   private softmax(logits: number[]): number[] {
-    const maxLogit = Math.max(...logits);
-    const scores = logits.map(l => Math.exp(l - maxLogit));
-    const sum = scores.reduce((a, b) => a + b, 0);
-    return scores.map(s => s / sum);
+    const maxLogit = Math.max(...logits)
+    const scores = logits.map((l) => Math.exp(l - maxLogit))
+    const sum = scores.reduce((a, b) => a + b, 0)
+    return scores.map((s) => s / sum)
   }
 
   private formatResults(samples: string[], probabilities: number[]): string {
@@ -84,12 +101,13 @@ export class Reranker {
 
   private async loadModel(): Promise<void> {
     try {
+      logger.log('Loading reranker model...')
       this._session = await ort.InferenceSession.create(this._modelPath, {
         executionProviders: ['wasm']
       })
-      logger.log(`Model loaded from ${this._modelPath}`)
+      logger.log('Reranker model loaded')
     } catch (error) {
-      console.error('Error loading model:', error)
+      console.error(error)
       throw error
     }
   }
@@ -100,7 +118,7 @@ export class Reranker {
       this._tokenizer = new Toxe(this._tokenizerPath)
       logger.log('Tokenizer loaded')
     } catch (error) {
-      console.error('Error loading tokenizer:', error)
+      console.error(error)
       throw error
     }
   }
