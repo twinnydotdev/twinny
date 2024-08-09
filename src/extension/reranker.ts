@@ -101,10 +101,11 @@ export class Reranker {
 
   private async loadModel(): Promise<void> {
     try {
+      logger.log('Loading reranker model...')
       this._session = await ort.InferenceSession.create(this._modelPath, {
         executionProviders: ['wasm']
       })
-      logger.log(`Model loaded from ${this._modelPath}`)
+      logger.log('Reranker model loaded')
     } catch (error) {
       console.error(error)
       throw error
