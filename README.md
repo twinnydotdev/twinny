@@ -21,14 +21,6 @@ Get AI-based suggestions in real time. Let Twinny autocomplete your code as you 
 Discuss your code via the sidebar: get function explanations, generate tests, request refactoring, and more.
 <img src="https://github.com/rjmacarthy/twinny/assets/5537428/a5c5bb34-60f6-41f6-8226-c62cf4c17c1d" width="760"/>
 
-### Workspace Embeddings
-Enhance your coding experience with context-aware AI assistance using workspace embeddings.
-- **Embed Your Workspace**: Easily embed your entire workspace with a single click.
-- **Context-Aware Responses**: twinny uses relevant parts of your codebase to provide more accurate and contextual answers.
-- **Customizable Embedding Provider**: By default, uses Ollama Embedding (all-minilm:latest), but supports various providers.
-- **Adjustable Relevance**: Fine-tune the rerank probability threshold to control the inclusion of context in AI responses.
-- **Toggle Embedded Context**: Easily switch between using embedded context or not for each message.
-
 ### Additional Features
 - Operates online or offline
 - Highly customizable API endpoints for FIM and chat
@@ -44,6 +36,14 @@ Enhance your coding experience with context-aware AI assistance using workspace 
 - Creates new documents from code blocks
 - Copies generated code solution blocks
 - Workspace embeddings for context-aware AI assistance
+- 
+### Workspace Embeddings
+Enhance your coding experience with context-aware AI assistance using workspace embeddings.
+- **Embed Your Workspace**: Easily embed your entire workspace with a single click.
+- **Context-Aware Responses**: twinny uses relevant parts of your codebase to provide more accurate and contextual answers.
+- **Customizable Embedding Provider**: By default, uses Ollama Embedding (all-minilm:latest), but supports various providers.
+- **Adjustable Relevance**: Fine-tune the rerank probability threshold to control the inclusion of context in AI responses.
+- **Toggle Embedded Context**: Easily switch between using embedded context or not for each message.
 
 ## Known Issues
 Visit the GitHub [issues page](https://github.com/rjmacarthy/twinny/issues) for known problems and troubleshooting.
