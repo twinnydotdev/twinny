@@ -492,9 +492,6 @@ export async function getDocumentSplitChunks(
     const parser = await getParser(filePath)
 
     if (!parser) {
-      logger.log(
-        `No parser available for file ${filePath}. Falling back to simple chunking.`
-      )
       return simpleChunk(content, { minSize, maxSize, overlap })
     }
 

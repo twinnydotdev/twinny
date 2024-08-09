@@ -131,7 +131,7 @@ export class EmbeddingDatabase {
       {
         location: vscode.ProgressLocation.Notification,
         title: 'Embedding',
-        cancellable: false
+        cancellable: true,
       },
       async (progress) => {
         const promises = filePaths.map(async (filePath) => {

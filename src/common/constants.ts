@@ -219,7 +219,7 @@ export const TITLE_GENERATION_PROMPT_MESAGE = `
   It should not contain any special characters or quotes.
 `
 
-export const WASM_LANGAUAGES: { [key: string]: string } = {
+export const WASM_LANGUAGES: { [key: string]: string } = {
   'php-s': 'php',
   bash: 'bash',
   c: 'c',
@@ -354,6 +354,7 @@ export const EMBEDDING_IGNORE_LIST = [
   'LICENSE',
   'Makefile',
   'node_modules',
+  'onnx',
   'out',
   'package-lock.json',
   'package.json',
@@ -384,6 +385,7 @@ export const EMBEDDING_IGNORE_LIST = [
   'util',
   'utils',
   'vagrantfile',
+  'visx',
   'webpack.config.js',
   'yarn.lock',
   'yml'
