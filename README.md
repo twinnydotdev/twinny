@@ -36,7 +36,7 @@ Discuss your code via the sidebar: get function explanations, generate tests, re
 - Creates new documents from code blocks
 - Copies generated code solution blocks
 - Workspace embeddings for context-aware AI assistance
-- 
+  
 ### Workspace Embeddings
 Enhance your coding experience with context-aware AI assistance using workspace embeddings.
 - **Embed Your Workspace**: Easily embed your entire workspace with a single click.
