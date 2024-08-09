@@ -28,10 +28,6 @@ import { copy } from 'esbuild-plugin-copy';
             to: './out/tree-sitter-wasms'
           },
           {
-            from: './models/**/*',
-            to: './out/models',
-          },
-          {
             from: './node_modules/web-tree-sitter/tree-sitter.wasm',
             to: './out/tree-sitter.wasm'
           },

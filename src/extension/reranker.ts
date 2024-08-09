@@ -16,8 +16,8 @@ export class Reranker {
   private readonly _tokenizerPath: string
 
   constructor() {
-    this._modelPath = path.join(__dirname, 'models', 'reranker.onnx')
-    this._tokenizerPath = path.join(__dirname, 'models', 'spm.model')
+    this._modelPath = path.join(__dirname, '..', 'models', 'reranker.onnx')
+    this._tokenizerPath = path.join(__dirname, '..', 'models', 'spm.model')
     this.init()
   }
 
