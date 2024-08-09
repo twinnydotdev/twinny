@@ -10,14 +10,22 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
-          - os: ubuntu-latest
-            target: linux-x64
           - os: windows-latest
-            target: win32-x64
+            platform: win32
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
           - os: macos-latest
-            target: darwin-x64
+            platform: darwin
+            arch: x64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -26,11 +34,13 @@ jobs:
           node-version: 18
       - run: npm ci
       - name: Package Extension
-        run: npx vsce package --target ${{ matrix.target }}
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+        run: npx vsce package --target ${{ matrix.platform }}-${{ matrix.arch }}
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: vsix-${{ matrix.target }}
+          name: vsix-${{ matrix.platform }}-${{ matrix.arch }}
           path: "*.vsix"
 
   publish:
@@ -50,6 +60,14 @@ jobs:
           VSCE_PAT: ${{ secrets.VS_CODE_MARKETPLACE_TOKEN }}
         run: |
           for file in ./vsix/**/*.vsix; do
-            echo "Publishing $file"
+            echo "Publishing $file to Visual Studio Marketplace"
             npx vsce publish --pat "$VSCE_PAT" --packagePath "$file"
+          done
+      - name: Publish to Open VSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+        run: |
+          for file in ./vsix/**/*.vsix; do
+            echo "Publishing $file to Open VSX Registry"
+            npx ovsx publish -p "$OVSX_PAT" --packagePath "$file"
           done
