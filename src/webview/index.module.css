@@ -55,7 +55,6 @@ h6 {
   font-weight: 400;
 }
 
-
 pre {
   background-color: var(--vscode-textCodeBlock-background);
   border-radius: 3px;
@@ -174,7 +173,7 @@ pre code {
   position: relative;
 }
 
-.chatInput {
+.tiptap {
   border-radius: 5px;
   box-sizing: border-box;
   position: relative;
@@ -189,11 +188,12 @@ pre code {
   font-family: var(--vscode-font-family);
   resize: none;
   overflow: hidden;
+  outline: none;
 }
 
 .chatSubmit {
   position: absolute;
-  bottom: 7px;
+  bottom: 3px;
   right: 5px;
   cursor: pointer;
   padding: 5px;
@@ -334,4 +334,50 @@ pre code {
 
 .embeddingOptions .sliderLabel {
   transform: translateY(-9px);
+}
+
+.tiptap p {
+  margin: 0;
+}
+
+:global(.tiptap .mention) {
+  background-color: var(--vscode-inputOption-activeBackground);
+  border-radius: 0.4rem;
+  box-decoration-break: clone;
+  color: var(--vscode-inputOption-activeForeground);
+  padding: 1px 2px 2px 2px;
+}
+
+:global(.tiptap) {
+  outline: none;
+}
+
+:global(.tiptap:first-child ){
+  margin-top: 0;
+}
+
+.dropdownMenu {
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-inputOption-activeBorder);
+  border-radius: 0.4rem;
+  box-shadow: var(--vscode-widget-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  overflow: auto;
+  position: relative;
+}
+
+.dropdownMenu button, :global(.tiptap .item) {
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  background-color: transparent;
+  width: 100%;
+  padding: 0.2rem 0.5rem;
+}
+
+.dropdownMenu button.dropdownSelected {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-inputValidation-infoForeground);
 }

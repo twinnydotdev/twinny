@@ -15,7 +15,7 @@ import {
   TWINNY_COMMAND_NAME,
   SYMMETRY_DATA_MESSAGE,
   SYMMETRY_EMITTER_KEY,
-  SYSTEM,
+  SYSTEM
 } from '../../common/constants'
 import { ChatService } from '../chat-service'
 import {
@@ -23,7 +23,7 @@ import {
   Message,
   ApiModel,
   ServerMessage,
-  InferenceRequest
+  InferenceRequest,
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
@@ -85,7 +85,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       webviewView,
       this._db,
       this._sessionManager,
-      this.symmetryService,
+      this.symmetryService
     )
 
     this.conversationHistory = new ConversationHistory(
@@ -127,7 +127,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
 
     webviewView.webview.onDidReceiveMessage(
-      (message: ClientMessage<string | boolean> & ClientMessage<Message[]>) => {
+      (message) => {
         const eventHandlers = {
           [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
           [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
@@ -142,8 +142,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnySendLanguage]: this.getCurrentLanguage,
           [EVENT_NAME.twinnySendTheme]: this.getTheme,
           [EVENT_NAME.twinnySetGlobalContext]: this.setGlobalContext,
-          [EVENT_NAME.twinnySetWorkspaceContext]:
-            this.setTwinnyWorkspaceContext,
+          [EVENT_NAME.twinnySetWorkspaceContext]: this.setWorkspaceContext,
           [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
           [EVENT_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
           [EVENT_NAME.twinnySetConfigValue]: this.setConfigurationValue,
@@ -153,7 +152,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
           [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
           [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
-          [EVENT_NAME.twinnySessionContext]: this.getSessionContext
+          [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
         }
         eventHandlers[message.type as string]?.(message)
       }
@@ -185,22 +184,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  public getConfigurationValue = (data: ClientMessage) => {
-    if (!data.key) return
+  public getConfigurationValue = (message: ClientMessage) => {
+    if (!message.key) return
     const config = vscode.workspace.getConfiguration('twinny')
     this.view?.webview.postMessage({
       type: EVENT_NAME.twinnyGetConfigValue,
       value: {
-        data: config.get(data.key as string),
-        type: data.key
+        data: config.get(message.key as string),
+        type: message.key
       }
     } as ServerMessage<string>)
   }
 
-  public setConfigurationValue = (data: ClientMessage) => {
-    if (!data.key) return
+  public setConfigurationValue = (message: ClientMessage) => {
+    if (!message.key) return
     const config = vscode.workspace.getConfiguration('twinny')
-    config.update(data.key, data.data, vscode.ConfigurationTarget.Global)
+    config.update(message.key, message.data, vscode.ConfigurationTarget.Global)
   }
 
   public fetchOllamaModels = async () => {
@@ -230,14 +229,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     } as ServerMessage<string[]>)
   }
 
-  public sendNotification = (data: ClientMessage) => {
-    vscode.window.showInformationMessage(data.data as string)
+  public sendNotification = (message: ClientMessage) => {
+    vscode.window.showInformationMessage(message.data as string)
   }
 
-  public clickSuggestion = (data: ClientMessage) => {
+  public clickSuggestion = (message: ClientMessage) => {
     vscode.commands.executeCommand(
       'twinny.templateCompletion',
-      data.data as string
+      message.data as string
     )
   }
 
@@ -270,6 +269,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         )
       )
     }
+
     this.chatService?.streamChatCompletion(data.data || [])
   }
 
@@ -307,22 +307,32 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  public acceptSolution = (data: ClientMessage) => {
+  public acceptSolution = (message: ClientMessage) => {
     const editor = vscode.window.activeTextEditor
     const selection = editor?.selection
     if (!selection) return
     vscode.window.activeTextEditor?.edit((editBuilder) => {
-      editBuilder.replace(selection, data.data as string)
+      editBuilder.replace(selection, message.data as string)
     })
   }
 
-  public createNewUntitledDocument = async (data: ClientMessage) => {
+  public createNewUntitledDocument = async (message: ClientMessage) => {
     const lang = getLanguage()
     const document = await vscode.workspace.openTextDocument({
-      content: data.data as string,
+      content: message.data as string,
       language: lang.languageId
     })
     await vscode.window.showTextDocument(document)
+  }
+
+  public getGlobalContext = (message: ClientMessage) => {
+    const storedData = this._context?.globalState.get(
+      `${EVENT_NAME.twinnyGlobalContext}-${message.key}`
+    )
+    this.view?.webview.postMessage({
+      type: `${EVENT_NAME.twinnyGlobalContext}-${message.key}`,
+      value: storedData
+    })
   }
 
   public getTheme = () => {
@@ -370,41 +380,31 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  public getGlobalContext = (data: ClientMessage) => {
-    const storedData = this._context?.globalState.get(
-      `${EVENT_NAME.twinnyGlobalContext}-${data.key}`
-    )
-    this.view?.webview.postMessage({
-      type: `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
-      value: storedData
-    })
-  }
-
-  public setGlobalContext = (data: ClientMessage) => {
+  public setGlobalContext = (message: ClientMessage) => {
     this._context?.globalState.update(
-      `${EVENT_NAME.twinnyGlobalContext}-${data.key}`,
-      data.data
+      `${EVENT_NAME.twinnyGlobalContext}-${message.key}`,
+      message.data
     )
   }
 
-  public getTwinnyWorkspaceContext = (data: ClientMessage) => {
+  public getTwinnyWorkspaceContext = (message: ClientMessage) => {
     const storedData = this._context?.workspaceState.get(
-      `${EVENT_NAME.twinnyWorkspaceContext}-${data.key}`
+      `${EVENT_NAME.twinnyWorkspaceContext}-${message.key}`
     )
     this.view?.webview.postMessage({
-      type: `${EVENT_NAME.twinnyWorkspaceContext}-${data.key}`,
+      type: `${EVENT_NAME.twinnyWorkspaceContext}-${message.key}`,
       value: storedData
     } as ServerMessage)
   }
 
-  public setTwinnyWorkspaceContext = <T>(data: ClientMessage<T>) => {
-    const value = data.data
+  public setWorkspaceContext = <T>(message: ClientMessage<T>) => {
+    const value = message.data
     this._context.workspaceState.update(
-      `${EVENT_NAME.twinnyWorkspaceContext}-${data.key}`,
+      `${EVENT_NAME.twinnyWorkspaceContext}-${message.key}`,
       value
     )
     this.view?.webview.postMessage({
-      type: `${EVENT_NAME.twinnyWorkspaceContext}-${data.key}`,
+      type: `${EVENT_NAME.twinnyWorkspaceContext}-${message.key}`,
       value
     })
   }
