@@ -64,10 +64,6 @@ export interface ClientMessage<T = string | boolean | Message[]> {
   key?: string
 }
 
-export type ClientMessageWithData = ClientMessage<string | boolean> &
-  ClientMessage<Message[]> &
-  ClientMessage<GithubPullRequestMessage>
-
 export interface ServerMessage<T = LanguageType> {
   type: string
   value: {
@@ -84,12 +80,6 @@ export interface Message {
   type?: string
   language?: LanguageType
   error?: boolean
-}
-
-export interface GithubPullRequestMessage {
-  owner: string
-  repo: string
-  number: number
 }
 
 export interface Conversation {

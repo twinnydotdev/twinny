@@ -24,8 +24,6 @@ import {
   ApiModel,
   ServerMessage,
   InferenceRequest,
-  ClientMessageWithData,
-  GithubPullRequestMessage
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
@@ -37,7 +35,6 @@ import { SessionManager } from '../session-manager'
 import { Logger } from '../../common/logger'
 
 const logger = new Logger()
-import { GithubService } from '../github-service'
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _config = vscode.workspace.getConfiguration('twinny')
@@ -46,7 +43,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   private _templateDir: string
   private _templateProvider: TemplateProvider
   private _ollamaService: OllamaService | undefined = undefined
-  private _githubService: GithubService | undefined = undefined
   public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
   public view?: vscode.WebviewView
@@ -100,7 +96,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     )
 
     new ProviderManager(this._context, this.view)
-    this._githubService = new GithubService(this._context, this.view)
 
     // codeReviewer.getPullRequestDiff('bitfinexcom', 'bfx-ui-settings', 1257)
 
@@ -134,7 +129,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
 
     webviewView.webview.onDidReceiveMessage(
-      (message: ClientMessageWithData) => {
+      (message) => {
         const eventHandlers = {
           [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
           [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
@@ -160,7 +155,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
           [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
           [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
-          [EVENT_NAME.twinnyGithhubReview]: this.githubReview
         }
         eventHandlers[message.type as string]?.(message)
       }
@@ -225,12 +219,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     } catch (e) {
       return
     }
-  }
-
-  public githubReview(message: ClientMessage<GithubPullRequestMessage>) {
-    if (!message.data) return
-    const { owner, repo, number } = message.data
-    this._githubService?.getPullRequestReview(owner, repo, number)
   }
 
   public listTemplates = () => {
