@@ -228,30 +228,6 @@ export const TITLE_GENERATION_PROMPT_MESAGE = `
   It should not contain any special characters or quotes.
 `
 
-export const getCodeReviewPrompt = (code: string) => `
-  As a highly skilled software engineer, review the following code:
-
-  \`\`\`
-  ${code}
-  \`\`\`
-
-  Present it in markdown format, and refrain from mentioning:
-  - Adding comments or documentation
-  - Adding dependencies or related pull requests
-`
-
-export const getPullRequestDescription = (code: string) => `
-  As a highly skilled software engineer, write a description for this pull request from the unidiff.
-
-  \`\`\`
-  ${code}
-  \`\`\`
-
-  Present it in markdown format, and refrain from mentioning:
-  - Adding comments or documentation
-  - Adding dependencies or related pull requests
-`
-
 export const WASM_LANGUAGES: { [key: string]: string } = {
   'php-s': 'php',
   bash: 'bash',
