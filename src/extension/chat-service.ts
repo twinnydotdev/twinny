@@ -446,14 +446,14 @@ export class ChatService {
   public async getRagContext(
     text?: string,
   ): Promise<string | null> {
-    const ragContextKey = `${EVENT_NAME.twinnyWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
-    const isRagEnabled = this._context?.workspaceState.get(ragContextKey)
 
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
 
-    if (!isRagEnabled || symmetryConnected)
+    const workspaceMentioned = text?.includes('@workspace')
+
+    if (symmetryConnected || !workspaceMentioned)
       return null
 
     updateLoadingMessage(this._view, 'Exploring knowledge base')

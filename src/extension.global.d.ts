@@ -1,5 +1,6 @@
 declare module 'hyperswarm'
 declare module 'b4a'
+declare module '@tiptap/extension-placeholder'
 
 declare module 'hypercore-crypto' {
   const hyperCoreCrypto: {

@@ -26,6 +26,12 @@ export const MIN_COMPLETION_CHUNKS = 2
 export const MAX_EMPTY_COMPLETION_CHARS = 250
 export const DEFAULT_RERANK_THRESHOLD = 0.5
 
+export const defaultChunkOptions = {
+  maxSize: 500,
+  minSize: 50,
+  overlap: 50
+}
+
 export const EVENT_NAME = {
   twinngAddMessage: 'twinny-add-message',
   twinnyAcceptSolution: 'twinny-accept-solution',
@@ -118,8 +124,8 @@ export const PROVIDER_EVENT_NAME = {
   updateProvider: 'twinny.update-provider'
 }
 
-export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
 export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
+export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
 export const ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY =
   'twinny.active-embeddings-provider'
 export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
@@ -145,11 +151,13 @@ export const EXTENSION_SETTING_KEY = {
 
 export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: 'twinnyConversationHistory',
-  twinnyEnableRag: 'twinnyEnableRag',
   twinnyGeneratingText: 'twinnyGeneratingText',
   twinnyManageProviders: 'twinnyManageProviders',
   twinnyManageTemplates: 'twinnyManageTemplates',
   twinnyRerankThreshold: 'twinnyRerankThreshold',
+  twinnyMaxChunkSize: 'twinnyMaxChunkSize',
+  twinnyMinChunkSize: 'twinnyMinChunkSize',
+  twinnyOverlapSize: 'twinnyOverlapSize',
   twinnySymmetryTab: 'twinnySymmetryTab'
 }
 

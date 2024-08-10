@@ -164,7 +164,7 @@ export const apiProviders = {
   LMStudio: 'lmstudio',
   Ollama: 'ollama',
   Oobabooga: 'oobabooga',
-  OpenWebUI: 'openwebui',
+  OpenWebUI: 'openwebui'
 } as const
 
 export interface ApiModel {
@@ -247,9 +247,9 @@ export interface InferenceRequest {
 }
 
 export interface ChunkOptions {
-  minSize?: number
-  maxSize?: number
-  overlap?: number
+  minSize: number
+  maxSize: number
+  overlap: number
 }
 
 export type Embedding = {

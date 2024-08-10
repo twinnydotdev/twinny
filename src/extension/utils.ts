@@ -1,5 +1,6 @@
 import {
   ColorThemeKind,
+  ExtensionContext,
   InlineCompletionContext,
   InlineCompletionTriggerKind,
   Position,
@@ -31,7 +32,9 @@ import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
+  defaultChunkOptions,
   EVENT_NAME,
+  EXTENSION_CONTEXT_NAME,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
@@ -481,32 +484,51 @@ function getSplitChunks(node: SyntaxNode, options: ChunkOptions): string[] {
   return chunks
 }
 
+export const getChunkOptions = (
+  context: ExtensionContext | undefined
+): ChunkOptions => {
+  if (!context) return defaultChunkOptions
+  const maxChunkSizeContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize}`
+  const minChunkSizeContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyMinChunkSize}`
+  const overlap = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyOverlapSize}`
+
+  const options = {
+    maxSize: Number(context.globalState.get(maxChunkSizeContext)) || 500,
+    minSize: Number(context.globalState.get(minChunkSizeContext)) || 50,
+    overlap: Number(context.globalState.get(overlap)) || 50
+  }
+
+  return options
+}
+
 export async function getDocumentSplitChunks(
   content: string,
   filePath: string,
-  options: ChunkOptions = {}
+  context: ExtensionContext | undefined
 ): Promise<string[]> {
-  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+  if (!context) return []
+
+  const options = getChunkOptions(context)
 
   try {
     const parser = await getParser(filePath)
 
     if (!parser) {
-      return simpleChunk(content, { minSize, maxSize, overlap })
+      return simpleChunk(content, options)
     }
 
     const tree = parser.parse(content)
-    const chunks = getSplitChunks(tree.rootNode, { minSize, maxSize })
+    const chunks = getSplitChunks(tree.rootNode, options)
 
-    return combineChunks(chunks, { minSize, maxSize, overlap })
+    return combineChunks(chunks, options)
   } catch (error) {
     console.error(`Error parsing file ${filePath}: ${error}`)
-    return simpleChunk(content, { minSize, maxSize, overlap })
+    return simpleChunk(content, options)
   }
 }
 
 function combineChunks(chunks: string[], options: ChunkOptions): string[] {
-  const { minSize = 50, maxSize = 500, overlap = 50 } = options
+  const { minSize, maxSize, overlap } = options
   const result: string[] = []
   let currentChunk = ''
 

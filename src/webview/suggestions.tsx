@@ -35,10 +35,10 @@ export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
   }
 
   useEffect(() => {
-    if (!templateContext?.length) {
+    if (!templateContext?.context?.length) {
       return
     }
-    const filteredTemplates = fixDeletedTemplates(templateContext)
+    const filteredTemplates = fixDeletedTemplates(templateContext.context)
     setSuggestions(filteredTemplates)
   }, [templates])
 
