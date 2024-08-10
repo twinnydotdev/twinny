@@ -134,9 +134,10 @@ export class EmbeddingDatabase {
         cancellable: true,
       },
       async (progress) => {
+        if (!this._extensionContext) return
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, 'utf-8')
-          const chunks = await getDocumentSplitChunks(content, filePath)
+          const chunks = await getDocumentSplitChunks(content, filePath, this._extensionContext)
           const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
           this._filePaths.push({

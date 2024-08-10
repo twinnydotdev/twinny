@@ -1,19 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   VSCodeButton,
   VSCodePanelView,
   VSCodeBadge,
-  VSCodeDivider,
+  VSCodeDivider
 } from '@vscode/webview-ui-toolkit/react'
+import { useEditor, EditorContent, Extension, Editor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
+import Mention, { MentionPluginKey } from '@tiptap/extension-mention'
+import { suggestion } from './suggestion'
 
 import {
   ASSISTANT,
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   USER,
-  SYMMETRY_EMITTER_KEY,
-  EXTENSION_CONTEXT_NAME
+  SYMMETRY_EMITTER_KEY
 } from '../common/constants'
 
 import useAutosizeTextArea, {
@@ -23,12 +27,7 @@ import useAutosizeTextArea, {
   useTheme,
   useWorkSpaceContext
 } from './hooks'
-import {
-  DisabledAutoScrollIcon,
-  DisabledRAGIcon,
-  EnabledAutoScrollIcon,
-  EnabledRAGIcon
-} from './icons'
+import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from './icons'
 
 import { Suggestions } from './suggestions'
 import {
@@ -43,11 +42,38 @@ import { ProviderSelect } from './provider-select'
 import { EmbeddingOptions } from './embedding-options'
 import ChatLoader from './chat-loader'
 
+const CustomKeyMap = Extension.create({
+  name: 'customKeymap',
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) {
+          return false
+        }
+        this.options.handleSubmitForm(editor.getText())
+        this.options.clearEditor()
+        return true
+      },
+      'Mod-Enter': ({ editor }) => {
+        editor.commands.insertContent('\n')
+        return true
+      },
+      'Shift-Enter': ({ editor }) => {
+        editor.commands.insertContent('\n')
+        return true
+      }
+    }
+  }
+})
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const Chat = () => {
   const [inputText, setInputText] = useState('')
   const generatingRef = useRef(false)
+  const editorRef = useRef<Editor | null>(null)
   const stopRef = useRef(false)
   const theme = useTheme()
   const [loading, setLoading] = useState(false)
@@ -66,8 +92,6 @@ export const Chat = () => {
   } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
-  const { context: enableRagContext, setContext: setEnableRagContext } =
-    useWorkSpaceContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableRag)
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
   useAutosizeTextArea(chatRef, inputText)
@@ -202,24 +226,35 @@ export const Chat = () => {
     }, 200)
   }
 
-  const handleSubmitForm = (input: string) => {
-    if (input) {
-      setLoading(true)
-      setInputText('')
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: [
-          ...(messages || []),
-          {
-            role: USER,
-            content: input
+  const handleSubmitForm = useCallback(
+    (input: string) => {
+      if (input) {
+        setLoading(true)
+        setInputText('')
+        global.vscode.postMessage({
+          type: EVENT_NAME.twinnyChatMessage,
+          data: [
+            ...(messages || []),
+            {
+              role: USER,
+              content: input
+            }
+          ]
+        } as ClientMessage)
+        setMessages((prev) => [...(prev || []), { role: USER, content: input }])
+        setTimeout(() => {
+          if (markdownRef.current) {
+            markdownRef.current.scrollTop = markdownRef.current.scrollHeight
           }
-        ]
-      } as ClientMessage)
-      setMessages((prev) => [...(prev || []), { role: USER, content: input }])
-      scrollToBottom()
-    }
-  }
+        }, 200)
+      }
+    },
+    [messages]
+  )
+
+  const clearEditor = useCallback(() => {
+    editorRef.current?.commands.clearContent()
+  }, [])
 
   const handleToggleAutoScroll = () => {
     setAutoScrollContext((prev) => {
@@ -269,17 +304,6 @@ export const Chat = () => {
     }
   }
 
-  const handleToggleRag = (): void => {
-    setEnableRagContext((prev) => {
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnySetWorkspaceContext,
-        key: EXTENSION_CONTEXT_NAME.twinnyEnableRag,
-        data: !prev
-      } as ClientMessage)
-      return !prev
-    })
-  }
-
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     chatRef.current?.focus()
@@ -294,6 +318,30 @@ export const Chat = () => {
       return setMessages(conversation.messages)
     }
   }, [conversation?.id, autoScrollContext, showProvidersContext])
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: 'How can twinny help you today?'
+      }),
+      Mention.configure({
+        HTMLAttributes: {
+          class: 'mention'
+        },
+        suggestion
+      }),
+      CustomKeyMap.configure({
+        handleSubmitForm,
+        clearEditor
+      })
+    ],
+    content: inputText
+  })
+
+  if (editor && !editorRef.current) {
+    editorRef.current = editor
+  }
 
   return (
     <VSCodePanelView>
@@ -355,14 +403,6 @@ export const Chat = () => {
             >
               <span className="codicon codicon-arrow-down"></span>
             </VSCodeButton>
-            <VSCodeButton
-              title="Toggle RAG context for next message"
-              appearance="icon"
-              onClick={handleToggleRag}
-            >
-            {enableRagContext ? <EnabledRAGIcon /> : <DisabledRAGIcon />}
-            </VSCodeButton>
-            <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           <div>
             {generatingRef.current && (
@@ -408,28 +448,10 @@ export const Chat = () => {
         </div>
         <form>
           <div className={styles.chatBox}>
-            <textarea
-              ref={chatRef}
-              disabled={generatingRef.current}
+            <EditorContent
               placeholder="How can twinny help you today?"
-              rows={1}
-              value={inputText}
-              className={styles.chatInput}
-              onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-                const target = e.target as HTMLTextAreaElement
-                if (e.key === 'Enter' && !e.ctrlKey) {
-                  e.preventDefault()
-
-                  handleSubmitForm(target.value)
-                } else if (e.ctrlKey && e.key === 'Enter') {
-                  setInputText(`${target.value}\n`)
-                }
-              }}
-              onChange={(e) => {
-                const event =
-                  e as unknown as React.ChangeEvent<HTMLTextAreaElement>
-                setInputText(event.target.value)
-              }}
+              className={styles.tiptap}
+              editor={editor}
             />
             <div
               role="button"

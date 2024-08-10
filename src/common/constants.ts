@@ -26,6 +26,12 @@ export const MIN_COMPLETION_CHUNKS = 2
 export const MAX_EMPTY_COMPLETION_CHARS = 250
 export const DEFAULT_RERANK_THRESHOLD = 0.5
 
+export const defaultChunkOptions = {
+  maxSize: 500,
+  minSize: 50,
+  overlap: 50
+}
+
 export const EVENT_NAME = {
   twinngAddMessage: 'twinny-add-message',
   twinnyAcceptSolution: 'twinny-accept-solution',
@@ -65,7 +71,8 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context'
+  twinnyWorkspaceContext: 'twinny-workspace-context',
+  twinnyGithhubReview: 'twinny-githhub-review'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -118,8 +125,8 @@ export const PROVIDER_EVENT_NAME = {
   updateProvider: 'twinny.update-provider'
 }
 
-export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
 export const ACTIVE_CONVERSATION_STORAGE_KEY = 'twinny.active-conversation'
+export const ACTIVE_CHAT_PROVIDER_STORAGE_KEY = 'twinny.active-chat-provider'
 export const ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY =
   'twinny.active-embeddings-provider'
 export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
@@ -145,11 +152,13 @@ export const EXTENSION_SETTING_KEY = {
 
 export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: 'twinnyConversationHistory',
-  twinnyEnableRag: 'twinnyEnableRag',
   twinnyGeneratingText: 'twinnyGeneratingText',
   twinnyManageProviders: 'twinnyManageProviders',
   twinnyManageTemplates: 'twinnyManageTemplates',
   twinnyRerankThreshold: 'twinnyRerankThreshold',
+  twinnyMaxChunkSize: 'twinnyMaxChunkSize',
+  twinnyMinChunkSize: 'twinnyMinChunkSize',
+  twinnyOverlapSize: 'twinnyOverlapSize',
   twinnySymmetryTab: 'twinnySymmetryTab'
 }
 
@@ -219,17 +228,43 @@ export const TITLE_GENERATION_PROMPT_MESAGE = `
   It should not contain any special characters or quotes.
 `
 
+export const getCodeReviewPrompt = (code: string) => `
+  As a highly skilled software engineer, review the following code:
+
+  \`\`\`
+  ${code}
+  \`\`\`
+
+  Present it in markdown format, and refrain from mentioning:
+  - Adding comments or documentation
+  - Adding dependencies or related pull requests
+`
+
+export const getPullRequestDescription = (code: string) => `
+  As a highly skilled software engineer, write a description for this pull request from the unidiff.
+
+  \`\`\`
+  ${code}
+  \`\`\`
+
+  Present it in markdown format, and refrain from mentioning:
+  - Adding comments or documentation
+  - Adding dependencies or related pull requests
+`
+
 export const WASM_LANGUAGES: { [key: string]: string } = {
   'php-s': 'php',
   bash: 'bash',
-  c: 'c',
-  cc: 'cpp',
-  cjs: 'javascript',
   cpp: 'cpp',
+  hpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  hxx: 'cpp',
   cs: 'c_sharp',
+  c: 'c',
+  cjs: 'javascript',
   css: 'css',
   cts: 'typescript',
-  cxx: 'cpp',
   eex: 'embedded_template',
   el: 'elisp',
   elm: 'elm',
@@ -240,10 +275,8 @@ export const WASM_LANGUAGES: { [key: string]: string } = {
   go: 'go',
   h: 'c',
   heex: 'embedded_template',
-  hpp: 'cpp',
   htm: 'html',
   html: 'html',
-  hxx: 'cpp',
   java: 'java',
   js: 'javascript',
   json: 'json',
@@ -445,3 +478,10 @@ export const SYMMETRY_EMITTER_KEY = {
   conversationTitle: 'conversationTitle',
   inference: 'inference'
 }
+export const MULTI_LINE_REACT = [
+  'jsx_closing_element',
+  'jsx_element',
+  'jsx_element',
+  'jsx_opening_element',
+  'jsx_self_closing_element'
+]

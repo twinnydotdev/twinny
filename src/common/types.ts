@@ -64,6 +64,10 @@ export interface ClientMessage<T = string | boolean | Message[]> {
   key?: string
 }
 
+export type ClientMessageWithData = ClientMessage<string | boolean> &
+  ClientMessage<Message[]> &
+  ClientMessage<GithubPullRequestMessage>
+
 export interface ServerMessage<T = LanguageType> {
   type: string
   value: {
@@ -80,6 +84,12 @@ export interface Message {
   type?: string
   language?: LanguageType
   error?: boolean
+}
+
+export interface GithubPullRequestMessage {
+  owner: string
+  repo: string
+  number: number
 }
 
 export interface Conversation {
@@ -164,7 +174,7 @@ export const apiProviders = {
   LMStudio: 'lmstudio',
   Ollama: 'ollama',
   Oobabooga: 'oobabooga',
-  OpenWebUI: 'openwebui',
+  OpenWebUI: 'openwebui'
 } as const
 
 export interface ApiModel {
@@ -247,9 +257,9 @@ export interface InferenceRequest {
 }
 
 export interface ChunkOptions {
-  minSize?: number
-  maxSize?: number
-  overlap?: number
+  minSize: number
+  maxSize: number
+  overlap: number
 }
 
 export type Embedding = {
