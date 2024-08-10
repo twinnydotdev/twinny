@@ -1,16 +1,13 @@
 name: Publish Extension
-
 on:
   workflow_dispatch:
   push:
     branches:
       - main
-
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
             target: linux-x64
@@ -18,6 +15,8 @@ jobs:
             target: win32-x64
           - os: macos-latest
             target: darwin-x64
+          - os: macos-12
+            target: darwin-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -32,7 +31,6 @@ jobs:
         with:
           name: vsix-${{ matrix.target }}
           path: "*.vsix"
-
   publish:
     needs: build
     runs-on: ubuntu-latest
