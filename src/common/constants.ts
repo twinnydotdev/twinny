@@ -71,8 +71,7 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context',
-  twinnyGithhubReview: 'twinny-githhub-review'
+  twinnyWorkspaceContext: 'twinny-workspace-context'
 }
 
 export const TWINNY_COMMAND_NAME = {

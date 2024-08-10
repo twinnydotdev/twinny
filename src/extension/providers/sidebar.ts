@@ -97,8 +97,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     new ProviderManager(this._context, this.view)
 
-    // codeReviewer.getPullRequestDiff('bitfinexcom', 'bfx-ui-settings', 1257)
-
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [this._context?.extensionUri]
