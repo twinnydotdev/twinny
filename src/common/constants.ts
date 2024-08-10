@@ -454,10 +454,3 @@ export const SYMMETRY_EMITTER_KEY = {
   conversationTitle: 'conversationTitle',
   inference: 'inference'
 }
-export const MULTI_LINE_REACT = [
-  'jsx_closing_element',
-  'jsx_element',
-  'jsx_element',
-  'jsx_opening_element',
-  'jsx_self_closing_element'
-]
