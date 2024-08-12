@@ -239,13 +239,30 @@ export class ChatService {
       ) as number
       const metric = storedMetric || DEFAULT_VECTOR_SEARCH_METRIC
 
-      const documents =
+      const query = relevantFiles?.length
+        ? `file IN ("${relevantFiles.map((file) => file[0]).join('","')}")`
+        : ''
+
+      const queryEmbeddedDocuments =
         (await this._db.getDocuments(
           embedding,
-          relevantCodeCount,
+          Math.round(relevantCodeCount / 2),
           table,
-          metric as 'cosine' | 'l2' | 'dot'
+          metric as 'cosine' | 'l2' | 'dot',
+          query
         )) || []
+
+      const embeddedDocuments = await this._db.getDocuments(
+        embedding,
+        Math.round(relevantCodeCount / 2),
+        table,
+        metric as 'cosine' | 'l2' | 'dot',
+      ) || []
+
+      const documents = [
+        ...embeddedDocuments,
+        ...queryEmbeddedDocuments,
+      ]
 
       const documentScores = await this._reranker.rerank(
         text,
