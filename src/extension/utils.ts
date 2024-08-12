@@ -495,7 +495,7 @@ export const getChunkOptions = (
   const options = {
     maxSize: Number(context.globalState.get(maxChunkSizeContext)) || 500,
     minSize: Number(context.globalState.get(minChunkSizeContext)) || 50,
-    overlap: Number(context.globalState.get(overlap)) || 50
+    overlap: Number(context.globalState.get(overlap)) || 10
   }
 
   return options
@@ -519,7 +519,6 @@ export async function getDocumentSplitChunks(
 
     const tree = parser.parse(content)
     const chunks = getSplitChunks(tree.rootNode, options)
-
     return combineChunks(chunks, options)
   } catch (error) {
     console.error(`Error parsing file ${filePath}: ${error}`)
@@ -611,12 +610,12 @@ export const logStreamOptions = (opts: any) => {
 Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
 Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
 Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
-Number characters in all messages = ${opts.body.messages?.reduce(
-      (acc: number, msg: Message) => {
+Number characters in all messages = ${
+      opts.body.messages &&
+      opts.body.messages?.reduce((acc: number, msg: Message) => {
         return msg.content?.length ? acc + msg.content?.length : 0
-      },
-      0
-    )}\n\n
-    `
+      }, 0)
+    }\n\n
+    `.trim()
   )
 }

@@ -189,11 +189,12 @@ pre code {
   resize: none;
   overflow: hidden;
   outline: none;
+  padding-right: 30px;
 }
 
 .chatSubmit {
   position: absolute;
-  bottom: 3px;
+  bottom: 1px;
   right: 5px;
   cursor: pointer;
   padding: 5px;
@@ -320,6 +321,14 @@ pre code {
 
 .embeddingOptions > div {
   width: 100%;
+}
+
+.embeddingOptions small {
+  display: block;
+}
+
+.embeddingOptions vscode-button {
+  margin-bottom: 5px;
 }
 
 .embeddingOptions vscode-dropdown {

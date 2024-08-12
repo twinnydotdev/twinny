@@ -18,6 +18,9 @@ import {
 import { TwinnyProvider } from './provider-manager'
 import { getDocumentSplitChunks } from './utils'
 import { IntoVector } from '@lancedb/lancedb/dist/arrow'
+import { Logger } from '../common/logger'
+
+const logger = new Logger()
 
 export class EmbeddingDatabase {
   private _config = vscode.workspace.getConfiguration('twinny')
@@ -87,14 +90,16 @@ export class EmbeddingDatabase {
 
   private getAllFilePaths = async (dirPath: string): Promise<string[]> => {
     let filePaths: string[] = []
-    const dirents = await fs.promises.readdir(dirPath, {
-      withFileTypes: true
-    })
-    const gitIgnoredFiles = this.readGitIgnoreFile()
+    const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
+    const gitIgnoredFiles = this.readGitIgnoreFile() || []
     const submodules = this.readGitSubmodulesFile()
+
+    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ''
 
     for (const dirent of dirents) {
       const fullPath = path.join(dirPath, dirent.name)
+      const relativePath = path.relative(rootPath, fullPath)
+
       if (this.getIgnoreDirectory(dirent.name)) continue
 
       if (submodules?.some((submodule) => fullPath.includes(submodule))) {
@@ -102,11 +107,15 @@ export class EmbeddingDatabase {
       }
 
       if (
-        gitIgnoredFiles?.some(
-          (pattern) =>
-            minimatch(fullPath, pattern, { dot: true }) &&
+        gitIgnoredFiles.some((pattern) => {
+          const isIgnored =
+            minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
             !pattern.startsWith('!')
-        )
+          if (isIgnored) {
+            logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
+          }
+          return isIgnored
+        })
       ) {
         continue
       }
@@ -131,13 +140,17 @@ export class EmbeddingDatabase {
       {
         location: vscode.ProgressLocation.Notification,
         title: 'Embedding',
-        cancellable: true,
+        cancellable: true
       },
       async (progress) => {
         if (!this._extensionContext) return
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, 'utf-8')
-          const chunks = await getDocumentSplitChunks(content, filePath, this._extensionContext)
+          const chunks = await getDocumentSplitChunks(
+            content,
+            filePath,
+            this._extensionContext
+          )
           const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
           this._filePaths.push({
@@ -207,11 +220,12 @@ export class EmbeddingDatabase {
     vector: IntoVector,
     limit: number,
     tableName: string,
+    metric: 'cosine' | 'l2' | 'dot' = 'cosine',
     where?: string
   ): Promise<EmbeddedDocument[] | undefined> {
     try {
       const table = await this._db?.openTable(tableName)
-      const query = await table?.search(vector).limit(limit)
+      const query = table?.search(vector).limit(limit).distanceType(metric) // add type assertion
       if (where) query?.where(where)
       return query?.toArray()
     } catch (e) {
@@ -232,14 +246,36 @@ export class EmbeddingDatabase {
   private readGitIgnoreFile(): string[] | undefined {
     try {
       const folders = vscode.workspace.workspaceFolders
-      if (!folders || folders.length === 0) return undefined
+      if (!folders || folders.length === 0) {
+        console.log('No workspace folders found')
+        return undefined
+      }
+
       const rootPath = folders[0].uri.fsPath
-      if (!rootPath) return undefined
+      if (!rootPath) {
+        console.log('Root path is undefined')
+        return undefined
+      }
+
       const gitIgnoreFilePath = path.join(rootPath, '.gitignore')
-      if (!fs.existsSync(gitIgnoreFilePath)) return undefined
-      const ignoreFileContent = fs.readFileSync(gitIgnoreFilePath).toString()
-      return ignoreFileContent.split('\n').filter((line: string) => line !== '')
+      if (!fs.existsSync(gitIgnoreFilePath)) {
+        console.log('.gitignore file not found at', gitIgnoreFilePath)
+        return undefined
+      }
+
+      const ignoreFileContent = fs.readFileSync(gitIgnoreFilePath, 'utf8')
+      return ignoreFileContent
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line !== '' && !line.startsWith('#'))
+        .map((pattern) => {
+          if (pattern.endsWith('/')) {
+            return pattern + '**'
+          }
+          return pattern
+        })
     } catch (e) {
+      console.error('Error reading .gitignore file:', e)
       return undefined
     }
   }
