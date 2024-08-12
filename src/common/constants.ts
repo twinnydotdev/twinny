@@ -158,6 +158,9 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyMaxChunkSize: 'twinnyMaxChunkSize',
   twinnyMinChunkSize: 'twinnyMinChunkSize',
   twinnyOverlapSize: 'twinnyOverlapSize',
+  twinnyRelevantFilePaths: 'twinnyRelevantFilePaths',
+  twinnyRelevantCodeSnippets: 'twinnyRelevantCodeSnippets',
+  twinnyVectorSearchMetric : 'twinnyVectorSearchMetric',
   twinnySymmetryTab: 'twinnySymmetryTab'
 }
 
@@ -401,6 +404,16 @@ export const EMBEDDING_IGNORE_LIST = [
   'yml'
 ]
 
+export const DEFAULT_RELEVANT_FILE_COUNT = 10
+export const DEFAULT_RELEVANT_CODE_COUNT = 5
+export const DEFAULT_VECTOR_SEARCH_METRIC = 'l2'
+
+export const EMBEDDING_METRICS = [
+  'cosine',
+  'l2',
+  'dot'
+]
+
 export const MULTILINE_OUTSIDE = [
   'class_body',
   'class',
@@ -428,9 +441,7 @@ export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 
 export const MULTI_LINE_DELIMITERS = ['\n\n', '\r\n\r\n']
 
-export const RELEVANT_FILE_COUNT = 10 // todo make this configurable
 
-export const RELEVANT_CODE_COUNT = 5 // todo make this configurable
 
 export const SYMMETRY_DATA_MESSAGE = {
   disconnect: 'disconnect',

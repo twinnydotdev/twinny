@@ -6,7 +6,11 @@ import {
   VSCodeTextField
 } from '@vscode/webview-ui-toolkit/react'
 
-import { EVENT_NAME, EXTENSION_CONTEXT_NAME } from '../common/constants'
+import {
+  EMBEDDING_METRICS,
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME
+} from '../common/constants'
 import { ClientMessage } from '../common/types'
 import { useGlobalContext, useProviders } from './hooks'
 import styles from './index.module.css'
@@ -35,6 +39,15 @@ export const EmbeddingOptions = () => {
   const { context: overlap = '20', setContext: setOverlap } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyOverlapSize)
 
+  const { context: codeSnippets = '5', setContext: setRelevantCodeSnippets } =
+    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets)
+
+  const { context: filePaths = '10', setContext: setRelevantFilePaths } =
+    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths)
+
+  const { context: metric = 'l2', setContext: setMetric } =
+    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric)
+
   const embeddingProviders = Object.values(getProvidersByType('embedding'))
 
   const handleEmbedDocuments = () => {
@@ -60,6 +73,20 @@ export const EmbeddingOptions = () => {
     setMinChunkSize(value)
   }
 
+  const handleRelevantCodeSnippetsChange = (
+    e: Event | FormEvent<HTMLElement>
+  ) => {
+    const event = e as unknown as React.ChangeEvent<HTMLInputElement>
+    const { value } = event.target
+    setRelevantCodeSnippets(value)
+  }
+
+  const handleRelevantFilepathsChange = (e: Event | FormEvent<HTMLElement>) => {
+    const event = e as unknown as React.ChangeEvent<HTMLInputElement>
+    const { value } = event.target
+    setRelevantFilePaths(value)
+  }
+
   const handleOverlapSizeChange = (e: Event | FormEvent<HTMLElement>) => {
     const event = e as unknown as React.ChangeEvent<HTMLInputElement>
     const { value } = event.target
@@ -71,6 +98,12 @@ export const EmbeddingOptions = () => {
     const value = event.target.value
     const provider = providers[value]
     setActiveEmbeddingsProvider(provider)
+  }
+
+  const handleChangeMetric = (e: unknown): void => {
+    const event = e as React.ChangeEvent<HTMLSelectElement>
+    const value = event.target.value
+    setMetric(value)
   }
 
   if (!embeddingProviders) {
@@ -136,6 +169,45 @@ export const EmbeddingOptions = () => {
         </VSCodeButton>
       </div>
       <VSCodeDivider />
+      <div>
+        <div>Code snippets</div>
+        <VSCodeTextField
+          value={codeSnippets}
+          name="provider"
+          onChange={(e) => handleRelevantCodeSnippetsChange(e)}
+        />
+        <small>
+          The number code snippets to be used as context.
+        </small>
+      </div>
+      <div>
+        <div>Filepaths</div>
+        <VSCodeTextField
+          value={filePaths}
+          name="provider"
+          onChange={(e) => handleRelevantFilepathsChange(e)}
+        />
+        <small>
+          The number of filepaths to be used as context.
+        </small>
+      </div>
+      <div>
+        <div>Search Metric</div>
+        <VSCodeDropdown
+          value={metric}
+          name="provider"
+          onChange={handleChangeMetric}
+        >
+          {EMBEDDING_METRICS.map((metric: string) => (
+            <VSCodeOption key={metric} value={metric}>
+              {metric}
+            </VSCodeOption>
+          ))}
+        </VSCodeDropdown>
+        <small>
+          The metric to be used for the vector search.
+        </small>
+      </div>
       <div>
         <div>
           <label htmlFor="threshold">

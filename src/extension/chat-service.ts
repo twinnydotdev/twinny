@@ -10,17 +10,18 @@ import * as path from 'path'
 import * as fs from 'fs/promises'
 
 import {
-  EXTENSION_CONTEXT_NAME,
-  EVENT_NAME,
-  WEBUI_TABS,
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  DEFAULT_RELEVANT_CODE_COUNT,
+  DEFAULT_RELEVANT_FILE_COUNT,
+  DEFAULT_RERANK_THRESHOLD,
+  DEFAULT_VECTOR_SEARCH_METRIC,
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME,
+  EXTENSION_SESSION_NAME,
+  SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
-  RELEVANT_FILE_COUNT,
-  RELEVANT_CODE_COUNT,
-  SYMMETRY_EMITTER_KEY,
-  DEFAULT_RERANK_THRESHOLD,
-  EXTENSION_SESSION_NAME
+  WEBUI_TABS
 } from '../common/constants'
 import {
   StreamResponse,
@@ -28,8 +29,7 @@ import {
   ServerMessage,
   TemplateData,
   Message,
-  StreamRequestOptions,
-  EmbeddedDocument
+  StreamRequestOptions
 } from '../common/types'
 import {
   getChatDataFromProvider,
@@ -56,7 +56,6 @@ export class ChatService {
   private _context?: ExtensionContext
   private _controller?: AbortController
   private _db?: EmbeddingDatabase
-  private _documents: EmbeddedDocument[] = []
   private _keepAlive = this._config.get('keepAlive') as string | number
   private _numPredictChat = this._config.get('numPredictChat') as number
   private _promptTemplate = ''
@@ -121,9 +120,25 @@ export class ChatService {
 
       if (!embedding) return []
 
+      const relevantFileCountContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths}`
+      const stored = this._context?.globalState.get(
+        relevantFileCountContext
+      ) as number
+      const relevantFileCount = Number(stored) || DEFAULT_RELEVANT_FILE_COUNT
+
+      const storedMetric = this._context?.globalState.get(
+        `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric}`
+      ) as number
+
+      const metric = storedMetric || DEFAULT_VECTOR_SEARCH_METRIC
+
       const filePaths =
-        (await this._db.getDocuments(embedding, RELEVANT_FILE_COUNT, table)) ||
-        []
+        (await this._db.getDocuments(
+          embedding,
+          relevantFileCount,
+          table,
+          metric as 'cosine' | 'l2' | 'dot'
+        )) || []
 
       if (!filePaths.length) return []
 
@@ -209,20 +224,27 @@ export class ChatService {
     const rerankThreshold = this.getRerankThreshold()
 
     if (await this._db.hasEmbeddingTable(table)) {
+      const relevantCodeCountContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets}`
+      const stored = this._context?.globalState.get(
+        relevantCodeCountContext
+      ) as number
+      const relevantCodeCount = Number(stored) || DEFAULT_RELEVANT_CODE_COUNT
+
       const embedding = await this._db.fetchModelEmbedding(text)
 
       if (!embedding) return ''
 
-      const query = relevantFiles?.length
-        ? `file IN ("${relevantFiles.map((file) => file[0]).join('","')}")`
-        : ''
+      const storedMetric = this._context?.globalState.get(
+        `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric}`
+      ) as number
+      const metric = storedMetric || DEFAULT_VECTOR_SEARCH_METRIC
 
       const documents =
         (await this._db.getDocuments(
           embedding,
-          RELEVANT_CODE_COUNT,
+          relevantCodeCount,
           table,
-          query
+          metric as 'cosine' | 'l2' | 'dot'
         )) || []
 
       const documentScores = await this._reranker.rerank(
@@ -443,23 +465,21 @@ export class ChatService {
     } as ServerMessage<string>)
   }
 
-  public async getRagContext(
-    text?: string,
-  ): Promise<string | null> {
-
+  public async getRagContext(text?: string): Promise<string | null> {
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
 
     const workspaceMentioned = text?.includes('@workspace')
 
-    if (symmetryConnected || !workspaceMentioned)
-      return null
+    if (symmetryConnected || !workspaceMentioned) return null
 
     updateLoadingMessage(this._view, 'Exploring knowledge base')
 
-    const relevantFiles = await this.getRelevantFiles(text)
-    const relevantCode = await this.getRelevantCode(text, relevantFiles)
+    const prompt = text?.replace(/@workspace/g, '')
+
+    const relevantFiles = await this.getRelevantFiles(prompt)
+    const relevantCode = await this.getRelevantCode(prompt, relevantFiles)
 
     let combinedContext = ''
 
@@ -507,6 +527,9 @@ export class ChatService {
     }
 
     const ragContext = await this.getRagContext(text)
+
+    const cleanedText = text?.replace(/@workspace/g, '').trim()
+
     if (ragContext) {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
     }
@@ -514,13 +537,16 @@ export class ChatService {
     const updatedMessages = [systemMessage, ...messages.slice(0, -1)]
 
     if (additionalContext) {
-      const lastMessageContent = `${text}\n\n${additionalContext.trim()}`
+      const lastMessageContent = `${cleanedText}\n\n${additionalContext.trim()}`
       updatedMessages.push({
         role: USER,
         content: lastMessageContent
       })
     } else {
-      updatedMessages.push(lastMessage)
+      updatedMessages.push({
+        ...lastMessage,
+        content: cleanedText
+      })
     }
     updateLoadingMessage(this._view, 'Thinking')
     const request = this.buildStreamRequest(updatedMessages)

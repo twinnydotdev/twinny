@@ -71,7 +71,6 @@ const CustomKeyMap = Extension.create({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const Chat = () => {
-  const [inputText, setInputText] = useState('')
   const generatingRef = useRef(false)
   const editorRef = useRef<Editor | null>(null)
   const stopRef = useRef(false)
@@ -94,7 +93,6 @@ export const Chat = () => {
     useConversationHistory()
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
-  useAutosizeTextArea(chatRef, inputText)
 
   const scrollToBottom = () => {
     if (!autoScrollContext) return
@@ -226,31 +224,29 @@ export const Chat = () => {
     }, 200)
   }
 
-  const handleSubmitForm = useCallback(
-    (input: string) => {
-      if (input) {
-        setLoading(true)
-        setInputText('')
-        global.vscode.postMessage({
-          type: EVENT_NAME.twinnyChatMessage,
-          data: [
-            ...(messages || []),
-            {
-              role: USER,
-              content: input
-            }
-          ]
-        } as ClientMessage)
-        setMessages((prev) => [...(prev || []), { role: USER, content: input }])
-        setTimeout(() => {
-          if (markdownRef.current) {
-            markdownRef.current.scrollTop = markdownRef.current.scrollHeight
+  const handleSubmitForm = () => {
+    const input = editor?.getText()
+    if (input) {
+      setLoading(true)
+      clearEditor()
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnyChatMessage,
+        data: [
+          ...(messages || []),
+          {
+            role: USER,
+            content: input
           }
-        }, 200)
-      }
-    },
-    [messages]
-  )
+        ]
+      } as ClientMessage)
+      setMessages((prev) => [...(prev || []), { role: USER, content: input }])
+      setTimeout(() => {
+        if (markdownRef.current) {
+          markdownRef.current.scrollTop = markdownRef.current.scrollHeight
+        }
+      }, 200)
+    }
+  }
 
   const clearEditor = useCallback(() => {
     editorRef.current?.commands.clearContent()
@@ -306,7 +302,7 @@ export const Chat = () => {
 
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
-    chatRef.current?.focus()
+    editor?.commands.focus()
     scrollToBottom()
     return () => {
       window.removeEventListener('message', messageEventHandler)
@@ -336,8 +332,9 @@ export const Chat = () => {
         clearEditor
       })
     ],
-    content: inputText
   })
+
+  useAutosizeTextArea(chatRef, editor?.getText() || '')
 
   if (editor && !editorRef.current) {
     editorRef.current = editor
@@ -403,6 +400,7 @@ export const Chat = () => {
             >
               <span className="codicon codicon-arrow-down"></span>
             </VSCodeButton>
+            <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           <div>
             {generatingRef.current && (
@@ -455,7 +453,7 @@ export const Chat = () => {
             />
             <div
               role="button"
-              onClick={() => handleSubmitForm(inputText)}
+              onClick={() => handleSubmitForm()}
               className={styles.chatSubmit}
             >
               <span className="codicon codicon-send"></span>
