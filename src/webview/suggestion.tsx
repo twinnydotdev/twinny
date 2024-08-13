@@ -13,7 +13,7 @@ import { RefAttributes } from 'react'
 
 export const suggestion = {
   items: ({ query }: { query: string }): string[] => {
-    return ['workspace'].filter((item) =>
+    return ['workspace', 'problems'].filter((item) =>
       item.toLowerCase().startsWith(query.toLowerCase())
     )
   },

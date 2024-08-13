@@ -161,7 +161,8 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyRelevantFilePaths: 'twinnyRelevantFilePaths',
   twinnyRelevantCodeSnippets: 'twinnyRelevantCodeSnippets',
   twinnyVectorSearchMetric : 'twinnyVectorSearchMetric',
-  twinnySymmetryTab: 'twinnySymmetryTab'
+  twinnySymmetryTab: 'twinnySymmetryTab',
+  twinnyEnableRag: 'twinnyEnableRag'
 }
 
 export const EXTENSION_SESSION_NAME = {

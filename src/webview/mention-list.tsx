@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import styles from './index.module.css'
 import cx from 'classnames'
-import React, {
+import {
   forwardRef,
   useEffect,
   useImperativeHandle,

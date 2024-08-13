@@ -4,7 +4,9 @@ import {
   commands,
   window,
   workspace,
-  ExtensionContext
+  ExtensionContext,
+  languages,
+  DiagnosticSeverity
 } from 'vscode'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -252,17 +254,15 @@ export class ChatService {
           query
         )) || []
 
-      const embeddedDocuments = await this._db.getDocuments(
-        embedding,
-        Math.round(relevantCodeCount / 2),
-        table,
-        metric as 'cosine' | 'l2' | 'dot',
-      ) || []
+      const embeddedDocuments =
+        (await this._db.getDocuments(
+          embedding,
+          Math.round(relevantCodeCount / 2),
+          table,
+          metric as 'cosine' | 'l2' | 'dot'
+        )) || []
 
-      const documents = [
-        ...embeddedDocuments,
-        ...queryEmbeddedDocuments,
-      ]
+      const documents = [...embeddedDocuments, ...queryEmbeddedDocuments]
 
       const documentScores = await this._reranker.rerank(
         text,
@@ -482,23 +482,59 @@ export class ChatService {
     } as ServerMessage<string>)
   }
 
+  getProblemsContext(): string {
+    const problems = workspace.textDocuments
+      .flatMap((document) =>
+        languages.getDiagnostics(document.uri).map((diagnostic) => ({
+          severity: DiagnosticSeverity[diagnostic.severity],
+          message: diagnostic.message,
+          code: document.getText(diagnostic.range),
+          line: document.lineAt(diagnostic.range.start.line).text,
+          lineNumber: diagnostic.range.start.line + 1,
+          character: diagnostic.range.start.character + 1,
+          source: diagnostic.source,
+          diagnosticCode: diagnostic.code
+        }))
+      )
+      .map((problem) => JSON.stringify(problem))
+      .join('\n')
+
+    return problems
+  }
+
   public async getRagContext(text?: string): Promise<string | null> {
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
 
+    let combinedContext = ''
+
     const workspaceMentioned = text?.includes('@workspace')
 
-    if (symmetryConnected || !workspaceMentioned) return null
+    const problemsMentioned = text?.includes('@problems')
 
-    updateLoadingMessage(this._view, 'Exploring knowledge base')
+    const ragContextKey = `${EVENT_NAME.twinnyWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
+    const isRagEnabled = this._context?.workspaceState.get(ragContextKey)
 
-    const prompt = text?.replace(/@workspace/g, '')
+    if (symmetryConnected) return null
 
-    const relevantFiles = await this.getRelevantFiles(prompt)
-    const relevantCode = await this.getRelevantCode(prompt, relevantFiles)
+    let problemsContext = ''
 
-    let combinedContext = ''
+    if (problemsMentioned) {
+      problemsContext = this.getProblemsContext()
+      if (problemsContext) combinedContext += problemsContext + '\n\n'
+    }
+
+    const prompt = text?.replace(/@workspace|@problems/g, '')
+
+    let relevantFiles: [string, number][] | null = []
+    let relevantCode: string | null = ''
+
+    if (workspaceMentioned || isRagEnabled) {
+      updateLoadingMessage(this._view, 'Exploring knowledge base')
+      relevantFiles = await this.getRelevantFiles(prompt)
+      relevantCode = await this.getRelevantCode(prompt, relevantFiles)
+    }
 
     if (relevantFiles?.length) {
       const filesTemplate =
