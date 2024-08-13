@@ -17,7 +17,8 @@ import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   USER,
-  SYMMETRY_EMITTER_KEY
+  SYMMETRY_EMITTER_KEY,
+  EXTENSION_CONTEXT_NAME
 } from '../common/constants'
 
 import useAutosizeTextArea, {
@@ -27,7 +28,7 @@ import useAutosizeTextArea, {
   useTheme,
   useWorkSpaceContext
 } from './hooks'
-import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from './icons'
+import { DisabledAutoScrollIcon, DisabledRAGIcon, EnabledAutoScrollIcon, EnabledRAGIcon } from './icons'
 
 import { Suggestions } from './suggestions'
 import {
@@ -91,6 +92,9 @@ export const Chat = () => {
   } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
+
+  const { context: enableRagContext, setContext: setEnableRagContext } =
+    useWorkSpaceContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableRag)
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
 
@@ -300,6 +304,17 @@ export const Chat = () => {
     }
   }
 
+  const handleToggleRag = (): void => {
+    setEnableRagContext((prev) => {
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnySetWorkspaceContext,
+        key: EXTENSION_CONTEXT_NAME.twinnyEnableRag,
+        data: !prev
+      } as ClientMessage)
+      return !prev
+    })
+  }
+
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
     editor?.commands.focus()
@@ -399,6 +414,13 @@ export const Chat = () => {
               onClick={handleScrollBottom}
             >
               <span className="codicon codicon-arrow-down"></span>
+            </VSCodeButton>
+            <VSCodeButton
+              title="Enable/disable RAG context for all messages"
+              appearance="icon"
+              onClick={handleToggleRag}
+            >
+            {enableRagContext ? <EnabledRAGIcon /> : <DisabledRAGIcon />}
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
