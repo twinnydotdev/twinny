@@ -12,7 +12,7 @@ jobs:
           - os: ubuntu-latest
             target: linux-x64
             npm_config_arch: x64
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             target: linux-arm64
             npm_config_arch: arm64
           - os: macos-12
@@ -24,7 +24,7 @@ jobs:
           - os: windows-latest
             target: win32-x64
             npm_config_arch: x64
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.target == 'linux-arm64' && 'ubuntu-latest-arm64' || matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
