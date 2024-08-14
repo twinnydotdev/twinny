@@ -12,13 +12,8 @@ jobs:
           - os: ubuntu-latest
             target: linux-x64
             npm_config_arch: x64
-          - os: ubuntu-latest
+          - runs-on: ubuntu-latest-arm64
             target: linux-arm64
-            npm_config_arch: arm64
-          - os: windows-latest
-            target: win32-x64
-          - os: windows-latest
-            target: win32-arm64
             npm_config_arch: arm64
           - os: macos-12
             target: darwin-x64
@@ -26,6 +21,9 @@ jobs:
           - os: macos-latest
             target: darwin-arm64
             npm_config_arch: arm64
+          - os: windows-latest
+            target: win32-x64
+            npm_config_arch: x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
