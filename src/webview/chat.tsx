@@ -10,7 +10,6 @@ import { useEditor, EditorContent, Extension, Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Mention, { MentionPluginKey } from '@tiptap/extension-mention'
-import { suggestion } from './suggestion'
 
 import {
   ASSISTANT,
@@ -28,7 +27,12 @@ import useAutosizeTextArea, {
   useTheme,
   useWorkSpaceContext
 } from './hooks'
-import { DisabledAutoScrollIcon, DisabledRAGIcon, EnabledAutoScrollIcon, EnabledRAGIcon } from './icons'
+import {
+  DisabledAutoScrollIcon,
+  DisabledRAGIcon,
+  EnabledAutoScrollIcon,
+  EnabledRAGIcon
+} from './icons'
 
 import { Suggestions } from './suggestions'
 import {
@@ -38,13 +42,14 @@ import {
 } from '../common/types'
 import { Message } from './message'
 import { getCompletionContent } from './utils'
-import styles from './index.module.css'
 import { ProviderSelect } from './provider-select'
 import { EmbeddingOptions } from './embedding-options'
 import ChatLoader from './chat-loader'
+import { suggestion } from './suggestion'
+import styles from './index.module.css'
 
 const CustomKeyMap = Extension.create({
-  name: 'customKeymap',
+  name: 'chatKeyMap',
 
   addKeyboardShortcuts() {
     return {
@@ -76,7 +81,7 @@ export const Chat = () => {
   const editorRef = useRef<Editor | null>(null)
   const stopRef = useRef(false)
   const theme = useTheme()
-  const [loading, setLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
@@ -131,12 +136,12 @@ export const Chat = () => {
         return messages
       })
       setTimeout(() => {
-        chatRef.current?.focus()
+        editor?.commands.focus()
         stopRef.current = false
       }, 200)
     }
     setCompletion(null)
-    setLoading(false)
+    setIsLoading(false)
     generatingRef.current = false
   }
 
@@ -146,7 +151,7 @@ export const Chat = () => {
       return
     }
     generatingRef.current = true
-    setLoading(false)
+    setIsLoading(false)
     scrollToBottom()
     setMessages((prev) => [
       ...(prev || []),
@@ -163,7 +168,6 @@ export const Chat = () => {
       return
     }
     generatingRef.current = true
-    setLoading(false)
     setCompletion({
       role: ASSISTANT,
       content: getCompletionContent(message),
@@ -175,7 +179,7 @@ export const Chat = () => {
   }
 
   const handleLoadingMessage = () => {
-    setLoading(true)
+    setIsLoading(true)
     if (autoScrollContext) scrollToBottom()
   }
 
@@ -201,7 +205,7 @@ export const Chat = () => {
       case EVENT_NAME.twinnyStopGeneration: {
         setCompletion(null)
         generatingRef.current = false
-        setLoading(false)
+        setIsLoading(false)
         chatRef.current?.focus()
         setActiveConversation(undefined)
         setMessages([])
@@ -219,7 +223,7 @@ export const Chat = () => {
       type: EVENT_NAME.twinnyStopGeneration
     } as ClientMessage)
     setCompletion(null)
-    setLoading(false)
+    setIsLoading(false)
     setMessages([])
     generatingRef.current = false
     setTimeout(() => {
@@ -228,10 +232,64 @@ export const Chat = () => {
     }, 200)
   }
 
+  const handleRegenerateMessage = (index: number): void => {
+    setIsLoading(true)
+    setMessages((prev) => {
+      if (!prev) return prev
+      const updatedMessages = prev.slice(0, index)
+
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnyChatMessage,
+        data: updatedMessages
+      } as ClientMessage)
+
+      return updatedMessages
+    })
+  }
+
+  const handleDeleteMessage = (index: number): void => {
+    setMessages((prev) => {
+      if (!prev || prev.length === 0) return prev
+
+      if (prev.length === 2) return prev
+
+      const updatedMessages = [
+        ...prev.slice(0, index),
+        ...prev.slice(index + 2)
+      ]
+
+      saveLastConversation({
+        ...conversation,
+        messages: updatedMessages
+      })
+
+      return updatedMessages
+    })
+  }
+
+  const handleEditMessage = (message: string, index: number): void => {
+    setIsLoading(true)
+    setMessages((prev) => {
+      if (!prev) return prev
+
+      const updatedMessages = [
+        ...prev.slice(0, index),
+        { ...prev[index], content: message }
+      ]
+
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnyChatMessage,
+        data: updatedMessages
+      } as ClientMessage)
+
+      return updatedMessages
+    })
+  }
+
   const handleSubmitForm = () => {
     const input = editor?.getText()
     if (input) {
-      setLoading(true)
+      setIsLoading(true)
       clearEditor()
       global.vscode.postMessage({
         type: EVENT_NAME.twinnyChatMessage,
@@ -346,7 +404,7 @@ export const Chat = () => {
         handleSubmitForm,
         clearEditor
       })
-    ],
+    ]
   })
 
   useAutosizeTextArea(chatRef, editor?.getText() || '')
@@ -364,12 +422,25 @@ export const Chat = () => {
             : generatingRef.current && <span>New conversation</span>}
         </h4>
         <div className={styles.markdown} ref={markdownRef}>
-          {messages?.map((message) => (
-            <Message message={message} theme={theme} />
+          {messages?.map((message, index) => (
+            <Message
+              key={index}
+              onRegenerate={handleRegenerateMessage}
+              onUpdate={handleEditMessage}
+              onDelete={handleDeleteMessage}
+              isLoading={isLoading || generatingRef.current}
+              isAssistant={index % 2 !== 0}
+              conversationLength={messages?.length}
+              message={message}
+              theme={theme}
+              index={index}
+            />
           ))}
-          {loading && <ChatLoader />}
+          {isLoading && !generatingRef.current && <ChatLoader />}
           {!!completion && (
             <Message
+              isLoading={false}
+              isAssistant
               theme={theme}
               message={{
                 ...completion,
@@ -420,7 +491,7 @@ export const Chat = () => {
               appearance="icon"
               onClick={handleToggleRag}
             >
-            {enableRagContext ? <EnabledRAGIcon /> : <DisabledRAGIcon />}
+              {enableRagContext ? <EnabledRAGIcon /> : <DisabledRAGIcon />}
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>

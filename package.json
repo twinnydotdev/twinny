@@ -477,6 +477,7 @@
     "stream-http": "^3.2.0",
     "string_score": "^0.1.22",
     "tippy.js": "^6.3.7",
+    "tiptap-markdown": "^0.8.10",
     "toxe": "^1.1.0",
     "uuid": "^9.0.1"
   },

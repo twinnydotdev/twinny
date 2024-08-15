@@ -29,6 +29,8 @@ export const ChatLoader = () => {
 
   return (
     <Message
+      isLoading
+      isAssistant
       theme={theme}
       message={{
         content: `${loader || 'Thinking'}${dots}`,

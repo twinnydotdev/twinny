@@ -137,10 +137,13 @@ pre code {
 }
 
 .messageRole {
-  display: block;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 6px;
   font-weight: 600;
   font-size: 12px;
+  min-height: 24px;
 }
 
 .userMessage {
@@ -161,6 +164,12 @@ pre code {
 .assistantMessage::after {
   left: 10px;
   background-color: var(--vscode-editor-background);
+}
+
+.messageOptions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .loading {
@@ -187,6 +196,7 @@ pre code {
   min-width: var(--input-min-width);
   font-family: var(--vscode-font-family);
   resize: none;
+  font-size: 14px;
   overflow: hidden;
   outline: none;
   padding-right: 30px;
