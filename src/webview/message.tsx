@@ -4,7 +4,6 @@ import remarkGfm from 'remark-gfm'
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
 import { EditorContent, Extension, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Placeholder from '@tiptap/extension-placeholder'
 import { Markdown as TiptapMarkdown } from 'tiptap-markdown'
 
 import CodeBlock from './code-block'
@@ -30,7 +29,7 @@ const CustomKeyMap = Extension.create({
   addKeyboardShortcuts() {
     return {
       Enter: ({ editor }) => {
-        if (!editor.getText().length) return false
+        if (!editor.getText().trim().length) return false
         this.options.handleToggleSave()
         return true
       },
@@ -77,9 +76,6 @@ export const Message = ({
     {
       extensions: [
         StarterKit,
-        Placeholder.configure({
-          placeholder: 'How can twinny help you today?'
-        }),
         CustomKeyMap.configure({
           handleToggleSave
         }),
