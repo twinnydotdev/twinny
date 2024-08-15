@@ -52,7 +52,6 @@ export const Settings = () => {
   return (
     <>
       <h3>Template settings</h3>
-      <h3>Additional settings</h3>
       <p>Select the templates you want to use in the chat interface.</p>
       {templates &&
         templates.map((templateName: string) => (
