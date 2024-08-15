@@ -291,17 +291,18 @@ export const Chat = () => {
     if (input) {
       setIsLoading(true)
       clearEditor()
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: [
-          ...(messages || []),
-          {
-            role: USER,
-            content: input
-          }
+      setMessages((prevMessages) => {
+        const updatedMessages = [
+          ...(prevMessages || []),
+          { role: USER, content: input }
         ]
-      } as ClientMessage)
-      setMessages((prev) => [...(prev || []), { role: USER, content: input }])
+        global.vscode.postMessage({
+          type: EVENT_NAME.twinnyChatMessage,
+          data: updatedMessages
+        } as ClientMessage)
+        return updatedMessages
+      })
+
       setTimeout(() => {
         if (markdownRef.current) {
           markdownRef.current.scrollTop = markdownRef.current.scrollHeight
@@ -546,7 +547,7 @@ export const Chat = () => {
             />
             <div
               role="button"
-              onClick={() => handleSubmitForm()}
+              onClick={handleSubmitForm}
               className={styles.chatSubmit}
             >
               <span className="codicon codicon-send"></span>
