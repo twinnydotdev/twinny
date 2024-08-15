@@ -58,7 +58,7 @@ const CustomKeyMap = Extension.create({
         if (mentionState && mentionState.active) {
           return false
         }
-        this.options.handleSubmitForm(editor.getText())
+        this.options.handleSubmitForm()
         this.options.clearEditor()
         return true
       },
