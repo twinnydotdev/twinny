@@ -66,8 +66,16 @@ export const Message = ({
 
   const handleRegenerate = () => onRegenerate?.(index)
 
+  const handleToggleCancel = () => {
+    setEditing(false)
+    editor?.commands.setContent(message.content as string)
+  }
+
   const handleToggleSave = () => {
     const content = editor?.storage.markdown.getMarkdown()
+    if (message.content === content) {
+      return setEditing(false)
+    }
     onUpdate?.(content || '', index)
     setEditing(false)
   }
@@ -105,13 +113,22 @@ export const Message = ({
           <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
           <div className={styles.messageOptions}>
             {editing && !isAssistant && (
-              <VSCodeButton
-                title="Save message"
-                appearance="icon"
-                onClick={handleToggleSave}
-              >
-                <span className="codicon codicon-check"></span>
-              </VSCodeButton>
+              <>
+                <VSCodeButton
+                  title="Cancel edit"
+                  appearance="icon"
+                  onClick={handleToggleCancel}
+                >
+                  <span className="codicon codicon-close"></span>
+                </VSCodeButton>
+                <VSCodeButton
+                  title="Save message"
+                  appearance="icon"
+                  onClick={handleToggleSave}
+                >
+                  <span className="codicon codicon-check"></span>
+                </VSCodeButton>
+              </>
             )}
             {!editing && !isAssistant && (
               <>
