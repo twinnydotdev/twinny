@@ -602,6 +602,18 @@ export const updateLoadingMessage = (
   } as ServerMessage<string>)
 }
 
+export const updateSymmetryStatus = (
+  view: WebviewView | undefined,
+  message: string
+) => {
+  view?.webview.postMessage({
+    type: EVENT_NAME.twinnySendSymmetryMessage,
+    value: {
+      data: message
+    }
+  } as ServerMessage<string>)
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logStreamOptions = (opts: any) => {
   logger.log(

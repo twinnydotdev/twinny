@@ -60,9 +60,12 @@ export const EVENT_NAME = {
   twinnyRerankThresholdChanged: 'twinny-rerank-threshold-changed',
   twinnySendLanguage: 'twinny-send-language',
   twinnySendLoader: 'twinny-send-loader',
+  twinnySendSymmetryMessage: 'twinny-send-symmetry-message',
   twinnySendSystemMessage: 'twinny-send-system-message',
   twinnySendTheme: 'twinny-send-theme',
   twinnySessionContext: 'twinny-session-context',
+  twinnyStartSymmetryProvider: 'twinny-start-symmetry-provider',
+  twinnyStopSymmetryProvider: 'twinny-stop-symmetry-provider',
   twinnySetConfigValue: 'twinny-set-config-value',
   twinnySetGlobalContext: 'twinny-set-global-context',
   twinnySetOllamaModel: 'twinny-set-ollama-model',
@@ -132,6 +135,10 @@ export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = 'twinny.active-fim-provider'
 export const CONVERSATION_STORAGE_KEY = 'twinny.conversations'
 export const INFERENCE_PROVIDERS_STORAGE_KEY = 'twinny.inference-providers'
 
+export const GLOBAL_STORAGE_KEY = {
+  autoConnectSymmetryProvider: 'twinny.autoConnectSymmetryProvider'
+}
+
 export const WORKSPACE_STORAGE_KEY = {
   autoScroll: 'autoScroll',
   chatMessage: 'chatMessage',
@@ -160,13 +167,14 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyOverlapSize: 'twinnyOverlapSize',
   twinnyRelevantFilePaths: 'twinnyRelevantFilePaths',
   twinnyRelevantCodeSnippets: 'twinnyRelevantCodeSnippets',
-  twinnyVectorSearchMetric : 'twinnyVectorSearchMetric',
+  twinnyVectorSearchMetric: 'twinnyVectorSearchMetric',
   twinnySymmetryTab: 'twinnySymmetryTab',
   twinnyEnableRag: 'twinnyEnableRag'
 }
 
 export const EXTENSION_SESSION_NAME = {
-  twinnySymmetryConnection: 'twinnySymmetryConnection'
+  twinnySymmetryConnection: 'twinnySymmetryConnection',
+  twinnySymmetryConnectionProvider: 'twinnySymmetryConnectionProvider'
 }
 
 export const WEBUI_TABS = {
@@ -409,11 +417,7 @@ export const DEFAULT_RELEVANT_FILE_COUNT = 10
 export const DEFAULT_RELEVANT_CODE_COUNT = 5
 export const DEFAULT_VECTOR_SEARCH_METRIC = 'l2'
 
-export const EMBEDDING_METRICS = [
-  'cosine',
-  'l2',
-  'dot'
-]
+export const EMBEDDING_METRICS = ['cosine', 'l2', 'dot']
 
 export const MULTILINE_OUTSIDE = [
   'class_body',
@@ -441,8 +445,6 @@ export const MULTILINE_INSIDE = [
 export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 
 export const MULTI_LINE_DELIMITERS = ['\n\n', '\r\n\r\n']
-
-
 
 export const SYMMETRY_DATA_MESSAGE = {
   disconnect: 'disconnect',

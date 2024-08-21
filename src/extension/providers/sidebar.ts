@@ -153,6 +153,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
           [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
           [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
+          [EVENT_NAME.twinnyStartSymmetryProvider]: this.createSymmetryProvider,
+          [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider,
+
         }
         eventHandlers[message.type as string]?.(message)
       }
@@ -252,7 +255,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
       const messages = [systemMessage, ...(data.data as Message[])]
 
-      updateLoadingMessage(this.view, 'Using symmetry for inference...')
+      updateLoadingMessage(this.view, 'Using symmetry for inference')
 
       logger.log(`
         Using symmetry for inference
@@ -432,6 +435,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     if (this._config.symmetryServerKey) {
       await this.symmetryService?.disconnect()
     }
+  }
+
+  public createSymmetryProvider = () => {
+    this.symmetryService?.startSymmetryProvider()
+  }
+
+  public stopSymmetryProvider = () => {
+    this.symmetryService?.stopSymmetryProvider()
   }
 
   private twinnyHideBackButton() {

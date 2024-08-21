@@ -5,7 +5,8 @@ import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   PROVIDER_EVENT_NAME,
-  EXTENSION_SESSION_NAME
+  EXTENSION_SESSION_NAME,
+  GLOBAL_STORAGE_KEY
 } from '../common/constants'
 import {
   ApiModel,
@@ -475,7 +476,6 @@ const useAutosizeTextArea = (
 }
 
 export const useSymmetryConnection = () => {
-  const [autoConnect, setAutoConnect] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const {
     context: symmetryConnectionSession,
@@ -483,6 +483,20 @@ export const useSymmetryConnection = () => {
   } = useSessionContext<SymmetryConnection>(
     EXTENSION_SESSION_NAME.twinnySymmetryConnection
   )
+
+  const {
+    context: symmetryProviderStatus,
+    setContext: setSymmetryProviderStatus
+  } = useSessionContext<string>(
+    EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
+  )
+
+  const {
+    context: autoConnectProviderContext,
+    setContext: setAutoConnectProviderContext
+  } = useGlobalContext<boolean>(GLOBAL_STORAGE_KEY.autoConnectSymmetryProvider)
+
+  const isProviderConnected = symmetryProviderStatus === 'connected'
 
   const connectToSymmetry = () => {
     setConnecting(true)
@@ -498,15 +512,30 @@ export const useSymmetryConnection = () => {
     } as ClientMessage)
   }
 
+  const connectAsProvider = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyStartSymmetryProvider
+    } as ClientMessage)
+  }
+
+  const disconnectAsProvider = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyStopSymmetryProvider
+    } as ClientMessage)
+  }
+
   const handler = (event: MessageEvent) => {
-    const message: ServerMessage<SymmetryConnection> = event.data
+    const message: ServerMessage<SymmetryConnection | string> = event.data
     if (message?.type === EVENT_NAME.twinnyConnectedToSymmetry) {
       setConnecting(false)
-      setSymmetryConnectionSession(message.value.data)
+      setSymmetryConnectionSession(message.value.data as SymmetryConnection)
     }
     if (message?.type === EVENT_NAME.twinnyDisconnectedFromSymmetry) {
       setConnecting(false)
       setSymmetryConnectionSession(undefined)
+    }
+    if (message?.type === EVENT_NAME.twinnySendSymmetryMessage) {
+      setSymmetryProviderStatus(message?.value.data as string)
     }
     return () => window.removeEventListener('message', handler)
   }
@@ -519,14 +548,28 @@ export const useSymmetryConnection = () => {
     return () => window.removeEventListener('message', handler)
   }, [])
 
+  useEffect(() => {
+    if (
+      autoConnectProviderContext &&
+      symmetryProviderStatus === 'disconnected'
+    ) {
+      connectAsProvider()
+    }
+  }, [autoConnectProviderContext, symmetryProviderStatus, connectAsProvider])
+
+
   return {
+    autoConnectProviderContext,
+    connectAsProvider,
+    connecting,
     connectToSymmetry,
+    disconnectAsProvider,
     disconnectSymmetry,
     isConnected: symmetryConnectionSession !== undefined,
-    autoConnect,
-    setAutoConnect,
-    connecting,
-    symmetryConnection: symmetryConnectionSession
+    isProviderConnected,
+    setAutoConnectProviderContext,
+    symmetryConnection: symmetryConnectionSession,
+    symmetryProviderStatus
   }
 }
 

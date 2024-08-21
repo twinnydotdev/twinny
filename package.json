@@ -416,6 +416,7 @@
   "devDependencies": {
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
     "@types/async-lock": "^1.4.2",
+    "@types/js-yaml": "^4.0.9",
     "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
@@ -464,6 +465,7 @@
     "handlebars-loader": "^1.7.3",
     "hypercore-crypto": "^3.4.2",
     "hyperswarm": "^4.7.15",
+    "js-yaml": "^4.1.0",
     "minimatch": "^9.0.4",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
@@ -476,6 +478,7 @@
     "remark-gfm": "^4.0.0",
     "stream-http": "^3.2.0",
     "string_score": "^0.1.22",
+    "symmetry-client": "^1.0.2",
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.8.10",
     "toxe": "^1.1.0",

@@ -2,12 +2,18 @@
 import { workspace, commands, WebviewView, ExtensionContext } from 'vscode'
 import Hyperswarm from 'hyperswarm'
 import crypto from 'hypercore-crypto'
+import { SymmetryProvider } from 'symmetry-client'
+import path from 'path'
+import os from 'os'
+import fs from 'fs'
+import yaml from 'js-yaml'
 
 import b4a from 'b4a'
 import {
   createSymmetryMessage,
   safeParseJson,
-  safeParseJsonResponse
+  safeParseJsonResponse,
+  updateSymmetryStatus
 } from './utils'
 import { getChatDataFromProvider } from './utils'
 import {
@@ -23,10 +29,13 @@ import {
   EXTENSION_SESSION_NAME,
   SYMMETRY_EMITTER_KEY,
   SYMMETRY_DATA_MESSAGE,
-  WEBUI_TABS
+  WEBUI_TABS,
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  GLOBAL_STORAGE_KEY
 } from '../common/constants'
 import { SessionManager } from './session-manager'
 import { EventEmitter } from 'stream'
+import { TwinnyProvider } from './provider-manager'
 
 export class SymmetryService extends EventEmitter {
   private _config = workspace.getConfiguration('twinny')
@@ -40,6 +49,7 @@ export class SymmetryService extends EventEmitter {
   private _context: ExtensionContext
   private _providerTopic: Buffer | undefined
   private _emitterKey = ''
+  private _provider: SymmetryProvider | undefined
 
   constructor(
     view: WebviewView | undefined,
@@ -53,6 +63,10 @@ export class SymmetryService extends EventEmitter {
     this._providerPeer
     this._context = context
     this._providerTopic
+    const autoConnectProvider = this._context.globalState.get(
+      `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.autoConnectSymmetryProvider}`
+    )
+    if (autoConnectProvider) this.startSymmetryProvider()
   }
 
   public connect = async (key: string) => {
@@ -76,8 +90,10 @@ export class SymmetryService extends EventEmitter {
         if (data && data.key) {
           switch (data?.key) {
             case SYMMETRY_DATA_MESSAGE.ping:
-              this._providerPeer?.write(createSymmetryMessage(SYMMETRY_DATA_MESSAGE.pong));
-              break;
+              this._providerPeer?.write(
+                createSymmetryMessage(SYMMETRY_DATA_MESSAGE.pong)
+              )
+              break
             case SYMMETRY_DATA_MESSAGE.providerDetails:
               peer.write(
                 createSymmetryMessage(
@@ -122,19 +138,24 @@ export class SymmetryService extends EventEmitter {
           data: {
             modelName: connection.modelName,
             name: connection.name,
-            provider: connection.provider,
+            provider: connection.provider
           }
         }
       })
       this.view?.webview.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
-          data: WEBUI_TABS.chat,
+          data: WEBUI_TABS.chat
         }
       })
       this._sessionManager?.set(
         EXTENSION_SESSION_NAME.twinnySymmetryConnection,
         connection
+      )
+      commands.executeCommand(
+        'setContext',
+        EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
+        false
       )
     })
     return this
@@ -152,7 +173,10 @@ export class SymmetryService extends EventEmitter {
         this.handleInferenceEnd()
 
       this.handleIncomingData(chunk, (response: StreamResponse) => {
-        const data = getChatDataFromProvider(this._config.symmetryProvider, response)
+        const data = getChatDataFromProvider(
+          this._config.symmetryProvider,
+          response
+        )
         this._completion = this._completion + data
         if (!data) return
         this.emit(this._emitterKey, this._completion)
@@ -196,6 +220,87 @@ export class SymmetryService extends EventEmitter {
         console.error('Error parsing JSON:', e)
       }
     }
+  }
+
+  public getChatProvider() {
+    const provider = this._context?.globalState.get<TwinnyProvider>(
+      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
+    )
+    return provider
+  }
+
+  private getSymmetryConfigPath(): string {
+    const homeDir = os.homedir()
+    return path.join(homeDir, '.config', 'symmetry', 'provider.yaml')
+  }
+
+  private createOrUpdateProviderConfig(providerConfig: TwinnyProvider): void {
+    const configPath = this.getSymmetryConfigPath()
+    const configDir = path.dirname(configPath)
+
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true })
+    }
+
+    const symmetryConfiguration = yaml.dump({
+      apiHostname: providerConfig.apiHostname,
+      apiKey: providerConfig.apiKey,
+      apiPath: providerConfig.apiPath,
+      apiPort: providerConfig.apiPort,
+      apiProtocol: providerConfig.apiProtocol,
+      apiProvider: providerConfig.provider,
+      dataCollectionEnabled: false,
+      maxConnections: 10,
+      modelName: providerConfig.modelName,
+      name: os.hostname(),
+      path: configPath,
+      public: true,
+      serverKey: this._config.symmetryServerKey,
+      systemMessage: ''
+    })
+
+    fs.writeFileSync(configPath, symmetryConfiguration, 'utf8')
+  }
+
+  public async startSymmetryProvider() {
+    const providerConfig = this.getChatProvider()
+
+    if (!providerConfig) return
+
+    const configPath = this.getSymmetryConfigPath()
+
+    if (!fs.existsSync(configPath)) {
+      this.createOrUpdateProviderConfig(providerConfig)
+    }
+
+    this._provider = new SymmetryProvider(configPath)
+
+    const sessionKey = EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
+
+    this._sessionManager?.set(sessionKey, 'connecting')
+
+    const sessionTypeName = `${EVENT_NAME.twinnySessionContext}-${sessionKey}`
+
+    this.view?.webview.postMessage({
+      type: sessionTypeName,
+      value: 'connecting'
+    })
+
+    await this._provider.init()
+
+    this._sessionManager?.set(sessionKey, 'connected')
+
+    this.view?.webview.postMessage({
+      type: sessionTypeName,
+      value: 'connected'
+    })
+  }
+
+  public async stopSymmetryProvider() {
+    await this._provider?.destroySwarms()
+    updateSymmetryStatus(this.view, 'disconnected')
+    const sessionKey = EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
+    this._sessionManager?.set(sessionKey, 'disconnected')
   }
 
   public write(message: string) {
