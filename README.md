@@ -48,7 +48,7 @@ Enhance your coding experience with context-aware AI assistance using workspace 
 - **Toggle Embedded Context**: Easily switch between using embedded context or not for each message.
 
 ### Symmetry network
-Symmetry is a decentralized peer-to-peer network tool designed to democratize access to computational resources for AI inference. Key features include:
+[Symmetry](https://twinny.dev/symmetry) is a decentralized peer-to-peer network tool designed to democratize access to computational resources for AI inference. Key features include:
 
 - Resource Sharing: Users can offer or seek computational power for various AI tasks.
 - Direct Connections: Enables secure, peer-to-peer connections between users.
@@ -56,6 +56,8 @@ Symmetry is a decentralized peer-to-peer network tool designed to democratize ac
 - Public Provider Access: Users can leverage models from other users who are public providers on the Symmetry network.
 
 Symmetry aims to make AI inference more accessible and efficient for developers and researchers.
+
+The client source code is open source and can be found [here](https://github.com/twinnydotdev/symmetry-core).
 
 ## Known Issues
 Visit the GitHub [issues page](https://github.com/rjmacarthy/twinny/issues) for known problems and troubleshooting.
