@@ -2,7 +2,7 @@
 import { workspace, commands, WebviewView, ExtensionContext } from 'vscode'
 import Hyperswarm from 'hyperswarm'
 import crypto from 'hypercore-crypto'
-import { SymmetryProvider } from 'symmetry-client'
+import { SymmetryProvider } from 'symmetry-core'
 import path from 'path'
 import os from 'os'
 import fs from 'fs'
