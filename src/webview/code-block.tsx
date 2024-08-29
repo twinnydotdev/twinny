@@ -1,5 +1,5 @@
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
-import { ReactNode } from 'react'
+import React, { ReactNode } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
@@ -44,6 +44,13 @@ export const CodeBlock = (props: CodeBlockProps) => {
     })
   }
 
+  const handleOpenDiff = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyOpenDiff,
+      data: String(children).replace(/^\n/, '')
+    })
+  }
+
   return (
     <>
       <SyntaxHighlighter
@@ -75,6 +82,13 @@ export const CodeBlock = (props: CodeBlockProps) => {
             >
               <span className="codicon codicon-new-file"></span>
             </VSCodeButton>
+            <VSCodeButton
+              title="Open diff"
+              onClick={handleOpenDiff}
+              appearance="icon"
+            >
+              <span className="codicon codicon-diff"></span>
+            </VSCodeButton>
           </div>
         </>
       )}
@@ -82,4 +96,4 @@ export const CodeBlock = (props: CodeBlockProps) => {
   )
 }
 
-export default CodeBlock
+export default React.memo(CodeBlock)

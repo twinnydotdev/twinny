@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react'
-import Markdown from 'react-markdown'
+import React, { useEffect, useCallback, useMemo } from 'react'
+import Markdown, { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
 import { EditorContent, Extension, useEditor } from '@tiptap/react'
@@ -12,7 +12,7 @@ import { Message as MessageType, ThemeType } from '../common/types'
 import { ASSISTANT, TWINNY, YOU } from '../common/constants'
 
 interface MessageProps {
-  conversationLength?: number | undefined
+  conversationLength?: number
   index?: number
   isAssistant?: boolean
   isLoading?: boolean
@@ -25,7 +25,6 @@ interface MessageProps {
 
 const CustomKeyMap = Extension.create({
   name: 'messageKeyMap',
-
   addKeyboardShortcuts() {
     return {
       Enter: ({ editor }) => {
@@ -45,66 +44,103 @@ const CustomKeyMap = Extension.create({
   }
 })
 
-export const Message = ({
-  conversationLength = 0,
-  index = 0,
-  isAssistant,
-  isLoading,
-  message,
-  onDelete,
-  onRegenerate,
-  onUpdate,
-  theme
-}: MessageProps) => {
-  if (!message?.content) return null
+const MemoizedCodeBlock = React.memo(CodeBlock)
+const MemoizedVSCodeButton = React.memo(VSCodeButton)
 
-  const [editing, setEditing] = React.useState<boolean>(false)
+export const Message: React.FC<MessageProps> = React.memo(
+  ({
+    conversationLength = 0,
+    index = 0,
+    isAssistant,
+    isLoading,
+    message,
+    onDelete,
+    onRegenerate,
+    onUpdate,
+    theme
+  }) => {
+    const [editing, setEditing] = React.useState<boolean>(false)
 
-  const handleToggleEditing = () => setEditing(!editing)
+    const handleToggleEditing = useCallback(
+      () => setEditing((prev) => !prev),
+      []
+    )
+    const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
+    const handleRegenerate = useCallback(
+      () => onRegenerate?.(index),
+      [onRegenerate, index]
+    )
 
-  const handleDelete = () => onDelete?.(index)
+    const handleToggleCancel = useCallback(() => {
+      setEditing(false)
+      editor?.commands.setContent(message?.content as string)
+    }, [message?.content])
 
-  const handleRegenerate = () => onRegenerate?.(index)
+    const handleToggleSave = useCallback(() => {
+      const content = editor?.storage.markdown.getMarkdown()
+      if (message?.content === content) {
+        return setEditing(false)
+      }
+      onUpdate?.(content || '', index)
+      setEditing(false)
+    }, [message?.content, onUpdate, index])
 
-  const handleToggleCancel = () => {
-    setEditing(false)
-    editor?.commands.setContent(message.content as string)
-  }
+    const editor = useEditor(
+      {
+        extensions: [
+          StarterKit,
+          CustomKeyMap.configure({
+            handleToggleSave
+          }),
+          TiptapMarkdown
+        ],
+        content: message?.content
+      },
+      [index]
+    )
 
-  const handleToggleSave = () => {
-    const content = editor?.storage.markdown.getMarkdown()
-    if (message.content === content) {
-      return setEditing(false)
-    }
-    onUpdate?.(content || '', index)
-    setEditing(false)
-  }
+    useEffect(() => {
+      if (editor && message?.content && message.content !== editor.getText()) {
+        editor.commands.setContent(message.content)
+      }
+    }, [editor, message?.content])
 
-  const editor = useEditor(
-    {
-      extensions: [
-        StarterKit,
-        CustomKeyMap.configure({
-          handleToggleSave
-        }),
-        TiptapMarkdown
-      ],
-      content: message?.content
-    },
-    [index]
-  )
+    const renderPre = useCallback(
+      ({ children }: { children: React.ReactNode }) => {
+        if (React.isValidElement(children)) {
+          return (
+            <MemoizedCodeBlock
+              role={message?.role}
+              language={message?.language}
+              theme={theme}
+              {...children.props}
+            />
+          )
+        }
+        return <pre>{children}</pre>
+      },
+      [message?.role, message?.language, theme]
+    )
 
-  useEffect(() => {
-    if (editor && message.content && message.content !== editor.getText()) {
-      editor.commands.setContent(message.content)
-    }
-  }, [editor, message.content])
+    const renderCode = useCallback(
+      ({ children }: { children: React.ReactNode }) => <code>{children}</code>,
+      []
+    )
 
-  return (
-    <>
+    const markdownComponents = useMemo(
+      () => ({
+        pre: renderPre,
+        code: renderCode
+      }),
+      [renderPre, renderCode]
+    )
+
+    if (!message?.content) return null
+
+    return (
       <div
         className={`${styles.message} ${
-          message?.role === ASSISTANT
+          message.role === ASSISTANT
             ? styles.assistantMessage
             : styles.userMessage
         }`}
@@ -114,51 +150,51 @@ export const Message = ({
           <div className={styles.messageOptions}>
             {editing && !isAssistant && (
               <>
-                <VSCodeButton
+                <MemoizedVSCodeButton
                   title="Cancel edit"
                   appearance="icon"
                   onClick={handleToggleCancel}
                 >
                   <span className="codicon codicon-close"></span>
-                </VSCodeButton>
-                <VSCodeButton
+                </MemoizedVSCodeButton>
+                <MemoizedVSCodeButton
                   title="Save message"
                   appearance="icon"
                   onClick={handleToggleSave}
                 >
                   <span className="codicon codicon-check"></span>
-                </VSCodeButton>
+                </MemoizedVSCodeButton>
               </>
             )}
             {!editing && !isAssistant && (
               <>
-                <VSCodeButton
+                <MemoizedVSCodeButton
                   disabled={isLoading}
                   title="Edit message"
                   appearance="icon"
                   onClick={handleToggleEditing}
                 >
                   <span className="codicon codicon-edit"></span>
-                </VSCodeButton>
-                <VSCodeButton
+                </MemoizedVSCodeButton>
+                <MemoizedVSCodeButton
                   disabled={isLoading || conversationLength <= 2}
-                  title="Edit message"
+                  title="Delete message"
                   appearance="icon"
                   onClick={handleDelete}
                 >
                   <span className="codicon codicon-trash"></span>
-                </VSCodeButton>
+                </MemoizedVSCodeButton>
               </>
             )}
             {!editing && isAssistant && (
-              <VSCodeButton
+              <MemoizedVSCodeButton
                 disabled={isLoading}
                 title="Regenerate from here"
                 appearance="icon"
                 onClick={handleRegenerate}
               >
                 <span className="codicon codicon-sync"></span>
-              </VSCodeButton>
+              </MemoizedVSCodeButton>
             )}
           </div>
         </div>
@@ -171,29 +207,12 @@ export const Message = ({
         ) : (
           <Markdown
             remarkPlugins={[remarkGfm]}
-            components={{
-              pre({ children }) {
-                if (React.isValidElement(children)) {
-                  return (
-                    <CodeBlock
-                      role={message.role}
-                      language={message.language}
-                      theme={theme}
-                      {...children.props}
-                    />
-                  )
-                }
-                return <pre>{children}</pre>
-              },
-              code({ children }) {
-                return <code>{children}</code>
-              }
-            }}
+            components={markdownComponents as Components}
           >
             {message.content.trimStart()}
           </Markdown>
         )}
       </div>
-    </>
-  )
-}
+    )
+  }
+)

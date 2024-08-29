@@ -23,7 +23,7 @@ import {
   Message,
   ApiModel,
   ServerMessage,
-  InferenceRequest,
+  InferenceRequest
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
@@ -33,22 +33,24 @@ import { EmbeddingDatabase } from '../embeddings'
 import { SymmetryService } from '../symmetry-service'
 import { SessionManager } from '../session-manager'
 import { Logger } from '../../common/logger'
+import { DiffManager } from '../diff'
 
 const logger = new Logger()
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _config = vscode.workspace.getConfiguration('twinny')
   private _context: vscode.ExtensionContext
+  private _db: EmbeddingDatabase | undefined
+  private _diffManager = new DiffManager()
+  private _ollamaService: OllamaService | undefined = undefined
+  private _sessionManager: SessionManager
   private _statusBar: vscode.StatusBarItem
   private _templateDir: string
   private _templateProvider: TemplateProvider
-  private _ollamaService: OllamaService | undefined = undefined
-  public conversationHistory: ConversationHistory | undefined = undefined
   public chatService: ChatService | undefined = undefined
-  public view?: vscode.WebviewView
-  private _db: EmbeddingDatabase | undefined
+  public conversationHistory: ConversationHistory | undefined = undefined
   public symmetryService?: SymmetryService | undefined
-  private _sessionManager: SessionManager
+  public view?: vscode.WebviewView
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -126,40 +128,38 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       })
     })
 
-    webviewView.webview.onDidReceiveMessage(
-      (message) => {
-        const eventHandlers = {
-          [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
-          [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
-          [EVENT_NAME.twinnyClickSuggestion]: this.clickSuggestion,
-          [EVENT_NAME.twinnyFetchOllamaModels]: this.fetchOllamaModels,
-          [EVENT_NAME.twinnyGlobalContext]: this.getGlobalContext,
-          [EVENT_NAME.twinnyListTemplates]: this.listTemplates,
-          [EVENT_NAME.twinnySetTab]: this.setTab,
-          [TWINNY_COMMAND_NAME.settings]: this.openSettings,
-          [EVENT_NAME.twinnyNewDocument]: this.createNewUntitledDocument,
-          [EVENT_NAME.twinnyNotification]: this.sendNotification,
-          [EVENT_NAME.twinnySendLanguage]: this.getCurrentLanguage,
-          [EVENT_NAME.twinnySendTheme]: this.getTheme,
-          [EVENT_NAME.twinnySetGlobalContext]: this.setGlobalContext,
-          [EVENT_NAME.twinnySetWorkspaceContext]: this.setWorkspaceContext,
-          [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
-          [EVENT_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
-          [EVENT_NAME.twinnySetConfigValue]: this.setConfigurationValue,
-          [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
-          [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
-          [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
-          [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
-          [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
-          [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
-          [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
-          [EVENT_NAME.twinnyStartSymmetryProvider]: this.createSymmetryProvider,
-          [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider,
-
-        }
-        eventHandlers[message.type as string]?.(message)
+    webviewView.webview.onDidReceiveMessage((message) => {
+      const eventHandlers = {
+        [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
+        [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
+        [EVENT_NAME.twinnyClickSuggestion]: this.clickSuggestion,
+        [EVENT_NAME.twinnyFetchOllamaModels]: this.fetchOllamaModels,
+        [EVENT_NAME.twinnyGlobalContext]: this.getGlobalContext,
+        [EVENT_NAME.twinnyOpenDiff]: this.openDiff,
+        [EVENT_NAME.twinnyListTemplates]: this.listTemplates,
+        [EVENT_NAME.twinnySetTab]: this.setTab,
+        [TWINNY_COMMAND_NAME.settings]: this.openSettings,
+        [EVENT_NAME.twinnyNewDocument]: this.createNewUntitledDocument,
+        [EVENT_NAME.twinnyNotification]: this.sendNotification,
+        [EVENT_NAME.twinnySendLanguage]: this.getCurrentLanguage,
+        [EVENT_NAME.twinnySendTheme]: this.getTheme,
+        [EVENT_NAME.twinnySetGlobalContext]: this.setGlobalContext,
+        [EVENT_NAME.twinnySetWorkspaceContext]: this.setWorkspaceContext,
+        [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
+        [EVENT_NAME.twinnyWorkspaceContext]: this.getTwinnyWorkspaceContext,
+        [EVENT_NAME.twinnySetConfigValue]: this.setConfigurationValue,
+        [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
+        [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
+        [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
+        [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
+        [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
+        [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
+        [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
+        [EVENT_NAME.twinnyStartSymmetryProvider]: this.createSymmetryProvider,
+        [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider
       }
-    )
+      eventHandlers[message.type as string]?.(message)
+    })
   }
 
   public openSettings() {
@@ -183,7 +183,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
     if (!this._db) return
     for (const dir of dirs) {
-      (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
+      ;(await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
     }
   }
 
@@ -310,13 +310,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  public acceptSolution = (message: ClientMessage) => {
-    const editor = vscode.window.activeTextEditor
-    const selection = editor?.selection
-    if (!selection) return
-    vscode.window.activeTextEditor?.edit((editBuilder) => {
-      editBuilder.replace(selection, message.data as string)
-    })
+  public openDiff = async (message: ClientMessage) => {
+    await this._diffManager.openDiff(message)
+  }
+
+  public acceptSolution = async (message: ClientMessage) => {
+    await this._diffManager.acceptSolution(message)
   }
 
   public createNewUntitledDocument = async (message: ClientMessage) => {
