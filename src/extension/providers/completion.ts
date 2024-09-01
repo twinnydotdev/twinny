@@ -154,7 +154,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       getShouldSkipCompletion(context, this._autoSuggestEnabled) ||
       getIsMiddleOfString()
     ) {
-      this._statusBar.text = '🤖'
+      this._statusBar.text = '$(code)'
       return
     }
 
@@ -497,7 +497,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   public abortCompletion() {
     this._abortController?.abort()
-    this._statusBar.text = '🤖'
+    this._statusBar.text = '$(code)'
   }
 
   private logCompletion(formattedCompletion: string) {
@@ -529,7 +529,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       cache.setCache(this._prefixSuffix, formattedCompletion)
 
     this._completion = ''
-    this._statusBar.text = '🤖'
+    this._statusBar.text = '$(code)'
     this.lastCompletionText = formattedCompletion
     this._lastCompletionMultiline = getLineBreakCount(this._completion) > 1
 

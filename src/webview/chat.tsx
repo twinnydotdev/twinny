@@ -521,7 +521,7 @@ export const Chat = () => {
                   appearance="icon"
                   onClick={handleToggleProviderSelection}
                 >
-                  <span className={styles.textIcon}>🤖</span>
+                  <span className="codicon codicon-keyboard"></span>
                 </VSCodeButton>
               </>
             )}

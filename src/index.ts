@@ -295,5 +295,6 @@ export async function activate(context: ExtensionContext) {
   )
 
   if (config.get('enabled')) statusBar.show()
-  statusBar.text = '🤖'
+
+  statusBar.text = '$(code)'
 }

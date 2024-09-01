@@ -359,7 +359,7 @@ export class ChatService {
   }
 
   private onStreamEnd = (onEnd?: (completion: string) => void) => {
-    this._statusBar.text = '🤖'
+    this._statusBar.text = '$(code)'
     commands.executeCommand(
       'setContext',
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
@@ -408,7 +408,7 @@ export class ChatService {
 
   public destroyStream = () => {
     this._controller?.abort()
-    this._statusBar.text = '🤖'
+    this._statusBar.text = '$(code)'
     commands.executeCommand(
       'setContext',
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
