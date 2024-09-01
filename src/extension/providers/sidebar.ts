@@ -183,7 +183,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }
     if (!this._db) return
     for (const dir of dirs) {
-      ;(await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
+      (await this._db.injestDocuments(dir.uri.fsPath)).populateDatabase()
     }
   }
 

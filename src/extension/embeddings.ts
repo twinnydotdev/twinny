@@ -68,7 +68,7 @@ export class EmbeddingDatabase {
     const requestOptions: RequestOptions = {
       hostname: provider.apiHostname,
       port: provider.apiPort,
-      path: '/api/embeddings',
+      path: provider.apiPath,
       protocol: provider.apiProtocol,
       method: 'POST',
       headers: {
