@@ -50,6 +50,10 @@ export class SymmetryService extends EventEmitter {
   private _providerTopic: Buffer | undefined
   private _emitterKey = ''
   private _provider: SymmetryProvider | undefined
+  private _modelName = this._config.symmetryModelName
+  private _symmetryProvider = this._config.symmetryProvider
+  private _symmetryServerKey = this._config.symmetryServerKey
+
 
   constructor(
     view: WebviewView | undefined,
@@ -67,6 +71,11 @@ export class SymmetryService extends EventEmitter {
       `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.autoConnectSymmetryProvider}`
     )
     if (autoConnectProvider) this.startSymmetryProvider()
+
+    workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration('twinny')) return
+      this.updateConfig()
+    })
   }
 
   public connect = async (key: string) => {
@@ -80,7 +89,7 @@ export class SymmetryService extends EventEmitter {
       this._serverPeer = peer
       peer.write(
         createSymmetryMessage(SYMMETRY_DATA_MESSAGE.requestProvider, {
-          modelName: this._config.symmetryModelName
+          modelName: this._modelName,
         })
       )
       peer.on('data', (message: Buffer) => {
@@ -174,7 +183,7 @@ export class SymmetryService extends EventEmitter {
 
       this.handleIncomingData(chunk, (response: StreamResponse) => {
         const data = getChatDataFromProvider(
-          this._config.symmetryProvider,
+          this._symmetryProvider,
           response
         )
         this._completion = this._completion + data
@@ -255,7 +264,7 @@ export class SymmetryService extends EventEmitter {
       name: os.hostname(),
       path: configPath,
       public: true,
-      serverKey: this._config.symmetryServerKey,
+      serverKey: this._symmetryServerKey,
       systemMessage: ''
     })
 
@@ -305,5 +314,12 @@ export class SymmetryService extends EventEmitter {
 
   public write(message: string) {
     this._providerPeer?.write(message)
+  }
+
+  private updateConfig() {
+    this._config = workspace.getConfiguration('twinny')
+    this._symmetryProvider = this._config.symmetryProvider
+    this._symmetryServerKey = this._config.symmetryServerKey
+    this._modelName = this._config.symmetryModelName
   }
 }
