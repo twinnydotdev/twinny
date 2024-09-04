@@ -25,6 +25,7 @@ export const SKIP_IMPORT_KEYWORDS_AFTER = ['from', 'as', 'import']
 export const MIN_COMPLETION_CHUNKS = 2
 export const MAX_EMPTY_COMPLETION_CHARS = 250
 export const DEFAULT_RERANK_THRESHOLD = 0.5
+export const URL_SYMMETRY_WS = 'wss://twinny.dev/ws'
 
 export const defaultChunkOptions = {
   maxSize: 500,
@@ -39,6 +40,7 @@ export const EVENT_NAME = {
   twinnyChatMessage: 'twinny-chat-message',
   twinnyClickSuggestion: 'twinny-click-suggestion',
   twinnyConnectedToSymmetry: 'twinny-connected-to-symmetry',
+  twinnySymmetryModeles: 'twinny-symmetry-models',
   twinnyConnectSymmetry: 'twinny-connect-symmetry',
   twinnyDisconnectedFromSymmetry: 'twinny-disconnected-from-symmetry',
   twinnyDisconnectSymmetry: 'twinny-disconnect-symmetry',

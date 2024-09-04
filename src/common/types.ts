@@ -241,6 +241,20 @@ export interface SymmetryConnection {
   provider: string;
   id: string;
 }
+
+export interface SymmetryModelProvider {
+  connections: number | null;
+  data_collection_enabled: number;
+  id: number;
+  last_seen: string;
+  max_connections: number;
+  model_name: string;
+  name: string;
+  online: number;
+  provider: string;
+  public: number;
+}
+
 export interface InferenceRequest {
   key: string;
   messages: Message[];

@@ -36,3 +36,12 @@
   display: flex;
   justify-content: flex-start;
 }
+
+.dropdownContainer {
+  margin-bottom: 1rem;
+}
+
+.dropdownContainer label {
+  display: block;
+  margin-bottom: 0.5rem;
+}

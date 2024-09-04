@@ -15,6 +15,7 @@ import {
   LanguageType,
   ServerMessage,
   SymmetryConnection,
+  SymmetryModelProvider,
   ThemeType
 } from '../common/types'
 import { TwinnyProvider } from '../extension/provider-manager'
@@ -477,6 +478,9 @@ const useAutosizeTextArea = (
 
 export const useSymmetryConnection = () => {
   const [connecting, setConnecting] = useState(false)
+  const [models, setModels] = useState<SymmetryModelProvider[]>([])
+  const [selectedModel, setSelectedModel] =
+    useState<SymmetryModelProvider | null>(null)
   const {
     context: symmetryConnectionSession,
     setContext: setSymmetryConnectionSession
@@ -501,8 +505,9 @@ export const useSymmetryConnection = () => {
   const connectToSymmetry = () => {
     setConnecting(true)
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyConnectSymmetry
-    } as ClientMessage)
+      type: EVENT_NAME.twinnyConnectSymmetry,
+      data: selectedModel
+    } as ClientMessage<SymmetryModelProvider>)
   }
 
   const disconnectSymmetry = () => {
@@ -525,7 +530,9 @@ export const useSymmetryConnection = () => {
   }
 
   const handler = (event: MessageEvent) => {
-    const message: ServerMessage<SymmetryConnection | string> = event.data
+    const message: ServerMessage<
+      SymmetryConnection | string | SymmetryModelProvider[]
+    > = event.data
     if (message?.type === EVENT_NAME.twinnyConnectedToSymmetry) {
       setConnecting(false)
       setSymmetryConnectionSession(message.value.data as SymmetryConnection)
@@ -536,6 +543,11 @@ export const useSymmetryConnection = () => {
     }
     if (message?.type === EVENT_NAME.twinnySendSymmetryMessage) {
       setSymmetryProviderStatus(message?.value.data as string)
+    }
+
+    if (message?.type === EVENT_NAME.twinnySymmetryModeles) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setModels(message?.value.data as unknown as SymmetryModelProvider[])
     }
     return () => window.removeEventListener('message', handler)
   }
@@ -557,10 +569,12 @@ export const useSymmetryConnection = () => {
     }
   }, [autoConnectProviderContext, symmetryProviderStatus, connectAsProvider])
 
-
   return {
     autoConnectProviderContext,
     connectAsProvider,
+    models,
+    selectedModel,
+    setSelectedModel,
     connecting,
     connectToSymmetry,
     disconnectAsProvider,

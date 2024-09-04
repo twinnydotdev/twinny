@@ -23,7 +23,8 @@ import {
   Message,
   ApiModel,
   ServerMessage,
-  InferenceRequest
+  InferenceRequest,
+  SymmetryModelProvider
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
@@ -424,9 +425,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  private connectToSymmetry = () => {
+  private connectToSymmetry = (data: ClientMessage<SymmetryModelProvider>) => {
     if (this._config.symmetryServerKey) {
-      this.symmetryService?.connect(this._config.symmetryServerKey)
+      this.symmetryService?.connect(this._config.symmetryServerKey, data.data?.model_name)
     }
   }
 

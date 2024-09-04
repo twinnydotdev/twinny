@@ -31,11 +31,12 @@ import {
   SYMMETRY_DATA_MESSAGE,
   WEBUI_TABS,
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
-  GLOBAL_STORAGE_KEY
+  GLOBAL_STORAGE_KEY,
 } from '../common/constants'
 import { SessionManager } from './session-manager'
 import { EventEmitter } from 'stream'
 import { TwinnyProvider } from './provider-manager'
+import { SymmetryWs } from './symmetry-ws'
 
 export class SymmetryService extends EventEmitter {
   private _config = workspace.getConfiguration('twinny')
@@ -50,10 +51,9 @@ export class SymmetryService extends EventEmitter {
   private _providerTopic: Buffer | undefined
   private _emitterKey = ''
   private _provider: SymmetryProvider | undefined
-  private _modelName = this._config.symmetryModelName
   private _symmetryProvider = this._config.symmetryProvider
   private _symmetryServerKey = this._config.symmetryServerKey
-
+  private ws: SymmetryWs | undefined
 
   constructor(
     view: WebviewView | undefined,
@@ -76,9 +76,13 @@ export class SymmetryService extends EventEmitter {
       if (!event.affectsConfiguration('twinny')) return
       this.updateConfig()
     })
+
+    this.ws = new SymmetryWs(view)
+    this.ws.connectSymmetryWs()
   }
 
-  public connect = async (key: string) => {
+  public connect = async (key: string, model: string | undefined) => {
+    if (!model || !key) return
     this._serverSwarm = new Hyperswarm()
     const serverKey = Buffer.from(key)
     const discoveryKey = crypto.discoveryKey(serverKey)
@@ -89,7 +93,7 @@ export class SymmetryService extends EventEmitter {
       this._serverPeer = peer
       peer.write(
         createSymmetryMessage(SYMMETRY_DATA_MESSAGE.requestProvider, {
-          modelName: this._modelName,
+          modelName: model
         })
       )
       peer.on('data', (message: Buffer) => {
@@ -182,10 +186,7 @@ export class SymmetryService extends EventEmitter {
         this.handleInferenceEnd()
 
       this.handleIncomingData(chunk, (response: StreamResponse) => {
-        const data = getChatDataFromProvider(
-          this._symmetryProvider,
-          response
-        )
+        const data = getChatDataFromProvider(this._symmetryProvider, response)
         this._completion = this._completion + data
         if (!data) return
         this.emit(this._emitterKey, this._completion)
@@ -320,6 +321,5 @@ export class SymmetryService extends EventEmitter {
     this._config = workspace.getConfiguration('twinny')
     this._symmetryProvider = this._config.symmetryProvider
     this._symmetryServerKey = this._config.symmetryServerKey
-    this._modelName = this._config.symmetryModelName
   }
 }
