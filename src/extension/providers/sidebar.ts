@@ -427,7 +427,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private connectToSymmetry = (data: ClientMessage<SymmetryModelProvider>) => {
     if (this._config.symmetryServerKey) {
-      this.symmetryService?.connect(this._config.symmetryServerKey, data.data?.model_name)
+      this.symmetryService?.connect(
+        this._config.symmetryServerKey,
+        data.data?.model_name,
+        data.data?.provider
+      )
     }
   }
 

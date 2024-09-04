@@ -31,7 +31,7 @@ import {
   SYMMETRY_DATA_MESSAGE,
   WEBUI_TABS,
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
-  GLOBAL_STORAGE_KEY,
+  GLOBAL_STORAGE_KEY
 } from '../common/constants'
 import { SessionManager } from './session-manager'
 import { EventEmitter } from 'stream'
@@ -51,7 +51,7 @@ export class SymmetryService extends EventEmitter {
   private _providerTopic: Buffer | undefined
   private _emitterKey = ''
   private _provider: SymmetryProvider | undefined
-  private _symmetryProvider = this._config.symmetryProvider
+  private _symmetryProvider: string | undefined
   private _symmetryServerKey = this._config.symmetryServerKey
   private ws: SymmetryWs | undefined
 
@@ -81,8 +81,13 @@ export class SymmetryService extends EventEmitter {
     this.ws.connectSymmetryWs()
   }
 
-  public connect = async (key: string, model: string | undefined) => {
+  public connect = async (
+    key: string,
+    model: string | undefined,
+    provider: string | undefined
+  ) => {
     if (!model || !key) return
+    this._symmetryProvider = provider
     this._serverSwarm = new Hyperswarm()
     const serverKey = Buffer.from(key)
     const discoveryKey = crypto.discoveryKey(serverKey)
@@ -186,6 +191,7 @@ export class SymmetryService extends EventEmitter {
         this.handleInferenceEnd()
 
       this.handleIncomingData(chunk, (response: StreamResponse) => {
+        if (!this._symmetryProvider) return
         const data = getChatDataFromProvider(this._symmetryProvider, response)
         this._completion = this._completion + data
         if (!data) return
@@ -319,7 +325,6 @@ export class SymmetryService extends EventEmitter {
 
   private updateConfig() {
     this._config = workspace.getConfiguration('twinny')
-    this._symmetryProvider = this._config.symmetryProvider
     this._symmetryServerKey = this._config.symmetryServerKey
   }
 }
