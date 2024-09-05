@@ -12,7 +12,8 @@ export interface RequestOptionsOllama extends RequestBodyBase {
   model: string
   keep_alive?: string | number
   messages?: Message[] | Message
-  prompt: string
+  prompt?: string
+  input?: string
   options: Record<string, unknown>
 }
 
@@ -267,7 +268,7 @@ export interface ChunkOptions {
 }
 
 export type Embedding = {
-  embedding: number[]
+  embeddings: number[]
 }
 
 export type EmbeddedDocument = {

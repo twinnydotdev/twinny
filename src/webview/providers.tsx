@@ -23,9 +23,10 @@ export const Providers = () => {
   const [provider, setProvider] = React.useState<TwinnyProvider | undefined>()
   const { models } = useOllamaModels()
   const hasOllamaModels = !!models?.length
-  const { updateProvider } = useProviders()
-  const { providers, removeProvider, copyProvider, resetProviders } =
+  const { updateProvider, providers, removeProvider, copyProvider, resetProviders } =
     useProviders()
+
+  console.log(providers)
 
   const handleClose = () => {
     setShowForm(false)

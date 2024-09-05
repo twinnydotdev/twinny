@@ -60,7 +60,7 @@ export class EmbeddingDatabase {
 
     const requestBody: RequestOptionsOllama = {
       model: this._embeddingModel,
-      prompt: content,
+      input: content,
       stream: false,
       options: {}
     }
@@ -82,7 +82,7 @@ export class EmbeddingDatabase {
         body: requestBody,
         options: requestOptions,
         onData: (response) => {
-          resolve((response as Embedding).embedding)
+          resolve((response as Embedding).embeddings)
         }
       })
     })

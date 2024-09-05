@@ -86,7 +86,7 @@ export class ProviderManager {
   getDefaultChatProvider() {
     return {
       apiHostname: '0.0.0.0',
-      apiPath: '/v1/chat/completions',
+      apiPath: '/api/chat',
       apiPort: 11434,
       apiProtocol: 'http',
       id: uuidv4(),
@@ -100,7 +100,7 @@ export class ProviderManager {
   getDefaultEmbeddingsProvider() {
     return {
       apiHostname: '0.0.0.0',
-      apiPath: '/v1/embeddings',
+      apiPath: '/api/embed',
       apiPort: 11434,
       apiProtocol: 'http',
       id: uuidv4(),
@@ -148,13 +148,27 @@ export class ProviderManager {
     return provider
   }
 
+  fixLegacyDefaultEmbeddingPath() {
+    const provider = this._context.globalState.get<TwinnyProvider>(
+      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
+    )
+    if (provider && provider.apiPath === '/v1/embeddings') {
+      this.updateProvider({
+        ...provider,
+        apiPath: '/api/embed',
+      })
+    }
+  }
+
   addDefaultEmbeddingsProvider(): TwinnyProvider {
     const provider = this.getDefaultEmbeddingsProvider()
+
     if (
       !this._context.globalState.get(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY)
     ) {
       this.addDefaultProvider(provider)
     }
+    this.fixLegacyDefaultEmbeddingPath()
     return provider
   }
 
@@ -283,6 +297,7 @@ export class ProviderManager {
     const providers = this.getProviders() || {}
     const activeFimProvider = this.getActiveFimProvider()
     const activeChatProvider = this.getActiveChatProvider()
+    const activeEmbeddingsProvider = this.getActiveEmbeddingsProvider()
     if (!provider) return
     providers[provider.id] = provider
     this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
@@ -290,6 +305,8 @@ export class ProviderManager {
       this.setActiveFimProvider(provider)
     if (provider.id === activeChatProvider?.id)
       this.setActiveChatProvider(provider)
+    if (provider.id === activeEmbeddingsProvider?.id)
+      this.setActiveEmbeddingsProvider(provider)
     this.getAllProviders()
   }
 
