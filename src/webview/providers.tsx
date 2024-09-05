@@ -26,8 +26,6 @@ export const Providers = () => {
   const { updateProvider, providers, removeProvider, copyProvider, resetProviders } =
     useProviders()
 
-  console.log(providers)
-
   const handleClose = () => {
     setShowForm(false)
   }
