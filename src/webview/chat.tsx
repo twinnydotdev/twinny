@@ -399,7 +399,7 @@ export const Chat = () => {
 
   const { suggestion, filePaths } = useSuggestion()
 
-  const memoizedSuggestion = useMemo(() => suggestion, [filePaths.length])
+  const memoizedSuggestion = useMemo(() => suggestion, [JSON.stringify(filePaths)])
 
   const editor = useEditor(
     {
@@ -432,9 +432,8 @@ export const Chat = () => {
   useAutosizeTextArea(chatRef, editorRef.current?.getText() || '')
 
   useEffect(() => {
-    if (editor) {
-      editorRef.current = editor
-    }
+    if (editor) editorRef.current = editor
+    editorRef.current?.commands.focus()
   }, [editor])
 
   useEffect(() => {

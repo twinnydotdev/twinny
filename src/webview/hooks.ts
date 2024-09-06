@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RefAttributes, useEffect, useRef, useState } from 'react'
+import { RefAttributes, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import tippy, { Instance as TippyInstance } from 'tippy.js'
 import { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
 import { MentionNodeAttrs } from '@tiptap/extension-mention'
@@ -513,84 +513,88 @@ export const useFilePaths = () => {
 export const useSuggestion = () => {
   const { filePaths } = useFilePaths()
 
-  const getFilePaths = () => filePaths
+  const getFilePaths = useCallback(() => filePaths, [filePaths])
 
-  const suggestion = {
-    items: ({ query }: { query: string }) => {
-      const filePaths = getFilePaths()
-      const fileItems: FileItem[] = filePaths.map((path) => ({
-        name: path.split('/').pop() || '',
-        path: path
-      }))
-      const defaultItems: FileItem[] = [
-        { name: 'workspace', path: 'workspace' },
-        { name: 'problems', path: 'problems' }
-      ]
-      return Promise.resolve(
-        [...defaultItems, ...fileItems]
-          .filter((item) =>
-            item.name.toLowerCase().startsWith(query.toLowerCase())
-          )
-          .slice(0, 10)
-      )
-    },
-    render: () => {
-      let reactRenderer: ReactRenderer<
-        MentionListRef,
-        MentionListProps & RefAttributes<MentionListRef>
-      >
-      let popup: TippyInstance[]
+  const items = useCallback(({ query }: { query: string }) => {
+    const filePaths = getFilePaths()
+    const fileItems: FileItem[] = filePaths.map((path) => ({
+      name: path.split('/').pop() || '',
+      path: path
+    }))
+    const defaultItems: FileItem[] = [
+      { name: 'workspace', path: 'workspace' },
+      { name: 'problems', path: 'problems' }
+    ]
+    return Promise.resolve(
+      [...defaultItems, ...fileItems]
+        .filter((item) =>
+          item.name.toLowerCase().startsWith(query.toLowerCase())
+        )
+        .slice(0, 10)
+    )
+  }, [getFilePaths])
 
-      return {
-        onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
-          reactRenderer = new ReactRenderer(MentionList, {
-            props,
-            editor: props.editor
+  const render = useCallback(() => {
+    let reactRenderer: ReactRenderer<
+      MentionListRef,
+      MentionListProps & RefAttributes<MentionListRef>
+    >
+    let popup: TippyInstance[]
+
+    return {
+      onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
+        reactRenderer = new ReactRenderer(MentionList, {
+          props,
+          editor: props.editor
+        })
+
+        const getReferenceClientRect = props.clientRect as () => DOMRect
+
+        popup = tippy('body', {
+          getReferenceClientRect,
+          appendTo: () => document.body,
+          content: reactRenderer.element,
+          showOnCreate: true,
+          interactive: true,
+          trigger: 'manual',
+          placement: 'bottom-start'
+        })
+      },
+
+      onUpdate(props: SuggestionProps<MentionNodeAttrs>) {
+        reactRenderer.updateProps(props)
+
+        if (popup) {
+          popup[0].setProps({
+            getReferenceClientRect: props.clientRect as () => DOMRect
           })
+        }
+      },
 
-          const getReferenceClientRect = props.clientRect as () => DOMRect
+      onKeyDown(props: SuggestionKeyDownProps) {
+        if (props.event.key === 'Escape') {
+          popup[0].hide()
+          return true
+        }
 
-          popup = tippy('body', {
-            getReferenceClientRect,
-            appendTo: () => document.body,
-            content: reactRenderer.element,
-            showOnCreate: true,
-            interactive: true,
-            trigger: 'manual',
-            placement: 'bottom-start'
-          })
-        },
+        if (!reactRenderer.ref) return false
 
-        onUpdate(props: SuggestionProps<MentionNodeAttrs>) {
-          reactRenderer.updateProps(props)
+        return reactRenderer.ref.onKeyDown(props)
+      },
 
-          if (popup) {
-            popup[0].setProps({
-              getReferenceClientRect: props.clientRect as () => DOMRect
-            })
-          }
-        },
-
-        onKeyDown(props: SuggestionKeyDownProps) {
-          if (props.event.key === 'Escape') {
-            popup[0].hide()
-            return true
-          }
-
-          if (!reactRenderer.ref) return false
-
-          return reactRenderer.ref.onKeyDown(props)
-        },
-
-        onExit() {
-          if (popup) {
-            popup[0].destroy()
-            reactRenderer.destroy()
-          }
+      onExit() {
+        if (popup) {
+          popup[0].destroy()
+          reactRenderer.destroy()
         }
       }
     }
-  }
+  }, [])
+
+  const suggestion = useMemo(() => ({
+    items,
+    render
+  }), [items, render])
 
   return {
     suggestion,
