@@ -1,20 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export class SessionManager {
-  private sessionData: Map<string, any>
+  private _sessionData: Map<string, any>
 
   constructor() {
-    this.sessionData = new Map()
+    this._sessionData = new Map()
   }
 
   set(key: string, value: any): void {
-    this.sessionData.set(key, value)
+    this._sessionData.set(key, value)
   }
 
   get(key: string): any {
-    return this.sessionData.get(key)
+    return this._sessionData.get(key)
   }
 
   clear(): void {
-    this.sessionData.clear()
+    this._sessionData.clear()
   }
 }

@@ -9,16 +9,16 @@ import {
 import * as path from 'path'
 import * as os from 'os'
 import * as fs from 'fs'
-import { EmbeddingDatabase } from './extension/embeddings'
 import * as vscode from 'vscode'
 
 import { CompletionProvider } from './extension/providers/completion'
 import { SidebarProvider } from './extension/providers/sidebar'
 import { SessionManager } from './extension/session-manager'
+import { EmbeddingDatabase } from './extension/embeddings'
 import {
   delayExecution,
   getTerminal,
-  getSanitizedCommitMessage,
+  getSanitizedCommitMessage
 } from './extension/utils'
 import { setContext } from './extension/context'
 import {
@@ -26,19 +26,17 @@ import {
   EXTENSION_NAME,
   EVENT_NAME,
   WEBUI_TABS,
-  TWINNY_COMMAND_NAME,
+  TWINNY_COMMAND_NAME
 } from './common/constants'
 import { TemplateProvider } from './extension/template-provider'
-import {
-  ServerMessage
-} from './common/types'
+import { ServerMessage } from './common/types'
 import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
   const config = workspace.getConfiguration('twinny')
-  const statusBar = window.createStatusBarItem(StatusBarAlignment.Right)
+  const statusBarItem = window.createStatusBarItem(StatusBarAlignment.Right)
   const templateDir = path.join(os.homedir(), '.twinny/templates') as string
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
@@ -57,18 +55,18 @@ export async function activate(context: ExtensionContext) {
   }
 
   const sidebarProvider = new SidebarProvider(
-    statusBar,
+    statusBarItem,
     context,
     templateDir,
     db,
-    sessionManager,
+    sessionManager
   )
 
   const completionProvider = new CompletionProvider(
-    statusBar,
+    statusBarItem,
     fileInteractionCache,
     templateProvider,
-    context,
+    context
   )
 
   templateProvider.init()
@@ -79,10 +77,10 @@ export async function activate(context: ExtensionContext) {
       completionProvider
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.enable, () => {
-      statusBar.show()
+      statusBarItem.show()
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.disable, () => {
-      statusBar.hide()
+      statusBarItem.hide()
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.explain, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
@@ -138,7 +136,7 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_CONTEXT_NAME.twinnyManageProviders,
         true
       )
-      sidebarProvider.view?.webview.postMessage({
+      sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
           data: WEBUI_TABS.providers
@@ -153,7 +151,7 @@ export async function activate(context: ExtensionContext) {
           EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
           true
         )
-        sidebarProvider.view?.webview.postMessage({
+        sidebarProvider.webView?.postMessage({
           type: EVENT_NAME.twinnySetTab,
           value: {
             data: WEBUI_TABS.symmetry
@@ -169,7 +167,7 @@ export async function activate(context: ExtensionContext) {
           EXTENSION_CONTEXT_NAME.twinnyConversationHistory,
           true
         )
-        sidebarProvider.view?.webview.postMessage({
+        sidebarProvider.webView?.postMessage({
           type: EVENT_NAME.twinnySetTab,
           value: {
             data: WEBUI_TABS.history
@@ -183,7 +181,7 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_CONTEXT_NAME.twinnyManageTemplates,
         true
       )
-      sidebarProvider.view?.webview.postMessage({
+      sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
           data: WEBUI_TABS.settings
@@ -214,7 +212,7 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openChat, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.hideBackButton)
-      sidebarProvider.view?.webview.postMessage({
+      sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
           data: WEBUI_TABS.chat
@@ -242,15 +240,10 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
       sidebarProvider.conversationHistory?.resetConversation()
       sidebarProvider.newConversation()
-      sidebarProvider.view?.webview.postMessage({
+      sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnyStopGeneration
       } as ServerMessage<string>)
     }),
-    window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),
-    statusBar
-  )
-
-  context.subscriptions.push(
     workspace.onDidCloseTextDocument((document) => {
       const filePath = document.uri.fsPath
       fileInteractionCache.endSession()
@@ -277,7 +270,13 @@ export async function activate(context: ExtensionContext) {
       const currentLine = changes.range.start.line
       const currentCharacter = changes.range.start.character
       fileInteractionCache.incrementStrokes(currentLine, currentCharacter)
-    })
+    }),
+    workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration('twinny')) return
+      completionProvider.updateConfig()
+    }),
+    window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),
+    statusBarItem
   )
 
   window.onDidChangeTextEditorSelection(() => {
@@ -287,14 +286,7 @@ export async function activate(context: ExtensionContext) {
     }, 200)
   })
 
-  context.subscriptions.push(
-    workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration('twinny')) return
-      completionProvider.updateConfig()
-    })
-  )
+  if (config.get('enabled')) statusBarItem.show()
 
-  if (config.get('enabled')) statusBar.show()
-
-  statusBar.text = '$(code)'
+  statusBarItem.text = '$(code)'
 }

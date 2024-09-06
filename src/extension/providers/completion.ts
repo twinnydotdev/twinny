@@ -53,7 +53,7 @@ import { FileInteractionCache } from '../file-interaction'
 import { getLineBreakCount } from '../../webview/utils'
 import { TemplateProvider } from '../template-provider'
 import { TwinnyProvider } from '../provider-manager'
-import { getNodeAtPosition, getParser } from '../parser-utils'
+import { getNodeAtPosition, getParser } from '../parser'
 
 export class CompletionProvider implements InlineCompletionItemProvider {
   private _config = workspace.getConfiguration('twinny')
@@ -560,6 +560,5 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._multilineCompletionsEnabled = this._config.get(
       'multilineCompletionsEnabled'
     ) as boolean
-    this._logger.updateConfig()
   }
 }

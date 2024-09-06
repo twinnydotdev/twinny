@@ -11,21 +11,20 @@ import {
   StreamRequestOptions as RequestOptions,
   Embedding
 } from '../common/types'
-import {
-  ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
-  EMBEDDING_IGNORE_LIST
-} from '../common/constants'
+import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
-import { getDocumentSplitChunks } from './utils'
+import {
+  getDocumentSplitChunks,
+  getIgnoreDirectory,
+  readGitIgnoreFile,
+  readGitSubmodulesFile
+} from './utils'
 import { IntoVector } from '@lancedb/lancedb/dist/arrow'
 import { Logger } from '../common/logger'
 
 const logger = new Logger()
 
 export class EmbeddingDatabase {
-  private _config = vscode.workspace.getConfiguration('twinny')
-  private _bearerToken = this._config.get('apiBearerToken') as string
-  private _embeddingModel = this._config.get('embeddingModel') as string
   private _documents: EmbeddedDocument[] = []
   private _filePaths: EmbeddedDocument[] = []
   private _db: lancedb.Connection | null = null
@@ -59,7 +58,7 @@ export class EmbeddingDatabase {
     if (!provider) return
 
     const requestBody: RequestOptionsOllama = {
-      model: this._embeddingModel,
+      model: provider.modelName,
       input: content,
       stream: false,
       options: {}
@@ -73,7 +72,7 @@ export class EmbeddingDatabase {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this._bearerToken}`
+        Authorization: `Bearer ${provider.apiKey}`
       }
     }
 
@@ -91,8 +90,8 @@ export class EmbeddingDatabase {
   private getAllFilePaths = async (dirPath: string): Promise<string[]> => {
     let filePaths: string[] = []
     const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
-    const gitIgnoredFiles = this.readGitIgnoreFile() || []
-    const submodules = this.readGitSubmodulesFile()
+    const gitIgnoredFiles = readGitIgnoreFile() || []
+    const submodules = readGitSubmodulesFile()
 
     const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ''
 
@@ -100,7 +99,7 @@ export class EmbeddingDatabase {
       const fullPath = path.join(dirPath, dirent.name)
       const relativePath = path.relative(rootPath, fullPath)
 
-      if (this.getIgnoreDirectory(dirent.name)) continue
+      if (getIgnoreDirectory(dirent.name)) continue
 
       if (submodules?.some((submodule) => fullPath.includes(submodule))) {
         continue
@@ -241,71 +240,5 @@ export class EmbeddingDatabase {
 
   private getIsDuplicateItem(item: string, collection: string[]): boolean {
     return collection.includes(item.trim().toLowerCase())
-  }
-
-  private readGitIgnoreFile(): string[] | undefined {
-    try {
-      const folders = vscode.workspace.workspaceFolders
-      if (!folders || folders.length === 0) {
-        console.log('No workspace folders found')
-        return undefined
-      }
-
-      const rootPath = folders[0].uri.fsPath
-      if (!rootPath) {
-        console.log('Root path is undefined')
-        return undefined
-      }
-
-      const gitIgnoreFilePath = path.join(rootPath, '.gitignore')
-      if (!fs.existsSync(gitIgnoreFilePath)) {
-        console.log('.gitignore file not found at', gitIgnoreFilePath)
-        return undefined
-      }
-
-      const ignoreFileContent = fs.readFileSync(gitIgnoreFilePath, 'utf8')
-      return ignoreFileContent
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line !== '' && !line.startsWith('#'))
-        .map((pattern) => {
-          if (pattern.endsWith('/')) {
-            return pattern + '**'
-          }
-          return pattern
-        })
-    } catch (e) {
-      console.error('Error reading .gitignore file:', e)
-      return undefined
-    }
-  }
-
-  private readGitSubmodulesFile(): string[] | undefined {
-    try {
-      const folders = vscode.workspace.workspaceFolders
-      if (!folders || folders.length === 0) return undefined
-      const rootPath = folders[0].uri.fsPath
-      if (!rootPath) return undefined
-      const gitSubmodulesFilePath = path.join(rootPath, '.gitmodules')
-      if (!fs.existsSync(gitSubmodulesFilePath)) return undefined
-      const submodulesFileContent = fs
-        .readFileSync(gitSubmodulesFilePath)
-        .toString()
-      const submodulePaths: string[] = []
-      submodulesFileContent.split('\n').forEach((line: string) => {
-        if (line.startsWith('\tpath = ')) {
-          submodulePaths.push(line.slice(8))
-        }
-      })
-      return submodulePaths
-    } catch (e) {
-      return undefined
-    }
-  }
-
-  private getIgnoreDirectory(fileName: string): boolean {
-    return EMBEDDING_IGNORE_LIST.some((ignoreItem: string) =>
-      fileName.includes(ignoreItem)
-    )
   }
 }

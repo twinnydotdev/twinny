@@ -7,12 +7,15 @@ import {
   Range,
   Terminal,
   TextDocument,
-  WebviewView,
+  Webview,
   window,
   workspace
 } from 'vscode'
+import fs from 'fs'
+import path from 'path'
 import * as util from 'util'
 import { exec } from 'child_process'
+import { minimatch } from 'minimatch'
 
 const execAsync = util.promisify(exec)
 
@@ -33,6 +36,7 @@ import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
   defaultChunkOptions,
+  EMBEDDING_IGNORE_LIST,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   LINE_BREAK_REGEX,
@@ -46,7 +50,7 @@ import {
 } from '../common/constants'
 import { Logger } from '../common/logger'
 import { SyntaxNode } from 'web-tree-sitter'
-import { getParser } from './parser-utils'
+import { getParser } from './parser'
 
 const logger = new Logger()
 
@@ -591,10 +595,10 @@ function simpleChunk(content: string, options: ChunkOptions): string[] {
 }
 
 export const updateLoadingMessage = (
-  view: WebviewView | undefined,
+  webView: Webview | undefined,
   message: string
 ) => {
-  view?.webview.postMessage({
+  webView?.postMessage({
     type: EVENT_NAME.twinnySendLoader,
     value: {
       data: message
@@ -603,15 +607,133 @@ export const updateLoadingMessage = (
 }
 
 export const updateSymmetryStatus = (
-  view: WebviewView | undefined,
+  webView: Webview | undefined,
   message: string
 ) => {
-  view?.webview.postMessage({
+  webView?.postMessage({
     type: EVENT_NAME.twinnySendSymmetryMessage,
     value: {
       data: message
     }
   } as ServerMessage<string>)
+}
+
+export function getNonce() {
+  let text = ''
+  const possible =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length))
+  }
+  return text
+}
+
+export function readGitSubmodulesFile(): string[] | undefined {
+  try {
+    const folders = workspace.workspaceFolders
+    if (!folders || folders.length === 0) return undefined
+    const rootPath = folders[0].uri.fsPath
+    if (!rootPath) return undefined
+    const gitSubmodulesFilePath = path.join(rootPath, '.gitmodules')
+    if (!fs.existsSync(gitSubmodulesFilePath)) return undefined
+    const submodulesFileContent = fs
+      .readFileSync(gitSubmodulesFilePath)
+      .toString()
+    const submodulePaths: string[] = []
+    submodulesFileContent.split('\n').forEach((line: string) => {
+      if (line.startsWith('\tpath = ')) {
+        submodulePaths.push(line.slice(8))
+      }
+    })
+    return submodulePaths
+  } catch (e) {
+    return undefined
+  }
+}
+
+export async function getAllFilePaths(dirPath: string): Promise<string[]> {
+  if (!dirPath) return []
+  let filePaths: string[] = []
+  const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
+  const gitIgnoredFiles = readGitIgnoreFile() || []
+  const submodules = readGitSubmodulesFile()
+
+  const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ''
+
+  for (const dirent of dirents) {
+    const fullPath = path.join(dirPath, dirent.name)
+    const relativePath = path.relative(rootPath, fullPath)
+
+    if (getIgnoreDirectory(dirent.name)) continue
+
+    if (submodules?.some((submodule) => fullPath.includes(submodule))) {
+      continue
+    }
+
+    if (
+      gitIgnoredFiles.some((pattern) => {
+        const isIgnored =
+          minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
+          !pattern.startsWith('!')
+        if (isIgnored) {
+          logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
+        }
+        return isIgnored
+      })
+    ) {
+      continue
+    }
+
+    if (dirent.isDirectory()) {
+      filePaths = filePaths.concat(await getAllFilePaths(fullPath))
+    } else if (dirent.isFile()) {
+      filePaths.push(fullPath)
+    }
+  }
+  return filePaths
+}
+
+export function getIgnoreDirectory(fileName: string): boolean {
+  return EMBEDDING_IGNORE_LIST.some((ignoreItem: string) =>
+    fileName.includes(ignoreItem)
+  )
+}
+
+export function readGitIgnoreFile(): string[] | undefined {
+  try {
+    const folders = workspace.workspaceFolders
+    if (!folders || folders.length === 0) {
+      console.log('No workspace folders found')
+      return undefined
+    }
+
+    const rootPath = folders[0].uri.fsPath
+    if (!rootPath) {
+      console.log('Root path is undefined')
+      return undefined
+    }
+
+    const gitIgnoreFilePath = path.join(rootPath, '.gitignore')
+    if (!fs.existsSync(gitIgnoreFilePath)) {
+      console.log('.gitignore file not found at', gitIgnoreFilePath)
+      return undefined
+    }
+
+    const ignoreFileContent = fs.readFileSync(gitIgnoreFilePath, 'utf8')
+    return ignoreFileContent
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '' && !line.startsWith('#'))
+      .map((pattern) => {
+        if (pattern.endsWith('/')) {
+          return pattern + '**'
+        }
+        return pattern
+      })
+  } catch (e) {
+    console.error('Error reading .gitignore file:', e)
+    return undefined
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

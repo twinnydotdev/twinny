@@ -90,10 +90,10 @@ pre code {
   overflow-x: hidden;
   padding-top: 20px;
   font-size: 14px;
+  margin-top: 20px;
 }
 
 .title {
-  background-color: var(--vscode-diffEditor-unchangedRegionBackground);
   color: var(--vscode-textPreformat-foreground);
   display: block;
   font-weight: 600;
@@ -394,6 +394,7 @@ pre code {
   background-color: transparent;
   width: 100%;
   padding: 0.2rem 0.5rem;
+  text-align: left;
 }
 
 .dropdownMenu button.dropdownSelected {

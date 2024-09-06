@@ -40,13 +40,14 @@ export const EVENT_NAME = {
   twinnyChatMessage: 'twinny-chat-message',
   twinnyClickSuggestion: 'twinny-click-suggestion',
   twinnyConnectedToSymmetry: 'twinny-connected-to-symmetry',
-  twinnySymmetryModeles: 'twinny-symmetry-models',
   twinnyConnectSymmetry: 'twinny-connect-symmetry',
   twinnyDisconnectedFromSymmetry: 'twinny-disconnected-from-symmetry',
   twinnyDisconnectSymmetry: 'twinny-disconnect-symmetry',
   twinnyEmbedDocuments: 'twinny-embed-documents',
   twinnyEnableModelDownload: 'twinny-enable-model-download',
   twinnyFetchOllamaModels: 'twinny-fetch-ollama-models',
+  twinnyFileListRequest: 'twinny-file-list-request',
+  twinnyFileListResponse: 'twinny-file-list-response',
   twinnyGetConfigValue: 'twinny-get-config-value',
   twinnyGetGitChanges: 'twinny-get-git-changes',
   twinnyGlobalContext: 'twinny-global-context',
@@ -61,6 +62,7 @@ export const EVENT_NAME = {
   twinnyOpenDiff: 'twinny-open-diff',
   twinnyRerankThresholdChanged: 'twinny-rerank-threshold-changed',
   twinnySendLanguage: 'twinny-send-language',
+  twinnySymmetryModeles: 'twinny-symmetry-models',
   twinnySendLoader: 'twinny-send-loader',
   twinnySendSymmetryMessage: 'twinny-send-symmetry-message',
   twinnySendSystemMessage: 'twinny-send-system-message',
@@ -76,7 +78,7 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context'
+  twinnyGetWorkspaceContext: 'twinny-workspace-context'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -93,6 +95,7 @@ export const TWINNY_COMMAND_NAME = {
   manageProviders: 'twinny.manageProviders',
   manageTemplates: 'twinny.manageTemplates',
   newConversation: 'twinny.newConversation',
+  openPanelChat: 'twinny.openPanelChat',
   openChat: 'twinny.openChat',
   refactor: 'twinny.refactor',
   sendTerminalText: 'twinny.sendTerminalText',

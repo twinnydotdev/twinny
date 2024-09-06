@@ -1,6 +1,7 @@
 import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
+
 import { Conversation } from '../common/types'
-import styles from './conversation-history.module.css'
+import styles from '../styles/conversation-history.module.css'
 import { useConversationHistory } from './hooks'
 import { EVENT_NAME } from '../common/constants'
 

@@ -43,7 +43,7 @@ export interface StreamResponse {
   prompt_eval_duration: number
   eval_count: number
   eval_duration: number
-  type? : string
+  type?: string
   choices: [
     {
       text: string
@@ -59,8 +59,9 @@ export interface LanguageType {
   languageId: string | undefined
 }
 
-export interface ClientMessage<T = string | boolean | Message[]> {
+export interface ClientMessage<T = string | boolean | Message[], Y = unknown> {
   data?: T
+  meta?: Y
   type?: string
   key?: string
 }
@@ -78,9 +79,6 @@ export interface ServerMessage<T = LanguageType> {
 export interface Message {
   role: string
   content: string | undefined
-  type?: string
-  language?: LanguageType
-  error?: boolean
 }
 
 export interface Conversation {
@@ -152,7 +150,7 @@ export interface StreamRequest {
   onEnd?: () => void
   onStart?: (controller: AbortController) => void
   onError?: (error: Error) => void
-  onData: <T = StreamResponse>(streamResponse:  T) => void
+  onData: <T = StreamResponse>(streamResponse: T) => void
 }
 
 export interface UiTabs {
@@ -218,47 +216,47 @@ export interface InferenceProvider {
 }
 
 export interface Peer {
-  publicKey: Buffer;
-  write: (value: string) => boolean;
-  on: (key: string, cb: (data: Buffer) => void) => void;
-  once: (key: string, cb: (data: Buffer) => void) => void;
-  writable: boolean;
-  key: string;
-  discovery_key: string;
+  publicKey: Buffer
+  write: (value: string) => boolean
+  on: (key: string, cb: (data: Buffer) => void) => void
+  once: (key: string, cb: (data: Buffer) => void) => void
+  writable: boolean
+  key: string
+  discovery_key: string
 }
 
 export interface SymmetryMessage<T> {
-  key: string;
-  data: T;
+  key: string
+  data: T
 }
 
-export type ServerMessageKey = keyof typeof SYMMETRY_DATA_MESSAGE;
+export type ServerMessageKey = keyof typeof SYMMETRY_DATA_MESSAGE
 
 export interface SymmetryConnection {
   sessionToken?: string
   discoveryKey?: string
   modelName?: string
-  name: string;
-  provider: string;
-  id: string;
+  name: string
+  provider: string
+  id: string
 }
 
 export interface SymmetryModelProvider {
-  connections: number | null;
-  data_collection_enabled: number;
-  id: number;
-  last_seen: string;
-  max_connections: number;
-  model_name: string;
-  name: string;
-  online: number;
-  provider: string;
-  public: number;
+  connections: number | null
+  data_collection_enabled: number
+  id: number
+  last_seen: string
+  max_connections: number
+  model_name: string
+  name: string
+  online: number
+  provider: string
+  public: number
 }
 
 export interface InferenceRequest {
-  key: string;
-  messages: Message[];
+  key: string
+  messages: Message[]
 }
 
 export interface ChunkOptions {
@@ -275,4 +273,14 @@ export type EmbeddedDocument = {
   content: string
   vector: number[] | undefined
   file: string
+}
+
+export interface FileItem {
+  name: string
+  path: string
+}
+
+export interface MentionType {
+  name: string
+  path: string
 }

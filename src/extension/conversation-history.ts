@@ -1,4 +1,4 @@
-import { ExtensionContext, WebviewView, workspace } from 'vscode'
+import { ExtensionContext, Webview, workspace } from 'vscode'
 import {
   ClientMessage,
   Conversation,
@@ -30,29 +30,29 @@ type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory {
   private _context: ExtensionContext
-  private _webviewView: WebviewView
   private _config = workspace.getConfiguration('twinny')
   private _keepAlive = this._config.get('keepAlive') as string | number
+  private _sessionManager: SessionManager | undefined
+  private _symmetryService: SymmetryService
   private _temperature = this._config.get('temperature') as number
   private _title = ''
-  private _sessionManager: SessionManager
-  private _symmetryService: SymmetryService
+  private _webView: Webview
 
   constructor(
     context: ExtensionContext,
-    webviewView: WebviewView,
-    sessionManager: SessionManager,
+    webView: Webview,
+    sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
     this._context = context
-    this._webviewView = webviewView
+    this._webView = webView
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this.setUpEventListeners()
   }
 
   setUpEventListeners() {
-    this._webviewView.webview.onDidReceiveMessage(
+    this._webView?.onDidReceiveMessage(
       (message: ClientMessage<Conversation>) => {
         this.handleMessage(message)
       }
@@ -62,7 +62,7 @@ export class ConversationHistory {
       SYMMETRY_EMITTER_KEY.conversationTitle,
       (completion: string) => {
         const activeConversation = this.getActiveConversation()
-        this._webviewView?.webview.postMessage({
+        this._webView?.postMessage({
           type: CONVERSATION_EVENT_NAME.getActiveConversation,
           value: {
             data: {
@@ -178,7 +178,7 @@ export class ConversationHistory {
 
   getAllConversations() {
     const conversations = this.getConversations() || {}
-    this._webviewView.webview.postMessage({
+    this._webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.getConversations,
       value: {
         data: conversations
@@ -213,7 +213,7 @@ export class ConversationHistory {
       ACTIVE_CONVERSATION_STORAGE_KEY,
       conversation
     )
-    this._webviewView?.webview.postMessage({
+    this._webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.getActiveConversation,
       value: {
         data: conversation
@@ -257,7 +257,7 @@ export class ConversationHistory {
       return
 
     if (
-      this._sessionManager.get(EXTENSION_SESSION_NAME.twinnySymmetryConnection)
+      this._sessionManager?.get(EXTENSION_SESSION_NAME.twinnySymmetryConnection)
     ) {
       this._symmetryService?.write(
         createSymmetryMessage(SYMMETRY_DATA_MESSAGE.inference, {

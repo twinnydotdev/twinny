@@ -8,15 +8,15 @@ import {
   VSCodePanelView,
   VSCodeTextField
 } from '@vscode/webview-ui-toolkit/react'
-import { apiProviders } from '../common/types'
 
-import styles from './providers.module.css'
+import { apiProviders } from '../common/types'
 import { TwinnyProvider } from '../extension/provider-manager'
 import {
   DEFAULT_PROVIDER_FORM_VALUES,
   FIM_TEMPLATE_FORMAT
 } from '../common/constants'
 import { ModelSelect } from './model-select'
+import styles from '../styles/providers.module.css'
 
 export const Providers = () => {
   const [showForm, setShowForm] = React.useState(false)

@@ -1,35 +1,51 @@
 import * as vscode from 'vscode'
-
-import { EmbeddingDatabase } from '../embeddings'
-import { SessionManager } from '../session-manager'
 import { BaseProvider } from './base'
 import { getNonce } from '../utils'
 
-export class SidebarProvider extends BaseProvider {
-  public context: vscode.ExtensionContext
+// TODO
+export class FullScreenProvider extends BaseProvider {
+  private _panel?: vscode.WebviewPanel
 
   constructor(
-    statusBarItem: vscode.StatusBarItem,
     context: vscode.ExtensionContext,
     templateDir: string,
-    db: EmbeddingDatabase | undefined,
-    sessionManager: SessionManager
+    statusBarItem: vscode.StatusBarItem
   ) {
-    super(context, templateDir, statusBarItem, db, sessionManager)
+    super(context, templateDir, statusBarItem)
     this.context = context
   }
 
-  public resolveWebviewView(webviewView: vscode.WebviewView) {
-    if (!this.context) return
+  public createOrShowPanel() {
+    const columnToShowIn = vscode.window.activeTextEditor
+      ? vscode.window.activeTextEditor.viewColumn
+      : undefined
 
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [this.context?.extensionUri]
+    if (this._panel) {
+      this._panel.reveal(columnToShowIn)
+    } else {
+      this._panel = vscode.window.createWebviewPanel(
+        'twinnyFullScreenPanel',
+        'twinny',
+        columnToShowIn || vscode.ViewColumn.One,
+        {
+          enableScripts: true,
+          localResourceRoots: [this.context.extensionUri],
+          retainContextWhenHidden: true
+        }
+      )
+
+      this._panel.webview.html = this.getHtmlForWebview(this._panel.webview)
+
+      this.registerWebView(this._panel.webview)
+
+      this._panel.onDidDispose(
+        () => {
+          this._panel = undefined
+        },
+        null,
+        this.context.subscriptions
+      )
     }
-
-    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview)
-
-    this.registerWebView(webviewView.webview)
   }
 
   private getHtmlForWebview(webview: vscode.Webview) {
@@ -54,6 +70,7 @@ export class SidebarProvider extends BaseProvider {
     return `<!DOCTYPE html>
     <html lang="en">
       <head>
+          <title>twinny</title>
           <link href="${codiconCssWebviewUri}" rel="stylesheet">
           <link href="${css}" rel="stylesheet">
           <meta charset="UTF-8">
@@ -71,7 +88,7 @@ export class SidebarProvider extends BaseProvider {
           </style>
       </head>
       <body>
-          <div id="root"></div>
+          <div id="root-panel"></div>
           <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
       </body>
     </html>`

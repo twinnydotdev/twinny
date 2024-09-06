@@ -1,22 +1,23 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { WebSocket } from 'ws'
 import * as vscode from 'vscode'
 import { EVENT_NAME, URL_SYMMETRY_WS } from '../common/constants'
 
 export class SymmetryWs {
-  private ws: WebSocket | null = null
-  private view: vscode.WebviewView | undefined
+  private _ws: WebSocket | null = null
+  private _webView: vscode.Webview | undefined
 
-  constructor(view: vscode.WebviewView | undefined) {
-    this.view = view
+  constructor(view: vscode.Webview | undefined) {
+    this._webView = view
   }
 
   public connectSymmetryWs = () => {
-    this.ws = new WebSocket(URL_SYMMETRY_WS)
+    this._ws = new WebSocket(URL_SYMMETRY_WS)
 
-    this.ws.on('message', (data) => {
+    this._ws.on('message', (data: any) => {
       try {
         const parsedData = JSON.parse(data.toString())
-        this.view?.webview.postMessage({
+        this._webView?.postMessage({
           type: EVENT_NAME.twinnySymmetryModeles,
           value: {
             data: parsedData?.allPeers
@@ -27,14 +28,14 @@ export class SymmetryWs {
       }
     })
 
-    this.ws.on('error', (error) => {
+    this._ws.on('error', (error: any) => {
       console.error('WebSocket error:', error)
     })
   }
 
   public dispose() {
-    if (this.ws) {
-      this.ws.close()
+    if (this._ws) {
+      this._ws.close()
     }
   }
 }

@@ -1,41 +1,41 @@
 import { PrefixSuffix } from '../common/types'
 
 export class LRUCache<T = string> {
-  private capacity: number
-  private cache: Map<string, T | null>
+  private _capacity: number
+  private _cache: Map<string, T | null>
 
   constructor(capacity: number) {
-    this.capacity = capacity
-    this.cache = new Map()
+    this._capacity = capacity
+    this._cache = new Map()
   }
 
   getAll(): Map<string, T | null> {
-    return this.cache
+    return this._cache
   }
 
   get(key: string): T | null | undefined {
-    if (!this.cache.has(key)) return undefined
+    if (!this._cache.has(key)) return undefined
 
-    const value = this.cache.get(key)
-    this.cache.delete(key)
+    const value = this._cache.get(key)
+    this._cache.delete(key)
     if (value !== undefined) {
-      this.cache.set(key, value)
+      this._cache.set(key, value)
     }
     return value
   }
 
   delete(key: string): void {
-    this.cache.delete(key)
+    this._cache.delete(key)
   }
 
   set(key: string, value: T | null): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key)
-    } else if (this.cache.size === this.capacity) {
-      const firstKey = this.cache.keys().next().value
-      this.cache.delete(firstKey)
+    if (this._cache.has(key)) {
+      this._cache.delete(key)
+    } else if (this._cache.size === this._capacity) {
+      const firstKey = this._cache.keys().next().value
+      this._cache.delete(firstKey)
     }
-    this.cache.set(key, value)
+    this._cache.set(key, value)
   }
 
   normalize(src: string): string {

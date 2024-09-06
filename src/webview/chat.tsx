@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   VSCodeButton,
@@ -6,10 +6,10 @@ import {
   VSCodeBadge,
   VSCodeDivider
 } from '@vscode/webview-ui-toolkit/react'
-import { useEditor, EditorContent, Extension, Editor } from '@tiptap/react'
+import { useEditor, EditorContent, Editor, JSONContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import Mention, { MentionPluginKey } from '@tiptap/extension-mention'
+import Mention from '@tiptap/extension-mention'
 
 import {
   ASSISTANT,
@@ -23,6 +23,7 @@ import {
 import useAutosizeTextArea, {
   useConversationHistory,
   useSelection,
+  useSuggestion,
   useSymmetryConnection,
   useTheme,
   useWorkSpaceContext
@@ -37,42 +38,16 @@ import {
 import { Suggestions } from './suggestions'
 import {
   ClientMessage,
+  MentionType,
   Message as MessageType,
   ServerMessage
 } from '../common/types'
 import { Message } from './message'
-import { getCompletionContent } from './utils'
+import { CustomKeyMap, getCompletionContent } from './utils'
 import { ProviderSelect } from './provider-select'
 import { EmbeddingOptions } from './embedding-options'
-import ChatLoader from './chat-loader'
-import { suggestion } from './suggestion'
-import styles from './index.module.css'
-
-const CustomKeyMap = Extension.create({
-  name: 'chatKeyMap',
-
-  addKeyboardShortcuts() {
-    return {
-      Enter: ({ editor }) => {
-        const mentionState = MentionPluginKey.getState(editor.state)
-        if (mentionState && mentionState.active) {
-          return false
-        }
-        this.options.handleSubmitForm()
-        this.options.clearEditor()
-        return true
-      },
-      'Mod-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
-        return true
-      },
-      'Shift-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
-        return true
-      }
-    }
-  }
-})
+import ChatLoader from './loader'
+import styles from '../styles/index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -136,7 +111,7 @@ export const Chat = () => {
         return messages
       })
       setTimeout(() => {
-        editor?.commands.focus()
+        editorRef.current?.commands.focus()
         stopRef.current = false
       }, 200)
     }
@@ -170,10 +145,7 @@ export const Chat = () => {
     generatingRef.current = true
     setCompletion({
       role: ASSISTANT,
-      content: getCompletionContent(message),
-      type: message.value.type,
-      language: message.value.data,
-      error: message.value.error
+      content: getCompletionContent(message)
     })
     scrollToBottom()
   }
@@ -224,7 +196,6 @@ export const Chat = () => {
     } as ClientMessage)
     setCompletion(null)
     setIsLoading(false)
-    setMessages([])
     generatingRef.current = false
     setTimeout(() => {
       chatRef.current?.focus()
@@ -286,20 +257,57 @@ export const Chat = () => {
     })
   }
 
+  const getMentions = () => {
+    const mentions: MentionType[] = []
+    editorRef.current?.getJSON().content?.forEach((node) => {
+      if (node.type === 'paragraph' && Array.isArray(node.content)) {
+        node.content.forEach((innerNode: JSONContent) => {
+          if (innerNode.type === 'mention' && innerNode.attrs) {
+            mentions.push({
+              name:
+                innerNode.attrs.label ||
+                innerNode.attrs.id.split('/').pop() ||
+                '',
+              path: innerNode.attrs.id
+            })
+          }
+        })
+      }
+    })
+
+    return mentions
+  }
+
+  const replaceMentionsInText = useCallback(
+    (text: string, mentions: MentionType[]): string => {
+      return mentions.reduce(
+        (result, mention) => result.replace(mention.path, `@${mention.name}`),
+        text
+      )
+    },
+    []
+  )
+
   const handleSubmitForm = () => {
-    const input = editor?.getText()
-    if (input) {
+    const input = editorRef.current?.getText()
+    if (input && editorRef.current) {
+      const mentions = getMentions()
+
       setIsLoading(true)
       clearEditor()
       setMessages((prevMessages) => {
         const updatedMessages = [
           ...(prevMessages || []),
-          { role: USER, content: input }
+          { role: USER, content: replaceMentionsInText(input, mentions) }
         ]
-        global.vscode.postMessage({
+
+        const clientMessage: ClientMessage<MessageType[], MentionType[]> = {
           type: EVENT_NAME.twinnyChatMessage,
-          data: updatedMessages
-        } as ClientMessage)
+          data: updatedMessages,
+          meta: mentions
+        }
+
+        global.vscode.postMessage(clientMessage)
         return updatedMessages
       })
 
@@ -376,7 +384,7 @@ export const Chat = () => {
 
   useEffect(() => {
     window.addEventListener('message', messageEventHandler)
-    editor?.commands.focus()
+    editorRef.current?.commands.focus()
     scrollToBottom()
     return () => {
       window.removeEventListener('message', messageEventHandler)
@@ -389,30 +397,55 @@ export const Chat = () => {
     }
   }, [conversation?.id, autoScrollContext, showProvidersContext])
 
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Placeholder.configure({
-        placeholder: 'How can twinny help you today?'
-      }),
-      Mention.configure({
-        HTMLAttributes: {
-          class: 'mention'
-        },
-        suggestion
-      }),
-      CustomKeyMap.configure({
-        handleSubmitForm,
-        clearEditor
+  const { suggestion, filePaths } = useSuggestion()
+
+  const memoizedSuggestion = useMemo(() => suggestion, [filePaths.length])
+
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit,
+        Placeholder.configure({
+          placeholder: 'How can twinny help you today?'
+        }),
+        Mention.configure({
+          HTMLAttributes: {
+            class: 'mention'
+          },
+          suggestion: memoizedSuggestion,
+          renderText({ node }) {
+            if (node.attrs.name) {
+              return `${node.attrs.name ?? node.attrs.id}`
+            }
+            return node.attrs.id ?? ''
+          }
+        }),
+        CustomKeyMap.configure({
+          handleSubmitForm,
+          clearEditor
+        })
+      ]
+    },
+    [memoizedSuggestion]
+  )
+
+  useAutosizeTextArea(chatRef, editorRef.current?.getText() || '')
+
+  useEffect(() => {
+    if (editor) {
+      editorRef.current = editor
+    }
+  }, [editor])
+
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.extensionManager.extensions.forEach((extension) => {
+        if (extension.name === 'mention') {
+          extension.options.suggestion = memoizedSuggestion
+        }
       })
-    ]
-  })
-
-  useAutosizeTextArea(chatRef, editor?.getText() || '')
-
-  if (editor && !editorRef.current) {
-    editorRef.current = editor
-  }
+    }
+  }, [memoizedSuggestion])
 
   return (
     <VSCodePanelView>
@@ -543,7 +576,7 @@ export const Chat = () => {
             <EditorContent
               placeholder="How can twinny help you today?"
               className={styles.tiptap}
-              editor={editor}
+              editor={editorRef.current}
             />
             <div
               role="button"
