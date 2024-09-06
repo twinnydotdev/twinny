@@ -6,9 +6,9 @@ import { defaultTemplates } from './templates'
 import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from '../common/constants'
 
 export class TemplateProvider {
-  private _basePath: string
+  private _basePath: string | undefined
 
-  constructor(basePath: string) {
+  constructor(basePath: string | undefined) {
     this._basePath = basePath
   }
 
@@ -23,6 +23,7 @@ export class TemplateProvider {
 
   public createTemplateDir() {
     try {
+      if (!this._basePath) return
       const exists = fs.existsSync(this._basePath)
       if (!exists) {
         fs.mkdirSync(this._basePath, { recursive: true })
@@ -37,7 +38,7 @@ export class TemplateProvider {
   public copyDefaultTemplates() {
     try {
       defaultTemplates.forEach(({ name, template }) => {
-        const destFile = path.join(this._basePath, name)
+        const destFile = path.join(this._basePath || '', name)
         if (!fs.existsSync(`${destFile}.hbs`)) {
           fs.writeFileSync(`${destFile}.hbs`, template, 'utf8')
         }
@@ -107,6 +108,7 @@ export class TemplateProvider {
   }
 
   public listTemplates(): string[] {
+    if (!this._basePath) return []
     const files = fs.readdirSync(this._basePath, 'utf8')
     const templates = files.filter((fileName) => fileName.endsWith('.hbs'))
     const templateNames = templates

@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RefAttributes, useEffect, useRef, useState } from 'react'
 import tippy, { Instance as TippyInstance } from 'tippy.js'
+import { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
+import { MentionNodeAttrs } from '@tiptap/extension-mention'
+import { ReactRenderer } from '@tiptap/react'
 
 import {
   CONVERSATION_EVENT_NAME,
@@ -22,10 +25,7 @@ import {
   ThemeType
 } from '../common/types'
 import { TwinnyProvider } from '../extension/provider-manager'
-import { ReactRenderer } from '@tiptap/react'
-import { AtList, AtListProps, AtListRef } from './mention-list'
-import { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
-import { MentionNodeAttrs } from '@tiptap/extension-mention'
+import { MentionList, MentionListProps, MentionListRef } from './mention-list'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -111,7 +111,7 @@ export const useWorkSpaceContext = <T>(key: string) => {
 
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
-    if (message?.type === `${EVENT_NAME.twinnyWorkspaceContext}-${key}`) {
+    if (message?.type === `${EVENT_NAME.twinnyGetWorkspaceContext}-${key}`) {
       setContext(event.data.value)
     }
   }
@@ -119,7 +119,7 @@ export const useWorkSpaceContext = <T>(key: string) => {
   useEffect(() => {
     window.addEventListener('message', handler)
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyWorkspaceContext,
+      type: EVENT_NAME.twinnyGetWorkspaceContext,
       key
     })
 
@@ -536,14 +536,14 @@ export const useSuggestion = () => {
     },
     render: () => {
       let reactRenderer: ReactRenderer<
-        AtListRef,
-        AtListProps & RefAttributes<AtListRef>
+        MentionListRef,
+        MentionListProps & RefAttributes<MentionListRef>
       >
       let popup: TippyInstance[]
 
       return {
         onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
-          reactRenderer = new ReactRenderer(AtList, {
+          reactRenderer = new ReactRenderer(MentionList, {
             props,
             editor: props.editor
           })
@@ -564,7 +564,7 @@ export const useSuggestion = () => {
         onUpdate(props: SuggestionProps<MentionNodeAttrs>) {
           reactRenderer.updateProps(props)
 
-          if (popup && popup.length) {
+          if (popup) {
             popup[0].setProps({
               getReferenceClientRect: props.clientRect as () => DOMRect
             })
@@ -572,7 +572,7 @@ export const useSuggestion = () => {
         },
 
         onKeyDown(props: SuggestionKeyDownProps) {
-          if (props.event.key === 'Escape' && popup && popup.length) {
+          if (props.event.key === 'Escape') {
             popup[0].hide()
             return true
           }
@@ -583,7 +583,7 @@ export const useSuggestion = () => {
         },
 
         onExit() {
-          if (popup && popup.length) {
+          if (popup) {
             popup[0].destroy()
             reactRenderer.destroy()
           }

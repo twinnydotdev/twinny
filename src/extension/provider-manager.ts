@@ -1,4 +1,4 @@
-import { ExtensionContext, WebviewView } from 'vscode'
+import { ExtensionContext, Webview } from 'vscode'
 import { apiProviders, ClientMessage, ServerMessage } from '../common/types'
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -29,17 +29,17 @@ type Providers = Record<string, TwinnyProvider> | undefined
 
 export class ProviderManager {
   _context: ExtensionContext
-  _webviewView: WebviewView
+  _webView: Webview
 
-  constructor(context: ExtensionContext, webviewView: WebviewView) {
+  constructor(context: ExtensionContext, webviewView: Webview) {
     this._context = context
-    this._webviewView = webviewView
+    this._webView = webviewView
     this.setUpEventListeners()
     this.addDefaultProviders()
   }
 
   setUpEventListeners() {
-    this._webviewView.webview.onDidReceiveMessage(
+    this._webView?.onDidReceiveMessage(
       (message: ClientMessage<TwinnyProvider>) => {
         this.handleMessage(message)
       }
@@ -75,7 +75,7 @@ export class ProviderManager {
   }
 
   public focusProviderTab = () => {
-    this._webviewView?.webview.postMessage({
+    this._webView.postMessage({
       type: PROVIDER_EVENT_NAME.focusProviderTab,
       value: {
         data: WEBUI_TABS.providers
@@ -201,7 +201,7 @@ export class ProviderManager {
 
   getAllProviders() {
     const providers = this.getProviders() || {}
-    this._webviewView.webview.postMessage({
+    this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getAllProviders,
       value: {
         data: providers
@@ -213,7 +213,7 @@ export class ProviderManager {
     const provider = this._context.globalState.get<TwinnyProvider>(
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
-    this._webviewView.webview.postMessage({
+    this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveChatProvider,
       value: {
         data: provider
@@ -226,7 +226,7 @@ export class ProviderManager {
     const provider = this._context.globalState.get<TwinnyProvider>(
       ACTIVE_FIM_PROVIDER_STORAGE_KEY
     )
-    this._webviewView.webview.postMessage({
+    this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveFimProvider,
       value: {
         data: provider
@@ -239,7 +239,7 @@ export class ProviderManager {
     const provider = this._context.globalState.get<TwinnyProvider>(
       ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
     )
-    this._webviewView.webview.postMessage({
+    this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
       value: {
         data: provider

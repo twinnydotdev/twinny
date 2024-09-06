@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { workspace, commands, WebviewView, ExtensionContext } from 'vscode'
+import { workspace, commands, ExtensionContext, Webview } from 'vscode'
 import Hyperswarm from 'hyperswarm'
 import crypto from 'hypercore-crypto'
 import { SymmetryProvider } from 'symmetry-core'
@@ -40,28 +40,28 @@ import { SymmetryWs } from './symmetry-ws'
 
 export class SymmetryService extends EventEmitter {
   private _config = workspace.getConfiguration('twinny')
-  private view: WebviewView | undefined
   private _completion = ''
-  private _providerSwarm: undefined | typeof Hyperswarm
-  private _serverSwarm: undefined | typeof Hyperswarm
-  private _sessionManager: SessionManager
-  private _providerPeer: undefined | Peer
-  private _serverPeer: undefined | Peer
   private _context: ExtensionContext
-  private _providerTopic: Buffer | undefined
   private _emitterKey = ''
   private _provider: SymmetryProvider | undefined
+  private _providerPeer: undefined | Peer
+  private _providerSwarm: undefined | typeof Hyperswarm
+  private _providerTopic: Buffer | undefined
+  private _serverPeer: undefined | Peer
+  private _serverSwarm: undefined | typeof Hyperswarm
+  private _sessionManager: SessionManager | undefined
   private _symmetryProvider: string | undefined
   private _symmetryServerKey = this._config.symmetryServerKey
-  private ws: SymmetryWs | undefined
+  private _webView: Webview | undefined
+  private _ws: SymmetryWs | undefined
 
   constructor(
-    view: WebviewView | undefined,
-    sessionManager: SessionManager,
+    webView: Webview | undefined,
+    sessionManager: SessionManager | undefined,
     context: ExtensionContext
   ) {
     super()
-    this.view = view
+    this._webView = webView
     this._sessionManager = sessionManager
     this._providerSwarm
     this._providerPeer
@@ -77,8 +77,8 @@ export class SymmetryService extends EventEmitter {
       this.updateConfig()
     })
 
-    this.ws = new SymmetryWs(view)
-    this.ws.connectSymmetryWs()
+    this._ws = new SymmetryWs(this._webView)
+    this._ws.connectSymmetryWs()
   }
 
   public connect = async (
@@ -129,13 +129,13 @@ export class SymmetryService extends EventEmitter {
   }
 
   public disconnect = async () => {
-    this._sessionManager.set(
+    this._sessionManager?.set(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection,
       undefined
     )
     this._serverSwarm?.destroy()
     this._providerSwarm?.destroy()
-    this.view?.webview.postMessage({
+    this._webView?.postMessage({
       type: EVENT_NAME.twinnyDisconnectedFromSymmetry
     } as ServerMessage)
   }
@@ -150,7 +150,7 @@ export class SymmetryService extends EventEmitter {
     this._providerSwarm.on('connection', (peer: any) => {
       this._providerPeer = peer
       this.providerListeners(peer)
-      this.view?.webview.postMessage({
+      this._webView?.postMessage({
         type: EVENT_NAME.twinnyConnectedToSymmetry,
         value: {
           data: {
@@ -160,7 +160,7 @@ export class SymmetryService extends EventEmitter {
           }
         }
       })
-      this.view?.webview.postMessage({
+      this._webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
           data: WEBUI_TABS.chat
@@ -209,7 +209,7 @@ export class SymmetryService extends EventEmitter {
     if (!this._completion) return
 
     if (this._emitterKey === SYMMETRY_EMITTER_KEY.inference) {
-      this.view?.webview.postMessage({
+      this._webView?.postMessage({
         type: EVENT_NAME.twinnyOnEnd,
         value: {
           completion: this._completion.trimStart()
@@ -297,7 +297,7 @@ export class SymmetryService extends EventEmitter {
 
     const sessionTypeName = `${EVENT_NAME.twinnySessionContext}-${sessionKey}`
 
-    this.view?.webview.postMessage({
+    this._webView?.postMessage({
       type: sessionTypeName,
       value: 'connecting'
     })
@@ -306,7 +306,7 @@ export class SymmetryService extends EventEmitter {
 
     this._sessionManager?.set(sessionKey, 'connected')
 
-    this.view?.webview.postMessage({
+    this._webView?.postMessage({
       type: sessionTypeName,
       value: 'connected'
     })
@@ -314,7 +314,7 @@ export class SymmetryService extends EventEmitter {
 
   public async stopSymmetryProvider() {
     await this._provider?.destroySwarms()
-    updateSymmetryStatus(this.view, 'disconnected')
+    updateSymmetryStatus(this._webView, 'disconnected')
     const sessionKey = EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
     this._sessionManager?.set(sessionKey, 'disconnected')
   }

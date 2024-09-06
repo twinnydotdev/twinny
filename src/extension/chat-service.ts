@@ -1,12 +1,12 @@
 import {
   StatusBarItem,
-  WebviewView,
   commands,
   window,
   workspace,
   ExtensionContext,
   languages,
-  DiagnosticSeverity
+  DiagnosticSeverity,
+  Webview
 } from 'vscode'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -67,19 +67,19 @@ export class ChatService {
   private _symmetryService?: SymmetryService
   private _temperature = this._config.get('temperature') as number
   private _templateProvider?: TemplateProvider
-  private _view?: WebviewView
-  private _sessionManager: SessionManager
+  private _webView?: Webview
+  private _sessionManager: SessionManager | undefined
 
   constructor(
     statusBar: StatusBarItem,
-    templateDir: string,
+    templateDir: string | undefined,
     extensionContext: ExtensionContext,
-    view: WebviewView,
+    webView: Webview,
     db: EmbeddingDatabase | undefined,
-    sessionManager: SessionManager,
+    sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
-    this._view = view
+    this._webView = webView
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
     this._reranker = new Reranker()
@@ -101,7 +101,7 @@ export class ChatService {
     this._symmetryService?.on(
       SYMMETRY_EMITTER_KEY.inference,
       (completion: string) => {
-        this._view?.webview.postMessage({
+        this._webView?.postMessage({
           type: EVENT_NAME.twinnyOnCompletion,
           value: {
             completion: completion.trimStart(),
@@ -345,7 +345,7 @@ export class ChatService {
       const data = getChatDataFromProvider(provider.provider, streamResponse)
       this._completion = this._completion + data
       if (onEnd) return
-      this._view?.webview.postMessage({
+      this._webView?.postMessage({
         type: EVENT_NAME.twinnyOnCompletion,
         value: {
           completion: this._completion.trimStart(),
@@ -368,12 +368,12 @@ export class ChatService {
     )
     if (onEnd) {
       onEnd(this._completion)
-      this._view?.webview.postMessage({
+      this._webView?.postMessage({
         type: EVENT_NAME.twinnyOnEnd
       } as ServerMessage)
       return
     }
-    this._view?.webview.postMessage({
+    this._webView?.postMessage({
       type: EVENT_NAME.twinnyOnEnd,
       value: {
         completion: this._completion.trimStart(),
@@ -384,7 +384,7 @@ export class ChatService {
   }
 
   private onStreamError = (error: Error) => {
-    this._view?.webview.postMessage({
+    this._webView?.postMessage({
       type: EVENT_NAME.twinnyOnEnd,
       value: {
         error: true,
@@ -400,7 +400,7 @@ export class ChatService {
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       true
     )
-    this._view?.webview.onDidReceiveMessage((data: { type: string }) => {
+    this._webView?.onDidReceiveMessage((data: { type: string }) => {
       if (data.type === EVENT_NAME.twinnyStopGeneration) {
         this._controller?.abort()
       }
@@ -415,7 +415,7 @@ export class ChatService {
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       true
     )
-    this._view?.webview.postMessage({
+    this._webView?.postMessage({
       type: EVENT_NAME.twinnyOnEnd,
       value: {
         completion: this._completion.trimStart(),
@@ -466,7 +466,7 @@ export class ChatService {
   }
 
   private sendEditorLanguage = () => {
-    this._view?.webview.postMessage({
+    this._webView?.postMessage({
       type: EVENT_NAME.twinnySendLanguage,
       value: {
         data: getLanguage()
@@ -475,7 +475,7 @@ export class ChatService {
   }
 
   private focusChatTab = () => {
-    this._view?.webview.postMessage({
+    this._webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
       value: {
         data: WEBUI_TABS.chat
@@ -514,7 +514,7 @@ export class ChatService {
 
     const problemsMentioned = text?.includes('@problems')
 
-    const ragContextKey = `${EVENT_NAME.twinnyWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
+    const ragContextKey = `${EVENT_NAME.twinnyGetWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
     const isRagEnabled = this._context?.workspaceState.get(ragContextKey)
 
     if (symmetryConnected) return null
@@ -532,7 +532,7 @@ export class ChatService {
     let relevantCode: string | null = ''
 
     if (workspaceMentioned || isRagEnabled) {
-      updateLoadingMessage(this._view, 'Exploring knowledge base')
+      updateLoadingMessage(this._webView, 'Exploring knowledge base')
       relevantFiles = await this.getRelevantFiles(prompt)
       relevantCode = await this.getRelevantCode(prompt, relevantFiles)
     }
@@ -559,6 +559,7 @@ export class ChatService {
   }
 
   private async loadFileContents(files: FileItem[]): Promise<string> {
+    if (!files?.length) return ''
     let fileContents = '';
 
     for (const file of files) {
@@ -622,7 +623,7 @@ export class ChatService {
         content: cleanedText
       })
     }
-    updateLoadingMessage(this._view, 'Thinking')
+    updateLoadingMessage(this._webView, 'Thinking')
     const request = this.buildStreamRequest(updatedMessages)
     if (!request) return
     const { requestBody, requestOptions } = request
@@ -648,10 +649,10 @@ export class ChatService {
 
     if (!skipMessage) {
       this.focusChatTab()
-      this._view?.webview.postMessage({
+      this._webView?.postMessage({
         type: EVENT_NAME.twinnyOnLoading
       })
-      this._view?.webview.postMessage({
+      this._webView?.postMessage({
         type: EVENT_NAME.twinngAddMessage,
         value: {
           completion: kebabToSentence(template) + '\n\n' + '```\n' + selection,

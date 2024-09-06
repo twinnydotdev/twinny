@@ -6,10 +6,10 @@ import {
   VSCodeBadge,
   VSCodeDivider
 } from '@vscode/webview-ui-toolkit/react'
-import { useEditor, EditorContent, Extension, Editor, JSONContent } from '@tiptap/react'
+import { useEditor, EditorContent, Editor, JSONContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import Mention, { MentionPluginKey } from '@tiptap/extension-mention'
+import Mention from '@tiptap/extension-mention'
 
 import {
   ASSISTANT,
@@ -43,37 +43,11 @@ import {
   ServerMessage
 } from '../common/types'
 import { Message } from './message'
-import { getCompletionContent } from './utils'
+import { CustomKeyMap, getCompletionContent } from './utils'
 import { ProviderSelect } from './provider-select'
 import { EmbeddingOptions } from './embedding-options'
-import ChatLoader from './chat-loader'
-import styles from './index.module.css'
-
-const CustomKeyMap = Extension.create({
-  name: 'chatKeyMap',
-
-  addKeyboardShortcuts() {
-    return {
-      Enter: ({ editor }) => {
-        const mentionState = MentionPluginKey.getState(editor.state)
-        if (mentionState && mentionState.active) {
-          return false
-        }
-        this.options.handleSubmitForm()
-        this.options.clearEditor()
-        return true
-      },
-      'Mod-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
-        return true
-      },
-      'Shift-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
-        return true
-      }
-    }
-  }
-})
+import ChatLoader from './loader'
+import styles from '../styles/index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -222,7 +196,6 @@ export const Chat = () => {
     } as ClientMessage)
     setCompletion(null)
     setIsLoading(false)
-    setMessages([])
     generatingRef.current = false
     setTimeout(() => {
       chatRef.current?.focus()
@@ -441,7 +414,10 @@ export const Chat = () => {
           },
           suggestion: memoizedSuggestion,
           renderText({ node }) {
-            return `${node.attrs.name ?? node.attrs.id}`
+            if (node.attrs.name) {
+              return `${node.attrs.name ?? node.attrs.id}`
+            }
+            return node.attrs.id ?? ''
           }
         }),
         CustomKeyMap.configure({

@@ -1,3 +1,6 @@
+import { Extension } from '@tiptap/react'
+import { MentionPluginKey } from '@tiptap/extension-mention'
+
 import { EMPTY_MESAGE } from '../common/constants'
 import { CodeLanguage, supportedLanguages } from '../common/languages'
 import { LanguageType, ServerMessage } from '../common/types'
@@ -60,3 +63,30 @@ export const getModelShortName = (name: string) => {
   }
   return name
 }
+
+
+export const CustomKeyMap = Extension.create({
+  name: 'chatKeyMap',
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) {
+          return false
+        }
+        this.options.handleSubmitForm()
+        this.options.clearEditor()
+        return true
+      },
+      'Mod-Enter': ({ editor }) => {
+        editor.commands.insertContent('\n')
+        return true
+      },
+      'Shift-Enter': ({ editor }) => {
+        editor.commands.insertContent('\n')
+        return true
+      }
+    }
+  }
+})

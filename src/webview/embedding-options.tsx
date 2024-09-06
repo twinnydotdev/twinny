@@ -5,6 +5,8 @@ import {
   VSCodeOption,
   VSCodeTextField
 } from '@vscode/webview-ui-toolkit/react'
+import { FormEvent } from 'react'
+import { TextFieldType } from '@vscode/webview-ui-toolkit'
 
 import {
   EMBEDDING_METRICS,
@@ -13,9 +15,7 @@ import {
 } from '../common/constants'
 import { ClientMessage } from '../common/types'
 import { useGlobalContext, useProviders } from './hooks'
-import styles from './index.module.css'
-import { FormEvent } from 'react'
-import { TextFieldType } from '@vscode/webview-ui-toolkit'
+import styles from '../styles/index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

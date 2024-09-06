@@ -78,7 +78,7 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyWorkspaceContext: 'twinny-workspace-context'
+  twinnyGetWorkspaceContext: 'twinny-workspace-context'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -95,6 +95,7 @@ export const TWINNY_COMMAND_NAME = {
   manageProviders: 'twinny.manageProviders',
   manageTemplates: 'twinny.manageTemplates',
   newConversation: 'twinny.newConversation',
+  openPanelChat: 'twinny.openPanelChat',
   openChat: 'twinny.openChat',
   refactor: 'twinny.refactor',
   sendTerminalText: 'twinny.sendTerminalText',

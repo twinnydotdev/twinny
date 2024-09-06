@@ -7,9 +7,9 @@ import StarterKit from '@tiptap/starter-kit'
 import { Markdown as TiptapMarkdown } from 'tiptap-markdown'
 
 import CodeBlock from './code-block'
-import styles from './index.module.css'
 import { Message as MessageType, ThemeType } from '../common/types'
 import { ASSISTANT, TWINNY, YOU } from '../common/constants'
+import styles from '../styles/index.module.css'
 
 interface MessageProps {
   conversationLength?: number
@@ -111,7 +111,6 @@ export const Message: React.FC<MessageProps> = React.memo(
           return (
             <MemoizedCodeBlock
               role={message?.role}
-              language={message?.language}
               theme={theme}
               {...children.props}
             />
@@ -119,7 +118,7 @@ export const Message: React.FC<MessageProps> = React.memo(
         }
         return <pre>{children}</pre>
       },
-      [message?.role, message?.language, theme]
+      [message?.role, theme]
     )
 
     const renderCode = useCallback(

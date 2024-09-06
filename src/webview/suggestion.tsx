@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { RefAttributes } from 'react'
 import { ReactRenderer } from '@tiptap/react'
 import tippy, { Instance as TippyInstance } from 'tippy.js'
 import { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
+import { MentionNodeAttrs } from '@tiptap/extension-mention'
 
 import {
-  AtList,
-  AtListProps,
-  AtListRef,
-  MentionNodeAttrs
+  MentionList,
+  MentionListProps,
+  MentionListRef,
 } from './mention-list'
-import { RefAttributes } from 'react'
 
 export const getSuggestions = (fileList: string[]) => ({
   items: ({ query }: { query: string }): string[] => {
@@ -20,14 +20,14 @@ export const getSuggestions = (fileList: string[]) => ({
 
   render: () => {
     let component: ReactRenderer<
-      AtListRef,
-      AtListProps & RefAttributes<AtListRef>
+      MentionListRef,
+      MentionListProps & RefAttributes<MentionListRef>
     >
     let popup: TippyInstance[]
 
     return {
       onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
-        component = new ReactRenderer(AtList, {
+        component = new ReactRenderer(MentionList, {
           props,
           editor: props.editor
         })

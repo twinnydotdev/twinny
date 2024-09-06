@@ -1,10 +1,10 @@
-import { WORKSPACE_STORAGE_KEY, EVENT_NAME } from '../common/constants'
+import { useEffect, useState } from 'react'
 import cn from 'classnames'
 
-import styles from './index.module.css'
 import { useTemplates, useWorkSpaceContext } from './hooks'
 import { kebabToSentence } from './utils'
-import { useEffect, useState } from 'react'
+import { WORKSPACE_STORAGE_KEY, EVENT_NAME } from '../common/constants'
+import styles from '../styles/index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

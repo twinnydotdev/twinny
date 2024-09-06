@@ -1,13 +1,10 @@
 import { workspace } from 'vscode'
-import { Logger } from '../common/logger'
 
 export class OllamaService {
-  private logger: Logger
   private _config = workspace.getConfiguration('twinny')
   private _baseUrl: string
 
   constructor() {
-    this.logger = new Logger()
     const protocol = (this._config.get('ollamaUseTls') as boolean)
       ? 'https'
       : 'http'

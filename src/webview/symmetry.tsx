@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react'
-import { useSymmetryConnection } from './hooks'
 import {
   VSCodeButton,
   VSCodePanelView,
@@ -9,7 +8,8 @@ import {
   VSCodeOption
 } from '@vscode/webview-ui-toolkit/react'
 
-import styles from './symmetry.module.css'
+import { useSymmetryConnection } from './hooks'
+import styles from '../styles/symmetry.module.css'
 
 export const Symmetry = () => {
   const {
