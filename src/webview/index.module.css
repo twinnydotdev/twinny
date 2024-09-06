@@ -394,6 +394,7 @@ pre code {
   background-color: transparent;
   width: 100%;
   padding: 0.2rem 0.5rem;
+  text-align: left;
 }
 
 .dropdownMenu button.dropdownSelected {

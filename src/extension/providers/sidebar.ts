@@ -24,7 +24,8 @@ import {
   ApiModel,
   ServerMessage,
   InferenceRequest,
-  SymmetryModelProvider
+  SymmetryModelProvider,
+  FileItem
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
 import { OllamaService } from '../ollama-service'
@@ -35,6 +36,7 @@ import { SymmetryService } from '../symmetry-service'
 import { SessionManager } from '../session-manager'
 import { Logger } from '../../common/logger'
 import { DiffManager } from '../diff'
+import { FileTreeProvider } from '../tree'
 
 const logger = new Logger()
 
@@ -52,6 +54,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public conversationHistory: ConversationHistory | undefined = undefined
   public symmetryService?: SymmetryService | undefined
   public view?: vscode.WebviewView
+  private _fileTreeProvider: FileTreeProvider
 
   constructor(
     statusBar: vscode.StatusBarItem,
@@ -66,6 +69,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._sessionManager = sessionManager
     this._templateProvider = new TemplateProvider(templateDir)
     this._ollamaService = new OllamaService()
+    this._fileTreeProvider = new FileTreeProvider()
     if (db) {
       this._db = db
     }
@@ -157,7 +161,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
         [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
         [EVENT_NAME.twinnyStartSymmetryProvider]: this.createSymmetryProvider,
-        [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider
+        [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider,
+        [EVENT_NAME.twinnyFileListRequest]: this.requestFileList
       }
       eventHandlers[message.type as string]?.(message)
     })
@@ -174,6 +179,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         data: tab as string
       }
     } as ServerMessage<string>)
+  }
+
+  public requestFileList = async (message: ClientMessage) => {
+    if (message.type === EVENT_NAME.twinnyFileListRequest) {
+      const files = await this._fileTreeProvider?.getAllFiles()
+      this.view?.webview.postMessage({
+        type: EVENT_NAME.twinnyFileListResponse,
+        value: {
+          data: files
+        }
+      })
+    }
   }
 
   public embedDocuments = async () => {
@@ -274,7 +291,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       )
     }
 
-    this.chatService?.streamChatCompletion(data.data || [])
+    this.chatService?.streamChatCompletion(
+      data.data || [],
+      data.meta as FileItem[]
+    )
   }
 
   public async streamTemplateCompletion(template: string) {

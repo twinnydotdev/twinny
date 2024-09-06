@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { RefAttributes, useEffect, useRef, useState } from 'react'
+import tippy, { Instance as TippyInstance } from 'tippy.js'
 
 import {
   CONVERSATION_EVENT_NAME,
@@ -12,6 +14,7 @@ import {
   ApiModel,
   ClientMessage,
   Conversation,
+  FileItem,
   LanguageType,
   ServerMessage,
   SymmetryConnection,
@@ -19,6 +22,10 @@ import {
   ThemeType
 } from '../common/types'
 import { TwinnyProvider } from '../extension/provider-manager'
+import { ReactRenderer } from '@tiptap/react'
+import { AtList, AtListProps, AtListRef } from './mention-list'
+import { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
+import { MentionNodeAttrs } from '@tiptap/extension-mention'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -474,6 +481,121 @@ const useAutosizeTextArea = (
       chatRef.current.style.height = `${scrollHeight + 5}px`
     }
   }, [chatRef, value])
+}
+
+export const useFilePaths = () => {
+  const filePaths = useRef<string[] | undefined>()
+
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<string[]> = event.data
+    if (
+      !filePaths.current?.length &&
+      message?.type === EVENT_NAME.twinnyFileListResponse
+    ) {
+      filePaths.current = message.value.data // response sets the list from vscode backend
+    }
+  }
+
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyFileListRequest
+    })
+
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  return {
+    filePaths: filePaths.current || []
+  }
+}
+
+export const useSuggestion = () => {
+  const { filePaths } = useFilePaths()
+
+  const getFilePaths = () => filePaths
+
+  const suggestion = {
+    items: ({ query }: { query: string }) => {
+      const filePaths = getFilePaths()
+      const fileItems: FileItem[] = filePaths.map((path) => ({
+        name: path.split('/').pop() || '',
+        path: path
+      }))
+      const defaultItems: FileItem[] = [
+        { name: 'workspace', path: 'workspace' },
+        { name: 'problems', path: 'problems' }
+      ]
+      return Promise.resolve(
+        [...defaultItems, ...fileItems]
+          .filter((item) =>
+            item.name.toLowerCase().startsWith(query.toLowerCase())
+          )
+          .slice(0, 10)
+      )
+    },
+    render: () => {
+      let reactRenderer: ReactRenderer<
+        AtListRef,
+        AtListProps & RefAttributes<AtListRef>
+      >
+      let popup: TippyInstance[]
+
+      return {
+        onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
+          reactRenderer = new ReactRenderer(AtList, {
+            props,
+            editor: props.editor
+          })
+
+          const getReferenceClientRect = props.clientRect as () => DOMRect
+
+          popup = tippy('body', {
+            getReferenceClientRect,
+            appendTo: () => document.body,
+            content: reactRenderer.element,
+            showOnCreate: true,
+            interactive: true,
+            trigger: 'manual',
+            placement: 'bottom-start'
+          })
+        },
+
+        onUpdate(props: SuggestionProps<MentionNodeAttrs>) {
+          reactRenderer.updateProps(props)
+
+          if (popup && popup.length) {
+            popup[0].setProps({
+              getReferenceClientRect: props.clientRect as () => DOMRect
+            })
+          }
+        },
+
+        onKeyDown(props: SuggestionKeyDownProps) {
+          if (props.event.key === 'Escape' && popup && popup.length) {
+            popup[0].hide()
+            return true
+          }
+
+          if (!reactRenderer.ref) return false
+
+          return reactRenderer.ref.onKeyDown(props)
+        },
+
+        onExit() {
+          if (popup && popup.length) {
+            popup[0].destroy()
+            reactRenderer.destroy()
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    suggestion,
+    filePaths
+  }
 }
 
 export const useSymmetryConnection = () => {

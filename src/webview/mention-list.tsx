@@ -8,6 +8,7 @@ import {
   useState
 } from 'react'
 import { Editor } from '@tiptap/core'
+import { FileItem } from '../common/types'
 
 export interface MentionNodeAttrs {
   id: string
@@ -15,7 +16,7 @@ export interface MentionNodeAttrs {
 }
 
 export interface AtListProps {
-  items: string[]
+  items: FileItem[]
   command: (attrs: MentionNodeAttrs) => void
   editor: Editor
   range: Range
@@ -32,7 +33,7 @@ export const AtList = forwardRef<AtListRef, AtListProps>((props, ref) => {
     const item = props.items[index]
 
     if (item) {
-      props.command({ id: item, label: item })
+      props.command({ id: item.path, label: item.name })
     }
   }
 
@@ -76,7 +77,7 @@ export const AtList = forwardRef<AtListRef, AtListProps>((props, ref) => {
   return (
     <div className={styles.dropdownMenu}>
       {props.items.length ? (
-        props.items.map((item: string, index: number) => (
+        props.items.map((item: FileItem, index: number) => (
           <button
             className={cx({
               [styles.dropdownSelected]: index === selectedIndex
@@ -84,7 +85,7 @@ export const AtList = forwardRef<AtListRef, AtListProps>((props, ref) => {
             key={index}
             onClick={() => selectItem(index)}
           >
-            {item}
+            {item.name}
           </button>
         ))
       ) : (

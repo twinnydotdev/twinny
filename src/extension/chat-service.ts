@@ -31,7 +31,8 @@ import {
   ServerMessage,
   TemplateData,
   Message,
-  StreamRequestOptions
+  StreamRequestOptions,
+  FileItem
 } from '../common/types'
 import {
   getChatDataFromProvider,
@@ -557,7 +558,22 @@ export class ChatService {
     return combinedContext.trim() || null
   }
 
-  public async streamChatCompletion(messages: Message[]) {
+  private async loadFileContents(files: FileItem[]): Promise<string> {
+    let fileContents = '';
+
+    for (const file of files) {
+      try {
+        const content = await fs.readFile(file.path, 'utf-8');
+        fileContents += `File: ${file.name}\n\n${content}\n\n`;
+      } catch (error) {
+        console.error(`Error reading file ${file.path}:`, error);
+      }
+    }
+    return fileContents.trim();
+  }
+
+
+  public async streamChatCompletion(messages: Message[], filePaths: FileItem[]) {
     this._completion = ''
     this.sendEditorLanguage()
     const editor = window.activeTextEditor
@@ -585,6 +601,11 @@ export class ChatService {
 
     if (ragContext) {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
+    }
+
+    const fileContents = await this.loadFileContents(filePaths);
+    if (fileContents) {
+      additionalContext += `File Contents:\n${fileContents}\n\n`;
     }
 
     const updatedMessages = [systemMessage, ...messages.slice(0, -1)]

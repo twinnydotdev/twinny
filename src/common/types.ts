@@ -59,8 +59,9 @@ export interface LanguageType {
   languageId: string | undefined
 }
 
-export interface ClientMessage<T = string | boolean | Message[]> {
-  data?: T
+export interface ClientMessage<T = string | boolean | Message[], Y = unknown> {
+  data?: T,
+  meta?: Y,
   type?: string
   key?: string
 }
@@ -78,9 +79,6 @@ export interface ServerMessage<T = LanguageType> {
 export interface Message {
   role: string
   content: string | undefined
-  type?: string
-  language?: LanguageType
-  error?: boolean
 }
 
 export interface Conversation {
@@ -275,4 +273,14 @@ export type EmbeddedDocument = {
   content: string
   vector: number[] | undefined
   file: string
+}
+
+export interface FileItem {
+  name: string;
+  path: string;
+}
+
+export interface MentionType {
+  name: string;
+  path: string;
 }

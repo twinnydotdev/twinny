@@ -11,9 +11,9 @@ import {
 } from './mention-list'
 import { RefAttributes } from 'react'
 
-export const suggestion = {
+export const getSuggestions = (fileList: string[]) => ({
   items: ({ query }: { query: string }): string[] => {
-    return ['workspace', 'problems'].filter((item) =>
+    return ['workspace', 'problems', ...fileList].filter((item) =>
       item.toLowerCase().startsWith(query.toLowerCase())
     )
   },
@@ -52,7 +52,7 @@ export const suggestion = {
       onUpdate(props: SuggestionProps<MentionNodeAttrs>) {
         component.updateProps({
           ...props,
-          items: suggestion.items({ query: props.query })
+          items: getSuggestions(fileList).items({ query: props.query })
         })
 
         if (!props.clientRect) {
@@ -74,9 +74,11 @@ export const suggestion = {
       },
 
       onExit() {
-        popup[0].destroy()
-        component.destroy()
+        if (popup.length > 0) {
+          popup[0].destroy()
+          component.destroy()
+        }
       }
     }
   }
-}
+})
