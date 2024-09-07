@@ -16,7 +16,7 @@ import {
   FIM_TEMPLATE_FORMAT
 } from '../common/constants'
 import { ModelSelect } from './model-select'
-import styles from '../styles/providers.module.css'
+import styles from './styles/providers.module.css'
 
 export const Providers = () => {
   const [showForm, setShowForm] = React.useState(false)

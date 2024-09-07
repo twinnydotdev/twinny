@@ -375,6 +375,14 @@ pre code {
   margin-top: 0;
 }
 
+:global(.tiptap p.is-editor-empty:first-child::before) {
+  color: var(--vscode-disabledForeground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
 .dropdownMenu {
   background: var(--vscode-dropdown-background);
   border: 1px solid var(--vscode-inputOption-activeBorder);

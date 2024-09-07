@@ -5,7 +5,7 @@ import { Editor } from '@tiptap/core'
 import { MentionNodeAttrs } from '@tiptap/extension-mention'
 
 import { FileItem } from '../common/types'
-import styles from '../styles/index.module.css'
+import styles from './styles/index.module.css'
 
 export interface MentionListProps {
   items: FileItem[]

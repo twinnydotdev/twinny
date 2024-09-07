@@ -9,7 +9,7 @@ import { Markdown as TiptapMarkdown } from 'tiptap-markdown'
 import CodeBlock from './code-block'
 import { Message as MessageType, ThemeType } from '../common/types'
 import { ASSISTANT, TWINNY, YOU } from '../common/constants'
-import styles from '../styles/index.module.css'
+import styles from './styles/index.module.css'
 
 interface MessageProps {
   conversationLength?: number

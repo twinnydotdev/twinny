@@ -9,7 +9,7 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import { useSymmetryConnection } from './hooks'
-import styles from '../styles/symmetry.module.css'
+import styles from './styles/symmetry.module.css'
 
 export const Symmetry = () => {
   const {

@@ -6,7 +6,7 @@ import {
   WORKSPACE_STORAGE_KEY
 } from '../common/constants'
 import { kebabToSentence } from './utils'
-import styles from '../styles/index.module.css'
+import styles from './styles/index.module.css'
 
 export const Settings = () => {
   const { templates, saveTemplates } = useTemplates()

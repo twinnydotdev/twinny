@@ -47,7 +47,7 @@ import { CustomKeyMap, getCompletionContent } from './utils'
 import { ProviderSelect } from './provider-select'
 import { EmbeddingOptions } from './embedding-options'
 import ChatLoader from './loader'
-import styles from '../styles/index.module.css'
+import styles from './styles/index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -289,7 +289,7 @@ export const Chat = () => {
   )
 
   const handleSubmitForm = () => {
-    const input = editorRef.current?.getText()
+    const input = editorRef.current?.getText().trim()
     if (input && editorRef.current) {
       const mentions = getMentions()
 
@@ -405,9 +405,6 @@ export const Chat = () => {
     {
       extensions: [
         StarterKit,
-        Placeholder.configure({
-          placeholder: 'How can twinny help you today?'
-        }),
         Mention.configure({
           HTMLAttributes: {
             class: 'mention'
@@ -423,7 +420,10 @@ export const Chat = () => {
         CustomKeyMap.configure({
           handleSubmitForm,
           clearEditor
-        })
+        }),
+        Placeholder.configure({
+          placeholder: 'How can twinny help you today?'
+        }),
       ]
     },
     [memoizedSuggestion]

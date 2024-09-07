@@ -4,7 +4,7 @@ import {
 } from '@vscode/webview-ui-toolkit/react'
 
 import { useProviders } from './hooks'
-import styles from '../styles/providers.module.css'
+import styles from './styles/providers.module.css'
 
 export const ProviderSelect = () => {
   const {

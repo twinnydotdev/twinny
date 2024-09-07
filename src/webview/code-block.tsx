@@ -6,7 +6,7 @@ import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { ASSISTANT, EVENT_NAME } from '../common/constants'
 import { LanguageType, Theme, ThemeType } from '../common/types'
 import { getLanguageMatch } from './utils'
-import styles from '../styles/index.module.css'
+import styles from './styles/index.module.css'
 
 interface CodeBlockProps {
   className?: string

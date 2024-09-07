@@ -15,7 +15,7 @@ import {
 } from '../common/constants'
 import { ClientMessage } from '../common/types'
 import { useGlobalContext, useProviders } from './hooks'
-import styles from '../styles/index.module.css'
+import styles from './styles/index.module.css'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
