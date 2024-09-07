@@ -70,5 +70,7 @@ Thanks for using Twinny!
 This project is and will always be free and open source. If you find it helpful, please consider showing your appreciation with a small donation <3
 Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
 
+Follow my journey on X for updates! https://x.com/rjmacarthy
+
 ## Disclaimer
 Twinny is actively developed and provided "as is". Functionality may vary between updates.
