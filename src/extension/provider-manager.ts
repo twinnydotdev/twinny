@@ -86,7 +86,7 @@ export class ProviderManager {
   getDefaultChatProvider() {
     return {
       apiHostname: '0.0.0.0',
-      apiPath: '/api/chat',
+      apiPath: '/v1/chat/completions',
       apiPort: 11434,
       apiProtocol: 'http',
       id: uuidv4(),
