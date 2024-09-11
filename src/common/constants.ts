@@ -195,6 +195,7 @@ export const FIM_TEMPLATE_FORMAT = {
   codegemma: 'codegemma',
   codellama: 'codellama',
   codeqwen: 'codeqwen',
+  codestral: 'codestral',
   custom: 'custom-template',
   deepseek: 'deepseek',
   llama: 'llama',
@@ -215,6 +216,8 @@ export const STOP_DEEPSEEK = [
 export const STOP_STARCODER = ['<|endoftext|>', '<file_sep>']
 
 export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
+
+export const STOP_CODESTRAL = ['[PREFIX]', '[SUFFIX]']
 
 export const DEFAULT_TEMPLATE_NAMES = defaultTemplates.map(({ name }) => name)
 
