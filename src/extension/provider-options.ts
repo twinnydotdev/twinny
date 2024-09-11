@@ -76,7 +76,7 @@ export function createStreamRequestBodyFim(
         prompt,
         stream: true,
         temperature: options.temperature,
-        n_predict: options.numPredictFim
+        max_tokens: options.numPredictFim
       }
     case apiProviders.LlamaCpp:
     case apiProviders.Oobabooga:
@@ -84,7 +84,7 @@ export function createStreamRequestBodyFim(
         prompt,
         stream: true,
         temperature: options.temperature,
-        n_predict: options.numPredictFim
+        max_tokens: options.numPredictFim
       }
     case apiProviders.LiteLLM:
       return {
