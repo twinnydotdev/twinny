@@ -76,7 +76,7 @@ export const getFimPromptTemplateCodestral = ({
     language,
     header
   )
-  return `[SUFFIX]${suffix}[PREFIX]${fileContext}\n${heading}${prefix}`
+  return `${fileContext}\n\n[SUFFIX]${suffix}[PREFIX]${heading}${prefix}`
 }
 
 export const getFimPromptTemplateOther = ({
@@ -131,6 +131,10 @@ function getFimTemplateChosen(format: string, args: FimPromptTemplate) {
 
   if (format === FIM_TEMPLATE_FORMAT.deepseek) {
     return getFimPromptTemplateDeepseek(args)
+  }
+
+  if (format === FIM_TEMPLATE_FORMAT.codestral) {
+    return getFimPromptTemplateCodestral(args)
   }
 
   if (
