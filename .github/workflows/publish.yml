@@ -31,7 +31,7 @@ jobs:
       - name: Package Extension
         run: npx vsce package --target ${{ matrix.target }}
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: vsix-${{ matrix.target }}
           path: "*.vsix"
@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: 18
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: ./vsix
       - name: Publish to Visual Studio Marketplace
