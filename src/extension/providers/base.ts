@@ -37,15 +37,13 @@ import { Logger } from '../../common/logger'
 import { DiffManager } from '../diff'
 import { ProviderManager } from '../provider-manager'
 import { FileTreeProvider } from '../tree'
+import { GithubService as ReviewService } from '../review-service'
 
 const logger = new Logger()
 
 export class BaseProvider {
-  public context: vscode.ExtensionContext
-  public webView?: vscode.Webview
-  public conversationHistory: ConversationHistory | undefined = undefined
-  private _config = vscode.workspace.getConfiguration('twinny')
   private _chatService: ChatService | undefined = undefined
+  private _config = vscode.workspace.getConfiguration('twinny')
   private _diffManager = new DiffManager()
   private _embeddingDatabase: EmbeddingDatabase | undefined
   private _fileTreeProvider: FileTreeProvider
@@ -55,6 +53,10 @@ export class BaseProvider {
   private _symmetryService?: SymmetryService | undefined
   private _templateDir: string | undefined
   private _templateProvider: TemplateProvider
+  public context: vscode.ExtensionContext
+  public conversationHistory: ConversationHistory | undefined = undefined
+  public reviewService: ReviewService | undefined = undefined
+  public webView?: vscode.Webview
 
   constructor(
     context: vscode.ExtensionContext,
@@ -97,6 +99,14 @@ export class BaseProvider {
       this.webView,
       this._sessionManager,
       this._symmetryService
+    )
+
+    this.reviewService = new ReviewService(
+      this.context,
+      this.webView,
+      this._sessionManager,
+      this._symmetryService,
+      this._templateDir
     )
 
     new ProviderManager(this.context, this.webView)
@@ -201,7 +211,9 @@ export class BaseProvider {
     }
     if (!this._embeddingDatabase) return
     for (const dir of dirs) {
-      (await this._embeddingDatabase.injestDocuments(dir.uri.fsPath)).populateDatabase()
+      (
+        await this._embeddingDatabase.injestDocuments(dir.uri.fsPath)
+      ).populateDatabase()
     }
   }
 

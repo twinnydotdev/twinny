@@ -29,14 +29,14 @@ import { SymmetryService } from './symmetry-service'
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory {
-  private _context: ExtensionContext
-  private _config = workspace.getConfiguration('twinny')
-  private _keepAlive = this._config.get('keepAlive') as string | number
+  public config = workspace.getConfiguration('twinny')
+  public context: ExtensionContext
+  public keepAlive = this.config.get('keepAlive') as string | number
+  public temperature = this.config.get('temperature') as number
+  public webView: Webview
   private _sessionManager: SessionManager | undefined
   private _symmetryService: SymmetryService
-  private _temperature = this._config.get('temperature') as number
   private _title = ''
-  private _webView: Webview
 
   constructor(
     context: ExtensionContext,
@@ -44,15 +44,15 @@ export class ConversationHistory {
     sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
-    this._context = context
-    this._webView = webView
+    this.context = context
+    this.webView = webView
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this.setUpEventListeners()
   }
 
   setUpEventListeners() {
-    this._webView?.onDidReceiveMessage(
+    this.webView?.onDidReceiveMessage(
       (message: ClientMessage<Conversation>) => {
         this.handleMessage(message)
       }
@@ -62,7 +62,7 @@ export class ConversationHistory {
       SYMMETRY_EMITTER_KEY.conversationTitle,
       (completion: string) => {
         const activeConversation = this.getActiveConversation()
-        this._webView?.postMessage({
+        this.webView?.postMessage({
           type: CONVERSATION_EVENT_NAME.getActiveConversation,
           value: {
             data: {
@@ -130,13 +130,13 @@ export class ConversationHistory {
     })
   }
 
-  private getProvider = () => {
-    return this._context?.globalState.get<TwinnyProvider>(
+  public getProvider = () => {
+    return this.context?.globalState.get<TwinnyProvider>(
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
   }
 
-  private buildStreamRequest(messages?: Message[]) {
+  public buildStreamRequest(messages?: Message[]) {
     const provider = this.getProvider()
 
     if (!provider || !messages?.length) return
@@ -156,7 +156,7 @@ export class ConversationHistory {
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
       numPredictChat: 100,
-      temperature: this._temperature,
+      temperature: this.temperature,
       messages: [
         ...messages,
         {
@@ -164,7 +164,7 @@ export class ConversationHistory {
           content: TITLE_GENERATION_PROMPT_MESAGE
         }
       ],
-      keepAlive: this._keepAlive
+      keepAlive: this.keepAlive
     })
 
     return { requestOptions, requestBody }
@@ -178,7 +178,7 @@ export class ConversationHistory {
 
   getAllConversations() {
     const conversations = this.getConversations() || {}
-    this._webView?.postMessage({
+    this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.getConversations,
       value: {
         data: conversations
@@ -187,21 +187,21 @@ export class ConversationHistory {
   }
 
   getConversations(): Conversations {
-    const conversations = this._context.globalState.get<
+    const conversations = this.context.globalState.get<
       Record<string, Conversation>
     >(CONVERSATION_STORAGE_KEY)
     return conversations
   }
 
   resetConversation() {
-    this._context.globalState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
+    this.context.globalState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
     this.setActiveConversation(undefined)
   }
 
   updateConversation(conversation: Conversation) {
     const conversations = this.getConversations() || {}
     if (!conversation.id) return
-    this._context.globalState.update(CONVERSATION_STORAGE_KEY, {
+    this.context.globalState.update(CONVERSATION_STORAGE_KEY, {
       ...conversations,
       [conversation.id]: conversation
     })
@@ -209,11 +209,11 @@ export class ConversationHistory {
   }
 
   setActiveConversation(conversation: Conversation | undefined) {
-    this._context.globalState.update(
+    this.context.globalState.update(
       ACTIVE_CONVERSATION_STORAGE_KEY,
       conversation
     )
-    this._webView?.postMessage({
+    this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.getActiveConversation,
       value: {
         data: conversation
@@ -224,7 +224,7 @@ export class ConversationHistory {
 
   getActiveConversation() {
     const conversation: Conversation | undefined =
-      this._context.globalState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
+      this.context.globalState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
     this.setActiveConversation(conversation)
     return conversation
   }
@@ -233,7 +233,7 @@ export class ConversationHistory {
     const conversations = this.getConversations() || {}
     if (!conversation?.id) return
     delete conversations[conversation.id]
-    this._context.globalState.update(CONVERSATION_STORAGE_KEY, {
+    this.context.globalState.update(CONVERSATION_STORAGE_KEY, {
       ...conversations
     })
     this.setActiveConversation(undefined)
@@ -241,7 +241,7 @@ export class ConversationHistory {
   }
 
   clearAllConversations() {
-    this._context.globalState.update(CONVERSATION_STORAGE_KEY, {})
+    this.context.globalState.update(CONVERSATION_STORAGE_KEY, {})
     this.setActiveConversation(undefined)
   }
 
@@ -287,7 +287,7 @@ export class ConversationHistory {
       messages: conversation.messages
     }
     conversations[id] = newConversation
-    this._context.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
+    this.context.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
     this.setActiveConversation(newConversation)
     this._title = ''
   }

@@ -8,6 +8,10 @@ vscode-text-area {
   width: 100%;
 }
 
+vscode-text-field {
+  width: 100%;
+}
+
 h1,
 h2,
 h3,
@@ -408,4 +412,48 @@ pre code {
 .dropdownMenu button.dropdownSelected {
   background-color: var(--vscode-button-background);
   color: var(--vscode-inputValidation-infoForeground);
+}
+
+.menuContainer {
+  padding: 10px;
+  display: flex;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 93px);
+  background-color: var(--vscode-editorWidget-background);
+  z-index: 10;
+  justify-content: flex-end;
+  flex-direction: column;
+  animation-name: animateUpFadeIn;
+  animation-duration: 0.2s;
+}
+
+.menuContainer .active {
+  background-color: var(--vscode-inputOption-activeBackground);
+}
+
+.prList {
+  margin: 0;
+  padding: 0;
+}
+
+.prList li {
+  margin-bottom: 10px;
+}
+
+.prButtonContainer {
+  margin-top: 7px;
+}
+
+.prItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.prTitle {
+  flex-grow: 1;
+  margin-right: 8px;
 }

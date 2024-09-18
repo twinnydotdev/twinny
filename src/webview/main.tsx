@@ -7,12 +7,14 @@ import { EVENT_NAME, WEBUI_TABS } from '../common/constants'
 import { Providers } from './providers'
 import { Symmetry } from './symmetry'
 import { ConversationHistory } from './conversation-history'
+import { Review } from './review'
 
 const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.chat]: <Chat />,
   [WEBUI_TABS.settings]: <Settings />,
   [WEBUI_TABS.providers]: <Providers />,
-  [WEBUI_TABS.symmetry]: <Symmetry />
+  [WEBUI_TABS.symmetry]: <Symmetry />,
+  [WEBUI_TABS.review]: <Review />
 }
 
 export const Main = () => {

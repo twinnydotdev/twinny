@@ -418,7 +418,7 @@ export const getCurrentWorkspacePath = (): string | undefined => {
 export const getGitChanges = async (): Promise<string> => {
   try {
     const path = getCurrentWorkspacePath()
-    const { stdout } = await execAsync('git diff --cached', {
+    const { stdout } = await execAsync('git diff', {
       cwd: path
     })
     return stdout

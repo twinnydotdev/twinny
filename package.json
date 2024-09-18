@@ -85,42 +85,47 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnySymmetryTab"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnySymmetryTab || view == twinny.sidebar && twinnyReviewTab"
         },
         {
-          "command": "twinny.symmetry",
+          "command": "twinny.review",
           "group": "navigation@1",
           "when": "view == twinny.sidebar"
         },
         {
-          "command": "twinny.manageProviders",
+          "command": "twinny.symmetry",
           "group": "navigation@2",
           "when": "view == twinny.sidebar"
         },
         {
-          "command": "twinny.manageTemplates",
+          "command": "twinny.manageProviders",
           "group": "navigation@3",
+          "when": "view == twinny.sidebar"
+        },
+        {
+          "command": "twinny.manageTemplates",
+          "group": "navigation@4",
           "when": "view == twinny.sidebar"
         },
         {
           "command": "twinny.templates",
           "when": "view == twinny.sidebar",
-          "group": "navigation@4"
+          "group": "navigation@5"
         },
         {
           "command": "twinny.conversationHistory",
           "when": "view == twinny.sidebar",
-          "group": "navigation@5"
+          "group": "navigation@6"
         },
         {
           "command": "twinny.newConversation",
           "when": "view == twinny.sidebar",
-          "group": "navigation@6"
+          "group": "navigation@7"
         },
         {
           "command": "twinny.settings",
           "when": "view == twinny.sidebar",
-          "group": "navigation@7"
+          "group": "navigation@8"
         }
       ]
     },
@@ -164,6 +169,10 @@
         "shortTitle": "Disable twinny"
       },
       {
+        "command": "twinny.getGitCommitMessage",
+        "title": "Twinny - Generate commit message"
+      },
+      {
         "command": "twinny.sidebar.focus",
         "shortTitle": "Enable twinny sidebar",
         "title": "Enable twinny sidebar"
@@ -173,6 +182,12 @@
         "shortTitle": "twinny settings",
         "title": "Open twinny settings",
         "icon": "$(gear)"
+      },
+      {
+        "command": "twinny.review",
+        "shortTitle": "twinny code reviewer",
+        "title": "Code reviewer",
+        "icon": "$(git-pull-request)"
       },
       {
         "command": "twinny.symmetry",
@@ -376,6 +391,12 @@
           "type": "string",
           "description": "The symmetry master server key.",
           "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
+        },
+        "twinny.githubToken": {
+          "order": 27,
+          "type": "string",
+          "default": "",
+          "description": "Your GitHub token. Used for fetching GitHub data."
         }
       }
     }

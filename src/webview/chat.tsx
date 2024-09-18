@@ -359,12 +359,6 @@ export const Chat = () => {
     })
   }
 
-  const handleGetGitChanges = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyGetGitChanges
-    } as ClientMessage)
-  }
-
   const handleScrollBottom = () => {
     if (markdownRef.current) {
       markdownRef.current.scrollTop = markdownRef.current.scrollHeight
@@ -504,13 +498,6 @@ export const Chat = () => {
               ) : (
                 <DisabledAutoScrollIcon />
               )}
-            </VSCodeButton>
-            <VSCodeButton
-              onClick={handleGetGitChanges}
-              title="Generate commit message from staged changes"
-              appearance="icon"
-            >
-              <span className="codicon codicon-git-pull-request"></span>
             </VSCodeButton>
             <VSCodeButton
               title="Scroll down to the bottom"

@@ -175,6 +175,19 @@ export async function activate(context: ExtensionContext) {
         } as ServerMessage<string>)
       }
     ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.review, async () => {
+      commands.executeCommand(
+        'setContext',
+        EXTENSION_CONTEXT_NAME.twinnyReviewTab,
+        true
+      )
+      sidebarProvider.webView?.postMessage({
+        type: EVENT_NAME.twinnySetTab,
+        value: {
+          data: WEBUI_TABS.review
+        }
+      } as ServerMessage<string>)
+    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageTemplates, async () => {
       commands.executeCommand(
         'setContext',
@@ -207,6 +220,11 @@ export async function activate(context: ExtensionContext) {
       commands.executeCommand(
         'setContext',
         EXTENSION_CONTEXT_NAME.twinnyManageProviders,
+        false
+      )
+      commands.executeCommand(
+        'setContext',
+        EXTENSION_CONTEXT_NAME.twinnyReviewTab,
         false
       )
     }),

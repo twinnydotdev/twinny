@@ -78,7 +78,8 @@ export const EVENT_NAME = {
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyGetWorkspaceContext: 'twinny-workspace-context'
+  twinnyGetWorkspaceContext: 'twinny-workspace-context',
+  twinnyGithhubReview: 'twinny-githhub-review'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -87,6 +88,7 @@ export const TWINNY_COMMAND_NAME = {
   conversationHistory: 'twinny.conversationHistory',
   disable: 'twinny.disable',
   enable: 'twinny.enable',
+  review: 'twinny.review',
   explain: 'twinny.explain',
   focusSidebar: 'twinny.sidebar.focus',
   generateDocs: 'twinny.generateDocs',
@@ -151,7 +153,9 @@ export const WORKSPACE_STORAGE_KEY = {
   selectedTemplates: 'selectedTemplates',
   selection: 'selection',
   showEmbeddingOptions: 'showEmbeddingOptions',
-  showProviders: 'showProviders'
+  showProviders: 'showProviders',
+  reviewOwner: 'reviewOwner',
+  reviewRepo: 'reviewRepo',
 }
 
 export const EXTENSION_SETTING_KEY = {
@@ -166,6 +170,7 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyGeneratingText: 'twinnyGeneratingText',
   twinnyManageProviders: 'twinnyManageProviders',
   twinnyManageTemplates: 'twinnyManageTemplates',
+  twinnyReviewTab: 'twinnyReviewTab',
   twinnyRerankThreshold: 'twinnyRerankThreshold',
   twinnyMaxChunkSize: 'twinnyMaxChunkSize',
   twinnyMinChunkSize: 'twinnyMinChunkSize',
@@ -186,6 +191,7 @@ export const WEBUI_TABS = {
   chat: 'chat',
   history: 'history',
   providers: 'providers',
+  review: 'review',
   settings: 'templates',
   symmetry: 'symmetry'
 }
@@ -240,6 +246,11 @@ export const DEFAULT_PROVIDER_FORM_VALUES = {
   name: '',
   provider: 'ollama',
   type: 'chat'
+}
+
+export const GITHUB_EVENT_NAME = {
+  getPullRequests: 'github.getPullRequests',
+  getPullRequestReview: 'github.getPullRequestReview'
 }
 
 export const TITLE_GENERATION_PROMPT_MESAGE = `

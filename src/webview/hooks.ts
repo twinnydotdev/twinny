@@ -1,5 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RefAttributes, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  RefAttributes,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 import tippy, { Instance as TippyInstance } from 'tippy.js'
 import { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
 import { MentionNodeAttrs } from '@tiptap/extension-mention'
@@ -11,7 +18,8 @@ import {
   EVENT_NAME,
   PROVIDER_EVENT_NAME,
   EXTENSION_SESSION_NAME,
-  GLOBAL_STORAGE_KEY
+  GLOBAL_STORAGE_KEY,
+  GITHUB_EVENT_NAME
 } from '../common/constants'
 import {
   ApiModel,
@@ -212,6 +220,53 @@ export const useTemplates = () => {
     return () => window.removeEventListener('message', handler)
   }, [])
   return { templates, saveTemplates }
+}
+
+export const useGithubPRs = () => {
+  const [prs, setPRs] = useState<Array<{ number: number; title: string }>>([])
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const message = event.data
+      if (message.type === GITHUB_EVENT_NAME.getPullRequests) {
+        setPRs(message.value.data)
+        setIsLoading(false)
+      }
+    }
+
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  const getPrs = (owner: string | undefined, repo: string | undefined) => {
+    setIsLoading(true)
+    global.vscode.postMessage({
+      type: GITHUB_EVENT_NAME.getPullRequests,
+      data: { owner, repo }
+    })
+  }
+
+  const startReview = (
+    owner: string | undefined,
+    repo: string | undefined,
+    selectedPR: number,
+    title: string
+  ) => {
+    if (selectedPR === null) return
+
+    global.vscode.postMessage({
+      type: GITHUB_EVENT_NAME.getPullRequestReview,
+      data: { owner, repo, number: selectedPR, title }
+    })
+  }
+
+  return {
+    prs,
+    isLoading,
+    getPrs,
+    startReview
+  }
 }
 
 export const useProviders = () => {
@@ -425,6 +480,7 @@ export const useConversationHistory = () => {
         setConversations(message.value.data)
       }
       if (message?.type === CONVERSATION_EVENT_NAME.getActiveConversation) {
+        console.log(message.value.data as Conversation)
         setConversation(message.value.data as Conversation)
       }
     }
@@ -515,24 +571,27 @@ export const useSuggestion = () => {
 
   const getFilePaths = useCallback(() => filePaths, [filePaths])
 
-  const items = useCallback(({ query }: { query: string }) => {
-    const filePaths = getFilePaths()
-    const fileItems: FileItem[] = filePaths.map((path) => ({
-      name: path.split('/').pop() || '',
-      path: path
-    }))
-    const defaultItems: FileItem[] = [
-      { name: 'workspace', path: 'workspace' },
-      { name: 'problems', path: 'problems' }
-    ]
-    return Promise.resolve(
-      [...defaultItems, ...fileItems]
-        .filter((item) =>
-          item.name.toLowerCase().startsWith(query.toLowerCase())
-        )
-        .slice(0, 10)
-    )
-  }, [getFilePaths])
+  const items = useCallback(
+    ({ query }: { query: string }) => {
+      const filePaths = getFilePaths()
+      const fileItems: FileItem[] = filePaths.map((path) => ({
+        name: path.split('/').pop() || '',
+        path: path
+      }))
+      const defaultItems: FileItem[] = [
+        { name: 'workspace', path: 'workspace' },
+        { name: 'problems', path: 'problems' }
+      ]
+      return Promise.resolve(
+        [...defaultItems, ...fileItems]
+          .filter((item) =>
+            item.name.toLowerCase().startsWith(query.toLowerCase())
+          )
+          .slice(0, 10)
+      )
+    },
+    [getFilePaths]
+  )
 
   const render = useCallback(() => {
     let reactRenderer: ReactRenderer<
@@ -591,10 +650,13 @@ export const useSuggestion = () => {
     }
   }, [])
 
-  const suggestion = useMemo(() => ({
-    items,
-    render
-  }), [items, render])
+  const suggestion = useMemo(
+    () => ({
+      items,
+      render
+    }),
+    [items, render]
+  )
 
   return {
     suggestion,

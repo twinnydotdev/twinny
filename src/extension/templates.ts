@@ -1,4 +1,3 @@
-
 export const defaultTemplates = [
   {
     name: 'explain',
@@ -102,6 +101,24 @@ Unidiff: \`\`\`{{code}}\`\`\`
   {
     name: 'fim',
     template: '<PRE>{{{prefix}}} <SUF> {{{suffix}}} <MID>'
+  },
+  {
+    name: 'review',
+    template: `
+You are a highly skilled software engineer specializing in code reviews.
+Your task is to review code changes in a unidiff format.
+Ensure your feedback is constructive and professional.
+
+Review the following diff:
+
+\`\`\`
+{{{code}}}
+\`\`\`
+
+Present it in markdown format, and refrain from mentioning:
+- Adding comments or documentation
+- Adding dependencies or related pull requests
+     `.trim()
   },
   {
     name: 'fim-system',
