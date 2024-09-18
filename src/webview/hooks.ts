@@ -479,10 +479,6 @@ export const useConversationHistory = () => {
       if (message?.type === CONVERSATION_EVENT_NAME.getConversations) {
         setConversations(message.value.data)
       }
-      if (message?.type === CONVERSATION_EVENT_NAME.getActiveConversation) {
-        console.log(message.value.data as Conversation)
-        setConversation(message.value.data as Conversation)
-      }
     }
   }
 

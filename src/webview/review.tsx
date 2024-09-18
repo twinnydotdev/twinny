@@ -21,7 +21,6 @@ export const Review = () => {
     startReview(owner, repo, selectedPR, title)
   }
 
-
   const handleRepoChange = (e: Event | FormEvent<HTMLElement>) => {
     const event = e as unknown as React.ChangeEvent<HTMLInputElement>
     const { value } = event.target

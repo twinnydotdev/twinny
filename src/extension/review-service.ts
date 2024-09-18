@@ -9,7 +9,6 @@ import {
   TemplateData
 } from '../common/types'
 import {
-  ACTIVE_CONVERSATION_STORAGE_KEY,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   GITHUB_EVENT_NAME,
@@ -33,13 +32,7 @@ export class GithubService extends ConversationHistory {
     symmetryService: SymmetryService,
     templateDir: string | undefined
   ) {
-    super(
-      context,
-      webView,
-      sessionManager,
-      symmetryService,
-    )
-    this.context = context
+    super(context, webView, sessionManager, symmetryService)
     this._templateProvider = new TemplateProvider(templateDir)
     this.eventListeners()
   }
@@ -154,7 +147,6 @@ export class GithubService extends ConversationHistory {
 
     this.resetConversation()
 
-
     setTimeout(async () => {
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyOnLoading
@@ -219,7 +211,7 @@ export class GithubService extends ConversationHistory {
             this.webView?.postMessage({
               type: EVENT_NAME.twinnyOnEnd,
               value: {
-                completion: this._completion.trimStart(),
+                completion: this._completion.trimStart()
               }
             })
             this._completion = ''
