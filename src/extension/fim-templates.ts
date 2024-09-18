@@ -3,7 +3,8 @@ import {
   STOP_DEEPSEEK,
   STOP_LLAMA,
   STOP_STARCODER,
-  STOP_CODEGEMMA
+  STOP_CODEGEMMA,
+  STOP_CODESTRAL
 } from '../common/constants'
 import { supportedLanguages } from '../common/languages'
 import { FimPromptTemplate } from '../common/types'
@@ -61,6 +62,23 @@ export const getFimPromptTemplateDeepseek = ({
   return `<｜fim▁begin｜>${fileContext}\n${heading}${prefix}<｜fim▁hole｜>${suffix}<｜fim▁end｜>`
 }
 
+export const getFimPromptTemplateCodestral = ({
+  context,
+  header,
+  fileContextEnabled,
+  prefixSuffix,
+  language
+}: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
+  const { fileContext, heading } = getFileContext(
+    fileContextEnabled,
+    context,
+    language,
+    header
+  )
+  return `${fileContext}\n\n[SUFFIX]${suffix}[PREFIX]${heading}${prefix}`
+}
+
 export const getFimPromptTemplateOther = ({
   context,
   header,
@@ -90,6 +108,10 @@ function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
     return getFimPromptTemplateDeepseek(args)
   }
 
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.codestral)) {
+    return getFimPromptTemplateCodestral(args)
+  }
+
   if (
     fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode) ||
     fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder) ||
@@ -109,6 +131,10 @@ function getFimTemplateChosen(format: string, args: FimPromptTemplate) {
 
   if (format === FIM_TEMPLATE_FORMAT.deepseek) {
     return getFimPromptTemplateDeepseek(args)
+  }
+
+  if (format === FIM_TEMPLATE_FORMAT.codestral) {
+    return getFimPromptTemplateCodestral(args)
   }
 
   if (
@@ -157,6 +183,10 @@ export const getStopWordsAuto = (fimModel: string) => {
     return STOP_CODEGEMMA
   }
 
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.codestral)) {
+    return STOP_CODESTRAL
+  }
+
   return STOP_LLAMA
 }
 
@@ -169,6 +199,7 @@ export const getStopWordsChosen = (format: string) => {
   )
     return STOP_STARCODER
   if (format === FIM_TEMPLATE_FORMAT.codegemma) return STOP_CODEGEMMA
+  if (format === FIM_TEMPLATE_FORMAT.codestral) return STOP_CODESTRAL
   return STOP_LLAMA
 }
 
