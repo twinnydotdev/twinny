@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
+import cn from 'classnames'
 import {
   VSCodeButton,
   VSCodePanelView,
@@ -49,9 +49,14 @@ import { EmbeddingOptions } from './embedding-options'
 import ChatLoader from './loader'
 import styles from './styles/index.module.css'
 
+interface ChatProps {
+  fullScreen?: boolean
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
-export const Chat = () => {
+export const Chat = (props: ChatProps): JSX.Element => {
+  const { fullScreen } = props
   const generatingRef = useRef(false)
   const editorRef = useRef<Editor | null>(null)
   const stopRef = useRef(false)
@@ -158,7 +163,7 @@ export const Chat = () => {
   const messageEventHandler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     switch (message.type) {
-      case EVENT_NAME.twinngAddMessage: {
+      case EVENT_NAME.twinnyAddMessage: {
         handleAddTemplateMessage(message)
         break
       }
@@ -398,7 +403,10 @@ export const Chat = () => {
 
   const { suggestion, filePaths } = useSuggestion()
 
-  const memoizedSuggestion = useMemo(() => suggestion, [JSON.stringify(filePaths)])
+  const memoizedSuggestion = useMemo(
+    () => suggestion,
+    [JSON.stringify(filePaths)]
+  )
 
   const editor = useEditor(
     {
@@ -422,7 +430,7 @@ export const Chat = () => {
         }),
         Placeholder.configure({
           placeholder: 'How can twinny help you today?'
-        }),
+        })
       ]
     },
     [memoizedSuggestion]
@@ -445,15 +453,38 @@ export const Chat = () => {
     }
   }, [memoizedSuggestion])
 
+  const handleNewConversation = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyNewConversation
+    })
+  }
+
   return (
     <VSCodePanelView>
       <div className={styles.container}>
+        {!!fullScreen && (
+          <div className={styles.fullScreenActions}>
+            <VSCodeButton
+              onClick={handleNewConversation}
+              appearance="icon"
+              title="New conversation"
+            >
+              <i className="codicon codicon-comment-discussion" />
+            </VSCodeButton>
+          </div>
+        )}
         <h4 className={styles.title}>
           {conversation?.title
             ? conversation?.title
             : generatingRef.current && <span>New conversation</span>}
         </h4>
-        <div className={styles.markdown} ref={markdownRef}>
+        <div
+          className={cn({
+            [styles.markdown]: !fullScreen,
+            [styles.markdownFullScreen]: fullScreen
+          })}
+          ref={markdownRef}
+        >
           {messages?.map((message, index) => (
             <Message
               key={index}

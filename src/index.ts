@@ -32,6 +32,7 @@ import { TemplateProvider } from './extension/template-provider'
 import { ServerMessage } from './common/types'
 import { FileInteractionCache } from './extension/file-interaction'
 import { getLineBreakCount } from './webview/utils'
+import { FullScreenProvider } from './extension/providers/panel'
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
@@ -41,6 +42,11 @@ export async function activate(context: ExtensionContext) {
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
   const sessionManager = new SessionManager()
+  const fullScreenProvider = new FullScreenProvider(
+    context,
+    templateDir,
+    statusBarItem
+  )
 
   const homeDir = os.homedir()
   const dbDir = path.join(homeDir, '.twinny/embeddings')
@@ -261,6 +267,10 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnyStopGeneration
       } as ServerMessage<string>)
+    }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
+      commands.executeCommand('workbench.action.closeSidebar');
+      fullScreenProvider.createOrShowPanel()
     }),
     workspace.onDidCloseTextDocument((document) => {
       const filePath = document.uri.fsPath

@@ -171,6 +171,7 @@ export class BaseProvider {
         [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider,
         [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
         [EVENT_NAME.twinnyFileListRequest]: this.fileListRequest,
+        [EVENT_NAME.twinnyNewConversation]: this.twinnyNewConversation,
         [TWINNY_COMMAND_NAME.settings]: this.openSettings
       }
       eventHandlers[message.type as string]?.(message)
@@ -181,6 +182,14 @@ export class BaseProvider {
     this._symmetryService?.write(
       createSymmetryMessage(SYMMETRY_DATA_MESSAGE.newConversation)
     )
+  }
+
+  private twinnyNewConversation = () => {
+    this.conversationHistory?.resetConversation()
+    this.newConversation()
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnyStopGeneration
+    } as ServerMessage<string>)
   }
 
   public destroyStream = () => {

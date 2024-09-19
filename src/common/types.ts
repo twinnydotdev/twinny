@@ -294,3 +294,9 @@ export interface MentionType {
   name: string
   path: string
 }
+
+export interface GitHubPr {
+  number: number
+  title: string
+  html_url: string
+}

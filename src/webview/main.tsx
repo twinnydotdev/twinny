@@ -10,15 +10,22 @@ import { ConversationHistory } from './conversation-history'
 import { Review } from './review'
 
 const tabs: Record<string, JSX.Element> = {
-  [WEBUI_TABS.chat]: <Chat />,
   [WEBUI_TABS.settings]: <Settings />,
   [WEBUI_TABS.providers]: <Providers />,
   [WEBUI_TABS.symmetry]: <Symmetry />,
   [WEBUI_TABS.review]: <Review />
 }
 
-export const Main = () => {
+interface MainProps {
+  fullScreen?: boolean
+}
+
+export const Main = ({ fullScreen }: MainProps) => {
   const [tab, setTab] = useState<string | undefined>(WEBUI_TABS.chat)
+
+  const tabsWithProps = {
+    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />,
+  }
 
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<string | undefined> = event.data
@@ -39,7 +46,9 @@ export const Main = () => {
     return <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
   }
 
-  const element: JSX.Element = tabs[tab]
+  const allTabs = { ...tabs, ...tabsWithProps }
+
+  const element: JSX.Element = allTabs[tab]
 
   return element || null
 }

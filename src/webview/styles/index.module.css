@@ -81,11 +81,12 @@ pre code {
   height: 95vh;
 }
 
-.controlBar {
+.fullScreenActions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
+  margin-top: 20px;
 }
 
 .markdown {
@@ -93,6 +94,14 @@ pre code {
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 20px;
+  font-size: 14px;
+  margin-top: 20px;
+}
+
+.markdownFullScreen {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
   font-size: 14px;
   margin-top: 20px;
 }
@@ -456,4 +465,8 @@ pre code {
 .prTitle {
   flex-grow: 1;
   margin-right: 8px;
+}
+
+.prTitle a {
+  color: var(--vscode-textLink-foreground);
 }

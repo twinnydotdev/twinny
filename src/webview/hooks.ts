@@ -26,6 +26,7 @@ import {
   ClientMessage,
   Conversation,
   FileItem,
+  GitHubPr,
   LanguageType,
   ServerMessage,
   SymmetryConnection,
@@ -223,7 +224,7 @@ export const useTemplates = () => {
 }
 
 export const useGithubPRs = () => {
-  const [prs, setPRs] = useState<Array<{ number: number; title: string }>>([])
+  const [prs, setPRs] = useState<Array<GitHubPr>>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
   useEffect(() => {

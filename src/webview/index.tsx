@@ -6,8 +6,14 @@ import { Main } from './main'
 (globalThis as any).vscode = window.acquireVsCodeApi()
 
 const container = document.querySelector('#root')
+const panelContainer = document.querySelector('#root-panel')
 
 if (container) {
   const root = createRoot(container)
   root.render(<Main />)
+}
+
+if (panelContainer) {
+  const root = createRoot(panelContainer)
+  root.render(<Main fullScreen />)
 }
