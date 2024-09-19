@@ -560,21 +560,23 @@ export class ChatService {
 
   private async loadFileContents(files: FileItem[]): Promise<string> {
     if (!files?.length) return ''
-    let fileContents = '';
+    let fileContents = ''
 
     for (const file of files) {
       try {
-        const content = await fs.readFile(file.path, 'utf-8');
-        fileContents += `File: ${file.name}\n\n${content}\n\n`;
+        const content = await fs.readFile(file.path, 'utf-8')
+        fileContents += `File: ${file.name}\n\n${content}\n\n`
       } catch (error) {
-        console.error(`Error reading file ${file.path}:`, error);
+        console.error(`Error reading file ${file.path}:`, error)
       }
     }
-    return fileContents.trim();
+    return fileContents.trim()
   }
 
-
-  public async streamChatCompletion(messages: Message[], filePaths: FileItem[]) {
+  public async streamChatCompletion(
+    messages: Message[],
+    filePaths: FileItem[]
+  ) {
     this._completion = ''
     this.sendEditorLanguage()
     const editor = window.activeTextEditor
@@ -604,27 +606,37 @@ export class ChatService {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
     }
 
-    const fileContents = await this.loadFileContents(filePaths);
+    const fileContents = await this.loadFileContents(filePaths)
     if (fileContents) {
-      additionalContext += `File Contents:\n${fileContents}\n\n`;
+      additionalContext += `File Contents:\n${fileContents}\n\n`
     }
 
-    const updatedMessages = [systemMessage, ...messages.slice(0, -1)]
+    const provider = this.getProvider()
+
+    if (!provider) return
+
+    const conversation = []
+
+    conversation.push(...messages.slice(0, -1))
+
+    if (!provider.modelName.includes('claude')) {
+      conversation.unshift(systemMessage)
+    }
 
     if (additionalContext) {
       const lastMessageContent = `${cleanedText}\n\n${additionalContext.trim()}`
-      updatedMessages.push({
+      conversation.push({
         role: USER,
         content: lastMessageContent
       })
     } else {
-      updatedMessages.push({
+      conversation.push({
         ...lastMessage,
         content: cleanedText
       })
     }
     updateLoadingMessage(this._webView, 'Thinking')
-    const request = this.buildStreamRequest(updatedMessages)
+    const request = this.buildStreamRequest(conversation)
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions })
@@ -678,13 +690,20 @@ export class ChatService {
       ? `${prompt}\n\nAdditional Context:\n${ragContext}`
       : prompt
 
-    const conversation: Message[] = [
-      systemMessage,
-      {
-        role: USER,
-        content: userContent
-      }
-    ]
+    const provider = this.getProvider()
+
+    if (!provider) return []
+
+    const conversation = []
+
+    conversation.push({
+      role: USER,
+      content: userContent
+    })
+
+    if (!provider.modelName.includes('claude')) {
+      conversation.push(systemMessage)
+    }
 
     return conversation
   }

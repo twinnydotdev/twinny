@@ -21,7 +21,9 @@ import {
   EXTENSION_SESSION_NAME,
   SYMMETRY_EMITTER_KEY,
   SYMMETRY_DATA_MESSAGE,
-  TITLE_GENERATION_PROMPT_MESAGE
+  TITLE_GENERATION_PROMPT_MESAGE,
+  USER,
+  ASSISTANT
 } from '../common/constants'
 import { SessionManager } from './session-manager'
 import { SymmetryService } from './symmetry-service'
@@ -157,6 +159,13 @@ export class ConversationHistory {
 
     const requestOptions = this.getRequestOptions(provider)
 
+    if (messages.length === 1 && messages[0].role === ASSISTANT) {
+      messages.unshift({
+        role: USER,
+        content: 'Request to review code.'
+      })
+    }
+
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
       numPredictChat: this.config.numPredictChat,
@@ -164,7 +173,7 @@ export class ConversationHistory {
       messages: [
         ...messages,
         {
-          role: 'user',
+          role: USER,
           content: TITLE_GENERATION_PROMPT_MESAGE
         }
       ],
@@ -236,7 +245,7 @@ export class ConversationHistory {
       conversation
     )
     this.webView?.postMessage({
-      type: CONVERSATION_EVENT_NAME.getActiveConversation,
+      type: CONVERSATION_EVENT_NAME.setActiveConversation,
       value: {
         data: conversation
       }
@@ -287,7 +296,7 @@ export class ConversationHistory {
           messages: [
             ...conversation.messages,
             {
-              role: 'user',
+              role: USER,
               content: TITLE_GENERATION_PROMPT_MESAGE
             }
           ],

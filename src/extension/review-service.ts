@@ -12,6 +12,7 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   GITHUB_EVENT_NAME,
+  USER,
   WEBUI_TABS
 } from '../common/constants'
 import { StreamResponse } from 'symmetry-core'
@@ -134,7 +135,7 @@ export class GithubService extends ConversationHistory {
 
     const messages = [
       {
-        role: 'user',
+        role: USER,
         content: prompt
       }
     ]
@@ -181,11 +182,6 @@ export class GithubService extends ConversationHistory {
         return streamResponse({
           body: requestBody,
           options: requestOptions,
-          onStart: (controller: AbortController) => {
-            this.webView?.onDidReceiveMessage(() => {
-              controller?.abort()
-            })
-          },
           onData: (streamResponse) => {
             const provider = this.getProvider()
             if (!provider) return
