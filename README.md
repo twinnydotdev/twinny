@@ -19,7 +19,8 @@ Get AI-based suggestions in real time. Let Twinny autocomplete your code as you 
 
 ### Chat with AI About Your Code
 Discuss your code via the sidebar: get function explanations, generate tests, request refactoring, and more.
-<img src="https://github.com/rjmacarthy/twinny/assets/5537428/a5c5bb34-60f6-41f6-8226-c62cf4c17c1d" width="760"/>
+<img src="https://github.com/user-attachments/assets/464c2762-1da7-4ff7-a3fd-c8703566924d" width="800"/>
+
 
 ### Additional Features
 - Operates online or offline
@@ -34,6 +35,8 @@ Discuss your code via the sidebar: get function explanations, generate tests, re
 - Compatible with Ollama, llama.cpp, oobabooga, and LM Studio APIs
 - Accepts code solutions directly in the editor
 - Creates new documents from code blocks
+- View side by side diff of code blocks
+- Open chat in full screen mode
 - Copies generated code solution blocks
 - Workspace embeddings for context-aware AI assistance
 - Connect to the Symmetry network for P2P AI inference
