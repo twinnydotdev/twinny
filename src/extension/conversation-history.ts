@@ -155,7 +155,7 @@ export class ConversationHistory {
 
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
-      numPredictChat: 100,
+      numPredictChat: this.config.numPredictChat,
       temperature: this.temperature,
       messages: [
         ...messages,
