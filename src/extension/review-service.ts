@@ -149,6 +149,14 @@ export class GithubService extends ConversationHistory {
     this.resetConversation()
 
     setTimeout(async () => {
+
+      this.webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        value: {
+          completion: prompt
+        }
+      })
+
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyOnLoading
       })

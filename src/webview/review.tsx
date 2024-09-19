@@ -75,7 +75,9 @@ export const Review = () => {
             {prs.map((pr) => (
               <li key={pr.number} className={styles.prItem}>
                 <span className={styles.prTitle}>
-                  {pr.title} (#{pr.number})
+                  <a href={pr.html_url}>
+                    {pr.title} (#{pr.number})
+                  </a>
                 </span>
                 <VSCodeButton
                   onClick={() => handleStartReview(pr.number, pr.title)}

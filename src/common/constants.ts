@@ -34,8 +34,8 @@ export const defaultChunkOptions = {
 }
 
 export const EVENT_NAME = {
-  twinngAddMessage: 'twinny-add-message',
   twinnyAcceptSolution: 'twinny-accept-solution',
+  twinnyAddMessage: 'twinny-add-message',
   twinnyChat: 'twinny-chat',
   twinnyChatMessage: 'twinny-chat-message',
   twinnyClickSuggestion: 'twinny-click-suggestion',
@@ -50,10 +50,13 @@ export const EVENT_NAME = {
   twinnyFileListResponse: 'twinny-file-list-response',
   twinnyGetConfigValue: 'twinny-get-config-value',
   twinnyGetGitChanges: 'twinny-get-git-changes',
+  twinnyGetWorkspaceContext: 'twinny-workspace-context',
+  twinnyGithhubReview: 'twinny-githhub-review',
   twinnyGlobalContext: 'twinny-global-context',
   twinnyHideBackButton: 'twinny-hide-back-button',
   twinnyListTemplates: 'twinny-list-templates',
   twinnyManageTemplates: 'twinny-manage-templates',
+  twinnyNewConversation: 'twinny-new-conversation',
   twinnyNewDocument: 'twinny-new-document',
   twinnyNotification: 'twinny-notification',
   twinnyOnCompletion: 'twinny-on-completion',
@@ -62,24 +65,22 @@ export const EVENT_NAME = {
   twinnyOpenDiff: 'twinny-open-diff',
   twinnyRerankThresholdChanged: 'twinny-rerank-threshold-changed',
   twinnySendLanguage: 'twinny-send-language',
-  twinnySymmetryModeles: 'twinny-symmetry-models',
   twinnySendLoader: 'twinny-send-loader',
   twinnySendSymmetryMessage: 'twinny-send-symmetry-message',
   twinnySendSystemMessage: 'twinny-send-system-message',
   twinnySendTheme: 'twinny-send-theme',
   twinnySessionContext: 'twinny-session-context',
-  twinnyStartSymmetryProvider: 'twinny-start-symmetry-provider',
-  twinnyStopSymmetryProvider: 'twinny-stop-symmetry-provider',
   twinnySetConfigValue: 'twinny-set-config-value',
   twinnySetGlobalContext: 'twinny-set-global-context',
   twinnySetOllamaModel: 'twinny-set-ollama-model',
   twinnySetSessionContext: 'twinny-set-session-context',
   twinnySetTab: 'twinny-set-tab',
   twinnySetWorkspaceContext: 'twinny-set-workspace-context',
+  twinnyStartSymmetryProvider: 'twinny-start-symmetry-provider',
   twinnyStopGeneration: 'twinny-stop-generation',
+  twinnyStopSymmetryProvider: 'twinny-stop-symmetry-provider',
+  twinnySymmetryModeles: 'twinny-symmetry-models',
   twinnyTextSelection: 'twinny-text-selection',
-  twinnyGetWorkspaceContext: 'twinny-workspace-context',
-  twinnyGithhubReview: 'twinny-githhub-review'
 }
 
 export const TWINNY_COMMAND_NAME = {

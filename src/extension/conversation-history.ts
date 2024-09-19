@@ -23,7 +23,6 @@ import {
   SYMMETRY_DATA_MESSAGE,
   TITLE_GENERATION_PROMPT_MESAGE,
   USER,
-  ASSISTANT
 } from '../common/constants'
 import { SessionManager } from './session-manager'
 import { SymmetryService } from './symmetry-service'
@@ -158,13 +157,6 @@ export class ConversationHistory {
     if (!provider || !messages?.length) return
 
     const requestOptions = this.getRequestOptions(provider)
-
-    if (messages.length === 1 && messages[0].role === ASSISTANT) {
-      messages.unshift({
-        role: USER,
-        content: 'Request to review code.'
-      })
-    }
 
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,

@@ -118,18 +118,27 @@
           "group": "navigation@6"
         },
         {
-          "command": "twinny.newConversation",
+          "command": "twinny.openPanelChat",
           "when": "view == twinny.sidebar",
           "group": "navigation@7"
         },
         {
-          "command": "twinny.settings",
+          "command": "twinny.newConversation",
           "when": "view == twinny.sidebar",
           "group": "navigation@8"
+        },
+        {
+          "command": "twinny.settings",
+          "when": "view == twinny.sidebar",
+          "group": "navigation@9"
         }
       ]
     },
     "commands": [
+      {
+        "command": "twinny.openPanelChat",
+        "title": "Twinny - Open full screen panel"
+      },
       {
         "command": "twinny.explain",
         "title": "Twinny - Explain"
@@ -200,6 +209,12 @@
         "shortTitle": "twinny conversation history",
         "title": "Open twinny conversation history",
         "icon": "$(history)"
+      },
+      {
+        "command": "twinny.openPanelChat",
+        "shortTitle": "Open twinny panel chat",
+        "title": "Open twinny panel chat",
+        "icon": "$(screen-full)"
       },
       {
         "command": "twinny.newConversation",

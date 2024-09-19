@@ -665,7 +665,7 @@ export class ChatService {
         type: EVENT_NAME.twinnyOnLoading
       })
       this._webView?.postMessage({
-        type: EVENT_NAME.twinngAddMessage,
+        type: EVENT_NAME.twinnyAddMessage,
         value: {
           completion: kebabToSentence(template) + '\n\n' + '```\n' + selection,
           data: getLanguage()
