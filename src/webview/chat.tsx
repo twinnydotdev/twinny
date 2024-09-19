@@ -308,6 +308,11 @@ export const Chat = () => {
         }
 
         global.vscode.postMessage(clientMessage)
+
+        saveLastConversation({
+          ...conversation,
+          messages: updatedMessages
+        })
         return updatedMessages
       })
 
