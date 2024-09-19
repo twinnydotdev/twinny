@@ -136,12 +136,8 @@ export class ConversationHistory {
     )
   }
 
-  public buildStreamRequest(messages?: Message[]) {
-    const provider = this.getProvider()
-
-    if (!provider || !messages?.length) return
-
-    const requestOptions: StreamRequestOptions = {
+  private getRequestOptions(provider: TwinnyProvider) {
+    return {
       hostname: provider.apiHostname,
       port: Number(provider.apiPort),
       path: provider.apiPath,
@@ -152,6 +148,14 @@ export class ConversationHistory {
         Authorization: `Bearer ${provider.apiKey}`
       }
     }
+  }
+
+  public buildStreamRequestTitle(messages?: Message[]) {
+    const provider = this.getProvider()
+
+    if (!provider || !messages?.length) return
+
+    const requestOptions = this.getRequestOptions(provider)
 
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
@@ -170,8 +174,26 @@ export class ConversationHistory {
     return { requestOptions, requestBody }
   }
 
+  public buildStreamRequest(messages?: Message[]) {
+    const provider = this.getProvider()
+
+    if (!provider || !messages?.length) return
+
+    const requestOptions = this.getRequestOptions(provider)
+
+    const requestBody = createStreamRequestBody(provider.provider, {
+      model: provider.modelName,
+      numPredictChat: this.config.numPredictChat,
+      temperature: this.temperature,
+      messages,
+      keepAlive: this.keepAlive
+    })
+
+    return { requestOptions, requestBody }
+  }
+
   async getConversationTitle(messages: Message[]): Promise<string> {
-    const request = this.buildStreamRequest(messages)
+    const request = this.buildStreamRequestTitle(messages)
     if (!request) return ''
     return await this.streamConversationTitle(request)
   }
@@ -223,8 +245,9 @@ export class ConversationHistory {
   }
 
   getActiveConversation() {
-    const conversation: Conversation | undefined =
-      this.context.globalState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
+    const conversation: Conversation | undefined = this.context.globalState.get(
+      ACTIVE_CONVERSATION_STORAGE_KEY
+    )
     this.setActiveConversation(conversation)
     return conversation
   }
