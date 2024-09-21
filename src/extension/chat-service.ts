@@ -702,7 +702,7 @@ export class ChatService {
     })
 
     if (!provider.modelName.includes('claude')) {
-      conversation.push(systemMessage)
+      conversation.unshift(systemMessage)
     }
 
     return conversation
