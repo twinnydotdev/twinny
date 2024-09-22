@@ -280,25 +280,8 @@ export class ConversationHistory {
     if (!conversation.messages.length || conversation.messages.length > 2)
       return
 
-    if (
-      this._sessionManager?.get(EXTENSION_SESSION_NAME.twinnySymmetryConnection)
-    ) {
-      this._symmetryService?.write(
-        createSymmetryMessage(SYMMETRY_DATA_MESSAGE.inference, {
-          messages: [
-            ...conversation.messages,
-            {
-              role: USER,
-              content: TITLE_GENERATION_PROMPT_MESAGE
-            }
-          ],
-          key: SYMMETRY_EMITTER_KEY.conversationTitle
-        })
-      )
-    } else {
-      this._title = await this.getConversationTitle(conversation.messages)
-      this.saveConversationEnd(conversation)
-    }
+    this._title = await this.getConversationTitle(conversation.messages)
+    this.saveConversationEnd(conversation)
   }
 
   private saveConversationEnd(conversation: Conversation) {

@@ -314,6 +314,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
         global.vscode.postMessage(clientMessage)
 
+        saveLastConversation({
+          ...conversation,
+          messages: updatedMessages
+        })
         return updatedMessages
       })
 
