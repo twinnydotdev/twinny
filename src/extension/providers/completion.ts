@@ -98,6 +98,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _templateProvider: TemplateProvider
   private _fileContextEnabled = this._config.get('fileContextEnabled') as boolean
   private _usingFimTemplate = false
+  private _provider: TwinnyProvider | undefined
 
   constructor(
     statusBar: StatusBarItem,
@@ -122,7 +123,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
-
+    this._provider = this.getProvider()
     const isLastCompletionAccepted =
       this._acceptedLastCompletion && !this.enableSubsequentCompletions
 
@@ -248,11 +249,15 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private onData(data: StreamResponse | undefined): string {
-    const provider = this.getProvider()
-    if (!provider) return ''
+    if (!this._provider) return ''
+
+    const stopWords = getStopWords(
+      this._provider.modelName,
+      this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
+    )
 
     try {
-      const providerFimData = getProviderFimData(provider.provider, data)
+      const providerFimData = getProviderFimData(this._provider.provider, data)
       if (providerFimData === undefined) return ''
 
       this._completion = this._completion + providerFimData
@@ -266,6 +271,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._logger.log(
           `Streaming response end as llm in empty completion loop:  ${this._nonce}`
         )
+      }
+
+      if (stopWords.some(stopWord => this._completion.includes(stopWord))) {
+        return this._completion
       }
 
       if (
@@ -430,12 +439,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private removeStopWords(completion: string) {
-    const provider = this.getProvider()
-    if (!provider) return completion
+    if (!this._provider) return completion
     let filteredCompletion = completion
     const stopWords = getStopWords(
-      provider.modelName,
-      provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
+      this._provider.modelName,
+      this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
     )
     stopWords.forEach((stopWord) => {
       filteredCompletion = filteredCompletion.split(stopWord).join('')
@@ -444,14 +452,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private async getPrompt(prefixSuffix: PrefixSuffix) {
-    const provider = this.getProvider()
-    if (!provider) return ''
-    if (!this._document || !this._position || !provider) return ''
+    if (!this._provider) return ''
+    if (!this._document || !this._position || !this._provider) return ''
 
     const documentLanguage = this._document.languageId
     const fileInteractionContext = await this.getFileInteractionContext()
 
-    if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
+    if (this._provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
       const systemMessage =
         await this._templateProvider.readSystemMessageTemplate('fim-system.hbs')
 
@@ -472,8 +479,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     }
 
     return getFimPrompt(
-      provider.modelName,
-      provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic,
+      this._provider.modelName,
+      this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic,
       {
         context: fileInteractionContext || '',
         prefixSuffix,

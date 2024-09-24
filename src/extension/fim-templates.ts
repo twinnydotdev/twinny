@@ -4,7 +4,8 @@ import {
   STOP_LLAMA,
   STOP_STARCODER,
   STOP_CODEGEMMA,
-  STOP_CODESTRAL
+  STOP_CODESTRAL,
+  STOP_QWEN
 } from '../common/constants'
 import { supportedLanguages } from '../common/languages'
 import { FimPromptTemplate } from '../common/types'
@@ -79,6 +80,13 @@ export const getFimPromptTemplateCodestral = ({
   return `${fileContext}\n\n[SUFFIX]${suffix}[PREFIX]${heading}${prefix}`
 }
 
+export const getFimPromptTemplateQwen = ({
+  prefixSuffix,
+}: FimPromptTemplate) => {
+  const { prefix, suffix } = prefixSuffix
+  return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+}
+
 export const getFimPromptTemplateOther = ({
   context,
   header,
@@ -112,10 +120,13 @@ function getFimTemplateAuto(fimModel: string, args: FimPromptTemplate) {
     return getFimPromptTemplateCodestral(args)
   }
 
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.codeqwen)) {
+    return getFimPromptTemplateQwen(args)
+  }
+
   if (
     fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode) ||
     fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder) ||
-    fimModel.includes(FIM_TEMPLATE_FORMAT.codeqwen) ||
     fimModel.includes(FIM_TEMPLATE_FORMAT.codegemma)
   ) {
     return getFimPromptTemplateOther(args)
@@ -137,11 +148,14 @@ function getFimTemplateChosen(format: string, args: FimPromptTemplate) {
     return getFimPromptTemplateCodestral(args)
   }
 
+  if (format === FIM_TEMPLATE_FORMAT.codeqwen) {
+    return getFimPromptTemplateQwen(args)
+  }
+
   if (
     format === FIM_TEMPLATE_FORMAT.stableCode ||
     format === FIM_TEMPLATE_FORMAT.starcoder ||
-    format === FIM_TEMPLATE_FORMAT.codegemma ||
-    format === FIM_TEMPLATE_FORMAT.codeqwen
+    format === FIM_TEMPLATE_FORMAT.codegemma
   ) {
     return getFimPromptTemplateOther(args)
   }
@@ -174,7 +188,8 @@ export const getStopWordsAuto = (fimModel: string) => {
 
   if (
     fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode) ||
-    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder)
+    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder) ||
+    fimModel.includes(FIM_TEMPLATE_FORMAT.codeqwen)
   ) {
     return ['<|endoftext|>']
   }
@@ -193,6 +208,7 @@ export const getStopWordsAuto = (fimModel: string) => {
 export const getStopWordsChosen = (format: string) => {
   if (format === FIM_TEMPLATE_FORMAT.codellama) return STOP_LLAMA
   if (format === FIM_TEMPLATE_FORMAT.deepseek) return STOP_DEEPSEEK
+  if (format === FIM_TEMPLATE_FORMAT.codeqwen) return STOP_QWEN
   if (
     format === FIM_TEMPLATE_FORMAT.stableCode ||
     format === FIM_TEMPLATE_FORMAT.starcoder

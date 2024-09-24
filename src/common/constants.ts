@@ -226,6 +226,8 @@ export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
 
 export const STOP_CODESTRAL = ['[PREFIX]', '[SUFFIX]']
 
+export const STOP_QWEN = ['<|endoftext|>']
+
 export const DEFAULT_TEMPLATE_NAMES = defaultTemplates.map(({ name }) => name)
 
 export const DEFAULT_ACTION_TEMPLATES = [
