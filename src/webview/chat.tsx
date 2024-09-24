@@ -147,7 +147,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
       generatingRef.current = false
       return
     }
-    generatingRef.current = true
     setCompletion({
       role: ASSISTANT,
       content: getCompletionContent(message)
@@ -195,7 +194,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const handleStopGeneration = () => {
     stopRef.current = true
-    generatingRef.current = false
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyStopGeneration
     } as ClientMessage)
@@ -295,38 +293,41 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const handleSubmitForm = () => {
     const input = editorRef.current?.getText().trim()
-    if (input && editorRef.current) {
-      const mentions = getMentions()
 
-      setIsLoading(true)
-      clearEditor()
-      setMessages((prevMessages) => {
-        const updatedMessages = [
-          ...(prevMessages || []),
-          { role: USER, content: replaceMentionsInText(input, mentions) }
-        ]
+    if (!input || generatingRef.current) return
 
-        const clientMessage: ClientMessage<MessageType[], MentionType[]> = {
-          type: EVENT_NAME.twinnyChatMessage,
-          data: updatedMessages,
-          meta: mentions
-        }
+    generatingRef.current = true
 
-        global.vscode.postMessage(clientMessage)
+    const mentions = getMentions()
 
-        saveLastConversation({
-          ...conversation,
-          messages: updatedMessages
-        })
-        return updatedMessages
+    setIsLoading(true)
+    clearEditor()
+    setMessages((prevMessages) => {
+      const updatedMessages = [
+        ...(prevMessages || []),
+        { role: USER, content: replaceMentionsInText(input, mentions) }
+      ]
+
+      const clientMessage: ClientMessage<MessageType[], MentionType[]> = {
+        type: EVENT_NAME.twinnyChatMessage,
+        data: updatedMessages,
+        meta: mentions
+      }
+
+      global.vscode.postMessage(clientMessage)
+
+      saveLastConversation({
+        ...conversation,
+        messages: updatedMessages
       })
+      return updatedMessages
+    })
 
-      setTimeout(() => {
-        if (markdownRef.current) {
-          markdownRef.current.scrollTop = markdownRef.current.scrollHeight
-        }
-      }, 200)
-    }
+    setTimeout(() => {
+      if (markdownRef.current) {
+        markdownRef.current.scrollTop = markdownRef.current.scrollHeight
+      }
+    }, 200)
   }
 
   const clearEditor = useCallback(() => {
