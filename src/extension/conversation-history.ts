@@ -12,15 +12,13 @@ import { v4 as uuidv4 } from 'uuid'
 import { createStreamRequestBody } from './provider-options'
 import { TwinnyProvider } from './provider-manager'
 import { streamResponse } from './stream'
-import { createSymmetryMessage, getChatDataFromProvider } from './utils'
+import { getChatDataFromProvider } from './utils'
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_CONVERSATION_STORAGE_KEY,
   CONVERSATION_EVENT_NAME,
   CONVERSATION_STORAGE_KEY,
   EXTENSION_SESSION_NAME,
-  SYMMETRY_EMITTER_KEY,
-  SYMMETRY_DATA_MESSAGE,
   TITLE_GENERATION_PROMPT_MESAGE,
   USER,
 } from '../common/constants'
@@ -56,22 +54,6 @@ export class ConversationHistory {
     this.webView?.onDidReceiveMessage(
       (message: ClientMessage<Conversation>) => {
         this.handleMessage(message)
-      }
-    )
-
-    this._symmetryService.on(
-      SYMMETRY_EMITTER_KEY.conversationTitle,
-      (completion: string) => {
-        const activeConversation = this.getActiveConversation()
-        this.webView?.postMessage({
-          type: CONVERSATION_EVENT_NAME.getActiveConversation,
-          value: {
-            data: {
-              ...activeConversation,
-              title: completion
-            }
-          }
-        } as ServerMessage<Conversation>)
       }
     )
   }
@@ -194,6 +176,12 @@ export class ConversationHistory {
   }
 
   async getConversationTitle(messages: Message[]): Promise<string> {
+    const symmetryConnected = this._sessionManager?.get(
+      EXTENSION_SESSION_NAME.twinnySymmetryConnection
+    )
+    if (symmetryConnected) {
+      return Promise.resolve(`${messages[0].content?.substring(0, 50)}...`)
+    }
     const request = this.buildStreamRequestTitle(messages)
     if (!request) return ''
     return await this.streamConversationTitle(request)

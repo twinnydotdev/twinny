@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { serverMessageKeys } from 'symmetry-core'
 
 import {
   createSymmetryMessage,
@@ -13,7 +14,6 @@ import {
   EXTENSION_SESSION_NAME,
   EVENT_NAME,
   TWINNY_COMMAND_NAME,
-  SYMMETRY_DATA_MESSAGE,
   SYMMETRY_EMITTER_KEY,
   SYSTEM
 } from '../../common/constants'
@@ -24,7 +24,6 @@ import {
   ApiModel,
   ServerMessage,
   InferenceRequest,
-  SymmetryModelProvider,
   FileItem
 } from '../../common/types'
 import { TemplateProvider } from '../template-provider'
@@ -147,8 +146,6 @@ export class BaseProvider {
         [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
         [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
         [EVENT_NAME.twinnyClickSuggestion]: this.clickSuggestion,
-        [EVENT_NAME.twinnyConnectSymmetry]: this.connectToSymmetry,
-        [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnectSymmetry,
         [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
         [EVENT_NAME.twinnyFetchOllamaModels]: this.fetchOllamaModels,
         [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
@@ -167,8 +164,6 @@ export class BaseProvider {
         [EVENT_NAME.twinnySetGlobalContext]: this.setGlobalContext,
         [EVENT_NAME.twinnySetTab]: this.setTab,
         [EVENT_NAME.twinnySetWorkspaceContext]: this.setWorkspaceContext,
-        [EVENT_NAME.twinnyStartSymmetryProvider]: this.createSymmetryProvider,
-        [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider,
         [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
         [EVENT_NAME.twinnyFileListRequest]: this.fileListRequest,
         [EVENT_NAME.twinnyNewConversation]: this.twinnyNewConversation,
@@ -180,7 +175,7 @@ export class BaseProvider {
 
   public newConversation() {
     this._symmetryService?.write(
-      createSymmetryMessage(SYMMETRY_DATA_MESSAGE.newConversation)
+      createSymmetryMessage(serverMessageKeys.newConversation)
     )
   }
 
@@ -315,7 +310,7 @@ export class BaseProvider {
 
       return this._symmetryService?.write(
         createSymmetryMessage<InferenceRequest>(
-          SYMMETRY_DATA_MESSAGE.inference,
+          serverMessageKeys.inference,
           {
             messages,
             key: SYMMETRY_EMITTER_KEY.inference
@@ -343,7 +338,7 @@ export class BaseProvider {
       `)
       return this._symmetryService?.write(
         createSymmetryMessage<InferenceRequest>(
-          SYMMETRY_DATA_MESSAGE.inference,
+          serverMessageKeys.inference,
           {
             messages,
             key: SYMMETRY_EMITTER_KEY.inference
@@ -463,30 +458,6 @@ export class BaseProvider {
       type: `${EVENT_NAME.twinnyGetWorkspaceContext}-${message.key}`,
       value
     })
-  }
-
-  private connectToSymmetry = (data: ClientMessage<SymmetryModelProvider>) => {
-    if (this._config.symmetryServerKey) {
-      this._symmetryService?.connect(
-        this._config.symmetryServerKey,
-        data.data?.model_name,
-        data.data?.provider
-      )
-    }
-  }
-
-  private disconnectSymmetry = async () => {
-    if (this._config.symmetryServerKey) {
-      await this._symmetryService?.disconnect()
-    }
-  }
-
-  private createSymmetryProvider = () => {
-    this._symmetryService?.startSymmetryProvider()
-  }
-
-  private stopSymmetryProvider = () => {
-    this._symmetryService?.stopSymmetryProvider()
   }
 
   private twinnyHideBackButton() {

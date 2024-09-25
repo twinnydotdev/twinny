@@ -1,6 +1,7 @@
 import { InlineCompletionItem, InlineCompletionList } from 'vscode'
 import { CodeLanguageDetails } from './languages'
-import { ALL_BRACKETS, SYMMETRY_DATA_MESSAGE } from './constants'
+import { ALL_BRACKETS } from './constants'
+import { serverMessageKeys } from 'symmetry-core'
 
 export interface RequestBodyBase {
   stream: boolean
@@ -33,7 +34,7 @@ export interface StreamResponse {
   response: string
   content: string
   message: {
-    content: string
+    role: 'assistant'
   }
   done: boolean
   context: number[]
@@ -240,7 +241,7 @@ export interface SymmetryMessage<T> {
   data: T
 }
 
-export type ServerMessageKey = keyof typeof SYMMETRY_DATA_MESSAGE
+export type ServerMessageKey = keyof typeof serverMessageKeys
 
 export interface SymmetryConnection {
   sessionToken?: string

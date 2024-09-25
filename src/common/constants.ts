@@ -236,6 +236,7 @@ export const STOP_QWEN = [
   '<|im_start|>',
   '<|repo_name|>',
   '<|fim_pad|>',
+  '<|cursor|>',
 ]
 
 export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
@@ -482,24 +483,6 @@ export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 
 export const MULTI_LINE_DELIMITERS = ['\n\n', '\r\n\r\n']
 
-export const SYMMETRY_DATA_MESSAGE = {
-  disconnect: 'disconnect',
-  heartbeat: 'heartbeat',
-  inference: 'inference',
-  inferenceEnd: 'inferenceEnd',
-  join: 'join',
-  leave: 'leave',
-  newConversation: 'newConversation',
-  ping: 'ping',
-  pong: 'pong',
-  providerDetails: 'providerDetails',
-  reportCompletion: 'reportCompletion',
-  requestProvider: 'requestProvider',
-  sessionValid: 'sessionValid',
-  verifySession: 'verifySession'
-} as const
-
 export const SYMMETRY_EMITTER_KEY = {
-  conversationTitle: 'conversationTitle',
   inference: 'inference'
 }

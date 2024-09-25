@@ -16,7 +16,6 @@ import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   USER,
-  SYMMETRY_EMITTER_KEY,
   EXTENSION_CONTEXT_NAME
 } from '../common/constants'
 
@@ -104,10 +103,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
             content: getCompletionContent(message)
           }
         ]
-
-        if (message.value.type === SYMMETRY_EMITTER_KEY.conversationTitle) {
-          return messages
-        }
 
         saveLastConversation({
           ...conversation,
@@ -553,7 +548,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
           <div>
-            {generatingRef.current && (
+            {generatingRef.current && !symmetryConnection && (
               <VSCodeButton
                 type="button"
                 appearance="icon"

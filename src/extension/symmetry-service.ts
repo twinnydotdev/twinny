@@ -2,7 +2,7 @@
 import { workspace, commands, ExtensionContext, Webview } from 'vscode'
 import Hyperswarm from 'hyperswarm'
 import crypto from 'hypercore-crypto'
-import { SymmetryProvider } from 'symmetry-core'
+import { serverMessageKeys, SymmetryProvider } from 'symmetry-core'
 import path from 'path'
 import os from 'os'
 import fs from 'fs'
@@ -21,14 +21,15 @@ import {
   ServerMessage,
   Peer,
   SymmetryMessage,
-  SymmetryConnection
+  SymmetryConnection,
+  ClientMessage,
+  SymmetryModelProvider
 } from '../common/types'
 import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_SESSION_NAME,
   SYMMETRY_EMITTER_KEY,
-  SYMMETRY_DATA_MESSAGE,
   WEBUI_TABS,
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   GLOBAL_STORAGE_KEY
@@ -79,15 +80,26 @@ export class SymmetryService extends EventEmitter {
 
     this._ws = new SymmetryWs(this._webView)
     this._ws.connectSymmetryWs()
+    this.setupEventListeners()
   }
 
-  public connect = async (
-    key: string,
-    model: string | undefined,
-    provider: string | undefined
-  ) => {
-    if (!model || !key) return
-    this._symmetryProvider = provider
+  private setupEventListeners() {
+    this._webView?.onDidReceiveMessage((message) => {
+      const eventHandlers = {
+        [EVENT_NAME.twinnyConnectSymmetry]: this.connect,
+        [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnect,
+        [EVENT_NAME.twinnyStartSymmetryProvider]: this.startSymmetryProvider,
+        [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider,
+      }
+      eventHandlers[message.type as string]?.(message)
+    })
+  }
+
+  public connect = async (data: ClientMessage<SymmetryModelProvider>) => {
+    const key = this._config.symmetryServerKey
+    const model = data.data?.model_name
+    if (!data.data?.model_name || !key) return
+    this._symmetryProvider = data.data.provider
     this._serverSwarm = new Hyperswarm()
     const serverKey = Buffer.from(key)
     const discoveryKey = crypto.discoveryKey(serverKey)
@@ -97,7 +109,7 @@ export class SymmetryService extends EventEmitter {
     this._serverSwarm.on('connection', (peer: Peer) => {
       this._serverPeer = peer
       peer.write(
-        createSymmetryMessage(SYMMETRY_DATA_MESSAGE.requestProvider, {
+        createSymmetryMessage(serverMessageKeys.requestProvider, {
           modelName: model
         })
       )
@@ -107,20 +119,20 @@ export class SymmetryService extends EventEmitter {
         )
         if (data && data.key) {
           switch (data?.key) {
-            case SYMMETRY_DATA_MESSAGE.ping:
+            case serverMessageKeys.ping:
               this._providerPeer?.write(
-                createSymmetryMessage(SYMMETRY_DATA_MESSAGE.pong)
+                createSymmetryMessage(serverMessageKeys.pong)
               )
               break
-            case SYMMETRY_DATA_MESSAGE.providerDetails:
+            case serverMessageKeys.providerDetails:
               peer.write(
                 createSymmetryMessage(
-                  SYMMETRY_DATA_MESSAGE.verifySession,
+                  serverMessageKeys.verifySession,
                   data.data?.sessionToken
                 )
               )
               break
-            case SYMMETRY_DATA_MESSAGE.sessionValid:
+            case serverMessageKeys.sessionValid:
               this.connectToProvider(data.data)
           }
         }
@@ -187,7 +199,7 @@ export class SymmetryService extends EventEmitter {
 
       if (!this._emitterKey) return
 
-      if (str.includes(SYMMETRY_DATA_MESSAGE.inferenceEnd))
+      if (str.includes(serverMessageKeys.inferenceEnded))
         this.handleInferenceEnd()
 
       this.handleIncomingData(chunk, (response: StreamResponse) => {
