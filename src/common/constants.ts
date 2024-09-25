@@ -220,7 +220,7 @@ export const STOP_DEEPSEEK = [
   '<｜end▁of▁sentence｜>'
 ]
 
-export const STOP_STARCODER_QWEN = ['<|endoftext|>', '<file_sep>', '<fim_prefix>']
+export const STOP_STARCODER_QWEN = ['<file_sep>', '<fim_prefix>', '<|file_sep|>', '<|fim_prefix|>', '<|endoftext|>']
 
 export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
 
