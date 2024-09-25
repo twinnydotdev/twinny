@@ -1,10 +1,11 @@
 import {
   FIM_TEMPLATE_FORMAT,
-  STOP_DEEPSEEK,
-  STOP_LLAMA,
-  STOP_STARCODER_QWEN,
   STOP_CODEGEMMA,
   STOP_CODESTRAL,
+  STOP_DEEPSEEK,
+  STOP_LLAMA,
+  STOP_QWEN,
+  STOP_STARCODER,
 } from '../common/constants'
 import { supportedLanguages } from '../common/languages'
 import { FimPromptTemplate } from '../common/types'
@@ -80,7 +81,7 @@ export const getFimPromptTemplateCodestral = ({
 }
 
 export const getFimPromptTemplateQwen = ({
-  prefixSuffix,
+  prefixSuffix
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
@@ -187,10 +188,13 @@ export const getStopWordsAuto = (fimModel: string) => {
 
   if (
     fimModel.includes(FIM_TEMPLATE_FORMAT.stableCode) ||
-    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder) ||
-    fimModel.includes(FIM_TEMPLATE_FORMAT.codeqwen)
+    fimModel.includes(FIM_TEMPLATE_FORMAT.starcoder)
   ) {
-    return STOP_STARCODER_QWEN
+    return STOP_STARCODER
+  }
+
+  if (fimModel.includes(FIM_TEMPLATE_FORMAT.codeqwen)) {
+    return STOP_QWEN
   }
 
   if (fimModel.includes(FIM_TEMPLATE_FORMAT.codegemma)) {
@@ -207,14 +211,14 @@ export const getStopWordsAuto = (fimModel: string) => {
 export const getStopWordsChosen = (format: string) => {
   if (format === FIM_TEMPLATE_FORMAT.codellama) return STOP_LLAMA
   if (format === FIM_TEMPLATE_FORMAT.deepseek) return STOP_DEEPSEEK
-  if (format === FIM_TEMPLATE_FORMAT.codeqwen) return STOP_STARCODER_QWEN
+  if (format === FIM_TEMPLATE_FORMAT.codeqwen) return STOP_QWEN
+  if (format === FIM_TEMPLATE_FORMAT.codegemma) return STOP_CODEGEMMA
+  if (format === FIM_TEMPLATE_FORMAT.codestral) return STOP_CODESTRAL
   if (
     format === FIM_TEMPLATE_FORMAT.stableCode ||
     format === FIM_TEMPLATE_FORMAT.starcoder
   )
-    return STOP_STARCODER_QWEN
-  if (format === FIM_TEMPLATE_FORMAT.codegemma) return STOP_CODEGEMMA
-  if (format === FIM_TEMPLATE_FORMAT.codestral) return STOP_CODESTRAL
+    return STOP_STARCODER
   return STOP_LLAMA
 }
 

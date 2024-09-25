@@ -80,7 +80,7 @@ export const EVENT_NAME = {
   twinnyStopGeneration: 'twinny-stop-generation',
   twinnyStopSymmetryProvider: 'twinny-stop-symmetry-provider',
   twinnySymmetryModeles: 'twinny-symmetry-models',
-  twinnyTextSelection: 'twinny-text-selection',
+  twinnyTextSelection: 'twinny-text-selection'
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -156,7 +156,7 @@ export const WORKSPACE_STORAGE_KEY = {
   showEmbeddingOptions: 'showEmbeddingOptions',
   showProviders: 'showProviders',
   reviewOwner: 'reviewOwner',
-  reviewRepo: 'reviewRepo',
+  reviewRepo: 'reviewRepo'
 }
 
 export const EXTENSION_SETTING_KEY = {
@@ -220,7 +220,22 @@ export const STOP_DEEPSEEK = [
   '<｜end▁of▁sentence｜>'
 ]
 
-export const STOP_STARCODER_QWEN = ['<file_sep>', '<fim_prefix>', '<|file_sep|>', '<|fim_prefix|>', '<|endoftext|>']
+export const STOP_STARCODER = [
+  '<|endoftext|>',
+  '<file_sep>',
+  '<file_sep>',
+  '<fim_prefix>',
+  '<repo_name>',
+]
+
+export const STOP_QWEN = [
+  '<|endoftext|>',
+  '<|file_sep|>',
+  '<|fim_prefix|>',
+  '<|im_end|>',
+  '<|im_start|>',
+  '<|repo_name|>',
+]
 
 export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
 
