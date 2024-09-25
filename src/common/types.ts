@@ -34,6 +34,7 @@ export interface StreamResponse {
   response: string
   content: string
   message: {
+    content: string,
     role: 'assistant'
   }
   done: boolean
