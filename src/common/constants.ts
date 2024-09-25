@@ -235,6 +235,7 @@ export const STOP_QWEN = [
   '<|im_end|>',
   '<|im_start|>',
   '<|repo_name|>',
+  '<|fim_pad|>',
 ]
 
 export const STOP_CODEGEMMA = ['<|file_separator|>', '<|end_of_turn|>', '<eos>']
