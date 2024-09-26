@@ -10,7 +10,7 @@ declare module 'hypercore-crypto' {
     verify: (challenge: Buffer, signature: Buffer, publicKey: Buffer) => boolean
   }
 
-  export = hyperCoreCrypto
+  export default hyperCoreCrypto
 }
 
 declare module '*.css'

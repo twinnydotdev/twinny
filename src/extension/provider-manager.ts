@@ -23,6 +23,7 @@ export interface TwinnyProvider {
   type: string
   apiKey?: string
   fimTemplate?: string
+  repositoryLevel?: boolean
 }
 
 type Providers = Record<string, TwinnyProvider> | undefined

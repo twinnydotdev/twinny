@@ -1,4 +1,4 @@
-import { InlineCompletionItem, InlineCompletionList } from 'vscode'
+import { InlineCompletionItem, InlineCompletionList, Uri } from 'vscode'
 import { CodeLanguageDetails } from './languages'
 import { ALL_BRACKETS } from './constants'
 import { serverMessageKeys } from 'symmetry-core'
@@ -26,6 +26,15 @@ export interface StreamBodyOpenAI extends RequestBodyBase {
 export interface PrefixSuffix {
   prefix: string
   suffix: string
+}
+
+
+export interface RepositoryLevelData {
+  uri: Uri;
+  text: string;
+  name: string;
+  isOpen: boolean;
+  relevanceScore: number;
 }
 
 export interface StreamResponse {
@@ -209,6 +218,8 @@ export interface InteractionItem {
   name: string | null | undefined
   sessionLength: number
   visits: number | null | undefined
+  isOpen?: boolean
+  relevanceScore: number | null | undefined
   activeLines: {
     line: number
     character: number

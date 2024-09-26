@@ -27,15 +27,21 @@ import {
 import { cache } from '../cache'
 import { supportedLanguages } from '../../common/languages'
 import {
+  RepositoryLevelData as RepositoryDocment,
   FimTemplateData,
   PrefixSuffix,
   ResolvedInlineCompletion,
   StreamRequestOptions,
   StreamResponse
 } from '../../common/types'
-import { getFimPrompt, getStopWords } from '../fim-templates'
+import {
+  getFimPrompt,
+  getFimTemplateRepositoryLevel,
+  getStopWords
+} from '../fim-templates'
 import {
   ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+  FILE_IGNORE_LIST,
   FIM_TEMPLATE_FORMAT,
   LINE_BREAK_REGEX,
   MAX_CONTEXT_LINE_COUNT,
@@ -96,7 +102,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _statusBar: StatusBarItem
   private _temperature = this._config.get('temperature') as number
   private _templateProvider: TemplateProvider
-  private _fileContextEnabled = this._config.get('fileContextEnabled') as boolean
+  private _fileContextEnabled = this._config.get(
+    'fileContextEnabled'
+  ) as boolean
   private _usingFimTemplate = false
   private _provider: TwinnyProvider | undefined
 
@@ -207,7 +215,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     })
   }
 
-  private async tryParseDocument (document: TextDocument) {
+  private async tryParseDocument(document: TextDocument) {
     try {
       if (!this._position || !this._document) return
       const parser = await getParser(document.uri.fsPath)
@@ -273,7 +281,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         )
       }
 
-      if (stopWords.some(stopWord => this._completion.includes(stopWord))) {
+      if (stopWords.some((stopWord) => this._completion.includes(stopWord))) {
         return this._completion
       }
 
@@ -338,7 +346,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             }
           }
         }
-      } catch (e) { // Currently doesnt catch when parser fucks up
+      } catch (e) {
+        // Currently doesnt catch when parser fucks up
         console.error(e)
         this.abortCompletion()
       }
@@ -388,6 +397,81 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     return `\n${language}\n${path}\n`
   }
 
+  public getIgnoreDirectory(fileName: string): boolean {
+    return FILE_IGNORE_LIST.some((ignoreItem: string) =>
+      fileName.includes(ignoreItem)
+    )
+  }
+
+  private async getRelevantDocuments(): Promise<RepositoryDocment[]> {
+    const interactions = this._fileInteractionCache.getAll()
+    const currentFileName = this._document?.fileName || ''
+    const openTextDocuments = workspace.textDocuments
+
+    const openDocumentsData: RepositoryDocment[] = openTextDocuments
+      .filter((doc) => {
+        const isCurrentFile = doc.fileName === currentFileName
+        const isGitFile =
+          doc.fileName.includes('.git') || doc.fileName.includes('git/')
+        const isIgnored = this.getIgnoreDirectory(doc.fileName)
+        return !isCurrentFile && !isGitFile && !isIgnored
+      })
+      .map((doc) => {
+        const interaction = interactions.find((i) => i.name === doc.fileName)
+        return {
+          uri: doc.uri,
+          text: doc.getText(),
+          name: doc.fileName,
+          isOpen: true,
+          relevanceScore: interaction?.relevanceScore || 0
+        }
+      })
+
+    const otherDocumentsData: RepositoryDocment[] = (
+      await Promise.all(
+        interactions
+          .filter(
+            (interaction) =>
+              !openTextDocuments.some(
+                (doc) => doc.fileName === interaction.name
+              )
+          )
+          .filter(
+            (interaction) => !this.getIgnoreDirectory(interaction.name || '')
+          )
+          .map(async (interaction) => {
+            const filePath = interaction.name
+            if (!filePath) return null
+            if (
+              filePath.toString().match('.git') ||
+              currentFileName === filePath
+            )
+              return null
+            const uri = Uri.file(filePath)
+            try {
+              const document = await workspace.openTextDocument(uri)
+              return {
+                uri,
+                text: document.getText(),
+                name: filePath,
+                isOpen: false,
+                relevanceScore: interaction.relevanceScore
+              }
+            } catch (error) {
+              console.error(`Error opening document ${filePath}:`, error)
+              return null
+            }
+          })
+      )
+    ).filter((doc): doc is RepositoryDocment => doc !== null)
+
+    const allDocuments = [...openDocumentsData, ...otherDocumentsData].sort(
+      (a, b) => b.relevanceScore - a.relevanceScore
+    )
+
+    return allDocuments.slice(0, 3)
+  }
+
   private async getFileInteractionContext() {
     const interactions = this._fileInteractionCache.getAll()
     const currentFileName = this._document?.fileName || ''
@@ -395,6 +479,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     const fileChunks: string[] = []
     for (const interaction of interactions) {
       const filePath = interaction.name
+
+      if (!filePath) return
 
       if (filePath.toString().match('.git')) continue
 
@@ -467,15 +553,27 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           prefix: prefixSuffix.prefix,
           suffix: prefixSuffix.suffix,
           systemMessage,
-          context: fileInteractionContext,
+          context: fileInteractionContext || '',
           fileName: this._document.uri.fsPath,
-          language: documentLanguage,
+          language: documentLanguage
         })
 
       if (fimTemplate) {
         this._usingFimTemplate = true
         return fimTemplate
       }
+    }
+
+    if (this._provider.repositoryLevel) {
+      const repositoryLevelData = await this.getRelevantDocuments()
+      const repoName = workspace.name
+      const currentFile = await this._document.uri.fsPath
+      return getFimTemplateRepositoryLevel(
+        repoName || 'untitled',
+        repositoryLevelData,
+        prefixSuffix,
+        currentFile
+      )
     }
 
     return getFimPrompt(

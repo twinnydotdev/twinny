@@ -2,6 +2,7 @@ import React from 'react'
 import { useOllamaModels, useProviders } from './hooks'
 import {
   VSCodeButton,
+  VSCodeCheckbox,
   VSCodeDivider,
   VSCodeDropdown,
   VSCodeOption,
@@ -17,14 +18,20 @@ import {
 } from '../common/constants'
 import { ModelSelect } from './model-select'
 import styles from './styles/providers.module.css'
+import indexStyles from './styles/index.module.css'
 
 export const Providers = () => {
   const [showForm, setShowForm] = React.useState(false)
   const [provider, setProvider] = React.useState<TwinnyProvider | undefined>()
   const { models } = useOllamaModels()
   const hasOllamaModels = !!models?.length
-  const { updateProvider, providers, removeProvider, copyProvider, resetProviders } =
-    useProviders()
+  const {
+    updateProvider,
+    providers,
+    removeProvider,
+    copyProvider,
+    resetProviders
+  } = useProviders()
 
   const handleClose = () => {
     setShowForm(false)
@@ -212,6 +219,14 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
     setFormState({ ...formState, [name]: value.trim() })
   }
 
+  const handleRepositoryLevelCheck = (
+    e: React.MouseEvent<HTMLInputElement, MouseEvent>
+  ) => {
+    const target = e.target as HTMLInputElement
+    console.log(target.checked, target.value)
+    setFormState({ ...formState, repositoryLevel: target.checked })
+  }
+
   const handleCancel = () => {
     onClose()
   }
@@ -391,6 +406,20 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             placeholder="Enter an API key"
           ></VSCodeTextField>
         </div>
+
+        {formState.type === 'fim' && (
+          <div className={indexStyles.vscodeCheckbox}>
+            <label htmlFor="repositoryLevel">
+              <VSCodeCheckbox
+                id="repositoryLevel"
+                name="repositoryLevel"
+                checked={formState.repositoryLevel}
+                onClick={handleRepositoryLevelCheck}
+              ></VSCodeCheckbox>
+              <span>Repository Level</span>
+            </label>
+          </div>
+        )}
 
         <div className={styles.providerFormButtons}>
           <VSCodeButton appearance="primary" type="submit">

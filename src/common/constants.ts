@@ -336,7 +336,7 @@ export const WASM_LANGUAGES: { [key: string]: string } = {
 }
 
 // TODO: We could have an extendable regex for this
-export const EMBEDDING_IGNORE_LIST = [
+export const FILE_IGNORE_LIST = [
   '__mocks__',
   '__tests__',
   '.babelrc.js',

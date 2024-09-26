@@ -36,7 +36,7 @@ import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
   defaultChunkOptions,
-  EMBEDDING_IGNORE_LIST,
+  FILE_IGNORE_LIST,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   LINE_BREAK_REGEX,
@@ -694,7 +694,7 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
 }
 
 export function getIgnoreDirectory(fileName: string): boolean {
-  return EMBEDDING_IGNORE_LIST.some((ignoreItem: string) =>
+  return FILE_IGNORE_LIST.some((ignoreItem: string) =>
     fileName.includes(ignoreItem)
   )
 }

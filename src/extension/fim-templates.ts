@@ -5,10 +5,14 @@ import {
   STOP_DEEPSEEK,
   STOP_LLAMA,
   STOP_QWEN,
-  STOP_STARCODER,
+  STOP_STARCODER
 } from '../common/constants'
 import { supportedLanguages } from '../common/languages'
-import { FimPromptTemplate } from '../common/types'
+import {
+  RepositoryLevelData,
+  FimPromptTemplate,
+  PrefixSuffix
+} from '../common/types'
 
 const getFileContext = (
   fileContextEnabled: boolean,
@@ -206,6 +210,37 @@ export const getStopWordsAuto = (fimModel: string) => {
   }
 
   return STOP_LLAMA
+}
+
+export const getFimTemplateRepositoryLevel = (
+  repo: string,
+  code: RepositoryLevelData[],
+  prefixSuffix: PrefixSuffix,
+  currentFileName: string | undefined
+) => {
+  return getFimPromptTemplateQwenMulti(
+    repo,
+    code,
+    prefixSuffix,
+    currentFileName
+  )
+}
+
+export const getFimPromptTemplateQwenMulti = (
+  repo: string,
+  files: RepositoryLevelData[],
+  prefixSuffix: PrefixSuffix,
+  currentFileName: string | undefined
+): string => {
+  let prompt = `<|repo_name|>${repo}\n`
+
+  for (const file of files) {
+    prompt += `<|file_sep|>${file.name}\n${file.text}\n`
+  }
+
+  prompt += `<|file_sep|>${currentFileName}\n${prefixSuffix.prefix}`
+
+  return prompt.trim()
 }
 
 export const getStopWordsChosen = (format: string) => {
