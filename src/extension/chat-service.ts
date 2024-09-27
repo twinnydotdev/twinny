@@ -514,9 +514,6 @@ export class ChatService {
 
     const problemsMentioned = text?.includes('@problems')
 
-    const ragContextKey = `${EVENT_NAME.twinnyGetWorkspaceContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableRag}`
-    const isRagEnabled = this._context?.workspaceState.get(ragContextKey)
-
     if (symmetryConnected) return null
 
     let problemsContext = ''
@@ -531,7 +528,7 @@ export class ChatService {
     let relevantFiles: [string, number][] | null = []
     let relevantCode: string | null = ''
 
-    if (workspaceMentioned || isRagEnabled) {
+    if (workspaceMentioned) {
       updateLoadingMessage(this._webView, 'Exploring knowledge base')
       relevantFiles = await this.getRelevantFiles(prompt)
       relevantCode = await this.getRelevantCode(prompt, relevantFiles)

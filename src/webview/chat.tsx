@@ -16,7 +16,6 @@ import {
   WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
   USER,
-  EXTENSION_CONTEXT_NAME
 } from '../common/constants'
 
 import useAutosizeTextArea, {
@@ -29,9 +28,7 @@ import useAutosizeTextArea, {
 } from './hooks'
 import {
   DisabledAutoScrollIcon,
-  DisabledRAGIcon,
   EnabledAutoScrollIcon,
-  EnabledRAGIcon
 } from './icons'
 
 import { Suggestions } from './suggestions'
@@ -76,9 +73,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
   } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
-
-  const { context: enableRagContext, setContext: setEnableRagContext } =
-    useWorkSpaceContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableRag)
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
 
@@ -344,6 +338,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }
 
   const handleToggleProviderSelection = () => {
+    if (showEmbeddingOptionsContext) handleToggleEmbeddingOptions()
     setShowProvidersContext((prev) => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
@@ -355,6 +350,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }
 
   const handleToggleEmbeddingOptions = () => {
+    if (showProvidersContext) handleToggleProviderSelection()
     setShowEmbeddingOptionsContext((prev) => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
@@ -369,17 +365,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
     if (markdownRef.current) {
       markdownRef.current.scrollTop = markdownRef.current.scrollHeight
     }
-  }
-
-  const handleToggleRag = (): void => {
-    setEnableRagContext((prev) => {
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnySetWorkspaceContext,
-        key: EXTENSION_CONTEXT_NAME.twinnyEnableRag,
-        data: !prev
-      } as ClientMessage)
-      return !prev
-    })
   }
 
   useEffect(() => {
@@ -495,17 +480,20 @@ export const Chat = (props: ChatProps): JSX.Element => {
               index={index}
             />
           ))}
-          {isLoading && !generatingRef.current && <ChatLoader />}
-          {!!completion && (
-            <Message
-              isLoading={false}
-              isAssistant
-              theme={theme}
-              message={{
-                ...completion,
-                role: ASSISTANT
-              }}
-            />
+          {isLoading && !generatingRef.current && !completion ? (
+            <ChatLoader />
+          ) : (
+            !!completion && (
+              <Message
+                isLoading={false}
+                isAssistant
+                theme={theme}
+                message={{
+                  ...completion,
+                  role: ASSISTANT
+                }}
+              />
+            )
           )}
         </div>
         {!!selection.length && (
@@ -537,13 +525,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
               onClick={handleScrollBottom}
             >
               <span className="codicon codicon-arrow-down"></span>
-            </VSCodeButton>
-            <VSCodeButton
-              title="Enable/disable RAG context for all messages"
-              appearance="icon"
-              onClick={handleToggleRag}
-            >
-              {enableRagContext ? <EnabledRAGIcon /> : <DisabledRAGIcon />}
             </VSCodeButton>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
           </div>
