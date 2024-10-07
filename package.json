@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.17.20",
+  "version": "3.17.21",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -294,7 +294,9 @@
           "additionalProperties": {
             "type": "boolean"
           },
-          "default": {"*": true},
+          "default": {
+            "*": true
+          },
           "markdownDescription": "Languages to enable completions with Twinny for. `*` is used as the default."
         },
         "twinny.autoSuggestEnabled": {
