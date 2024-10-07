@@ -105,6 +105,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _fileContextEnabled = this._config.get(
     'fileContextEnabled'
   ) as boolean
+  private _enabledLanguages = this._config.get('enabledLanguages') as Record<string, boolean>
   private _usingFimTemplate = false
   private _provider: TwinnyProvider | undefined
 
@@ -140,6 +141,9 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       document,
       position
     )
+
+    const languageEnabled = this._enabledLanguages[document.languageId] ?? this._enabledLanguages['*'] ?? true
+    if (!languageEnabled) return
 
     const cachedCompletion = cache.getCache(this._prefixSuffix)
     if (cachedCompletion && this._completionCacheEnabled) {
