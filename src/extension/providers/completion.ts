@@ -105,7 +105,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _fileContextEnabled = this._config.get(
     'fileContextEnabled'
   ) as boolean
-  private _enabledLanguages = this._config.get('enabledLanguages') as Record<string, boolean>
+  private _enabledLanguages = this._config.get('enabledLanguages') as Record<
+    string,
+    boolean
+  >
   private _usingFimTemplate = false
   private _provider: TwinnyProvider | undefined
 
@@ -142,7 +145,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       position
     )
 
-    const languageEnabled = this._enabledLanguages[document.languageId] ?? this._enabledLanguages['*'] ?? true
+    const languageEnabled =
+      this._enabledLanguages[document.languageId] ??
+      this._enabledLanguages['*'] ??
+      true
+
     if (!languageEnabled) return
 
     const cachedCompletion = cache.getCache(this._prefixSuffix)
@@ -665,6 +672,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._numLineContext = this._config.get('contextLength') as number
     this._numPredictFim = this._config.get('numPredictFim') as number
     this._temperature = this._config.get('temperature') as number
+    this._enabledLanguages = this._config.get('enabledLanguages') as Record<
+      string,
+      boolean
+    >
     this._fileContextEnabled = this._config.get('fileContextEnabled') as boolean
     this._multilineCompletionsEnabled = this._config.get(
       'multilineCompletionsEnabled'
