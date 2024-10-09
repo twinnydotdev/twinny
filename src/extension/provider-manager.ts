@@ -154,10 +154,10 @@ export class ProviderManager {
       ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
     )
     if (provider && provider.apiPath === '/v1/embeddings') {
-      this.updateProvider({
-        ...provider,
-        apiPath: '/api/embed',
-      })
+      // this.updateProvider({
+      //   ...provider,
+      //   apiPath: '/api/embed',
+      // })
     }
   }
 
