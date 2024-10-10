@@ -149,18 +149,6 @@ export class ProviderManager {
     return provider
   }
 
-  fixLegacyDefaultEmbeddingPath() {
-    const provider = this._context.globalState.get<TwinnyProvider>(
-      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
-    )
-    if (provider && provider.apiPath === '/v1/embeddings') {
-      // this.updateProvider({
-      //   ...provider,
-      //   apiPath: '/api/embed',
-      // })
-    }
-  }
-
   addDefaultEmbeddingsProvider(): TwinnyProvider {
     const provider = this.getDefaultEmbeddingsProvider()
 
@@ -169,7 +157,6 @@ export class ProviderManager {
     ) {
       this.addDefaultProvider(provider)
     }
-    this.fixLegacyDefaultEmbeddingPath()
     return provider
   }
 
