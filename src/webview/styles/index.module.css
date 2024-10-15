@@ -96,6 +96,7 @@ pre code {
   padding-top: 20px;
   font-size: 14px;
   margin-top: 20px;
+  padding-right: 8px;
 }
 
 .markdownFullScreen {
@@ -160,23 +161,24 @@ pre code {
 }
 
 .userMessage {
-  background-color: var(--vscode-editorWidget-background);
+  background-color: var(--vscode-editor-background);
   align-self: flex-end;
 }
 
 .userMessage::after {
   right: 10px;
-  background-color: var(--vscode-editorWidget-background);
+  background-color: var(--vscode-editor-background);
 }
 
 .assistantMessage {
-  background-color: var(--vscode-editor-background);
   align-self: flex-start;
+  background-color: var(--vscode-editorWidget-background);
 }
 
 .assistantMessage::after {
   left: 10px;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--vscode-editorWidget-background);
+
 }
 
 .messageOptions {
