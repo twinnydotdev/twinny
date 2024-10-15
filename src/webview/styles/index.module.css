@@ -178,7 +178,6 @@ pre code {
 .assistantMessage::after {
   left: 10px;
   background-color: var(--vscode-editorWidget-background);
-
 }
 
 .messageOptions {
