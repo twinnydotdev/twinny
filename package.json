@@ -136,10 +136,6 @@
     },
     "commands": [
       {
-        "command": "twinny.openPanelChat",
-        "title": "Twinny - Open full screen panel"
-      },
-      {
         "command": "twinny.explain",
         "title": "Twinny - Explain"
       },
@@ -176,10 +172,6 @@
         "command": "twinny.disable",
         "title": "Disable twinny",
         "shortTitle": "Disable twinny"
-      },
-      {
-        "command": "twinny.getGitCommitMessage",
-        "title": "Twinny - Generate commit message"
       },
       {
         "command": "twinny.sidebar.focus",
