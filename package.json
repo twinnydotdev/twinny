@@ -423,6 +423,7 @@
     "build": "node scripts/build.mjs",
     "build-tests": "tsc -p . --outDir out",
     "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "package": "node scripts/build.mjs",
     "pretest": "npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",

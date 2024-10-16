@@ -20,10 +20,10 @@ import {
   StreamResponse,
 } from "../common/types"
 
+import { streamResponse } from "./api"
 import { TwinnyProvider } from "./provider-manager"
 import { createStreamRequestBody } from "./provider-options"
 import { SessionManager } from "./session-manager"
-import { streamResponse } from "./stream"
 import { SymmetryService } from "./symmetry-service"
 import { getChatDataFromProvider } from "./utils"
 
