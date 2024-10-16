@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.17.27",
+  "version": "3.17.28",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -267,145 +267,145 @@
       ]
     },
     "configuration": {
-    "title": "twinny",
-    "properties": {
-      "twinny.enabled": {
-        "order": 0,
-        "type": "boolean",
-        "default": true,
-        "markdownDescription": "Toggles the Twinny extension on or off. When `true`, Twinny is active and ready to provide completions."
-      },
-      "twinny.enabledLanguages": {
-        "order": 1,
-        "type": "object",
-        "additionalProperties": {
-          "type": "boolean"
+      "title": "twinny",
+      "properties": {
+        "twinny.enabled": {
+          "order": 0,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Toggles the Twinny extension on or off. When `true`, Twinny is active and ready to provide completions."
         },
-        "default": {
-          "*": true
+        "twinny.enabledLanguages": {
+          "order": 1,
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "default": {
+            "*": true
+          },
+          "markdownDescription": "Specifies which languages to enable completions with Twinny for. Use `*` as the default for all languages. Example:\n```json\n{\n  \"*\": true,\n  \"python\": true,\n  \"javascript\": false\n}\n```"
         },
-        "markdownDescription": "Specifies which languages to enable completions with Twinny for. Use `*` as the default for all languages. Example:\n```json\n{\n  \"*\": true,\n  \"python\": true,\n  \"javascript\": false\n}\n```"
-      },
-      "twinny.autoSuggestEnabled": {
-        "order": 2,
-        "type": "boolean",
-        "default": true,
-        "markdownDescription": "When `true`, Twinny will automatically suggest completions. You can still manually trigger completions using the default shortcut (`Alt+\\`)."
-      },
-      "twinny.contextLength": {
-        "order": 3,
-        "type": "number",
-        "default": 100,
-        "markdownDescription": "Specifies how many lines of context (before and after the current line) to include in Fill-in-Middle (FIM) prompts. A higher number provides more context but may slow down completions.",
-        "required": true
-      },
-      "twinny.debounceWait": {
-        "order": 4,
-        "type": "number",
-        "default": 300,
-        "markdownDescription": "Sets the delay (in milliseconds) before triggering the next completion. This helps reduce API calls and improve performance.",
-        "required": true
-      },
-      "twinny.temperature": {
-        "order": 5,
-        "type": "number",
-        "default": 0.2,
-        "markdownDescription": "Controls the randomness of the model's output. Lower values (e.g., 0.2) produce more focused and deterministic outputs, while higher values (e.g., 0.8) lead to more diverse and creative completions.",
-        "required": true
-      },
-      "twinny.multilineCompletionsEnabled": {
-        "order": 6,
-        "type": "boolean",
-        "default": true,
-        "markdownDescription": "When `true`, Twinny will attempt to generate multi-line completions. This is an experimental feature and may not work perfectly in all scenarios."
-      },
-      "twinny.maxLines": {
-        "dependencies": {
-          "twinny.multilineCompletionsEnabled": true
+        "twinny.autoSuggestEnabled": {
+          "order": 2,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When `true`, Twinny will automatically suggest completions. You can still manually trigger completions using the default shortcut (`Alt+\\`)."
         },
-        "order": 7,
-        "type": "number",
-        "default": 30,
-        "markdownDescription": "Sets the maximum number of lines for multi-line completions. Only applies when `twinny.multilineCompletionsEnabled` is `true`."
-      },
-      "twinny.fileContextEnabled": {
-        "order": 9,
-        "type": "boolean",
-        "default": false,
-        "markdownDescription": "When `true`, Twinny will scan neighboring documents to provide more context for completions. This is an experimental feature and may impact performance."
-      },
-      "twinny.completionCacheEnabled": {
-        "order": 10,
-        "type": "boolean",
-        "default": false,
-        "markdownDescription": "Enables caching of Fill-in-Middle (FIM) completions for identical prompts. This can significantly improve performance but may use more memory."
-      },
-      "twinny.numPredictChat": {
-        "order": 11,
-        "type": "number",
-        "default": 512,
-        "markdownDescription": "Sets the maximum number of tokens to generate for chat completions. Higher values allow for longer completions but may increase response time.",
-        "required": true
-      },
-      "twinny.numPredictFim": {
-        "order": 12,
-        "type": "number",
-        "default": 512,
-        "markdownDescription": "Defines the maximum number of tokens for Fill-in-Middle (FIM) completions. Use `-1` for no limit. Twinny will attempt to stop at logical line breaks regardless of this setting.",
-        "required": true
-      },
-      "twinny.enableSubsequentCompletions": {
-        "order": 13,
-        "type": "boolean",
-        "default": true,
-        "markdownDescription": "When `true`, Twinny will continue to make completion requests to the API after the previous completion was accepted. This can provide a more fluid completion experience."
-      },
-      "twinny.ollamaHostname": {
-        "order": 14,
-        "type": "string",
-        "default": "0.0.0.0",
-        "markdownDescription": "Specifies the hostname for the Ollama API. Use `0.0.0.0` for localhost or provide a specific IP address or domain name.",
-        "required": true
-      },
-      "twinny.ollamaApiPort": {
-        "order": 15,
-        "type": "number",
-        "default": 11434,
-        "markdownDescription": "Sets the port number for the Ollama API. The default is `11434`, but you can change it if your Ollama instance uses a different port.",
-        "required": false
-      },
-      "twinny.keepAlive": {
-        "order": 16,
-        "type": "string",
-        "default": "5m",
-        "markdownDescription": "Sets the duration to keep models in memory for Ollama API. Use formats like `5m` for 5 minutes or `1h` for 1 hour. Set to `-1` to keep models in memory indefinitely."
-      },
-      "twinny.ollamaUseTls": {
-        "order": 17,
-        "type": "boolean",
-        "default": false,
-        "markdownDescription": "When `true`, Twinny will use TLS encryption for connections to the Ollama API. Ensure your Ollama instance is configured for TLS before enabling this option."
-      },
-      "twinny.enableLogging": {
-        "order": 18,
-        "type": "boolean",
-        "default": true,
-        "markdownDescription": "Activates debug logging for Twinny. When `true`, Twinny will output detailed logs, which can be helpful for troubleshooting."
-      },
-      "twinny.symmetryServerKey": {
-        "order": 19,
-        "type": "string",
-        "markdownDescription": "Sets the symmetry master server key. Default value is provided for twinny's Symmetry server.",
-        "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
-      },
-      "twinny.githubToken": {
-        "order": 20,
-        "type": "string",
-        "default": "",
-        "markdownDescription": "Your personal GitHub access token. This is used for fetching data from GitHub repositories. Keep this token secure and do not share it."
+        "twinny.contextLength": {
+          "order": 3,
+          "type": "number",
+          "default": 100,
+          "markdownDescription": "Specifies how many lines of context (before and after the current line) to include in Fill-in-Middle (FIM) prompts. A higher number provides more context but may slow down completions.",
+          "required": true
+        },
+        "twinny.debounceWait": {
+          "order": 4,
+          "type": "number",
+          "default": 300,
+          "markdownDescription": "Sets the delay (in milliseconds) before triggering the next completion. This helps reduce API calls and improve performance.",
+          "required": true
+        },
+        "twinny.temperature": {
+          "order": 5,
+          "type": "number",
+          "default": 0.2,
+          "markdownDescription": "Controls the randomness of the model's output. Lower values (e.g., 0.2) produce more focused and deterministic outputs, while higher values (e.g., 0.8) lead to more diverse and creative completions.",
+          "required": true
+        },
+        "twinny.multilineCompletionsEnabled": {
+          "order": 6,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When `true`, Twinny will attempt to generate multi-line completions. This is an experimental feature and may not work perfectly in all scenarios."
+        },
+        "twinny.maxLines": {
+          "dependencies": {
+            "twinny.multilineCompletionsEnabled": true
+          },
+          "order": 7,
+          "type": "number",
+          "default": 30,
+          "markdownDescription": "Sets the maximum number of lines for multi-line completions. Only applies when `twinny.multilineCompletionsEnabled` is `true`."
+        },
+        "twinny.fileContextEnabled": {
+          "order": 9,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "When `true`, Twinny will scan neighboring documents to provide more context for completions. This is an experimental feature and may impact performance."
+        },
+        "twinny.completionCacheEnabled": {
+          "order": 10,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Enables caching of Fill-in-Middle (FIM) completions for identical prompts. This can significantly improve performance but may use more memory."
+        },
+        "twinny.numPredictChat": {
+          "order": 11,
+          "type": "number",
+          "default": 512,
+          "markdownDescription": "Sets the maximum number of tokens to generate for chat completions. Higher values allow for longer completions but may increase response time.",
+          "required": true
+        },
+        "twinny.numPredictFim": {
+          "order": 12,
+          "type": "number",
+          "default": 512,
+          "markdownDescription": "Defines the maximum number of tokens for Fill-in-Middle (FIM) completions. Use `-1` for no limit. Twinny will attempt to stop at logical line breaks regardless of this setting.",
+          "required": true
+        },
+        "twinny.enableSubsequentCompletions": {
+          "order": 13,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When `true`, Twinny will continue to make completion requests to the API after the previous completion was accepted. This can provide a more fluid completion experience."
+        },
+        "twinny.ollamaHostname": {
+          "order": 14,
+          "type": "string",
+          "default": "0.0.0.0",
+          "markdownDescription": "Specifies the hostname for the Ollama API. Use `0.0.0.0` for localhost or provide a specific IP address or domain name.",
+          "required": true
+        },
+        "twinny.ollamaApiPort": {
+          "order": 15,
+          "type": "number",
+          "default": 11434,
+          "markdownDescription": "Sets the port number for the Ollama API. The default is `11434`, but you can change it if your Ollama instance uses a different port.",
+          "required": false
+        },
+        "twinny.keepAlive": {
+          "order": 16,
+          "type": "string",
+          "default": "5m",
+          "markdownDescription": "Sets the duration to keep models in memory for Ollama API. Use formats like `5m` for 5 minutes or `1h` for 1 hour. Set to `-1` to keep models in memory indefinitely."
+        },
+        "twinny.ollamaUseTls": {
+          "order": 17,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "When `true`, Twinny will use TLS encryption for connections to the Ollama API. Ensure your Ollama instance is configured for TLS before enabling this option."
+        },
+        "twinny.enableLogging": {
+          "order": 18,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Activates debug logging for Twinny. When `true`, Twinny will output detailed logs, which can be helpful for troubleshooting."
+        },
+        "twinny.symmetryServerKey": {
+          "order": 19,
+          "type": "string",
+          "markdownDescription": "Sets the symmetry master server key. Default value is provided for twinny's Symmetry server.",
+          "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
+        },
+        "twinny.githubToken": {
+          "order": 20,
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Your personal GitHub access token. This is used for fetching data from GitHub repositories. Keep this token secure and do not share it."
+        }
       }
     }
-  }
   },
   "scripts": {
     "build": "node scripts/build.mjs",
