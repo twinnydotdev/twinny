@@ -7,16 +7,16 @@ import {
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   TWINNY_COMMAND_NAME,
-  WORKSPACE_STORAGE_KEY,
+  WORKSPACE_STORAGE_KEY
 } from "../../common/constants"
-import { Logger } from "../../common/logger"
+import { logger } from "../../common/logger"
 import {
   ApiModel,
   ClientMessage,
   FileItem,
   InferenceRequest,
   Message,
-  ServerMessage,
+  ServerMessage
 } from "../../common/types"
 import { ChatService } from "../chat-service"
 import { ConversationHistory } from "../conversation-history"
@@ -35,37 +35,35 @@ import {
   getLanguage,
   getTextSelection,
   getTheme,
-  updateLoadingMessage,
+  updateLoadingMessage
 } from "../utils"
 
-const logger = new Logger()
-
 export class BaseProvider {
-  private _chatService: ChatService | undefined = undefined
-  private _config = vscode.workspace.getConfiguration("twinny")
+  private _chatService: ChatService | undefined
   private _diffManager = new DiffManager()
   private _embeddingDatabase: EmbeddingDatabase | undefined
   private _fileTreeProvider: FileTreeProvider
-  private _ollamaService: OllamaService | undefined = undefined
-  private _sessionManager: SessionManager | undefined = undefined
+  private _ollamaService: OllamaService | undefined
+  private _sessionManager: SessionManager | undefined
   private _statusBarItem: vscode.StatusBarItem
-  private _symmetryService?: SymmetryService | undefined
+  private _symmetryService?: SymmetryService
   private _templateDir: string | undefined
   private _templateProvider: TemplateProvider
   public context: vscode.ExtensionContext
-  public conversationHistory: ConversationHistory | undefined = undefined
-  public reviewService: ReviewService | undefined = undefined
+  public conversationHistory: ConversationHistory | undefined
+  public reviewService: ReviewService | undefined
   public webView?: vscode.Webview
+
 
   constructor(
     context: vscode.ExtensionContext,
     templateDir: string,
     statusBar: vscode.StatusBarItem,
-    db?: EmbeddingDatabase | undefined,
+    db?: EmbeddingDatabase,
     sessionManager?: SessionManager
   ) {
-    this._fileTreeProvider = new FileTreeProvider()
     this.context = context
+    this._fileTreeProvider = new FileTreeProvider()
     this._embeddingDatabase = db
     this._ollamaService = new OllamaService()
     this._sessionManager = sessionManager
@@ -76,9 +74,14 @@ export class BaseProvider {
 
   public registerWebView(webView: vscode.Webview) {
     this.webView = webView
+    this.initializeServices()
+    this.registerEventListeners()
+  }
 
+  private initializeServices() {
+    if (!this.webView) return
     this._symmetryService = new SymmetryService(
-      webView,
+      this.webView,
       this._sessionManager,
       this.context
     )
@@ -109,68 +112,54 @@ export class BaseProvider {
     )
 
     new ProviderManager(this.context, this.webView)
+  }
 
-    vscode.window.onDidChangeActiveColorTheme(() => {
-      this.webView?.postMessage({
-        type: EVENT_NAME.twinnySendTheme,
-        value: {
-          data: getTheme(),
-        },
-      })
+  private registerEventListeners() {
+    vscode.window.onDidChangeActiveColorTheme(this.handleThemeChange)
+    vscode.window.onDidChangeTextEditorSelection(this.handleTextSelection)
+
+    const eventHandlers = {
+      [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
+      [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
+      [EVENT_NAME.twinnyClickSuggestion]: this.clickSuggestion,
+      [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
+      [EVENT_NAME.twinnyFetchOllamaModels]: this.fetchOllamaModels,
+      [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
+      [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
+      [EVENT_NAME.twinnyGetWorkspaceContext]: this.getTwinnyWorkspaceContext,
+      [EVENT_NAME.twinnyGlobalContext]: this.getGlobalContext,
+      [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
+      [EVENT_NAME.twinnyListTemplates]: this.listTemplates,
+      [EVENT_NAME.twinnyNewDocument]: this.createNewUntitledDocument,
+      [EVENT_NAME.twinnyNotification]: this.sendNotification,
+      [EVENT_NAME.twinnyOpenDiff]: this.openDiff,
+      [EVENT_NAME.twinnySendLanguage]: this.getCurrentLanguage,
+      [EVENT_NAME.twinnySendTheme]: this.getTheme,
+      [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
+      [EVENT_NAME.twinnySetConfigValue]: this.setConfigurationValue,
+      [EVENT_NAME.twinnySetGlobalContext]: this.setGlobalContext,
+      [EVENT_NAME.twinnySetTab]: this.setTab,
+      [EVENT_NAME.twinnySetWorkspaceContext]: this.setWorkspaceContext,
+      [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
+      [EVENT_NAME.twinnyFileListRequest]: this.fileListRequest,
+      [EVENT_NAME.twinnyNewConversation]: this.twinnyNewConversation,
+      [TWINNY_COMMAND_NAME.settings]: this.openSettings
+    }
+    this.webView?.onDidReceiveMessage((message: ClientMessage<Message[]>) => {
+      const eventHandler = eventHandlers[message.type as string]
+      if (eventHandler) eventHandler(message)
     })
+  }
 
-    vscode.window.onDidChangeTextEditorSelection(
-      (event: vscode.TextEditorSelectionChangeEvent) => {
-        const text = event.textEditor.document.getText(event.selections[0])
-        this.webView?.postMessage({
-          type: EVENT_NAME.twinnyTextSelection,
-          value: {
-            type: WORKSPACE_STORAGE_KEY.selection,
-            completion: text,
-          },
-        })
-      }
-    )
+  private handleThemeChange = () => {
+    this.sendThemeToWebView()
+  }
 
-    vscode.window.onDidChangeActiveColorTheme(() => {
-      this.webView?.postMessage({
-        type: EVENT_NAME.twinnySendTheme,
-        value: {
-          data: getTheme(),
-        },
-      })
-    })
-
-    this.webView?.onDidReceiveMessage((message) => {
-      const eventHandlers = {
-        [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
-        [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
-        [EVENT_NAME.twinnyClickSuggestion]: this.clickSuggestion,
-        [EVENT_NAME.twinnyEmbedDocuments]: this.embedDocuments,
-        [EVENT_NAME.twinnyFetchOllamaModels]: this.fetchOllamaModels,
-        [EVENT_NAME.twinnyGetConfigValue]: this.getConfigurationValue,
-        [EVENT_NAME.twinnyGetGitChanges]: this.getGitCommitMessage,
-        [EVENT_NAME.twinnyGetWorkspaceContext]: this.getTwinnyWorkspaceContext,
-        [EVENT_NAME.twinnyGlobalContext]: this.getGlobalContext,
-        [EVENT_NAME.twinnyHideBackButton]: this.twinnyHideBackButton,
-        [EVENT_NAME.twinnyListTemplates]: this.listTemplates,
-        [EVENT_NAME.twinnyNewDocument]: this.createNewUntitledDocument,
-        [EVENT_NAME.twinnyNotification]: this.sendNotification,
-        [EVENT_NAME.twinnyOpenDiff]: this.openDiff,
-        [EVENT_NAME.twinnySendLanguage]: this.getCurrentLanguage,
-        [EVENT_NAME.twinnySendTheme]: this.getTheme,
-        [EVENT_NAME.twinnySessionContext]: this.getSessionContext,
-        [EVENT_NAME.twinnySetConfigValue]: this.setConfigurationValue,
-        [EVENT_NAME.twinnySetGlobalContext]: this.setGlobalContext,
-        [EVENT_NAME.twinnySetTab]: this.setTab,
-        [EVENT_NAME.twinnySetWorkspaceContext]: this.setWorkspaceContext,
-        [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
-        [EVENT_NAME.twinnyFileListRequest]: this.fileListRequest,
-        [EVENT_NAME.twinnyNewConversation]: this.twinnyNewConversation,
-        [TWINNY_COMMAND_NAME.settings]: this.openSettings,
-      }
-      eventHandlers[message.type as string]?.(message)
-    })
+  private handleTextSelection = (
+    event: vscode.TextEditorSelectionChangeEvent
+  ) => {
+    const text = event.textEditor.document.getText(event.selections[0])
+    this.sendTextSelectionToWebView(text)
   }
 
   public newConversation() {
@@ -179,31 +168,70 @@ export class BaseProvider {
     )
   }
 
+  public destroyStream = () => {
+    this._chatService?.destroyStream()
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnyStopGeneration
+    })
+  }
+
+  public async streamTemplateCompletion(template: string) {
+    const symmetryConnected = this._sessionManager?.get(
+      EXTENSION_SESSION_NAME.twinnySymmetryConnection
+    )
+    if (symmetryConnected && this._chatService) {
+      const messages = await this._chatService.getTemplateMessages(template)
+      logger.log(`
+        Using symmetry for inference
+        Messages: ${JSON.stringify(messages)}
+      `)
+      return this._symmetryService?.write(
+        createSymmetryMessage<InferenceRequest>(serverMessageKeys.inference, {
+          messages,
+          key: SYMMETRY_EMITTER_KEY.inference
+        })
+      )
+    }
+    this._chatService?.streamTemplateCompletion(template)
+  }
+
+  public getGitCommitMessage = async () => {
+    const diff = await getGitChanges()
+    if (!diff.length) {
+      vscode.window.showInformationMessage(
+        "No changes found in the current workspace."
+      )
+      return
+    }
+    this.conversationHistory?.resetConversation()
+    this._chatService?.streamTemplateCompletion(
+      "commit-message",
+      diff,
+      (completion: string) => {
+        vscode.commands.executeCommand("twinny.sendTerminalText", completion)
+      },
+      true
+    )
+  }
+
   private twinnyNewConversation = () => {
     this.conversationHistory?.resetConversation()
     this.newConversation()
     this.webView?.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration,
+      type: EVENT_NAME.twinnyStopGeneration
     } as ServerMessage<string>)
   }
 
-  public destroyStream = () => {
-    this._chatService?.destroyStream()
-    this.webView?.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration,
-    })
-  }
-
-  private openSettings() {
+  private openSettings = () => {
     vscode.commands.executeCommand(TWINNY_COMMAND_NAME.settings)
   }
 
-  private setTab(tab: ClientMessage) {
+  private setTab = (tab: ClientMessage) => {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
       value: {
-        data: tab as string,
-      },
+        data: tab as string
+      }
     } as ServerMessage<string>)
   }
 
@@ -228,8 +256,8 @@ export class BaseProvider {
       type: EVENT_NAME.twinnyGetConfigValue,
       value: {
         data: config.get(message.key as string),
-        type: message.key,
-      },
+        type: message.key
+      }
     } as ServerMessage<string>)
   }
 
@@ -239,8 +267,8 @@ export class BaseProvider {
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyFileListResponse,
         value: {
-          data: files,
-        },
+          data: files
+        }
       })
     }
   }
@@ -260,8 +288,8 @@ export class BaseProvider {
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyFetchOllamaModels,
         value: {
-          data: models,
-        },
+          data: models
+        }
       } as ServerMessage<ApiModel[]>)
     } catch (e) {
       return
@@ -273,8 +301,8 @@ export class BaseProvider {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyListTemplates,
       value: {
-        data: templates,
-      },
+        data: templates
+      }
     } as ServerMessage<string[]>)
   }
 
@@ -296,7 +324,7 @@ export class BaseProvider {
     if (symmetryConnected) {
       const systemMessage = {
         role: SYSTEM,
-        content: await this._templateProvider?.readSystemMessageTemplate(),
+        content: await this._templateProvider?.readSystemMessageTemplate()
       }
 
       const messages = [systemMessage, ...(data.data as Message[])]
@@ -309,13 +337,10 @@ export class BaseProvider {
       `)
 
       return this._symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(
-          serverMessageKeys.inference,
-          {
-            messages,
-            key: SYMMETRY_EMITTER_KEY.inference,
-          }
-        )
+        createSymmetryMessage<InferenceRequest>(serverMessageKeys.inference, {
+          messages,
+          key: SYMMETRY_EMITTER_KEY.inference
+        })
       )
     }
 
@@ -325,38 +350,8 @@ export class BaseProvider {
     )
   }
 
-  public async streamTemplateCompletion(template: string) {
-    const symmetryConnected = this._sessionManager?.get(
-      EXTENSION_SESSION_NAME.twinnySymmetryConnection
-    )
-    if (symmetryConnected && this._chatService) {
-      const messages = await this._chatService.getTemplateMessages(template)
-
-      logger.log(`
-        Using symmetry for inference
-        Messages: ${JSON.stringify(messages)}
-      `)
-      return this._symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(
-          serverMessageKeys.inference,
-          {
-            messages,
-            key: SYMMETRY_EMITTER_KEY.inference,
-          }
-        )
-      )
-    }
-    this._chatService?.streamTemplateCompletion(template)
-  }
-
   private getSelectedText = () => {
-    this.webView?.postMessage({
-      type: EVENT_NAME.twinnyTextSelection,
-      value: {
-        type: WORKSPACE_STORAGE_KEY.selection,
-        completion: getTextSelection(),
-      },
-    })
+    this.sendTextSelectionToWebView(getTextSelection())
   }
 
   private openDiff = async (message: ClientMessage) => {
@@ -371,7 +366,7 @@ export class BaseProvider {
     const lang = getLanguage()
     const document = await vscode.workspace.openTextDocument({
       content: message.data as string,
-      language: lang.languageId,
+      language: lang.languageId
     })
     await vscode.window.showTextDocument(document)
   }
@@ -382,52 +377,28 @@ export class BaseProvider {
     )
     this.webView?.postMessage({
       type: `${EVENT_NAME.twinnyGlobalContext}-${message.key}`,
-      value: storedData,
+      value: storedData
     })
   }
 
   private getTheme = () => {
-    this.webView?.postMessage({
-      type: EVENT_NAME.twinnySendTheme,
-      value: {
-        data: getTheme(),
-      },
-    })
+    this.sendThemeToWebView()
   }
 
   private getCurrentLanguage = () => {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnySendLanguage,
       value: {
-        data: getLanguage(),
-      },
+        data: getLanguage()
+      }
     } as ServerMessage)
-  }
-
-  public getGitCommitMessage = async () => {
-    const diff = await getGitChanges()
-    if (!diff.length) {
-      vscode.window.showInformationMessage(
-        "No changes found in the current workspace."
-      )
-      return
-    }
-    this.conversationHistory?.resetConversation()
-    this._chatService?.streamTemplateCompletion(
-      "commit-message",
-      diff,
-      (completion: string) => {
-        vscode.commands.executeCommand("twinny.sendTerminalText", completion)
-      },
-      true
-    )
   }
 
   private getSessionContext = (data: ClientMessage) => {
     if (!data.key) return undefined
     return this.webView?.postMessage({
       type: `${EVENT_NAME.twinnySessionContext}-${data.key}`,
-      value: this._sessionManager?.get(data.key),
+      value: this._sessionManager?.get(data.key)
     })
   }
 
@@ -444,7 +415,7 @@ export class BaseProvider {
     )
     this.webView?.postMessage({
       type: `${EVENT_NAME.twinnyGetWorkspaceContext}-${message.key}`,
-      value: storedData,
+      value: storedData
     } as ServerMessage)
   }
 
@@ -456,11 +427,31 @@ export class BaseProvider {
     )
     this.webView?.postMessage({
       type: `${EVENT_NAME.twinnyGetWorkspaceContext}-${message.key}`,
-      value,
+      value
     })
   }
 
   private twinnyHideBackButton() {
     vscode.commands.executeCommand(TWINNY_COMMAND_NAME.hideBackButton)
+  }
+
+  // Helper methods
+  private sendThemeToWebView() {
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnySendTheme,
+      value: {
+        data: getTheme()
+      }
+    })
+  }
+
+  private sendTextSelectionToWebView(text: string) {
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnyTextSelection,
+      value: {
+        type: WORKSPACE_STORAGE_KEY.selection,
+        completion: text
+      }
+    })
   }
 }
