@@ -83,13 +83,13 @@ export class EmbeddingDatabase {
         body: requestBody,
         options: requestOptions,
         onData: (response) => {
-          resolve(this.getEmbeddingsFromResponse(provider, response))
+          resolve(this.getEmbeddingFromResponse(provider, response))
         }
       })
     })
   }
 
-  private getEmbeddingsFromResponse(provider: TwinnyProvider, response: any): number[] {
+  private getEmbeddingFromResponse(provider: TwinnyProvider, response: any): number[] {
 
     if( provider.provider === apiProviders.LMStudio) {
       return (response as LMStudioEmbedding).data?.[0].embedding;
