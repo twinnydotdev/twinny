@@ -2,7 +2,7 @@ import { VSCodeButton, VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 
 import {
   DEFAULT_ACTION_TEMPLATES,
-  WORKSPACE_STORAGE_KEY,
+  WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 
 import { useTemplates, useWorkSpaceContext } from "./hooks"
@@ -11,8 +11,11 @@ import { kebabToSentence } from "./utils"
 import styles from "./styles/index.module.css"
 
 export const Settings = () => {
-  const { templates, saveTemplates } = useTemplates()
-  const { context: selectedTemplatesContext, setContext: setSelectedTemplatesContext} =
+  const { templates, saveTemplates, editDefaultTemplates } = useTemplates()
+  const {
+    context: selectedTemplatesContext,
+    setContext: setSelectedTemplatesContext
+  } =
     useWorkSpaceContext<string[]>(WORKSPACE_STORAGE_KEY.selectedTemplates) || []
 
   const handleTemplateClick = (
@@ -50,9 +53,17 @@ export const Settings = () => {
     setSelectedTemplatesContext(DEFAULT_ACTION_TEMPLATES)
   }
 
+  const handleEditDefaultTemplates = () => {
+    editDefaultTemplates()
+  }
 
   return (
     <>
+      <h3>Edit default templates</h3>
+      <p>Edit the default templates used in the twinny extension.</p>
+      <VSCodeButton onClick={handleEditDefaultTemplates}>
+        Open template editor
+      </VSCodeButton>
       <h3>Template settings</h3>
       <p>Select the templates you want to use in the chat interface.</p>
       {templates &&

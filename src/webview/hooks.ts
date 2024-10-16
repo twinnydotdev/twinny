@@ -5,7 +5,7 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
+  useState
 } from "react"
 import { MentionNodeAttrs } from "@tiptap/extension-mention"
 import { ReactRenderer } from "@tiptap/react"
@@ -19,7 +19,7 @@ import {
   GITHUB_EVENT_NAME,
   GLOBAL_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
-  WORKSPACE_STORAGE_KEY,
+  WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import {
   ApiModel,
@@ -31,7 +31,7 @@ import {
   ServerMessage,
   SymmetryConnection,
   SymmetryModelProvider,
-  ThemeType,
+  ThemeType
 } from "../common/types"
 import { TwinnyProvider } from "../extension/provider-manager"
 
@@ -53,7 +53,7 @@ export const useSelection = (onSelect?: () => void) => {
   useEffect(() => {
     window.addEventListener("message", handler)
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyTextSelection,
+      type: EVENT_NAME.twinnyTextSelection
     })
     return () => window.removeEventListener("message", handler)
   }, [])
@@ -76,7 +76,7 @@ export const useGlobalContext = <T>(key: string) => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnySetGlobalContext,
       key,
-      data: value,
+      data: value
     })
   }
 
@@ -85,7 +85,7 @@ export const useGlobalContext = <T>(key: string) => {
 
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyGlobalContext,
-      key,
+      key
     })
 
     return () => window.removeEventListener("message", handler)
@@ -108,7 +108,7 @@ export const useSessionContext = <T>(key: string) => {
     window.addEventListener("message", handler)
     global.vscode.postMessage({
       type: EVENT_NAME.twinnySessionContext,
-      key,
+      key
     })
     return () => window.removeEventListener("message", handler)
   }, [])
@@ -130,7 +130,7 @@ export const useWorkSpaceContext = <T>(key: string) => {
     window.addEventListener("message", handler)
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyGetWorkspaceContext,
-      key,
+      key
     })
 
     return () => window.removeEventListener("message", handler)
@@ -150,7 +150,7 @@ export const useTheme = () => {
   }
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendTheme,
+      type: EVENT_NAME.twinnySendTheme
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
@@ -169,7 +169,7 @@ export const useLoading = () => {
   }
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendLoader,
+      type: EVENT_NAME.twinnySendLoader
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
@@ -188,7 +188,7 @@ export const useLanguage = (): LanguageType | undefined => {
   }
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendLanguage,
+      type: EVENT_NAME.twinnySendLanguage
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
@@ -210,18 +210,24 @@ export const useTemplates = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnySetWorkspaceContext,
       key: WORKSPACE_STORAGE_KEY.selectedTemplates,
-      data: templates,
+      data: templates
     } as ClientMessage<string[]>)
+  }
+
+  const editDefaultTemplates = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyEditDefaultTemplates
+    })
   }
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyListTemplates,
+      type: EVENT_NAME.twinnyListTemplates
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
   }, [])
-  return { templates, saveTemplates }
+  return { templates, saveTemplates, editDefaultTemplates }
 }
 
 export const useGithubPRs = () => {
@@ -245,7 +251,7 @@ export const useGithubPRs = () => {
     setIsLoading(true)
     global.vscode.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequests,
-      data: { owner, repo },
+      data: { owner, repo }
     })
   }
 
@@ -259,7 +265,7 @@ export const useGithubPRs = () => {
 
     global.vscode.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequestReview,
-      data: { owner, repo, number: selectedPR, title },
+      data: { owner, repo, number: selectedPR, title }
     })
   }
 
@@ -267,7 +273,7 @@ export const useGithubPRs = () => {
     prs,
     isLoading,
     getPrs,
-    startReview,
+    startReview
   }
 }
 
@@ -310,49 +316,49 @@ export const useProviders = () => {
   const saveProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.addProvider,
-      data: provider,
+      data: provider
     } as ClientMessage<TwinnyProvider>)
   }
 
   const copyProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.copyProvider,
-      data: provider,
+      data: provider
     } as ClientMessage<TwinnyProvider>)
   }
 
   const updateProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.updateProvider,
-      data: provider,
+      data: provider
     } as ClientMessage<TwinnyProvider>)
   }
 
   const removeProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.removeProvider,
-      data: provider,
+      data: provider
     } as ClientMessage<TwinnyProvider>)
   }
 
   const setActiveFimProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.setActiveFimProvider,
-      data: provider,
+      data: provider
     } as ClientMessage<TwinnyProvider>)
   }
 
   const setActiveEmbeddingsProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider,
-      data: provider,
+      data: provider
     } as ClientMessage<TwinnyProvider>)
   }
 
   const setActiveChatProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.setActiveChatProvider,
-      data: provider,
+      data: provider
     } as ClientMessage<TwinnyProvider>)
   }
 
@@ -364,22 +370,22 @@ export const useProviders = () => {
 
   const resetProviders = () => {
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.resetProvidersToDefaults,
+      type: PROVIDER_EVENT_NAME.resetProvidersToDefaults
     } as ClientMessage<TwinnyProvider>)
   }
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getAllProviders,
+      type: PROVIDER_EVENT_NAME.getAllProviders
     })
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveChatProvider,
+      type: PROVIDER_EVENT_NAME.getActiveChatProvider
     })
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveFimProvider,
+      type: PROVIDER_EVENT_NAME.getActiveFimProvider
     })
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
+      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
@@ -398,7 +404,7 @@ export const useProviders = () => {
     setActiveChatProvider,
     setActiveEmbeddingsProvider,
     setActiveFimProvider,
-    updateProvider,
+    updateProvider
   }
 }
 
@@ -420,7 +426,7 @@ export const useConfigurationSetting = (key: string) => {
   useEffect(() => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyGetConfigValue,
-      key,
+      key
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
@@ -437,27 +443,27 @@ export const useConversationHistory = () => {
 
   const getConversations = () => {
     global.vscode.postMessage({
-      type: CONVERSATION_EVENT_NAME.getConversations,
+      type: CONVERSATION_EVENT_NAME.getConversations
     } as ClientMessage<string>)
   }
 
   const getActiveConversation = () => {
     global.vscode.postMessage({
-      type: CONVERSATION_EVENT_NAME.getActiveConversation,
+      type: CONVERSATION_EVENT_NAME.getActiveConversation
     })
   }
 
   const removeConversation = (conversation: Conversation) => {
     global.vscode.postMessage({
       type: CONVERSATION_EVENT_NAME.removeConversation,
-      data: conversation,
+      data: conversation
     } as ClientMessage<Conversation>)
   }
 
   const setActiveConversation = (conversation: Conversation | undefined) => {
     global.vscode.postMessage({
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
-      data: conversation,
+      data: conversation
     } as ClientMessage<Conversation | undefined>)
     setConversation(conversation)
   }
@@ -465,13 +471,13 @@ export const useConversationHistory = () => {
   const saveLastConversation = (conversation: Conversation | undefined) => {
     global.vscode.postMessage({
       type: CONVERSATION_EVENT_NAME.saveConversation,
-      data: conversation,
+      data: conversation
     } as ClientMessage<Conversation>)
   }
 
   const clearAllConversations = () => {
     global.vscode.postMessage({
-      type: CONVERSATION_EVENT_NAME.clearAllConversations,
+      type: CONVERSATION_EVENT_NAME.clearAllConversations
     } as ClientMessage<string>)
   }
 
@@ -502,7 +508,7 @@ export const useConversationHistory = () => {
     removeConversation,
     saveLastConversation,
     clearAllConversations,
-    setActiveConversation,
+    setActiveConversation
   }
 }
 
@@ -518,7 +524,7 @@ export const useOllamaModels = () => {
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyFetchOllamaModels,
+      type: EVENT_NAME.twinnyFetchOllamaModels
     })
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
@@ -555,7 +561,7 @@ export const useFilePaths = () => {
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyFileListRequest,
+      type: EVENT_NAME.twinnyFileListRequest
     })
 
     window.addEventListener("message", handler)
@@ -563,7 +569,7 @@ export const useFilePaths = () => {
   }, [])
 
   return {
-    filePaths: filePaths.current || [],
+    filePaths: filePaths.current || []
   }
 }
 
@@ -577,11 +583,11 @@ export const useSuggestion = () => {
       const filePaths = getFilePaths()
       const fileItems: FileItem[] = filePaths.map((path) => ({
         name: path.split("/").pop() || "",
-        path: path,
+        path: path
       }))
       const defaultItems: FileItem[] = [
         { name: "workspace", path: "workspace" },
-        { name: "problems", path: "problems" },
+        { name: "problems", path: "problems" }
       ]
       return Promise.resolve(
         [...defaultItems, ...fileItems]
@@ -605,7 +611,7 @@ export const useSuggestion = () => {
       onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
         reactRenderer = new ReactRenderer(MentionList, {
           props,
-          editor: props.editor,
+          editor: props.editor
         })
 
         const getReferenceClientRect = props.clientRect as () => DOMRect
@@ -617,7 +623,7 @@ export const useSuggestion = () => {
           showOnCreate: true,
           interactive: true,
           trigger: "manual",
-          placement: "bottom-start",
+          placement: "bottom-start"
         })
       },
 
@@ -626,7 +632,7 @@ export const useSuggestion = () => {
 
         if (popup) {
           popup[0].setProps({
-            getReferenceClientRect: props.clientRect as () => DOMRect,
+            getReferenceClientRect: props.clientRect as () => DOMRect
           })
         }
       },
@@ -647,21 +653,21 @@ export const useSuggestion = () => {
           popup[0].destroy()
           reactRenderer.destroy()
         }
-      },
+      }
     }
   }, [])
 
   const suggestion = useMemo(
     () => ({
       items,
-      render,
+      render
     }),
     [items, render]
   )
 
   return {
     suggestion,
-    filePaths,
+    filePaths
   }
 }
 
@@ -672,21 +678,21 @@ export const useSymmetryConnection = () => {
     useState<SymmetryModelProvider | null>(null)
   const {
     context: symmetryConnectionSession,
-    setContext: setSymmetryConnectionSession,
+    setContext: setSymmetryConnectionSession
   } = useSessionContext<SymmetryConnection>(
     EXTENSION_SESSION_NAME.twinnySymmetryConnection
   )
 
   const {
     context: symmetryProviderStatus,
-    setContext: setSymmetryProviderStatus,
+    setContext: setSymmetryProviderStatus
   } = useSessionContext<string>(
     EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
   )
 
   const {
     context: autoConnectProviderContext,
-    setContext: setAutoConnectProviderContext,
+    setContext: setAutoConnectProviderContext
   } = useGlobalContext<boolean>(GLOBAL_STORAGE_KEY.autoConnectSymmetryProvider)
 
   const isProviderConnected = symmetryProviderStatus === "connected"
@@ -695,26 +701,26 @@ export const useSymmetryConnection = () => {
     setConnecting(true)
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyConnectSymmetry,
-      data: selectedModel,
+      data: selectedModel
     } as ClientMessage<SymmetryModelProvider>)
   }
 
   const disconnectSymmetry = () => {
     setConnecting(true)
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyDisconnectSymmetry,
+      type: EVENT_NAME.twinnyDisconnectSymmetry
     } as ClientMessage)
   }
 
   const connectAsProvider = () => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStartSymmetryProvider,
+      type: EVENT_NAME.twinnyStartSymmetryProvider
     } as ClientMessage)
   }
 
   const disconnectAsProvider = () => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStopSymmetryProvider,
+      type: EVENT_NAME.twinnyStopSymmetryProvider
     } as ClientMessage)
   }
 
@@ -772,7 +778,7 @@ export const useSymmetryConnection = () => {
     isProviderConnected,
     setAutoConnectProviderContext,
     symmetryConnection: symmetryConnectionSession,
-    symmetryProviderStatus,
+    symmetryProviderStatus
   }
 }
 

@@ -129,13 +129,6 @@ export async function activate(context: ExtensionContext) {
       completionProvider.onError()
       sidebarProvider.destroyStream()
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.templates, async () => {
-      await vscode.commands.executeCommand(
-        "vscode.openFolder",
-        vscode.Uri.file(templateDir),
-        true
-      )
-    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageProviders, async () => {
       commands.executeCommand(
         "setContext",

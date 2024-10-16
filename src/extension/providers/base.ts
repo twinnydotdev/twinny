@@ -143,6 +143,7 @@ export class BaseProvider {
       [EVENT_NAME.twinnyTextSelection]: this.getSelectedText,
       [EVENT_NAME.twinnyFileListRequest]: this.fileListRequest,
       [EVENT_NAME.twinnyNewConversation]: this.twinnyNewConversation,
+      [EVENT_NAME.twinnyEditDefaultTemplates]: this.editDefaultTemplates,
       [TWINNY_COMMAND_NAME.settings]: this.openSettings
     }
     this.webView?.onDidReceiveMessage((message: ClientMessage<Message[]>) => {
@@ -165,6 +166,15 @@ export class BaseProvider {
   public newConversation() {
     this._symmetryService?.write(
       createSymmetryMessage(serverMessageKeys.newConversation)
+    )
+  }
+
+  public editDefaultTemplates = async () => {
+    if (!this._templateDir) return
+    await vscode.commands.executeCommand(
+      "vscode.openFolder",
+      vscode.Uri.file(this._templateDir),
+      true
     )
   }
 
