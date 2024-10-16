@@ -1,29 +1,31 @@
-import { commands, ExtensionContext, Webview } from 'vscode'
-import { streamResponse } from './stream'
-import { getChatDataFromProvider, updateLoadingMessage } from './utils'
+import { commands, ExtensionContext, Webview } from "vscode"
+
+import {
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME,
+  GITHUB_EVENT_NAME,
+  USER,
+  WEBUI_TABS,
+} from "../common/constants"
 import {
   ClientMessage,
   RequestBodyBase,
   ServerMessage,
   StreamRequestOptions,
   StreamResponse,
-  TemplateData
-} from '../common/types'
-import {
-  EVENT_NAME,
-  EXTENSION_CONTEXT_NAME,
-  GITHUB_EVENT_NAME,
-  USER,
-  WEBUI_TABS
-} from '../common/constants'
-import { TemplateProvider } from './template-provider'
-import { ConversationHistory } from './conversation-history'
-import { SessionManager } from './session-manager'
-import { SymmetryService } from './symmetry-service'
+  TemplateData,
+} from "../common/types"
+
+import { ConversationHistory } from "./conversation-history"
+import { SessionManager } from "./session-manager"
+import { streamResponse } from "./stream"
+import { SymmetryService } from "./symmetry-service"
+import { TemplateProvider } from "./template-provider"
+import { getChatDataFromProvider, updateLoadingMessage } from "./utils"
 
 export class GithubService extends ConversationHistory {
-  private _completion = ''
-  private _githubToken = this.config.get('githubToken') as string
+  private _completion = ""
+  private _githubToken = this.config.get("githubToken") as string
   private _templateProvider: TemplateProvider
 
   constructor(
@@ -55,8 +57,8 @@ export class GithubService extends ConversationHistory {
   }
 
   private async loadReviewTemplate(diff: string): Promise<string> {
-    return await this._templateProvider.readTemplate<TemplateData>('review', {
-      code: diff
+    return await this._templateProvider.readTemplate<TemplateData>("review", {
+      code: diff,
     })
   }
 
@@ -67,7 +69,7 @@ export class GithubService extends ConversationHistory {
     const prs = await this.getPullRequests(data.owner, data.repo)
     this.webView.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequests,
-      value: { data: prs }
+      value: { data: prs },
     })
   }
 
@@ -91,14 +93,14 @@ export class GithubService extends ConversationHistory {
     )
     this.webView.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequestReview,
-      value: { data: review }
+      value: { data: review },
     })
   }
 
   getHeaders() {
     return {
       Authorization: `Bearer ${this._githubToken}`,
-      Accept: 'application/vnd.github.v3.diff'
+      Accept: "application/vnd.github.v3.diff",
     }
   }
 
@@ -106,15 +108,15 @@ export class GithubService extends ConversationHistory {
     this.webView.postMessage({
       type: EVENT_NAME.twinnySetTab,
       value: {
-        data: WEBUI_TABS.chat
-      }
+        data: WEBUI_TABS.chat,
+      },
     } as ServerMessage<string>)
   }
 
   async getPullRequests(owner: string, repo: string) {
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls`
     const response = await fetch(url, {
-      headers: this.getHeaders()
+      headers: this.getHeaders(),
     })
     return response.json()
   }
@@ -128,7 +130,7 @@ export class GithubService extends ConversationHistory {
     const headers = this.getHeaders()
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`
     const response = await fetch(url, {
-      headers
+      headers,
     })
     const diff = await response.text()
     const prompt = await this.loadReviewTemplate(`${title} \n\n ${diff}`)
@@ -136,8 +138,8 @@ export class GithubService extends ConversationHistory {
     const messages = [
       {
         role: USER,
-        content: prompt
-      }
+        content: prompt,
+      },
     ]
 
     const request = this.buildStreamRequest(messages)
@@ -153,21 +155,21 @@ export class GithubService extends ConversationHistory {
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         value: {
-          completion: prompt
-        }
+          completion: prompt,
+        },
       })
 
       this.webView?.postMessage({
-        type: EVENT_NAME.twinnyOnLoading
+        type: EVENT_NAME.twinnyOnLoading,
       })
 
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyReviewTab,
         false
       )
 
-      updateLoadingMessage(this.webView, 'Reviewing')
+      updateLoadingMessage(this.webView, "Reviewing")
 
       await this.streamCodeReview(request)
     }, 500)
@@ -175,7 +177,7 @@ export class GithubService extends ConversationHistory {
 
   streamCodeReview({
     requestBody,
-    requestOptions
+    requestOptions,
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
@@ -183,7 +185,7 @@ export class GithubService extends ConversationHistory {
   }): Promise<string> {
     const provider = this.getProvider()
 
-    if (!provider) return Promise.resolve('')
+    if (!provider) return Promise.resolve("")
 
     return new Promise((_, reject) => {
       try {
@@ -203,11 +205,11 @@ export class GithubService extends ConversationHistory {
               this.webView.postMessage({
                 type: EVENT_NAME.twinnyOnCompletion,
                 value: {
-                  completion: this._completion.trimStart()
-                }
+                  completion: this._completion.trimStart(),
+                },
               } as ServerMessage)
             } catch (error) {
-              console.error('Error parsing JSON:', error)
+              console.error("Error parsing JSON:", error)
               return
             }
           },
@@ -215,11 +217,11 @@ export class GithubService extends ConversationHistory {
             this.webView?.postMessage({
               type: EVENT_NAME.twinnyOnEnd,
               value: {
-                completion: this._completion.trimStart()
-              }
+                completion: this._completion.trimStart(),
+              },
             })
-            this._completion = ''
-          }
+            this._completion = ""
+          },
         })
       } catch (e) {
         return reject(e)

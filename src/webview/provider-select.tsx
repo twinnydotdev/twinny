@@ -1,10 +1,11 @@
 import {
   VSCodeDropdown,
   VSCodeOption,
-} from '@vscode/webview-ui-toolkit/react'
+} from "@vscode/webview-ui-toolkit/react"
 
-import { useProviders } from './hooks'
-import styles from './styles/providers.module.css'
+import { useProviders } from "./hooks"
+
+import styles from "./styles/providers.module.css"
 
 export const ProviderSelect = () => {
   const {
@@ -13,7 +14,7 @@ export const ProviderSelect = () => {
     setActiveFimProvider,
     providers,
     chatProvider,
-    fimProvider
+    fimProvider,
   } = useProviders()
 
   const handleChangeChatProvider = (e: unknown): void => {
@@ -39,7 +40,7 @@ export const ProviderSelect = () => {
           name="provider"
           onChange={handleChangeChatProvider}
         >
-          {Object.values(getProvidersByType('chat'))
+          {Object.values(getProvidersByType("chat"))
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>
@@ -55,7 +56,7 @@ export const ProviderSelect = () => {
           name="provider"
           onChange={handleChangeFimProvider}
         >
-          {Object.values(getProvidersByType('fim'))
+          {Object.values(getProvidersByType("fim"))
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>

@@ -64,21 +64,21 @@ export const RAGIcon = ({ enabled }: { enabled: boolean }) => (
   >
     <path
       d="M4 5C4 3.89543 5.79086 3 8 3C10.2091 3 12 3.89543 12 5M4 5C4 6.10457 5.79086 7 8 7C10.2091 7 12 6.10457 12 5M4 5V19C4 20.1046 5.79086 21 8 21C10.2091 21 12 20.1046 12 19V5"
-      stroke={enabled ? 'currentColor' : '#888888'}
+      stroke={enabled ? "currentColor" : "#888888"}
       strokeWidth="1"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
       d="M16 12H20M20 12L17 9M20 12L17 15"
-      stroke={enabled ? 'currentColor' : '#888888'}
+      stroke={enabled ? "currentColor" : "#888888"}
       strokeWidth="1"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
       d="M14 5H20M14 9H20M14 13H15M14 17H20"
-      stroke={enabled ? 'currentColor' : '#888888'}
+      stroke={enabled ? "currentColor" : "#888888"}
       strokeWidth="1"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -87,8 +87,8 @@ export const RAGIcon = ({ enabled }: { enabled: boolean }) => (
       cx="19"
       cy="19"
       r="3"
-      fill={enabled ? 'currentColor' : 'none'}
-      stroke={enabled ? 'currentColor' : '#888888'}
+      fill={enabled ? "currentColor" : "none"}
+      stroke={enabled ? "currentColor" : "#888888"}
       strokeWidth="1"
     />
   </svg>

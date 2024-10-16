@@ -1,15 +1,17 @@
-import React, { useEffect, useCallback, useMemo } from 'react'
-import Markdown, { Components } from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
-import { EditorContent, Extension, useEditor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import { Markdown as TiptapMarkdown } from 'tiptap-markdown'
+import React, { useCallback, useEffect, useMemo } from "react"
+import Markdown, { Components } from "react-markdown"
+import { EditorContent, Extension, useEditor } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
+import remarkGfm from "remark-gfm"
+import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
-import CodeBlock from './code-block'
-import { Message as MessageType, ThemeType } from '../common/types'
-import { ASSISTANT, TWINNY, YOU } from '../common/constants'
-import styles from './styles/index.module.css'
+import { ASSISTANT, TWINNY, YOU } from "../common/constants"
+import { Message as MessageType, ThemeType } from "../common/types"
+
+import CodeBlock from "./code-block"
+
+import styles from "./styles/index.module.css"
 
 interface MessageProps {
   conversationLength?: number
@@ -24,7 +26,7 @@ interface MessageProps {
 }
 
 const CustomKeyMap = Extension.create({
-  name: 'messageKeyMap',
+  name: "messageKeyMap",
   addKeyboardShortcuts() {
     return {
       Enter: ({ editor }) => {
@@ -32,16 +34,16 @@ const CustomKeyMap = Extension.create({
         this.options.handleToggleSave()
         return true
       },
-      'Mod-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
+      "Mod-Enter": ({ editor }) => {
+        editor.commands.insertContent("\n")
         return true
       },
-      'Shift-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
+      "Shift-Enter": ({ editor }) => {
+        editor.commands.insertContent("\n")
         return true
-      }
+      },
     }
-  }
+  },
 })
 
 const MemoizedCodeBlock = React.memo(CodeBlock)
@@ -57,7 +59,7 @@ export const Message: React.FC<MessageProps> = React.memo(
     onDelete,
     onRegenerate,
     onUpdate,
-    theme
+    theme,
   }) => {
     const [editing, setEditing] = React.useState<boolean>(false)
 
@@ -81,7 +83,7 @@ export const Message: React.FC<MessageProps> = React.memo(
       if (message?.content === content) {
         return setEditing(false)
       }
-      onUpdate?.(content || '', index)
+      onUpdate?.(content || "", index)
       setEditing(false)
     }, [message?.content, onUpdate, index])
 
@@ -90,11 +92,11 @@ export const Message: React.FC<MessageProps> = React.memo(
         extensions: [
           StarterKit,
           CustomKeyMap.configure({
-            handleToggleSave
+            handleToggleSave,
           }),
-          TiptapMarkdown
+          TiptapMarkdown,
         ],
-        content: message?.content
+        content: message?.content,
       },
       [index]
     )
@@ -129,7 +131,7 @@ export const Message: React.FC<MessageProps> = React.memo(
     const markdownComponents = useMemo(
       () => ({
         pre: renderPre,
-        code: renderCode
+        code: renderCode,
       }),
       [renderPre, renderCode]
     )

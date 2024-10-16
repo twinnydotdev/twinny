@@ -1,15 +1,15 @@
+import * as fs from "fs/promises"
+import * as path from "path"
 import {
-  StatusBarItem,
   commands,
-  window,
-  workspace,
+  DiagnosticSeverity,
   ExtensionContext,
   languages,
-  DiagnosticSeverity,
-  Webview
-} from 'vscode'
-import * as path from 'path'
-import * as fs from 'fs/promises'
+  StatusBarItem,
+  Webview,
+  window,
+  workspace,
+} from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -23,49 +23,50 @@ import {
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
-  WEBUI_TABS
-} from '../common/constants'
+  WEBUI_TABS,
+} from "../common/constants"
+import { CodeLanguageDetails } from "../common/languages"
+import { Logger } from "../common/logger"
 import {
-  StreamResponse,
+  FileItem,
+  Message,
   RequestBodyBase,
   ServerMessage,
-  TemplateData,
-  Message,
   StreamRequestOptions,
-  FileItem
-} from '../common/types'
+  StreamResponse,
+  TemplateData,
+} from "../common/types"
+import { kebabToSentence } from "../webview/utils"
+
+import { EmbeddingDatabase } from "./embeddings"
+import { TwinnyProvider } from "./provider-manager"
+import { createStreamRequestBody } from "./provider-options"
+import { Reranker } from "./reranker"
+import { SessionManager } from "./session-manager"
+import { streamResponse } from "./stream"
+import { SymmetryService } from "./symmetry-service"
+import { TemplateProvider } from "./template-provider"
 import {
   getChatDataFromProvider,
   getLanguage,
-  updateLoadingMessage
-} from './utils'
-import { CodeLanguageDetails } from '../common/languages'
-import { TemplateProvider } from './template-provider'
-import { streamResponse } from './stream'
-import { createStreamRequestBody } from './provider-options'
-import { kebabToSentence } from '../webview/utils'
-import { TwinnyProvider } from './provider-manager'
-import { EmbeddingDatabase } from './embeddings'
-import { Reranker } from './reranker'
-import { SymmetryService } from './symmetry-service'
-import { Logger } from '../common/logger'
-import { SessionManager } from './session-manager'
+  updateLoadingMessage,
+} from "./utils"
 
 const logger = new Logger()
 
 export class ChatService {
-  private _completion = ''
-  private _config = workspace.getConfiguration('twinny')
+  private _completion = ""
+  private _config = workspace.getConfiguration("twinny")
   private _context?: ExtensionContext
   private _controller?: AbortController
   private _db?: EmbeddingDatabase
-  private _keepAlive = this._config.get('keepAlive') as string | number
-  private _numPredictChat = this._config.get('numPredictChat') as number
-  private _promptTemplate = ''
+  private _keepAlive = this._config.get("keepAlive") as string | number
+  private _numPredictChat = this._config.get("numPredictChat") as number
+  private _promptTemplate = ""
   private _reranker: Reranker
   private _statusBar: StatusBarItem
   private _symmetryService?: SymmetryService
-  private _temperature = this._config.get('temperature') as number
+  private _temperature = this._config.get("temperature") as number
   private _templateProvider?: TemplateProvider
   private _webView?: Webview
   private _sessionManager: SessionManager | undefined
@@ -88,7 +89,7 @@ export class ChatService {
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration('twinny')) {
+      if (!event.affectsConfiguration("twinny")) {
         return
       }
       this.updateConfig()
@@ -105,8 +106,8 @@ export class ChatService {
           type: EVENT_NAME.twinnyOnCompletion,
           value: {
             completion: completion.trimStart(),
-            data: getLanguage()
-          }
+            data: getLanguage(),
+          },
         } as ServerMessage)
       }
     )
@@ -140,7 +141,7 @@ export class ChatService {
           embedding,
           relevantFileCount,
           table,
-          metric as 'cosine' | 'l2' | 'dot'
+          metric as "cosine" | "l2" | "dot"
         )) || []
 
       if (!filePaths.length) return []
@@ -207,10 +208,10 @@ export class ChatService {
       }
 
       if (stats.size === 0) {
-        return ''
+        return ""
       }
 
-      const content = await fs.readFile(filePath, 'utf-8')
+      const content = await fs.readFile(filePath, "utf-8")
       return content
     } catch (error) {
       return null
@@ -221,7 +222,7 @@ export class ChatService {
     text: string | undefined,
     relevantFiles: [string, number][]
   ): Promise<string> {
-    if (!this._db || !text || !workspace.name) return ''
+    if (!this._db || !text || !workspace.name) return ""
 
     const table = `${workspace.name}-documents`
     const rerankThreshold = this.getRerankThreshold()
@@ -235,7 +236,7 @@ export class ChatService {
 
       const embedding = await this._db.fetchModelEmbedding(text)
 
-      if (!embedding) return ''
+      if (!embedding) return ""
 
       const storedMetric = this._context?.globalState.get(
         `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric}`
@@ -243,15 +244,15 @@ export class ChatService {
       const metric = storedMetric || DEFAULT_VECTOR_SEARCH_METRIC
 
       const query = relevantFiles?.length
-        ? `file IN ("${relevantFiles.map((file) => file[0]).join('","')}")`
-        : ''
+        ? `file IN ("${relevantFiles.map((file) => file[0]).join("\",\"")}")`
+        : ""
 
       const queryEmbeddedDocuments =
         (await this._db.getDocuments(
           embedding,
           Math.round(relevantCodeCount / 2),
           table,
-          metric as 'cosine' | 'l2' | 'dot',
+          metric as "cosine" | "l2" | "dot",
           query
         )) || []
 
@@ -260,17 +261,17 @@ export class ChatService {
           embedding,
           Math.round(relevantCodeCount / 2),
           table,
-          metric as 'cosine' | 'l2' | 'dot'
+          metric as "cosine" | "l2" | "dot"
         )) || []
 
       const documents = [...embeddedDocuments, ...queryEmbeddedDocuments]
 
       const documentScores = await this._reranker.rerank(
         text,
-        documents.map((item) => (item.content ? item.content.trim() : ''))
+        documents.map((item) => (item.content ? item.content.trim() : ""))
       )
 
-      if (!documentScores) return ''
+      if (!documentScores) return ""
 
       const readThreshould = rerankThreshold
 
@@ -292,11 +293,11 @@ export class ChatService {
         .map(({ content }) => content)
 
       return [readFileChunks.filter(Boolean), documentChunks.filter(Boolean)]
-        .join('\n\n')
+        .join("\n\n")
         .trim()
     }
 
-    return ''
+    return ""
   }
 
   private getProvider = () => {
@@ -316,11 +317,11 @@ export class ChatService {
       port: Number(provider.apiPort),
       path: provider.apiPath,
       protocol: provider.apiProtocol,
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${provider.apiKey}`
-      }
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`,
+      },
     }
 
     const requestBody = createStreamRequestBody(provider.provider, {
@@ -328,7 +329,7 @@ export class ChatService {
       numPredictChat: this._numPredictChat,
       temperature: this._temperature,
       messages,
-      keepAlive: this._keepAlive
+      keepAlive: this._keepAlive,
     })
 
     return { requestOptions, requestBody }
@@ -350,26 +351,26 @@ export class ChatService {
         value: {
           completion: this._completion.trimStart(),
           data: getLanguage(),
-          type: this._promptTemplate
-        }
+          type: this._promptTemplate,
+        },
       } as ServerMessage)
     } catch (error) {
-      console.error('Error parsing JSON:', error)
+      console.error("Error parsing JSON:", error)
       return
     }
   }
 
   private onStreamEnd = (onEnd?: (completion: string) => void) => {
-    this._statusBar.text = '$(code)'
+    this._statusBar.text = "$(code)"
     commands.executeCommand(
-      'setContext',
+      "setContext",
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
     if (onEnd) {
       onEnd(this._completion)
       this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnEnd
+        type: EVENT_NAME.twinnyOnEnd,
       } as ServerMessage)
       return
     }
@@ -378,8 +379,8 @@ export class ChatService {
       value: {
         completion: this._completion.trimStart(),
         data: getLanguage(),
-        type: this._promptTemplate
-      }
+        type: this._promptTemplate,
+      },
     } as ServerMessage)
   }
 
@@ -388,15 +389,15 @@ export class ChatService {
       type: EVENT_NAME.twinnyOnEnd,
       value: {
         error: true,
-        errorMessage: error.message
-      }
+        errorMessage: error.message,
+      },
     } as ServerMessage)
   }
 
   private onStreamStart = (controller: AbortController) => {
     this._controller = controller
     commands.executeCommand(
-      'setContext',
+      "setContext",
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       true
     )
@@ -409,9 +410,9 @@ export class ChatService {
 
   public destroyStream = () => {
     this._controller?.abort()
-    this._statusBar.text = '$(code)'
+    this._statusBar.text = "$(code)"
     commands.executeCommand(
-      'setContext',
+      "setContext",
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       true
     )
@@ -420,8 +421,8 @@ export class ChatService {
       value: {
         completion: this._completion.trimStart(),
         data: getLanguage(),
-        type: this._promptTemplate
-      }
+        type: this._promptTemplate,
+      },
     } as ServerMessage)
   }
 
@@ -433,22 +434,22 @@ export class ChatService {
     const editor = window.activeTextEditor
     const selection = editor?.selection
     const selectionContext =
-      editor?.document.getText(selection) || context || ''
+      editor?.document.getText(selection) || context || ""
 
     const prompt = await this._templateProvider?.readTemplate<TemplateData>(
       template,
       {
-        code: selectionContext || '',
-        language: language?.langName || 'unknown'
+        code: selectionContext || "",
+        language: language?.langName || "unknown",
       }
     )
-    return { prompt: prompt || '', selection: selectionContext }
+    return { prompt: prompt || "", selection: selectionContext }
   }
 
   private streamResponse({
     requestBody,
     requestOptions,
-    onEnd
+    onEnd,
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
@@ -461,7 +462,7 @@ export class ChatService {
         this.onStreamData(streamResponse as StreamResponse, onEnd),
       onEnd: () => this.onStreamEnd(onEnd),
       onStart: this.onStreamStart,
-      onError: this.onStreamError
+      onError: this.onStreamError,
     })
   }
 
@@ -469,8 +470,8 @@ export class ChatService {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySendLanguage,
       value: {
-        data: getLanguage()
-      }
+        data: getLanguage(),
+      },
     } as ServerMessage)
   }
 
@@ -478,8 +479,8 @@ export class ChatService {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
       value: {
-        data: WEBUI_TABS.chat
-      }
+        data: WEBUI_TABS.chat,
+      },
     } as ServerMessage<string>)
   }
 
@@ -494,11 +495,11 @@ export class ChatService {
           lineNumber: diagnostic.range.start.line + 1,
           character: diagnostic.range.start.character + 1,
           source: diagnostic.source,
-          diagnosticCode: diagnostic.code
+          diagnosticCode: diagnostic.code,
         }))
       )
       .map((problem) => JSON.stringify(problem))
-      .join('\n')
+      .join("\n")
 
     return problems
   }
@@ -508,28 +509,28 @@ export class ChatService {
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
 
-    let combinedContext = ''
+    let combinedContext = ""
 
-    const workspaceMentioned = text?.includes('@workspace')
+    const workspaceMentioned = text?.includes("@workspace")
 
-    const problemsMentioned = text?.includes('@problems')
+    const problemsMentioned = text?.includes("@problems")
 
     if (symmetryConnected) return null
 
-    let problemsContext = ''
+    let problemsContext = ""
 
     if (problemsMentioned) {
       problemsContext = this.getProblemsContext()
-      if (problemsContext) combinedContext += problemsContext + '\n\n'
+      if (problemsContext) combinedContext += problemsContext + "\n\n"
     }
 
-    const prompt = text?.replace(/@workspace|@problems/g, '')
+    const prompt = text?.replace(/@workspace|@problems/g, "")
 
     let relevantFiles: [string, number][] | null = []
-    let relevantCode: string | null = ''
+    let relevantCode: string | null = ""
 
     if (workspaceMentioned) {
-      updateLoadingMessage(this._webView, 'Exploring knowledge base')
+      updateLoadingMessage(this._webView, "Exploring knowledge base")
       relevantFiles = await this.getRelevantFiles(prompt)
       relevantCode = await this.getRelevantCode(prompt, relevantFiles)
     }
@@ -537,16 +538,16 @@ export class ChatService {
     if (relevantFiles?.length) {
       const filesTemplate =
         await this._templateProvider?.readTemplate<TemplateData>(
-          'relevant-files',
-          { code: relevantFiles.map((file) => file[0]).join(', ') }
+          "relevant-files",
+          { code: relevantFiles.map((file) => file[0]).join(", ") }
         )
-      combinedContext += filesTemplate + '\n\n'
+      combinedContext += filesTemplate + "\n\n"
     }
 
     if (relevantCode) {
       const codeTemplate =
         await this._templateProvider?.readTemplate<TemplateData>(
-          'relevant-code',
+          "relevant-code",
           { code: relevantCode }
         )
       combinedContext += codeTemplate
@@ -556,12 +557,12 @@ export class ChatService {
   }
 
   private async loadFileContents(files: FileItem[]): Promise<string> {
-    if (!files?.length) return ''
-    let fileContents = ''
+    if (!files?.length) return ""
+    let fileContents = ""
 
     for (const file of files) {
       try {
-        const content = await fs.readFile(file.path, 'utf-8')
+        const content = await fs.readFile(file.path, "utf-8")
         fileContents += `File: ${file.name}\n\n${content}\n\n`
       } catch (error) {
         console.error(`Error reading file ${file.path}:`, error)
@@ -574,7 +575,7 @@ export class ChatService {
     messages: Message[],
     filePaths: FileItem[]
   ) {
-    this._completion = ''
+    this._completion = ""
     this.sendEditorLanguage()
     const editor = window.activeTextEditor
     const selection = editor?.selection
@@ -586,10 +587,10 @@ export class ChatService {
       role: SYSTEM,
       content: await this._templateProvider?.readSystemMessageTemplate(
         this._promptTemplate
-      )
+      ),
     }
 
-    let additionalContext = ''
+    let additionalContext = ""
 
     if (userSelection) {
       additionalContext += `Selected Code:\n${userSelection}\n\n`
@@ -597,7 +598,7 @@ export class ChatService {
 
     const ragContext = await this.getRagContext(text)
 
-    const cleanedText = text?.replace(/@workspace/g, '').trim()
+    const cleanedText = text?.replace(/@workspace/g, "").trim()
 
     if (ragContext) {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
@@ -616,7 +617,7 @@ export class ChatService {
 
     conversation.push(...messages.slice(0, -1))
 
-    if (!provider.modelName.includes('claude')) {
+    if (!provider.modelName.includes("claude")) {
       conversation.unshift(systemMessage)
     }
 
@@ -624,15 +625,15 @@ export class ChatService {
       const lastMessageContent = `${cleanedText}\n\n${additionalContext.trim()}`
       conversation.push({
         role: USER,
-        content: lastMessageContent
+        content: lastMessageContent,
       })
     } else {
       conversation.push({
         ...lastMessage,
-        content: cleanedText
+        content: cleanedText,
       })
     }
-    updateLoadingMessage(this._webView, 'Thinking')
+    updateLoadingMessage(this._webView, "Thinking")
     const request = this.buildStreamRequest(conversation)
     if (!request) return
     const { requestBody, requestOptions } = request
@@ -644,9 +645,9 @@ export class ChatService {
     context?: string,
     skipMessage?: boolean
   ): Promise<Message[]> {
-    this._statusBar.text = '$(loading~spin)'
+    this._statusBar.text = "$(loading~spin)"
     const { language } = getLanguage()
-    this._completion = ''
+    this._completion = ""
     this._promptTemplate = template
     this.sendEditorLanguage()
 
@@ -659,14 +660,14 @@ export class ChatService {
     if (!skipMessage) {
       this.focusChatTab()
       this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnLoading
+        type: EVENT_NAME.twinnyOnLoading,
       })
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         value: {
-          completion: kebabToSentence(template) + '\n\n' + '```\n' + selection,
-          data: getLanguage()
-        }
+          completion: kebabToSentence(template) + "\n\n" + "```\n" + selection,
+          data: getLanguage(),
+        },
       } as ServerMessage)
     }
 
@@ -674,12 +675,12 @@ export class ChatService {
       role: SYSTEM,
       content: await this._templateProvider?.readSystemMessageTemplate(
         this._promptTemplate
-      )
+      ),
     }
 
     let ragContext = undefined
 
-    if (['explain'].includes(template)) {
+    if (["explain"].includes(template)) {
       ragContext = await this.getRagContext(selection)
     }
 
@@ -695,10 +696,10 @@ export class ChatService {
 
     conversation.push({
       role: USER,
-      content: userContent
+      content: userContent,
     })
 
-    if (!provider.modelName.includes('claude')) {
+    if (!provider.modelName.includes("claude")) {
       conversation.unshift(systemMessage)
     }
 
@@ -724,8 +725,8 @@ export class ChatService {
   }
 
   private updateConfig() {
-    this._config = workspace.getConfiguration('twinny')
-    this._temperature = this._config.get('temperature') as number
-    this._keepAlive = this._config.get('keepAlive') as string | number
+    this._config = workspace.getConfiguration("twinny")
+    this._temperature = this._config.get("temperature") as number
+    this._keepAlive = this._config.get("keepAlive") as string | number
   }
 }

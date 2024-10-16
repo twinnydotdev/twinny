@@ -1,4 +1,4 @@
-import { ExtensionContext } from 'vscode'
+import { ExtensionContext } from "vscode"
 
 let context: ExtensionContext | null = null
 

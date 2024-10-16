@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { WebSocket } from 'ws'
-import * as vscode from 'vscode'
-import { EVENT_NAME, URL_SYMMETRY_WS } from '../common/constants'
+import * as vscode from "vscode"
+import { WebSocket } from "ws"
+
+import { EVENT_NAME, URL_SYMMETRY_WS } from "../common/constants"
 
 export class SymmetryWs {
   private _ws: WebSocket | null = null
@@ -14,22 +15,22 @@ export class SymmetryWs {
   public connectSymmetryWs = () => {
     this._ws = new WebSocket(URL_SYMMETRY_WS)
 
-    this._ws.on('message', (data: any) => {
+    this._ws.on("message", (data: any) => {
       try {
         const parsedData = JSON.parse(data.toString())
         this._webView?.postMessage({
           type: EVENT_NAME.twinnySymmetryModeles,
           value: {
-            data: parsedData?.allPeers
-          }
+            data: parsedData?.allPeers,
+          },
         })
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error)
+        console.error("Error parsing WebSocket message:", error)
       }
     })
 
-    this._ws.on('error', (error: any) => {
-      console.error('WebSocket error:', error)
+    this._ws.on("error", (error: any) => {
+      console.error("WebSocket error:", error)
     })
   }
 

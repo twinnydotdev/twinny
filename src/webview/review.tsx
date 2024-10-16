@@ -1,8 +1,11 @@
-import React, { FormEvent, useEffect } from 'react'
-import { VSCodeButton, VSCodeTextField } from '@vscode/webview-ui-toolkit/react'
-import { useGithubPRs, useGlobalContext } from './hooks'
-import styles from './styles/index.module.css'
-import { WORKSPACE_STORAGE_KEY } from '../common/constants'
+import React, { FormEvent, useEffect } from "react"
+import { VSCodeButton, VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
+
+import { WORKSPACE_STORAGE_KEY } from "../common/constants"
+
+import { useGithubPRs, useGlobalContext } from "./hooks"
+
+import styles from "./styles/index.module.css"
 
 export const Review = () => {
   const { prs, getPrs, startReview, isLoading } = useGithubPRs()
@@ -49,12 +52,12 @@ export const Review = () => {
       </p>
       <div className={styles.prInputContainer}>
         <VSCodeTextField
-          value={owner ? owner : ''}
+          value={owner ? owner : ""}
           onChange={handleOwnerChange}
           placeholder="Owner"
         />
         <VSCodeTextField
-          value={repo ? repo : ''}
+          value={repo ? repo : ""}
           onChange={handleRepoChange}
           placeholder="Repository"
         />
@@ -63,7 +66,7 @@ export const Review = () => {
             onClick={handleFetchPRs}
             disabled={isLoading || !owner || !repo}
           >
-            {isLoading ? 'Fetching...' : 'Fetch PRs'}
+            {isLoading ? "Fetching..." : "Fetch PRs"}
           </VSCodeButton>
         </div>
       </div>

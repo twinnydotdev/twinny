@@ -1,15 +1,15 @@
-import { Extension } from '@tiptap/react'
-import { MentionPluginKey } from '@tiptap/extension-mention'
+import { MentionPluginKey } from "@tiptap/extension-mention"
+import { Extension } from "@tiptap/react"
 
-import { EMPTY_MESAGE } from '../common/constants'
-import { CodeLanguage, supportedLanguages } from '../common/languages'
-import { LanguageType, ServerMessage } from '../common/types'
+import { EMPTY_MESAGE } from "../common/constants"
+import { CodeLanguage, supportedLanguages } from "../common/languages"
+import { LanguageType, ServerMessage } from "../common/types"
 
 export const getLanguageMatch = (
   language: LanguageType | undefined,
   className: string | undefined
 ) => {
-  const match = /language-(\w+)/.exec(className || '')
+  const match = /language-(\w+)/.exec(className || "")
 
   if (match && match.length) {
     const matchedLanguage = supportedLanguages[match[1] as CodeLanguage]
@@ -28,7 +28,7 @@ export const getLanguageMatch = (
       : languageId
   }
 
-  return 'auto'
+  return "auto"
 }
 
 export const getCompletionContent = (message: ServerMessage) => {
@@ -41,10 +41,10 @@ export const getCompletionContent = (message: ServerMessage) => {
 
 export const kebabToSentence = (kebabStr: string) => {
   if (!kebabStr) {
-    return ''
+    return ""
   }
 
-  const words = kebabStr.split('-')
+  const words = kebabStr.split("-")
 
   if (!words.length) {
     return kebabStr
@@ -52,10 +52,10 @@ export const kebabToSentence = (kebabStr: string) => {
 
   words[0] = words[0].charAt(0).toUpperCase() + words[0].slice(1)
 
-  return words.join(' ')
+  return words.join(" ")
 }
 
-export const getLineBreakCount = (str: string) => str.split('\n').length
+export const getLineBreakCount = (str: string) => str.split("\n").length
 
 export const getModelShortName = (name: string) => {
   if (name.length > 40) {
@@ -66,7 +66,7 @@ export const getModelShortName = (name: string) => {
 
 
 export const CustomKeyMap = Extension.create({
-  name: 'chatKeyMap',
+  name: "chatKeyMap",
 
   addKeyboardShortcuts() {
     return {
@@ -79,14 +79,14 @@ export const CustomKeyMap = Extension.create({
         this.options.clearEditor()
         return true
       },
-      'Mod-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
+      "Mod-Enter": ({ editor }) => {
+        editor.commands.insertContent("\n")
         return true
       },
-      'Shift-Enter': ({ editor }) => {
-        editor.commands.insertContent('\n')
+      "Shift-Enter": ({ editor }) => {
+        editor.commands.insertContent("\n")
         return true
-      }
+      },
     }
-  }
+  },
 })

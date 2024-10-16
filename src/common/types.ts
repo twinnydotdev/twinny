@@ -1,7 +1,8 @@
-import { InlineCompletionItem, InlineCompletionList, Uri } from 'vscode'
-import { CodeLanguageDetails } from './languages'
-import { ALL_BRACKETS } from './constants'
-import { serverMessageKeys } from 'symmetry-core'
+import { serverMessageKeys } from "symmetry-core"
+import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
+
+import { ALL_BRACKETS } from "./constants"
+import { CodeLanguageDetails } from "./languages"
 
 export interface RequestBodyBase {
   stream: boolean
@@ -44,7 +45,7 @@ export interface StreamResponse {
   content: string
   message: {
     content: string,
-    role: 'assistant'
+    role: "assistant"
   }
   done: boolean
   context: number[]
@@ -109,9 +110,9 @@ export interface Conversation {
 }
 
 export const Theme = {
-  Light: 'Light',
-  Dark: 'Dark',
-  Contrast: 'Contrast'
+  Light: "Light",
+  Dark: "Dark",
+  Contrast: "Contrast",
 } as const
 
 export interface DefaultTemplate {
@@ -179,12 +180,12 @@ export interface UiTabs {
 }
 
 export const apiProviders = {
-  LiteLLM: 'litellm',
-  LlamaCpp: 'llamacpp',
-  LMStudio: 'lmstudio',
-  Ollama: 'ollama',
-  Oobabooga: 'oobabooga',
-  OpenWebUI: 'openwebui'
+  LiteLLM: "litellm",
+  LlamaCpp: "llamacpp",
+  LMStudio: "lmstudio",
+  Ollama: "ollama",
+  Oobabooga: "oobabooga",
+  OpenWebUI: "openwebui",
 } as const
 
 export interface ApiModel {

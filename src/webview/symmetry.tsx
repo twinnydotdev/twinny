@@ -1,15 +1,16 @@
-import React, { useEffect } from 'react'
+import React, { useEffect } from "react"
 import {
   VSCodeButton,
-  VSCodePanelView,
-  VSCodeDivider,
   VSCodeCheckbox,
+  VSCodeDivider,
   VSCodeDropdown,
-  VSCodeOption
-} from '@vscode/webview-ui-toolkit/react'
+  VSCodeOption,
+  VSCodePanelView,
+} from "@vscode/webview-ui-toolkit/react"
 
-import { useSymmetryConnection } from './hooks'
-import styles from './styles/symmetry.module.css'
+import { useSymmetryConnection } from "./hooks"
+
+import styles from "./styles/symmetry.module.css"
 
 export const Symmetry = () => {
   const {
@@ -26,7 +27,7 @@ export const Symmetry = () => {
     setAutoConnectProviderContext,
     models,
     selectedModel,
-    setSelectedModel
+    setSelectedModel,
   } = useSymmetryConnection()
 
   const handleAutoConnectProviderChange = (
@@ -48,10 +49,10 @@ export const Symmetry = () => {
   const ConnectionStatus = () => (
     <span className={isConnected ? styles.connected : styles.disconnected}>
       {connecting
-        ? 'Connecting...'
+        ? "Connecting..."
         : isConnected
-        ? 'Connected'
-        : 'Not connected'}
+        ? "Connected"
+        : "Not connected"}
     </span>
   )
 
@@ -59,11 +60,11 @@ export const Symmetry = () => {
     <span
       className={isProviderConnected ? styles.connected : styles.disconnected}
     >
-      {symmetryProviderStatus === 'connecting'
-        ? 'Connecting...'
+      {symmetryProviderStatus === "connecting"
+        ? "Connecting..."
         : isProviderConnected
-        ? 'Connected'
-        : 'Not connected'}
+        ? "Connected"
+        : "Not connected"}
     </span>
   )
 
@@ -115,7 +116,7 @@ export const Symmetry = () => {
                       return (
                         <VSCodeOption
                           key={modelName}
-                          value={model?.id.toString() ?? ''}
+                          value={model?.id.toString() ?? ""}
                         >
                           {modelName}
                         </VSCodeOption>
@@ -133,10 +134,10 @@ export const Symmetry = () => {
               onClick={isConnected ? disconnectSymmetry : connectToSymmetry}
             >
               {connecting
-                ? 'Connecting...'
+                ? "Connecting..."
                 : isConnected
-                ? 'Disconnect'
-                : 'Connect'}
+                ? "Disconnect"
+                : "Connect"}
             </VSCodeButton>
           </div>
 
@@ -152,11 +153,11 @@ export const Symmetry = () => {
                 isProviderConnected ? disconnectAsProvider : connectAsProvider
               }
             >
-              {symmetryProviderStatus === 'connecting'
-                ? 'Connecting...'
+              {symmetryProviderStatus === "connecting"
+                ? "Connecting..."
                 : isProviderConnected
-                ? 'Disconnect'
-                : 'Connect'}
+                ? "Disconnect"
+                : "Connect"}
             </VSCodeButton>
           </div>
           <div className={styles.checkboxContainer}>
@@ -169,7 +170,7 @@ export const Symmetry = () => {
           </div>
           {isProviderConnected && (
             <p>
-              You should now be visible on the{' '}
+              You should now be visible on the{" "}
               <a
                 href="https://twinny.dev/symmetry"
                 target="_blank"
@@ -177,15 +178,15 @@ export const Symmetry = () => {
               >
                 Symmetry providers page
               </a>
-              . For a more permanent connection, consider using the{' '}
-              <code>symmetry-cli</code> package. Visit the{' '}
+              . For a more permanent connection, consider using the{" "}
+              <code>symmetry-cli</code> package. Visit the{" "}
               <a
                 href="https://github.com/twinnydotdev/symmetry-cli"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Symmetry CLI repository
-              </a>{' '}
+              </a>{" "}
               to get started.
             </p>
           )}
@@ -193,7 +194,7 @@ export const Symmetry = () => {
           <VSCodeDivider />
 
           <p>
-            For more information about Symmetry, please refer to our{' '}
+            For more information about Symmetry, please refer to our{" "}
             <a
               href="https://twinnydotdev.github.io/twinny-docs/general/symmetry"
               target="_blank"
@@ -216,7 +217,7 @@ export const Symmetry = () => {
         connections are peer to peer, encrypted end-to-end and secure.
       </p>
       <p>
-        To explore available providers, visit the{' '}
+        To explore available providers, visit the{" "}
         <a
           href="https://twinny.dev/symmetry"
           target="_blank"

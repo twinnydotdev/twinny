@@ -1,7 +1,8 @@
-import Parser, { SyntaxNode } from 'web-tree-sitter'
-import { WASM_LANGUAGES } from '../common/constants'
-import path from 'path'
-import { Position } from 'vscode'
+import path from "path"
+import { Position } from "vscode"
+import Parser, { SyntaxNode } from "web-tree-sitter"
+
+import { WASM_LANGUAGES } from "../common/constants"
 
 const parserCache: { [language: string]: Parser } = {}
 
@@ -28,7 +29,7 @@ export const getParser = async (
     const parser = new Parser()
     const wasmPath = path.join(
       __dirname,
-      'tree-sitter-wasms',
+      "tree-sitter-wasms",
       `tree-sitter-${language}.wasm`
     )
     const parserLanguage = await Parser.Language.load(wasmPath)
@@ -37,7 +38,7 @@ export const getParser = async (
     parserCache[language] = parser
     return parser
   } catch (e) {
-    console.error('Error in getParser:', e)
+    console.error("Error in getParser:", e)
     throw e
   }
 }

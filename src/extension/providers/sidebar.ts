@@ -1,9 +1,10 @@
-import * as vscode from 'vscode'
+import * as vscode from "vscode"
 
-import { EmbeddingDatabase } from '../embeddings'
-import { SessionManager } from '../session-manager'
-import { BaseProvider } from './base'
-import { getNonce } from '../utils'
+import { EmbeddingDatabase } from "../embeddings"
+import { SessionManager } from "../session-manager"
+import { getNonce } from "../utils"
+
+import { BaseProvider } from "./base"
 
 export class SidebarProvider extends BaseProvider {
   public context: vscode.ExtensionContext
@@ -24,7 +25,7 @@ export class SidebarProvider extends BaseProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [this.context?.extensionUri]
+      localResourceRoots: [this.context?.extensionUri],
     }
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview)
@@ -34,17 +35,17 @@ export class SidebarProvider extends BaseProvider {
 
   private getHtmlForWebview(webview: vscode.Webview) {
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.js')
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "sidebar.js")
     )
 
     const codiconCssUri = vscode.Uri.joinPath(
       this.context.extensionUri,
-      'assets',
-      'codicon.css'
+      "assets",
+      "codicon.css"
     )
 
     const css = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.css')
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "sidebar.css")
     )
 
     const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)

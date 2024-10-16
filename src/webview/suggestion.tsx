@@ -1,19 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RefAttributes } from 'react'
-import { ReactRenderer } from '@tiptap/react'
-import tippy, { Instance as TippyInstance } from 'tippy.js'
-import { SuggestionProps, SuggestionKeyDownProps } from '@tiptap/suggestion'
-import { MentionNodeAttrs } from '@tiptap/extension-mention'
+import { RefAttributes } from "react"
+import { MentionNodeAttrs } from "@tiptap/extension-mention"
+import { ReactRenderer } from "@tiptap/react"
+import { SuggestionKeyDownProps,SuggestionProps } from "@tiptap/suggestion"
+import tippy, { Instance as TippyInstance } from "tippy.js"
 
 import {
   MentionList,
   MentionListProps,
   MentionListRef,
-} from './mention-list'
+} from "./mention-list"
 
 export const getSuggestions = (fileList: string[]) => ({
   items: ({ query }: { query: string }): string[] => {
-    return ['workspace', 'problems', ...fileList].filter((item) =>
+    return ["workspace", "problems", ...fileList].filter((item) =>
       item.toLowerCase().startsWith(query.toLowerCase())
     )
   },
@@ -29,7 +29,7 @@ export const getSuggestions = (fileList: string[]) => ({
       onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
         component = new ReactRenderer(MentionList, {
           props,
-          editor: props.editor
+          editor: props.editor,
         })
 
         const getReferenceClientRect = props.clientRect as () => DOMRect
@@ -38,21 +38,21 @@ export const getSuggestions = (fileList: string[]) => ({
           return
         }
 
-        popup = tippy('body', {
+        popup = tippy("body", {
           getReferenceClientRect,
           appendTo: () => document.body,
           content: component.element,
           showOnCreate: true,
           interactive: true,
-          trigger: 'manual',
-          placement: 'bottom-start'
+          trigger: "manual",
+          placement: "bottom-start",
         })
       },
 
       onUpdate(props: SuggestionProps<MentionNodeAttrs>) {
         component.updateProps({
           ...props,
-          items: getSuggestions(fileList).items({ query: props.query })
+          items: getSuggestions(fileList).items({ query: props.query }),
         })
 
         if (!props.clientRect) {
@@ -60,12 +60,12 @@ export const getSuggestions = (fileList: string[]) => ({
         }
 
         popup[0].setProps({
-          getReferenceClientRect: props.clientRect as () => DOMRect
+          getReferenceClientRect: props.clientRect as () => DOMRect,
         })
       },
 
       onKeyDown(props: SuggestionKeyDownProps) {
-        if (props.event.key === 'Escape') {
+        if (props.event.key === "Escape") {
           popup[0].hide()
           return true
         }
@@ -78,7 +78,7 @@ export const getSuggestions = (fileList: string[]) => ({
           popup[0].destroy()
           component.destroy()
         }
-      }
+      },
     }
-  }
+  },
 })

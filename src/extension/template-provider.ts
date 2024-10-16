@@ -1,9 +1,11 @@
-import * as fs from 'fs'
-import * as Handlebars from 'handlebars'
-import * as path from 'path'
-import { DefaultTemplate } from '../common/types'
-import { defaultTemplates } from './templates'
-import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from '../common/constants'
+import * as fs from "fs"
+import * as Handlebars from "handlebars"
+import * as path from "path"
+
+import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from "../common/constants"
+import { DefaultTemplate } from "../common/types"
+
+import { defaultTemplates } from "./templates"
 
 export class TemplateProvider {
   private _basePath: string | undefined
@@ -18,7 +20,7 @@ export class TemplateProvider {
   }
 
   public registerHandlebarsHelpers(): void {
-    Handlebars.registerHelper('eq', (a, b) => a == b)
+    Handlebars.registerHelper("eq", (a, b) => a == b)
   }
 
   public createTemplateDir() {
@@ -38,9 +40,9 @@ export class TemplateProvider {
   public copyDefaultTemplates() {
     try {
       defaultTemplates.forEach(({ name, template }) => {
-        const destFile = path.join(this._basePath || '', name)
+        const destFile = path.join(this._basePath || "", name)
         if (!fs.existsSync(`${destFile}.hbs`)) {
-          fs.writeFileSync(`${destFile}.hbs`, template, 'utf8')
+          fs.writeFileSync(`${destFile}.hbs`, template, "utf8")
         }
       })
     } catch (e) {
@@ -52,7 +54,7 @@ export class TemplateProvider {
     const defaultPath = `${this._basePath}/system.hbs`
 
     /* allow custom system messages, per templated task */
-    const templatePrefix = templateName ? `${templateName}-` : ''
+    const templatePrefix = templateName ? `${templateName}-` : ""
     const templatePath = `${this._basePath}/${templatePrefix}system.hbs`
 
     const path = fs.existsSync(templatePath) ? templatePath : defaultPath
@@ -60,7 +62,7 @@ export class TemplateProvider {
       return new Promise<string>((resolve, reject) => {
         fs.readFile(
           path,
-          { encoding: 'utf-8' },
+          { encoding: "utf-8" },
           (err, templateString: string) => {
             if (err) return reject(err)
             resolve(templateString)
@@ -77,8 +79,8 @@ export class TemplateProvider {
     const path = `${this._basePath}/${templateName}.hbs`
     try {
       return new Promise<HandlebarsTemplateDelegate<T>>((resolve, reject) => {
-        fs.readFile(path, { encoding: 'utf-8' }, (err, templateString) => {
-          if (err && err.code !== 'ENOENT') return reject(err)
+        fs.readFile(path, { encoding: "utf-8" }, (err, templateString) => {
+          if (err && err.code !== "ENOENT") return reject(err)
 
           if (
             !templateString &&
@@ -86,7 +88,7 @@ export class TemplateProvider {
           ) {
             templateString =
               defaultTemplates.find(({ name }) => name === templateName)
-                ?.template || ''
+                ?.template || ""
             if (!templateString) {
               return reject(new Error(`Template "${templateName}" not found`))
             }
@@ -104,15 +106,15 @@ export class TemplateProvider {
   }
 
   private filterSystemTemplates = (filterName: string) => {
-    return filterName !== 'chat' && filterName.includes(SYSTEM) === false
+    return filterName !== "chat" && filterName.includes(SYSTEM) === false
   }
 
   public listTemplates(): string[] {
     if (!this._basePath) return []
-    const files = fs.readdirSync(this._basePath, 'utf8')
-    const templates = files.filter((fileName) => fileName.endsWith('.hbs'))
+    const files = fs.readdirSync(this._basePath, "utf8")
+    const templates = files.filter((fileName) => fileName.endsWith(".hbs"))
     const templateNames = templates
-      .map((fileName) => fileName.replace('.hbs', ''))
+      .map((fileName) => fileName.replace(".hbs", ""))
       .sort((a, b) => a.localeCompare(b))
       .filter(this.filterSystemTemplates)
     return templateNames
@@ -128,12 +130,12 @@ export class TemplateProvider {
 
       const result = template({
         ...data,
-        systemMessage: await this.readSystemMessageTemplate(templateName)
+        systemMessage: await this.readSystemMessageTemplate(templateName),
       })
       return result
     } catch (error) {
-      console.error('Error rendering the template:', error)
-      return ''
+      console.error("Error rendering the template:", error)
+      return ""
     }
   }
 }

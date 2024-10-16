@@ -1,21 +1,22 @@
-import { Position, Range, TextEditor } from 'vscode'
+import { Position, Range, TextEditor } from "vscode"
 
-import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from '../common/constants'
-import { Bracket } from '../common/types'
-import { getLanguage } from './utils'
-import { supportedLanguages } from '../common/languages'
-import { getLineBreakCount } from '../webview/utils'
+import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from "../common/constants"
+import { supportedLanguages } from "../common/languages"
+import { Bracket } from "../common/types"
+import { getLineBreakCount } from "../webview/utils"
+
+import { getLanguage } from "./utils"
 
 export class CompletionFormatter {
   private _characterAfterCursor: string
   private _charAfterCursor: string
   private _charBeforeCursor: string
-  private _completion = ''
+  private _completion = ""
   private _cursorPosition: Position
   private _editor: TextEditor
   private _lineText: string
-  private _normalisedCompletion = ''
-  private _originalCompletion = ''
+  private _normalisedCompletion = ""
+  private _originalCompletion = ""
   private _textAfterCursor: string
 
   constructor(editor: TextEditor) {
@@ -27,28 +28,28 @@ export class CompletionFormatter {
     this._lineText = this._editor.document.lineAt(
       this._cursorPosition.line
     ).text
-    this._textAfterCursor = document?.getText(textAfterRange) || ''
+    this._textAfterCursor = document?.getText(textAfterRange) || ""
     this._characterAfterCursor = this._textAfterCursor
       ? (this._textAfterCursor.at(0) as string)
-      : ''
+      : ""
     this._editor = editor
     this._charBeforeCursor =
       this._cursorPosition.character > 0
         ? this._lineText[this._cursorPosition.character - 1]
-        : ''
+        : ""
     this._charAfterCursor = this._lineText[this._cursorPosition.character]
   }
 
   private isMatchingPair = (open?: Bracket, close?: string): boolean => {
     return (
-      (open === '[' && close === ']') ||
-      (open === '(' && close === ')') ||
-      (open === '{' && close === '}')
+      (open === "[" && close === "]") ||
+      (open === "(" && close === ")") ||
+      (open === "{" && close === "}")
     )
   }
 
   private matchCompletionBrackets = (): CompletionFormatter => {
-    let accumulatedCompletion = ''
+    let accumulatedCompletion = ""
     const openBrackets: Bracket[] = []
     for (const character of this._originalCompletion) {
       if (OPENING_BRACKETS.includes(character)) {
@@ -76,8 +77,8 @@ export class CompletionFormatter {
 
   private ignoreBlankLines = (): CompletionFormatter => {
     if (
-      this._completion.trimStart() === '' &&
-      this._originalCompletion !== '\n'
+      this._completion.trimStart() === "" &&
+      this._originalCompletion !== "\n"
     ) {
       this._completion = this._completion.trim()
     }
@@ -139,16 +140,16 @@ export class CompletionFormatter {
 
     if (
       trimmedCharAfterCursor &&
-      (this._normalisedCompletion.endsWith('\',') ||
-        this._normalisedCompletion.endsWith('",') ||
-        (this._normalisedCompletion.endsWith('`,') &&
+      (this._normalisedCompletion.endsWith("',") ||
+        this._normalisedCompletion.endsWith("\",") ||
+        (this._normalisedCompletion.endsWith("`,") &&
           QUOTES.includes(trimmedCharAfterCursor)))
     ) {
       this._completion = this._completion.slice(0, -2)
     } else if (
-      (this._normalisedCompletion.endsWith('\'') ||
-        this._normalisedCompletion.endsWith('"') ||
-        this._normalisedCompletion.endsWith('`')) &&
+      (this._normalisedCompletion.endsWith("'") ||
+        this._normalisedCompletion.endsWith("\"") ||
+        this._normalisedCompletion.endsWith("`")) &&
       QUOTES.includes(trimmedCharAfterCursor)
     ) {
       this._completion = this._completion.slice(0, -1)
@@ -173,7 +174,7 @@ export class CompletionFormatter {
       if (
         this.normalise(line.text) === this.normalise(this._originalCompletion)
       ) {
-        this._completion = ''
+        this._completion = ""
         return this
       }
       nextLineIndex++
@@ -191,7 +192,7 @@ export class CompletionFormatter {
 
   private skipMiddleOfWord() {
     if (this.isCursorAtMiddleOfWord()) {
-      this._completion = ''
+      this._completion = ""
     }
     return this
   }
@@ -206,7 +207,7 @@ export class CompletionFormatter {
     )
 
     if (textAfter.score(this._completion) > 0.6) {
-      this._completion = ''
+      this._completion = ""
     }
 
     return this
@@ -214,7 +215,7 @@ export class CompletionFormatter {
 
   private getCompletion = () => {
     if (this._completion.trim().length === 0) {
-      this._completion = ''
+      this._completion = ""
     }
     return this._completion
   }
@@ -236,8 +237,8 @@ export class CompletionFormatter {
     const languageId =
       supportedLanguages[language.languageId as keyof typeof supportedLanguages]
 
-    if (this._normalisedCompletion.startsWith('// File:') || this._normalisedCompletion === '//') {
-      this._completion = ''
+    if (this._normalisedCompletion.startsWith("// File:") || this._normalisedCompletion === "//") {
+      this._completion = ""
       return this
     }
 
@@ -255,7 +256,7 @@ export class CompletionFormatter {
 
     if (lineCount > 1) return this
 
-    const completionLines = this._completion.split('\n').filter((line) => {
+    const completionLines = this._completion.split("\n").filter((line) => {
       const startsWithComment = line.startsWith(languageId.syntaxComments.start)
       const includesCommentReference = /\b(Language|File|End):\s*(.*)\b/.test(
         line
@@ -265,7 +266,7 @@ export class CompletionFormatter {
     })
 
     if (completionLines.length) {
-      this._completion = completionLines.join('\n')
+      this._completion = completionLines.join("\n")
     }
 
     return this
@@ -279,7 +280,7 @@ export class CompletionFormatter {
   }
 
   public format = (completion: string): string => {
-    this._completion = ''
+    this._completion = ""
     this._normalisedCompletion = this.normalise(completion)
     this._originalCompletion = completion
     const infillText = this.matchCompletionBrackets()

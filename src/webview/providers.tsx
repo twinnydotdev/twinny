@@ -1,5 +1,4 @@
-import React from 'react'
-import { useOllamaModels, useProviders } from './hooks'
+import React from "react"
 import {
   VSCodeButton,
   VSCodeCheckbox,
@@ -7,18 +6,21 @@ import {
   VSCodeDropdown,
   VSCodeOption,
   VSCodePanelView,
-  VSCodeTextField
-} from '@vscode/webview-ui-toolkit/react'
+  VSCodeTextField,
+} from "@vscode/webview-ui-toolkit/react"
 
-import { apiProviders } from '../common/types'
-import { TwinnyProvider } from '../extension/provider-manager'
 import {
   DEFAULT_PROVIDER_FORM_VALUES,
-  FIM_TEMPLATE_FORMAT
-} from '../common/constants'
-import { ModelSelect } from './model-select'
-import styles from './styles/providers.module.css'
-import indexStyles from './styles/index.module.css'
+  FIM_TEMPLATE_FORMAT,
+} from "../common/constants"
+import { apiProviders } from "../common/types"
+import { TwinnyProvider } from "../extension/provider-manager"
+
+import { useOllamaModels, useProviders } from "./hooks"
+import { ModelSelect } from "./model-select"
+
+import indexStyles from "./styles/index.module.css"
+import styles from "./styles/providers.module.css"
 
 export const Providers = () => {
   const [showForm, setShowForm] = React.useState(false)
@@ -30,7 +32,7 @@ export const Providers = () => {
     providers,
     removeProvider,
     copyProvider,
-    resetProviders
+    resetProviders,
   } = useProviders()
 
   const handleClose = () => {
@@ -62,7 +64,7 @@ export const Providers = () => {
   const handleSetModel = (provider: TwinnyProvider, model: string) => {
     updateProvider({
       ...provider,
-      modelName: model
+      modelName: model,
     })
   }
 
@@ -150,7 +152,7 @@ export const Providers = () => {
                     <div>
                       <b>Type:</b> {provider.type}
                     </div>
-                    {provider.type === 'fim' && (
+                    {provider.type === "fim" && (
                       <div>
                         <b>Fim Template:</b> {provider.fimTemplate}
                       </div>
@@ -214,8 +216,8 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
   const handleChangeDropdown = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
-    const value = event?.target.value || ''
-    const name = event?.target.name || ''
+    const value = event?.target.value || ""
+    const name = event?.target.name || ""
     setFormState({ ...formState, [name]: value.trim() })
   }
 
@@ -293,7 +295,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             onChange={handleChangeDropdown}
             value={formState.type}
           >
-            {['chat', 'fim', 'embedding'].map((type, index) => (
+            {["chat", "fim", "embedding"].map((type, index) => (
               <VSCodeOption key={index} value={type}>
                 {type}
               </VSCodeOption>
@@ -301,7 +303,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
           </VSCodeDropdown>
         </div>
 
-        {formState.type === 'fim' && (
+        {formState.type === "fim" && (
           <div>
             <div>
               <label htmlFor="type">Fim Template*</label>
@@ -312,7 +314,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
               value={formState.fimTemplate}
             >
               {Object.values(FIM_TEMPLATE_FORMAT).map((type, index) => (
-                <VSCodeOption key={index} value={type || 'automatic'}>
+                <VSCodeOption key={index} value={type || "automatic"}>
                   {type}
                 </VSCodeOption>
               ))}
@@ -346,7 +348,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
             onChange={handleChangeDropdown}
             value={formState.apiProtocol}
           >
-            {['http', 'https'].map((type, index) => (
+            {["http", "https"].map((type, index) => (
               <VSCodeOption key={index} value={type}>
                 {type}
               </VSCodeOption>
@@ -402,12 +404,12 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
           <VSCodeTextField
             onChange={handleChange}
             name="apiKey"
-            value={formState.apiKey || ''}
+            value={formState.apiKey || ""}
             placeholder="Enter an API key"
           ></VSCodeTextField>
         </div>
 
-        {formState.type === 'fim' && (
+        {formState.type === "fim" && (
           <div className={indexStyles.vscodeCheckbox}>
             <label htmlFor="repositoryLevel">
               <VSCodeCheckbox

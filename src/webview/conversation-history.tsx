@@ -1,9 +1,11 @@
-import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
+import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
-import { Conversation } from '../common/types'
-import styles from './styles/conversation-history.module.css'
-import { useConversationHistory } from './hooks'
-import { EVENT_NAME } from '../common/constants'
+import { EVENT_NAME } from "../common/constants"
+import { Conversation } from "../common/types"
+
+import { useConversationHistory } from "./hooks"
+
+import styles from "./styles/conversation-history.module.css"
 
 interface ConversationHistoryProps {
   onSelect: () => void
@@ -16,14 +18,14 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
     conversations: savedConversations,
     setActiveConversation,
     removeConversation,
-    clearAllConversations
+    clearAllConversations,
   } = useConversationHistory()
 
   const handleSetConversation = (conversation: Conversation) => {
     setActiveConversation(conversation)
     onSelect()
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyHideBackButton
+      type: EVENT_NAME.twinnyHideBackButton,
     })
   }
 
