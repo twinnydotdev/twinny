@@ -16,8 +16,8 @@ import {
   LMStudioEmbedding
 } from '../common/types'
 
-import { TwinnyProvider } from './provider-manager'
-import { fetchEmbedding } from "./stream"
+import { fetchEmbedding } from "./api"
+import { TwinnyProvider } from "./provider-manager"
 import {
   getDocumentSplitChunks,
   getIgnoreDirectory,
