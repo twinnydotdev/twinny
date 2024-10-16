@@ -9,7 +9,9 @@ import {
   EmbeddedDocument,
   RequestOptionsOllama,
   StreamRequestOptions as RequestOptions,
-  Embedding
+  Embedding,
+  apiProviders,
+  LMStudioEmbedding
 } from '../common/types'
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from '../common/constants'
 import { TwinnyProvider } from './provider-manager'
@@ -81,10 +83,19 @@ export class EmbeddingDatabase {
         body: requestBody,
         options: requestOptions,
         onData: (response) => {
-          resolve((response as Embedding).embeddings)
+          resolve(this.getEmbeddingsFromResponse(provider, response))
         }
       })
     })
+  }
+
+  private getEmbeddingsFromResponse(provider: TwinnyProvider, response: any): number[] {
+
+    if( provider.provider === apiProviders.LMStudio) {
+      return (response as LMStudioEmbedding).data?.[0].embedding;
+    }
+
+    return (response as Embedding).embeddings;
   }
 
   private getAllFilePaths = async (dirPath: string): Promise<string[]> => {
