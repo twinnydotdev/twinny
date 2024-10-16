@@ -6,24 +6,22 @@ import path from "path"
 import * as vscode from "vscode"
 
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
-import { Logger } from "../common/logger"
+import { logger } from "../common/logger"
 import {
   EmbeddedDocument,
   Embedding,
   RequestOptionsOllama,
-  StreamRequestOptions as RequestOptions,
+  StreamRequestOptions as RequestOptions
 } from "../common/types"
 
+import { fetchEmbedding } from "./api"
 import { TwinnyProvider } from "./provider-manager"
-import { fetchEmbedding } from "./stream"
 import {
   getDocumentSplitChunks,
   getIgnoreDirectory,
   readGitIgnoreFile,
-  readGitSubmodulesFile,
+  readGitSubmodulesFile
 } from "./utils"
-
-const logger = new Logger()
 
 export class EmbeddingDatabase {
   private _documents: EmbeddedDocument[] = []
@@ -62,7 +60,7 @@ export class EmbeddingDatabase {
       model: provider.modelName,
       input: content,
       stream: false,
-      options: {},
+      options: {}
     }
 
     const requestOptions: RequestOptions = {
@@ -73,8 +71,8 @@ export class EmbeddingDatabase {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`,
-      },
+        Authorization: `Bearer ${provider.apiKey}`
+      }
     }
 
     return new Promise<number[]>((resolve) => {
@@ -83,7 +81,7 @@ export class EmbeddingDatabase {
         options: requestOptions,
         onData: (response) => {
           resolve((response as Embedding).embeddings)
-        },
+        }
       })
     })
   }
@@ -112,7 +110,9 @@ export class EmbeddingDatabase {
             minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
             !pattern.startsWith("!")
           if (isIgnored) {
-            logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
+            logger.log(
+              `Ignoring ${relativePath} due to pattern: ${pattern}`
+            )
           }
           return isIgnored
         })
@@ -140,7 +140,7 @@ export class EmbeddingDatabase {
       {
         location: vscode.ProgressLocation.Notification,
         title: "Embedding",
-        cancellable: true,
+        cancellable: true
       },
       async (progress) => {
         if (!this._extensionContext) return
@@ -156,7 +156,7 @@ export class EmbeddingDatabase {
           this._filePaths.push({
             content: filePath,
             vector: filePathEmbedding,
-            file: filePath,
+            file: filePath
           })
 
           for (const chunk of chunks) {
@@ -165,7 +165,7 @@ export class EmbeddingDatabase {
             this._documents.push({
               content: chunk,
               file: filePath,
-              vector: vector,
+              vector: vector
             })
           }
 
@@ -173,7 +173,7 @@ export class EmbeddingDatabase {
           progress.report({
             message: `${((processedFiles / totalFiles) * 100).toFixed(
               2
-            )}% (${filePath.split("/").pop()})`,
+            )}% (${filePath.split("/").pop()})`
           })
         })
 

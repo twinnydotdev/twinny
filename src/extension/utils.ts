@@ -14,7 +14,7 @@ import {
   TextDocument,
   Webview,
   window,
-  workspace,
+  workspace
 } from "vscode"
 import { SyntaxNode } from "web-tree-sitter"
 
@@ -32,10 +32,10 @@ import {
   QUOTES,
   QUOTES_REGEX,
   SKIP_DECLARATION_SYMBOLS,
-  TWINNY,
+  TWINNY
 } from "../common/constants"
 import { supportedLanguages } from "../common/languages"
-import { Logger } from "../common/logger"
+import { logger } from "../common/logger"
 import {
   apiProviders,
   Bracket,
@@ -46,14 +46,12 @@ import {
   ServerMessage,
   ServerMessageKey,
   StreamResponse,
-  Theme,
+  Theme
 } from "../common/types"
 
 import { getParser } from "./parser"
 
 const execAsync = util.promisify(exec)
-
-const logger = new Logger()
 
 export const delayExecution = <T extends () => void>(
   fn: T,
@@ -78,7 +76,7 @@ export const getLanguage = (): LanguageType => {
     supportedLanguages[languageId as keyof typeof supportedLanguages]
   return {
     language,
-    languageId,
+    languageId
   }
 }
 
@@ -206,7 +204,7 @@ export const getPrefixSuffix = (
 
   return {
     prefix: document.getText(prefixRange),
-    suffix: document.getText(suffixRange),
+    suffix: document.getText(suffixRange)
   }
 }
 
@@ -215,7 +213,7 @@ export const getBeforeAndAfter = () => {
   if (!editor)
     return {
       charBefore: "",
-      charAfter: "",
+      charAfter: ""
     }
 
   const position = editor.selection.active
@@ -231,7 +229,7 @@ export const getBeforeAndAfter = () => {
 
   return {
     charBefore,
-    charAfter,
+    charAfter
   }
 }
 
@@ -288,7 +286,7 @@ export const getPreviousLineIsOpeningBracket = () => {
 
 export const getIsMultilineCompletion = ({
   node,
-  prefixSuffix,
+  prefixSuffix
 }: {
   node: SyntaxNode | null
   prefixSuffix: PrefixSuffix | null
@@ -420,7 +418,7 @@ export const getGitChanges = async (): Promise<string> => {
   try {
     const path = getCurrentWorkspacePath()
     const { stdout } = await execAsync("git diff", {
-      cwd: path,
+      cwd: path
     })
     return stdout
   } catch (error) {
@@ -500,7 +498,7 @@ export const getChunkOptions = (
   const options = {
     maxSize: Number(context.globalState.get(maxChunkSizeContext)) || 500,
     minSize: Number(context.globalState.get(minChunkSizeContext)) || 50,
-    overlap: Number(context.globalState.get(overlap)) || 10,
+    overlap: Number(context.globalState.get(overlap)) || 10
   }
 
   return options
@@ -576,9 +574,6 @@ function simpleChunk(content: string, options: ChunkOptions): string[] {
         error instanceof RangeError &&
         error.message.includes("Invalid array length")
       ) {
-        logger.log(
-          "Maximum array size reached. Returning chunks processed so far."
-        )
         break
       } else {
         throw error
@@ -602,8 +597,8 @@ export const updateLoadingMessage = (
   webView?.postMessage({
     type: EVENT_NAME.twinnySendLoader,
     value: {
-      data: message,
-    },
+      data: message
+    }
   } as ServerMessage<string>)
 }
 
@@ -614,8 +609,8 @@ export const updateSymmetryStatus = (
   webView?.postMessage({
     type: EVENT_NAME.twinnySendSymmetryMessage,
     value: {
-      data: message,
-    },
+      data: message
+    }
   } as ServerMessage<string>)
 }
 
@@ -676,9 +671,6 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
         const isIgnored =
           minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
           !pattern.startsWith("!")
-        if (isIgnored) {
-          logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
-        }
         return isIgnored
       })
     ) {
@@ -739,18 +731,34 @@ export function readGitIgnoreFile(): string[] | undefined {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logStreamOptions = (opts: any) => {
-  logger.log(
-    `
-***Twinny Stream Debug***\n\
-Streaming response from ${opts.options.hostname}:${opts.options.port}.\n\
-Request body:\n${JSON.stringify(opts.body, null, 2)}\n\n
-Request options:\n${JSON.stringify(opts.options, null, 2)}\n\n
-Number characters in all messages = ${
-      opts.body.messages &&
-      opts.body.messages?.reduce((acc: number, msg: Message) => {
-        return msg.content?.length ? acc + msg.content?.length : 0
-      }, 0)
-    }\n\n
-    `.trim()
-  )
+  const hostname = opts.options?.hostname ?? "unknown"
+  const port = opts.options?.port ?? "unknown"
+  const body = opts.body ?? {}
+  const options = opts.options ?? {}
+
+  const totalCharacters = calculateTotalCharacters(body.messages)
+
+  const logMessage = `
+    ***Twinny Stream Debug***
+    Streaming response from ${hostname}:${port}.
+    Request body:
+    ${JSON.stringify(body, null, 2)}
+
+    Request options:
+    ${JSON.stringify(options, null, 2)}
+
+    Number characters in all messages = ${totalCharacters}
+  `.trim()
+
+  logger.log(logMessage)
+}
+
+const calculateTotalCharacters = (messages: Message[] | undefined): number => {
+  if (!Array.isArray(messages)) {
+    return 0
+  }
+
+  return messages.reduce((acc: number, msg: Message) => {
+    return acc + (typeof msg.content === "string" ? msg.content.length : 0)
+  }, 0)
 }

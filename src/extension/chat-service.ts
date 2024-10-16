@@ -26,7 +26,7 @@ import {
   WEBUI_TABS,
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
-import { Logger } from "../common/logger"
+import { logger } from "../common/logger"
 import {
   FileItem,
   Message,
@@ -38,12 +38,12 @@ import {
 } from "../common/types"
 import { kebabToSentence } from "../webview/utils"
 
+import { streamResponse } from "./api"
 import { EmbeddingDatabase } from "./embeddings"
 import { TwinnyProvider } from "./provider-manager"
 import { createStreamRequestBody } from "./provider-options"
 import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
-import { streamResponse } from "./stream"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
 import {
@@ -51,8 +51,6 @@ import {
   getLanguage,
   updateLoadingMessage,
 } from "./utils"
-
-const logger = new Logger()
 
 export class ChatService {
   private _completion = ""

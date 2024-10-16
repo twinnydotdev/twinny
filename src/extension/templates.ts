@@ -5,8 +5,7 @@ export const defaultTemplates = [
 Explain the following code concisely:
 {{{code}}}
 Focus on key functionality and purpose. The language is:
-{{language}}
-  `.trim(),
+{{language}}`.trim()
   },
   {
     name: "refactor",
@@ -15,8 +14,7 @@ Refactor the following code to improve efficiency or readability without alterin
 {{{code}}}
 Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
 The language is: {{language}}.
-Do not explain the code in your response.
-  `.trim(),
+Do not explain the code in your response.`.trim()
   },
   {
     name: "add-types",
@@ -25,8 +23,7 @@ Add types to the following code, keeping the logic unchanged:
 {{{code}}}
 Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
 The language is: {{language}}.
-Do not explain the code in your response.
-  `.trim(),
+Do not explain the code in your response.`.trim()
   },
   {
     name: "add-tests",
@@ -34,8 +31,7 @@ Do not explain the code in your response.
 Write comprehensive unit tests for the following code block:
 {{{code}}}
 Use the most popular testing library for {{language}}.
-Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
-  `.trim(),
+Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.`.trim()
   },
   {
     name: "fix-code",
@@ -44,8 +40,7 @@ Fix any errors in the following code without changing its core functionality:
 {{{code}}}
 Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
 The language is: {{language}}.
-Do not explain the changes in your response.
-  `.trim(),
+Do not explain the changes in your response.`.trim()
   },
   {
     name: "generate-docs",
@@ -53,16 +48,14 @@ Do not explain the changes in your response.
 Generate comprehensive documentation for the following code block:
 {{{code}}}
 Use the standard documentation format for {{language}}. If unsure, use a widely accepted format.
-Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.
-  `.trim(),
+Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.`.trim()
   },
   {
     name: "system",
     template: `You are a helpful, respectful and honest coding assistant.
 Always reply using markdown.
 Be clear and concise, prioritizing brevity in your responses.
-For code refactoring, use markdown with appropriate code formatting.
-  `.trim(),
+For code refactoring, use markdown with appropriate code formatting.`.trim()
   },
   {
     name: "relevant-code",
@@ -73,8 +66,7 @@ Limit your answer to three sentences.
 
 {{{code}}}
 
-Disregard if not relevant to the current query.
-    `.trim(),
+Disregard if not relevant to the current query.`.trim()
   },
   {
     name: "relevant-files",
@@ -83,24 +75,23 @@ These file paths may be relevant to your query:
 
 {{{code}}}
 
-Consider these in your response if pertinent. Disregard if not relevant.
-    `.trim(),
+Consider these in your response if pertinent. Disregard if not relevant.`.trim()
   },
   {
     name: "commit-message",
-    template: `Generate a concise git commit message.
+    template: `
+Generate a concise git commit message.
 Respond with a single line of text, maximum 100 characters.
 
 Example: "Added a new feature"
 
 Unidiff: \`\`\`{{code}}\`\`\`
 
-<commit message>
-    `.trim(),
+<commit message>`.trim()
   },
   {
     name: "fim",
-    template: "<PRE>{{{prefix}}} <SUF> {{{suffix}}} <MID>",
+    template: "<PRE>{{{prefix}}} <SUF> {{{suffix}}} <MID>"
   },
   {
     name: "review",
@@ -117,11 +108,10 @@ Review the following diff:
 
 Present it in markdown format, and refrain from mentioning:
 - Adding comments or documentation
-- Adding dependencies or related pull requests
-     `.trim(),
+- Adding dependencies or related pull requests`.trim()
   },
   {
     name: "fim-system",
-    template: "",
-  },
+    template: ""
+  }
 ]
