@@ -2,17 +2,16 @@ import * as ort from "onnxruntime-web"
 import * as path from "path"
 import { Toxe } from "toxe"
 
-import { Logger } from "../common/logger"
+import { logger } from "../common/logger"
 
 ort.env.wasm.numThreads = 1
-
-const logger = new Logger()
 
 export class Reranker {
   private _tokenizer: Toxe | null = null
   private _session: ort.InferenceSession | null = null
   private readonly _modelPath: string
   private readonly _tokenizerPath: string
+
 
   constructor() {
     this._modelPath = path.join(__dirname, "..", "models", "reranker.onnx")

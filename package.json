@@ -2,7 +2,7 @@
   "name": "twinny-vkx86",
   "displayName": "twinny-vkx86 - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.17.26",
+  "version": "3.17.27",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -423,6 +423,7 @@
     "build": "node scripts/build.mjs",
     "build-tests": "tsc -p . --outDir out",
     "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "package": "node scripts/build.mjs",
     "pretest": "npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",

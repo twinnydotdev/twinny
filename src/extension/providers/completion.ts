@@ -12,7 +12,7 @@ import {
   TextDocument,
   Uri,
   window,
-  workspace,
+  workspace
 } from "vscode"
 import Parser, { SyntaxNode } from "web-tree-sitter"
 
@@ -28,31 +28,31 @@ import {
   MIN_COMPLETION_CHUNKS,
   MULTI_LINE_DELIMITERS,
   MULTILINE_INSIDE,
-  MULTILINE_OUTSIDE,
+  MULTILINE_OUTSIDE
 } from "../../common/constants"
 import { supportedLanguages } from "../../common/languages"
-import { Logger } from "../../common/logger"
+import { logger } from "../../common/logger"
 import {
   FimTemplateData,
   PrefixSuffix,
   RepositoryLevelData as RepositoryDocment,
   ResolvedInlineCompletion,
   StreamRequestOptions,
-  StreamResponse,
+  StreamResponse
 } from "../../common/types"
 import { getLineBreakCount } from "../../webview/utils"
+import { streamResponse } from "../api"
 import { cache } from "../cache"
 import { CompletionFormatter } from "../completion-formatter"
 import { FileInteractionCache } from "../file-interaction"
 import {
   getFimPrompt,
   getFimTemplateRepositoryLevel,
-  getStopWords,
+  getStopWords
 } from "../fim-templates"
 import { getNodeAtPosition, getParser } from "../parser"
 import { TwinnyProvider } from "../provider-manager"
 import { createStreamRequestBodyFim } from "../provider-options"
-import { streamResponse } from "../stream"
 import { TemplateProvider } from "../template-provider"
 import {
   getCurrentLineText,
@@ -60,7 +60,7 @@ import {
   getIsMiddleOfString,
   getIsMultilineCompletion,
   getPrefixSuffix,
-  getShouldSkipCompletion,
+  getShouldSkipCompletion
 } from "../utils"
 
 export class CompletionProvider implements InlineCompletionItemProvider {
@@ -90,7 +90,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   private _lastCompletionMultiline = false
   public lastCompletionText = ""
   private _lock: AsyncLock
-  private _logger: Logger
   private _maxLines = this._config.get("maxLines") as number
   private _multilineCompletionsEnabled = this._config.get(
     "multilineCompletionsEnabled"
@@ -123,7 +122,6 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._abortController = null
     this._document = null
     this._lock = new AsyncLock()
-    this._logger = new Logger()
     this._position = null
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
@@ -190,7 +188,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     this._isMultilineCompletion = getIsMultilineCompletion({
       node: this._nodeAtPosition,
-      prefixSuffix: this._prefixSuffix,
+      prefixSuffix: this._prefixSuffix
     })
 
     if (this._debouncer) clearTimeout(this._debouncer)
@@ -217,7 +215,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 if (completion) {
                   this._abortController?.abort()
                 }
-              },
+              }
             })
           } catch (error) {
             this.onError()
@@ -251,7 +249,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       model: provider.modelName,
       numPredictFim: this._numPredictFim,
       temperature: this._temperature,
-      keepAlive: this._keepAlive,
+      keepAlive: this._keepAlive
     })
 
     const options: StreamRequestOptions = {
@@ -262,8 +260,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: provider.apiKey ? `Bearer ${provider.apiKey}` : "",
-      },
+        Authorization: provider.apiKey ? `Bearer ${provider.apiKey}` : ""
+      }
     }
 
     return { options, body }
@@ -289,7 +287,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._completion.trim().length === 0
       ) {
         this.abortCompletion()
-        this._logger.log(
+        logger.log(
           `Streaming response end as llm in empty completion loop:  ${this._nonce}`
         )
       }
@@ -303,7 +301,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._chunkCount >= MIN_COMPLETION_CHUNKS &&
         LINE_BREAK_REGEX.test(this._completion.trimStart())
       ) {
-        this._logger.log(
+        logger.log(
           `Streaming response end due to single line completion:  ${this._nonce} \nCompletion: ${this._completion}`
         )
         return this._completion
@@ -315,7 +313,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         this._chunkCount >= MIN_COMPLETION_CHUNKS &&
         LINE_BREAK_REGEX.test(this._completion.trimStart())
       if (isMultilineCompletionRequired) {
-        this._logger.log(
+        logger.log(
           `Streaming response end due to multiline not required  ${this._nonce} \nCompletion: ${this._completion}`
         )
         return this._completion
@@ -351,7 +349,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                   this._completion.endsWith(delimiter)
                 )
               ) {
-                this._logger.log(
+                logger.log(
                   `Streaming response end due to delimiter ${this._nonce} \nCompletion: ${this._completion}`
                 )
                 return this._completion
@@ -366,7 +364,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       }
 
       if (getLineBreakCount(this._completion) >= this._maxLines) {
-        this._logger.log(
+        logger.log(
           `
             Streaming response end due to max line count ${this._nonce} \nCompletion: ${this._completion}
           `
@@ -436,7 +434,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           text: doc.getText(),
           name: doc.fileName,
           isOpen: true,
-          relevanceScore: interaction?.relevanceScore || 0,
+          relevanceScore: interaction?.relevanceScore || 0
         }
       })
 
@@ -468,7 +466,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 text: document.getText(),
                 name: filePath,
                 isOpen: false,
-                relevanceScore: interaction.relevanceScore,
+                relevanceScore: interaction.relevanceScore
               }
             } catch (error) {
               console.error(`Error opening document ${filePath}:`, error)
@@ -568,7 +566,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           systemMessage,
           context: fileInteractionContext || "",
           fileName: this._document.uri.fsPath,
-          language: documentLanguage,
+          language: documentLanguage
         })
 
       if (fimTemplate) {
@@ -597,7 +595,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         prefixSuffix,
         header: this.getPromptHeader(documentLanguage, this._document.uri),
         fileContextEnabled: this._fileContextEnabled,
-        language: documentLanguage,
+        language: documentLanguage
       }
     )
   }
@@ -619,7 +617,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
   }
 
   private logCompletion(formattedCompletion: string) {
-    this._logger.log(
+    logger.log(
       `
       *** Twinny completion triggered for file: ${this._document?.uri} ***
       Original completion: ${this._completion}
@@ -655,7 +653,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       new InlineCompletionItem(
         formattedCompletion,
         new Range(this._position, this._position)
-      ),
+      )
     ]
   }
 

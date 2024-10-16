@@ -16,9 +16,9 @@ import {
   TemplateData,
 } from "../common/types"
 
+import { streamResponse } from "./api"
 import { ConversationHistory } from "./conversation-history"
 import { SessionManager } from "./session-manager"
-import { streamResponse } from "./stream"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
 import { getChatDataFromProvider, updateLoadingMessage } from "./utils"
