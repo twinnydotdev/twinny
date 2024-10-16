@@ -6,6 +6,7 @@ import {
   RequestBodyBase,
   ServerMessage,
   StreamRequestOptions,
+  StreamResponse,
   TemplateData
 } from '../common/types'
 import {
@@ -15,7 +16,6 @@ import {
   USER,
   WEBUI_TABS
 } from '../common/constants'
-import { StreamResponse } from 'symmetry-core'
 import { TemplateProvider } from './template-provider'
 import { ConversationHistory } from './conversation-history'
 import { SessionManager } from './session-manager'
