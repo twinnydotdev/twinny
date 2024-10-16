@@ -5,14 +5,14 @@ import {
   STOP_DEEPSEEK,
   STOP_LLAMA,
   STOP_QWEN,
-  STOP_STARCODER
-} from '../common/constants'
-import { supportedLanguages } from '../common/languages'
+  STOP_STARCODER,
+} from "../common/constants"
+import { supportedLanguages } from "../common/languages"
 import {
-  RepositoryLevelData,
   FimPromptTemplate,
-  PrefixSuffix
-} from '../common/types'
+  PrefixSuffix,
+  RepositoryLevelData,
+} from "../common/types"
 
 const getFileContext = (
   fileContextEnabled: boolean,
@@ -23,11 +23,11 @@ const getFileContext = (
   const languageId =
     supportedLanguages[language as keyof typeof supportedLanguages]
   const fileContext = fileContextEnabled
-    ? `${languageId?.syntaxComments?.start || ''}${context}${
-        languageId?.syntaxComments?.end || ''
+    ? `${languageId?.syntaxComments?.start || ""}${context}${
+        languageId?.syntaxComments?.end || ""
       }`
-    : ''
-  return { heading: header ?? '', fileContext }
+    : ""
+  return { heading: header ?? "", fileContext }
 }
 
 export const getFimPromptTemplateLLama = ({
@@ -35,7 +35,7 @@ export const getFimPromptTemplateLLama = ({
   header,
   fileContextEnabled,
   prefixSuffix,
-  language
+  language,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const { fileContext, heading } = getFileContext(
@@ -55,7 +55,7 @@ export const getFimPromptTemplateDeepseek = ({
   header,
   fileContextEnabled,
   prefixSuffix,
-  language
+  language,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const { fileContext, heading } = getFileContext(
@@ -72,7 +72,7 @@ export const getFimPromptTemplateCodestral = ({
   header,
   fileContextEnabled,
   prefixSuffix,
-  language
+  language,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const { fileContext, heading } = getFileContext(
@@ -85,7 +85,7 @@ export const getFimPromptTemplateCodestral = ({
 }
 
 export const getFimPromptTemplateQwen = ({
-  prefixSuffix
+  prefixSuffix,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
@@ -96,7 +96,7 @@ export const getFimPromptTemplateOther = ({
   header,
   fileContextEnabled,
   prefixSuffix,
-  language
+  language,
 }: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
   const { fileContext, heading } = getFileContext(

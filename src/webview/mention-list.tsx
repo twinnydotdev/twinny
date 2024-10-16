@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import cx from 'classnames'
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
-import { Editor } from '@tiptap/core'
-import { MentionNodeAttrs } from '@tiptap/extension-mention'
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react"
+import { Editor } from "@tiptap/core"
+import { MentionNodeAttrs } from "@tiptap/extension-mention"
+import cx from "classnames"
 
-import { FileItem } from '../common/types'
-import styles from './styles/index.module.css'
+import { FileItem } from "../common/types"
+
+import styles from "./styles/index.module.css"
 
 export interface MentionListProps {
   items: FileItem[]
@@ -48,23 +49,23 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
 
     useImperativeHandle(ref, () => ({
       onKeyDown: ({ event }: { event: KeyboardEvent }) => {
-        if (event.key === 'ArrowUp') {
+        if (event.key === "ArrowUp") {
           upHandler()
           return true
         }
 
-        if (event.key === 'ArrowDown') {
+        if (event.key === "ArrowDown") {
           downHandler()
           return true
         }
 
-        if (event.key === 'Enter') {
+        if (event.key === "Enter") {
           enterHandler()
           return true
         }
 
         return false
-      }
+      },
     }))
 
     return (
@@ -73,7 +74,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
           props.items.map((item: FileItem, index: number) => (
             <button
               className={cx({
-                [styles.dropdownSelected]: index === selectedIndex
+                [styles.dropdownSelected]: index === selectedIndex,
               })}
               key={index}
               onClick={() => selectItem(index)}

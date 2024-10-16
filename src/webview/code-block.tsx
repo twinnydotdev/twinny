@@ -1,12 +1,14 @@
-import { VSCodeButton } from '@vscode/webview-ui-toolkit/react'
-import React, { ReactNode } from 'react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import React, { ReactNode } from "react"
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
+import { vs,vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
+import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
-import { ASSISTANT, EVENT_NAME } from '../common/constants'
-import { LanguageType, Theme, ThemeType } from '../common/types'
-import { getLanguageMatch } from './utils'
-import styles from './styles/index.module.css'
+import { ASSISTANT, EVENT_NAME } from "../common/constants"
+import { LanguageType, Theme, ThemeType } from "../common/types"
+
+import { getLanguageMatch } from "./utils"
+
+import styles from "./styles/index.module.css"
 
 interface CodeBlockProps {
   className?: string
@@ -25,37 +27,37 @@ export const CodeBlock = (props: CodeBlockProps) => {
   const lang = getLanguageMatch(language, className)
 
   const handleCopy = () => {
-    const text = String(children).replace(/^\n/, '')
+    const text = String(children).replace(/^\n/, "")
     navigator.clipboard.writeText(text)
   }
 
   const handleNewDocument = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyNewDocument,
-      data: String(children).replace(/^\n/, '')
+      data: String(children).replace(/^\n/, ""),
     })
   }
 
   const handleAccept = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyAcceptSolution,
-      data: String(children).replace(/^\n/, '')
+      data: String(children).replace(/^\n/, ""),
     })
   }
 
   const handleOpenDiff = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyOpenDiff,
-      data: String(children).replace(/^\n/, '')
+      data: String(children).replace(/^\n/, ""),
     })
   }
 
   return (
     <>
       <SyntaxHighlighter
-        children={String(children).trimStart().replace(/\n$/, '')}
+        children={String(children).trimStart().replace(/\n$/, "")}
         style={theme === Theme.Dark ? vscDarkPlus : vs}
-        language={lang || 'auto'}
+        language={lang || "auto"}
       />
       {role === ASSISTANT && (
         <>

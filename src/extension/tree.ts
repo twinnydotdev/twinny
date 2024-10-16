@@ -1,14 +1,15 @@
-import * as vscode from 'vscode'
-import * as fs from 'fs'
-import * as path from 'path'
-import ignore, { Ignore } from 'ignore'
+import * as fs from "fs"
+import ignore, { Ignore } from "ignore"
+import * as path from "path"
+import * as vscode from "vscode"
+
 import {
   getAllFilePaths,
-} from './utils'
+} from "./utils"
 
 export class FileTreeProvider {
   private _ignoreRules: Ignore
-  private _workspaceRoot = ''
+  private _workspaceRoot = ""
 
   constructor() {
     this._ignoreRules = this.setupIgnoreRules()
@@ -30,23 +31,23 @@ export class FileTreeProvider {
 
   private setupIgnoreRules(): Ignore {
     const ig = ignore()
-    ig.add(['.git', '.git/**'])
+    ig.add([".git", ".git/**"])
 
-    const gitIgnorePath = path.join(this._workspaceRoot, '.gitignore')
+    const gitIgnorePath = path.join(this._workspaceRoot, ".gitignore")
     if (fs.existsSync(gitIgnorePath)) {
-      const ignoreContent = fs.readFileSync(gitIgnorePath, 'utf8')
+      const ignoreContent = fs.readFileSync(gitIgnorePath, "utf8")
       const rules = ignoreContent
-        .split('\n')
+        .split("\n")
         .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith('#'))
+        .filter((line) => line && !line.startsWith("#"))
       ig.add(rules)
     }
 
     return ig
   }
 
-  private generateFileTree(dir: string, prefix = ''): string {
-    let output = ''
+  private generateFileTree(dir: string, prefix = ""): string {
+    let output = ""
     const entries = fs.readdirSync(dir, { withFileTypes: true })
 
     const filteredEntries = entries.filter((entry) => {
@@ -59,11 +60,11 @@ export class FileTreeProvider {
 
     filteredEntries.forEach((entry, index) => {
       const isLast = index === filteredEntries.length - 1
-      const marker = isLast ? '└── ' : '├── '
+      const marker = isLast ? "└── " : "├── "
       output += `${prefix}${marker}${entry.name}\n`
 
       if (entry.isDirectory()) {
-        const newPrefix = prefix + (isLast ? '    ' : '│   ')
+        const newPrefix = prefix + (isLast ? "    " : "│   ")
         output += this.generateFileTree(path.join(dir, entry.name), newPrefix)
       }
     })

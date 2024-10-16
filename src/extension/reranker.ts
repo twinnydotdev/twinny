@@ -1,7 +1,8 @@
-import * as ort from 'onnxruntime-web'
-import * as path from 'path'
-import { Toxe } from 'toxe'
-import { Logger } from '../common/logger'
+import * as ort from "onnxruntime-web"
+import * as path from "path"
+import { Toxe } from "toxe"
+
+import { Logger } from "../common/logger"
 
 ort.env.wasm.numThreads = 1
 
@@ -14,15 +15,15 @@ export class Reranker {
   private readonly _tokenizerPath: string
 
   constructor() {
-    this._modelPath = path.join(__dirname, '..', 'models', 'reranker.onnx')
-    this._tokenizerPath = path.join(__dirname, '..', 'models', 'spm.model')
+    this._modelPath = path.join(__dirname, "..", "models", "reranker.onnx")
+    this._tokenizerPath = path.join(__dirname, "..", "models", "spm.model")
     this.init()
   }
 
   public async init(): Promise<void> {
     try {
       await Promise.all([this.loadModel(), this.loadTokenizer()])
-      logger.log('Reranker initialized successfully')
+      logger.log("Reranker initialized successfully")
     } catch (error) {
       console.error(error)
     }
@@ -43,7 +44,7 @@ export class Reranker {
 
     const output = await this._session?.run({
       input_ids: inputTensor,
-      attention_mask: attentionMaskTensor
+      attention_mask: attentionMaskTensor,
     })
 
     if (!output) return undefined
@@ -62,9 +63,9 @@ export class Reranker {
 
   private getInputTensor(ids: number[], sampleCount: number): ort.Tensor {
     const inputIds = ids.map(BigInt)
-    return new ort.Tensor('int64', BigInt64Array.from(inputIds), [
+    return new ort.Tensor("int64", BigInt64Array.from(inputIds), [
       sampleCount,
-      inputIds.length / sampleCount
+      inputIds.length / sampleCount,
     ])
   }
 
@@ -72,9 +73,9 @@ export class Reranker {
     inputLength: number,
     sampleCount: number
   ): ort.Tensor {
-    return new ort.Tensor('int64', new BigInt64Array(inputLength).fill(1n), [
+    return new ort.Tensor("int64", new BigInt64Array(inputLength).fill(1n), [
       sampleCount,
-      inputLength / sampleCount
+      inputLength / sampleCount,
     ])
   }
 
@@ -96,16 +97,16 @@ export class Reranker {
   private formatResults(samples: string[], probabilities: number[]): string {
     return Array.from(new Set(samples))
       .map((s, i) => `${i + 1}. ${s}: ${probabilities[i].toFixed(3)}`.trim())
-      .join('\n')
+      .join("\n")
   }
 
   private async loadModel(): Promise<void> {
     try {
-      logger.log('Loading reranker model...')
+      logger.log("Loading reranker model...")
       this._session = await ort.InferenceSession.create(this._modelPath, {
-        executionProviders: ['wasm']
+        executionProviders: ["wasm"],
       })
-      logger.log('Reranker model loaded')
+      logger.log("Reranker model loaded")
     } catch (error) {
       console.error(error)
       throw error
@@ -114,9 +115,9 @@ export class Reranker {
 
   private async loadTokenizer(): Promise<void> {
     try {
-      logger.log('Loading tokenizer...')
+      logger.log("Loading tokenizer...")
       this._tokenizer = new Toxe(this._tokenizerPath)
-      logger.log('Tokenizer loaded')
+      logger.log("Tokenizer loaded")
     } catch (error) {
       console.error(error)
       throw error

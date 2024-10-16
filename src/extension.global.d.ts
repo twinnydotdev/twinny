@@ -1,8 +1,8 @@
-declare module 'hyperswarm'
-declare module 'b4a'
-declare module '@tiptap/extension-placeholder'
+declare module "hyperswarm"
+declare module "b4a"
+declare module "@tiptap/extension-placeholder"
 
-declare module 'hypercore-crypto' {
+declare module "hypercore-crypto" {
   const hyperCoreCrypto: {
     keyPair: () => { publicKey: Buffer; secretKey: Buffer }
     discoveryKey: (publicKey: Buffer) => Buffer
@@ -13,9 +13,9 @@ declare module 'hypercore-crypto' {
   export default hyperCoreCrypto
 }
 
-declare module '*.css'
+declare module "*.css"
 
-declare module '*.css' {
+declare module "*.css" {
   const content: Record<string, string>
   export default content
 }

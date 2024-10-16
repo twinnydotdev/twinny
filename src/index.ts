@@ -1,44 +1,44 @@
+import * as fs from "fs"
+import * as os from "os"
+import * as path from "path"
 import {
   commands,
   ExtensionContext,
   languages,
   StatusBarAlignment,
   window,
-  workspace
-} from 'vscode'
-import * as path from 'path'
-import * as os from 'os'
-import * as fs from 'fs'
-import * as vscode from 'vscode'
+  workspace,
+} from "vscode"
+import * as vscode from "vscode"
 
-import { CompletionProvider } from './extension/providers/completion'
-import { SidebarProvider } from './extension/providers/sidebar'
-import { SessionManager } from './extension/session-manager'
-import { EmbeddingDatabase } from './extension/embeddings'
 import {
-  delayExecution,
-  getTerminal,
-  getSanitizedCommitMessage
-} from './extension/utils'
-import { setContext } from './extension/context'
-import {
+  EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_NAME,
-  EVENT_NAME,
+  TWINNY_COMMAND_NAME,
   WEBUI_TABS,
-  TWINNY_COMMAND_NAME
-} from './common/constants'
-import { TemplateProvider } from './extension/template-provider'
-import { ServerMessage } from './common/types'
-import { FileInteractionCache } from './extension/file-interaction'
-import { getLineBreakCount } from './webview/utils'
-import { FullScreenProvider } from './extension/providers/panel'
+} from "./common/constants"
+import { ServerMessage } from "./common/types"
+import { setContext } from "./extension/context"
+import { EmbeddingDatabase } from "./extension/embeddings"
+import { FileInteractionCache } from "./extension/file-interaction"
+import { CompletionProvider } from "./extension/providers/completion"
+import { FullScreenProvider } from "./extension/providers/panel"
+import { SidebarProvider } from "./extension/providers/sidebar"
+import { SessionManager } from "./extension/session-manager"
+import { TemplateProvider } from "./extension/template-provider"
+import {
+  delayExecution,
+  getSanitizedCommitMessage,
+  getTerminal,
+} from "./extension/utils"
+import { getLineBreakCount } from "./webview/utils"
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
-  const config = workspace.getConfiguration('twinny')
+  const config = workspace.getConfiguration("twinny")
   const statusBarItem = window.createStatusBarItem(StatusBarAlignment.Right)
-  const templateDir = path.join(os.homedir(), '.twinny/templates') as string
+  const templateDir = path.join(os.homedir(), ".twinny/templates") as string
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
   const sessionManager = new SessionManager()
@@ -49,7 +49,7 @@ export async function activate(context: ExtensionContext) {
   )
 
   const homeDir = os.homedir()
-  const dbDir = path.join(homeDir, '.twinny/embeddings')
+  const dbDir = path.join(homeDir, ".twinny/embeddings")
   let db
 
   if (workspace.name) {
@@ -79,7 +79,7 @@ export async function activate(context: ExtensionContext) {
 
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
-      { pattern: '**' },
+      { pattern: "**" },
       completionProvider
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.enable, () => {
@@ -90,30 +90,30 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.explain, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      delayExecution(() => sidebarProvider?.streamTemplateCompletion('explain'))
+      delayExecution(() => sidebarProvider?.streamTemplateCompletion("explain"))
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.addTypes, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion('add-types')
+        sidebarProvider?.streamTemplateCompletion("add-types")
       )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.refactor, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion('refactor')
+        sidebarProvider?.streamTemplateCompletion("refactor")
       )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.generateDocs, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion('generate-docs')
+        sidebarProvider?.streamTemplateCompletion("generate-docs")
       )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.addTests, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion('add-tests')
+        sidebarProvider?.streamTemplateCompletion("add-tests")
       )
     }),
     commands.registerCommand(
@@ -131,37 +131,37 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.templates, async () => {
       await vscode.commands.executeCommand(
-        'vscode.openFolder',
+        "vscode.openFolder",
         vscode.Uri.file(templateDir),
         true
       )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageProviders, async () => {
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyManageProviders,
         true
       )
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
-          data: WEBUI_TABS.providers
-        }
+          data: WEBUI_TABS.providers,
+        },
       } as ServerMessage<string>)
     }),
     commands.registerCommand(
       TWINNY_COMMAND_NAME.twinnySymmetryTab,
       async () => {
         commands.executeCommand(
-          'setContext',
+          "setContext",
           EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
           true
         )
         sidebarProvider.webView?.postMessage({
           type: EVENT_NAME.twinnySetTab,
           value: {
-            data: WEBUI_TABS.symmetry
-          }
+            data: WEBUI_TABS.symmetry,
+          },
         } as ServerMessage<string>)
       }
     ),
@@ -169,67 +169,67 @@ export async function activate(context: ExtensionContext) {
       TWINNY_COMMAND_NAME.conversationHistory,
       async () => {
         commands.executeCommand(
-          'setContext',
+          "setContext",
           EXTENSION_CONTEXT_NAME.twinnyConversationHistory,
           true
         )
         sidebarProvider.webView?.postMessage({
           type: EVENT_NAME.twinnySetTab,
           value: {
-            data: WEBUI_TABS.history
-          }
+            data: WEBUI_TABS.history,
+          },
         } as ServerMessage<string>)
       }
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.review, async () => {
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyReviewTab,
         true
       )
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
-          data: WEBUI_TABS.review
-        }
+          data: WEBUI_TABS.review,
+        },
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageTemplates, async () => {
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyManageTemplates,
         true
       )
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
-          data: WEBUI_TABS.settings
-        }
+          data: WEBUI_TABS.settings,
+        },
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.hideBackButton, () => {
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyManageTemplates,
         false
       )
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyConversationHistory,
         false
       )
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
         false
       )
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyManageProviders,
         false
       )
       commands.executeCommand(
-        'setContext',
+        "setContext",
         EXTENSION_CONTEXT_NAME.twinnyReviewTab,
         false
       )
@@ -239,13 +239,13 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
-          data: WEBUI_TABS.chat
-        }
+          data: WEBUI_TABS.chat,
+        },
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.settings, () => {
       vscode.commands.executeCommand(
-        'workbench.action.openSettings',
+        "workbench.action.openSettings",
         EXTENSION_NAME
       )
     }),
@@ -265,11 +265,11 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.conversationHistory?.resetConversation()
       sidebarProvider.newConversation()
       sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration
+        type: EVENT_NAME.twinnyStopGeneration,
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
-      commands.executeCommand('workbench.action.closeSidebar');
+      commands.executeCommand("workbench.action.closeSidebar");
       fullScreenProvider.createOrShowPanel()
     }),
     workspace.onDidCloseTextDocument((document) => {
@@ -300,10 +300,10 @@ export async function activate(context: ExtensionContext) {
       fileInteractionCache.incrementStrokes(currentLine, currentCharacter)
     }),
     workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration('twinny')) return
+      if (!event.affectsConfiguration("twinny")) return
       completionProvider.updateConfig()
     }),
-    window.registerWebviewViewProvider('twinny.sidebar', sidebarProvider),
+    window.registerWebviewViewProvider("twinny.sidebar", sidebarProvider),
     statusBarItem
   )
 
@@ -314,7 +314,7 @@ export async function activate(context: ExtensionContext) {
     }, 200)
   })
 
-  if (config.get('enabled')) statusBarItem.show()
+  if (config.get("enabled")) statusBarItem.show()
 
-  statusBarItem.text = '$(code)'
+  statusBarItem.text = "$(code)"
 }

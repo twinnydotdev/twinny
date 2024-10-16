@@ -1,11 +1,11 @@
-import { USER } from '../common/constants'
+import { USER } from "../common/constants"
 import {
+  apiProviders,
   Message,
   RequestBodyBase,
-  apiProviders,
+  RequestOptionsOllama,
   StreamBodyOpenAI,
-  RequestOptionsOllama
-} from '../common/types'
+} from "../common/types"
 
 export function createStreamRequestBody(
   provider: string,
@@ -25,13 +25,13 @@ export function createStreamRequestBody(
         model: options.model,
         stream: true,
         messages: options.messages,
-        keep_alive: options.keepAlive === '-1'
+        keep_alive: options.keepAlive === "-1"
           ? -1
           : options.keepAlive,
         options: {
           temperature: options.temperature,
-          num_predict: options.numPredictChat
-        }
+          num_predict: options.numPredictChat,
+        },
       }
     case apiProviders.LiteLLM:
     default:
@@ -40,7 +40,7 @@ export function createStreamRequestBody(
         stream: true,
         max_tokens: options.numPredictChat,
         messages: options.messages,
-        temperature: options.temperature
+        temperature: options.temperature,
       }
   }
 }
@@ -62,13 +62,13 @@ export function createStreamRequestBodyFim(
         model: options.model,
         prompt,
         stream: true,
-        keep_alive: options.keepAlive === '-1'
+        keep_alive: options.keepAlive === "-1"
           ? -1
           : options.keepAlive,
         options: {
           temperature: options.temperature,
-          num_predict: options.numPredictFim
-        }
+          num_predict: options.numPredictFim,
+        },
       }
     case apiProviders.LMStudio:
       return {
@@ -76,7 +76,7 @@ export function createStreamRequestBodyFim(
         prompt,
         stream: true,
         temperature: options.temperature,
-        max_tokens: options.numPredictFim
+        max_tokens: options.numPredictFim,
       }
     case apiProviders.LlamaCpp:
     case apiProviders.Oobabooga:
@@ -84,7 +84,7 @@ export function createStreamRequestBodyFim(
         prompt,
         stream: true,
         temperature: options.temperature,
-        max_tokens: options.numPredictFim
+        max_tokens: options.numPredictFim,
       }
     case apiProviders.LiteLLM:
       return {
@@ -92,14 +92,14 @@ export function createStreamRequestBodyFim(
         model: options.model,
         stream: true,
         max_tokens: options.numPredictFim,
-        temperature: options.temperature
+        temperature: options.temperature,
       }
     default:
       return {
         prompt,
         stream: true,
         temperature: options.temperature,
-        n_predict: options.numPredictFim
+        n_predict: options.numPredictFim,
       }
   }
 }

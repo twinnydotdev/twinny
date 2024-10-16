@@ -1,18 +1,6 @@
-import { ExtensionContext, Webview, workspace } from 'vscode'
-import {
-  ClientMessage,
-  Conversation,
-  Message,
-  ServerMessage,
-  RequestBodyBase,
-  StreamRequestOptions,
-  StreamResponse
-} from '../common/types'
-import { v4 as uuidv4 } from 'uuid'
-import { createStreamRequestBody } from './provider-options'
-import { TwinnyProvider } from './provider-manager'
-import { streamResponse } from './stream'
-import { getChatDataFromProvider } from './utils'
+import { v4 as uuidv4 } from "uuid"
+import { ExtensionContext, Webview, workspace } from "vscode"
+
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_CONVERSATION_STORAGE_KEY,
@@ -21,21 +9,35 @@ import {
   EXTENSION_SESSION_NAME,
   TITLE_GENERATION_PROMPT_MESAGE,
   USER,
-} from '../common/constants'
-import { SessionManager } from './session-manager'
-import { SymmetryService } from './symmetry-service'
+} from "../common/constants"
+import {
+  ClientMessage,
+  Conversation,
+  Message,
+  RequestBodyBase,
+  ServerMessage,
+  StreamRequestOptions,
+  StreamResponse,
+} from "../common/types"
+
+import { TwinnyProvider } from "./provider-manager"
+import { createStreamRequestBody } from "./provider-options"
+import { SessionManager } from "./session-manager"
+import { streamResponse } from "./stream"
+import { SymmetryService } from "./symmetry-service"
+import { getChatDataFromProvider } from "./utils"
 
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory {
-  public config = workspace.getConfiguration('twinny')
+  public config = workspace.getConfiguration("twinny")
   public context: ExtensionContext
-  public keepAlive = this.config.get('keepAlive') as string | number
-  public temperature = this.config.get('temperature') as number
+  public keepAlive = this.config.get("keepAlive") as string | number
+  public temperature = this.config.get("temperature") as number
   public webView: Webview
   private _sessionManager: SessionManager | undefined
   private _symmetryService: SymmetryService
-  private _title = ''
+  private _title = ""
 
   constructor(
     context: ExtensionContext,
@@ -81,7 +83,7 @@ export class ConversationHistory {
 
   streamConversationTitle({
     requestBody,
-    requestOptions
+    requestOptions,
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
@@ -89,7 +91,7 @@ export class ConversationHistory {
   }): Promise<string> {
     const provider = this.getProvider()
 
-    if (!provider) return Promise.resolve('')
+    if (!provider) return Promise.resolve("")
 
     return new Promise((resolve, reject) => {
       try {
@@ -105,7 +107,7 @@ export class ConversationHistory {
           },
           onEnd: () => {
             return resolve(this._title)
-          }
+          },
         })
       } catch (e) {
         return reject(e)
@@ -125,11 +127,11 @@ export class ConversationHistory {
       port: Number(provider.apiPort),
       path: provider.apiPath,
       protocol: provider.apiProtocol,
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${provider.apiKey}`
-      }
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`,
+      },
     }
   }
 
@@ -148,10 +150,10 @@ export class ConversationHistory {
         ...messages,
         {
           role: USER,
-          content: TITLE_GENERATION_PROMPT_MESAGE
-        }
+          content: TITLE_GENERATION_PROMPT_MESAGE,
+        },
       ],
-      keepAlive: this.keepAlive
+      keepAlive: this.keepAlive,
     })
 
     return { requestOptions, requestBody }
@@ -169,7 +171,7 @@ export class ConversationHistory {
       numPredictChat: this.config.numPredictChat,
       temperature: this.temperature,
       messages,
-      keepAlive: this.keepAlive
+      keepAlive: this.keepAlive,
     })
 
     return { requestOptions, requestBody }
@@ -183,7 +185,7 @@ export class ConversationHistory {
       return Promise.resolve(`${messages[0].content?.substring(0, 50)}...`)
     }
     const request = this.buildStreamRequestTitle(messages)
-    if (!request) return ''
+    if (!request) return ""
     return await this.streamConversationTitle(request)
   }
 
@@ -192,8 +194,8 @@ export class ConversationHistory {
     this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.getConversations,
       value: {
-        data: conversations
-      }
+        data: conversations,
+      },
     })
   }
 
@@ -214,7 +216,7 @@ export class ConversationHistory {
     if (!conversation.id) return
     this.context.globalState.update(CONVERSATION_STORAGE_KEY, {
       ...conversations,
-      [conversation.id]: conversation
+      [conversation.id]: conversation,
     })
     this.setActiveConversation(conversation)
   }
@@ -227,8 +229,8 @@ export class ConversationHistory {
     this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
       value: {
-        data: conversation
-      }
+        data: conversation,
+      },
     } as ServerMessage<Conversation>)
     this.getAllConversations()
   }
@@ -246,7 +248,7 @@ export class ConversationHistory {
     if (!conversation?.id) return
     delete conversations[conversation.id]
     this.context.globalState.update(CONVERSATION_STORAGE_KEY, {
-      ...conversations
+      ...conversations,
     })
     this.setActiveConversation(undefined)
     this.getAllConversations()
@@ -262,7 +264,7 @@ export class ConversationHistory {
     if (activeConversation)
       return this.updateConversation({
         ...activeConversation,
-        messages: conversation.messages
+        messages: conversation.messages,
       })
 
     if (!conversation.messages.length || conversation.messages.length > 2)
@@ -278,12 +280,12 @@ export class ConversationHistory {
     if (!conversations) return
     const newConversation: Conversation = {
       id,
-      title: this._title || '',
-      messages: conversation.messages
+      title: this._title || "",
+      messages: conversation.messages,
     }
     conversations[id] = newConversation
     this.context.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
     this.setActiveConversation(newConversation)
-    this._title = ''
+    this._title = ""
   }
 }

@@ -1,6 +1,7 @@
-import * as vscode from 'vscode'
-import * as path from 'path'
-import { ClientMessage } from '../common/types'
+import * as path from "path"
+import * as vscode from "vscode"
+
+import { ClientMessage } from "../common/types"
 
 export class DiffManager {
   private _originalUri: vscode.Uri | undefined
@@ -11,7 +12,7 @@ export class DiffManager {
   private getFileExtension(document: vscode.TextDocument): string {
     const fileName = document.fileName
     const extension = path.extname(fileName)
-    return extension ? extension.slice(1) : 'txt'
+    return extension ? extension.slice(1) : "txt"
   }
 
   private async cleanupTempFiles() {
@@ -21,7 +22,7 @@ export class DiffManager {
         await vscode.workspace.fs.delete(this._modifiedUri)
         await vscode.workspace.fs.delete(vscode.Uri.file(this._tempDir), { recursive: true })
       } catch (error) {
-        console.error('Error cleaning up temporary files:', error)
+        console.error("Error cleaning up temporary files:", error)
       }
     }
   }
@@ -38,8 +39,8 @@ export class DiffManager {
     const fileExtension = this.getFileExtension(editor.document)
 
     this._tempDir = path.join(
-      vscode.workspace.workspaceFolders?.[0].uri.fsPath || '',
-      'tmp',
+      vscode.workspace.workspaceFolders?.[0].uri.fsPath || "",
+      "tmp",
       Date.now().toString() // Add timestamp to ensure uniqueness
     )
     this._originalUri = vscode.Uri.file(
@@ -54,21 +55,21 @@ export class DiffManager {
 
     await vscode.workspace.fs.writeFile(
       this._originalUri,
-      Buffer.from(text, 'utf8')
+      Buffer.from(text, "utf8")
     )
     await vscode.workspace.fs.writeFile(
       this._modifiedUri,
-      Buffer.from(message.data as string, 'utf8')
+      Buffer.from(message.data as string, "utf8")
     )
 
     const title = `Original ↔ Modified (${fileExtension})`
     const options: vscode.TextDocumentShowOptions = {
       viewColumn: vscode.ViewColumn.Beside,
-      preserveFocus: false
+      preserveFocus: false,
     }
 
     await vscode.commands.executeCommand(
-      'vscode.diff',
+      "vscode.diff",
       this._originalUri,
       this._modifiedUri,
       title,
@@ -77,7 +78,7 @@ export class DiffManager {
 
     // Set up a listener to clean up temp files when the diff editor is closed
     const disposable = vscode.window.onDidChangeVisibleTextEditors(async (editors) => {
-      const diffEditorOpen = editors.some(e => e.document.uri.scheme === 'diff')
+      const diffEditorOpen = editors.some(e => e.document.uri.scheme === "diff")
       if (!diffEditorOpen) {
         await this.cleanupTempFiles()
         disposable.dispose()
@@ -88,9 +89,9 @@ export class DiffManager {
   public async acceptSolution(message: ClientMessage) {
     if (this._originalEditor) {
       const diffEditor = vscode.window.activeTextEditor
-      if (diffEditor && diffEditor.document.uri.scheme === 'diff') {
+      if (diffEditor && diffEditor.document.uri.scheme === "diff") {
         await vscode.commands.executeCommand(
-          'workbench.action.closeActiveEditor'
+          "workbench.action.closeActiveEditor"
         )
       }
       await this._originalEditor.edit((editBuilder: vscode.TextEditorEdit) => {

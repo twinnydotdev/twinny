@@ -1,5 +1,6 @@
-import { InteractionItem } from '../common/types'
-import { LRUCache } from './cache'
+import { InteractionItem } from "../common/types"
+
+import { LRUCache } from "./cache"
 
 export class FileInteractionCache {
   private _currentFile: string | null = null
@@ -71,7 +72,7 @@ export class FileInteractionCache {
         sessionLength: interaction?.sessionLength || 0,
         lastVisited: interaction?.lastVisited || 0,
         activeLines: interaction?.activeLines || [],
-        relevanceScore: this.calculateRelevanceScore(interaction)
+        relevanceScore: this.calculateRelevanceScore(interaction),
       }))
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
   }
@@ -87,7 +88,7 @@ export class FileInteractionCache {
     this._interactions.set(this._currentFile, {
       ...item,
       visits: (item.visits || 0) + 1,
-      lastVisited: Date.now()
+      lastVisited: Date.now(),
     })
   }
 
@@ -101,9 +102,9 @@ export class FileInteractionCache {
       keyStrokes: (item.keyStrokes || 0) + 1,
       activeLines: [
         ...item.activeLines,
-        { line: currentLine, character: currentCharacter }
+        { line: currentLine, character: currentCharacter },
       ],
-      lastVisited: Date.now()
+      lastVisited: Date.now(),
     })
 
     this.resumeSession()
@@ -136,7 +137,7 @@ export class FileInteractionCache {
       this._interactions.set(this._currentFile, {
         ...item,
         sessionLength: (item.sessionLength || 0) + sessionLength,
-        lastVisited: Date.now()
+        lastVisited: Date.now(),
       })
     }
 
@@ -151,13 +152,13 @@ export class FileInteractionCache {
   }
 
   put(filePath: string): void {
-    this._currentFile = filePath.replace('.git', '').replace('.hg', '')
-    const fileExtension = this._currentFile.split('.').pop()
+    this._currentFile = filePath.replace(".git", "").replace(".hg", "")
+    const fileExtension = this._currentFile.split(".").pop()
     if (this._interactions.get(this._currentFile)) {
       this.incrementVisits()
       return
     }
-    if (this._currentFile.includes('.') && fileExtension) {
+    if (this._currentFile.includes(".") && fileExtension) {
       this._interactions.set(this._currentFile, {
         name: this._currentFile,
         keyStrokes: 0,
@@ -165,7 +166,7 @@ export class FileInteractionCache {
         sessionLength: 0,
         activeLines: [],
         lastVisited: Date.now(),
-        relevanceScore: 0
+        relevanceScore: 0,
       })
     }
   }

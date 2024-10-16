@@ -1,12 +1,12 @@
-import { createRoot } from 'react-dom/client'
+import { createRoot } from "react-dom/client"
 
-import { Main } from './main'
+import { Main } from "./main"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).vscode = window.acquireVsCodeApi()
 
-const container = document.querySelector('#root')
-const panelContainer = document.querySelector('#root-panel')
+const container = document.querySelector("#root")
+const panelContainer = document.querySelector("#root-panel")
 
 if (container) {
   const root = createRoot(container)

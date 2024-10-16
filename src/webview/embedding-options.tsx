@@ -1,21 +1,23 @@
+import { FormEvent } from "react"
+import { TextFieldType } from "@vscode/webview-ui-toolkit"
 import {
   VSCodeButton,
   VSCodeDivider,
   VSCodeDropdown,
   VSCodeOption,
-  VSCodeTextField
-} from '@vscode/webview-ui-toolkit/react'
-import { FormEvent } from 'react'
-import { TextFieldType } from '@vscode/webview-ui-toolkit'
+  VSCodeTextField,
+} from "@vscode/webview-ui-toolkit/react"
 
 import {
   EMBEDDING_METRICS,
   EVENT_NAME,
-  EXTENSION_CONTEXT_NAME
-} from '../common/constants'
-import { ClientMessage } from '../common/types'
-import { useGlobalContext, useProviders } from './hooks'
-import styles from './styles/index.module.css'
+  EXTENSION_CONTEXT_NAME,
+} from "../common/constants"
+import { ClientMessage } from "../common/types"
+
+import { useGlobalContext, useProviders } from "./hooks"
+
+import styles from "./styles/index.module.css"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
@@ -24,35 +26,35 @@ export const EmbeddingOptions = () => {
     embeddingProvider,
     getProvidersByType,
     providers,
-    setActiveEmbeddingsProvider
+    setActiveEmbeddingsProvider,
   } = useProviders()
 
   const { context: rerankThreshold = 0.5, setContext: setRerankThreshold } =
     useGlobalContext<number>(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)
 
-  const { context: maxChunkSize = '500', setContext: setMaxChunkSize } =
+  const { context: maxChunkSize = "500", setContext: setMaxChunkSize } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize)
 
-  const { context: minChunkSize = '50', setContext: setMinChunkSize } =
+  const { context: minChunkSize = "50", setContext: setMinChunkSize } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyMinChunkSize)
 
-  const { context: overlap = '20', setContext: setOverlap } =
+  const { context: overlap = "20", setContext: setOverlap } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyOverlapSize)
 
-  const { context: codeSnippets = '5', setContext: setRelevantCodeSnippets } =
+  const { context: codeSnippets = "5", setContext: setRelevantCodeSnippets } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets)
 
-  const { context: filePaths = '10', setContext: setRelevantFilePaths } =
+  const { context: filePaths = "10", setContext: setRelevantFilePaths } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths)
 
-  const { context: metric = 'l2', setContext: setMetric } =
+  const { context: metric = "l2", setContext: setMetric } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric)
 
-  const embeddingProviders = Object.values(getProvidersByType('embedding'))
+  const embeddingProviders = Object.values(getProvidersByType("embedding"))
 
   const handleEmbedDocuments = () => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyEmbedDocuments
+      type: EVENT_NAME.twinnyEmbedDocuments,
     } as ClientMessage<string[]>)
   }
 
