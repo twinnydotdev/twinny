@@ -1,4 +1,4 @@
-import { PrefixSuffix } from '../common/types'
+import { PrefixSuffix } from "../common/types"
 
 export class LRUCache<T = string> {
   private _capacity: number
@@ -33,19 +33,20 @@ export class LRUCache<T = string> {
       this._cache.delete(key)
     } else if (this._cache.size === this._capacity) {
       const firstKey = this._cache.keys().next().value
+      if (!firstKey) return
       this._cache.delete(firstKey)
     }
     this._cache.set(key, value)
   }
 
   normalize(src: string): string {
-    return src.split('\n').join('').replace(/\s+/g, '').replace(/\s/g, '')
+    return src.split("\n").join("").replace(/\s+/g, "").replace(/\s/g, "")
   }
 
   getKey(prefixSuffix: PrefixSuffix): string {
     const { prefix, suffix } = prefixSuffix
     if (suffix) {
-      return this.normalize(prefix + ' #### ' + suffix)
+      return this.normalize(prefix + " #### " + suffix)
     }
     return this.normalize(prefix)
   }

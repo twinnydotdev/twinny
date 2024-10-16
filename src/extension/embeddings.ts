@@ -1,28 +1,29 @@
-import fs from 'fs'
-import path from 'path'
-import * as vscode from 'vscode'
-import { fetchEmbedding } from './stream'
-import * as lancedb from '@lancedb/lancedb'
-import { minimatch } from 'minimatch'
+import * as lancedb from "@lancedb/lancedb"
+import { IntoVector } from "@lancedb/lancedb/dist/arrow"
+import fs from "fs"
+import { minimatch } from "minimatch"
+import path from "path"
+import * as vscode from "vscode"
 
+import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
+import { Logger } from "../common/logger"
 import {
   EmbeddedDocument,
+  Embedding,
   RequestOptionsOllama,
   StreamRequestOptions as RequestOptions,
-  Embedding,
   apiProviders,
   LMStudioEmbedding
 } from '../common/types'
-import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from '../common/constants'
+
 import { TwinnyProvider } from './provider-manager'
+import { fetchEmbedding } from "./stream"
 import {
   getDocumentSplitChunks,
   getIgnoreDirectory,
   readGitIgnoreFile,
-  readGitSubmodulesFile
-} from './utils'
-import { IntoVector } from '@lancedb/lancedb/dist/arrow'
-import { Logger } from '../common/logger'
+  readGitSubmodulesFile,
+} from "./utils"
 
 const logger = new Logger()
 
@@ -32,7 +33,7 @@ export class EmbeddingDatabase {
   private _db: lancedb.Connection | null = null
   private _dbPath: string
   private _extensionContext?: vscode.ExtensionContext
-  private _workspaceName = vscode.workspace.name || ''
+  private _workspaceName = vscode.workspace.name || ""
   private _documentTableName = `${this._workspaceName}-documents`
   private _filePathTableName = `${this._workspaceName}-file-paths`
 
@@ -63,7 +64,7 @@ export class EmbeddingDatabase {
       model: provider.modelName,
       input: content,
       stream: false,
-      options: {}
+      options: {},
     }
 
     const requestOptions: RequestOptions = {
@@ -71,11 +72,11 @@ export class EmbeddingDatabase {
       port: provider.apiPort,
       path: provider.apiPath,
       protocol: provider.apiProtocol,
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${provider.apiKey}`
-      }
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`,
+      },
     }
 
     return new Promise<number[]>((resolve) => {
@@ -89,22 +90,13 @@ export class EmbeddingDatabase {
     })
   }
 
-  private getEmbeddingFromResponse(provider: TwinnyProvider, response: any): number[] {
-
-    if( provider.provider === apiProviders.LMStudio) {
-      return (response as LMStudioEmbedding).data?.[0].embedding;
-    }
-
-    return (response as Embedding).embeddings;
-  }
-
   private getAllFilePaths = async (dirPath: string): Promise<string[]> => {
     let filePaths: string[] = []
     const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
     const gitIgnoredFiles = readGitIgnoreFile() || []
     const submodules = readGitSubmodulesFile()
 
-    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ''
+    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ""
 
     for (const dirent of dirents) {
       const fullPath = path.join(dirPath, dirent.name)
@@ -120,7 +112,7 @@ export class EmbeddingDatabase {
         gitIgnoredFiles.some((pattern) => {
           const isIgnored =
             minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
-            !pattern.startsWith('!')
+            !pattern.startsWith("!")
           if (isIgnored) {
             logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
           }
@@ -149,13 +141,13 @@ export class EmbeddingDatabase {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Embedding',
-        cancellable: true
+        title: "Embedding",
+        cancellable: true,
       },
       async (progress) => {
         if (!this._extensionContext) return
         const promises = filePaths.map(async (filePath) => {
-          const content = await fs.promises.readFile(filePath, 'utf-8')
+          const content = await fs.promises.readFile(filePath, "utf-8")
           const chunks = await getDocumentSplitChunks(
             content,
             filePath,
@@ -166,7 +158,7 @@ export class EmbeddingDatabase {
           this._filePaths.push({
             content: filePath,
             vector: filePathEmbedding,
-            file: filePath
+            file: filePath,
           })
 
           for (const chunk of chunks) {
@@ -175,7 +167,7 @@ export class EmbeddingDatabase {
             this._documents.push({
               content: chunk,
               file: filePath,
-              vector: vector
+              vector: vector,
             })
           }
 
@@ -183,7 +175,7 @@ export class EmbeddingDatabase {
           progress.report({
             message: `${((processedFiles / totalFiles) * 100).toFixed(
               2
-            )}% (${filePath.split('/').pop()})`
+            )}% (${filePath.split("/").pop()})`,
           })
         })
 
@@ -217,7 +209,7 @@ export class EmbeddingDatabase {
       this._documents.length = 0
       this._filePaths.length = 0
     } catch (e) {
-      console.log('Error populating database', e)
+      console.log("Error populating database", e)
     }
   }
 
@@ -230,7 +222,7 @@ export class EmbeddingDatabase {
     vector: IntoVector,
     limit: number,
     tableName: string,
-    metric: 'cosine' | 'l2' | 'dot' = 'cosine',
+    metric: "cosine" | "l2" | "dot" = "cosine",
     where?: string
   ): Promise<EmbeddedDocument[] | undefined> {
     try {
@@ -244,7 +236,7 @@ export class EmbeddingDatabase {
   }
 
   public async getDocumentByFilePath(filePath: string) {
-    const content = await fs.promises.readFile(filePath, 'utf-8')
+    const content = await fs.promises.readFile(filePath, "utf-8")
     const contentSnippet = content?.slice(0, 500)
     return contentSnippet
   }
@@ -252,4 +244,13 @@ export class EmbeddingDatabase {
   private getIsDuplicateItem(item: string, collection: string[]): boolean {
     return collection.includes(item.trim().toLowerCase())
   }
+
+  private getEmbeddingFromResponse(provider: TwinnyProvider, response: any): number[] {
+    if( provider.provider === apiProviders.LMStudio) {
+      return (response as LMStudioEmbedding).data?.[0].embedding;
+    }
+
+    return (response as Embedding).embeddings;
+  }
+
 }

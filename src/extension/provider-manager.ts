@@ -1,5 +1,6 @@
-import { ExtensionContext, Webview } from 'vscode'
-import { apiProviders, ClientMessage, ServerMessage } from '../common/types'
+import { v4 as uuidv4 } from "uuid"
+import { ExtensionContext, Webview } from "vscode"
+
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
@@ -7,9 +8,9 @@ import {
   FIM_TEMPLATE_FORMAT,
   INFERENCE_PROVIDERS_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
-  WEBUI_TABS
-} from '../common/constants'
-import { v4 as uuidv4 } from 'uuid'
+  WEBUI_TABS,
+} from "../common/constants"
+import { apiProviders, ClientMessage, ServerMessage } from "../common/types"
 
 export interface TwinnyProvider {
   apiHostname: string
@@ -79,8 +80,8 @@ export class ProviderManager {
     this._webView.postMessage({
       type: PROVIDER_EVENT_NAME.focusProviderTab,
       value: {
-        data: WEBUI_TABS.providers
-      }
+        data: WEBUI_TABS.providers,
+      },
     } as ServerMessage<string>)
   }
 
@@ -161,12 +162,12 @@ export class ProviderManager {
   }
 
   addDefaultProvider(provider: TwinnyProvider): void {
-    if (provider.type === 'chat') {
+    if (provider.type === "chat") {
       this._context.globalState.update(
         ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
         provider
       )
-    } else if (provider.type === 'fim') {
+    } else if (provider.type === "fim") {
       this._context.globalState.update(
         ACTIVE_FIM_PROVIDER_STORAGE_KEY,
         provider
@@ -192,8 +193,8 @@ export class ProviderManager {
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getAllProviders,
       value: {
-        data: providers
-      }
+        data: providers,
+      },
     })
   }
 
@@ -204,8 +205,8 @@ export class ProviderManager {
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveChatProvider,
       value: {
-        data: provider
-      }
+        data: provider,
+      },
     })
     return provider
   }
@@ -217,8 +218,8 @@ export class ProviderManager {
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveFimProvider,
       value: {
-        data: provider
-      }
+        data: provider,
+      },
     })
     return provider
   }
@@ -230,8 +231,8 @@ export class ProviderManager {
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
       value: {
-        data: provider
-      }
+        data: provider,
+      },
     })
     return provider
   }

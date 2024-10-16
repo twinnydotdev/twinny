@@ -1,19 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react"
 
-import { Chat } from './chat'
-import { Settings } from './settings'
-import { ServerMessage } from '../common/types'
-import { EVENT_NAME, WEBUI_TABS } from '../common/constants'
-import { Providers } from './providers'
-import { Symmetry } from './symmetry'
-import { ConversationHistory } from './conversation-history'
-import { Review } from './review'
+import { EVENT_NAME, WEBUI_TABS } from "../common/constants"
+import { ServerMessage } from "../common/types"
+
+import { Chat } from "./chat"
+import { ConversationHistory } from "./conversation-history"
+import { Providers } from "./providers"
+import { Review } from "./review"
+import { Settings } from "./settings"
+import { Symmetry } from "./symmetry"
 
 const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.settings]: <Settings />,
   [WEBUI_TABS.providers]: <Providers />,
   [WEBUI_TABS.symmetry]: <Symmetry />,
-  [WEBUI_TABS.review]: <Review />
+  [WEBUI_TABS.review]: <Review />,
 }
 
 interface MainProps {
@@ -32,10 +33,10 @@ export const Main = ({ fullScreen }: MainProps) => {
     if (message?.type === EVENT_NAME.twinnySetTab) {
       setTab(message?.value.data)
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
   useEffect(() => {
-    window.addEventListener('message', handler)
+    window.addEventListener("message", handler)
   }, [])
 
   if (!tab) {

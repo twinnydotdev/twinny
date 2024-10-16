@@ -1,6 +1,8 @@
-import * as vscode from 'vscode'
-import { BaseProvider } from './base'
-import { getNonce } from '../utils'
+import * as vscode from "vscode"
+
+import { getNonce } from "../utils"
+
+import { BaseProvider } from "./base"
 
 // TODO
 export class FullScreenProvider extends BaseProvider {
@@ -24,13 +26,13 @@ export class FullScreenProvider extends BaseProvider {
       this._panel.reveal(columnToShowIn)
     } else {
       this._panel = vscode.window.createWebviewPanel(
-        'twinnyFullScreenPanel',
-        'twinny',
+        "twinnyFullScreenPanel",
+        "twinny",
         columnToShowIn || vscode.ViewColumn.One,
         {
           enableScripts: true,
           localResourceRoots: [this.context.extensionUri],
-          retainContextWhenHidden: true
+          retainContextWhenHidden: true,
         }
       )
 
@@ -50,17 +52,17 @@ export class FullScreenProvider extends BaseProvider {
 
   private getHtmlForWebview(webview: vscode.Webview) {
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.js')
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "sidebar.js")
     )
 
     const codiconCssUri = vscode.Uri.joinPath(
       this.context.extensionUri,
-      'assets',
-      'codicon.css'
+      "assets",
+      "codicon.css"
     )
 
     const css = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'out', 'sidebar.css')
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "sidebar.css")
     )
 
     const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)

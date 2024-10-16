@@ -2,7 +2,7 @@
   "name": "twinny-vkx86",
   "displayName": "twinny-vkx86 - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.17.25",
+  "version": "3.17.26",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -136,10 +136,6 @@
     },
     "commands": [
       {
-        "command": "twinny.openPanelChat",
-        "title": "Twinny - Open full screen panel"
-      },
-      {
         "command": "twinny.explain",
         "title": "Twinny - Explain"
       },
@@ -176,10 +172,6 @@
         "command": "twinny.disable",
         "title": "Disable twinny",
         "shortTitle": "Disable twinny"
-      },
-      {
-        "command": "twinny.getGitCommitMessage",
-        "title": "Twinny - Generate commit message"
       },
       {
         "command": "twinny.sidebar.focus",
@@ -430,7 +422,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build-tests": "tsc -p . --outDir out",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
     "package": "node scripts/build.mjs",
     "pretest": "npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",
@@ -462,6 +454,8 @@
     "css-loader": "^6.8.1",
     "esbuild": "^0.21.4",
     "esbuild-plugin-copy": "^2.1.1",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "jest": "^29.7.0",
     "mocha": "^10.3.0",
     "rimraf": "^5.0.5",

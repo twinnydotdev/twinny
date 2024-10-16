@@ -1,12 +1,14 @@
-import { VSCodeButton, VSCodeCheckbox } from '@vscode/webview-ui-toolkit/react'
+import { VSCodeButton, VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 
-import { useTemplates, useWorkSpaceContext } from './hooks'
 import {
   DEFAULT_ACTION_TEMPLATES,
-  WORKSPACE_STORAGE_KEY
-} from '../common/constants'
-import { kebabToSentence } from './utils'
-import styles from './styles/index.module.css'
+  WORKSPACE_STORAGE_KEY,
+} from "../common/constants"
+
+import { useTemplates, useWorkSpaceContext } from "./hooks"
+import { kebabToSentence } from "./utils"
+
+import styles from "./styles/index.module.css"
 
 export const Settings = () => {
   const { templates, saveTemplates } = useTemplates()

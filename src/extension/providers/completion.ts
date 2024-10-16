@@ -1,44 +1,23 @@
+import AsyncLock from "async-lock"
 import {
+  ExtensionContext,
+  InlineCompletionContext,
   InlineCompletionItem,
   InlineCompletionItemProvider,
   InlineCompletionList,
+  InlineCompletionTriggerKind,
   Position,
   Range,
-  TextDocument,
-  workspace,
   StatusBarItem,
-  window,
+  TextDocument,
   Uri,
-  InlineCompletionContext,
-  InlineCompletionTriggerKind,
-  ExtensionContext
-} from 'vscode'
-import Parser, { SyntaxNode } from 'web-tree-sitter'
-import AsyncLock from 'async-lock'
-import 'string_score'
-import {
-  getFimDataFromProvider as getProviderFimData,
-  getPrefixSuffix,
-  getShouldSkipCompletion,
-  getIsMiddleOfString,
-  getIsMultilineCompletion,
-  getCurrentLineText
-} from '../utils'
-import { cache } from '../cache'
-import { supportedLanguages } from '../../common/languages'
-import {
-  RepositoryLevelData as RepositoryDocment,
-  FimTemplateData,
-  PrefixSuffix,
-  ResolvedInlineCompletion,
-  StreamRequestOptions,
-  StreamResponse
-} from '../../common/types'
-import {
-  getFimPrompt,
-  getFimTemplateRepositoryLevel,
-  getStopWords
-} from '../fim-templates'
+  window,
+  workspace,
+} from "vscode"
+import Parser, { SyntaxNode } from "web-tree-sitter"
+
+import "string_score"
+
 import {
   ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   FILE_IGNORE_LIST,
@@ -49,63 +28,86 @@ import {
   MIN_COMPLETION_CHUNKS,
   MULTI_LINE_DELIMITERS,
   MULTILINE_INSIDE,
-  MULTILINE_OUTSIDE
-} from '../../common/constants'
-import { streamResponse } from '../stream'
-import { createStreamRequestBodyFim } from '../provider-options'
-import { Logger } from '../../common/logger'
-import { CompletionFormatter } from '../completion-formatter'
-import { FileInteractionCache } from '../file-interaction'
-import { getLineBreakCount } from '../../webview/utils'
-import { TemplateProvider } from '../template-provider'
-import { TwinnyProvider } from '../provider-manager'
-import { getNodeAtPosition, getParser } from '../parser'
+  MULTILINE_OUTSIDE,
+} from "../../common/constants"
+import { supportedLanguages } from "../../common/languages"
+import { Logger } from "../../common/logger"
+import {
+  FimTemplateData,
+  PrefixSuffix,
+  RepositoryLevelData as RepositoryDocment,
+  ResolvedInlineCompletion,
+  StreamRequestOptions,
+  StreamResponse,
+} from "../../common/types"
+import { getLineBreakCount } from "../../webview/utils"
+import { cache } from "../cache"
+import { CompletionFormatter } from "../completion-formatter"
+import { FileInteractionCache } from "../file-interaction"
+import {
+  getFimPrompt,
+  getFimTemplateRepositoryLevel,
+  getStopWords,
+} from "../fim-templates"
+import { getNodeAtPosition, getParser } from "../parser"
+import { TwinnyProvider } from "../provider-manager"
+import { createStreamRequestBodyFim } from "../provider-options"
+import { streamResponse } from "../stream"
+import { TemplateProvider } from "../template-provider"
+import {
+  getCurrentLineText,
+  getFimDataFromProvider as getProviderFimData,
+  getIsMiddleOfString,
+  getIsMultilineCompletion,
+  getPrefixSuffix,
+  getShouldSkipCompletion,
+} from "../utils"
 
 export class CompletionProvider implements InlineCompletionItemProvider {
-  private _config = workspace.getConfiguration('twinny')
+  private _config = workspace.getConfiguration("twinny")
   private _abortController: AbortController | null
   private _acceptedLastCompletion = false
   private _completionCacheEnabled = this._config.get(
-    'completionCacheEnabled'
+    "completionCacheEnabled"
   ) as boolean
   private _chunkCount = 0
-  private _completion = ''
+  private _completion = ""
   private _nodeAtPosition: SyntaxNode | null = null
   private _debouncer: NodeJS.Timeout | undefined
-  private _debounceWait = this._config.get('debounceWait') as number
+  private _debounceWait = this._config.get("debounceWait") as number
   private _autoSuggestEnabled = this._config.get(
-    'autoSuggestEnabled'
+    "autoSuggestEnabled"
   ) as boolean
   private _document: TextDocument | null
-  private _enabled = this._config.get('enabled')
+  private _enabled = this._config.get("enabled")
   private enableSubsequentCompletions = this._config.get(
-    'enableSubsequent'
+    "enableSubsequent"
   ) as boolean
   private _extensionContext: ExtensionContext
   private _fileInteractionCache: FileInteractionCache
   private _isMultilineCompletion = false
-  private _keepAlive = this._config.get('keepAlive') as string | number
+  private _keepAlive = this._config.get("keepAlive") as string | number
   private _lastCompletionMultiline = false
-  public lastCompletionText = ''
+  public lastCompletionText = ""
   private _lock: AsyncLock
   private _logger: Logger
-  private _maxLines = this._config.get('maxLines') as number
+  private _maxLines = this._config.get("maxLines") as number
   private _multilineCompletionsEnabled = this._config.get(
-    'multilineCompletionsEnabled'
+    "multilineCompletionsEnabled"
   ) as boolean
   private _nonce = 0
-  private _numLineContext = this._config.get('contextLength') as number
-  private _numPredictFim = this._config.get('numPredictFim') as number
+  private _numLineContext = this._config.get("contextLength") as number
+  private _numPredictFim = this._config.get("numPredictFim") as number
   private _parser: Parser | undefined
   private _position: Position | null
-  private _prefixSuffix: PrefixSuffix = { prefix: '', suffix: '' }
+  private _prefixSuffix: PrefixSuffix = { prefix: "", suffix: "" }
   private _statusBar: StatusBarItem
-  private _temperature = this._config.get('temperature') as number
+  private _temperature = this._config.get("temperature") as number
   private _templateProvider: TemplateProvider
   private _fileContextEnabled = this._config.get(
-    'fileContextEnabled'
+    "fileContextEnabled"
   ) as boolean
-  private _enabledLanguages = this._config.get('enabledLanguages') as Record<
+  private _enabledLanguages = this._config.get("enabledLanguages") as Record<
     string,
     boolean
   >
@@ -147,7 +149,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     const languageEnabled =
       this._enabledLanguages[document.languageId] ??
-      this._enabledLanguages['*'] ??
+      this._enabledLanguages["*"] ??
       true
 
     if (!languageEnabled) return
@@ -174,7 +176,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       getShouldSkipCompletion(context, this._autoSuggestEnabled) ||
       getIsMiddleOfString()
     ) {
-      this._statusBar.text = '$(code)'
+      this._statusBar.text = "$(code)"
       return
     }
 
@@ -182,13 +184,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._document = document
     this._position = position
     this._nonce = this._nonce + 1
-    this._statusBar.text = '$(loading~spin)'
-    this._statusBar.command = 'twinny.stopGeneration'
+    this._statusBar.text = "$(loading~spin)"
+    this._statusBar.command = "twinny.stopGeneration"
     await this.tryParseDocument(document)
 
     this._isMultilineCompletion = getIsMultilineCompletion({
       node: this._nodeAtPosition,
-      prefixSuffix: this._prefixSuffix
+      prefixSuffix: this._prefixSuffix,
     })
 
     if (this._debouncer) clearTimeout(this._debouncer)
@@ -199,7 +201,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
       this._debouncer = setTimeout(() => {
-        this._lock.acquire('twinny.completion', async () => {
+        this._lock.acquire("twinny.completion", async () => {
           const provider = this.getProvider()
           if (!provider) return
           const request = this.buildStreamRequest(prompt, provider)
@@ -215,7 +217,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 if (completion) {
                   this._abortController?.abort()
                 }
-              }
+              },
             })
           } catch (error) {
             this.onError()
@@ -249,7 +251,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       model: provider.modelName,
       numPredictFim: this._numPredictFim,
       temperature: this._temperature,
-      keepAlive: this._keepAlive
+      keepAlive: this._keepAlive,
     })
 
     const options: StreamRequestOptions = {
@@ -257,18 +259,18 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       port: Number(provider.apiPort),
       path: provider.apiPath,
       protocol: provider.apiProtocol,
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: provider.apiKey ? `Bearer ${provider.apiKey}` : ''
-      }
+        "Content-Type": "application/json",
+        Authorization: provider.apiKey ? `Bearer ${provider.apiKey}` : "",
+      },
     }
 
     return { options, body }
   }
 
   private onData(data: StreamResponse | undefined): string {
-    if (!this._provider) return ''
+    if (!this._provider) return ""
 
     const stopWords = getStopWords(
       this._provider.modelName,
@@ -277,7 +279,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
     try {
       const providerFimData = getProviderFimData(this._provider.provider, data)
-      if (providerFimData === undefined) return ''
+      if (providerFimData === undefined) return ""
 
       this._completion = this._completion + providerFimData
       this._chunkCount = this._chunkCount + 1
@@ -326,10 +328,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
             (MULTILINE_INSIDE.includes(this._nodeAtPosition?.type) &&
               this._nodeAtPosition?.childCount > 2)
 
-          const lineText = getCurrentLineText(this._position) || ''
-          if (!this._parser) return ''
+          const lineText = getCurrentLineText(this._position) || ""
+          if (!this._parser) return ""
 
-          if (providerFimData.includes('\n')) {
+          if (providerFimData.includes("\n")) {
             const { rootNode } = this._parser.parse(
               `${lineText}${this._completion}`
             )
@@ -372,10 +374,10 @@ export class CompletionProvider implements InlineCompletionItemProvider {
         return this._completion
       }
 
-      return ''
+      return ""
     } catch (e) {
       console.error(e)
-      return ''
+      return ""
     }
   }
 
@@ -392,17 +394,17 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       supportedLanguages[languageId as keyof typeof supportedLanguages]
 
     if (!lang) {
-      return ''
+      return ""
     }
 
-    const language = `${lang.syntaxComments?.start || ''} Language: ${
+    const language = `${lang.syntaxComments?.start || ""} Language: ${
       lang?.langName
-    } (${languageId}) ${lang.syntaxComments?.end || ''}`
+    } (${languageId}) ${lang.syntaxComments?.end || ""}`
 
     const path = `${
-      lang.syntaxComments?.start || ''
+      lang.syntaxComments?.start || ""
     } File uri: ${uri.toString()} (${languageId}) ${
-      lang.syntaxComments?.end || ''
+      lang.syntaxComments?.end || ""
     }`
 
     return `\n${language}\n${path}\n`
@@ -416,14 +418,14 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private async getRelevantDocuments(): Promise<RepositoryDocment[]> {
     const interactions = this._fileInteractionCache.getAll()
-    const currentFileName = this._document?.fileName || ''
+    const currentFileName = this._document?.fileName || ""
     const openTextDocuments = workspace.textDocuments
 
     const openDocumentsData: RepositoryDocment[] = openTextDocuments
       .filter((doc) => {
         const isCurrentFile = doc.fileName === currentFileName
         const isGitFile =
-          doc.fileName.includes('.git') || doc.fileName.includes('git/')
+          doc.fileName.includes(".git") || doc.fileName.includes("git/")
         const isIgnored = this.getIgnoreDirectory(doc.fileName)
         return !isCurrentFile && !isGitFile && !isIgnored
       })
@@ -434,7 +436,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
           text: doc.getText(),
           name: doc.fileName,
           isOpen: true,
-          relevanceScore: interaction?.relevanceScore || 0
+          relevanceScore: interaction?.relevanceScore || 0,
         }
       })
 
@@ -448,13 +450,13 @@ export class CompletionProvider implements InlineCompletionItemProvider {
               )
           )
           .filter(
-            (interaction) => !this.getIgnoreDirectory(interaction.name || '')
+            (interaction) => !this.getIgnoreDirectory(interaction.name || "")
           )
           .map(async (interaction) => {
             const filePath = interaction.name
             if (!filePath) return null
             if (
-              filePath.toString().match('.git') ||
+              filePath.toString().match(".git") ||
               currentFileName === filePath
             )
               return null
@@ -466,7 +468,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
                 text: document.getText(),
                 name: filePath,
                 isOpen: false,
-                relevanceScore: interaction.relevanceScore
+                relevanceScore: interaction.relevanceScore,
               }
             } catch (error) {
               console.error(`Error opening document ${filePath}:`, error)
@@ -485,7 +487,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   private async getFileInteractionContext() {
     const interactions = this._fileInteractionCache.getAll()
-    const currentFileName = this._document?.fileName || ''
+    const currentFileName = this._document?.fileName || ""
 
     const fileChunks: string[] = []
     for (const interaction of interactions) {
@@ -493,7 +495,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
       if (!filePath) return
 
-      if (filePath.toString().match('.git')) continue
+      if (filePath.toString().match(".git")) continue
 
       const uri = Uri.file(filePath)
 
@@ -532,7 +534,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       }
     }
 
-    return fileChunks.join('\n')
+    return fileChunks.join("\n")
   }
 
   private removeStopWords(completion: string) {
@@ -543,30 +545,30 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
     )
     stopWords.forEach((stopWord) => {
-      filteredCompletion = filteredCompletion.split(stopWord).join('')
+      filteredCompletion = filteredCompletion.split(stopWord).join("")
     })
     return filteredCompletion
   }
 
   private async getPrompt(prefixSuffix: PrefixSuffix) {
-    if (!this._provider) return ''
-    if (!this._document || !this._position || !this._provider) return ''
+    if (!this._provider) return ""
+    if (!this._document || !this._position || !this._provider) return ""
 
     const documentLanguage = this._document.languageId
     const fileInteractionContext = await this.getFileInteractionContext()
 
     if (this._provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
       const systemMessage =
-        await this._templateProvider.readSystemMessageTemplate('fim-system.hbs')
+        await this._templateProvider.readSystemMessageTemplate("fim-system.hbs")
 
       const fimTemplate =
-        await this._templateProvider.readTemplate<FimTemplateData>('fim', {
+        await this._templateProvider.readTemplate<FimTemplateData>("fim", {
           prefix: prefixSuffix.prefix,
           suffix: prefixSuffix.suffix,
           systemMessage,
-          context: fileInteractionContext || '',
+          context: fileInteractionContext || "",
           fileName: this._document.uri.fsPath,
-          language: documentLanguage
+          language: documentLanguage,
         })
 
       if (fimTemplate) {
@@ -580,7 +582,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       const repoName = workspace.name
       const currentFile = await this._document.uri.fsPath
       return getFimTemplateRepositoryLevel(
-        repoName || 'untitled',
+        repoName || "untitled",
         repositoryLevelData,
         prefixSuffix,
         currentFile
@@ -591,11 +593,11 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       this._provider.modelName,
       this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic,
       {
-        context: fileInteractionContext || '',
+        context: fileInteractionContext || "",
         prefixSuffix,
         header: this.getPromptHeader(documentLanguage, this._document.uri),
         fileContextEnabled: this._fileContextEnabled,
-        language: documentLanguage
+        language: documentLanguage,
       }
     )
   }
@@ -613,7 +615,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
 
   public abortCompletion() {
     this._abortController?.abort()
-    this._statusBar.text = '$(code)'
+    this._statusBar.text = "$(code)"
   }
 
   private logCompletion(formattedCompletion: string) {
@@ -644,8 +646,8 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     if (this._completionCacheEnabled)
       cache.setCache(this._prefixSuffix, formattedCompletion)
 
-    this._completion = ''
-    this._statusBar.text = '$(code)'
+    this._completion = ""
+    this._statusBar.text = "$(code)"
     this.lastCompletionText = formattedCompletion
     this._lastCompletionMultiline = getLineBreakCount(this._completion) > 1
 
@@ -653,32 +655,32 @@ export class CompletionProvider implements InlineCompletionItemProvider {
       new InlineCompletionItem(
         formattedCompletion,
         new Range(this._position, this._position)
-      )
+      ),
     ]
   }
 
   public updateConfig() {
-    this._config = workspace.getConfiguration('twinny')
+    this._config = workspace.getConfiguration("twinny")
     this._completionCacheEnabled = this._config.get(
-      'completionCacheEnabled'
+      "completionCacheEnabled"
     ) as boolean
-    this._debounceWait = this._config.get('debounceWait') as number
-    this._autoSuggestEnabled = this._config.get('autoSuggestEnabled') as boolean
+    this._debounceWait = this._config.get("debounceWait") as number
+    this._autoSuggestEnabled = this._config.get("autoSuggestEnabled") as boolean
     this.enableSubsequentCompletions = this._config.get(
-      'enableSubsequentCompletions'
+      "enableSubsequentCompletions"
     ) as boolean
-    this._keepAlive = this._config.get('keepAlive') as string | number
-    this._maxLines = this._config.get('maxLines') as number
-    this._numLineContext = this._config.get('contextLength') as number
-    this._numPredictFim = this._config.get('numPredictFim') as number
-    this._temperature = this._config.get('temperature') as number
-    this._enabledLanguages = this._config.get('enabledLanguages') as Record<
+    this._keepAlive = this._config.get("keepAlive") as string | number
+    this._maxLines = this._config.get("maxLines") as number
+    this._numLineContext = this._config.get("contextLength") as number
+    this._numPredictFim = this._config.get("numPredictFim") as number
+    this._temperature = this._config.get("temperature") as number
+    this._enabledLanguages = this._config.get("enabledLanguages") as Record<
       string,
       boolean
     >
-    this._fileContextEnabled = this._config.get('fileContextEnabled') as boolean
+    this._fileContextEnabled = this._config.get("fileContextEnabled") as boolean
     this._multilineCompletionsEnabled = this._config.get(
-      'multilineCompletionsEnabled'
+      "multilineCompletionsEnabled"
     ) as boolean
   }
 }

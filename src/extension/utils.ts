@@ -1,3 +1,8 @@
+import { exec } from "child_process"
+import fs from "fs"
+import { minimatch } from "minimatch"
+import path from "path"
+import * as util from "util"
 import {
   ColorThemeKind,
   ExtensionContext,
@@ -9,36 +14,17 @@ import {
   TextDocument,
   Webview,
   window,
-  workspace
-} from 'vscode'
-import fs from 'fs'
-import path from 'path'
-import * as util from 'util'
-import { exec } from 'child_process'
-import { minimatch } from 'minimatch'
+  workspace,
+} from "vscode"
+import { SyntaxNode } from "web-tree-sitter"
 
-const execAsync = util.promisify(exec)
-
-import {
-  Theme,
-  LanguageType,
-  apiProviders,
-  StreamResponse,
-  PrefixSuffix,
-  Bracket,
-  ServerMessageKey,
-  Message,
-  ChunkOptions,
-  ServerMessage
-} from '../common/types'
-import { supportedLanguages } from '../common/languages'
 import {
   ALL_BRACKETS,
   CLOSING_BRACKETS,
   defaultChunkOptions,
-  FILE_IGNORE_LIST,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
+  FILE_IGNORE_LIST,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
@@ -46,11 +32,26 @@ import {
   QUOTES,
   QUOTES_REGEX,
   SKIP_DECLARATION_SYMBOLS,
-  TWINNY
-} from '../common/constants'
-import { Logger } from '../common/logger'
-import { SyntaxNode } from 'web-tree-sitter'
-import { getParser } from './parser'
+  TWINNY,
+} from "../common/constants"
+import { supportedLanguages } from "../common/languages"
+import { Logger } from "../common/logger"
+import {
+  apiProviders,
+  Bracket,
+  ChunkOptions,
+  LanguageType,
+  Message,
+  PrefixSuffix,
+  ServerMessage,
+  ServerMessageKey,
+  StreamResponse,
+  Theme,
+} from "../common/types"
+
+import { getParser } from "./parser"
+
+const execAsync = util.promisify(exec)
 
 const logger = new Logger()
 
@@ -67,7 +68,7 @@ export const getTextSelection = () => {
   const editor = window.activeTextEditor
   const selection = editor?.selection
   const text = editor?.document.getText(selection)
-  return text || ''
+  return text || ""
 }
 
 export const getLanguage = (): LanguageType => {
@@ -77,7 +78,7 @@ export const getLanguage = (): LanguageType => {
     supportedLanguages[languageId as keyof typeof supportedLanguages]
   return {
     language,
-    languageId
+    languageId,
   }
 }
 
@@ -137,7 +138,7 @@ export const getSkipVariableDeclataion = (
     characterBefore &&
     SKIP_DECLARATION_SYMBOLS.includes(characterBefore.trim()) &&
     textAfter.length &&
-    (!textAfter.at(0) as unknown as string) === '?' &&
+    (!textAfter.at(0) as unknown as string) === "?" &&
     !getIsOnlyBrackets(textAfter)
   ) {
     return true
@@ -205,7 +206,7 @@ export const getPrefixSuffix = (
 
   return {
     prefix: document.getText(prefixRange),
-    suffix: document.getText(suffixRange)
+    suffix: document.getText(suffixRange),
   }
 }
 
@@ -213,8 +214,8 @@ export const getBeforeAndAfter = () => {
   const editor = window.activeTextEditor
   if (!editor)
     return {
-      charBefore: '',
-      charAfter: ''
+      charBefore: "",
+      charAfter: "",
     }
 
   const position = editor.selection.active
@@ -223,14 +224,14 @@ export const getBeforeAndAfter = () => {
   const charBefore = lineText
     .substring(0, position.character)
     .trim()
-    .split('')
+    .split("")
     .reverse()[0]
 
-  const charAfter = lineText.substring(position.character).trim().split('')[0]
+  const charAfter = lineText.substring(position.character).trim().split("")[0]
 
   return {
     charBefore,
-    charAfter
+    charAfter,
   }
 }
 
@@ -244,7 +245,7 @@ export const getIsMiddleOfString = () => {
 
 export const getCurrentLineText = (position: Position | null) => {
   const editor = window.activeTextEditor
-  if (!editor || !position) return ''
+  if (!editor || !position) return ""
 
   const lineText = editor.document.lineAt(position.line).text
 
@@ -280,14 +281,14 @@ export const getPreviousLineIsOpeningBracket = () => {
   const previousLineCharacter = editor.document
     .lineAt(Math.max(position.line - 1, 0))
     .text.trim()
-    .split('')
+    .split("")
     .reverse()[0]
   return getIsOnlyOpeningBrackets(previousLineCharacter)
 }
 
 export const getIsMultilineCompletion = ({
   node,
-  prefixSuffix
+  prefixSuffix,
 }: {
   node: SyntaxNode | null
   prefixSuffix: PrefixSuffix | null
@@ -322,15 +323,15 @@ export const getChatDataFromProvider = (
     case apiProviders.OpenWebUI:
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
-        : ''
+        : ""
     case apiProviders.LlamaCpp:
       return data?.content
     case apiProviders.LiteLLM:
     default:
-      if (data?.choices[0].delta.content === 'undefined') return ''
+      if (data?.choices[0].delta.content === "undefined") return ""
       return data?.choices[0].delta?.content
         ? data?.choices[0].delta.content
-        : ''
+        : ""
   }
 }
 
@@ -348,15 +349,15 @@ export const getFimDataFromProvider = (
       return data?.choices[0].delta.content
     default:
       if (!data?.choices.length) return
-      if (data?.choices[0].text === 'undefined') {
-        return ''
+      if (data?.choices[0].text === "undefined") {
+        return ""
       }
-      return data?.choices[0].text ? data?.choices[0].text : ''
+      return data?.choices[0].text ? data?.choices[0].text : ""
   }
 }
 
 export function isStreamWithDataPrefix(stringBuffer: string) {
-  return stringBuffer.startsWith('data:')
+  return stringBuffer.startsWith("data:")
 }
 
 export const getNoTextBeforeOrAfter = () => {
@@ -379,7 +380,7 @@ export function safeParseJsonResponse(
 ): StreamResponse | undefined {
   try {
     if (isStreamWithDataPrefix(stringBuffer)) {
-      return JSON.parse(stringBuffer.split('data:')[1])
+      return JSON.parse(stringBuffer.split("data:")[1])
     }
     return JSON.parse(stringBuffer)
   } catch (e) {
@@ -391,7 +392,7 @@ export function safeParseJsonStringBuffer(
   stringBuffer: string
 ): unknown | undefined {
   try {
-    return JSON.parse(stringBuffer.replace(NORMALIZE_REGEX, ''))
+    return JSON.parse(stringBuffer.replace(NORMALIZE_REGEX, ""))
   } catch (e) {
     return undefined
   }
@@ -410,7 +411,7 @@ export const getCurrentWorkspacePath = (): string | undefined => {
     const workspaceFolder = workspace.workspaceFolders[0]
     return workspaceFolder.uri.fsPath
   } else {
-    window.showInformationMessage('No workspace is open.')
+    window.showInformationMessage("No workspace is open.")
     return undefined
   }
 }
@@ -418,13 +419,13 @@ export const getCurrentWorkspacePath = (): string | undefined => {
 export const getGitChanges = async (): Promise<string> => {
   try {
     const path = getCurrentWorkspacePath()
-    const { stdout } = await execAsync('git diff', {
-      cwd: path
+    const { stdout } = await execAsync("git diff", {
+      cwd: path,
     })
     return stdout
   } catch (error) {
-    console.error('Error executing git command:', error)
-    return ''
+    console.error("Error executing git command:", error)
+    return ""
   }
 }
 
@@ -438,7 +439,7 @@ export const getTerminal = async (): Promise<Terminal | undefined> => {
 
 export const getTerminalExists = (): boolean => {
   if (window.terminals.length === 0) {
-    window.showErrorMessage('No active terminals')
+    window.showErrorMessage("No active terminals")
     return false
   }
   return true
@@ -453,15 +454,15 @@ export function createSymmetryMessage<T>(
 
 export const getSanitizedCommitMessage = (commitMessage: string) => {
   const sanitizedMessage = commitMessage
-    .replace(QUOTES_REGEX, '')
-    .replace(LINE_BREAK_REGEX, '')
+    .replace(QUOTES_REGEX, "")
+    .replace(LINE_BREAK_REGEX, "")
     .trim()
 
   return `git commit -m "${sanitizedMessage}"`
 }
 
 export const getNormalisedText = (text: string) =>
-  text.replace(NORMALIZE_REGEX, ' ')
+  text.replace(NORMALIZE_REGEX, " ")
 
 function getSplitChunks(node: SyntaxNode, options: ChunkOptions): string[] {
   const { minSize = 50, maxSize = 500 } = options
@@ -499,7 +500,7 @@ export const getChunkOptions = (
   const options = {
     maxSize: Number(context.globalState.get(maxChunkSizeContext)) || 500,
     minSize: Number(context.globalState.get(minChunkSizeContext)) || 50,
-    overlap: Number(context.globalState.get(overlap)) || 10
+    overlap: Number(context.globalState.get(overlap)) || 10,
   }
 
   return options
@@ -533,7 +534,7 @@ export async function getDocumentSplitChunks(
 function combineChunks(chunks: string[], options: ChunkOptions): string[] {
   const { minSize, maxSize, overlap } = options
   const result: string[] = []
-  let currentChunk = ''
+  let currentChunk = ""
 
   for (const chunk of chunks) {
     if (currentChunk.length + chunk.length > maxSize) {
@@ -541,10 +542,10 @@ function combineChunks(chunks: string[], options: ChunkOptions): string[] {
         result.push(currentChunk)
         currentChunk = chunk
       } else {
-        currentChunk += ' ' + chunk
+        currentChunk += " " + chunk
       }
     } else {
-      currentChunk += (currentChunk ? ' ' : '') + chunk
+      currentChunk += (currentChunk ? " " : "") + chunk
     }
     if (currentChunk.length >= maxSize - overlap) {
       result.push(currentChunk)
@@ -573,10 +574,10 @@ function simpleChunk(content: string, options: ChunkOptions): string[] {
     } catch (error) {
       if (
         error instanceof RangeError &&
-        error.message.includes('Invalid array length')
+        error.message.includes("Invalid array length")
       ) {
         logger.log(
-          'Maximum array size reached. Returning chunks processed so far.'
+          "Maximum array size reached. Returning chunks processed so far."
         )
         break
       } else {
@@ -601,8 +602,8 @@ export const updateLoadingMessage = (
   webView?.postMessage({
     type: EVENT_NAME.twinnySendLoader,
     value: {
-      data: message
-    }
+      data: message,
+    },
   } as ServerMessage<string>)
 }
 
@@ -613,15 +614,15 @@ export const updateSymmetryStatus = (
   webView?.postMessage({
     type: EVENT_NAME.twinnySendSymmetryMessage,
     value: {
-      data: message
-    }
+      data: message,
+    },
   } as ServerMessage<string>)
 }
 
 export function getNonce() {
-  let text = ''
+  let text = ""
   const possible =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length))
   }
@@ -634,14 +635,14 @@ export function readGitSubmodulesFile(): string[] | undefined {
     if (!folders || folders.length === 0) return undefined
     const rootPath = folders[0].uri.fsPath
     if (!rootPath) return undefined
-    const gitSubmodulesFilePath = path.join(rootPath, '.gitmodules')
+    const gitSubmodulesFilePath = path.join(rootPath, ".gitmodules")
     if (!fs.existsSync(gitSubmodulesFilePath)) return undefined
     const submodulesFileContent = fs
       .readFileSync(gitSubmodulesFilePath)
       .toString()
     const submodulePaths: string[] = []
-    submodulesFileContent.split('\n').forEach((line: string) => {
-      if (line.startsWith('\tpath = ')) {
+    submodulesFileContent.split("\n").forEach((line: string) => {
+      if (line.startsWith("\tpath = ")) {
         submodulePaths.push(line.slice(8))
       }
     })
@@ -658,7 +659,7 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
   const gitIgnoredFiles = readGitIgnoreFile() || []
   const submodules = readGitSubmodulesFile()
 
-  const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ''
+  const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ""
 
   for (const dirent of dirents) {
     const fullPath = path.join(dirPath, dirent.name)
@@ -674,7 +675,7 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
       gitIgnoredFiles.some((pattern) => {
         const isIgnored =
           minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
-          !pattern.startsWith('!')
+          !pattern.startsWith("!")
         if (isIgnored) {
           logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
         }
@@ -703,35 +704,35 @@ export function readGitIgnoreFile(): string[] | undefined {
   try {
     const folders = workspace.workspaceFolders
     if (!folders || folders.length === 0) {
-      console.log('No workspace folders found')
+      console.log("No workspace folders found")
       return undefined
     }
 
     const rootPath = folders[0].uri.fsPath
     if (!rootPath) {
-      console.log('Root path is undefined')
+      console.log("Root path is undefined")
       return undefined
     }
 
-    const gitIgnoreFilePath = path.join(rootPath, '.gitignore')
+    const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
     if (!fs.existsSync(gitIgnoreFilePath)) {
-      console.log('.gitignore file not found at', gitIgnoreFilePath)
+      console.log(".gitignore file not found at", gitIgnoreFilePath)
       return undefined
     }
 
-    const ignoreFileContent = fs.readFileSync(gitIgnoreFilePath, 'utf8')
+    const ignoreFileContent = fs.readFileSync(gitIgnoreFilePath, "utf8")
     return ignoreFileContent
-      .split('\n')
+      .split("\n")
       .map((line) => line.trim())
-      .filter((line) => line !== '' && !line.startsWith('#'))
+      .filter((line) => line !== "" && !line.startsWith("#"))
       .map((pattern) => {
-        if (pattern.endsWith('/')) {
-          return pattern + '**'
+        if (pattern.endsWith("/")) {
+          return pattern + "**"
         }
         return pattern
       })
   } catch (e) {
-    console.error('Error reading .gitignore file:', e)
+    console.error("Error reading .gitignore file:", e)
     return undefined
   }
 }

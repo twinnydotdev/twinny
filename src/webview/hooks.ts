@@ -5,22 +5,22 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState
-} from 'react'
-import tippy, { Instance as TippyInstance } from 'tippy.js'
-import { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
-import { MentionNodeAttrs } from '@tiptap/extension-mention'
-import { ReactRenderer } from '@tiptap/react'
+  useState,
+} from "react"
+import { MentionNodeAttrs } from "@tiptap/extension-mention"
+import { ReactRenderer } from "@tiptap/react"
+import { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion"
+import tippy, { Instance as TippyInstance } from "tippy.js"
 
 import {
   CONVERSATION_EVENT_NAME,
-  WORKSPACE_STORAGE_KEY,
   EVENT_NAME,
-  PROVIDER_EVENT_NAME,
   EXTENSION_SESSION_NAME,
+  GITHUB_EVENT_NAME,
   GLOBAL_STORAGE_KEY,
-  GITHUB_EVENT_NAME
-} from '../common/constants'
+  PROVIDER_EVENT_NAME,
+  WORKSPACE_STORAGE_KEY,
+} from "../common/constants"
 import {
   ApiModel,
   ClientMessage,
@@ -31,16 +31,17 @@ import {
   ServerMessage,
   SymmetryConnection,
   SymmetryModelProvider,
-  ThemeType
-} from '../common/types'
-import { TwinnyProvider } from '../extension/provider-manager'
-import { MentionList, MentionListProps, MentionListRef } from './mention-list'
+  ThemeType,
+} from "../common/types"
+import { TwinnyProvider } from "../extension/provider-manager"
+
+import { MentionList, MentionListProps, MentionListRef } from "./mention-list"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 
 export const useSelection = (onSelect?: () => void) => {
-  const [selection, setSelection] = useState('')
+  const [selection, setSelection] = useState("")
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     if (message?.type === EVENT_NAME.twinnyTextSelection) {
@@ -50,11 +51,11 @@ export const useSelection = (onSelect?: () => void) => {
   }
 
   useEffect(() => {
-    window.addEventListener('message', handler)
+    window.addEventListener("message", handler)
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyTextSelection
+      type: EVENT_NAME.twinnyTextSelection,
     })
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return selection
@@ -75,19 +76,19 @@ export const useGlobalContext = <T>(key: string) => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnySetGlobalContext,
       key,
-      data: value
+      data: value,
     })
   }
 
   useEffect(() => {
-    window.addEventListener('message', handler)
+    window.addEventListener("message", handler)
 
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyGlobalContext,
-      key
+      key,
     })
 
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return { context, setContext }
@@ -104,12 +105,12 @@ export const useSessionContext = <T>(key: string) => {
   }
 
   useEffect(() => {
-    window.addEventListener('message', handler)
+    window.addEventListener("message", handler)
     global.vscode.postMessage({
       type: EVENT_NAME.twinnySessionContext,
-      key
+      key,
     })
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return { context, setContext }
@@ -126,13 +127,13 @@ export const useWorkSpaceContext = <T>(key: string) => {
   }
 
   useEffect(() => {
-    window.addEventListener('message', handler)
+    window.addEventListener("message", handler)
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyGetWorkspaceContext,
-      key
+      key,
     })
 
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return { context, setContext }
@@ -145,14 +146,14 @@ export const useTheme = () => {
     if (message?.type === EVENT_NAME.twinnySendTheme) {
       setTheme(message?.value.data)
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendTheme
+      type: EVENT_NAME.twinnySendTheme,
     })
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
   return theme
 }
@@ -164,14 +165,14 @@ export const useLoading = () => {
     if (message?.type === EVENT_NAME.twinnySendLoader) {
       setLoader(message?.value.data)
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendLoader
+      type: EVENT_NAME.twinnySendLoader,
     })
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
   return loader
 }
@@ -183,14 +184,14 @@ export const useLanguage = (): LanguageType | undefined => {
     if (message?.type === EVENT_NAME.twinnySendLanguage) {
       setLanguage(message?.value.data)
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendLanguage
+      type: EVENT_NAME.twinnySendLanguage,
     })
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
   return language
 }
@@ -202,23 +203,23 @@ export const useTemplates = () => {
     if (message?.type === EVENT_NAME.twinnyListTemplates) {
       setTemplates(message?.value.data)
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
 
   const saveTemplates = (templates: string[]) => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnySetWorkspaceContext,
       key: WORKSPACE_STORAGE_KEY.selectedTemplates,
-      data: templates
+      data: templates,
     } as ClientMessage<string[]>)
   }
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyListTemplates
+      type: EVENT_NAME.twinnyListTemplates,
     })
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
   return { templates, saveTemplates }
 }
@@ -236,15 +237,15 @@ export const useGithubPRs = () => {
       }
     }
 
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   const getPrs = (owner: string | undefined, repo: string | undefined) => {
     setIsLoading(true)
     global.vscode.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequests,
-      data: { owner, repo }
+      data: { owner, repo },
     })
   }
 
@@ -258,7 +259,7 @@ export const useGithubPRs = () => {
 
     global.vscode.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequestReview,
-      data: { owner, repo, number: selectedPR, title }
+      data: { owner, repo, number: selectedPR, title },
     })
   }
 
@@ -266,7 +267,7 @@ export const useGithubPRs = () => {
     prs,
     isLoading,
     getPrs,
-    startReview
+    startReview,
   }
 }
 
@@ -303,55 +304,55 @@ export const useProviders = () => {
         setEmbeddingProvider(provider)
       }
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
 
   const saveProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.addProvider,
-      data: provider
+      data: provider,
     } as ClientMessage<TwinnyProvider>)
   }
 
   const copyProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.copyProvider,
-      data: provider
+      data: provider,
     } as ClientMessage<TwinnyProvider>)
   }
 
   const updateProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.updateProvider,
-      data: provider
+      data: provider,
     } as ClientMessage<TwinnyProvider>)
   }
 
   const removeProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.removeProvider,
-      data: provider
+      data: provider,
     } as ClientMessage<TwinnyProvider>)
   }
 
   const setActiveFimProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.setActiveFimProvider,
-      data: provider
+      data: provider,
     } as ClientMessage<TwinnyProvider>)
   }
 
   const setActiveEmbeddingsProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider,
-      data: provider
+      data: provider,
     } as ClientMessage<TwinnyProvider>)
   }
 
   const setActiveChatProvider = (provider: TwinnyProvider) => {
     global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.setActiveChatProvider,
-      data: provider
+      data: provider,
     } as ClientMessage<TwinnyProvider>)
   }
 
@@ -363,25 +364,25 @@ export const useProviders = () => {
 
   const resetProviders = () => {
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.resetProvidersToDefaults
+      type: PROVIDER_EVENT_NAME.resetProvidersToDefaults,
     } as ClientMessage<TwinnyProvider>)
   }
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getAllProviders
+      type: PROVIDER_EVENT_NAME.getAllProviders,
     })
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveChatProvider
+      type: PROVIDER_EVENT_NAME.getActiveChatProvider,
     })
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveFimProvider
+      type: PROVIDER_EVENT_NAME.getActiveFimProvider,
     })
     global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider
+      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
     })
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return {
@@ -397,7 +398,7 @@ export const useProviders = () => {
     setActiveChatProvider,
     setActiveEmbeddingsProvider,
     setActiveFimProvider,
-    updateProvider
+    updateProvider,
   }
 }
 
@@ -419,10 +420,10 @@ export const useConfigurationSetting = (key: string) => {
   useEffect(() => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyGetConfigValue,
-      key
+      key,
     })
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [key])
 
   return { configurationSetting }
@@ -436,27 +437,27 @@ export const useConversationHistory = () => {
 
   const getConversations = () => {
     global.vscode.postMessage({
-      type: CONVERSATION_EVENT_NAME.getConversations
+      type: CONVERSATION_EVENT_NAME.getConversations,
     } as ClientMessage<string>)
   }
 
   const getActiveConversation = () => {
     global.vscode.postMessage({
-      type: CONVERSATION_EVENT_NAME.getActiveConversation
+      type: CONVERSATION_EVENT_NAME.getActiveConversation,
     })
   }
 
   const removeConversation = (conversation: Conversation) => {
     global.vscode.postMessage({
       type: CONVERSATION_EVENT_NAME.removeConversation,
-      data: conversation
+      data: conversation,
     } as ClientMessage<Conversation>)
   }
 
   const setActiveConversation = (conversation: Conversation | undefined) => {
     global.vscode.postMessage({
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
-      data: conversation
+      data: conversation,
     } as ClientMessage<Conversation | undefined>)
     setConversation(conversation)
   }
@@ -464,13 +465,13 @@ export const useConversationHistory = () => {
   const saveLastConversation = (conversation: Conversation | undefined) => {
     global.vscode.postMessage({
       type: CONVERSATION_EVENT_NAME.saveConversation,
-      data: conversation
+      data: conversation,
     } as ClientMessage<Conversation>)
   }
 
   const clearAllConversations = () => {
     global.vscode.postMessage({
-      type: CONVERSATION_EVENT_NAME.clearAllConversations
+      type: CONVERSATION_EVENT_NAME.clearAllConversations,
     } as ClientMessage<string>)
   }
 
@@ -489,9 +490,9 @@ export const useConversationHistory = () => {
   useEffect(() => {
     getConversations()
     getActiveConversation()
-    window.addEventListener('message', handler)
+    window.addEventListener("message", handler)
 
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return {
@@ -501,7 +502,7 @@ export const useConversationHistory = () => {
     removeConversation,
     saveLastConversation,
     clearAllConversations,
-    setActiveConversation
+    setActiveConversation,
   }
 }
 
@@ -512,15 +513,15 @@ export const useOllamaModels = () => {
     if (message?.type === EVENT_NAME.twinnyFetchOllamaModels) {
       setModels(message?.value.data)
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyFetchOllamaModels
+      type: EVENT_NAME.twinnyFetchOllamaModels,
     })
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return { models }
@@ -532,7 +533,7 @@ const useAutosizeTextArea = (
 ) => {
   useEffect(() => {
     if (chatRef?.current) {
-      chatRef.current.style.height = '0px'
+      chatRef.current.style.height = "0px"
       const scrollHeight = chatRef.current.scrollHeight
       chatRef.current.style.height = `${scrollHeight + 5}px`
     }
@@ -554,15 +555,15 @@ export const useFilePaths = () => {
 
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyFileListRequest
+      type: EVENT_NAME.twinnyFileListRequest,
     })
 
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   return {
-    filePaths: filePaths.current || []
+    filePaths: filePaths.current || [],
   }
 }
 
@@ -575,12 +576,12 @@ export const useSuggestion = () => {
     ({ query }: { query: string }) => {
       const filePaths = getFilePaths()
       const fileItems: FileItem[] = filePaths.map((path) => ({
-        name: path.split('/').pop() || '',
-        path: path
+        name: path.split("/").pop() || "",
+        path: path,
       }))
       const defaultItems: FileItem[] = [
-        { name: 'workspace', path: 'workspace' },
-        { name: 'problems', path: 'problems' }
+        { name: "workspace", path: "workspace" },
+        { name: "problems", path: "problems" },
       ]
       return Promise.resolve(
         [...defaultItems, ...fileItems]
@@ -604,19 +605,19 @@ export const useSuggestion = () => {
       onStart: (props: SuggestionProps<MentionNodeAttrs>) => {
         reactRenderer = new ReactRenderer(MentionList, {
           props,
-          editor: props.editor
+          editor: props.editor,
         })
 
         const getReferenceClientRect = props.clientRect as () => DOMRect
 
-        popup = tippy('body', {
+        popup = tippy("body", {
           getReferenceClientRect,
           appendTo: () => document.body,
           content: reactRenderer.element,
           showOnCreate: true,
           interactive: true,
-          trigger: 'manual',
-          placement: 'bottom-start'
+          trigger: "manual",
+          placement: "bottom-start",
         })
       },
 
@@ -625,13 +626,13 @@ export const useSuggestion = () => {
 
         if (popup) {
           popup[0].setProps({
-            getReferenceClientRect: props.clientRect as () => DOMRect
+            getReferenceClientRect: props.clientRect as () => DOMRect,
           })
         }
       },
 
       onKeyDown(props: SuggestionKeyDownProps) {
-        if (props.event.key === 'Escape') {
+        if (props.event.key === "Escape") {
           popup[0].hide()
           return true
         }
@@ -646,21 +647,21 @@ export const useSuggestion = () => {
           popup[0].destroy()
           reactRenderer.destroy()
         }
-      }
+      },
     }
   }, [])
 
   const suggestion = useMemo(
     () => ({
       items,
-      render
+      render,
     }),
     [items, render]
   )
 
   return {
     suggestion,
-    filePaths
+    filePaths,
   }
 }
 
@@ -671,49 +672,49 @@ export const useSymmetryConnection = () => {
     useState<SymmetryModelProvider | null>(null)
   const {
     context: symmetryConnectionSession,
-    setContext: setSymmetryConnectionSession
+    setContext: setSymmetryConnectionSession,
   } = useSessionContext<SymmetryConnection>(
     EXTENSION_SESSION_NAME.twinnySymmetryConnection
   )
 
   const {
     context: symmetryProviderStatus,
-    setContext: setSymmetryProviderStatus
+    setContext: setSymmetryProviderStatus,
   } = useSessionContext<string>(
     EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
   )
 
   const {
     context: autoConnectProviderContext,
-    setContext: setAutoConnectProviderContext
+    setContext: setAutoConnectProviderContext,
   } = useGlobalContext<boolean>(GLOBAL_STORAGE_KEY.autoConnectSymmetryProvider)
 
-  const isProviderConnected = symmetryProviderStatus === 'connected'
+  const isProviderConnected = symmetryProviderStatus === "connected"
 
   const connectToSymmetry = () => {
     setConnecting(true)
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyConnectSymmetry,
-      data: selectedModel
+      data: selectedModel,
     } as ClientMessage<SymmetryModelProvider>)
   }
 
   const disconnectSymmetry = () => {
     setConnecting(true)
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyDisconnectSymmetry
+      type: EVENT_NAME.twinnyDisconnectSymmetry,
     } as ClientMessage)
   }
 
   const connectAsProvider = () => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStartSymmetryProvider
+      type: EVENT_NAME.twinnyStartSymmetryProvider,
     } as ClientMessage)
   }
 
   const disconnectAsProvider = () => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStopSymmetryProvider
+      type: EVENT_NAME.twinnyStopSymmetryProvider,
     } as ClientMessage)
   }
 
@@ -737,21 +738,21 @@ export const useSymmetryConnection = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setModels(message?.value.data as unknown as SymmetryModelProvider[])
     }
-    return () => window.removeEventListener('message', handler)
+    return () => window.removeEventListener("message", handler)
   }
 
   useEffect(() => {
     if (symmetryConnectionSession !== undefined) {
       setSymmetryConnectionSession(symmetryConnectionSession)
     }
-    window.addEventListener('message', handler)
-    return () => window.removeEventListener('message', handler)
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
   }, [])
 
   useEffect(() => {
     if (
       autoConnectProviderContext &&
-      symmetryProviderStatus === 'disconnected'
+      symmetryProviderStatus === "disconnected"
     ) {
       connectAsProvider()
     }
@@ -771,7 +772,7 @@ export const useSymmetryConnection = () => {
     isProviderConnected,
     setAutoConnectProviderContext,
     symmetryConnection: symmetryConnectionSession,
-    symmetryProviderStatus
+    symmetryProviderStatus,
   }
 }
 

@@ -1,7 +1,8 @@
-import { VSCodeDropdown } from '@vscode/webview-ui-toolkit/react'
+import { VSCodeDropdown } from "@vscode/webview-ui-toolkit/react"
 
-import { getModelShortName } from './utils'
-import { ApiModel } from '../common/types'
+import { ApiModel } from "../common/types"
+
+import { getModelShortName } from "./utils"
 
 interface Props {
   model: string | undefined
@@ -12,7 +13,7 @@ interface Props {
 export const ModelSelect = ({ model, models, setModel }: Props) => {
   const handleOnChange = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
-    const selectedValue = event?.target.value || ''
+    const selectedValue = event?.target.value || ""
     setModel(selectedValue)
   }
 
