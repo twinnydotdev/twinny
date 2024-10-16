@@ -87,44 +87,44 @@ export class ProviderManager {
 
   getDefaultChatProvider() {
     return {
-      apiHostname: '127.0.0.1',
-      apiPath: '/v1/chat/completions',
-      apiPort: 1234,
-      apiProtocol: 'http',
+      apiHostname: "0.0.0.0",
+      apiPath: "/v1/chat/completions",
+      apiPort: 11434,
+      apiProtocol: "http",
       id: uuidv4(),
-      label: 'codeqwen-1-5-7b-chat Chat',
-      modelName: 'codeqwen-1-5-7b-chat',
-      provider: apiProviders.LMStudio,
-      type: 'chat'
+      label: "Ollama 7B Chat",
+      modelName: "codellama:7b-instruct",
+      provider: apiProviders.Ollama,
+      type: "chat",
     } as TwinnyProvider
   }
 
   getDefaultEmbeddingsProvider() {
     return {
-      apiHostname: '127.0.0.1',
-      apiPath: '/v1/embeddings',
-      apiPort: 1234,
-      apiProtocol: 'http',
+      apiHostname: "0.0.0.0",
+      apiPath: "/api/embed",
+      apiPort: 11434,
+      apiProtocol: "http",
       id: uuidv4(),
-      label: 'nomic-ai Embedding',
-      modelName: 'nomic-embed-text-v1.5',
-      provider: apiProviders.LMStudio,
-      type: 'embedding'
+      label: "Ollama Embedding",
+      modelName: "all-minilm:latest",
+      provider: apiProviders.Ollama,
+      type: "embedding",
     } as TwinnyProvider
   }
 
   getDefaultFimProvider() {
     return {
-      apiHostname: '127.0.0.1',
-      apiPath: '/v1/completions',
-      apiPort: 1234,
-      apiProtocol: 'http',
-      fimTemplate: FIM_TEMPLATE_FORMAT.starcoder,
-      label: 'starcoder2-3b FIM',
+      apiHostname: "0.0.0.0",
+      apiPath: "/api/generate",
+      apiPort: 11434,
+      apiProtocol: "http",
+      fimTemplate: FIM_TEMPLATE_FORMAT.codellama,
+      label: "Ollama 7B FIM",
       id: uuidv4(),
-      modelName: 'starcoder2-3b',
-      provider: apiProviders.LMStudio,
-      type: 'fim'
+      modelName: "codellama:7b-code",
+      provider: apiProviders.Ollama,
+      type: "fim",
     } as TwinnyProvider
   }
 

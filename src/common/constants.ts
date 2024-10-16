@@ -1,6 +1,6 @@
 import { defaultTemplates } from "../extension/templates"
 
-export const EXTENSION_NAME = "@ext:rjmacarthy.twinny-vkx86"
+export const EXTENSION_NAME = "@ext:rjmacarthy.twinny"
 export const ASSISTANT = "assistant"
 export const USER = "user"
 export const TWINNY = "twinny"
