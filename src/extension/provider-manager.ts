@@ -91,8 +91,8 @@ export class ProviderManager {
       apiPort: 1234,
       apiProtocol: 'http',
       id: uuidv4(),
-      label: 'StarCoder2-3B Chat',
-      modelName: 'second-state/StarCoder2-3B-GGUF/starcoder2-3b-Q4_0.gguf',
+      label: 'codeqwen-1-5-7b-chat Chat',
+      modelName: 'codeqwen-1-5-7b-chat',
       provider: apiProviders.LMStudio,
       type: 'chat'
     } as TwinnyProvider
@@ -106,7 +106,7 @@ export class ProviderManager {
       apiProtocol: 'http',
       id: uuidv4(),
       label: 'nomic-ai Embedding',
-      modelName: 'nomic-ai/nomic-embed-text-v1.5-GGUF/nomic-embed-text-v1.5.Q4_K_M.gguf',
+      modelName: 'nomic-embed-text-v1.5',
       provider: apiProviders.LMStudio,
       type: 'embedding'
     } as TwinnyProvider
@@ -119,9 +119,9 @@ export class ProviderManager {
       apiPort: 1234,
       apiProtocol: 'http',
       fimTemplate: FIM_TEMPLATE_FORMAT.starcoder,
-      label: 'StarCoder2-3B FIM',
+      label: 'starcoder2-3b FIM',
       id: uuidv4(),
-      modelName: 'second-state/StarCoder2-3B-GGUF/starcoder2-3b-Q4_0.gguf',
+      modelName: 'starcoder2-3b',
       provider: apiProviders.LMStudio,
       type: 'fim'
     } as TwinnyProvider
