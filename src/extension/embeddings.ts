@@ -250,6 +250,6 @@ export class EmbeddingDatabase {
       return (response as LMStudioEmbedding).data?.[0].embedding;
     }
 
-    return (response as Embedding).embeddings;
+    return (response as Embedding).embeddings
   }
 }
