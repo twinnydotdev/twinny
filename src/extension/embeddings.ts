@@ -252,5 +252,4 @@ export class EmbeddingDatabase {
 
     return (response as Embedding).embeddings;
   }
-
 }
