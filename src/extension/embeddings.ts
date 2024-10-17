@@ -247,7 +247,7 @@ export class EmbeddingDatabase {
 
   private getEmbeddingFromResponse(provider: TwinnyProvider, response: any): number[] {
     if (provider.provider === apiProviders.LMStudio) {
-      return (response as LMStudioEmbedding).data?.[0].embedding;
+      return (response as LMStudioEmbedding).data?.[0].embedding
     }
 
     return (response as Embedding).embeddings
