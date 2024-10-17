@@ -448,6 +448,10 @@ export const FILE_IGNORE_LIST = [
   "webpack.config.js",
   "yarn.lock",
   "yml",
+  ".jar",
+  ".war",
+  ".tar",
+  ".zip"
 ]
 
 export const DEFAULT_RELEVANT_FILE_COUNT = 10
