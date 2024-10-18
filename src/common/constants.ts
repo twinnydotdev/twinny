@@ -76,6 +76,7 @@ export const EVENT_NAME = {
   twinnySetSessionContext: "twinny-set-session-context",
   twinnySetTab: "twinny-set-tab",
   twinnySetWorkspaceContext: "twinny-set-workspace-context",
+  twinnyEditDefaultTemplates: "twinny-edit-default-templates",
   twinnyStartSymmetryProvider: "twinny-start-symmetry-provider",
   twinnyStopGeneration: "twinny-stop-generation",
   twinnyStopSymmetryProvider: "twinny-stop-symmetry-provider",
