@@ -7,12 +7,12 @@ import * as vscode from "vscode"
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
 import { logger } from "../common/logger"
 import {
+  apiProviders,
   EmbeddedDocument,
   Embedding,
+  LMStudioEmbedding,
   RequestOptionsOllama,
   StreamRequestOptions as RequestOptions,
-  apiProviders,
-  LMStudioEmbedding
 } from '../common/types'
 
 import { fetchEmbedding } from "./api"
@@ -239,12 +239,14 @@ export class EmbeddingDatabase {
     return collection.includes(item.trim().toLowerCase())
   }
 
-  private getEmbeddingFromResponse(provider: TwinnyProvider, response: any): number[] {
-    if( provider.provider === apiProviders.LMStudio) {
-      return (response as LMStudioEmbedding).data?.[0].embedding;
+  private getEmbeddingFromResponse<T>(
+    provider: TwinnyProvider,
+    response: T
+  ): number[] {
+    if (provider.provider === apiProviders.LMStudio) {
+      return (response as LMStudioEmbedding).data?.[0].embedding
     }
 
-    return (response as Embedding).embeddings;
+    return (response as Embedding).embeddings
   }
-
 }
