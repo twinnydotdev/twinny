@@ -67,6 +67,8 @@ export class ProviderManager {
         return this.setActiveChatProvider(provider)
       case PROVIDER_EVENT_NAME.setActiveFimProvider:
         return this.setActiveFimProvider(provider)
+      case PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider:
+        return this.setActiveEmbeddingsProvider(provider)
       case PROVIDER_EVENT_NAME.copyProvider:
         return this.copyProvider(provider)
       case PROVIDER_EVENT_NAME.getAllProviders:
