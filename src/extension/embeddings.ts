@@ -11,11 +11,13 @@ import {
   EmbeddedDocument,
   Embedding,
   RequestOptionsOllama,
-  StreamRequestOptions as RequestOptions
-} from "../common/types"
+  StreamRequestOptions as RequestOptions,
+  apiProviders,
+  LMStudioEmbedding
+} from '../common/types'
 
+import { TwinnyProvider } from './provider-manager'
 import { fetchEmbedding } from "./api"
-import { TwinnyProvider } from "./provider-manager"
 import {
   getDocumentSplitChunks,
   getIgnoreDirectory,
@@ -80,7 +82,7 @@ export class EmbeddingDatabase {
         body: requestBody,
         options: requestOptions,
         onData: (response) => {
-          resolve((response as Embedding).embeddings)
+          resolve(this.getEmbeddingFromResponse(provider, response))
         }
       })
     })
@@ -241,5 +243,13 @@ export class EmbeddingDatabase {
 
   private getIsDuplicateItem(item: string, collection: string[]): boolean {
     return collection.includes(item.trim().toLowerCase())
+  }
+
+  private getEmbeddingFromResponse(provider: TwinnyProvider, response: any): number[] {
+    if (provider.provider === apiProviders.LMStudio) {
+      return (response as LMStudioEmbedding).data?.[0].embedding
+    }
+
+    return (response as Embedding).embeddings
   }
 }

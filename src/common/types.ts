@@ -314,3 +314,22 @@ export interface GitHubPr {
   title: string
   html_url: string
 }
+
+export interface LMSEmbeddingItem {
+  object: string
+  embedding: number[]
+  index: number
+}
+
+export interface LMSEmbeddingUsage {
+  prompt_tokens: number
+  total_tokens: number
+}
+
+export interface LMStudioEmbedding {
+  object: string
+  data: LMSEmbeddingItem[]
+  model: string
+  usage: LMSEmbeddingUsage
+}
+
