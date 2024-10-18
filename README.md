@@ -81,5 +81,5 @@ Twinny is actively developed and provided "as is". Functionality may vary betwee
 # Build
 
 ```sh
-vsce package
+npm i && vsce package
 ```
