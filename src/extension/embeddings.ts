@@ -111,7 +111,7 @@ export class EmbeddingDatabase {
       }
 
       if(gitIgnorer.ignores(relativePath)){
-        // logger.log("git-ignored: " + relativePath)
+        logger.log("git-ignored: " + relativePath)
         continue
       }   
 
