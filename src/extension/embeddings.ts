@@ -8,16 +8,16 @@ import * as vscode from "vscode"
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
 import { logger } from "../common/logger"
 import {
+  apiProviders,
   EmbeddedDocument,
   Embedding,
+  LMStudioEmbedding,
   RequestOptionsOllama,
-  StreamRequestOptions as RequestOptions,
-  apiProviders,
-  LMStudioEmbedding
-} from '../common/types'
+  StreamRequestOptions as RequestOptions
+} from "../common/types"
 
-import { TwinnyProvider } from './provider-manager'
 import { fetchEmbedding } from "./api"
+import { TwinnyProvider } from "./provider-manager"
 import {
   getDocumentSplitChunks,
   getIgnoreDirectory,
@@ -112,9 +112,7 @@ export class EmbeddingDatabase {
             minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
             !pattern.startsWith("!")
           if (isIgnored) {
-            logger.log(
-              `Ignoring ${relativePath} due to pattern: ${pattern}`
-            )
+            logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
           }
           return isIgnored
         })
@@ -245,7 +243,10 @@ export class EmbeddingDatabase {
     return collection.includes(item.trim().toLowerCase())
   }
 
-  private getEmbeddingFromResponse(provider: TwinnyProvider, response: any): number[] {
+  private getEmbeddingFromResponse<T>(
+    provider: TwinnyProvider,
+    response: T
+  ): number[] {
     if (provider.provider === apiProviders.LMStudio) {
       return (response as LMStudioEmbedding).data?.[0].embedding
     }
