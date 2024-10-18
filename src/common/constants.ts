@@ -442,15 +442,22 @@ export const FILE_IGNORE_LIST = [
   "tmp",
   "tools",
   "tsconfig.json",
-  "util",
-  "utils",
+
+  //vk: these can be valid  sub-folder names for code
+  // "util",
+  // "utils",
+
   "vagrantfile",
   "vsix",
   "webpack.config.js",
   "yarn.lock",
   "yml",
+  ".mvn",
   ".jar",
   ".war",
+  "maven-wrapper.properties",
+  "mvnw.cmd",
+  "mvnw",
   ".tar",
   ".zip"
 ]

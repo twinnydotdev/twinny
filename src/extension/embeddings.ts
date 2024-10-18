@@ -111,13 +111,14 @@ export class EmbeddingDatabase {
       }
 
       if(gitIgnorer.ignores(relativePath)){
-        logger.log("git-ignored: " + relativePath)
+        // logger.log("git-ignored: " + relativePath)
         continue
-      }    
+      }   
 
       if (dirent.isDirectory()) {
         filePaths = filePaths.concat(await this.getAllFilePaths(fullPath))
       } else if (dirent.isFile()) {
+        // logger.log("add 4 embd: " + relativePath)
         filePaths.push(fullPath)
       }
     }
