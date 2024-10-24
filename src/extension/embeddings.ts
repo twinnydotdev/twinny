@@ -3,6 +3,7 @@ import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
 import path from "path"
 import * as vscode from "vscode"
+import ignore from "ignore"
 
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
 import { logger } from "../common/logger"
@@ -13,7 +14,7 @@ import {
   LMStudioEmbedding,
   RequestOptionsOllama,
   StreamRequestOptions as RequestOptions,
-} from '../common/types'
+} from "../common/types"
 
 import { fetchEmbedding } from "./api"
 import { TwinnyProvider } from "./provider-manager"
@@ -22,7 +23,6 @@ import {
   getIgnoreDirectory,
   readGitSubmodulesFile
 } from "./utils"
-import ignore from "ignore"
 
 export class EmbeddingDatabase {
   private _documents: EmbeddedDocument[] = []
@@ -94,10 +94,10 @@ export class EmbeddingDatabase {
 
     const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ""
 
-    const gitIgnorer = ignore()
+    const ig = ignore()
     const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
     if (fs.existsSync(gitIgnoreFilePath)) {
-      gitIgnorer.add(fs.readFileSync(gitIgnoreFilePath).toString())
+      ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
     }
 
     for (const dirent of dirents) {
@@ -110,15 +110,14 @@ export class EmbeddingDatabase {
         continue
       }
 
-      if(gitIgnorer.ignores(relativePath)){
-        logger.log("git-ignored: " + relativePath)
+      if(ig.ignores(relativePath)){
+        logger.log(`git-ignored: ${relativePath}`)
         continue
-      }   
+      }
 
       if (dirent.isDirectory()) {
         filePaths = filePaths.concat(await this.getAllFilePaths(fullPath))
       } else if (dirent.isFile()) {
-        // logger.log("add 4 embd: " + relativePath)
         filePaths.push(fullPath)
       }
     }

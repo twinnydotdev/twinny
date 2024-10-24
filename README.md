@@ -77,9 +77,3 @@ Follow my journey on X for updates! https://x.com/rjmacarthy
 
 ## Disclaimer
 Twinny is actively developed and provided "as is". Functionality may vary between updates.
-
-# Build
-
-```sh
-npm i && vsce package
-```
