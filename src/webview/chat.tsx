@@ -368,6 +368,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }
 
   useEffect(() => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyHideBackButton,
+    })
+  }, [])
+
+  useEffect(() => {
     window.addEventListener("message", messageEventHandler)
     editorRef.current?.commands.focus()
     scrollToBottom()
