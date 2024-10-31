@@ -117,7 +117,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     statusBar: StatusBarItem,
     fileInteractionCache: FileInteractionCache,
     templateProvider: TemplateProvider,
-    extentionContext: ExtensionContext
+    extensionContext: ExtensionContext
   ) {
     this._abortController = null
     this._document = null
@@ -126,7 +126,7 @@ export class CompletionProvider implements InlineCompletionItemProvider {
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
     this._templateProvider = templateProvider
-    this._extensionContext = extentionContext
+    this._extensionContext = extensionContext
   }
 
   public async provideInlineCompletionItems(
