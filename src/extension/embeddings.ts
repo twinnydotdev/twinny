@@ -1,9 +1,9 @@
 import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
+import ignore from "ignore"
 import path from "path"
 import * as vscode from "vscode"
-import ignore from "ignore"
 
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
 import { logger } from "../common/logger"
@@ -13,7 +13,7 @@ import {
   Embedding,
   LMStudioEmbedding,
   RequestOptionsOllama,
-  StreamRequestOptions as RequestOptions,
+  StreamRequestOptions as RequestOptions
 } from "../common/types"
 
 import { fetchEmbedding } from "./api"
