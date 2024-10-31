@@ -110,7 +110,7 @@ export class EmbeddingDatabase {
         continue
       }
 
-      if(ig.ignores(relativePath)){
+      if (ig.ignores(relativePath)){
         logger.log(`git-ignored: ${relativePath}`)
         continue
       }
