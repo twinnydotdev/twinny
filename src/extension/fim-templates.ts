@@ -81,9 +81,25 @@ const getFimPromptTemplateCodestral = ({
   return `${fileContext}\n\n[SUFFIX]${suffix}[PREFIX]${heading}${prefix}`
 }
 
-const getFimPromptTemplateQwen = ({ prefixSuffix }: FimPromptTemplate) => {
+const getFimPromptTemplateQwen = ({
+  context,
+  header,
+  fileContextEnabled,
+  prefixSuffix,
+  language
+}: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+  const { fileContext, heading } = getFileContext(
+    fileContextEnabled,
+    context,
+    language,
+    header
+  )
+  if (fileContextEnabled) {
+    return `<|file_sep|>${fileContext}\n\n<|file_sep|>${heading}<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+  } else {
+    return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+  }
 }
 
 const getFimPromptTemplateOther = ({
