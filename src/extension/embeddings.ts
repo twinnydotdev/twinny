@@ -1,9 +1,9 @@
 import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
-import { minimatch } from "minimatch"
 import path from "path"
 import * as vscode from "vscode"
+import ignore from "ignore"
 
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
 import { logger } from "../common/logger"
@@ -13,7 +13,7 @@ import {
   Embedding,
   LMStudioEmbedding,
   RequestOptionsOllama,
-  StreamRequestOptions as RequestOptions
+  StreamRequestOptions as RequestOptions,
 } from "../common/types"
 
 import { fetchEmbedding } from "./api"
@@ -21,7 +21,6 @@ import { TwinnyProvider } from "./provider-manager"
 import {
   getDocumentSplitChunks,
   getIgnoreDirectory,
-  readGitIgnoreFile,
   readGitSubmodulesFile
 } from "./utils"
 
@@ -91,10 +90,15 @@ export class EmbeddingDatabase {
   private getAllFilePaths = async (dirPath: string): Promise<string[]> => {
     let filePaths: string[] = []
     const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
-    const gitIgnoredFiles = readGitIgnoreFile() || []
     const submodules = readGitSubmodulesFile()
 
     const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ""
+
+    const ig = ignore()
+    const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
+    if (fs.existsSync(gitIgnoreFilePath)) {
+      ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
+    }
 
     for (const dirent of dirents) {
       const fullPath = path.join(dirPath, dirent.name)
@@ -106,17 +110,8 @@ export class EmbeddingDatabase {
         continue
       }
 
-      if (
-        gitIgnoredFiles.some((pattern) => {
-          const isIgnored =
-            minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
-            !pattern.startsWith("!")
-          if (isIgnored) {
-            logger.log(`Ignoring ${relativePath} due to pattern: ${pattern}`)
-          }
-          return isIgnored
-        })
-      ) {
+      if (ig.ignores(relativePath)) {
+        logger.log(`git-ignored: ${relativePath}`)
         continue
       }
 
