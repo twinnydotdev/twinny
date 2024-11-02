@@ -81,9 +81,28 @@ const getFimPromptTemplateCodestral = ({
   return `${fileContext}\n\n[SUFFIX]${suffix}[PREFIX]${heading}${prefix}`
 }
 
-const getFimPromptTemplateQwen = ({ prefixSuffix }: FimPromptTemplate) => {
+const getFimPromptTemplateQwen = ({
+  context,
+  header,
+  fileContextEnabled,
+  prefixSuffix,
+  language
+}: FimPromptTemplate) => {
   const { prefix, suffix } = prefixSuffix
-  return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+  const { fileContext, heading } = getFileContext(
+    fileContextEnabled,
+    context,
+    language,
+    header
+  )
+  // reference: https://github.com/QwenLM/Qwen2.5-Coder/blob/af09d8a8aef5daa34f098c60f7be7f0e2a733b69/examples/Qwen2.5-Coder-repolevel-fim.py
+  // TODO: files in fileContext should be separated with `\n\n<|file_sep|>path/to.file\n`
+  // also it's likely that LLM might be weirded out by heading's format :thinking_face:
+  if (fileContextEnabled) {
+    return `<|file_sep|>${fileContext}\n\n<|file_sep|>${heading}<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+  } else {
+    return `<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+  }
 }
 
 const getFimPromptTemplateOther = ({
