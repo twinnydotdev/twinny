@@ -369,7 +369,7 @@
         },
         "twinny.ollamaApiPort": {
           "order": 15,
-          "type": "number",
+          "type": ["number", "null"],
           "default": 11434,
           "markdownDescription": "Sets the port number for the Ollama API. The default is `11434`, but you can change it if your Ollama instance uses a different port.",
           "required": false
