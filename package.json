@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.18.3",
+  "version": "3.18.4",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -369,7 +369,10 @@
         },
         "twinny.ollamaApiPort": {
           "order": 15,
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "default": 11434,
           "markdownDescription": "Sets the port number for the Ollama API. The default is `11434`, but you can change it if your Ollama instance uses a different port.",
           "required": false
