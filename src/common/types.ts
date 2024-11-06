@@ -160,7 +160,7 @@ export type Bracket = (typeof ALL_BRACKETS)[number]
 export interface StreamRequestOptions {
   hostname: string
   path: string
-  port: string | number
+  port?: string | number
   protocol: string
   method: string
   headers: Record<string, string>

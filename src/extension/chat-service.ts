@@ -312,7 +312,7 @@ export class ChatService {
 
     const requestOptions: StreamRequestOptions = {
       hostname: provider.apiHostname,
-      port: Number(provider.apiPort),
+      port: provider.apiPort ? Number(provider.apiPort) : undefined,
       path: provider.apiPath,
       protocol: provider.apiProtocol,
       method: "POST",

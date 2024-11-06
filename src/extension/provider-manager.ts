@@ -15,7 +15,7 @@ import { apiProviders, ClientMessage, ServerMessage } from "../common/types"
 export interface TwinnyProvider {
   apiHostname: string
   apiPath: string
-  apiPort: number
+  apiPort?: number
   apiProtocol: string
   id: string
   label: string
