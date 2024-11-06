@@ -732,7 +732,7 @@ export function readGitIgnoreFile(): string[] | undefined {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logStreamOptions = (opts: any) => {
   const hostname = opts.options?.hostname ?? "unknown"
-  const port = opts.options?.port && opts.options.port !== "0" ? opts.options.port : null
+  const port = opts.options?.port ?? undefined
   const body = opts.body ?? {}
   const options = opts.options ?? {}
 
