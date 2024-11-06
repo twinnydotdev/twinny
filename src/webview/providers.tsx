@@ -373,10 +373,9 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
 
         <div>
           <div>
-            <label htmlFor="apiPort">Port*</label>
+            <label htmlFor="apiPort">Port</label>
           </div>
           <VSCodeTextField
-            required
             onChange={handleChange}
             name="apiPort"
             value={formState.apiPort.toString()}

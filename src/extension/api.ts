@@ -9,7 +9,7 @@ export async function streamResponse(request: StreamRequest) {
   const { signal } = controller
 
   try {
-    const url = `${options.protocol}://${options.hostname}:${options.port}${options.path}`
+    const url = `${options.protocol}://${options.hostname}${options.port && options.port !== "0" ? `:${options.port}` : ""}${options.path}`
     const fetchOptions = {
       method: options.method,
       headers: options.headers,
@@ -94,7 +94,7 @@ export async function fetchEmbedding(request: StreamRequest) {
 
 
   try {
-    const url = `${options.protocol}://${options.hostname}:${options.port}${options.path}`
+    const url = `${options.protocol}://${options.hostname}${options.port && options.port !== "0" ? `:${options.port}` : ""}${options.path}`
     const fetchOptions = {
       method: options.method,
       headers: options.headers,

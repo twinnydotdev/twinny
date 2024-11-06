@@ -732,7 +732,7 @@ export function readGitIgnoreFile(): string[] | undefined {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const logStreamOptions = (opts: any) => {
   const hostname = opts.options?.hostname ?? "unknown"
-  const port = opts.options?.port ?? "unknown"
+  const port = opts.options?.port && opts.options.port !== "0" ? opts.options.port : null
   const body = opts.body ?? {}
   const options = opts.options ?? {}
 
@@ -740,7 +740,7 @@ export const logStreamOptions = (opts: any) => {
 
   const logMessage = `
     ***Twinny Stream Debug***
-    Streaming response from ${hostname}:${port}.
+    Streaming response from ${hostname}${port ? `:${port}` : ""}.
     Request body:
     ${JSON.stringify(body, null, 2)}
 
