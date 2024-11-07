@@ -13,7 +13,6 @@ import { logger } from "../../common/logger"
 import {
   ApiModel,
   ClientMessage,
-  FileItem,
   InferenceRequest,
   Message,
   ServerMessage
@@ -53,7 +52,6 @@ export class BaseProvider {
   public conversationHistory: ConversationHistory | undefined
   public reviewService: ReviewService | undefined
   public webView?: vscode.Webview
-
 
   constructor(
     context: vscode.ExtensionContext,

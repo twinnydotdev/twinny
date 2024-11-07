@@ -25,7 +25,6 @@ import { getChatDataFromProvider, updateLoadingMessage } from "./utils"
 
 export class GithubService extends ConversationHistory {
   private _completion = ""
-  private _githubToken = this.config.get("githubToken") as string
   private _templateProvider: TemplateProvider
 
   constructor(
@@ -99,7 +98,7 @@ export class GithubService extends ConversationHistory {
 
   getHeaders() {
     return {
-      Authorization: `Bearer ${this._githubToken}`,
+      Authorization: `Bearer ${this.config.githubToken}`,
       Accept: "application/vnd.github.v3.diff",
     }
   }

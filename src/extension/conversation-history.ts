@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid"
-import { ExtensionContext, Webview, workspace } from "vscode"
+import { ExtensionContext, Webview } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -21,6 +21,7 @@ import {
 } from "../common/types"
 
 import { streamResponse } from "./api"
+import { Base } from "./base"
 import { TwinnyProvider } from "./provider-manager"
 import { createStreamRequestBody } from "./provider-options"
 import { SessionManager } from "./session-manager"
@@ -29,11 +30,8 @@ import { getChatDataFromProvider } from "./utils"
 
 type Conversations = Record<string, Conversation> | undefined
 
-export class ConversationHistory {
-  public config = workspace.getConfiguration("twinny")
+export class ConversationHistory extends Base {
   public context: ExtensionContext
-  public keepAlive = this.config.get("keepAlive") as string | number
-  public temperature = this.config.get("temperature") as number
   public webView: Webview
   private _sessionManager: SessionManager | undefined
   private _symmetryService: SymmetryService
@@ -45,6 +43,7 @@ export class ConversationHistory {
     sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
+    super()
     this.context = context
     this.webView = webView
     this._sessionManager = sessionManager
@@ -145,7 +144,7 @@ export class ConversationHistory {
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
       numPredictChat: this.config.numPredictChat,
-      temperature: this.temperature,
+      temperature: this.config.temperature,
       messages: [
         ...messages,
         {
@@ -153,7 +152,7 @@ export class ConversationHistory {
           content: TITLE_GENERATION_PROMPT_MESAGE,
         },
       ],
-      keepAlive: this.keepAlive,
+      keepAlive: this.config.keepAlive,
     })
 
     return { requestOptions, requestBody }
@@ -169,9 +168,9 @@ export class ConversationHistory {
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
       numPredictChat: this.config.numPredictChat,
-      temperature: this.temperature,
+      temperature: this.config.temperature,
       messages,
-      keepAlive: this.keepAlive,
+      keepAlive: this.config.keepAlive,
     })
 
     return { requestOptions, requestBody }

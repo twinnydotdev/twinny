@@ -25,7 +25,6 @@ import {
 } from "./utils"
 
 export class EmbeddingDatabase extends Base {
-  private _config = vscode.workspace.getConfiguration("twinny")
   private _documents: EmbeddedDocument[] = []
   private _filePaths: EmbeddedDocument[] = []
   private _db: lancedb.Connection | null = null
@@ -98,7 +97,7 @@ export class EmbeddingDatabase extends Base {
 
     const ig = ignore()
 
-    const embeddingIgnoredGlobs = this._config.get(
+    const embeddingIgnoredGlobs = this.config.get(
       "embeddingIgnoredGlobs",
       [] as string[]
     )
