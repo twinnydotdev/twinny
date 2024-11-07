@@ -360,15 +360,21 @@
           "default": true,
           "markdownDescription": "When `true`, Twinny will continue to make completion requests to the API after the previous completion was accepted. This can provide a more fluid completion experience."
         },
-        "twinny.ollamaHostname": {
+        "twinny.embeddingIgnoredGlobs": {
           "order": 14,
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Specifies file patterns to ignore when calculating embeddings, such as `**/*.md`, `**/node_modules/**`."
+        },
+        "twinny.ollamaHostname": {
+          "order": 15,
           "type": "string",
           "default": "0.0.0.0",
           "markdownDescription": "Specifies the hostname for the Ollama API. Use `0.0.0.0` for localhost or provide a specific IP address or domain name.",
           "required": true
         },
         "twinny.ollamaApiPort": {
-          "order": 15,
+          "order": 16,
           "type": [
             "number",
             "null"
@@ -378,31 +384,31 @@
           "required": false
         },
         "twinny.keepAlive": {
-          "order": 16,
+          "order": 17,
           "type": "string",
           "default": "5m",
           "markdownDescription": "Sets the duration to keep models in memory for Ollama API. Use formats like `5m` for 5 minutes or `1h` for 1 hour. Set to `-1` to keep models in memory indefinitely."
         },
         "twinny.ollamaUseTls": {
-          "order": 17,
+          "order": 18,
           "type": "boolean",
           "default": false,
           "markdownDescription": "When `true`, Twinny will use TLS encryption for connections to the Ollama API. Ensure your Ollama instance is configured for TLS before enabling this option."
         },
         "twinny.enableLogging": {
-          "order": 18,
+          "order": 19,
           "type": "boolean",
           "default": true,
           "markdownDescription": "Activates debug logging for Twinny. When `true`, Twinny will output detailed logs, which can be helpful for troubleshooting."
         },
         "twinny.symmetryServerKey": {
-          "order": 19,
+          "order": 20,
           "type": "string",
           "markdownDescription": "Sets the symmetry master server key. Default value is provided for twinny's Symmetry server.",
           "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
         },
         "twinny.githubToken": {
-          "order": 20,
+          "order": 21,
           "type": "string",
           "default": "",
           "markdownDescription": "Your personal GitHub access token. This is used for fetching data from GitHub repositories. Keep this token secure and do not share it."

@@ -1,9 +1,11 @@
-import { workspace } from "vscode"
+import { Base } from "../extension/base"
 
-export class Logger {
+export class Logger extends Base {
   private static instance: Logger
-  private _config = workspace.getConfiguration("twinny")
-  private _debugEnabled = this._config.get("enableLogging") as boolean
+
+  constructor () {
+    super()
+  }
 
   public static getInstance(): Logger {
     if (!Logger.instance) {
@@ -13,18 +15,13 @@ export class Logger {
   }
 
   public log = (message: string) => {
-    if (!this._debugEnabled) return
+    if (!this.config.enableLogging) return
     console.log(`[twinny] ${message}`)
   }
 
   public error = (err: NodeJS.ErrnoException) => {
-    if (!this._debugEnabled) return
+    if (!this.config.enableLogging) return
     console.error(err.message)
-  }
-
-  public updateConfig() {
-    this._config = workspace.getConfiguration("twinny")
-    this._debugEnabled = this._config.get("enableLogging") as boolean
   }
 }
 

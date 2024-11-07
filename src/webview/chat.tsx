@@ -486,7 +486,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
               index={index}
             />
           ))}
-          {isLoading && !generatingRef.current && !completion ? (
+          {isLoading && !completion ? (
             <ChatLoader />
           ) : (
             !!completion && (
