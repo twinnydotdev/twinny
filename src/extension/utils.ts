@@ -1,6 +1,6 @@
 import { exec } from "child_process"
 import fs from "fs"
-import { minimatch } from "minimatch"
+import ignore from "ignore"
 import path from "path"
 import * as util from "util"
 import {
@@ -24,7 +24,6 @@ import {
   defaultChunkOptions,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
-  FILE_IGNORE_LIST,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
@@ -651,29 +650,36 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
   if (!dirPath) return []
   let filePaths: string[] = []
   const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
-  const gitIgnoredFiles = readGitIgnoreFile() || []
   const submodules = readGitSubmodulesFile()
 
   const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ""
+  const config = workspace.getConfiguration("twinny")
+
+  const ig = ignore()
+
+  const embeddingIgnoredGlobs = config.get(
+    "embeddingIgnoredGlobs",
+    [] as string[]
+  )
+
+  ig.add(embeddingIgnoredGlobs)
+
+  const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
+
+  if (fs.existsSync(gitIgnoreFilePath)) {
+    ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
+  }
 
   for (const dirent of dirents) {
     const fullPath = path.join(dirPath, dirent.name)
     const relativePath = path.relative(rootPath, fullPath)
 
-    if (getIgnoreDirectory(dirent.name)) continue
-
     if (submodules?.some((submodule) => fullPath.includes(submodule))) {
       continue
     }
 
-    if (
-      gitIgnoredFiles.some((pattern) => {
-        const isIgnored =
-          minimatch(relativePath, pattern, { dot: true, matchBase: true }) &&
-          !pattern.startsWith("!")
-        return isIgnored
-      })
-    ) {
+    if (ig.ignores(relativePath)) {
+      logger.log(`git-ignored: ${relativePath}`)
       continue
     }
 
@@ -684,12 +690,6 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
     }
   }
   return filePaths
-}
-
-export function getIgnoreDirectory(fileName: string): boolean {
-  return FILE_IGNORE_LIST.some((ignoreItem: string) =>
-    fileName.includes(ignoreItem)
-  )
 }
 
 export function readGitIgnoreFile(): string[] | undefined {

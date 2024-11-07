@@ -21,7 +21,6 @@ import { Base } from "./base"
 import { TwinnyProvider } from "./provider-manager"
 import {
   getDocumentSplitChunks,
-  getIgnoreDirectory,
   readGitSubmodulesFile
 } from "./utils"
 
@@ -115,8 +114,6 @@ export class EmbeddingDatabase extends Base {
     for (const dirent of dirents) {
       const fullPath = path.join(dirPath, dirent.name)
       const relativePath = path.relative(rootPath, fullPath)
-
-      if (getIgnoreDirectory(dirent.name)) continue
 
       if (submodules?.some((submodule) => fullPath.includes(submodule))) {
         continue

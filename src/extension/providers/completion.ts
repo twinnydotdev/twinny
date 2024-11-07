@@ -1,4 +1,7 @@
 import AsyncLock from "async-lock"
+import fs from "fs"
+import ignore from "ignore"
+import path from "path"
 import {
   ExtensionContext,
   InlineCompletionContext,
@@ -64,7 +67,10 @@ import {
   getShouldSkipCompletion
 } from "../utils"
 
-export class CompletionProvider extends Base implements InlineCompletionItemProvider {
+export class CompletionProvider
+  extends Base
+  implements InlineCompletionItemProvider
+{
   private _abortController: AbortController | null
   private _acceptedLastCompletion = false
   private _chunkCount = 0
@@ -120,7 +126,8 @@ export class CompletionProvider extends Base implements InlineCompletionItemProv
       position
     )
 
-    const languageEnabled = this.config.enabledLanguages[document.languageId] ??
+    const languageEnabled =
+      this.config.enabledLanguages[document.languageId] ??
       this.config.enabledLanguages["*"] ??
       true
 
@@ -382,23 +389,32 @@ export class CompletionProvider extends Base implements InlineCompletionItemProv
     return `\n${language}\n${path}\n`
   }
 
-  public getIgnoreDirectory(fileName: string): boolean {
-    return FILE_IGNORE_LIST.some((ignoreItem: string) =>
-      fileName.includes(ignoreItem)
-    )
-  }
-
   private async getRelevantDocuments(): Promise<RepositoryDocment[]> {
     const interactions = this._fileInteractionCache.getAll()
     const currentFileName = this._document?.fileName || ""
     const openTextDocuments = workspace.textDocuments
+    const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ""
+    const ig = ignore()
+
+    const embeddingIgnoredGlobs = this.config.get(
+      "embeddingIgnoredGlobs",
+      [] as string[]
+    )
+
+    ig.add(embeddingIgnoredGlobs)
+
+    const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
+
+    if (fs.existsSync(gitIgnoreFilePath)) {
+      ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
+    }
 
     const openDocumentsData: RepositoryDocment[] = openTextDocuments
       .filter((doc) => {
         const isCurrentFile = doc.fileName === currentFileName
         const isGitFile =
           doc.fileName.includes(".git") || doc.fileName.includes("git/")
-        const isIgnored = this.getIgnoreDirectory(doc.fileName)
+        const isIgnored = ig.ignores(doc.fileName)
         return !isCurrentFile && !isGitFile && !isIgnored
       })
       .map((doc) => {
@@ -421,9 +437,7 @@ export class CompletionProvider extends Base implements InlineCompletionItemProv
                 (doc) => doc.fileName === interaction.name
               )
           )
-          .filter(
-            (interaction) => !this.getIgnoreDirectory(interaction.name || "")
-          )
+          .filter((interaction) => !ig.ignores(interaction.name || ""))
           .map(async (interaction) => {
             const filePath = interaction.name
             if (!filePath) return null

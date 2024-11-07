@@ -484,7 +484,6 @@
     "hyperswarm": "^4.7.15",
     "ignore": "^6.0.2",
     "js-yaml": "^4.1.0",
-    "minimatch": "^9.0.4",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
     "react": "^18.2.0",
