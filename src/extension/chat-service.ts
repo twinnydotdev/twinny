@@ -28,7 +28,6 @@ import {
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import {
-  FileItem,
   Message,
   RequestBodyBase,
   ServerMessage,
@@ -39,6 +38,7 @@ import {
 import { kebabToSentence } from "../webview/utils"
 
 import { streamResponse } from "./api"
+import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
 import { TwinnyProvider } from "./provider-manager"
 import { createStreamRequestBody } from "./provider-options"
@@ -52,19 +52,15 @@ import {
   updateLoadingMessage,
 } from "./utils"
 
-export class ChatService {
+export class ChatService extends Base {
   private _completion = ""
-  private _config = workspace.getConfiguration("twinny")
   private _context?: ExtensionContext
   private _controller?: AbortController
   private _db?: EmbeddingDatabase
-  private _keepAlive = this._config.get("keepAlive") as string | number
-  private _numPredictChat = this._config.get("numPredictChat") as number
   private _promptTemplate = ""
   private _reranker: Reranker
   private _statusBar: StatusBarItem
   private _symmetryService?: SymmetryService
-  private _temperature = this._config.get("temperature") as number
   private _templateProvider?: TemplateProvider
   private _webView?: Webview
   private _sessionManager: SessionManager | undefined
@@ -78,6 +74,7 @@ export class ChatService {
     sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
+    super()
     this._webView = webView
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
@@ -86,13 +83,6 @@ export class ChatService {
     this._db = db
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
-    workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration("twinny")) {
-        return
-      }
-      this.updateConfig()
-    })
-
     this.setupSymmetryListeners()
   }
 
@@ -324,10 +314,10 @@ export class ChatService {
 
     const requestBody = createStreamRequestBody(provider.provider, {
       model: provider.modelName,
-      numPredictChat: this._numPredictChat,
-      temperature: this._temperature,
+      numPredictChat: this.config.numPredictChat,
+      temperature: this.config.temperature,
       messages,
-      keepAlive: this._keepAlive,
+      keepAlive: this.config.keepAlive,
     })
 
     return { requestOptions, requestBody }
@@ -554,24 +544,8 @@ export class ChatService {
     return combinedContext.trim() || null
   }
 
-  private async loadFileContents(files: FileItem[]): Promise<string> {
-    if (!files?.length) return ""
-    let fileContents = ""
-
-    for (const file of files) {
-      try {
-        const content = await fs.readFile(file.path, "utf-8")
-        fileContents += `File: ${file.name}\n\n${content}\n\n`
-      } catch (error) {
-        console.error(`Error reading file ${file.path}:`, error)
-      }
-    }
-    return fileContents.trim()
-  }
-
   public async streamChatCompletion(
     messages: Message[],
-    filePaths: FileItem[]
   ) {
     this._completion = ""
     this.sendEditorLanguage()
@@ -600,11 +574,6 @@ export class ChatService {
 
     if (ragContext) {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
-    }
-
-    const fileContents = await this.loadFileContents(filePaths)
-    if (fileContents) {
-      additionalContext += `File Contents:\n${fileContents}\n\n`
     }
 
     const provider = this.getProvider()
@@ -720,11 +689,5 @@ export class ChatService {
     if (!request) return
     const { requestBody, requestOptions } = request
     return this.streamResponse({ requestBody, requestOptions, onEnd })
-  }
-
-  private updateConfig() {
-    this._config = workspace.getConfiguration("twinny")
-    this._temperature = this._config.get("temperature") as number
-    this._keepAlive = this._config.get("keepAlive") as string | number
   }
 }

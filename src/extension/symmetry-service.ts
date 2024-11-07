@@ -8,7 +8,7 @@ import os from "os"
 import path from "path"
 import { EventEmitter } from "stream"
 import { serverMessageKeys, SymmetryProvider } from "symmetry-core"
-import { commands, ExtensionContext, Webview,workspace } from "vscode"
+import { commands, ExtensionContext, Webview, workspace } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -17,7 +17,7 @@ import {
   EXTENSION_SESSION_NAME,
   GLOBAL_STORAGE_KEY,
   SYMMETRY_EMITTER_KEY,
-  WEBUI_TABS,
+  WEBUI_TABS
 } from "../common/constants"
 import {
   ClientMessage,
@@ -26,7 +26,7 @@ import {
   StreamResponse,
   SymmetryConnection,
   SymmetryMessage,
-  SymmetryModelProvider,
+  SymmetryModelProvider
 } from "../common/types"
 
 import { TwinnyProvider } from "./provider-manager"
@@ -34,9 +34,11 @@ import { SessionManager } from "./session-manager"
 import { SymmetryWs } from "./symmetry-ws"
 import {
   createSymmetryMessage,
- getChatDataFromProvider,  safeParseJson,
+  getChatDataFromProvider,
+  safeParseJson,
   safeParseJsonResponse,
-  updateSymmetryStatus } from "./utils"
+  updateSymmetryStatus
+} from "./utils"
 
 export class SymmetryService extends EventEmitter {
   private _config = workspace.getConfiguration("twinny")
@@ -51,7 +53,6 @@ export class SymmetryService extends EventEmitter {
   private _serverSwarm: undefined | typeof Hyperswarm
   private _sessionManager: SessionManager | undefined
   private _symmetryProvider: string | undefined
-  private _symmetryServerKey = this._config.symmetryServerKey
   private _webView: Webview | undefined
   private _ws: SymmetryWs | undefined
 
@@ -88,7 +89,7 @@ export class SymmetryService extends EventEmitter {
         [EVENT_NAME.twinnyConnectSymmetry]: this.connect,
         [EVENT_NAME.twinnyDisconnectSymmetry]: this.disconnect,
         [EVENT_NAME.twinnyStartSymmetryProvider]: this.startSymmetryProvider,
-        [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider,
+        [EVENT_NAME.twinnyStopSymmetryProvider]: this.stopSymmetryProvider
       }
       eventHandlers[message.type as string]?.(message)
     })
@@ -109,7 +110,7 @@ export class SymmetryService extends EventEmitter {
       this._serverPeer = peer
       peer.write(
         createSymmetryMessage(serverMessageKeys.requestProvider, {
-          modelName: model,
+          modelName: model
         })
       )
       peer.on("data", (message: Buffer) => {
@@ -147,7 +148,7 @@ export class SymmetryService extends EventEmitter {
     this._serverSwarm?.destroy()
     this._providerSwarm?.destroy()
     this._webView?.postMessage({
-      type: EVENT_NAME.twinnyDisconnectedFromSymmetry,
+      type: EVENT_NAME.twinnyDisconnectedFromSymmetry
     } as ServerMessage)
   }
 
@@ -155,7 +156,7 @@ export class SymmetryService extends EventEmitter {
     this._providerSwarm = new Hyperswarm()
     this._providerSwarm.join(b4a.from(connection.discoveryKey, "hex"), {
       client: true,
-      server: false,
+      server: false
     })
     this._providerSwarm.flush()
     this._providerSwarm.on("connection", (peer: any) => {
@@ -167,15 +168,15 @@ export class SymmetryService extends EventEmitter {
           data: {
             modelName: connection.modelName,
             name: connection.name,
-            provider: connection.provider,
-          },
-        },
+            provider: connection.provider
+          }
+        }
       })
       this._webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
         value: {
-          data: WEBUI_TABS.chat,
-        },
+          data: WEBUI_TABS.chat
+        }
       })
       this._sessionManager?.set(
         EXTENSION_SESSION_NAME.twinnySymmetryConnection,
@@ -223,8 +224,8 @@ export class SymmetryService extends EventEmitter {
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyOnEnd,
         value: {
-          completion: this._completion.trimStart(),
-        },
+          completion: this._completion.trimStart()
+        }
       } as ServerMessage)
     }
     this._completion = ""
@@ -282,8 +283,8 @@ export class SymmetryService extends EventEmitter {
       name: os.hostname(),
       path: configPath,
       public: true,
-      serverKey: this._symmetryServerKey,
-      systemMessage: "",
+      serverKey: this._config.symmetryServerKey,
+      systemMessage: ""
     })
 
     fs.writeFileSync(configPath, symmetryConfiguration, "utf8")
@@ -310,7 +311,7 @@ export class SymmetryService extends EventEmitter {
 
     this._webView?.postMessage({
       type: sessionTypeName,
-      value: "connecting",
+      value: "connecting"
     })
 
     await this._provider.init()
@@ -319,7 +320,7 @@ export class SymmetryService extends EventEmitter {
 
     this._webView?.postMessage({
       type: sessionTypeName,
-      value: "connected",
+      value: "connected"
     })
   }
 
@@ -336,6 +337,5 @@ export class SymmetryService extends EventEmitter {
 
   private updateConfig() {
     this._config = workspace.getConfiguration("twinny")
-    this._symmetryServerKey = this._config.symmetryServerKey
   }
 }

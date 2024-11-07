@@ -292,10 +292,6 @@ export async function activate(context: ExtensionContext) {
       const currentCharacter = changes.range.start.character
       fileInteractionCache.incrementStrokes(currentLine, currentCharacter)
     }),
-    workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration("twinny")) return
-      completionProvider.updateConfig()
-    }),
     window.registerWebviewViewProvider("twinny.sidebar", sidebarProvider),
     statusBarItem
   )
