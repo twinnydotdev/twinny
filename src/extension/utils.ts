@@ -663,6 +663,7 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
   )
 
   ig.add(embeddingIgnoredGlobs)
+  ig.add([".git", ".gitignore"])
 
   const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
 
