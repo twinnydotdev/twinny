@@ -103,6 +103,7 @@ export class EmbeddingDatabase extends Base {
     )
 
     ig.add(embeddingIgnoredGlobs)
+    ig.add([".git", ".gitignore"])
 
     const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
 
