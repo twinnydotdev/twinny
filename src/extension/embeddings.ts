@@ -97,6 +97,12 @@ export class EmbeddingDatabase extends Base {
 
     const ig = ignore()
 
+    const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
+
+    if (fs.existsSync(gitIgnoreFilePath)) {
+      ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
+    }
+
     const embeddingIgnoredGlobs = this.config.get(
       "embeddingIgnoredGlobs",
       [] as string[]
@@ -104,13 +110,7 @@ export class EmbeddingDatabase extends Base {
 
     ig.add(embeddingIgnoredGlobs)
     ig.add([".git", ".gitignore"])
-
-    const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
-
-    if (fs.existsSync(gitIgnoreFilePath)) {
-      ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
-    }
-
+    
     for (const dirent of dirents) {
       const fullPath = path.join(dirPath, dirent.name)
       const relativePath = path.relative(rootPath, fullPath)
