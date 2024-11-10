@@ -36,10 +36,9 @@ export class GithubService extends ConversationHistory {
   ) {
     super(context, webView, sessionManager, symmetryService)
     this._templateProvider = new TemplateProvider(templateDir)
-    this.eventListeners()
   }
 
-  eventListeners() {
+  setUpEventListeners() {
     this.webView.onDidReceiveMessage(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       async (message: ClientMessage<any>) => {
