@@ -11,7 +11,7 @@ export async function streamResponse(request: StreamRequest) {
   const timeOut = setTimeout(() => {
     controller.abort()
     onError?.(new Error("Request timed out"))
-  }, 10000)
+  }, 25000)
 
   try {
     const url = `${options.protocol}://${options.hostname}${options.port ? `:${options.port}` : ""}${options.path}`
