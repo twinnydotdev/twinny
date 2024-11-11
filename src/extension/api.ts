@@ -8,6 +8,11 @@ export async function streamResponse(request: StreamRequest) {
   const controller = new AbortController()
   const { signal } = controller
 
+  const timeOut = setTimeout(() => {
+    controller.abort()
+    onError?.(new Error("Request timed out"))
+  }, 25000)
+
   try {
     const url = `${options.protocol}://${options.hostname}${options.port ? `:${options.port}` : ""}${options.path}`
     const fetchOptions = {
@@ -18,6 +23,7 @@ export async function streamResponse(request: StreamRequest) {
     }
 
     const response = await fetch(url, fetchOptions)
+    clearTimeout(timeOut)
 
     if (!response.ok) {
       throw new Error(`Server responded with status code: ${response.status}`)
@@ -77,12 +83,14 @@ export async function streamResponse(request: StreamRequest) {
     onEnd?.()
     reader.releaseLock()
   } catch (error: unknown) {
+    clearTimeout(timeOut)
     controller.abort()
     if (error instanceof Error) {
       if (error.name === "AbortError") {
         onEnd?.()
       } else {
         console.error("Fetch error:", error)
+        onError?.(error)
       }
     }
   }
