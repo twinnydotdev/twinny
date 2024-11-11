@@ -220,6 +220,15 @@ export class GithubService extends ConversationHistory {
             })
             this._completion = ""
           },
+          onError: (error: Error) => {
+            this.webView?.postMessage({
+              type: EVENT_NAME.twinnyOnEnd,
+              value: {
+                error: true,
+                errorMessage: error.message,
+              },
+            } as ServerMessage)
+          }
         })
       } catch (e) {
         return reject(e)
