@@ -16,7 +16,6 @@ import {
   DEFAULT_RELEVANT_CODE_COUNT,
   DEFAULT_RELEVANT_FILE_COUNT,
   DEFAULT_RERANK_THRESHOLD,
-  DEFAULT_VECTOR_SEARCH_METRIC,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_SESSION_NAME,
@@ -118,18 +117,11 @@ export class ChatService extends Base {
       ) as number
       const relevantFileCount = Number(stored) || DEFAULT_RELEVANT_FILE_COUNT
 
-      const storedMetric = this._context?.globalState.get(
-        `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric}`
-      ) as number
-
-      const metric = storedMetric || DEFAULT_VECTOR_SEARCH_METRIC
-
       const filePaths =
         (await this._db.getDocuments(
           embedding,
           relevantFileCount,
           table,
-          metric as "cosine" | "l2" | "dot"
         )) || []
 
       if (!filePaths.length) return []
@@ -226,11 +218,6 @@ export class ChatService extends Base {
 
       if (!embedding) return ""
 
-      const storedMetric = this._context?.globalState.get(
-        `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric}`
-      ) as number
-      const metric = storedMetric || DEFAULT_VECTOR_SEARCH_METRIC
-
       const query = relevantFiles?.length
         ? `file IN ("${relevantFiles.map((file) => file[0]).join("\",\"")}")`
         : ""
@@ -240,7 +227,6 @@ export class ChatService extends Base {
           embedding,
           Math.round(relevantCodeCount / 2),
           table,
-          metric as "cosine" | "l2" | "dot",
           query
         )) || []
 
@@ -249,7 +235,6 @@ export class ChatService extends Base {
           embedding,
           Math.round(relevantCodeCount / 2),
           table,
-          metric as "cosine" | "l2" | "dot"
         )) || []
 
       const documents = [...embeddedDocuments, ...queryEmbeddedDocuments]

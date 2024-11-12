@@ -290,7 +290,7 @@ export interface ChunkOptions {
 }
 
 export type Embedding = {
-  embeddings: number[]
+  embeddings: [number[]]
 }
 
 export type EmbeddedDocument = {
