@@ -9,7 +9,6 @@ import {
 } from "@vscode/webview-ui-toolkit/react"
 
 import {
-  EMBEDDING_METRICS,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
 } from "../common/constants"
@@ -46,9 +45,6 @@ export const EmbeddingOptions = () => {
 
   const { context: filePaths = "10", setContext: setRelevantFilePaths } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths)
-
-  const { context: metric = "l2", setContext: setMetric } =
-    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyVectorSearchMetric)
 
   const embeddingProviders = Object.values(getProvidersByType("embedding"))
 
@@ -100,12 +96,6 @@ export const EmbeddingOptions = () => {
     const value = event.target.value
     const provider = providers[value]
     setActiveEmbeddingsProvider(provider)
-  }
-
-  const handleChangeMetric = (e: unknown): void => {
-    const event = e as React.ChangeEvent<HTMLSelectElement>
-    const value = event.target.value
-    setMetric(value)
   }
 
   if (!embeddingProviders) {
@@ -191,23 +181,6 @@ export const EmbeddingOptions = () => {
         />
         <small>
           The number of filepaths to be used as context.
-        </small>
-      </div>
-      <div>
-        <div>Search Metric</div>
-        <VSCodeDropdown
-          value={metric}
-          name="provider"
-          onChange={handleChangeMetric}
-        >
-          {EMBEDDING_METRICS.map((metric: string) => (
-            <VSCodeOption key={metric} value={metric}>
-              {metric}
-            </VSCodeOption>
-          ))}
-        </VSCodeDropdown>
-        <small>
-          The metric to be used for the vector search.
         </small>
       </div>
       <div>

@@ -19,10 +19,7 @@ import {
 import { fetchEmbedding } from "./api"
 import { Base } from "./base"
 import { TwinnyProvider } from "./provider-manager"
-import {
-  getDocumentSplitChunks,
-  readGitSubmodulesFile
-} from "./utils"
+import { getDocumentSplitChunks, readGitSubmodulesFile } from "./utils"
 
 export class EmbeddingDatabase extends Base {
   private _documents: EmbeddedDocument[] = []
@@ -110,7 +107,7 @@ export class EmbeddingDatabase extends Base {
 
     ig.add(embeddingIgnoredGlobs)
     ig.add([".git", ".gitignore"])
-    
+
     for (const dirent of dirents) {
       const fullPath = path.join(dirPath, dirent.name)
       const relativePath = path.relative(rootPath, fullPath)
@@ -150,26 +147,28 @@ export class EmbeddingDatabase extends Base {
         if (!this._extensionContext) return
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, "utf-8")
+
           const chunks = await getDocumentSplitChunks(
             content,
             filePath,
             this._extensionContext
           )
-          const filePathEmbedding = await this.fetchModelEmbedding(filePath)
+
+          const fileNameEmbedding = await this.fetchModelEmbedding(filePath)
 
           this._filePaths.push({
             content: filePath,
-            vector: filePathEmbedding,
+            vector: fileNameEmbedding,
             file: filePath
           })
 
           for (const chunk of chunks) {
-            const vector = await this.fetchModelEmbedding(filePath)
+            const chunkEmbedding = await this.fetchModelEmbedding(chunk)
             if (this.getIsDuplicateItem(chunk, chunks)) return
             this._documents.push({
               content: chunk,
-              file: filePath,
-              vector: vector
+              vector: chunkEmbedding,
+              file: filePath
             })
           }
 
@@ -196,11 +195,23 @@ export class EmbeddingDatabase extends Base {
     try {
       const tableNames = await this._db?.tableNames()
       if (!tableNames?.includes(`${this._workspaceName}-documents`)) {
-        await this._db?.createTable(this._documentTableName, this._documents)
+        await this._db?.createTable(
+          this._documentTableName,
+          this._documents,
+          {
+            mode: "overwrite"
+          }
+        )
       }
 
       if (!tableNames?.includes(`${this._workspaceName}-file-paths`)) {
-        await this._db?.createTable(this._filePathTableName, this._filePaths)
+        await this._db?.createTable(
+          this._filePathTableName,
+          this._filePaths,
+          {
+            mode: "overwrite"
+          }
+        )
         return
       }
 
@@ -224,12 +235,11 @@ export class EmbeddingDatabase extends Base {
     vector: IntoVector,
     limit: number,
     tableName: string,
-    metric: "cosine" | "l2" | "dot" = "cosine",
     where?: string
   ): Promise<EmbeddedDocument[] | undefined> {
     try {
       const table = await this._db?.openTable(tableName)
-      const query = table?.search(vector).limit(limit).distanceType(metric) // add type assertion
+      const query = table?.vectorSearch(vector).select("content").limit(limit)
       if (where) query?.where(where)
       return query?.toArray()
     } catch (e) {
@@ -255,6 +265,6 @@ export class EmbeddingDatabase extends Base {
       return (response as LMStudioEmbedding).data?.[0].embedding
     }
 
-    return (response as Embedding).embeddings
+    return (response as Embedding).embeddings[0]
   }
 }
