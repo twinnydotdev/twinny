@@ -154,11 +154,11 @@ export class EmbeddingDatabase extends Base {
             this._extensionContext
           )
 
-          const fileNameEmbedding = await this.fetchModelEmbedding(filePath)
+          const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
           this._filePaths.push({
             content: filePath,
-            vector: fileNameEmbedding,
+            vector: filePathEmbedding,
             file: filePath
           })
 
@@ -239,7 +239,7 @@ export class EmbeddingDatabase extends Base {
   ): Promise<EmbeddedDocument[] | undefined> {
     try {
       const table = await this._db?.openTable(tableName)
-      const query = table?.vectorSearch(vector).select("content").limit(limit)
+      const query = table?.vectorSearch(vector).limit(limit)
       if (where) query?.where(where)
       return query?.toArray()
     } catch (e) {
