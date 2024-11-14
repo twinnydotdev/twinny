@@ -27,6 +27,7 @@ import {
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import {
+  FileItem,
   Message,
   RequestBodyBase,
   ServerMessage,
@@ -529,8 +530,23 @@ export class ChatService extends Base {
     return combinedContext.trim() || null
   }
 
+  private async loadFileContents(files: FileItem[]): Promise<string> {
+    if (!files?.length) return ""
+    let fileContents = ""
+    for (const file of files) {
+      try {
+        const content = await fs.readFile(file.path, "utf-8")
+        fileContents += `File: ${file.name}\n\n${content}\n\n`
+      } catch (error) {
+        console.error(`Error reading file ${file.path}:`, error)
+      }
+    }
+    return fileContents.trim()
+  }
+
   public async streamChatCompletion(
     messages: Message[],
+    filePaths: FileItem[]
   ) {
     this._completion = ""
     this.sendEditorLanguage()
@@ -559,6 +575,14 @@ export class ChatService extends Base {
 
     if (ragContext) {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
+    }
+
+    filePaths = filePaths.filter((filepath) =>
+      filepath.name !== "workspace" && filepath.name !== "problems"
+    )
+    const fileContents = await this.loadFileContents(filePaths)
+    if (fileContents) {
+      additionalContext += `File Contents:\n${fileContents}\n\n`
     }
 
     const provider = this.getProvider()
