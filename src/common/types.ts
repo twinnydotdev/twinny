@@ -4,8 +4,6 @@ import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 import { ALL_BRACKETS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
 
-
-
 export interface RequestBodyBase {
   stream: boolean
   n_predict?: number
