@@ -92,6 +92,7 @@ export interface ServerMessage<T = LanguageType> {
     type: string
   }
 }
+
 export interface Message {
   role: string
   content: string | undefined
