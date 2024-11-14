@@ -767,7 +767,6 @@ const calculateTotalCharacters = (messages: Message[] | undefined): number => {
 }
 
 export function notifyKnownErrors(error: Error) {
-  //Using array matching error
   if (knownErrorMessages.some((msg) => error.message.includes(msg))) {
     vscode.window
       .showInformationMessage(
