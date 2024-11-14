@@ -1,6 +1,10 @@
 import { StreamRequest } from "../common/types"
 
-import { logStreamOptions, safeParseJsonResponse } from "./utils"
+import { logStreamOptions, safeParseJsonResponse, notifyKnownErrors } from "./utils"
+
+import { Logger } from '../common/logger';
+
+const log = Logger.getInstance();
 
 export async function streamResponse(request: StreamRequest) {
   logStreamOptions(request)
@@ -11,6 +15,7 @@ export async function streamResponse(request: StreamRequest) {
   const timeOut = setTimeout(() => {
     controller.abort()
     onError?.(new Error("Request timed out"))
+    log.logConsoleError(Logger.ErrorType.Timeout, 'Failed to establish connection', new Error("Request timed out"));
   }, 25000)
 
   try {
@@ -89,8 +94,9 @@ export async function streamResponse(request: StreamRequest) {
       if (error.name === "AbortError") {
         onEnd?.()
       } else {
-        console.error("Fetch error:", error)
+        log.logConsoleError(Logger.ErrorType.Fetch_Error, 'Fetch error', error);
         onError?.(error)
+        notifyKnownErrors(error)
       }
     }
   }
@@ -126,7 +132,8 @@ export async function fetchEmbedding(request: StreamRequest) {
 
   } catch (error: unknown) {
     if (error instanceof Error) {
-      console.error("Fetch error:", error)
+      log.logConsoleError(Logger.ErrorType.Fetch_Error, 'Fetch error', error);
+      notifyKnownErrors(error)
     }
   }
 }

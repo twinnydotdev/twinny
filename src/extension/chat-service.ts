@@ -363,11 +363,11 @@ export class ChatService extends Base {
       type: EVENT_NAME.twinnyOnEnd,
       value: {
         error: true,
-        errorMessage: error.message,
+        errorMessage: `==## ERROR ##== : ${error.message}`, // Highlight errors on webview
       },
     } as ServerMessage)
   }
-
+  
   private onStreamStart = (controller: AbortController) => {
     this._controller = controller
     commands.executeCommand(

@@ -368,3 +368,9 @@ export const MULTI_LINE_DELIMITERS = ["\n\n", "\r\n\r\n"]
 export const SYMMETRY_EMITTER_KEY = {
   inference: "inference",
 }
+
+//Define an array containing all the error messages that need to be detected when fetch error occurred
+export const knownErrorMessages = [
+"First parameter has member 'readable' that is not a ReadableStream.", //This error occurs When plugins such as Fitten Code are enabled
+"The 'transform.readable' property must be an instance of ReadableStream. Received an instance of h" //When you try to enable the Node.js compatibility mode Compat to solve the problem, this error may pop up
+];
