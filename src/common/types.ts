@@ -1,8 +1,29 @@
 import { serverMessageKeys } from "symmetry-core"
-import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
+import { InlineCompletionItem, InlineCompletionList, LogLevel, Uri } from "vscode"
 
 import { ALL_BRACKETS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
+
+export const ErrorType = {
+  Default: 0, // default color
+  
+  Fetch_Error: 91, // red -- fetch error
+  Abort: 90,     // gray -- abort
+  Timeout: 33,   // yellow -- timeout
+};
+
+/**
+ * Log error messages in the console with error type and message listed in a specified color , and light red for error details
+ * @param errorKey - The key for the color in the colors object.
+ * @param message - The error message to display.
+ * @param error - The error detail to display in white, can be an Error object or a string.
+ */
+export function logConsoleError(errorKey: number, message: string, error: Error | string): void {
+  const color = errorKey;
+  const coloredMessage = `\x1b[91m [ERROR_twinny] \x1b[32m Message: ${message} \n \x1b[${color}m Error Type： ${error instanceof Error ? error.name : 'Unknown Error'} \n  Error Message： ${error instanceof Error ? error.message  : error} \n \x1b[31m`;
+  const Content = error;
+  console.error(coloredMessage, Content);
+}
 
 export interface RequestBodyBase {
   stream: boolean
@@ -92,6 +113,7 @@ export interface ServerMessage<T = LanguageType> {
     type: string
   }
 }
+
 export interface Message {
   role: string
   content: string | undefined

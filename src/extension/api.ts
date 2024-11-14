@@ -1,6 +1,8 @@
-import { StreamRequest } from "../common/types"
+import { ErrorType,logConsoleError,StreamRequest } from "../common/types"
 
 import { logStreamOptions, safeParseJsonResponse } from "./utils"
+
+import * as vscode from 'vscode';
 
 export async function streamResponse(request: StreamRequest) {
   logStreamOptions(request)
@@ -11,6 +13,7 @@ export async function streamResponse(request: StreamRequest) {
   const timeOut = setTimeout(() => {
     controller.abort()
     onError?.(new Error("Request timed out"))
+    logConsoleError(ErrorType.Timeout, 'Failed to establish connection', new Error("Request timed out"));
   }, 25000)
 
   try {
@@ -89,8 +92,9 @@ export async function streamResponse(request: StreamRequest) {
       if (error.name === "AbortError") {
         onEnd?.()
       } else {
-        console.error("Fetch error:", error)
+        logConsoleError(ErrorType.Fetch_Error, 'Fetch error', error);
         onError?.(error)
+        fitchErrorDetection(error)
       }
     }
   }
@@ -126,7 +130,31 @@ export async function fetchEmbedding(request: StreamRequest) {
 
   } catch (error: unknown) {
     if (error instanceof Error) {
-      console.error("Fetch error:", error)
+      logConsoleError(ErrorType.Fetch_Error, 'Fetch error', error);
+      fitchErrorDetection(error)
     }
+  }
+}
+
+//Define an array containing all the error messages that need to be detected when fetch error occurred
+const knownErrorMessages = [
+  "First parameter has member 'readable' that is not a ReadableStream.", //This error occurs When plugins such as Fitten Code are enabled
+  "The 'transform.readable' property must be an instance of ReadableStream. Received an instance of h" //When you try to enable the Node.js compatibility mode Compat to solve the problem, this error may pop up
+];
+
+function fitchErrorDetection(error: Error) {
+  //Using array matching error
+  if (knownErrorMessages.some(msg => error.message.includes(msg))) {
+    vscode.window.showInformationMessage(
+      "Besides Twinny, there may be other AI extensions being enabled (such as Fitten Code) that are affecting the behavior of the fetch API or ReadableStream used in the Twinny plugin. We recommend that you disable that AI plugin for the smooth use of Twinny",
+      "View extensions",
+      "Restart Vscode (after disabling related extensions)"
+    ).then((selected) => {
+      if (selected === "View extensions") {
+        vscode.commands.executeCommand('workbench.view.extensions');
+      } else if (selected === "Restart Vscode (after disabling related extensions)") {
+        vscode.commands.executeCommand('workbench.action.reloadWindow');
+      }
+    });
   }
 }
