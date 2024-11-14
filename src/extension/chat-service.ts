@@ -367,7 +367,7 @@ export class ChatService extends Base {
       },
     } as ServerMessage)
   }
-  
+
   private onStreamStart = (controller: AbortController) => {
     this._controller = controller
     commands.executeCommand(
