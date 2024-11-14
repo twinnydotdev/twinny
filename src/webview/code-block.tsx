@@ -1,4 +1,5 @@
 import React, { ReactNode } from "react"
+import { useTranslation } from "react-i18next"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vs,vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
@@ -22,6 +23,7 @@ interface CodeBlockProps {
 const global = globalThis as any
 
 export const CodeBlock = (props: CodeBlockProps) => {
+  const { t } = useTranslation()
   const { children, language, className, theme, role } = props
 
   const lang = getLanguageMatch(language, className)
@@ -63,28 +65,28 @@ export const CodeBlock = (props: CodeBlockProps) => {
         <>
           <div className={styles.codeOptions}>
             <VSCodeButton
-              title="Accept solution"
+              title={t("accept-solution")}
               onClick={handleAccept}
               appearance="icon"
             >
               <span className="codicon codicon-check"></span>
             </VSCodeButton>
             <VSCodeButton
-              title="Copy code"
+              title={t("copy-code")}
               onClick={handleCopy}
               appearance="icon"
             >
               <span className="codicon codicon-copy"></span>
             </VSCodeButton>
             <VSCodeButton
-              title="Append to new document"
+              title={t("new-document")}
               onClick={handleNewDocument}
               appearance="icon"
             >
               <span className="codicon codicon-new-file"></span>
             </VSCodeButton>
             <VSCodeButton
-              title="Open diff"
+              title={t("open-diff")}
               onClick={handleOpenDiff}
               appearance="icon"
             >

@@ -1,4 +1,5 @@
 import { FormEvent } from "react"
+import { useTranslation } from "react-i18next"
 import { TextFieldType } from "@vscode/webview-ui-toolkit"
 import {
   VSCodeButton,
@@ -21,6 +22,7 @@ import styles from "./styles/index.module.css"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const EmbeddingOptions = () => {
+  const { t } = useTranslation()
   const {
     embeddingProvider,
     getProvidersByType,
@@ -112,7 +114,7 @@ export const EmbeddingOptions = () => {
   return (
     <div className={styles.embeddingOptions}>
       <div>
-        <div>Embedding provider</div>
+        <div>{t("embedding-provider")}</div>
         <VSCodeDropdown
           value={embeddingProvider?.id}
           name="provider"
@@ -128,7 +130,9 @@ export const EmbeddingOptions = () => {
         </VSCodeDropdown>
       </div>
       <div>
-        <div>Max chunk size</div>
+        <div>
+          {t("max-chunk-size")}
+        </div>
         <VSCodeTextField
           type={TextFieldType.text}
           value={maxChunkSize}
@@ -137,7 +141,9 @@ export const EmbeddingOptions = () => {
         />
       </div>
       <div>
-        <div>Min chunk size</div>
+        <div>
+          {t("max-chunk-size")}
+        </div>
         <VSCodeTextField
           value={minChunkSize}
           name="provider"
@@ -145,7 +151,9 @@ export const EmbeddingOptions = () => {
         />
       </div>
       <div>
-        <div>Overlap</div>
+        <div>
+          {t("overlap-size")}
+        </div>
         <VSCodeTextField
           value={overlap}
           name="provider"
@@ -157,19 +165,21 @@ export const EmbeddingOptions = () => {
           onClick={handleEmbedDocuments}
           className={styles.embedDocumentsButton}
         >
-          Embed workspace documents
+         {t("embed-documents")}
         </VSCodeButton>
       </div>
       <VSCodeDivider />
       <div>
-        <div>Code snippets</div>
+        <div>
+          {t("relevant-code-snippets")}
+        </div>
         <VSCodeTextField
           value={codeSnippets}
           name="provider"
           onChange={(e) => handleRelevantCodeSnippetsChange(e)}
         />
         <small>
-          The number code snippets to be used as context.
+          {t("number-code-snippets")}
         </small>
       </div>
       <div>
@@ -180,13 +190,13 @@ export const EmbeddingOptions = () => {
           onChange={(e) => handleRelevantFilepathsChange(e)}
         />
         <small>
-          The number of filepaths to be used as context.
+          {t("number-code-filepaths")}
         </small>
       </div>
       <div>
         <div>
           <label htmlFor="threshold">
-            Rerank probability threshold ({rerankThreshold})
+            {t("rerank-threshold")} ({rerankThreshold})
           </label>
         </div>
         <input
@@ -202,7 +212,7 @@ export const EmbeddingOptions = () => {
         />
         <div className={styles.sliderLabel}>
           <small>
-            The lower the threshold, the more likely a result is to be included.
+            {t("rerank-threshold-description")}
           </small>
         </div>
       </div>

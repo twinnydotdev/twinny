@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { VSCodeButton, VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 
 import {
@@ -11,6 +12,7 @@ import { kebabToSentence } from "./utils"
 import styles from "./styles/index.module.css"
 
 export const Settings = () => {
+  const { t } = useTranslation()
   const { templates, saveTemplates, editDefaultTemplates } = useTemplates()
   const {
     context: selectedTemplatesContext,
@@ -59,13 +61,21 @@ export const Settings = () => {
 
   return (
     <>
-      <h3>Edit default templates</h3>
-      <p>Edit the default templates used in the twinny extension.</p>
+      <h3>
+        {t("edit-default-templates")}
+      </h3>
+      <p>
+        {t("edit-default-templates-description")}
+      </p>
       <VSCodeButton onClick={handleEditDefaultTemplates}>
         Open template editor
       </VSCodeButton>
-      <h3>Template settings</h3>
-      <p>Select the templates you want to use in the chat interface.</p>
+      <h3>
+        {t("template-settings")}
+      </h3>
+      <p>
+        {t("template-settings-description")}
+      </p>
       {templates &&
         templates.map((templateName: string) => (
           <div key={templateName} className={styles.vscodeCheckbox}>
@@ -85,7 +95,7 @@ export const Settings = () => {
         className={styles.resetTemplatesButton}
         onClick={handleResetTemplates}
       >
-        Reset to default
+        {t("reset-to-default")}
       </VSCodeButton>
     </>
   )

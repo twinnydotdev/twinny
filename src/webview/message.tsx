@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo } from "react"
+import { useTranslation } from "react-i18next"
 import Markdown, { Components } from "react-markdown"
 import { EditorContent, Extension, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
@@ -61,6 +62,7 @@ export const Message: React.FC<MessageProps> = React.memo(
     onUpdate,
     theme,
   }) => {
+    const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
 
     const handleToggleEditing = useCallback(
@@ -152,14 +154,14 @@ export const Message: React.FC<MessageProps> = React.memo(
             {editing && !isAssistant && (
               <>
                 <MemoizedVSCodeButton
-                  title="Cancel edit"
+                  title={t("cancel-edit")}
                   appearance="icon"
                   onClick={handleToggleCancel}
                 >
                   <span className="codicon codicon-close"></span>
                 </MemoizedVSCodeButton>
                 <MemoizedVSCodeButton
-                  title="Save message"
+                  title={t("save-edit")}
                   appearance="icon"
                   onClick={handleToggleSave}
                 >
@@ -171,7 +173,7 @@ export const Message: React.FC<MessageProps> = React.memo(
               <>
                 <MemoizedVSCodeButton
                   disabled={isLoading}
-                  title="Edit message"
+                  title={t("edit-message")}
                   appearance="icon"
                   onClick={handleToggleEditing}
                 >
@@ -179,7 +181,7 @@ export const Message: React.FC<MessageProps> = React.memo(
                 </MemoizedVSCodeButton>
                 <MemoizedVSCodeButton
                   disabled={isLoading || conversationLength <= 2}
-                  title="Delete message"
+                  title={t("delete-message")}
                   appearance="icon"
                   onClick={handleDelete}
                 >
@@ -190,7 +192,7 @@ export const Message: React.FC<MessageProps> = React.memo(
             {!editing && isAssistant && (
               <MemoizedVSCodeButton
                 disabled={isLoading}
-                title="Regenerate from here"
+                title={t("regenerate-message")}
                 appearance="icon"
                 onClick={handleRegenerate}
               >
@@ -201,7 +203,6 @@ export const Message: React.FC<MessageProps> = React.memo(
         </div>
         {editing ? (
           <EditorContent
-            placeholder="How can twinny help you today?"
             className={styles.tiptap}
             editor={editor}
           />

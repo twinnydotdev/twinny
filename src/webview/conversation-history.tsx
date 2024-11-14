@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
 import { EVENT_NAME } from "../common/constants"
@@ -14,6 +15,7 @@ interface ConversationHistoryProps {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
+  const  { t } = useTranslation()
   const {
     conversations: savedConversations,
     setActiveConversation,
@@ -43,9 +45,11 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
 
   return (
     <div>
-      <h3>Conversation history</h3>
+      <h3>
+        {t("conversation-history")} ({conversations.length})
+      </h3>
       <VSCodeButton appearance="primary" onClick={handleClearAllConversations}>
-        Clear conversations
+        {t("clear-conversations")}
       </VSCodeButton>
       {conversations.length ? (
         conversations.map((conversation) => (
@@ -64,7 +68,9 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
           </div>
         ))
       ) : (
-        <p>Nothing to see here...</p>
+        <p>
+          {t("nothing-to-see-here")}
+        </p>
       )}
     </div>
   )

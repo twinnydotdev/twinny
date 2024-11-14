@@ -1,4 +1,5 @@
 import React, { useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import {
   VSCodeButton,
   VSCodeCheckbox,
@@ -13,6 +14,7 @@ import { useSymmetryConnection } from "./hooks"
 import styles from "./styles/symmetry.module.css"
 
 export const Symmetry = () => {
+  const { t } = useTranslation()
   const {
     connectAsProvider,
     connecting,
@@ -76,25 +78,29 @@ export const Symmetry = () => {
 
   return (
     <div className={styles.symmetryContainer}>
-      <h3>Symmetry Inference Network</h3>
+      <h3>
+        {t("symmetry-inference-network")}
+      </h3>
       <VSCodePanelView>
         <div className={styles.symmetryPanel}>
-          <h4>Consumer Connection</h4>
+          <h4>
+            {t("consumer-connection")}
+          </h4>
           <div className={styles.statusSection}>
             <p>
-              Status: <ConnectionStatus />
+              {t("status")}: <ConnectionStatus />
             </p>
           </div>
           {isConnected && (
             <div className={styles.providerInfo}>
               <p>
-                <b>Provider name:</b> {symmetryConnection?.name}
+                <b>{t("provider-name")}:</b> {symmetryConnection?.name}
               </p>
               <p>
-                <b>Provider model:</b> {symmetryConnection?.modelName}
+                <b>{t("model-name")}:</b> {symmetryConnection?.modelName}
               </p>
               <p>
-                <b>Provider type:</b> {symmetryConnection?.provider}
+                <b>{t("provider-type")}:</b> {symmetryConnection?.provider}
               </p>
             </div>
           )}
@@ -124,7 +130,9 @@ export const Symmetry = () => {
                     })}
                 </VSCodeDropdown>
               ) : (
-                <span>Loading available models...</span>
+                <span>
+                  {t("loading-available-models")}
+                </span>
               )}
             </div>
           )}
@@ -134,18 +142,20 @@ export const Symmetry = () => {
               onClick={isConnected ? disconnectSymmetry : connectToSymmetry}
             >
               {connecting
-                ? "Connecting..."
+                ? t("connecting")
                 : isConnected
-                ? "Disconnect"
-                : "Connect"}
+                ? t("disconnect")
+                : t("connect")}
             </VSCodeButton>
           </div>
 
           <VSCodeDivider />
 
-          <h4>Provider Connection</h4>
+          <h4>
+            {t("provider-connection")}
+          </h4>
           <p>
-            Provider status: <ProviderConnectionStatus />
+            {t("status")}: <ProviderConnectionStatus />
           </p>
           <div className={styles.buttonContainer}>
             <VSCodeButton
@@ -154,10 +164,11 @@ export const Symmetry = () => {
               }
             >
               {symmetryProviderStatus === "connecting"
-                ? "Connecting..."
+                ? t("connecting")
                 : isProviderConnected
-                ? "Disconnect"
-                : "Connect"}
+                ? t("disconnect")
+                : t("connect")
+              }
             </VSCodeButton>
           </div>
           <div className={styles.checkboxContainer}>
@@ -165,9 +176,10 @@ export const Symmetry = () => {
               checked={autoConnectProviderContext}
               onClick={handleAutoConnectProviderChange}
             >
-              Auto-connect as provider
+              {t("auto-connect-as-provider")}
             </VSCodeCheckbox>
           </div>
+          {/* TODO Use Trans component */}
           {isProviderConnected && (
             <p>
               You should now be visible on the{" "}
@@ -192,7 +204,7 @@ export const Symmetry = () => {
           )}
 
           <VSCodeDivider />
-
+          {/* TODO Use Trans component */}
           <p>
             For more information about Symmetry, please refer to our{" "}
             <a
@@ -207,15 +219,12 @@ export const Symmetry = () => {
         </div>
       </VSCodePanelView>
       <p>
-        Symmetry is a peer-to-peer AI inference network that allows secure,
-        direct connections between users. When you connect as a consumer,
-        Symmetry matches you with a provider based on your model selection.
+        {t("symmetry-description")}
       </p>
       <p>
-        You can also share your GPU resources by connecting to Symmetry as a
-        provider using your active twinny provider configuration. All
-        connections are peer to peer, encrypted end-to-end and secure.
+        {t("share-gpu-resources")}
       </p>
+      {/* TODO Use Trans component */}
       <p>
         To explore available providers, visit the{" "}
         <a
