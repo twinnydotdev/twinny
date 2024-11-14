@@ -13,6 +13,7 @@ import { logger } from "../../common/logger"
 import {
   ApiModel,
   ClientMessage,
+  FileItem,
   InferenceRequest,
   Message,
   ServerMessage
@@ -354,6 +355,7 @@ export class BaseProvider {
 
     this._chatService?.streamChatCompletion(
       data.data || [],
+      data.meta as FileItem[]
     )
   }
 
