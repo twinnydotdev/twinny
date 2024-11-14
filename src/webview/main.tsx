@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 
+import "./i18n"
+
 import { EVENT_NAME, WEBUI_TABS } from "../common/constants"
 import { ServerMessage } from "../common/types"
 

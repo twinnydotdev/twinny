@@ -1,18 +1,19 @@
 {
   "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "lib": ["es6", "dom"],
     "module": "commonjs",
     "moduleResolution": "node",
-    "target": "ES2020",
-    "lib": ["es6", "dom"],
-    "jsx": "react-jsx",
-    "sourceMap": true,
-    "rootDir": "src",
-    "strict": true,
-    "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
     "noUnusedParameters": true,
-    "allowJs": true,
-    "esModuleInterop": true
+    "resolveJsonModule": true,
+    "rootDir": "src",
+    "sourceMap": true,
+    "strict": true,
+    "target": "ES2020",
   },
   "exclude": ["node_modules", ".vscode-test", "out", "scripts", "assets"]
 }

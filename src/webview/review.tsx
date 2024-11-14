@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { VSCodeButton, VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
 
 import { WORKSPACE_STORAGE_KEY } from "../common/constants"
@@ -8,6 +9,7 @@ import { useGithubPRs, useGlobalContext } from "./hooks"
 import styles from "./styles/index.module.css"
 
 export const Review = () => {
+  const { t } = useTranslation()
   const { prs, getPrs, startReview, isLoading } = useGithubPRs()
   const { context: owner, setContext: setOwner } = useGlobalContext<string>(
     WORKSPACE_STORAGE_KEY.reviewOwner
@@ -44,11 +46,11 @@ export const Review = () => {
 
   return (
     <>
-      <h3>Review Pull Requests</h3>
+      <h3>
+        {t("review-pull-requests")}
+      </h3>
       <p>
-        This tab will help you review pull requests in your repository, enter
-        the owner and repository name below to get started. For now only GitHub
-        is supported, set your GitHub token in the settings tab to get started.
+        {t("owner-repo-name")}
       </p>
       <div className={styles.prInputContainer}>
         <VSCodeTextField
@@ -73,7 +75,9 @@ export const Review = () => {
 
       {prs.length > 0 && (
         <div className={styles.prListContainer}>
-          <h4>Pull Requests:</h4>
+          <h4>
+            {t("pull-requests")}
+          </h4>
           <ul className={styles.prList}>
             {prs.map((pr) => (
               <li key={pr.number} className={styles.prItem}>

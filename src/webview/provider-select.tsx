@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import {
   VSCodeDropdown,
   VSCodeOption,
@@ -8,6 +9,7 @@ import { useProviders } from "./hooks"
 import styles from "./styles/providers.module.css"
 
 export const ProviderSelect = () => {
+  const { t } = useTranslation()
   const {
     getProvidersByType,
     setActiveChatProvider,
@@ -34,7 +36,9 @@ export const ProviderSelect = () => {
   return (
     <div className={styles.providerSelector}>
       <div>
-        <div>Chat</div>
+        <div>
+          {t("chat")}
+        </div>
         <VSCodeDropdown
           value={chatProvider?.id}
           name="provider"
@@ -50,7 +54,9 @@ export const ProviderSelect = () => {
         </VSCodeDropdown>
       </div>
       <div>
-        <div>Fill-in-middle</div>
+        <div>
+          {t("fim")}
+        </div>
         <VSCodeDropdown
           value={fimProvider?.id}
           name="provider"

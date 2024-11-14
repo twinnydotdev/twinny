@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import Mention from "@tiptap/extension-mention"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Editor, EditorContent, JSONContent,useEditor } from "@tiptap/react"
@@ -57,6 +58,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const editorRef = useRef<Editor | null>(null)
   const stopRef = useRef(false)
   const theme = useTheme()
+  const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState<MessageType[] | undefined>()
   const [completion, setCompletion] = useState<MessageType | null>()
@@ -416,7 +418,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           clearEditor,
         }),
         Placeholder.configure({
-          placeholder: "How can twinny help you today?",
+          placeholder: t("placeholder") // "How can twinny help you today?",
         }),
       ],
     },
@@ -454,7 +456,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
             <VSCodeButton
               onClick={handleNewConversation}
               appearance="icon"
-              title="New conversation"
+              title={t("new-conversation")}
             >
               <i className="codicon codicon-comment-discussion" />
             </VSCodeButton>
@@ -516,7 +518,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <div>
             <VSCodeButton
               onClick={handleToggleAutoScroll}
-              title="Toggle auto scroll on/off"
+              title={t("toggle-auto-scroll")}
               appearance="icon"
             >
               {autoScrollContext ? (
@@ -526,7 +528,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
               )}
             </VSCodeButton>
             <VSCodeButton
-              title="Scroll down to the bottom"
+              title={t("scroll-down")}
               appearance="icon"
               onClick={handleScrollBottom}
             >
@@ -540,7 +542,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 type="button"
                 appearance="icon"
                 onClick={handleStopGeneration}
-                aria-label="Stop generation"
+                aria-label={t("stop-generation")}
               >
                 <span className="codicon codicon-debug-stop"></span>
               </VSCodeButton>
@@ -548,14 +550,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
             {!symmetryConnection && (
               <>
                 <VSCodeButton
-                  title="Embedding options"
+                  title={t("toggle-embedding-options")}
                   appearance="icon"
                   onClick={handleToggleEmbeddingOptions}
                 >
                   <span className="codicon codicon-database"></span>
                 </VSCodeButton>
                 <VSCodeButton
-                  title="Select active providers"
+                  title={t("toggle-provider-selection")}
                   appearance="icon"
                   onClick={handleToggleProviderSelection}
                 >
@@ -567,6 +569,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
               <a
                 href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}
               >
+                {/* TODO interpolate */}
                 <VSCodeBadge
                   title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
                 >
@@ -579,7 +582,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
         <form>
           <div className={styles.chatBox}>
             <EditorContent
-              placeholder="How can twinny help you today?"
               className={styles.tiptap}
               editor={editorRef.current}
             />

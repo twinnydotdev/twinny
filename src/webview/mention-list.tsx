@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Editor } from "@tiptap/core"
 import { MentionNodeAttrs } from "@tiptap/extension-mention"
 import cx from "classnames"
@@ -21,6 +22,7 @@ export interface MentionListRef {
 
 export const MentionList = forwardRef<MentionListRef, MentionListProps>(
   (props, ref) => {
+    const { t } = useTranslation()
     const [selectedIndex, setSelectedIndex] = useState(0)
 
     const selectItem = (index: number) => {
@@ -83,7 +85,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
             </button>
           ))
         ) : (
-          <div className="item">No result</div>
+          <div className="item">{t("no-result")}</div>
         )}
       </div>
     )
