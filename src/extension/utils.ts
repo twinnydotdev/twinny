@@ -3,7 +3,7 @@ import fs from "fs"
 import ignore from "ignore"
 import path from "path"
 import * as util from "util"
-import * as vscode from 'vscode';
+import * as vscode from "vscode"
 import {
   ColorThemeKind,
   ExtensionContext,
@@ -25,6 +25,7 @@ import {
   defaultChunkOptions,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
+  knownErrorMessages,
   LINE_BREAK_REGEX,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
@@ -32,8 +33,7 @@ import {
   QUOTES,
   QUOTES_REGEX,
   SKIP_DECLARATION_SYMBOLS,
-  TWINNY,
-  knownErrorMessages
+  TWINNY
 } from "../common/constants"
 import { supportedLanguages } from "../common/languages"
 import { logger } from "../common/logger"
@@ -768,17 +768,22 @@ const calculateTotalCharacters = (messages: Message[] | undefined): number => {
 
 export function notifyKnownErrors(error: Error) {
   //Using array matching error
-  if (knownErrorMessages.some(msg => error.message.includes(msg))) {
-    vscode.window.showInformationMessage(
-      "Besides Twinny, there may be other AI extensions being enabled (such as Fitten Code) that are affecting the behavior of the fetch API or ReadableStream used in the Twinny plugin. We recommend that you disable that AI plugin for the smooth use of Twinny",
-      "View extensions",
-      "Restart Visual Studio Code (after disabling related extensions)"
-    ).then((selected) => {
-      if (selected === "View extensions") {
-        vscode.commands.executeCommand('workbench.view.extensions');
-      } else if (selected === "Restart Visual Studio Code (after disabling related extensions)") {
-        vscode.commands.executeCommand('workbench.action.reloadWindow');
-      }
-    });
+  if (knownErrorMessages.some((msg) => error.message.includes(msg))) {
+    vscode.window
+      .showInformationMessage(
+        "Besides Twinny, there may be other AI extensions being enabled (such as Fitten Code) that are affecting the behavior of the fetch API or ReadableStream used in the Twinny plugin. We recommend that you disable that AI plugin for the smooth use of Twinny",
+        "View extensions",
+        "Restart Visual Studio Code (after disabling related extensions)"
+      )
+      .then((selected) => {
+        if (selected === "View extensions") {
+          vscode.commands.executeCommand("workbench.view.extensions")
+        } else if (
+          selected ===
+          "Restart Visual Studio Code (after disabling related extensions)"
+        ) {
+          vscode.commands.executeCommand("workbench.action.reloadWindow")
+        }
+      })
   }
 }

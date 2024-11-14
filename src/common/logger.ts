@@ -7,10 +7,10 @@ export class Logger extends Base {
     Default: 0, // default color
     Fetch_Error: 91, // red -- fetch error
     Abort: 90, // gray -- abort
-    Timeout: 33, // yellow -- timeout
-  };
+    Timeout: 33 // yellow -- timeout
+  }
 
-  constructor () {
+  constructor() {
     super()
   }
 
@@ -31,10 +31,18 @@ export class Logger extends Base {
     console.error(err.message)
   }
 
-  public logConsoleError(errorKey: number, message: string, error: Error | string): void {
-    const color = errorKey;
-    const coloredMessage = `\x1b[91m [ERROR_twinny] \x1b[32m Message: ${message} \n \x1b[${color}m Error Type: ${error instanceof Error ? error.name : 'Unknown Error'} \n  Error Message: ${error instanceof Error ? error.message : error} \n \x1b[31m`;
-    console.error(coloredMessage, error);
+  public logConsoleError(
+    errorKey: number,
+    message: string,
+    error: Error | string
+  ): void {
+    const color = errorKey
+    const coloredMessage = `\x1b[91m [ERROR_twinny] \x1b[32m Message: ${message} \n \x1b[${color}m Error Type: ${
+      error instanceof Error ? error.name : "Unknown Error"
+    } \n  Error Message: ${
+      error instanceof Error ? error.message : error
+    } \n \x1b[31m`
+    console.error(coloredMessage, error)
   }
 }
 

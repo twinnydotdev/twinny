@@ -1,5 +1,5 @@
 import { serverMessageKeys } from "symmetry-core"
-import { InlineCompletionItem, InlineCompletionList, LogLevel, Uri } from "vscode"
+import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
 import { ALL_BRACKETS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
