@@ -271,12 +271,6 @@ export class SymmetryService extends EventEmitter {
       fs.mkdirSync(configDir, { recursive: true })
     }
 
-    const existingConfig = yaml.load(fs.readFileSync(configPath, "utf8")) as any
-
-    const userSecret = existingConfig?.userSecret
-      ? existingConfig.userSecret
-      : crypto.randomBytes(32).toString("hex")
-
     const symmetryConfiguration = yaml.dump({
       apiHostname: provider.apiHostname,
       apiKey: provider.apiKey,
@@ -291,7 +285,6 @@ export class SymmetryService extends EventEmitter {
       path: configPath,
       public: true,
       serverKey: this._config.symmetryServerKey,
-      userSecret,
       systemMessage: ""
     })
 
@@ -307,23 +300,6 @@ export class SymmetryService extends EventEmitter {
 
     if (!fs.existsSync(configPath)) {
       await this.createProviderConfig(provider)
-    }
-
-    const existingConfig = yaml.load(fs.readFileSync(configPath, "utf8")) as any
-    const { userSecret } = existingConfig
-
-    if (!userSecret) {
-      vscode.window.showInformationMessage(
-        `
-          Twinny did not detect a userSecret for your provider.
-          Generating a \`userSecret\` for you at at ${configPath}
-          This only needs to be done once.
-        `
-      )
-      await fs.promises.writeFile(configPath, yaml.dump({
-        ...existingConfig,
-        userSecret: crypto.randomBytes(32).toString("hex")
-      }), "utf8")
     }
 
     this._provider = new SymmetryProvider(configPath)
