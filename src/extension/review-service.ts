@@ -26,6 +26,7 @@ import { getChatDataFromProvider, updateLoadingMessage } from "./utils"
 export class GithubService extends ConversationHistory {
   private _completion = ""
   private _templateProvider: TemplateProvider
+  private _controller?: AbortController
 
   constructor(
     context: ExtensionContext,
@@ -190,6 +191,14 @@ export class GithubService extends ConversationHistory {
         return streamResponse({
           body: requestBody,
           options: requestOptions,
+          onStart: (controller: AbortController) => {
+            this._controller = controller
+            this.webView?.onDidReceiveMessage((data: { type: string }) => {
+              if (data.type === EVENT_NAME.twinnyStopGeneration) {
+                this._controller?.abort()
+              }
+            })
+          },
           onData: (streamResponse) => {
             const provider = this.getProvider()
             if (!provider) return
