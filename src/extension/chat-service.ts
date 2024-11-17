@@ -530,7 +530,7 @@ export class ChatService extends Base {
     return combinedContext.trim() || null
   }
 
-  private async loadFileContents(files: FileItem[]): Promise<string> {
+  private async loadFileContents(files?: FileItem[]): Promise<string> {
     if (!files?.length) return ""
     let fileContents = ""
     for (const file of files) {
@@ -546,7 +546,7 @@ export class ChatService extends Base {
 
   public async streamChatCompletion(
     messages: Message[],
-    filePaths: FileItem[]
+    filePaths?: FileItem[]
   ) {
     this._completion = ""
     this.sendEditorLanguage()
@@ -577,7 +577,7 @@ export class ChatService extends Base {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
     }
 
-    filePaths = filePaths.filter((filepath) =>
+    filePaths = filePaths?.filter((filepath) =>
       filepath.name !== "workspace" && filepath.name !== "problems"
     )
     const fileContents = await this.loadFileContents(filePaths)
