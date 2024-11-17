@@ -16,14 +16,8 @@ export async function streamResponse(request: StreamRequest) {
   const { signal } = controller
 
   const timeOut = setTimeout(() => {
-    controller.abort()
-    onError?.(new Error("Request timed out"))
-    log.logConsoleError(
-      Logger.ErrorType.Timeout,
-      "Failed to establish connection",
-      new Error("Request timed out")
-    )
-  }, 25000)
+    controller.abort(new DOMException("Request timed out", "TimeoutError"))
+  }, 60000)
 
   try {
     const url = `${options.protocol}://${options.hostname}${
@@ -102,6 +96,9 @@ export async function streamResponse(request: StreamRequest) {
     if (error instanceof Error) {
       if (error.name === "AbortError") {
         onEnd?.()
+      } else if (error.name === "TimeoutError") {
+        onError?.(error)
+        log.logConsoleError(Logger.ErrorType.Timeout, "Failed to establish connection", error)
       } else {
         log.logConsoleError(Logger.ErrorType.Fetch_Error, "Fetch error", error)
         onError?.(error)
