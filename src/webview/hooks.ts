@@ -740,7 +740,7 @@ export const useSymmetryConnection = () => {
       setSymmetryProviderStatus(message?.value.data as string)
     }
 
-    if (message?.type === EVENT_NAME.twinnySymmetryModeles) {
+    if (message?.type === EVENT_NAME.twinnySymmetryModels) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setModels(message?.value.data as unknown as SymmetryModelProvider[])
     }
