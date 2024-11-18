@@ -37,7 +37,6 @@ export const EVENT_NAME = {
   twinntGetLocale: "twinnt-get-locale",
   twinnyAcceptSolution: "twinny-accept-solution",
   twinnyAddMessage: "twinny-add-message",
-  twinnyChangeLocale: "twinny-change-locale",
   twinnyChat: "twinny-chat",
   twinnyChatMessage: "twinny-chat-message",
   twinnyClickSuggestion: "twinny-click-suggestion",
@@ -161,7 +160,6 @@ export const WORKSPACE_STORAGE_KEY = {
   showProviders: "showProviders",
   reviewOwner: "reviewOwner",
   reviewRepo: "reviewRepo",
-  language: "language",
 }
 
 export const EXTENSION_SETTING_KEY = {
