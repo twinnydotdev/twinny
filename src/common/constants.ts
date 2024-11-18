@@ -83,7 +83,7 @@ export const EVENT_NAME = {
   twinnyStartSymmetryProvider: "twinny-start-symmetry-provider",
   twinnyStopGeneration: "twinny-stop-generation",
   twinnyStopSymmetryProvider: "twinny-stop-symmetry-provider",
-  twinnySymmetryModeles: "twinny-symmetry-models",
+  twinnySymmetryModels: "twinny-symmetry-models",
   twinnyTextSelection: "twinny-text-selection",
 }
 
