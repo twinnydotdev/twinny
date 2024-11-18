@@ -34,6 +34,7 @@ export const defaultChunkOptions = {
 }
 
 export const EVENT_NAME = {
+  twinntGetLocale: "twinnt-get-locale",
   twinnyAcceptSolution: "twinny-accept-solution",
   twinnyAddMessage: "twinny-add-message",
   twinnyChat: "twinny-chat",
@@ -43,6 +44,7 @@ export const EVENT_NAME = {
   twinnyConnectSymmetry: "twinny-connect-symmetry",
   twinnyDisconnectedFromSymmetry: "twinny-disconnected-from-symmetry",
   twinnyDisconnectSymmetry: "twinny-disconnect-symmetry",
+  twinnyEditDefaultTemplates: "twinny-edit-default-templates",
   twinnyEmbedDocuments: "twinny-embed-documents",
   twinnyEnableModelDownload: "twinny-enable-model-download",
   twinnyFetchOllamaModels: "twinny-fetch-ollama-models",
@@ -72,11 +74,11 @@ export const EVENT_NAME = {
   twinnySessionContext: "twinny-session-context",
   twinnySetConfigValue: "twinny-set-config-value",
   twinnySetGlobalContext: "twinny-set-global-context",
+  twinnySetLocale: "twinny-set-locale",
   twinnySetOllamaModel: "twinny-set-ollama-model",
   twinnySetSessionContext: "twinny-set-session-context",
   twinnySetTab: "twinny-set-tab",
   twinnySetWorkspaceContext: "twinny-set-workspace-context",
-  twinnyEditDefaultTemplates: "twinny-edit-default-templates",
   twinnyStartSymmetryProvider: "twinny-start-symmetry-provider",
   twinnyStopGeneration: "twinny-stop-generation",
   twinnyStopSymmetryProvider: "twinny-stop-symmetry-provider",

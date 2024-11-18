@@ -7,6 +7,7 @@ import { ServerMessage } from "../common/types"
 
 import { Chat } from "./chat"
 import { ConversationHistory } from "./conversation-history"
+import { useLocale } from "./hooks"
 import { Providers } from "./providers"
 import { Review } from "./review"
 import { Settings } from "./settings"
@@ -16,7 +17,7 @@ const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.settings]: <Settings />,
   [WEBUI_TABS.providers]: <Providers />,
   [WEBUI_TABS.symmetry]: <Symmetry />,
-  [WEBUI_TABS.review]: <Review />,
+  [WEBUI_TABS.review]: <Review />
 }
 
 interface MainProps {
@@ -25,9 +26,9 @@ interface MainProps {
 
 export const Main = ({ fullScreen }: MainProps) => {
   const [tab, setTab] = useState<string | undefined>(WEBUI_TABS.chat)
-
+  const { locale, renderKey } = useLocale()
   const tabsWithProps = {
-    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />,
+    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />
   }
 
   const handler = (event: MessageEvent) => {
@@ -53,5 +54,9 @@ export const Main = ({ fullScreen }: MainProps) => {
 
   const element: JSX.Element = allTabs[tab]
 
-  return element || null
+  return (
+    <div key={renderKey} data-locale={locale}>
+      {element}
+    </div>
+  )
 }
