@@ -10,6 +10,7 @@ import {
 import { MentionNodeAttrs } from "@tiptap/extension-mention"
 import { ReactRenderer } from "@tiptap/react"
 import { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion"
+import i18next from "i18next"
 import tippy, { Instance as TippyInstance } from "tippy.js"
 
 import {
@@ -780,6 +781,26 @@ export const useSymmetryConnection = () => {
     symmetryConnection: symmetryConnectionSession,
     symmetryProviderStatus
   }
+}
+
+export const useLocale = () => {
+  const [locale, setLocale] = useState<string>("en")
+  const [ renderKey, setRenderKey ] = useState<number>(0)
+  useEffect(() => {
+    const messageHandler = (event: MessageEvent) => {
+      if (event.data.type === EVENT_NAME.twinnySetLocale) {
+        i18next.changeLanguage(event.data.data)
+        setLocale(event.data.data)
+        setRenderKey((prev: number) => prev + 1)
+      }
+    }
+
+    global.vscode.postMessage({ type: EVENT_NAME.twinntGetLocale })
+
+    window.addEventListener("message", messageHandler)
+    return () => window.removeEventListener("message", messageHandler)
+  }, [i18next])
+  return { locale, renderKey }
 }
 
 export default useAutosizeTextArea

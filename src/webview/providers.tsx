@@ -245,7 +245,7 @@ function ProviderForm({ onClose, provider }: ProviderFormProps) {
       return (
         <div>
           <div>
-            <label htmlFor="modelName">Model name*</label>
+            <label htmlFor="modelName">{t("model-name")}*</label>
           </div>
           <ModelSelect
             models={models}

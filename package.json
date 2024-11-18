@@ -286,35 +286,51 @@
           },
           "markdownDescription": "Specifies which languages to enable completions with Twinny for. Use `*` as the default for all languages. Example:\n```json\n{\n  \"*\": true,\n  \"python\": true,\n  \"javascript\": false\n}\n```"
         },
-        "twinny.autoSuggestEnabled": {
+        "twinny.locale": {
           "order": 2,
+          "type": "string",
+          "enum": [
+            "en",
+            "zh-CN",
+            "zh-HK"
+          ],
+          "enumDescriptions": [
+            "English",
+            "Chinese (Simplified)",
+            "Chinese (Hong Kong)"
+          ],
+          "default": "en",
+          "markdownDescription": "Sets the locale for Twinny. The default is `en` (English)."
+        },
+        "twinny.autoSuggestEnabled": {
+          "order": 3,
           "type": "boolean",
           "default": true,
           "markdownDescription": "When `true`, Twinny will automatically suggest completions. You can still manually trigger completions using the default shortcut (`Alt+\\`)."
         },
         "twinny.contextLength": {
-          "order": 3,
+          "order": 4,
           "type": "number",
           "default": 100,
           "markdownDescription": "Specifies how many lines of context (before and after the current line) to include in Fill-in-Middle (FIM) prompts. A higher number provides more context but may slow down completions.",
           "required": true
         },
         "twinny.debounceWait": {
-          "order": 4,
+          "order": 5,
           "type": "number",
           "default": 300,
           "markdownDescription": "Sets the delay (in milliseconds) before triggering the next completion. This helps reduce API calls and improve performance.",
           "required": true
         },
         "twinny.temperature": {
-          "order": 5,
+          "order": 6,
           "type": "number",
           "default": 0.2,
           "markdownDescription": "Controls the randomness of the model's output. Lower values (e.g., 0.2) produce more focused and deterministic outputs, while higher values (e.g., 0.8) lead to more diverse and creative completions.",
           "required": true
         },
         "twinny.multilineCompletionsEnabled": {
-          "order": 6,
+          "order": 7,
           "type": "boolean",
           "default": true,
           "markdownDescription": "When `true`, Twinny will attempt to generate multi-line completions. This is an experimental feature and may not work perfectly in all scenarios."
@@ -323,7 +339,7 @@
           "dependencies": {
             "twinny.multilineCompletionsEnabled": true
           },
-          "order": 7,
+          "order": 8,
           "type": "number",
           "default": 30,
           "markdownDescription": "Sets the maximum number of lines for multi-line completions. Only applies when `twinny.multilineCompletionsEnabled` is `true`."
