@@ -8,8 +8,7 @@ import os from "os"
 import path from "path"
 import { EventEmitter } from "stream"
 import { serverMessageKeys, SymmetryProvider } from "symmetry-core"
-import * as vscode from "vscode"
-import { commands, ExtensionContext, Webview, window, workspace } from "vscode"
+import { commands, ExtensionContext, Webview, workspace } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -45,7 +44,6 @@ export class SymmetryService extends EventEmitter {
   private _config = workspace.getConfiguration("twinny")
   private _completion = ""
   private _context: ExtensionContext
-  private _emitterKey = ""
   private _provider: SymmetryProvider | undefined
   private _providerPeer: undefined | Peer
   private _providerSwarm: undefined | typeof Hyperswarm
@@ -107,38 +105,40 @@ export class SymmetryService extends EventEmitter {
     this._providerTopic = discoveryKey
     this._serverSwarm.join(this._providerTopic, { client: true, server: false })
     this._serverSwarm.flush()
-    this._serverSwarm.on("connection", (peer: Peer) => {
-      this._serverPeer = peer
-      peer.write(
-        createSymmetryMessage(serverMessageKeys.requestProvider, {
-          modelName: model
-        })
-      )
-      peer.on("data", (message: Buffer) => {
-        const data = safeParseJson<SymmetryMessage<SymmetryConnection>>(
-          message.toString()
-        )
-        if (data && data.key) {
-          switch (data?.key) {
-            case serverMessageKeys.ping:
-              this._providerPeer?.write(
-                createSymmetryMessage(serverMessageKeys.pong)
-              )
-              break
-            case serverMessageKeys.providerDetails:
-              peer.write(
-                createSymmetryMessage(
-                  serverMessageKeys.verifySession,
-                  data.data?.sessionToken
-                )
-              )
-              break
-            case serverMessageKeys.sessionValid:
-              this.connectToProvider(data.data)
-          }
-        }
+    this._serverSwarm.on("connection", (peer: Peer) =>
+      this.handleServerConnection(peer, model)
+    )
+  }
+
+  private handleServerConnection = (peer: Peer, model: string | undefined) => {
+    this._serverPeer = peer
+    peer.write(
+      createSymmetryMessage(serverMessageKeys.requestProvider, {
+        modelName: model
       })
-    })
+    )
+    peer.on("data", this.handleServerData)
+  }
+
+  private handleServerData = (message: Buffer) => {
+    const data = safeParseJson<SymmetryMessage<SymmetryConnection>>(
+      message.toString()
+    )
+    if (!data || !data.key) return
+
+    switch (data.key) {
+      case serverMessageKeys.providerDetails:
+        this._serverPeer?.write(
+          createSymmetryMessage(
+            serverMessageKeys.verifySession,
+            data.data?.sessionToken
+          )
+        )
+        break
+      case serverMessageKeys.sessionValid:
+        this.connectToProvider(data.data)
+        break
+    }
   }
 
   public disconnect = async () => {
@@ -160,57 +160,49 @@ export class SymmetryService extends EventEmitter {
       server: false
     })
     this._providerSwarm.flush()
-    this._providerSwarm.on("connection", (peer: any) => {
-      this._providerPeer = peer
-      this.providerListeners(peer)
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyConnectedToSymmetry,
-        value: {
-          data: {
-            modelName: connection.modelName,
-            name: connection.name,
-            provider: connection.provider
-          }
-        }
-      })
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        value: {
-          data: WEBUI_TABS.chat
-        }
-      })
-      this._sessionManager?.set(
-        EXTENSION_SESSION_NAME.twinnySymmetryConnection,
-        connection
-      )
-      commands.executeCommand(
-        "setContext",
-        EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
-        false
-      )
-    })
-    return this
+    this._providerSwarm.on("connection", (peer: any) =>
+      this.handleProviderConnection(peer, connection)
+    )
   }
 
-  private providerListeners = (peer: any) => {
+  private handleProviderConnection(peer: Peer, connection: SymmetryConnection) {
+    this._providerPeer = peer
+    this.setupProviderListeners(peer)
+    this.notifyWebView(EVENT_NAME.twinnyConnectedToSymmetry, {
+      data: {
+        modelName: connection.modelName,
+        name: connection.name,
+        provider: connection.provider
+      }
+    })
+    this.notifyWebView(EVENT_NAME.twinnySetTab, { data: WEBUI_TABS.chat })
+    this._sessionManager?.set(
+      EXTENSION_SESSION_NAME.twinnySymmetryConnection,
+      connection
+    )
+    commands.executeCommand(
+      "setContext",
+      EXTENSION_CONTEXT_NAME.twinnySymmetryTab,
+      false
+    )
+  }
+
+  private setupProviderListeners(peer: Peer) {
     peer.on("data", (chunk: Buffer) => {
       const str = chunk.toString()
-      if (str.includes("symmetryEmitterKey"))
-        this._emitterKey = JSON.parse(str).symmetryEmitterKey
-
-      if (!this._emitterKey) return
-
       if (str.includes(serverMessageKeys.inferenceEnded))
         this.handleInferenceEnd()
-
-      this.handleIncomingData(chunk, (response: StreamResponse) => {
-        if (!this._symmetryProvider) return
-        const data = getChatDataFromProvider(this._symmetryProvider, response)
-        this._completion = this._completion + data
-        if (!data) return
-        this.emit(this._emitterKey, this._completion)
-      })
+      this.handleIncomingData(chunk, (response: StreamResponse) =>
+        this.processResponseData(response)
+      )
     })
+  }
+
+  private processResponseData(response: StreamResponse) {
+    if (!this._symmetryProvider) return
+    const data = getChatDataFromProvider(this._symmetryProvider, response)
+    this._completion += data
+    if (data) this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
   }
 
   private handleInferenceEnd() {
@@ -221,14 +213,12 @@ export class SymmetryService extends EventEmitter {
     )
     if (!this._completion) return
 
-    if (this._emitterKey === SYMMETRY_EMITTER_KEY.inference) {
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnEnd,
-        value: {
-          completion: this._completion.trimStart()
-        }
-      } as ServerMessage)
-    }
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyOnEnd,
+      value: {
+        completion: this._completion.trimStart()
+      }
+    } as ServerMessage)
     this._completion = ""
   }
 
@@ -249,13 +239,6 @@ export class SymmetryService extends EventEmitter {
         console.error("Error parsing JSON:", e)
       }
     }
-  }
-
-  public getChatProvider() {
-    const provider = this._context?.globalState.get<TwinnyProvider>(
-      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
-    )
-    return provider
   }
 
   private getSymmetryConfigPath(): string {
@@ -288,7 +271,7 @@ export class SymmetryService extends EventEmitter {
       systemMessage: ""
     })
 
-    return fs.promises.writeFile(configPath, symmetryConfiguration, "utf8");
+    return fs.promises.writeFile(configPath, symmetryConfiguration, "utf8")
   }
 
   public startSymmetryProvider = async () => {
@@ -323,6 +306,17 @@ export class SymmetryService extends EventEmitter {
       type: sessionTypeName,
       value: "connected"
     })
+  }
+
+  private notifyWebView(type: string, value: any = {}) {
+    this._webView?.postMessage({ type, value })
+  }
+
+  public getChatProvider() {
+    const provider = this._context?.globalState.get<TwinnyProvider>(
+      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
+    )
+    return provider
   }
 
   public stopSymmetryProvider = async () => {

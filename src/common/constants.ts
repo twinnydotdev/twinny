@@ -25,7 +25,7 @@ export const SKIP_IMPORT_KEYWORDS_AFTER = ["from", "as", "import"]
 export const MIN_COMPLETION_CHUNKS = 2
 export const MAX_EMPTY_COMPLETION_CHARS = 250
 export const DEFAULT_RERANK_THRESHOLD = 0.5
-export const URL_SYMMETRY_WS = "wss://twinny.dev/ws"
+export const URL_SYMMETRY_WS = "http://twinny.dev/ws"
 
 export const defaultChunkOptions = {
   maxSize: 500,
