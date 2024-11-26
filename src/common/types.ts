@@ -220,8 +220,8 @@ export interface InteractionItem {
   name: string | null | undefined
   sessionLength: number
   visits: number | null | undefined
-  isOpen?: boolean
-  relevanceScore: number | null | undefined
+  isOpen: boolean
+  relevanceScore?: number | null | undefined
   activeLines: {
     line: number
     character: number

@@ -1,3 +1,5 @@
+import * as vscode from "vscode"
+
 import { InteractionItem } from "../common/types"
 
 import { LRUCache } from "./cache"
@@ -8,7 +10,9 @@ export class FileInteractionCache {
   private _interactions = new LRUCache<InteractionItem>(20)
   private _sessionPauseTime: Date | null = null
   private _sessionStartTime: Date | null = null
-  private readonly _inactivityThreshold = 5 * 60 * 1000 // 5 minutes
+  private readonly _disposables: vscode.Disposable[] = []
+  private readonly _inactivityThreshold = 5 * 60 * 1000
+  private readonly FILTER_REGEX = /\.git|git|package.json|.hg/
   private static readonly KEY_STROKE_WEIGHT = 2
   private static readonly OPEN_FILE_WEIGHT = 10
   private static readonly RECENCY_WEIGHT = 2.1
@@ -16,7 +20,24 @@ export class FileInteractionCache {
   private static readonly VISIT_WEIGHT = 0.5
 
   constructor() {
+    this._disposables.push(
+      vscode.workspace.onDidCloseTextDocument((doc) => {
+        const item = this._interactions.get(doc.fileName)
+        if (item) {
+          this._interactions.set(doc.fileName, { ...item, isOpen: false })
+        }
+      })
+    )
+
     this.resetInactivityTimeout()
+    this.addOpenFilesWithPriority()
+  }
+
+  dispose() {
+    if (this._inactivityTimeout) {
+      clearTimeout(this._inactivityTimeout)
+    }
+    this._disposables.forEach((d) => d.dispose())
   }
 
   resetInactivityTimeout() {
@@ -50,31 +71,44 @@ export class FileInteractionCache {
   private calculateRelevanceScore(interaction: InteractionItem | null): number {
     if (!interaction) return 0
 
-    const recency = Date.now() - (interaction.lastVisited || 0)
-    const score =
+    const recencyInHours =
+      (Date.now() - (interaction.lastVisited || 0)) / (1000 * 60 * 60)
+    const recencyScore = Math.max(0, 24 - recencyInHours) // Caps at 24 hours
+
+    return (
       (interaction.keyStrokes || 0) * FileInteractionCache.KEY_STROKE_WEIGHT +
       (interaction.visits || 0) * FileInteractionCache.VISIT_WEIGHT +
       (interaction.sessionLength || 0) *
-        FileInteractionCache.SESSION_LENGTH_WEIGHT -
-      recency * FileInteractionCache.RECENCY_WEIGHT
-
-    return (
-      score + (interaction.isOpen ? FileInteractionCache.OPEN_FILE_WEIGHT : 0)
+        FileInteractionCache.SESSION_LENGTH_WEIGHT +
+      recencyScore * FileInteractionCache.RECENCY_WEIGHT +
+      (interaction.isOpen ? FileInteractionCache.OPEN_FILE_WEIGHT : 0)
     )
   }
 
   getAll(): InteractionItem[] {
     return Array.from(this._interactions.getAll())
       .map(([name, interaction]) => ({
-        name,
         keyStrokes: interaction?.keyStrokes || 0,
         visits: interaction?.visits || 0,
         sessionLength: interaction?.sessionLength || 0,
         lastVisited: interaction?.lastVisited || 0,
         activeLines: interaction?.activeLines || [],
-        relevanceScore: this.calculateRelevanceScore(interaction),
+        isOpen: interaction?.isOpen || false,
+        name,
+        relevanceScore: this.calculateRelevanceScore(interaction)
       }))
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
+  }
+
+  addOpenFilesWithPriority(): void {
+    const openFiles = vscode.workspace.textDocuments
+      .filter((doc) => !doc.isUntitled)
+      .map((doc) => doc.fileName)
+      .filter((fileName) => !fileName.match(this.FILTER_REGEX))
+
+    for (const filePath of openFiles) {
+      this.putOpenFile(filePath)
+    }
   }
 
   getCurrentFile(): string | null {
@@ -88,7 +122,7 @@ export class FileInteractionCache {
     this._interactions.set(this._currentFile, {
       ...item,
       visits: (item.visits || 0) + 1,
-      lastVisited: Date.now(),
+      lastVisited: Date.now()
     })
   }
 
@@ -102,9 +136,9 @@ export class FileInteractionCache {
       keyStrokes: (item.keyStrokes || 0) + 1,
       activeLines: [
         ...item.activeLines,
-        { line: currentLine, character: currentCharacter },
+        { line: currentLine, character: currentCharacter }
       ],
-      lastVisited: Date.now(),
+      lastVisited: Date.now()
     })
 
     this.resumeSession()
@@ -113,7 +147,7 @@ export class FileInteractionCache {
 
   startSession(filePath: string): void {
     this._sessionStartTime = new Date()
-    this.put(filePath)
+    this.putOpenFile(filePath)
     this.incrementVisits()
     this.resetInactivityTimeout()
   }
@@ -137,7 +171,7 @@ export class FileInteractionCache {
       this._interactions.set(this._currentFile, {
         ...item,
         sessionLength: (item.sessionLength || 0) + sessionLength,
-        lastVisited: Date.now(),
+        lastVisited: Date.now()
       })
     }
 
@@ -151,22 +185,32 @@ export class FileInteractionCache {
     this._interactions.delete(filePath)
   }
 
-  put(filePath: string): void {
-    this._currentFile = filePath.replace(".git", "").replace(".hg", "")
-    const fileExtension = this._currentFile.split(".").pop()
-    if (this._interactions.get(this._currentFile)) {
-      this.incrementVisits()
-      return
-    }
-    if (this._currentFile.includes(".") && fileExtension) {
-      this._interactions.set(this._currentFile, {
-        name: this._currentFile,
+  putOpenFile(filePath: string): void {
+    this.putFile(filePath, true)
+  }
+
+  putClosedFile(filePath: string): void {
+    this.putFile(filePath, false)
+  }
+
+  putFile(filePath: string, isOpen: boolean): void {
+    if (filePath.match(this.FILTER_REGEX)) return
+
+    this._currentFile = filePath
+
+    const fileExtension = filePath.split(".").pop()
+
+    if (this._interactions.get(filePath)) return
+
+    if (filePath.includes(".") && fileExtension) {
+      this._interactions.set(filePath, {
+        name: filePath,
         keyStrokes: 0,
         visits: 1,
         sessionLength: 0,
         activeLines: [],
         lastVisited: Date.now(),
-        relevanceScore: 0,
+        isOpen
       })
     }
   }

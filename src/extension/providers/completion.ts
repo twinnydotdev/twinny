@@ -471,6 +471,7 @@ export class CompletionProvider
   }
 
   private async getFileInteractionContext() {
+    this._fileInteractionCache.addOpenFilesWithPriority()
     const interactions = this._fileInteractionCache.getAll()
     const currentFileName = this._document?.fileName || ""
 
