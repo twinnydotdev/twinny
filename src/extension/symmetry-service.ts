@@ -7,7 +7,11 @@ import yaml from "js-yaml"
 import os from "os"
 import path from "path"
 import { EventEmitter } from "stream"
-import { serverMessageKeys, SymmetryProvider } from "symmetry-core"
+import {
+  ProviderConfig,
+  serverMessageKeys,
+  SymmetryClient
+} from "symmetry-core"
 import { commands, ExtensionContext, Webview, workspace } from "vscode"
 
 import {
@@ -44,7 +48,7 @@ export class SymmetryService extends EventEmitter {
   private _config = workspace.getConfiguration("twinny")
   private _completion = ""
   private _context: ExtensionContext
-  private _provider: SymmetryProvider | undefined
+  private _client: SymmetryClient | undefined
   private _providerPeer: undefined | Peer
   private _providerSwarm: undefined | typeof Hyperswarm
   private _providerTopic: Buffer | undefined
@@ -246,7 +250,7 @@ export class SymmetryService extends EventEmitter {
     return path.join(homeDir, ".config", "symmetry", "provider.yaml")
   }
 
-  private createProviderConfig(provider: TwinnyProvider): Promise<void> {
+  private createProviderConfig(provider: TwinnyProvider): ProviderConfig {
     const configPath = this.getSymmetryConfigPath()
     const configDir = path.dirname(configPath)
 
@@ -254,58 +258,103 @@ export class SymmetryService extends EventEmitter {
       fs.mkdirSync(configDir, { recursive: true })
     }
 
-    const symmetryConfiguration = yaml.dump({
+    const config: ProviderConfig = {
       apiHostname: provider.apiHostname,
       apiKey: provider.apiKey,
-      apiPath: provider.apiPath,
-      apiPort: provider.apiPort,
+      apiBasePath: provider.apiPath,
+      apiChatPath: provider.apiPath,
+      dataPath: configDir,
+      apiPort: provider.apiPort || 8080,
       apiProtocol: provider.apiProtocol,
       apiProvider: provider.provider,
       dataCollectionEnabled: false,
       maxConnections: 10,
       modelName: provider.modelName,
       name: os.hostname(),
-      path: configPath,
       public: true,
       serverKey: this._config.symmetryServerKey,
-      systemMessage: ""
-    })
+      systemMessage: "",
+      userSecret: "",
+    }
 
-    return fs.promises.writeFile(configPath, symmetryConfiguration, "utf8")
+    const symmetryConfiguration = yaml.dump(config)
+
+    fs.promises.writeFile(configPath, symmetryConfiguration, "utf8")
+
+    return config
+  }
+
+  private async readProviderConfig(): Promise<ProviderConfig> {
+    const configPath = this.getSymmetryConfigPath()
+    const configStr = await fs.promises.readFile(configPath, "utf8")
+    return yaml.load(configStr) as ProviderConfig
+  }
+
+  private updateProviderConfig = async (provider: TwinnyProvider): Promise<void> => {
+    const configPath = this.getSymmetryConfigPath()
+    const configDir = path.dirname(configPath)
+
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true })
+    }
+
+    try {
+      if (fs.existsSync(configPath)) {
+        const backupPath = `${configPath}.backup-${Date.now()}`
+        await fs.promises.copyFile(configPath, backupPath)
+      }
+
+      let config: ProviderConfig
+      if (fs.existsSync(configPath)) {
+        config = await this.readProviderConfig()
+        const updates: Partial<ProviderConfig> = {}
+        if (!config.apiChatPath) updates.apiChatPath = provider.apiPath
+        if (!config.dataPath) updates.dataPath = configDir
+
+        const updatedConfig = { ...config, ...updates }
+        await fs.promises.writeFile(configPath, yaml.dump(updatedConfig), "utf8")
+      } else {
+        config = this.createProviderConfig(this.getChatProvider() as TwinnyProvider)
+        await fs.promises.writeFile(configPath, yaml.dump(config), "utf8")
+      }
+    } catch (error) {
+      console.error("Failed to update config:", error)
+      throw error
+    }
   }
 
   public startSymmetryProvider = async () => {
     const provider = this.getChatProvider()
-
     if (!provider) return
 
-    const configPath = this.getSymmetryConfigPath()
+    try {
+      await this.updateProviderConfig(provider)
 
-    if (!fs.existsSync(configPath)) {
-      await this.createProviderConfig(provider)
+      this._client = new SymmetryClient(this.getSymmetryConfigPath())
+
+      const sessionKey = EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
+      this._sessionManager?.set(sessionKey, "connecting")
+
+      const sessionTypeName = `${EVENT_NAME.twinnySessionContext}-${sessionKey}`
+      this._webView?.postMessage({
+        type: sessionTypeName,
+        value: "connecting"
+      })
+
+      await this._client.init()
+
+      this._sessionManager?.set(sessionKey, "connected")
+      this._webView?.postMessage({
+        type: sessionTypeName,
+        value: "connected"
+      })
+    } catch (error) {
+      console.error("Failed to start provider:", error)
+      this._sessionManager?.set(
+        EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider,
+        "error"
+      )
     }
-
-    this._provider = new SymmetryProvider(configPath)
-
-    const sessionKey = EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
-
-    this._sessionManager?.set(sessionKey, "connecting")
-
-    const sessionTypeName = `${EVENT_NAME.twinnySessionContext}-${sessionKey}`
-
-    this._webView?.postMessage({
-      type: sessionTypeName,
-      value: "connecting"
-    })
-
-    await this._provider.init()
-
-    this._sessionManager?.set(sessionKey, "connected")
-
-    this._webView?.postMessage({
-      type: sessionTypeName,
-      value: "connected"
-    })
   }
 
   private notifyWebView(type: string, value: any = {}) {
@@ -320,7 +369,7 @@ export class SymmetryService extends EventEmitter {
   }
 
   public stopSymmetryProvider = async () => {
-    await this._provider?.destroySwarms()
+    await this._client?.destroySwarms()
     updateSymmetryStatus(this._webView, "disconnected")
     const sessionKey = EXTENSION_SESSION_NAME.twinnySymmetryConnectionProvider
     this._sessionManager?.set(sessionKey, "disconnected")
