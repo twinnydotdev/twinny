@@ -9,7 +9,7 @@ Free and private AI extension for Visual Studio Code.
 - [Open WebUI](https://github.com/open-webui/open-webui)
 
 ## 🚀 Getting Started
-Visit the [quick start guide](https://twinnydotdev.github.io/twinny-docs/general/quick-start/) to get started.
+Visit the [quick start guide](https://docs.twinny.dev) to get started.
 
 ## Main Features
 
