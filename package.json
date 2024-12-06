@@ -512,7 +512,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "string_score": "^0.1.22",
-    "symmetry-core": "^1.0.30",
+    "symmetry-core": "^1.0.31",
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.8.10",
     "toxe": "^1.1.0",
