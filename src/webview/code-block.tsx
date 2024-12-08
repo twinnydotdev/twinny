@@ -40,6 +40,13 @@ export const CodeBlock = (props: CodeBlockProps) => {
     })
   }
 
+  const handleGenerateCode= () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyGenerateCode,
+      data: String(children).replace(/^\n/, ""),
+    })
+  }
+
   const handleAccept = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyAcceptSolution,
@@ -84,6 +91,13 @@ export const CodeBlock = (props: CodeBlockProps) => {
               appearance="icon"
             >
               <span className="codicon codicon-new-file"></span>
+            </VSCodeButton>
+            <VSCodeButton
+              title={t("generate-code")}
+              onClick={handleGenerateCode}
+              appearance="icon"
+            >
+              <span className="codicon codicon-"></span>
             </VSCodeButton>
             <VSCodeButton
               title={t("open-diff")}

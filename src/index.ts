@@ -110,6 +110,12 @@ export async function activate(context: ExtensionContext) {
         sidebarProvider?.streamTemplateCompletion("generate-docs")
       )
     }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.generateCodes, () => {
+      commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      delayExecution(() =>
+        sidebarProvider?.streamTemplateCompletion("generate-code")
+      )
+    }),//new function
     commands.registerCommand(TWINNY_COMMAND_NAME.addTests, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       delayExecution(() =>

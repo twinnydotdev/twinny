@@ -1,5 +1,6 @@
 import { serverMessageKeys } from "symmetry-core"
 import * as vscode from "vscode"
+import * as path from 'path';//new 
 
 import {
   EVENT_NAME,
@@ -118,6 +119,7 @@ export class BaseProvider {
     vscode.window.onDidChangeTextEditorSelection(this.handleTextSelection)
 
     const eventHandlers = {
+      [EVENT_NAME.twinnyGenerateCode]: this.generateCode,//new function
       [EVENT_NAME.twinnyAcceptSolution]: this.acceptSolution,
       [EVENT_NAME.twinnyChatMessage]: this.streamChatCompletion,
       [EVENT_NAME.twinnyClickSuggestion]: this.clickSuggestion,
@@ -392,6 +394,67 @@ export class BaseProvider {
     await vscode.window.showTextDocument(document)
   }
 
+  private generateCode = async (message: ClientMessage) => {
+    try {
+      // 解析传来的字符串内容为 JSON 对象
+      const text = message.data as string;
+      console.log(text);
+      const pattern = /\[([\s\S]*)\]/; // 正则表达式匹配包含在 [] 中的部分
+      const match = text.match(pattern);; // 提取第一个匹配项
+      console.log(match);
+      if (!match) {
+        vscode.window.showErrorMessage("Failed to parse data. Invalid JSON format.");
+        return
+      }
+      console.log(match[0]);
+      const fileDataArray = JSON.parse(match[0]) as { filePath: string, content: string }[];
+      console.log(fileDataArray);
+      const currentPath = path.resolve(path.resolve(__dirname, '..')) ;
+      const replacedPath = currentPath.replace(/\\/g, '/');
+      const bPath = "E:/test";
+
+      const workspaceFolder = bPath;
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("No workspace folder found.");
+        return;
+      }
+  
+      // 用于存储所有创建的文件 URI
+      const openedFiles: vscode.Uri[] = [];
+
+      // 遍历每个文件信息，创建文件并写入内容
+      for (const { filePath, content } of fileDataArray) {
+        const fullFilePath = path.join(workspaceFolder, filePath);
+        const fileUri = vscode.Uri.file(fullFilePath);
+  
+        try {
+          // 确保父目录存在，如果没有则创建目录
+          const dirPath = path.dirname(fullFilePath);
+          await vscode.workspace.fs.createDirectory(vscode.Uri.file(dirPath));
+  
+          // 将文件内容写入文件
+          await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content, "utf8"));
+          // 添加文件 URI 到已打开文件列表
+          openedFiles.push(fileUri);
+          
+          vscode.window.showInformationMessage(`File created: ${filePath}`);
+          //
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to create file: ${filePath}`);
+          console.error(error);
+        }
+      }
+
+      // 在工作区打开所有创建的文件
+      for (const fileUri of openedFiles) {
+        await vscode.window.showTextDocument(fileUri, { preview: false });
+      }
+      
+    } catch (error) {
+      vscode.window.showErrorMessage("Failed to parse data. Invalid JSON format.");
+      console.error("Error parsing message data:", error);
+    }
+  }
   private getGlobalContext = (message: ClientMessage) => {
     const storedData = this.context?.globalState.get(
       `${EVENT_NAME.twinnyGlobalContext}-${message.key}`

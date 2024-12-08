@@ -135,6 +135,10 @@
         "title": "Twinny - Explain"
       },
       {
+        "command": "twinny.generateCode",
+        "title": "Twinny - Generate code"
+      },
+      {
         "command": "twinny.refactor",
         "title": "Twinny - Refactor"
       },
@@ -492,6 +496,7 @@
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
     "async-lock": "^1.4.1",
+    "axios": "^1.7.9",
     "b4a": "^1.6.6",
     "classnames": "^2.5.1",
     "handlebars": "^4.7.8",
