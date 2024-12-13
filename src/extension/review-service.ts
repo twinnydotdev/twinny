@@ -222,7 +222,7 @@ export class GithubService extends ConversationHistory {
           },
           onEnd: () => {
             this.webView?.postMessage({
-              type: EVENT_NAME.twinnyOnEnd,
+              type: EVENT_NAME.twinnyOnCompletionEnd,
               value: {
                 completion: this._completion.trimStart(),
               },
@@ -231,7 +231,7 @@ export class GithubService extends ConversationHistory {
           },
           onError: (error: Error) => {
             this.webView?.postMessage({
-              type: EVENT_NAME.twinnyOnEnd,
+              type: EVENT_NAME.twinnyOnCompletionEnd,
               value: {
                 error: true,
                 errorMessage: error.message,

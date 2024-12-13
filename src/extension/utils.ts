@@ -314,25 +314,26 @@ export const getTheme = () => {
 }
 
 export const getChatDataFromProvider = (
-  provider: string,
   data: StreamResponse
 ) => {
-  switch (provider) {
-    case apiProviders.Ollama:
-    case apiProviders.OpenWebUI:
-      return data?.choices[0].delta?.content
-        ? data?.choices[0].delta.content
-        : ""
-    case apiProviders.LlamaCpp:
-      return data?.content
-    case apiProviders.LiteLLM:
-    default:
-      if (data?.choices[0].delta.content === "undefined") return ""
-      return data?.choices[0].delta?.content
-        ? data?.choices[0].delta.content
-        : ""
+  const toolCalls = data?.choices?.[0]?.message?.tool_calls;
+
+  if (toolCalls?.length) {
+    return {
+      type: "function_call" as const,
+      calls: toolCalls.map(call => ({
+        id: call.id,
+        name: call.function.name,
+        arguments: JSON.parse(call.function.arguments)
+      }))
+    };
   }
-}
+
+  return {
+    type: "content" as const,
+    content: data?.choices?.[0]?.message?.content || ""
+  };
+};
 
 export const getFimDataFromProvider = (
   provider: string,

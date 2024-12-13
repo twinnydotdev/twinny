@@ -21,7 +21,7 @@ export class FileTreeProvider {
     this._workspaceRoot = workspaceFolders[0].uri.fsPath
   }
 
-  provideTextDocumentContent(): string {
+  getWorkSpaceTree(): string {
     return this.generateFileTree(this._workspaceRoot)
   }
 

@@ -1,4 +1,5 @@
 import { USER } from "../common/constants"
+import { tools } from "../common/tool-definitions"
 import {
   apiProviders,
   Message,
@@ -10,7 +11,6 @@ import {
 export function createStreamRequestBody(
   provider: string,
   options: {
-
     temperature: number
     numPredictChat: number
     model: string
@@ -23,8 +23,9 @@ export function createStreamRequestBody(
     case apiProviders.OpenWebUI:
       return {
         model: options.model,
-        stream: true,
+        stream: false,
         messages: options.messages,
+        tools: tools,
         keep_alive: options.keepAlive === "-1"
           ? -1
           : options.keepAlive,
@@ -37,7 +38,8 @@ export function createStreamRequestBody(
     default:
       return {
         model: options.model,
-        stream: true,
+        stream: false,
+        tools: tools,
         max_tokens: options.numPredictChat,
         messages: options.messages,
         temperature: options.temperature,

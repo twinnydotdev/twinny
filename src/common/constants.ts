@@ -62,7 +62,7 @@ export const EVENT_NAME = {
   twinnyNewDocument: "twinny-new-document",
   twinnyNotification: "twinny-notification",
   twinnyOnCompletion: "twinny-on-completion",
-  twinnyOnEnd: "twinny-on-end",
+  twinnyOnCompletionEnd: "twinny-on-end",
   twinnyOnLoading: "twinny-on-loading",
   twinnyOpenDiff: "twinny-open-diff",
   twinnyRerankThresholdChanged: "twinny-rerank-threshold-changed",
@@ -120,6 +120,10 @@ export const CONVERSATION_EVENT_NAME = {
   saveConversation: "twinny.save-conversation",
   saveLastConversation: "twinny.save-last-conversation",
   setActiveConversation: "twinny.set-active-conversation",
+}
+
+export const TOOL_EVENT_NAME = {
+  toolUpdate: "twinny.tool-update",
 }
 
 export const PROVIDER_EVENT_NAME = {

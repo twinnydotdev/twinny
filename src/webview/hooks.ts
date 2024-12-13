@@ -20,6 +20,7 @@ import {
   GITHUB_EVENT_NAME,
   GLOBAL_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
+  TOOL_EVENT_NAME,
   WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import {
@@ -32,7 +33,7 @@ import {
   ServerMessage,
   SymmetryConnection,
   SymmetryModelProvider,
-  ThemeType
+  ThemeType,
 } from "../common/types"
 import { TwinnyProvider } from "../extension/provider-manager"
 
@@ -46,7 +47,8 @@ export const useSelection = (onSelect?: () => void) => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     if (message?.type === EVENT_NAME.twinnyTextSelection) {
-      setSelection(message?.value.completion.trim())
+      const selection = message?.value?.completion?.trim()
+      setSelection(selection || "")
       onSelect?.()
     }
   }
@@ -179,11 +181,14 @@ export const useLoading = () => {
 }
 
 export const useLanguage = (): LanguageType | undefined => {
-  const [language, setLanguage] = useState<LanguageType | undefined>()
+  const [language, setLanguage] = useState<LanguageType>()
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     if (message?.type === EVENT_NAME.twinnySendLanguage) {
-      setLanguage(message?.value.data)
+      const language = message?.value.data as LanguageType
+      if (language) {
+        setLanguage(language)
+      }
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -783,9 +788,38 @@ export const useSymmetryConnection = () => {
   }
 }
 
+export const useTools = () => {
+
+  const handleRunTool = (toolName: string) => {
+    console.log("running tool")
+    console.log(toolName)
+  }
+
+  const handleRejectTool = (toolName: string) => {
+    console.log("rejecting tool")
+    console.log(toolName)
+  }
+
+  useEffect(() => {
+    const messageHandler = (event: MessageEvent) => {
+      if (event.data.type === TOOL_EVENT_NAME.toolUpdate) {
+        console.log(event.data.value.data)
+      }
+    }
+
+    window.addEventListener("message", messageHandler)
+    return () => window.removeEventListener("message", messageHandler)
+  }, [])
+
+  return {
+    handleRunTool,
+    handleRejectTool
+  }
+}
+
 export const useLocale = () => {
   const [locale, setLocale] = useState<string>("en")
-  const [ renderKey, setRenderKey ] = useState<number>(0)
+  const [renderKey, setRenderKey] = useState<number>(0)
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
       if (event.data.type === EVENT_NAME.twinnySetLocale) {

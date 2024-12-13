@@ -45,6 +45,16 @@ export async function streamResponse(request: StreamRequest) {
 
     onStart?.(controller)
 
+    if (body.stream === false) {
+      const text = await response.text()
+      const json = safeParseJsonResponse(text)
+
+      if (!json || !onData) return
+
+      onData(json)
+      return
+    }
+
     const reader = response.body
       .pipeThrough(new TextDecoderStream())
       .pipeThrough(
@@ -98,7 +108,11 @@ export async function streamResponse(request: StreamRequest) {
         onEnd?.()
       } else if (error.name === "TimeoutError") {
         onError?.(error)
-        log.logConsoleError(Logger.ErrorType.Timeout, "Failed to establish connection", error)
+        log.logConsoleError(
+          Logger.ErrorType.Timeout,
+          "Failed to establish connection",
+          error
+        )
       } else {
         log.logConsoleError(Logger.ErrorType.Fetch_Error, "Fetch error", error)
         onError?.(error)

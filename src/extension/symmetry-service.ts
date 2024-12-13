@@ -204,7 +204,7 @@ export class SymmetryService extends EventEmitter {
 
   private processResponseData(response: StreamResponse) {
     if (!this._symmetryProvider) return
-    const data = getChatDataFromProvider(this._symmetryProvider, response)
+    const data = getChatDataFromProvider(response)
     this._completion += data
     if (data) this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
   }
@@ -218,7 +218,7 @@ export class SymmetryService extends EventEmitter {
     if (!this._completion) return
 
     this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnEnd,
+      type: EVENT_NAME.twinnyOnCompletionEnd,
       value: {
         completion: this._completion.trimStart()
       }

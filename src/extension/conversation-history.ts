@@ -98,10 +98,7 @@ export class ConversationHistory extends Base {
           body: requestBody,
           options: requestOptions,
           onData: (streamResponse) => {
-            const data = getChatDataFromProvider(
-              provider.provider,
-              streamResponse as StreamResponse
-            )
+            const data = getChatDataFromProvider(streamResponse as StreamResponse)
             this._title = this._title + data
           },
           onEnd: () => {
