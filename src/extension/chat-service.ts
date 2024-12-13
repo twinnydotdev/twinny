@@ -294,7 +294,7 @@ export class ChatService extends Base {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`,
+        Authorization: provider?.apiKey ? `Bearer ${provider.apiKey}` : undefined,
       },
     }
 
