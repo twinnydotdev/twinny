@@ -8,7 +8,7 @@ import {
   StatusBarItem,
   Webview,
   window,
-  workspace,
+  workspace
 } from "vscode"
 
 import {
@@ -22,7 +22,7 @@ import {
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
-  WEBUI_TABS,
+  WEBUI_TABS
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
@@ -33,7 +33,7 @@ import {
   ServerMessage,
   StreamRequestOptions,
   StreamResponse,
-  TemplateData,
+  TemplateData
 } from "../common/types"
 import { kebabToSentence } from "../webview/utils"
 
@@ -49,7 +49,7 @@ import { TemplateProvider } from "./template-provider"
 import {
   getChatDataFromProvider,
   getLanguage,
-  updateLoadingMessage,
+  updateLoadingMessage
 } from "./utils"
 
 export class ChatService extends Base {
@@ -94,8 +94,8 @@ export class ChatService extends Base {
           type: EVENT_NAME.twinnyOnCompletion,
           value: {
             completion: completion.trimStart(),
-            data: getLanguage(),
-          },
+            data: getLanguage()
+          }
         } as ServerMessage)
       }
     )
@@ -119,11 +119,7 @@ export class ChatService extends Base {
       const relevantFileCount = Number(stored) || DEFAULT_RELEVANT_FILE_COUNT
 
       const filePaths =
-        (await this._db.getDocuments(
-          embedding,
-          relevantFileCount,
-          table,
-        )) || []
+        (await this._db.getDocuments(embedding, relevantFileCount, table)) || []
 
       if (!filePaths.length) return []
 
@@ -235,7 +231,7 @@ export class ChatService extends Base {
         (await this._db.getDocuments(
           embedding,
           Math.round(relevantCodeCount / 2),
-          table,
+          table
         )) || []
 
       const documents = [...embeddedDocuments, ...queryEmbeddedDocuments]
@@ -293,9 +289,12 @@ export class ChatService extends Base {
       protocol: provider.apiProtocol,
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        Authorization: provider?.apiKey ? `Bearer ${provider.apiKey}` : undefined,
-      },
+        "Content-Type": "application/json"
+      }
+    }
+
+    if (provider.apiKey) {
+      requestOptions.headers["Authorization"] = `Bearer ${provider.apiKey}`
     }
 
     const requestBody = createStreamRequestBody(provider.provider, {
@@ -303,7 +302,7 @@ export class ChatService extends Base {
       numPredictChat: this.config.numPredictChat,
       temperature: this.config.temperature,
       messages,
-      keepAlive: this.config.keepAlive,
+      keepAlive: this.config.keepAlive
     })
 
     return { requestOptions, requestBody }
@@ -325,8 +324,8 @@ export class ChatService extends Base {
         value: {
           completion: this._completion.trimStart(),
           data: getLanguage(),
-          type: this._promptTemplate,
-        },
+          type: this._promptTemplate
+        }
       } as ServerMessage)
     } catch (error) {
       console.error("Error parsing JSON:", error)
@@ -344,7 +343,7 @@ export class ChatService extends Base {
     if (onEnd) {
       onEnd(this._completion)
       this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnEnd,
+        type: EVENT_NAME.twinnyOnEnd
       } as ServerMessage)
       return
     }
@@ -353,8 +352,8 @@ export class ChatService extends Base {
       value: {
         completion: this._completion.trimStart(),
         data: getLanguage(),
-        type: this._promptTemplate,
-      },
+        type: this._promptTemplate
+      }
     } as ServerMessage)
   }
 
@@ -363,8 +362,8 @@ export class ChatService extends Base {
       type: EVENT_NAME.twinnyOnEnd,
       value: {
         error: true,
-        errorMessage: `==## ERROR ##== : ${error.message}`, // Highlight errors on webview
-      },
+        errorMessage: `==## ERROR ##== : ${error.message}` // Highlight errors on webview
+      }
     } as ServerMessage)
   }
 
@@ -395,8 +394,8 @@ export class ChatService extends Base {
       value: {
         completion: this._completion.trimStart(),
         data: getLanguage(),
-        type: this._promptTemplate,
-      },
+        type: this._promptTemplate
+      }
     } as ServerMessage)
   }
 
@@ -414,7 +413,7 @@ export class ChatService extends Base {
       template,
       {
         code: selectionContext || "",
-        language: language?.langName || "unknown",
+        language: language?.langName || "unknown"
       }
     )
     return { prompt: prompt || "", selection: selectionContext }
@@ -423,7 +422,7 @@ export class ChatService extends Base {
   private streamResponse({
     requestBody,
     requestOptions,
-    onEnd,
+    onEnd
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
@@ -436,7 +435,7 @@ export class ChatService extends Base {
         this.onStreamData(streamResponse as StreamResponse, onEnd),
       onEnd: () => this.onStreamEnd(onEnd),
       onStart: this.onStreamStart,
-      onError: this.onStreamError,
+      onError: this.onStreamError
     })
   }
 
@@ -444,8 +443,8 @@ export class ChatService extends Base {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySendLanguage,
       value: {
-        data: getLanguage(),
-      },
+        data: getLanguage()
+      }
     } as ServerMessage)
   }
 
@@ -453,8 +452,8 @@ export class ChatService extends Base {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
       value: {
-        data: WEBUI_TABS.chat,
-      },
+        data: WEBUI_TABS.chat
+      }
     } as ServerMessage<string>)
   }
 
@@ -469,7 +468,7 @@ export class ChatService extends Base {
           lineNumber: diagnostic.range.start.line + 1,
           character: diagnostic.range.start.character + 1,
           source: diagnostic.source,
-          diagnosticCode: diagnostic.code,
+          diagnosticCode: diagnostic.code
         }))
       )
       .map((problem) => JSON.stringify(problem))
@@ -560,7 +559,7 @@ export class ChatService extends Base {
       role: SYSTEM,
       content: await this._templateProvider?.readSystemMessageTemplate(
         this._promptTemplate
-      ),
+      )
     }
 
     let additionalContext = ""
@@ -577,8 +576,9 @@ export class ChatService extends Base {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
     }
 
-    filePaths = filePaths?.filter((filepath) =>
-      filepath.name !== "workspace" && filepath.name !== "problems"
+    filePaths = filePaths?.filter(
+      (filepath) =>
+        filepath.name !== "workspace" && filepath.name !== "problems"
     )
     const fileContents = await this.loadFileContents(filePaths)
     if (fileContents) {
@@ -601,12 +601,12 @@ export class ChatService extends Base {
       const lastMessageContent = `${cleanedText}\n\n${additionalContext.trim()}`
       conversation.push({
         role: USER,
-        content: lastMessageContent,
+        content: lastMessageContent
       })
     } else {
       conversation.push({
         ...lastMessage,
-        content: cleanedText,
+        content: cleanedText
       })
     }
     updateLoadingMessage(this._webView, "Thinking")
@@ -636,14 +636,14 @@ export class ChatService extends Base {
     if (!skipMessage) {
       this.focusChatTab()
       this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnLoading,
+        type: EVENT_NAME.twinnyOnLoading
       })
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         value: {
           completion: kebabToSentence(template) + "\n\n" + "```\n" + selection,
-          data: getLanguage(),
-        },
+          data: getLanguage()
+        }
       } as ServerMessage)
     }
 
@@ -651,7 +651,7 @@ export class ChatService extends Base {
       role: SYSTEM,
       content: await this._templateProvider?.readSystemMessageTemplate(
         this._promptTemplate
-      ),
+      )
     }
 
     let ragContext = undefined
@@ -672,7 +672,7 @@ export class ChatService extends Base {
 
     conversation.push({
       role: USER,
-      content: userContent,
+      content: userContent
     })
 
     if (!provider.modelName.includes("claude")) {
