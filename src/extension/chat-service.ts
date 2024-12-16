@@ -12,7 +12,7 @@ import {
 } from "vscode"
 
 import {
-  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ASSISTANT,
   DEFAULT_RELEVANT_CODE_COUNT,
   DEFAULT_RELEVANT_FILE_COUNT,
   DEFAULT_RERANK_THRESHOLD,
@@ -33,28 +33,23 @@ import {
   ServerMessage,
   StreamRequestOptions,
   StreamResponse,
-  TemplateData
+  TemplateData,
+  Tool
 } from "../common/types"
 import { kebabToSentence } from "../webview/utils"
 
-import { streamResponse } from "./api"
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
-import { TwinnyProvider } from "./provider-manager"
-import { createStreamRequestBody } from "./provider-options"
+import { llm } from "./llm"
 import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
-import {
-  getChatDataFromProvider,
-  getLanguage,
-  updateLoadingMessage
-} from "./utils"
+import { Tools } from "./tools"
+import { getLanguage, getResponseData, updateLoadingMessage } from "./utils"
 
 export class ChatService extends Base {
   private _completion = ""
-  private _context?: ExtensionContext
   private _controller?: AbortController
   private _db?: EmbeddingDatabase
   private _promptTemplate = ""
@@ -64,6 +59,8 @@ export class ChatService extends Base {
   private _templateProvider?: TemplateProvider
   private _webView?: Webview
   private _sessionManager: SessionManager | undefined
+  private _tools?: Tools
+  private _conversation: Message[] = []
 
   constructor(
     statusBar: StatusBarItem,
@@ -74,16 +71,16 @@ export class ChatService extends Base {
     sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
-    super()
+    super(extensionContext)
     this._webView = webView
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
     this._reranker = new Reranker()
-    this._context = extensionContext
     this._db = db
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this.setupSymmetryListeners()
+    this._tools = new Tools(webView, extensionContext)
   }
 
   private setupSymmetryListeners() {
@@ -92,11 +89,11 @@ export class ChatService extends Base {
       (completion: string) => {
         this._webView?.postMessage({
           type: EVENT_NAME.twinnyOnCompletion,
-          value: {
-            completion: completion.trimStart(),
-            data: getLanguage()
+          data: {
+            content: completion.trimStart(),
+            role: ASSISTANT
           }
-        } as ServerMessage)
+        } as ServerMessage<Message>)
       }
     )
   }
@@ -113,7 +110,7 @@ export class ChatService extends Base {
       if (!embedding) return []
 
       const relevantFileCountContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths}`
-      const stored = this._context?.globalState.get(
+      const stored = this.context?.globalState.get(
         relevantFileCountContext
       ) as number
       const relevantFileCount = Number(stored) || DEFAULT_RELEVANT_FILE_COUNT
@@ -134,7 +131,7 @@ export class ChatService extends Base {
 
   private getRerankThreshold() {
     const rerankThresholdContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRerankThreshold}`
-    const stored = this._context?.globalState.get(
+    const stored = this.context?.globalState.get(
       rerankThresholdContext
     ) as number
     const rerankThreshold = stored || DEFAULT_RERANK_THRESHOLD
@@ -206,7 +203,7 @@ export class ChatService extends Base {
 
     if (await this._db.hasEmbeddingTable(table)) {
       const relevantCodeCountContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets}`
-      const stored = this._context?.globalState.get(
+      const stored = this.context?.globalState.get(
         relevantCodeCountContext
       ) as number
       const relevantCodeCount = Number(stored) || DEFAULT_RELEVANT_CODE_COUNT
@@ -270,104 +267,106 @@ export class ChatService extends Base {
     return ""
   }
 
-  private getProvider = () => {
-    const provider = this._context?.globalState.get<TwinnyProvider>(
-      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
-    )
-    return provider
-  }
 
-  private buildStreamRequest(messages?: Message[] | Message[]) {
-    const provider = this.getProvider()
 
-    if (!provider) return
 
-    const requestOptions: StreamRequestOptions = {
-      hostname: provider.apiHostname,
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
+
+  async getMessageTools(data: {
+    type: "function_call"
+    calls: Tool[]
+  }): Promise<Record<string, Tool>> {
+    const tools: Record<string, Tool> = {}
+    if (!data.calls?.length) return {}
+
+    for (const call of data.calls) {
+      tools[call.name] = {
+        arguments: call.arguments,
+        name: call.name,
+        status: "pending",
+        id: call.id
       }
     }
 
-    if (provider.apiKey) {
-      requestOptions.headers["Authorization"] = `Bearer ${provider.apiKey}`
-    }
-
-    const requestBody = createStreamRequestBody(provider.provider, {
-      model: provider.modelName,
-      numPredictChat: this.config.numPredictChat,
-      temperature: this.config.temperature,
-      messages,
-      keepAlive: this.config.keepAlive
-    })
-
-    return { requestOptions, requestBody }
+    return tools
   }
 
-  private onStreamData = (
-    streamResponse: StreamResponse,
-    onEnd?: (completion: string) => void
-  ) => {
-    const provider = this.getProvider()
-    if (!provider) return
-
+  private onLlmData = async (response: StreamResponse) => {
     try {
-      const data = getChatDataFromProvider(provider.provider, streamResponse)
-      this._completion = this._completion + data
-      if (onEnd) return
+      const data = getResponseData(response)
+
+      this._completion = this._completion + data.content
+
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyOnCompletion,
-        value: {
-          completion: this._completion.trimStart(),
-          data: getLanguage(),
-          type: this._promptTemplate
+        data: {
+          content: this._completion.trimStart(),
+          role: ASSISTANT
         }
-      } as ServerMessage)
+      } as ServerMessage<Message>)
     } catch (error) {
       console.error("Error parsing JSON:", error)
       return
     }
   }
 
-  private onStreamEnd = (onEnd?: (completion: string) => void) => {
+  private onLlmEnd = async (response?: StreamResponse) => {
     this._statusBar.text = "$(code)"
     commands.executeCommand(
       "setContext",
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
-    if (onEnd) {
-      onEnd(this._completion)
+
+    if (response) {
+      const data = getResponseData(response)
+
+      if (data.calls) {
+        const tools = await this.getMessageTools(data)
+
+        this._webView?.postMessage({
+          type: EVENT_NAME.twinnyOnCompletionEnd,
+          data: {
+            content: "Twinny would like to use the following tools:",
+            role: ASSISTANT,
+            tools,
+            id: crypto.randomUUID()
+          }
+        } as ServerMessage<Message>)
+
+        return
+      }
+
       this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnEnd
-      } as ServerMessage)
+        type: EVENT_NAME.twinnyOnCompletionEnd,
+        data: {
+          content: data.content,
+          role: ASSISTANT
+        }
+      } as ServerMessage<Message>)
+
       return
     }
+
     this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnEnd,
-      value: {
-        completion: this._completion.trimStart(),
-        data: getLanguage(),
-        type: this._promptTemplate
+      type: EVENT_NAME.twinnyOnCompletionEnd,
+      data: {
+        content: this._completion.trimStart(),
+        role: ASSISTANT
+      }
+    } as ServerMessage<Message>)
+  }
+
+  private onLlmError = (error: Error) => {
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyOnCompletionEnd,
+      data: {
+        content: `==## ERROR ##== : ${error.message}`,
+        role: ASSISTANT
       }
     } as ServerMessage)
   }
 
-  private onStreamError = (error: Error) => {
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnEnd,
-      value: {
-        error: true,
-        errorMessage: `==## ERROR ##== : ${error.message}` // Highlight errors on webview
-      }
-    } as ServerMessage)
-  }
-
-  private onStreamStart = (controller: AbortController) => {
+  private onLlmStart = (controller: AbortController) => {
     this._controller = controller
     commands.executeCommand(
       "setContext",
@@ -390,13 +389,12 @@ export class ChatService extends Base {
       true
     )
     this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnEnd,
-      value: {
-        completion: this._completion.trimStart(),
-        data: getLanguage(),
-        type: this._promptTemplate
+      type: EVENT_NAME.twinnyOnCompletionEnd,
+      data: {
+        content: this._completion.trimStart(),
+        role: ASSISTANT
       }
-    } as ServerMessage)
+    } as ServerMessage<Message>)
   }
 
   private buildTemplatePrompt = async (
@@ -419,41 +417,34 @@ export class ChatService extends Base {
     return { prompt: prompt || "", selection: selectionContext }
   }
 
-  private streamResponse({
+  private callLlm({
     requestBody,
-    requestOptions,
-    onEnd
+    requestOptions
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
-    onEnd?: (completion: string) => void
   }) {
-    return streamResponse({
+    return llm({
       body: requestBody,
       options: requestOptions,
-      onData: (streamResponse) =>
-        this.onStreamData(streamResponse as StreamResponse, onEnd),
-      onEnd: () => this.onStreamEnd(onEnd),
-      onStart: this.onStreamStart,
-      onError: this.onStreamError
+      onStart: this.onLlmStart,
+      onData: this.onLlmData,
+      onEnd: this.onLlmEnd,
+      onError: this.onLlmError
     })
   }
 
   private sendEditorLanguage = () => {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySendLanguage,
-      value: {
-        data: getLanguage()
-      }
+      data: getLanguage()
     } as ServerMessage)
   }
 
   private focusChatTab = () => {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
-      value: {
-        data: WEBUI_TABS.chat
-      }
+      data: WEBUI_TABS.chat
     } as ServerMessage<string>)
   }
 
@@ -589,31 +580,31 @@ export class ChatService extends Base {
 
     if (!provider) return
 
-    const conversation = []
+    this._conversation = []
 
-    conversation.push(...messages.slice(0, -1))
+    this._conversation.push(...messages.slice(0, -1))
 
     if (!provider.modelName.includes("claude")) {
-      conversation.unshift(systemMessage)
+      this._conversation.unshift(systemMessage)
     }
 
     if (additionalContext) {
       const lastMessageContent = `${cleanedText}\n\n${additionalContext.trim()}`
-      conversation.push({
+      this._conversation.push({
         role: USER,
         content: lastMessageContent
       })
     } else {
-      conversation.push({
+      this._conversation.push({
         ...lastMessage,
         content: cleanedText
       })
     }
     updateLoadingMessage(this._webView, "Thinking")
-    const request = this.buildStreamRequest(conversation)
+    const request = this.buildStreamRequest(this._conversation)
     if (!request) return
     const { requestBody, requestOptions } = request
-    return this.streamResponse({ requestBody, requestOptions })
+    return this.callLlm({ requestBody, requestOptions })
   }
 
   public async getTemplateMessages(
@@ -640,11 +631,10 @@ export class ChatService extends Base {
       })
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
-        value: {
-          completion: kebabToSentence(template) + "\n\n" + "```\n" + selection,
-          data: getLanguage()
+        data: {
+          content: kebabToSentence(template) + "\n\n" + "```\n" + selection
         }
-      } as ServerMessage)
+      } as ServerMessage<Message>)
     }
 
     const systemMessage = {
@@ -685,7 +675,6 @@ export class ChatService extends Base {
   public async streamTemplateCompletion(
     promptTemplate: string,
     context?: string,
-    onEnd?: (completion: string) => void,
     skipMessage?: boolean
   ) {
     const messages = await this.getTemplateMessages(
@@ -697,6 +686,6 @@ export class ChatService extends Base {
 
     if (!request) return
     const { requestBody, requestOptions } = request
-    return this.streamResponse({ requestBody, requestOptions, onEnd })
+    return this.callLlm({ requestBody, requestOptions })
   }
 }

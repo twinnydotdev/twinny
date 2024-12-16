@@ -8,9 +8,10 @@ import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, TWINNY, YOU } from "../common/constants"
-import { Message as MessageType, ThemeType } from "../common/types"
+import { Message as MessageType, ThemeType, Tool } from "../common/types"
 
-import CodeBlock from "./code-block"
+import { CodeBlock } from "./code-block"
+import { ToolExecution } from "./tool-execution"
 
 import styles from "./styles/index.module.css"
 
@@ -24,6 +25,9 @@ interface MessageProps {
   onRegenerate?: (index: number) => void
   onUpdate?: (message: string, index: number) => void
   theme: ThemeType | undefined
+  onRejectTool?: (message: MessageType, tool: Tool) => void
+  onRunTool?: (message: MessageType, tool: Tool) => void
+  onRunAllTools?: (message: MessageType) => void
 }
 
 const CustomKeyMap = Extension.create({
@@ -42,9 +46,9 @@ const CustomKeyMap = Extension.create({
       "Shift-Enter": ({ editor }) => {
         editor.commands.insertContent("\n")
         return true
-      },
+      }
     }
-  },
+  }
 })
 
 const MemoizedCodeBlock = React.memo(CodeBlock)
@@ -61,7 +65,20 @@ export const Message: React.FC<MessageProps> = React.memo(
     onRegenerate,
     onUpdate,
     theme,
+    onRunTool,
+    onRejectTool,
+    onRunAllTools
   }) => {
+    if (message?.tools)
+      return (
+        <ToolExecution
+          onRejectTool={onRejectTool}
+          onRunTool={onRunTool}
+          onRunAllTools={onRunAllTools}
+          message={message}
+        />
+      )
+
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
 
@@ -94,11 +111,11 @@ export const Message: React.FC<MessageProps> = React.memo(
         extensions: [
           StarterKit,
           CustomKeyMap.configure({
-            handleToggleSave,
+            handleToggleSave
           }),
-          TiptapMarkdown,
+          TiptapMarkdown
         ],
-        content: message?.content,
+        content: message?.content
       },
       [index]
     )
@@ -133,7 +150,7 @@ export const Message: React.FC<MessageProps> = React.memo(
     const markdownComponents = useMemo(
       () => ({
         pre: renderPre,
-        code: renderCode,
+        code: renderCode
       }),
       [renderPre, renderCode]
     )
@@ -202,10 +219,7 @@ export const Message: React.FC<MessageProps> = React.memo(
           </div>
         </div>
         {editing ? (
-          <EditorContent
-            className={styles.tiptap}
-            editor={editor}
-          />
+          <EditorContent className={styles.tiptap} editor={editor} />
         ) : (
           <Markdown
             remarkPlugins={[remarkGfm]}

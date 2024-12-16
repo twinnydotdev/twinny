@@ -1,5 +1,5 @@
 import { Logger } from "../common/logger"
-import { StreamRequest } from "../common/types"
+import { StreamRequest as LlmRequest } from "../common/types"
 
 import {
   logStreamOptions,
@@ -9,7 +9,7 @@ import {
 
 const log = Logger.getInstance()
 
-export async function streamResponse(request: StreamRequest) {
+export async function llm(request: LlmRequest) {
   logStreamOptions(request)
   const { body, options, onData, onEnd, onError, onStart } = request
   const controller = new AbortController()
@@ -45,6 +45,16 @@ export async function streamResponse(request: StreamRequest) {
 
     onStart?.(controller)
 
+    if (body.stream === false) {
+      const text = await response.text()
+      const json = safeParseJsonResponse(text)
+
+      if (!json || !onData) return
+
+      onEnd?.(json)
+      return
+    }
+
     const reader = response.body
       .pipeThrough(new TextDecoderStream())
       .pipeThrough(
@@ -70,6 +80,7 @@ export async function streamResponse(request: StreamRequest) {
             if (buffer) {
               try {
                 const json = safeParseJsonResponse(buffer)
+                if (!json) return
                 onData(json)
               } catch (e) {
                 onError?.(new Error("Error parsing JSON data from event"))
@@ -98,7 +109,11 @@ export async function streamResponse(request: StreamRequest) {
         onEnd?.()
       } else if (error.name === "TimeoutError") {
         onError?.(error)
-        log.logConsoleError(Logger.ErrorType.Timeout, "Failed to establish connection", error)
+        log.logConsoleError(
+          Logger.ErrorType.Timeout,
+          "Failed to establish connection",
+          error
+        )
       } else {
         log.logConsoleError(Logger.ErrorType.Fetch_Error, "Fetch error", error)
         onError?.(error)
@@ -108,7 +123,7 @@ export async function streamResponse(request: StreamRequest) {
   }
 }
 
-export async function fetchEmbedding(request: StreamRequest) {
+export async function fetchEmbedding(request: LlmRequest) {
   const { body, options, onData } = request
   const controller = new AbortController()
 

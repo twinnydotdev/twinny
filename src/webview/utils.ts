@@ -1,9 +1,8 @@
 import { MentionPluginKey } from "@tiptap/extension-mention"
 import { Extension } from "@tiptap/react"
 
-import { EMPTY_MESAGE } from "../common/constants"
 import { CodeLanguage, supportedLanguages } from "../common/languages"
-import { LanguageType, ServerMessage } from "../common/types"
+import { LanguageType } from "../common/types"
 
 export const getLanguageMatch = (
   language: LanguageType | undefined,
@@ -29,14 +28,6 @@ export const getLanguageMatch = (
   }
 
   return "auto"
-}
-
-export const getCompletionContent = (message: ServerMessage) => {
-  if (message.value.error && message.value.errorMessage) {
-    return message.value.errorMessage
-  }
-
-  return message.value.completion || EMPTY_MESAGE
 }
 
 export const kebabToSentence = (kebabStr: string) => {

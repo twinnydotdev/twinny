@@ -44,9 +44,10 @@ const global = globalThis as any
 export const useSelection = (onSelect?: () => void) => {
   const [selection, setSelection] = useState("")
   const handler = (event: MessageEvent) => {
-    const message: ServerMessage = event.data
+    const message: ServerMessage<string> = event.data
     if (message?.type === EVENT_NAME.twinnyTextSelection) {
-      setSelection(message?.value.completion.trim())
+      const selection = message?.data?.trim()
+      setSelection(selection || "")
       onSelect?.()
     }
   }
@@ -68,7 +69,7 @@ export const useGlobalContext = <T>(key: string) => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     if (message?.type === `${EVENT_NAME.twinnyGlobalContext}-${key}`) {
-      setContextState(event.data.value)
+      setContextState(event.data.data)
     }
   }
 
@@ -101,7 +102,7 @@ export const useSessionContext = <T>(key: string) => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     if (message?.type === `${EVENT_NAME.twinnySessionContext}-${key}`) {
-      setContext(event.data.value)
+      setContext(event.data.data)
     }
   }
 
@@ -123,7 +124,7 @@ export const useWorkSpaceContext = <T>(key: string) => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     if (message?.type === `${EVENT_NAME.twinnyGetWorkspaceContext}-${key}`) {
-      setContext(event.data.value)
+      setContext(event.data.data)
     }
   }
 
@@ -145,7 +146,7 @@ export const useTheme = () => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<ThemeType> = event.data
     if (message?.type === EVENT_NAME.twinnySendTheme) {
-      setTheme(message?.value.data)
+      setTheme(message?.data)
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -164,7 +165,7 @@ export const useLoading = () => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<string> = event.data
     if (message?.type === EVENT_NAME.twinnySendLoader) {
-      setLoader(message?.value.data)
+      setLoader(message?.data)
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -179,11 +180,14 @@ export const useLoading = () => {
 }
 
 export const useLanguage = (): LanguageType | undefined => {
-  const [language, setLanguage] = useState<LanguageType | undefined>()
+  const [language, setLanguage] = useState<LanguageType>()
   const handler = (event: MessageEvent) => {
-    const message: ServerMessage = event.data
+    const message: ServerMessage<LanguageType> = event.data
     if (message?.type === EVENT_NAME.twinnySendLanguage) {
-      setLanguage(message?.value.data)
+      const language = message.data
+      if (language) {
+        setLanguage(language)
+      }
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -202,7 +206,7 @@ export const useTemplates = () => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<string[]> = event.data
     if (message?.type === EVENT_NAME.twinnyListTemplates) {
-      setTemplates(message?.value.data)
+      setTemplates(message?.data)
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -239,7 +243,7 @@ export const useGithubPRs = () => {
     const handler = (event: MessageEvent) => {
       const message = event.data
       if (message.type === GITHUB_EVENT_NAME.getPullRequests) {
-        setPRs(message.value.data)
+        setPRs(message.data)
         setIsLoading(false)
       }
     }
@@ -288,26 +292,26 @@ export const useProviders = () => {
       Record<string, TwinnyProvider> | TwinnyProvider
     > = event.data
     if (message?.type === PROVIDER_EVENT_NAME.getAllProviders) {
-      if (message.value.data) {
-        const providers = message.value.data as Record<string, TwinnyProvider>
+      if (message.data) {
+        const providers = message.data as Record<string, TwinnyProvider>
         setProviders(providers)
       }
     }
     if (message?.type === PROVIDER_EVENT_NAME.getActiveChatProvider) {
-      if (message.value.data) {
-        const provider = message.value.data as TwinnyProvider
+      if (message.data) {
+        const provider = message.data as TwinnyProvider
         setChatProvider(provider)
       }
     }
     if (message?.type === PROVIDER_EVENT_NAME.getActiveFimProvider) {
-      if (message.value.data) {
-        const provider = message.value.data as TwinnyProvider
+      if (message.data) {
+        const provider = message.data as TwinnyProvider
         setFimProvider(provider)
       }
     }
     if (message?.type === PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider) {
-      if (message.value.data) {
-        const provider = message.value.data as TwinnyProvider
+      if (message.data) {
+        const provider = message.data as TwinnyProvider
         setEmbeddingProvider(provider)
       }
     }
@@ -409,33 +413,6 @@ export const useProviders = () => {
   }
 }
 
-export const useConfigurationSetting = (key: string) => {
-  const [configurationSetting, setConfigurationSettings] = useState<
-    string | boolean | number
-  >()
-
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<string | boolean | number> = event.data
-    if (
-      message?.type === EVENT_NAME.twinnyGetConfigValue &&
-      message.value.type === key
-    ) {
-      setConfigurationSettings(message?.value.data)
-    }
-  }
-
-  useEffect(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyGetConfigValue,
-      key
-    })
-    window.addEventListener("message", handler)
-    return () => window.removeEventListener("message", handler)
-  }, [key])
-
-  return { configurationSetting }
-}
-
 export const useConversationHistory = () => {
   const [conversations, setConversations] = useState<
     Record<string, Conversation>
@@ -483,13 +460,15 @@ export const useConversationHistory = () => {
   }
 
   const handler = (event: MessageEvent) => {
-    const message = event.data
-    if (message.value?.data) {
+    const message = event.data as ServerMessage<
+      Record<string, Conversation> | Conversation
+    >
+    if (message?.data) {
       if (message?.type === CONVERSATION_EVENT_NAME.getConversations) {
-        setConversations(message.value.data)
+        setConversations(message.data as Record<string, Conversation>)
       }
       if (message?.type === CONVERSATION_EVENT_NAME.setActiveConversation) {
-        setConversation(message.value.data)
+        setConversation(message.data as Conversation)
       }
     }
   }
@@ -518,7 +497,7 @@ export const useOllamaModels = () => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<ApiModel[]> = event.data
     if (message?.type === EVENT_NAME.twinnyFetchOllamaModels) {
-      setModels(message?.value.data)
+      setModels(message?.data)
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -556,7 +535,7 @@ export const useFilePaths = () => {
       !filePaths.current?.length &&
       message?.type === EVENT_NAME.twinnyFileListResponse
     ) {
-      filePaths.current = message.value.data // response sets the list from vscode backend
+      filePaths.current = message.data
     }
   }
 
@@ -684,6 +663,8 @@ export const useSymmetryConnection = () => {
     EXTENSION_SESSION_NAME.twinnySymmetryConnection
   )
 
+  console.log(symmetryConnectionSession)
+
   const {
     context: symmetryProviderStatus,
     setContext: setSymmetryProviderStatus
@@ -731,19 +712,18 @@ export const useSymmetryConnection = () => {
     > = event.data
     if (message?.type === EVENT_NAME.twinnyConnectedToSymmetry) {
       setConnecting(false)
-      setSymmetryConnectionSession(message.value.data as SymmetryConnection)
+      setSymmetryConnectionSession(message.data as SymmetryConnection)
     }
     if (message?.type === EVENT_NAME.twinnyDisconnectedFromSymmetry) {
       setConnecting(false)
       setSymmetryConnectionSession(undefined)
     }
     if (message?.type === EVENT_NAME.twinnySendSymmetryMessage) {
-      setSymmetryProviderStatus(message?.value.data as string)
+      setSymmetryProviderStatus(message?.data as string)
     }
 
     if (message?.type === EVENT_NAME.twinnySymmetryModels) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setModels(message?.value.data as unknown as SymmetryModelProvider[])
+      setModels(message?.data as SymmetryModelProvider[])
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -785,7 +765,7 @@ export const useSymmetryConnection = () => {
 
 export const useLocale = () => {
   const [locale, setLocale] = useState<string>("en")
-  const [ renderKey, setRenderKey ] = useState<number>(0)
+  const [renderKey, setRenderKey] = useState<number>(0)
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
       if (event.data.type === EVENT_NAME.twinnySetLocale) {

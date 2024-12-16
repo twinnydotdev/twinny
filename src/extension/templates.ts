@@ -78,18 +78,6 @@ These file paths may be relevant to your query:
 Consider these in your response if pertinent. Disregard if not relevant.`.trim()
   },
   {
-    name: "commit-message",
-    template: `
-Generate a concise git commit message.
-Respond with a single line of text, maximum 100 characters.
-
-Example: "Added a new feature"
-
-Unidiff: \`\`\`{{code}}\`\`\`
-
-<commit message>`.trim()
-  },
-  {
     name: "fim",
     template: "<PRE>{{{prefix}}} <SUF> {{{suffix}}} <MID>"
   },

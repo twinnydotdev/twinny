@@ -26,12 +26,10 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   knownErrorMessages,
-  LINE_BREAK_REGEX,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
   OPENING_BRACKETS,
   QUOTES,
-  QUOTES_REGEX,
   SKIP_DECLARATION_SYMBOLS,
   TWINNY
 } from "../common/constants"
@@ -313,24 +311,26 @@ export const getTheme = () => {
   }
 }
 
-export const getChatDataFromProvider = (
-  provider: string,
-  data: StreamResponse
-) => {
-  switch (provider) {
-    case apiProviders.Ollama:
-    case apiProviders.OpenWebUI:
-      return data?.choices[0].delta?.content
-        ? data?.choices[0].delta.content
-        : ""
-    case apiProviders.LlamaCpp:
-      return data?.content
-    case apiProviders.LiteLLM:
-    default:
-      if (data?.choices[0].delta.content === "undefined") return ""
-      return data?.choices[0].delta?.content
-        ? data?.choices[0].delta.content
-        : ""
+export const getResponseData = (data: StreamResponse) => {
+  const toolCalls = data?.choices?.[0]?.message?.tool_calls
+
+  if (toolCalls?.length) {
+    return {
+      type: "function_call" as const,
+      calls: toolCalls.map((call) => ({
+        id: call.id,
+        name: call.function.name,
+        arguments: JSON.parse(call.function.arguments)
+      }))
+    }
+  }
+
+  return {
+    type: "content" as const,
+    content:
+      data?.choices?.[0]?.delta?.content ||
+      data.choices[0].message?.content ||
+      ""
   }
 }
 
@@ -449,15 +449,6 @@ export function createSymmetryMessage<T>(
   data?: T
 ): string {
   return JSON.stringify({ key, data })
-}
-
-export const getSanitizedCommitMessage = (commitMessage: string) => {
-  const sanitizedMessage = commitMessage
-    .replace(QUOTES_REGEX, "")
-    .replace(LINE_BREAK_REGEX, "")
-    .trim()
-
-  return `git commit -m "${sanitizedMessage}"`
 }
 
 export const getNormalisedText = (text: string) =>
@@ -597,9 +588,7 @@ export const updateLoadingMessage = (
 ) => {
   webView?.postMessage({
     type: EVENT_NAME.twinnySendLoader,
-    value: {
-      data: message
-    }
+    data: message
   } as ServerMessage<string>)
 }
 
@@ -609,9 +598,7 @@ export const updateSymmetryStatus = (
 ) => {
   webView?.postMessage({
     type: EVENT_NAME.twinnySendSymmetryMessage,
-    value: {
-      data: message
-    }
+    data: message
   } as ServerMessage<string>)
 }
 

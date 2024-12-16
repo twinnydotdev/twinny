@@ -81,9 +81,7 @@ export class ProviderManager {
   public focusProviderTab = () => {
     this._webView.postMessage({
       type: PROVIDER_EVENT_NAME.focusProviderTab,
-      value: {
-        data: WEBUI_TABS.providers,
-      },
+      data: WEBUI_TABS.providers,
     } as ServerMessage<string>)
   }
 
@@ -194,9 +192,7 @@ export class ProviderManager {
     const providers = this.getProviders() || {}
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getAllProviders,
-      value: {
-        data: providers,
-      },
+      data: providers,
     })
   }
 
@@ -206,9 +202,7 @@ export class ProviderManager {
     )
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveChatProvider,
-      value: {
-        data: provider,
-      },
+      data: provider,
     })
     return provider
   }
@@ -219,9 +213,7 @@ export class ProviderManager {
     )
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveFimProvider,
-      value: {
-        data: provider,
-      },
+      data: provider,
     })
     return provider
   }
@@ -232,9 +224,7 @@ export class ProviderManager {
     )
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
-      value: {
-        data: provider,
-      },
+      data: provider,
     })
     return provider
   }

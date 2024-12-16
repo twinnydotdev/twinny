@@ -1,27 +1,28 @@
 import { commands, ExtensionContext, Webview } from "vscode"
 
 import {
+  ASSISTANT,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   GITHUB_EVENT_NAME,
   USER,
-  WEBUI_TABS,
+  WEBUI_TABS
 } from "../common/constants"
 import {
   ClientMessage,
+  Message,
   RequestBodyBase,
   ServerMessage,
   StreamRequestOptions,
-  StreamResponse,
-  TemplateData,
+  TemplateData
 } from "../common/types"
 
-import { streamResponse } from "./api"
 import { ConversationHistory } from "./conversation-history"
+import { llm } from "./llm"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
-import { getChatDataFromProvider, updateLoadingMessage } from "./utils"
+import { getResponseData, updateLoadingMessage } from "./utils"
 
 export class GithubService extends ConversationHistory {
   private _completion = ""
@@ -57,7 +58,7 @@ export class GithubService extends ConversationHistory {
 
   private async loadReviewTemplate(diff: string): Promise<string> {
     return await this._templateProvider.readTemplate<TemplateData>("review", {
-      code: diff,
+      code: diff
     })
   }
 
@@ -68,7 +69,7 @@ export class GithubService extends ConversationHistory {
     const prs = await this.getPullRequests(data.owner, data.repo)
     this.webView.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequests,
-      value: { data: prs },
+      data: prs
     })
   }
 
@@ -92,30 +93,28 @@ export class GithubService extends ConversationHistory {
     )
     this.webView.postMessage({
       type: GITHUB_EVENT_NAME.getPullRequestReview,
-      value: { data: review },
+      data: review
     })
   }
 
   getHeaders() {
     return {
       Authorization: `Bearer ${this.config.githubToken}`,
-      Accept: "application/vnd.github.v3.diff",
+      Accept: "application/vnd.github.v3.diff"
     }
   }
 
   private focusChatTab = () => {
     this.webView.postMessage({
       type: EVENT_NAME.twinnySetTab,
-      value: {
-        data: WEBUI_TABS.chat,
-      },
+      data: WEBUI_TABS.chat
     } as ServerMessage<string>)
   }
 
   async getPullRequests(owner: string, repo: string) {
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls`
     const response = await fetch(url, {
-      headers: this.getHeaders(),
+      headers: this.getHeaders()
     })
     return response.json()
   }
@@ -129,7 +128,7 @@ export class GithubService extends ConversationHistory {
     const headers = this.getHeaders()
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`
     const response = await fetch(url, {
-      headers,
+      headers
     })
     const diff = await response.text()
     const prompt = await this.loadReviewTemplate(`${title} \n\n ${diff}`)
@@ -137,8 +136,8 @@ export class GithubService extends ConversationHistory {
     const messages = [
       {
         role: USER,
-        content: prompt,
-      },
+        content: prompt
+      }
     ]
 
     const request = this.buildStreamRequest(messages)
@@ -150,16 +149,13 @@ export class GithubService extends ConversationHistory {
     this.resetConversation()
 
     setTimeout(async () => {
-
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
-        value: {
-          completion: prompt,
-        },
+        data: prompt
       })
 
       this.webView?.postMessage({
-        type: EVENT_NAME.twinnyOnLoading,
+        type: EVENT_NAME.twinnyOnLoading
       })
 
       commands.executeCommand(
@@ -176,7 +172,7 @@ export class GithubService extends ConversationHistory {
 
   streamCodeReview({
     requestBody,
-    requestOptions,
+    requestOptions
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
@@ -188,7 +184,7 @@ export class GithubService extends ConversationHistory {
 
     return new Promise((_, reject) => {
       try {
-        return streamResponse({
+        return llm({
           body: requestBody,
           options: requestOptions,
           onStart: (controller: AbortController) => {
@@ -204,39 +200,28 @@ export class GithubService extends ConversationHistory {
             if (!provider) return
 
             try {
-              const data = getChatDataFromProvider(
-                provider.provider,
-                streamResponse as StreamResponse
-              )
-              this._completion = this._completion + data
+              const data = getResponseData(streamResponse)
+              this._completion = this._completion + data.content
               this.webView.postMessage({
                 type: EVENT_NAME.twinnyOnCompletion,
-                value: {
-                  completion: this._completion.trimStart(),
-                },
-              } as ServerMessage)
+                data: {
+                  role: ASSISTANT,
+                  content: this._completion.trimStart()
+                }
+              } as ServerMessage<Message>)
             } catch (error) {
               console.error("Error parsing JSON:", error)
               return
             }
           },
-          onEnd: () => {
-            this.webView?.postMessage({
-              type: EVENT_NAME.twinnyOnEnd,
-              value: {
-                completion: this._completion.trimStart(),
-              },
-            })
-            this._completion = ""
-          },
           onError: (error: Error) => {
             this.webView?.postMessage({
-              type: EVENT_NAME.twinnyOnEnd,
-              value: {
-                error: true,
-                errorMessage: error.message,
-              },
-            } as ServerMessage)
+              type: EVENT_NAME.twinnyOnCompletionEnd,
+              data: {
+                role: ASSISTANT,
+                content: `Something went wrong ${error.message}`
+              }
+            } as ServerMessage<Message>)
           }
         })
       } catch (e) {

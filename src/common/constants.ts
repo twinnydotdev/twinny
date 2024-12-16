@@ -62,7 +62,7 @@ export const EVENT_NAME = {
   twinnyNewDocument: "twinny-new-document",
   twinnyNotification: "twinny-notification",
   twinnyOnCompletion: "twinny-on-completion",
-  twinnyOnEnd: "twinny-on-end",
+  twinnyOnCompletionEnd: "twinny-on-end",
   twinnyOnLoading: "twinny-on-loading",
   twinnyOpenDiff: "twinny-open-diff",
   twinnyRerankThresholdChanged: "twinny-rerank-threshold-changed",
@@ -104,7 +104,6 @@ export const TWINNY_COMMAND_NAME = {
   openPanelChat: "twinny.openPanelChat",
   openChat: "twinny.openChat",
   refactor: "twinny.refactor",
-  sendTerminalText: "twinny.sendTerminalText",
   settings: "twinny.settings",
   stopGeneration: "twinny.stopGeneration",
   templateCompletion: "twinny.templateCompletion",
@@ -120,6 +119,12 @@ export const CONVERSATION_EVENT_NAME = {
   saveConversation: "twinny.save-conversation",
   saveLastConversation: "twinny.save-last-conversation",
   setActiveConversation: "twinny.set-active-conversation",
+}
+
+export const TOOL_EVENT_NAME = {
+  runAllTools: "run-all-tools",
+  runTool: "run-tool",
+  rejectTool: "run-on-tool",
 }
 
 export const PROVIDER_EVENT_NAME = {
@@ -171,18 +176,19 @@ export const EXTENSION_SETTING_KEY = {
 
 export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: "twinnyConversationHistory",
+  twinnyEnableRag: "twinnyEnableRag",
+  twinnyEnableTools: "twinnyEnableTools",
   twinnyGeneratingText: "twinnyGeneratingText",
   twinnyManageProviders: "twinnyManageProviders",
   twinnyManageTemplates: "twinnyManageTemplates",
-  twinnyReviewTab: "twinnyReviewTab",
-  twinnyRerankThreshold: "twinnyRerankThreshold",
   twinnyMaxChunkSize: "twinnyMaxChunkSize",
   twinnyMinChunkSize: "twinnyMinChunkSize",
   twinnyOverlapSize: "twinnyOverlapSize",
-  twinnyRelevantFilePaths: "twinnyRelevantFilePaths",
   twinnyRelevantCodeSnippets: "twinnyRelevantCodeSnippets",
+  twinnyRelevantFilePaths: "twinnyRelevantFilePaths",
+  twinnyRerankThreshold: "twinnyRerankThreshold",
+  twinnyReviewTab: "twinnyReviewTab",
   twinnySymmetryTab: "twinnySymmetryTab",
-  twinnyEnableRag: "twinnyEnableRag",
 }
 
 export const EXTENSION_SESSION_NAME = {

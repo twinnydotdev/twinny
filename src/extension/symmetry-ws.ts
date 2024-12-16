@@ -20,9 +20,7 @@ export class SymmetryWs {
         const parsedData = JSON.parse(data.toString())
         this._webView?.postMessage({
           type: EVENT_NAME.twinnySymmetryModels,
-          value: {
-            data: parsedData?.allPeers?.filter((peer: any) => peer.online)
-          }
+          data: parsedData?.allPeers?.filter((peer: any) => peer.online)
         })
       } catch (error) {
         console.error("Error parsing WebSocket message:", error)

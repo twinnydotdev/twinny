@@ -34,7 +34,7 @@ export const Main = ({ fullScreen }: MainProps) => {
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<string | undefined> = event.data
     if (message?.type === EVENT_NAME.twinnySetTab) {
-      setTab(message?.value.data)
+      setTab(message?.data)
     }
     return () => window.removeEventListener("message", handler)
   }

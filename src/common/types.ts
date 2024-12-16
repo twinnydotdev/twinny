@@ -1,3 +1,4 @@
+import type { JSONSchema7 } from "json-schema"
 import { serverMessageKeys } from "symmetry-core"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
@@ -22,6 +23,7 @@ export interface RequestOptionsOllama extends RequestBodyBase {
 export interface StreamBodyOpenAI extends RequestBodyBase {
   messages?: Message[] | Message
   max_tokens: number
+  tools?: FunctionTool[]
 }
 
 export interface PrefixSuffix {
@@ -29,13 +31,19 @@ export interface PrefixSuffix {
   suffix: string
 }
 
-
 export interface RepositoryLevelData {
-  uri: Uri;
-  text: string;
-  name: string;
-  isOpen: boolean;
-  relevanceScore: number;
+  uri: Uri
+  text: string
+  name: string
+  isOpen: boolean
+  relevanceScore: number
+}
+
+type ToolCall = {
+  function: {
+    name: string
+    arguments: Record<string, unknown>
+  }
 }
 
 export interface StreamResponse {
@@ -44,8 +52,9 @@ export interface StreamResponse {
   response: string
   content: string
   message: {
-    content: string,
+    content: string
     role: "assistant"
+    tool_calls?: ToolCall[]
   }
   done: boolean
   context: number[]
@@ -56,14 +65,35 @@ export interface StreamResponse {
   eval_count: number
   eval_duration: number
   type?: string
+  tool_calls?: ToolCall[]
+  system_fingerprint: string
   choices: [
     {
       text: string
       delta: {
         content: string
       }
+      index: number
+      message: {
+        role: "assistant"
+        content: string
+        tool_calls?: Array<{
+          id: string
+          type: "function"
+          function: {
+            name: string
+            arguments: string
+          }
+        }>
+      }
+      finish_reason: "stop" | "tool_calls"
     }
   ]
+  usage: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
 }
 
 export interface LanguageType {
@@ -82,20 +112,16 @@ export type ClientMessageWithData = ClientMessage<string | boolean> &
   ClientMessage<Message[]> &
   ClientMessage<GithubPullRequestMessage>
 
-export interface ServerMessage<T = LanguageType> {
+export interface ServerMessage<T = unknown> {
   type: string
-  value: {
-    completion: string
-    data?: T
-    error?: boolean
-    errorMessage?: string
-    type: string
-  }
+  data: T
 }
 
 export interface Message {
   role: string
   content: string | undefined
+  tools?: Record<string, Tool>
+  id?: string
 }
 
 export interface GithubPullRequestMessage {
@@ -113,7 +139,7 @@ export interface Conversation {
 export const Theme = {
   Light: "Light",
   Dark: "Dark",
-  Contrast: "Contrast",
+  Contrast: "Contrast"
 } as const
 
 export interface DefaultTemplate {
@@ -170,10 +196,10 @@ export interface StreamRequestOptions {
 export interface StreamRequest {
   body: RequestBodyBase | StreamBodyOpenAI
   options: StreamRequestOptions
-  onEnd?: () => void
+  onEnd?: (response?: StreamResponse) => void
   onStart?: (controller: AbortController) => void
   onError?: (error: Error) => void
-  onData: <T = StreamResponse>(streamResponse: T) => void
+  onData: (streamResponse: StreamResponse) => void
 }
 
 export interface UiTabs {
@@ -186,7 +212,7 @@ export const apiProviders = {
   LMStudio: "lmstudio",
   Ollama: "ollama",
   Oobabooga: "oobabooga",
-  OpenWebUI: "openwebui",
+  OpenWebUI: "openwebui"
 } as const
 
 export interface ApiModel {
@@ -332,5 +358,56 @@ export interface LMStudioEmbedding {
   data: LMSEmbeddingItem[]
   model: string
   usage: LMSEmbeddingUsage
+}
+
+export type FunctionTool = {
+  type: "function"
+  function: {
+    name: string
+    description: string
+    parameters: JSONSchema7
+  }
+}
+
+export interface Tool {
+  id: string
+  name: string
+  arguments: Record<string, unknown>
+  status?: string
+  error?: string
+}
+
+export interface CreateFileArgs {
+  path: string
+  content: string
+  openAfterCreate?: boolean
+  createIntermediateDirs?: boolean
+  fileTemplate?: string
+  permissions?: string
+}
+
+export interface RunCommandArgs {
+  command: string
+  cwd?: string
+  env?: Record<string, string>
+  shell?: string
+  timeout?: number
+  captureOutput?: boolean
+  runInBackground?: boolean
+}
+
+export interface OpenFileArgs {
+  path: string
+  preview?: boolean
+  viewColumn?: "beside" | "active" | "new"
+  encoding?: string
+  revealIfOpen?: boolean
+}
+
+export interface EditFileArgs {
+  path: string
+  edit: string
+  createIfNotExists?: boolean
+  backupBeforeEdit?: boolean
 }
 

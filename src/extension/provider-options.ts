@@ -1,6 +1,7 @@
 import { USER } from "../common/constants"
 import {
   apiProviders,
+  FunctionTool,
   Message,
   RequestBodyBase,
   RequestOptionsOllama,
@@ -10,21 +11,22 @@ import {
 export function createStreamRequestBody(
   provider: string,
   options: {
-
     temperature: number
     numPredictChat: number
     model: string
     messages?: Message[]
     keepAlive?: string | number
-  }
+  },
+  tools?: FunctionTool[],
 ): RequestBodyBase | RequestOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
     case apiProviders.Ollama:
     case apiProviders.OpenWebUI:
       return {
         model: options.model,
-        stream: true,
+        stream: !tools?.length,
         messages: options.messages,
+        tools: tools,
         keep_alive: options.keepAlive === "-1"
           ? -1
           : options.keepAlive,
@@ -37,7 +39,8 @@ export function createStreamRequestBody(
     default:
       return {
         model: options.model,
-        stream: true,
+        stream: !tools?.length,
+        tools: tools,
         max_tokens: options.numPredictChat,
         messages: options.messages,
         temperature: options.temperature,

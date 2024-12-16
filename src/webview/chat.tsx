@@ -2,27 +2,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import Mention from "@tiptap/extension-mention"
 import Placeholder from "@tiptap/extension-placeholder"
-import { Editor, EditorContent, JSONContent,useEditor } from "@tiptap/react"
+import { Editor, EditorContent, JSONContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import {
   VSCodeBadge,
   VSCodeButton,
   VSCodeDivider,
-  VSCodePanelView,
+  VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import cn from "classnames"
 
 import {
   ASSISTANT,
   EVENT_NAME,
+  TOOL_EVENT_NAME,
   USER,
-  WORKSPACE_STORAGE_KEY,
+  WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import {
   ClientMessage,
   MentionType,
-  Message as MessageType,
+  Message,
   ServerMessage,
+  Tool
 } from "../common/types"
 
 import { EmbeddingOptions } from "./embedding-options"
@@ -32,17 +34,14 @@ import useAutosizeTextArea, {
   useSuggestion,
   useSymmetryConnection,
   useTheme,
-  useWorkSpaceContext,
+  useWorkSpaceContext
 } from "./hooks"
-import {
-  DisabledAutoScrollIcon,
-  EnabledAutoScrollIcon,
-} from "./icons"
+import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from "./icons"
 import ChatLoader from "./loader"
-import { Message } from "./message"
+import { Message as MessageComponent } from "./message"
 import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
-import { CustomKeyMap, getCompletionContent } from "./utils"
+import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/index.module.css"
 
@@ -60,8 +59,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const theme = useTheme()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState<MessageType[] | undefined>()
-  const [completion, setCompletion] = useState<MessageType | null>()
+  const [messages, setMessages] = useState<Message[]>()
+  const [completion, setCompletion] = useState<Message | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
   const { symmetryConnection } = useSymmetryConnection()
 
@@ -71,7 +70,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showProviders)
   const {
     context: showEmbeddingOptionsContext,
-    setContext: setShowEmbeddingOptionsContext,
+    setContext: setShowEmbeddingOptionsContext
   } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -89,34 +88,50 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const selection = useSelection(scrollToBottom)
 
-  const handleCompletionEnd = (message: ServerMessage) => {
-    if (message.value) {
-      setMessages((prev) => {
-        const messages = [
-          ...(prev || []),
-          {
-            role: ASSISTANT,
-            content: getCompletionContent(message),
-          },
-        ]
-
-        saveLastConversation({
-          ...conversation,
-          messages: messages,
-        })
-        return messages
-      })
-      setTimeout(() => {
-        editorRef.current?.commands.focus()
-        stopRef.current = false
-      }, 200)
+  const handleCompletionEnd = (message: ServerMessage<Message>) => {
+    if (!message.data) {
+      setCompletion(null)
+      setIsLoading(false)
+      generatingRef.current = false
+      return
     }
+
+    setMessages((prev) => {
+      if (message.data.id) {
+        const existingIndex = prev?.findIndex((m) => m.id === message.data.id)
+
+        if (existingIndex !== -1) {
+          const updatedMessages = [...(prev || [])]
+
+          updatedMessages[existingIndex || 0] = message.data
+
+          saveLastConversation({
+            ...conversation,
+            messages: updatedMessages
+          })
+          return updatedMessages
+        }
+      }
+
+      const messages = [...(prev || []), message.data]
+      saveLastConversation({
+        ...conversation,
+        messages: messages
+      })
+      return messages
+    })
+
+    setTimeout(() => {
+      editorRef.current?.commands.focus()
+      stopRef.current = false
+    }, 200)
+
     setCompletion(null)
     setIsLoading(false)
     generatingRef.current = false
   }
 
-  const handleAddTemplateMessage = (message: ServerMessage) => {
+  const handleAddTemplateMessage = (message: ServerMessage<Message>) => {
     if (stopRef.current) {
       generatingRef.current = false
       return
@@ -124,24 +139,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
     generatingRef.current = true
     setIsLoading(false)
     scrollToBottom()
-    setMessages((prev) => [
-      ...(prev || []),
-      {
-        role: USER,
-        content: message.value.completion as string,
-      },
-    ])
+    setMessages((prev) => [...(prev || []), message.data])
   }
 
-  const handleCompletionMessage = (message: ServerMessage) => {
+  const handleCompletionMessage = (message: ServerMessage<Message>) => {
     if (stopRef.current) {
       generatingRef.current = false
       return
     }
-    setCompletion({
-      role: ASSISTANT,
-      content: getCompletionContent(message),
-    })
+    setCompletion(message.data)
     scrollToBottom()
   }
 
@@ -154,19 +160,19 @@ export const Chat = (props: ChatProps): JSX.Element => {
     const message: ServerMessage = event.data
     switch (message.type) {
       case EVENT_NAME.twinnyAddMessage: {
-        handleAddTemplateMessage(message)
+        handleAddTemplateMessage(message as ServerMessage<Message>)
         break
       }
       case EVENT_NAME.twinnyOnCompletion: {
-        handleCompletionMessage(message)
+        handleCompletionMessage(message as ServerMessage<Message>)
         break
       }
       case EVENT_NAME.twinnyOnLoading: {
         handleLoadingMessage()
         break
       }
-      case EVENT_NAME.twinnyOnEnd: {
-        handleCompletionEnd(message)
+      case EVENT_NAME.twinnyOnCompletionEnd: {
+        handleCompletionEnd(message as ServerMessage<Message>)
         break
       }
       case EVENT_NAME.twinnyStopGeneration: {
@@ -186,7 +192,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const handleStopGeneration = () => {
     stopRef.current = true
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration,
+      type: EVENT_NAME.twinnyStopGeneration
     } as ClientMessage)
     setCompletion(null)
     setIsLoading(false)
@@ -205,7 +211,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       global.vscode.postMessage({
         type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
+        data: updatedMessages
       } as ClientMessage)
 
       return updatedMessages
@@ -220,12 +226,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       const updatedMessages = [
         ...prev.slice(0, index),
-        ...prev.slice(index + 2),
+        ...prev.slice(index + 2)
       ]
 
       saveLastConversation({
         ...conversation,
-        messages: updatedMessages,
+        messages: updatedMessages
       })
 
       return updatedMessages
@@ -239,12 +245,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       const updatedMessages = [
         ...prev.slice(0, index),
-        { ...prev[index], content: message },
+        { ...prev[index], content: message }
       ]
 
       global.vscode.postMessage({
         type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
+        data: updatedMessages
       } as ClientMessage)
 
       return updatedMessages
@@ -262,7 +268,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 innerNode.attrs.label ||
                 innerNode.attrs.id.split("/").pop() ||
                 "",
-              path: innerNode.attrs.id,
+              path: innerNode.attrs.id
             })
           }
         })
@@ -296,18 +302,18 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setMessages((prevMessages) => {
       const updatedMessages = [
         ...(prevMessages || []),
-        { role: USER, content: replaceMentionsInText(input, mentions) },
+        { role: USER, content: replaceMentionsInText(input, mentions) }
       ]
 
-      const clientMessage: ClientMessage<MessageType[], MentionType[]> = {
+      const clientMessage: ClientMessage<Message[], MentionType[]> = {
         type: EVENT_NAME.twinnyChatMessage,
         data: updatedMessages,
-        meta: mentions,
+        meta: mentions
       }
 
       saveLastConversation({
         ...conversation,
-        messages: updatedMessages,
+        messages: updatedMessages
       })
 
       global.vscode.postMessage(clientMessage)
@@ -331,7 +337,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
         key: WORKSPACE_STORAGE_KEY.autoScroll,
-        data: !prev,
+        data: !prev
       } as ClientMessage)
 
       if (!prev) scrollToBottom()
@@ -346,7 +352,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
         key: WORKSPACE_STORAGE_KEY.showProviders,
-        data: !prev,
+        data: !prev
       } as ClientMessage)
       return !prev
     })
@@ -358,7 +364,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnySetWorkspaceContext,
         key: WORKSPACE_STORAGE_KEY.showEmbeddingOptions,
-        data: !prev,
+        data: !prev
       } as ClientMessage)
       return !prev
     })
@@ -370,9 +376,42 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
   }
 
+  const handleNewConversation = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyNewConversation
+    })
+  }
+
+  const handleRejectTool = (message: Message, tool: Tool) => {
+    global.vscode.postMessage({
+      type: TOOL_EVENT_NAME.rejectTool,
+      data: {
+        message,
+        tool
+      }
+    } as ClientMessage<{ message: Message; tool: Tool }>)
+  }
+
+  const handleRunTool = (message: Message, tool: Tool) => {
+    global.vscode.postMessage({
+      type: TOOL_EVENT_NAME.runTool,
+      data: {
+        message,
+        tool
+      }
+    } as ClientMessage<{ message: Message; tool: Tool }>)
+  }
+
+  const handleRunAllTools = (message: Message) => {
+    global.vscode.postMessage({
+      type: TOOL_EVENT_NAME.runAllTools,
+      data: message
+    } as ClientMessage<Message>)
+  }
+
   useEffect(() => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyHideBackButton,
+      type: EVENT_NAME.twinnyHideBackButton
     })
   }, [])
 
@@ -404,7 +443,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         StarterKit,
         Mention.configure({
           HTMLAttributes: {
-            class: "mention",
+            class: "mention"
           },
           suggestion: memoizedSuggestion,
           renderText({ node }) {
@@ -412,16 +451,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
               return `${node.attrs.name ?? node.attrs.id}`
             }
             return node.attrs.id ?? ""
-          },
+          }
         }),
         CustomKeyMap.configure({
           handleSubmitForm,
-          clearEditor,
+          clearEditor
         }),
         Placeholder.configure({
           placeholder: t("placeholder") // "How can twinny help you today?",
-        }),
-      ],
+        })
+      ]
     },
     [memoizedSuggestion]
   )
@@ -442,12 +481,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
       })
     }
   }, [memoizedSuggestion])
-
-  const handleNewConversation = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyNewConversation,
-    })
-  }
 
   return (
     <VSCodePanelView>
@@ -471,12 +504,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
         <div
           className={cn({
             [styles.markdown]: !fullScreen,
-            [styles.markdownFullScreen]: fullScreen,
+            [styles.markdownFullScreen]: fullScreen
           })}
           ref={markdownRef}
         >
           {messages?.map((message, index) => (
-            <Message
+            <MessageComponent
               key={index}
               onRegenerate={handleRegenerateMessage}
               onUpdate={handleEditMessage}
@@ -487,19 +520,22 @@ export const Chat = (props: ChatProps): JSX.Element => {
               message={message}
               theme={theme}
               index={index}
+              onRejectTool={handleRejectTool}
+              onRunTool={handleRunTool}
+              onRunAllTools={handleRunAllTools}
             />
           ))}
           {isLoading && !completion ? (
             <ChatLoader />
           ) : (
             !!completion && (
-              <Message
+              <MessageComponent
                 isLoading={false}
                 isAssistant
                 theme={theme}
                 message={{
                   ...completion,
-                  role: ASSISTANT,
+                  role: ASSISTANT
                 }}
               />
             )
