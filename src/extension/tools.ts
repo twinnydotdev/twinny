@@ -3,43 +3,9 @@ import { TextEncoder } from "util"
 import * as vscode from "vscode"
 
 import { EVENT_NAME, TOOL_EVENT_NAME } from "../common/constants"
-import { ClientMessage, Message, ServerMessage, Tool } from "../common/types"
+import { ClientMessage, CreateFileArgs, EditFileArgs, Message, OpenFileArgs, RunCommandArgs, ServerMessage, Tool } from "../common/types"
 
 import { Base } from "./base"
-
-interface CreateFileArgs {
-  path: string
-  content: string
-  openAfterCreate?: boolean
-  createIntermediateDirs?: boolean
-  fileTemplate?: string
-  permissions?: string
-}
-
-interface RunCommandArgs {
-  command: string
-  cwd?: string
-  env?: Record<string, string>
-  shell?: string
-  timeout?: number
-  captureOutput?: boolean
-  runInBackground?: boolean
-}
-
-interface OpenFileArgs {
-  path: string
-  preview?: boolean
-  viewColumn?: "beside" | "active" | "new"
-  encoding?: string
-  revealIfOpen?: boolean
-}
-
-interface EditFileArgs {
-  path: string
-  edit: string
-  createIfNotExists?: boolean
-  backupBeforeEdit?: boolean
-}
 
 export class Tools extends Base {
   private _workspaceRoot: string | undefined

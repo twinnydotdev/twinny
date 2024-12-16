@@ -376,3 +376,38 @@ export interface Tool {
   status?: string
   error?: string
 }
+
+export interface CreateFileArgs {
+  path: string
+  content: string
+  openAfterCreate?: boolean
+  createIntermediateDirs?: boolean
+  fileTemplate?: string
+  permissions?: string
+}
+
+export interface RunCommandArgs {
+  command: string
+  cwd?: string
+  env?: Record<string, string>
+  shell?: string
+  timeout?: number
+  captureOutput?: boolean
+  runInBackground?: boolean
+}
+
+export interface OpenFileArgs {
+  path: string
+  preview?: boolean
+  viewColumn?: "beside" | "active" | "new"
+  encoding?: string
+  revealIfOpen?: boolean
+}
+
+export interface EditFileArgs {
+  path: string
+  edit: string
+  createIfNotExists?: boolean
+  backupBeforeEdit?: boolean
+}
+

@@ -329,7 +329,7 @@ export const getResponseData = (data: StreamResponse) => {
     type: "content" as const,
     content:
       data?.choices?.[0]?.delta?.content ||
-      data.choices[0].message.content ||
+      data.choices[0].message?.content ||
       ""
   }
 }

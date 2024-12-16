@@ -201,7 +201,7 @@ export class GithubService extends ConversationHistory {
 
             try {
               const data = getResponseData(streamResponse)
-              this._completion = this._completion + data
+              this._completion = this._completion + data.content
               this.webView.postMessage({
                 type: EVENT_NAME.twinnyOnCompletion,
                 data: {
