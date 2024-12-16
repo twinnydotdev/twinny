@@ -2,6 +2,7 @@ import { serverMessageKeys } from "symmetry-core"
 import * as vscode from "vscode"
 
 import {
+  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   EVENT_NAME,
   EXTENSION_SESSION_NAME,
   SYMMETRY_EMITTER_KEY,
@@ -24,7 +25,7 @@ import { ConversationHistory } from "../conversation-history"
 import { DiffManager } from "../diff"
 import { EmbeddingDatabase } from "../embeddings"
 import { OllamaService } from "../ollama"
-import { ProviderManager } from "../provider-manager"
+import { ProviderManager, TwinnyProvider } from "../provider-manager"
 import { GithubService as ReviewService } from "../review-service"
 import { SessionManager } from "../session-manager"
 import { SymmetryService } from "../symmetry-service"
@@ -155,6 +156,12 @@ export class BaseProvider {
       if (!event.affectsConfiguration("twinny")) return
       this.sendLocaleToWebView()
     })
+  }
+
+  public getFimProvider = () => {
+    return this.context.globalState.get<TwinnyProvider>(
+      ACTIVE_FIM_PROVIDER_STORAGE_KEY
+    )
   }
 
   private sendLocaleToWebView = () => {

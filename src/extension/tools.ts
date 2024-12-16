@@ -5,6 +5,8 @@ import * as vscode from "vscode"
 import { EVENT_NAME, TOOL_EVENT_NAME } from "../common/constants"
 import { ClientMessage, Message, ServerMessage, Tool } from "../common/types"
 
+import { Base } from "./base"
+
 interface CreateFileArgs {
   path: string
   content: string
@@ -39,11 +41,12 @@ interface EditFileArgs {
   backupBeforeEdit?: boolean
 }
 
-export class Tools {
+export class Tools extends Base {
   private _workspaceRoot: string | undefined
   private webView: vscode.Webview
 
-  constructor(webView: vscode.Webview) {
+  constructor(webView: vscode.Webview, context: vscode.ExtensionContext) {
+    super(context)
     this.webView = webView
     const workspaceFolders = vscode.workspace.workspaceFolders
     if (workspaceFolders) this._workspaceRoot = workspaceFolders[0].uri.fsPath
@@ -56,17 +59,11 @@ export class Tools {
     })
   }
 
-  // We'll define a separate method for rejecting a tool, similar to how we run a tool.
-  // Since rejecting a tool doesn't involve actually running its logic, we simply
-  // update its status and notify the UI.
-
   public async rejectTool(call: Tool, message: Message): Promise<void> {
-    // Mark the tool as rejected without executing it
     if (message.tools && message.tools[call.name]) {
       message.tools[call.name].status = "rejected"
     }
 
-    // Send an update to the UI so it knows the tool was rejected
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyOnCompletionEnd,
       data: message
@@ -76,7 +73,6 @@ export class Tools {
   public async runTool(call: Tool, message?: Message): Promise<string> {
     const method = this?.[call.name as keyof Tools]
     if (method && typeof method === "function") {
-      // If a message object is passed and we can find the tool, mark as running
       if (message?.tools && message.tools[call.name]) {
         message.tools[call.name].status = "running"
         this.webView?.postMessage({
@@ -89,8 +85,6 @@ export class Tools {
         args: unknown
       ) => Promise<string>
       const result = await boundMethod(call.arguments)
-
-      // If a message object is passed and we can find the tool, mark as success
       if (message?.tools && message.tools[call.name]) {
         message.tools[call.name].status = "success"
         this.webView?.postMessage({
@@ -110,14 +104,13 @@ export class Tools {
 
     for (const [toolName, tool] of Object.entries(message.tools)) {
       try {
-        // Mark as running
         message.tools[toolName].status = "running"
         this.webView?.postMessage({
           type: EVENT_NAME.twinnyOnCompletionEnd,
           data: message
         } as ServerMessage<Message>)
 
-        await this.runTool(tool, message) // This will internally mark success or error
+        await this.runTool(tool, message)
       } catch (error: unknown) {
         if (error instanceof Error && message.tools[toolName]) {
           message.tools[toolName].error = error.message
@@ -163,9 +156,6 @@ export class Tools {
         await this.rejectTool(data.tool, data.message)
         return
       }
-
-      default:
-      // Handle other message types if needed
     }
   }
 
@@ -250,7 +240,6 @@ export class Tools {
       path: filePath,
       preview = false,
       viewColumn = "active",
-      revealIfOpen = false
     } = args
     const fullPath = path.join(this._workspaceRoot || "", filePath)
     const uri = vscode.Uri.file(fullPath)
@@ -268,10 +257,6 @@ export class Tools {
         preview,
         viewColumn: column
       })
-
-      if (revealIfOpen) {
-        // If the file is already open, this action will reveal it in the editor anyway.
-      }
 
       return `File opened successfully: ${fullPath}`
     } catch (error) {
@@ -294,7 +279,6 @@ export class Tools {
     const uri = vscode.Uri.file(fullPath)
 
     try {
-      // If file doesn't exist and createIfNotExists is true, create it
       let fileExists = true
       try {
         await vscode.workspace.fs.stat(uri)

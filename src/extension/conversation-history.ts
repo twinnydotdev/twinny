@@ -8,7 +8,7 @@ import {
   CONVERSATION_STORAGE_KEY,
   EXTENSION_SESSION_NAME,
   TITLE_GENERATION_PROMPT_MESAGE,
-  USER,
+  USER
 } from "../common/constants"
 import {
   ClientMessage,
@@ -16,11 +16,11 @@ import {
   Message,
   RequestBodyBase,
   ServerMessage,
-  StreamRequestOptions,
+  StreamRequestOptions
 } from "../common/types"
 
-import { llm } from "./api"
 import { Base } from "./base"
+import { llm } from "./llm"
 import { TwinnyProvider } from "./provider-manager"
 import { createStreamRequestBody } from "./provider-options"
 import { SessionManager } from "./session-manager"
@@ -30,7 +30,6 @@ import { getResponseData } from "./utils"
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory extends Base {
-  public context: ExtensionContext
   public webView: Webview
   private _sessionManager: SessionManager | undefined
   private _symmetryService: SymmetryService
@@ -42,8 +41,7 @@ export class ConversationHistory extends Base {
     sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
-    super()
-    this.context = context
+    super(context)
     this.webView = webView
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
@@ -81,7 +79,7 @@ export class ConversationHistory extends Base {
 
   streamConversationTitle({
     requestBody,
-    requestOptions,
+    requestOptions
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
@@ -102,7 +100,7 @@ export class ConversationHistory extends Base {
           },
           onEnd: () => {
             return resolve(this._title)
-          },
+          }
         })
       } catch (e) {
         return reject(e)
@@ -125,8 +123,8 @@ export class ConversationHistory extends Base {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`,
-      },
+        Authorization: `Bearer ${provider.apiKey}`
+      }
     }
   }
 
@@ -145,10 +143,10 @@ export class ConversationHistory extends Base {
         ...messages,
         {
           role: USER,
-          content: TITLE_GENERATION_PROMPT_MESAGE,
-        },
+          content: TITLE_GENERATION_PROMPT_MESAGE
+        }
       ],
-      keepAlive: this.config.keepAlive,
+      keepAlive: this.config.keepAlive
     })
 
     return { requestOptions, requestBody }
@@ -166,7 +164,7 @@ export class ConversationHistory extends Base {
       numPredictChat: this.config.numPredictChat,
       temperature: this.config.temperature,
       messages,
-      keepAlive: this.config.keepAlive,
+      keepAlive: this.config.keepAlive
     })
 
     return { requestOptions, requestBody }
@@ -188,48 +186,47 @@ export class ConversationHistory extends Base {
     const conversations = this.getConversations() || {}
     this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.getConversations,
-      data: conversations,
+      data: conversations
     })
   }
 
   getConversations(): Conversations {
-    const conversations = this.context.globalState.get<
+    const conversations = this.context?.globalState.get<
       Record<string, Conversation>
     >(CONVERSATION_STORAGE_KEY)
     return conversations
   }
 
   resetConversation() {
-    this.context.globalState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
+    this.context?.globalState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
     this.setActiveConversation(undefined)
   }
 
   updateConversation(conversation: Conversation) {
     const conversations = this.getConversations() || {}
     if (!conversation.id) return
-    this.context.globalState.update(CONVERSATION_STORAGE_KEY, {
+    this.context?.globalState.update(CONVERSATION_STORAGE_KEY, {
       ...conversations,
-      [conversation.id]: conversation,
+      [conversation.id]: conversation
     })
     this.setActiveConversation(conversation)
   }
 
   setActiveConversation(conversation: Conversation | undefined) {
-    this.context.globalState.update(
+    this.context?.globalState.update(
       ACTIVE_CONVERSATION_STORAGE_KEY,
       conversation
     )
     this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
-      data: conversation,
+      data: conversation
     } as ServerMessage<Conversation>)
     this.getAllConversations()
   }
 
   getActiveConversation() {
-    const conversation: Conversation | undefined = this.context.globalState.get(
-      ACTIVE_CONVERSATION_STORAGE_KEY
-    )
+    const conversation: Conversation | undefined =
+      this.context?.globalState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
     this.setActiveConversation(conversation)
     return conversation
   }
@@ -238,15 +235,15 @@ export class ConversationHistory extends Base {
     const conversations = this.getConversations() || {}
     if (!conversation?.id) return
     delete conversations[conversation.id]
-    this.context.globalState.update(CONVERSATION_STORAGE_KEY, {
-      ...conversations,
+    this.context?.globalState.update(CONVERSATION_STORAGE_KEY, {
+      ...conversations
     })
     this.setActiveConversation(undefined)
     this.getAllConversations()
   }
 
   clearAllConversations() {
-    this.context.globalState.update(CONVERSATION_STORAGE_KEY, {})
+    this.context?.globalState.update(CONVERSATION_STORAGE_KEY, {})
     this.setActiveConversation(undefined)
   }
 
@@ -255,7 +252,7 @@ export class ConversationHistory extends Base {
     if (activeConversation)
       return this.updateConversation({
         ...activeConversation,
-        messages: conversation.messages,
+        messages: conversation.messages
       })
 
     if (!conversation.messages.length || conversation.messages.length > 2)
@@ -272,10 +269,10 @@ export class ConversationHistory extends Base {
     const newConversation: Conversation = {
       id,
       title: this._title || "",
-      messages: conversation.messages,
+      messages: conversation.messages
     }
     conversations[id] = newConversation
-    this.context.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
+    this.context?.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
     this.setActiveConversation(newConversation)
     this._title = ""
   }

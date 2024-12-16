@@ -4,7 +4,6 @@ import { getNonce } from "../utils"
 
 import { BaseProvider } from "./base"
 
-// TODO
 export class FullScreenProvider extends BaseProvider {
   private _panel?: vscode.WebviewPanel
 

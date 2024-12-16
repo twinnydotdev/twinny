@@ -5,7 +5,6 @@ import ignore from "ignore"
 import path from "path"
 import * as vscode from "vscode"
 
-import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../common/constants"
 import { logger } from "../common/logger"
 import {
   apiProviders,
@@ -16,8 +15,8 @@ import {
   StreamRequestOptions as RequestOptions
 } from "../common/types"
 
-import { fetchEmbedding } from "./api"
 import { Base } from "./base"
+import { fetchEmbedding } from "./llm"
 import { TwinnyProvider } from "./provider-manager"
 import { getDocumentSplitChunks, readGitSubmodulesFile } from "./utils"
 
@@ -26,15 +25,13 @@ export class EmbeddingDatabase extends Base {
   private _filePaths: EmbeddedDocument[] = []
   private _db: lancedb.Connection | null = null
   private _dbPath: string
-  private _extensionContext?: vscode.ExtensionContext
   private _workspaceName = vscode.workspace.name || ""
   private _documentTableName = `${this._workspaceName}-documents`
   private _filePathTableName = `${this._workspaceName}-file-paths`
 
-  constructor(dbPath: string, extensionContext: vscode.ExtensionContext) {
-    super()
+  constructor(dbPath: string, context: vscode.ExtensionContext) {
+    super(context)
     this._dbPath = dbPath
-    this._extensionContext = extensionContext
   }
 
   public async connect() {
@@ -44,11 +41,6 @@ export class EmbeddingDatabase extends Base {
       console.error(e)
     }
   }
-
-  private getProvider = () =>
-    this._extensionContext?.globalState.get<TwinnyProvider>(
-      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
-    )
 
   public async fetchModelEmbedding(content: string) {
     const provider = this.getProvider()
@@ -144,14 +136,14 @@ export class EmbeddingDatabase extends Base {
         cancellable: true
       },
       async (progress) => {
-        if (!this._extensionContext) return
+        if (!this.context) return
         const promises = filePaths.map(async (filePath) => {
           const content = await fs.promises.readFile(filePath, "utf-8")
 
           const chunks = await getDocumentSplitChunks(
             content,
             filePath,
-            this._extensionContext
+            this.context
           )
 
           const filePathEmbedding = await this.fetchModelEmbedding(filePath)

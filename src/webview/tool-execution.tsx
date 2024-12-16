@@ -14,7 +14,7 @@ const StatusIcon = ({ status }: { status: string }) => {
     rejected: "codicon-trash"
   }[status]
 
-  return <span className={`codicon ${iconClass} ${styles.statusIcon}`} />
+  return <span className={`codicon ${iconClass} ${styles.statusIcon}`} data-status={status} />
 }
 
 interface ToolExecutionProps {
@@ -65,8 +65,14 @@ export function ToolExecution({
 
   return (
     <div className={styles.root}>
+      {message.content && (
+        <p className={styles.messageContent}>
+          {message.content}
+        </p>
+      )}
       <div className={styles.headerBar}>
         <div className={styles.headerTitle}>
+          <span className="codicon codicon-tools" />
           {t("tools")}
           {runningCount > 0 && (
             <span className={styles.statusBadge} data-status="running">
@@ -147,7 +153,7 @@ export function ToolExecution({
                               </span>
                             </div>
                             <div className={styles.argumentValue}>
-                              <pre>{JSON.stringify(value, null, 2)}</pre>
+                              {JSON.stringify(value, null, 2)}
                             </div>
                           </div>
                         )

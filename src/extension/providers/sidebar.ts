@@ -7,8 +7,6 @@ import { getNonce } from "../utils"
 import { BaseProvider } from "./base"
 
 export class SidebarProvider extends BaseProvider {
-  public context: vscode.ExtensionContext
-
   constructor(
     statusBarItem: vscode.StatusBarItem,
     context: vscode.ExtensionContext,

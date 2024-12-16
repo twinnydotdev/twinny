@@ -13,7 +13,6 @@ import {
 } from "vscode"
 
 import {
-  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ASSISTANT,
   DEFAULT_RELEVANT_CODE_COUNT,
   DEFAULT_RELEVANT_FILE_COUNT,
@@ -28,7 +27,6 @@ import {
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
-import { tools } from "../common/tool-definitions"
 import {
   FileItem,
   Message,
@@ -41,11 +39,9 @@ import {
 } from "../common/types"
 import { kebabToSentence } from "../webview/utils"
 
-import { llm } from "./api"
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
-import { TwinnyProvider } from "./provider-manager"
-import { createStreamRequestBody } from "./provider-options"
+import { llm } from "./llm"
 import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
@@ -55,7 +51,6 @@ import { getLanguage, getResponseData, updateLoadingMessage } from "./utils"
 
 export class ChatService extends Base {
   private _completion = ""
-  private _context?: ExtensionContext
   private _controller?: AbortController
   private _db?: EmbeddingDatabase
   private _promptTemplate = ""
@@ -77,17 +72,16 @@ export class ChatService extends Base {
     sessionManager: SessionManager | undefined,
     symmetryService: SymmetryService
   ) {
-    super()
+    super(extensionContext)
     this._webView = webView
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
     this._reranker = new Reranker()
-    this._context = extensionContext
     this._db = db
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this.setupSymmetryListeners()
-    this._tools = new Tools(webView)
+    this._tools = new Tools(webView, extensionContext)
   }
 
   private setupSymmetryListeners() {
@@ -117,7 +111,7 @@ export class ChatService extends Base {
       if (!embedding) return []
 
       const relevantFileCountContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths}`
-      const stored = this._context?.globalState.get(
+      const stored = this.context?.globalState.get(
         relevantFileCountContext
       ) as number
       const relevantFileCount = Number(stored) || DEFAULT_RELEVANT_FILE_COUNT
@@ -138,7 +132,7 @@ export class ChatService extends Base {
 
   private getRerankThreshold() {
     const rerankThresholdContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRerankThreshold}`
-    const stored = this._context?.globalState.get(
+    const stored = this.context?.globalState.get(
       rerankThresholdContext
     ) as number
     const rerankThreshold = stored || DEFAULT_RERANK_THRESHOLD
@@ -210,7 +204,7 @@ export class ChatService extends Base {
 
     if (await this._db.hasEmbeddingTable(table)) {
       const relevantCodeCountContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets}`
-      const stored = this._context?.globalState.get(
+      const stored = this.context?.globalState.get(
         relevantCodeCountContext
       ) as number
       const relevantCodeCount = Number(stored) || DEFAULT_RELEVANT_CODE_COUNT
@@ -274,48 +268,9 @@ export class ChatService extends Base {
     return ""
   }
 
-  private getProvider = () => {
-    const provider = this._context?.globalState.get<TwinnyProvider>(
-      ACTIVE_CHAT_PROVIDER_STORAGE_KEY
-    )
-    return provider
-  }
 
-  private buildStreamRequest(messages?: Message[] | Message[]) {
-    const provider = this.getProvider()
 
-    if (!provider) return
 
-    const requestOptions: StreamRequestOptions = {
-      hostname: provider.apiHostname,
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
-      }
-    }
-
-    const useToolsName = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableTools}`
-    const toolsEnabled = this._context?.globalState.get(useToolsName) as number
-    const functionTools = toolsEnabled ? tools : undefined
-
-    const requestBody = createStreamRequestBody(
-      provider.provider,
-      {
-        model: provider.modelName,
-        numPredictChat: this.config.numPredictChat,
-        temperature: this.config.temperature,
-        messages,
-        keepAlive: this.config.keepAlive
-      },
-      functionTools
-    )
-
-    return { requestOptions, requestBody }
-  }
 
   async getMessageTools(data: {
     type: "function_call"
@@ -364,6 +319,7 @@ export class ChatService extends Base {
     )
 
     if (response) {
+      console.log(response)
       const data = getResponseData(response)
 
       if (data.calls) {
@@ -463,7 +419,7 @@ export class ChatService extends Base {
     return { prompt: prompt || "", selection: selectionContext }
   }
 
-  private streamResponse({
+  private callLlm({
     requestBody,
     requestOptions
   }: {
@@ -650,7 +606,7 @@ export class ChatService extends Base {
     const request = this.buildStreamRequest(this._conversation)
     if (!request) return
     const { requestBody, requestOptions } = request
-    return this.streamResponse({ requestBody, requestOptions })
+    return this.callLlm({ requestBody, requestOptions })
   }
 
   public async getTemplateMessages(
@@ -732,6 +688,6 @@ export class ChatService extends Base {
 
     if (!request) return
     const { requestBody, requestOptions } = request
-    return this.streamResponse({ requestBody, requestOptions })
+    return this.callLlm({ requestBody, requestOptions })
   }
 }

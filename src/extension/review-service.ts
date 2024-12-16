@@ -17,8 +17,8 @@ import {
   TemplateData
 } from "../common/types"
 
-import { llm } from "./api"
 import { ConversationHistory } from "./conversation-history"
+import { llm } from "./llm"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"

@@ -22,7 +22,6 @@ import Parser, { SyntaxNode } from "web-tree-sitter"
 import "string_score"
 
 import {
-  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   FIM_TEMPLATE_FORMAT,
   LINE_BREAK_REGEX,
   MAX_CONTEXT_LINE_COUNT,
@@ -43,7 +42,6 @@ import {
   StreamResponse
 } from "../../common/types"
 import { getLineBreakCount } from "../../webview/utils"
-import { llm } from "../api"
 import { Base } from "../base"
 import { cache } from "../cache"
 import { CompletionFormatter } from "../completion-formatter"
@@ -53,6 +51,7 @@ import {
   getFimTemplateRepositoryLevel,
   getStopWords
 } from "../fim-templates"
+import { llm } from "../llm"
 import { getNodeAtPosition, getParser } from "../parser"
 import { TwinnyProvider } from "../provider-manager"
 import { createStreamRequestBodyFim } from "../provider-options"
@@ -76,7 +75,6 @@ export class CompletionProvider
   private _completion = ""
   private _debouncer: NodeJS.Timeout | undefined
   private _document: TextDocument | null
-  private _extensionContext: ExtensionContext
   private _fileInteractionCache: FileInteractionCache
   private _isMultilineCompletion = false
   private _lastCompletionMultiline = false
@@ -96,9 +94,9 @@ export class CompletionProvider
     statusBar: StatusBarItem,
     fileInteractionCache: FileInteractionCache,
     templateProvider: TemplateProvider,
-    extensionContext: ExtensionContext
+    context: ExtensionContext
   ) {
-    super()
+    super(context)
     this._abortController = null
     this._document = null
     this._lock = new AsyncLock()
@@ -106,7 +104,29 @@ export class CompletionProvider
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
     this._templateProvider = templateProvider
-    this._extensionContext = extensionContext
+  }
+
+  private buildFimRequest(prompt: string, provider: TwinnyProvider) {
+    const body = createStreamRequestBodyFim(provider.provider, prompt, {
+      model: provider.modelName,
+      numPredictFim: this.config.numPredictFim,
+      temperature: this.config.temperature,
+      keepAlive: this.config.eepAlive
+    })
+
+    const options: StreamRequestOptions = {
+      hostname: provider.apiHostname,
+      port: provider.apiPort ? Number(provider.apiPort) : undefined,
+      path: provider.apiPath,
+      protocol: provider.apiProtocol,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: provider.apiKey ? `Bearer ${provider.apiKey}` : ""
+      }
+    }
+
+    return { options, body }
   }
 
   public async provideInlineCompletionItems(
@@ -182,7 +202,10 @@ export class CompletionProvider
         this._lock.acquire("twinny.completion", async () => {
           const provider = this.getProvider()
           if (!provider) return
-          const request = this.buildStreamRequest(prompt, provider)
+          const request = this.buildFimRequest(prompt, provider)
+
+          if (!request) return
+
           try {
             await llm({
               body: request.body,
@@ -222,29 +245,6 @@ export class CompletionProvider
     } catch (e) {
       return
     }
-  }
-
-  private buildStreamRequest(prompt: string, provider: TwinnyProvider) {
-    const body = createStreamRequestBodyFim(provider.provider, prompt, {
-      model: provider.modelName,
-      numPredictFim: this.config.numPredictFim,
-      temperature: this.config.temperature,
-      keepAlive: this.config.eepAlive
-    })
-
-    const options: StreamRequestOptions = {
-      hostname: provider.apiHostname,
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: provider.apiKey ? `Bearer ${provider.apiKey}` : ""
-      }
-    }
-
-    return { options, body }
   }
 
   private onData(data: StreamResponse | undefined): string {
@@ -588,11 +588,7 @@ export class CompletionProvider
     )
   }
 
-  private getProvider = () => {
-    return this._extensionContext.globalState.get<TwinnyProvider>(
-      ACTIVE_FIM_PROVIDER_STORAGE_KEY
-    )
-  }
+
 
   public setAcceptedLastCompletion(value: boolean) {
     this._acceptedLastCompletion = value

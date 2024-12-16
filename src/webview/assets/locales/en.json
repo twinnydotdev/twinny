@@ -29,7 +29,7 @@
   "edit-provider": "Edit Provider",
   "embed-documents": "Embed documents",
   "embedding-provider": "Embedding provider",
-  "enable-tools": "Enable tools",
+  "enable-tools": "Enable tools (Function calling)",
   "error": "Error",
   "fim-template": "FIM Template",
   "fim": "Fill-in-middle",
