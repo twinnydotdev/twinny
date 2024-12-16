@@ -7,7 +7,7 @@ import {
   languages,
   StatusBarAlignment,
   window,
-  workspace,
+  workspace
 } from "vscode"
 import * as vscode from "vscode"
 
@@ -16,7 +16,7 @@ import {
   EXTENSION_CONTEXT_NAME,
   EXTENSION_NAME,
   TWINNY_COMMAND_NAME,
-  WEBUI_TABS,
+  WEBUI_TABS
 } from "./common/constants"
 import { ServerMessage } from "./common/types"
 import { setContext } from "./extension/context"
@@ -29,8 +29,6 @@ import { SessionManager } from "./extension/session-manager"
 import { TemplateProvider } from "./extension/template-provider"
 import {
   delayExecution,
-  getSanitizedCommitMessage,
-  getTerminal,
 } from "./extension/utils"
 import { getLineBreakCount } from "./webview/utils"
 
@@ -137,9 +135,7 @@ export async function activate(context: ExtensionContext) {
       )
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
-        value: {
-          data: WEBUI_TABS.providers,
-        },
+        data: WEBUI_TABS.providers
       } as ServerMessage<string>)
     }),
     commands.registerCommand(
@@ -152,9 +148,7 @@ export async function activate(context: ExtensionContext) {
         )
         sidebarProvider.webView?.postMessage({
           type: EVENT_NAME.twinnySetTab,
-          value: {
-            data: WEBUI_TABS.symmetry,
-          },
+          data: WEBUI_TABS.symmetry
         } as ServerMessage<string>)
       }
     ),
@@ -168,9 +162,7 @@ export async function activate(context: ExtensionContext) {
         )
         sidebarProvider.webView?.postMessage({
           type: EVENT_NAME.twinnySetTab,
-          value: {
-            data: WEBUI_TABS.history,
-          },
+          data: WEBUI_TABS.history
         } as ServerMessage<string>)
       }
     ),
@@ -182,9 +174,7 @@ export async function activate(context: ExtensionContext) {
       )
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
-        value: {
-          data: WEBUI_TABS.review,
-        },
+        data: WEBUI_TABS.review
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageTemplates, async () => {
@@ -195,9 +185,7 @@ export async function activate(context: ExtensionContext) {
       )
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
-        value: {
-          data: WEBUI_TABS.settings,
-        },
+        data: WEBUI_TABS.settings
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.hideBackButton, () => {
@@ -231,9 +219,7 @@ export async function activate(context: ExtensionContext) {
       commands.executeCommand(TWINNY_COMMAND_NAME.hideBackButton)
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnySetTab,
-        value: {
-          data: WEBUI_TABS.chat,
-        },
+        data: WEBUI_TABS.chat
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.settings, () => {
@@ -242,13 +228,6 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_NAME
       )
     }),
-    commands.registerCommand(
-      TWINNY_COMMAND_NAME.sendTerminalText,
-      async (commitMessage: string) => {
-        const terminal = await getTerminal()
-        terminal?.sendText(getSanitizedCommitMessage(commitMessage), false)
-      }
-    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.getGitCommitMessage, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       sidebarProvider.conversationHistory?.resetConversation()
@@ -258,11 +237,11 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.conversationHistory?.resetConversation()
       sidebarProvider.newConversation()
       sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration,
+        type: EVENT_NAME.twinnyStopGeneration
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
-      commands.executeCommand("workbench.action.closeSidebar");
+      commands.executeCommand("workbench.action.closeSidebar")
       fullScreenProvider.createOrShowPanel()
     }),
     workspace.onDidCloseTextDocument((document) => {

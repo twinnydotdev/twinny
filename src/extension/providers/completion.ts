@@ -43,7 +43,7 @@ import {
   StreamResponse
 } from "../../common/types"
 import { getLineBreakCount } from "../../webview/utils"
-import { streamResponse } from "../api"
+import { llm } from "../api"
 import { Base } from "../base"
 import { cache } from "../cache"
 import { CompletionFormatter } from "../completion-formatter"
@@ -184,7 +184,7 @@ export class CompletionProvider
           if (!provider) return
           const request = this.buildStreamRequest(prompt, provider)
           try {
-            await streamResponse({
+            await llm({
               body: request.body,
               options: request.options,
               onStart: (controller) => (this._abortController = controller),

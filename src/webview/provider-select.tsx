@@ -1,11 +1,15 @@
 import { useTranslation } from "react-i18next"
 import {
+  VSCodeCheckbox,
   VSCodeDropdown,
-  VSCodeOption,
+  VSCodeOption
 } from "@vscode/webview-ui-toolkit/react"
 
-import { useProviders } from "./hooks"
+import { EXTENSION_CONTEXT_NAME } from "../common/constants"
 
+import { useGlobalContext, useProviders } from "./hooks"
+
+import indexStyles from "./styles/index.module.css"
 import styles from "./styles/providers.module.css"
 
 export const ProviderSelect = () => {
@@ -16,8 +20,11 @@ export const ProviderSelect = () => {
     setActiveFimProvider,
     providers,
     chatProvider,
-    fimProvider,
+    fimProvider
   } = useProviders()
+
+  const { context: enableTools = false, setContext: setEnableTools } =
+    useGlobalContext<boolean>(EXTENSION_CONTEXT_NAME.twinnyEnableTools)
 
   const handleChangeChatProvider = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
@@ -36,9 +43,7 @@ export const ProviderSelect = () => {
   return (
     <div className={styles.providerSelector}>
       <div>
-        <div>
-          {t("chat")}
-        </div>
+        <div>{t("chat")}</div>
         <VSCodeDropdown
           value={chatProvider?.id}
           name="provider"
@@ -54,9 +59,7 @@ export const ProviderSelect = () => {
         </VSCodeDropdown>
       </div>
       <div>
-        <div>
-          {t("fim")}
-        </div>
+        <div>{t("fim")}</div>
         <VSCodeDropdown
           value={fimProvider?.id}
           name="provider"
@@ -70,6 +73,19 @@ export const ProviderSelect = () => {
               </VSCodeOption>
             ))}
         </VSCodeDropdown>
+      </div>
+      <div className={styles.enableTools}>
+        <div className={indexStyles.vscodeCheckbox}>
+          <label htmlFor="repositoryLevel">
+            <VSCodeCheckbox
+              id="repositoryLevel"
+              name="repositoryLevel"
+              checked={enableTools}
+              onClick={() => setEnableTools(!enableTools)}
+            ></VSCodeCheckbox>
+            <span>{t("enable-tools")}</span>
+          </label>
+        </div>
       </div>
     </div>
   )

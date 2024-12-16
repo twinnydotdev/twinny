@@ -1,8 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo
-} from "react"
+import React, { useCallback, useEffect, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import Markdown, { Components } from "react-markdown"
 import { EditorContent, Extension, useEditor } from "@tiptap/react"
@@ -12,10 +8,10 @@ import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, TWINNY, YOU } from "../common/constants"
-import { Message as MessageType, ThemeType } from "../common/types"
+import { Message as MessageType, ThemeType, Tool } from "../common/types"
 
-import CodeBlock from "./code-block"
-import ToolExecution from "./tool-execution"
+import { CodeBlock } from "./code-block"
+import { ToolExecution } from "./tool-execution"
 
 import styles from "./styles/index.module.css"
 
@@ -29,8 +25,9 @@ interface MessageProps {
   onRegenerate?: (index: number) => void
   onUpdate?: (message: string, index: number) => void
   theme: ThemeType | undefined
-  onRejectTool?: (toolName: string) => void
-  onRunTool?: (toolName: string) => void
+  onRejectTool?: (message: MessageType, tool: Tool) => void
+  onRunTool?: (message: MessageType, tool: Tool) => void
+  onRunAllTools?: (message: MessageType) => void
 }
 
 const CustomKeyMap = Extension.create({
@@ -70,9 +67,17 @@ export const Message: React.FC<MessageProps> = React.memo(
     theme,
     onRunTool,
     onRejectTool,
+    onRunAllTools
   }) => {
     if (message?.tools)
-      return <ToolExecution onRejectTool={onRejectTool} onRunTool={onRunTool} message={message} />
+      return (
+        <ToolExecution
+          onRejectTool={onRejectTool}
+          onRunTool={onRunTool}
+          onRunAllTools={onRunAllTools}
+          message={message}
+        />
+      )
 
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)

@@ -17,16 +17,15 @@ import {
   RequestBodyBase,
   ServerMessage,
   StreamRequestOptions,
-  StreamResponse,
 } from "../common/types"
 
-import { streamResponse } from "./api"
+import { llm } from "./api"
 import { Base } from "./base"
 import { TwinnyProvider } from "./provider-manager"
 import { createStreamRequestBody } from "./provider-options"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
-import { getChatDataFromProvider } from "./utils"
+import { getResponseData } from "./utils"
 
 type Conversations = Record<string, Conversation> | undefined
 
@@ -94,12 +93,12 @@ export class ConversationHistory extends Base {
 
     return new Promise((resolve, reject) => {
       try {
-        return streamResponse({
+        return llm({
           body: requestBody,
           options: requestOptions,
           onData: (streamResponse) => {
-            const data = getChatDataFromProvider(streamResponse as StreamResponse)
-            this._title = this._title + data
+            const data = getResponseData(streamResponse)
+            this._title = this._title + data.content
           },
           onEnd: () => {
             return resolve(this._title)
@@ -189,9 +188,7 @@ export class ConversationHistory extends Base {
     const conversations = this.getConversations() || {}
     this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.getConversations,
-      value: {
-        data: conversations,
-      },
+      data: conversations,
     })
   }
 
@@ -224,9 +221,7 @@ export class ConversationHistory extends Base {
     )
     this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
-      value: {
-        data: conversation,
-      },
+      data: conversation,
     } as ServerMessage<Conversation>)
     this.getAllConversations()
   }

@@ -16,6 +16,7 @@ import { commands, ExtensionContext, Webview, workspace } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ASSISTANT,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_SESSION_NAME,
@@ -25,6 +26,7 @@ import {
 } from "../common/constants"
 import {
   ClientMessage,
+  Message,
   Peer,
   ServerMessage,
   StreamResponse,
@@ -38,7 +40,7 @@ import { SessionManager } from "./session-manager"
 import { SymmetryWs } from "./symmetry-ws"
 import {
   createSymmetryMessage,
-  getChatDataFromProvider,
+  getResponseData,
   safeParseJson,
   safeParseJsonResponse,
   updateSymmetryStatus
@@ -173,13 +175,11 @@ export class SymmetryService extends EventEmitter {
     this._providerPeer = peer
     this.setupProviderListeners(peer)
     this.notifyWebView(EVENT_NAME.twinnyConnectedToSymmetry, {
-      data: {
-        modelName: connection.modelName,
-        name: connection.name,
-        provider: connection.provider
-      }
+      modelName: connection.modelName,
+      name: connection.name,
+      provider: connection.provider
     })
-    this.notifyWebView(EVENT_NAME.twinnySetTab, { data: WEBUI_TABS.chat })
+    this.notifyWebView(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
     this._sessionManager?.set(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection,
       connection
@@ -193,8 +193,8 @@ export class SymmetryService extends EventEmitter {
 
   private setupProviderListeners(peer: Peer) {
     peer.on("data", (chunk: Buffer) => {
-      const str = chunk.toString()
-      if (str.includes(serverMessageKeys.inferenceEnded))
+      const response = chunk.toString()
+      if (response.includes(serverMessageKeys.inferenceEnded))
         this.handleInferenceEnd()
       this.handleIncomingData(chunk, (response: StreamResponse) =>
         this.processResponseData(response)
@@ -204,26 +204,9 @@ export class SymmetryService extends EventEmitter {
 
   private processResponseData(response: StreamResponse) {
     if (!this._symmetryProvider) return
-    const data = getChatDataFromProvider(response)
-    this._completion += data
+    const data = getResponseData(response)
+    this._completion += data.content
     if (data) this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
-  }
-
-  private handleInferenceEnd() {
-    commands.executeCommand(
-      "setContext",
-      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
-      false
-    )
-    if (!this._completion) return
-
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnCompletionEnd,
-      value: {
-        completion: this._completion.trimStart()
-      }
-    } as ServerMessage)
-    this._completion = ""
   }
 
   private handleIncomingData = (
@@ -243,6 +226,24 @@ export class SymmetryService extends EventEmitter {
         console.error("Error parsing JSON:", e)
       }
     }
+  }
+
+  private handleInferenceEnd() {
+    commands.executeCommand(
+      "setContext",
+      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
+      false
+    )
+    if (!this._completion) return
+
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyOnCompletionEnd,
+      data: {
+        role: ASSISTANT,
+        content: this._completion.trimStart()
+      }
+    } as ServerMessage<Message>)
+    this._completion = ""
   }
 
   private getSymmetryConfigPath(): string {
@@ -274,7 +275,7 @@ export class SymmetryService extends EventEmitter {
       public: true,
       serverKey: this._config.symmetryServerKey,
       systemMessage: "",
-      userSecret: "",
+      userSecret: ""
     }
 
     const symmetryConfiguration = yaml.dump(config)
@@ -290,7 +291,9 @@ export class SymmetryService extends EventEmitter {
     return yaml.load(configStr) as ProviderConfig
   }
 
-  private updateProviderConfig = async (provider: TwinnyProvider): Promise<void> => {
+  private updateProviderConfig = async (
+    provider: TwinnyProvider
+  ): Promise<void> => {
     const configPath = this.getSymmetryConfigPath()
     const configDir = path.dirname(configPath)
 
@@ -312,9 +315,15 @@ export class SymmetryService extends EventEmitter {
         if (!config.dataPath) updates.dataPath = configDir
 
         const updatedConfig = { ...config, ...updates }
-        await fs.promises.writeFile(configPath, yaml.dump(updatedConfig), "utf8")
+        await fs.promises.writeFile(
+          configPath,
+          yaml.dump(updatedConfig),
+          "utf8"
+        )
       } else {
-        config = this.createProviderConfig(this.getChatProvider() as TwinnyProvider)
+        config = this.createProviderConfig(
+          this.getChatProvider() as TwinnyProvider
+        )
         await fs.promises.writeFile(configPath, yaml.dump(config), "utf8")
       }
     } catch (error) {
@@ -338,7 +347,7 @@ export class SymmetryService extends EventEmitter {
       const sessionTypeName = `${EVENT_NAME.twinnySessionContext}-${sessionKey}`
       this._webView?.postMessage({
         type: sessionTypeName,
-        value: "connecting"
+        data: "connecting"
       })
 
       await this._client.init()
@@ -346,7 +355,7 @@ export class SymmetryService extends EventEmitter {
       this._sessionManager?.set(sessionKey, "connected")
       this._webView?.postMessage({
         type: sessionTypeName,
-        value: "connected"
+        data: "connected"
       })
     } catch (error) {
       console.error("Failed to start provider:", error)
@@ -357,8 +366,8 @@ export class SymmetryService extends EventEmitter {
     }
   }
 
-  private notifyWebView(type: string, value: any = {}) {
-    this._webView?.postMessage({ type, value })
+  private notifyWebView(type: string, data: any = {}) {
+    this._webView?.postMessage({ type, data })
   }
 
   public getChatProvider() {

@@ -7,7 +7,6 @@ import {
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   TWINNY_COMMAND_NAME,
-  WORKSPACE_STORAGE_KEY
 } from "../../common/constants"
 import { logger } from "../../common/logger"
 import {
@@ -15,8 +14,10 @@ import {
   ClientMessage,
   FileItem,
   InferenceRequest,
+  LanguageType,
   Message,
-  ServerMessage
+  ServerMessage,
+  ThemeType
 } from "../../common/types"
 import { ChatService } from "../chat-service"
 import { ConversationHistory } from "../conversation-history"
@@ -225,14 +226,6 @@ export class BaseProvider {
       return
     }
     this.conversationHistory?.resetConversation()
-    this._chatService?.streamTemplateCompletion(
-      "commit-message",
-      diff,
-      (completion: string) => {
-        vscode.commands.executeCommand("twinny.sendTerminalText", completion)
-      },
-      true
-    )
   }
 
   private twinnyNewConversation = () => {
@@ -250,9 +243,7 @@ export class BaseProvider {
   private setTab = (tab: ClientMessage) => {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
-      value: {
-        data: tab as string
-      }
+      data: tab,
     } as ServerMessage<string>)
   }
 
@@ -275,10 +266,7 @@ export class BaseProvider {
     const config = vscode.workspace.getConfiguration("twinny")
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyGetConfigValue,
-      value: {
-        data: config.get(message.key as string),
-        type: message.key
-      }
+      data: config.get(message.key),
     } as ServerMessage<string>)
   }
 
@@ -287,9 +275,7 @@ export class BaseProvider {
       const files = await this._fileTreeProvider?.getAllFiles()
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyFileListResponse,
-        value: {
-          data: files
-        }
+        data: files
       })
     }
   }
@@ -308,9 +294,7 @@ export class BaseProvider {
       }
       this.webView?.postMessage({
         type: EVENT_NAME.twinnyFetchOllamaModels,
-        value: {
-          data: models
-        }
+        data: models
       } as ServerMessage<ApiModel[]>)
     } catch (e) {
       return
@@ -321,9 +305,7 @@ export class BaseProvider {
     const templates = this._templateProvider.listTemplates()
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyListTemplates,
-      value: {
-        data: templates
-      }
+      data: templates
     } as ServerMessage<string[]>)
   }
 
@@ -398,7 +380,7 @@ export class BaseProvider {
     )
     this.webView?.postMessage({
       type: `${EVENT_NAME.twinnyGlobalContext}-${message.key}`,
-      value: storedData
+      data: storedData
     })
   }
 
@@ -409,17 +391,15 @@ export class BaseProvider {
   private getCurrentLanguage = () => {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnySendLanguage,
-      value: {
-        data: getLanguage()
-      }
-    } as ServerMessage)
+      data: getLanguage()
+    } as ServerMessage<LanguageType>)
   }
 
   private getSessionContext = (data: ClientMessage) => {
     if (!data.key) return undefined
     return this.webView?.postMessage({
       type: `${EVENT_NAME.twinnySessionContext}-${data.key}`,
-      value: this._sessionManager?.get(data.key)
+      data: this._sessionManager?.get(data.key)
     })
   }
 
@@ -436,19 +416,19 @@ export class BaseProvider {
     )
     this.webView?.postMessage({
       type: `${EVENT_NAME.twinnyGetWorkspaceContext}-${message.key}`,
-      value: storedData
+      data: storedData
     } as ServerMessage)
   }
 
   private setWorkspaceContext = <T>(message: ClientMessage<T>) => {
-    const value = message.data
+    const data = message.data
     this.context.workspaceState.update(
       `${EVENT_NAME.twinnyGetWorkspaceContext}-${message.key}`,
-      value
+      data
     )
     this.webView?.postMessage({
       type: `${EVENT_NAME.twinnyGetWorkspaceContext}-${message.key}`,
-      value
+      data
     })
   }
 
@@ -460,19 +440,14 @@ export class BaseProvider {
   private sendThemeToWebView() {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnySendTheme,
-      value: {
-        data: getTheme()
-      }
-    })
+      data: getTheme()
+    } as ServerMessage<ThemeType>)
   }
 
   private sendTextSelectionToWebView(text: string) {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyTextSelection,
-      value: {
-        type: WORKSPACE_STORAGE_KEY.selection,
-        completion: text
-      }
+      data: text
     })
   }
 }

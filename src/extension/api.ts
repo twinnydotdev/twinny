@@ -9,7 +9,7 @@ import {
 
 const log = Logger.getInstance()
 
-export async function streamResponse(request: StreamRequest) {
+export async function llm(request: StreamRequest) {
   logStreamOptions(request)
   const { body, options, onData, onEnd, onError, onStart } = request
   const controller = new AbortController()
@@ -51,7 +51,7 @@ export async function streamResponse(request: StreamRequest) {
 
       if (!json || !onData) return
 
-      onData(json)
+      onEnd?.(json)
       return
     }
 
@@ -80,6 +80,7 @@ export async function streamResponse(request: StreamRequest) {
             if (buffer) {
               try {
                 const json = safeParseJsonResponse(buffer)
+                if (!json) return
                 onData(json)
               } catch (e) {
                 onError?.(new Error("Error parsing JSON data from event"))

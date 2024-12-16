@@ -114,20 +114,14 @@ export type ClientMessageWithData = ClientMessage<string | boolean> &
 
 export interface ServerMessage<T = unknown> {
   type: string
-  value: {
-    type: string
-    completion?: string
-    tools: Record<string, Tool>
-    data?: T
-    error?: boolean
-    errorMessage?: string
-  }
+  data: T
 }
 
 export interface Message {
   role: string
   content: string | undefined
   tools?: Record<string, Tool>
+  id?: string
 }
 
 export interface GithubPullRequestMessage {
@@ -202,10 +196,10 @@ export interface StreamRequestOptions {
 export interface StreamRequest {
   body: RequestBodyBase | StreamBodyOpenAI
   options: StreamRequestOptions
-  onEnd?: () => void
+  onEnd?: (response?: StreamResponse) => void
   onStart?: (controller: AbortController) => void
   onError?: (error: Error) => void
-  onData: <T = StreamResponse>(streamResponse: T) => void
+  onData: (streamResponse: StreamResponse) => void
 }
 
 export interface UiTabs {
@@ -376,10 +370,9 @@ export type FunctionTool = {
 }
 
 export interface Tool {
-  name: string
-  result?: string
-  status?: "pending" | "success" | "error" | "running"
   id: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  arguments: Record<string, any>
+  name: string
+  arguments: Record<string, unknown>
+  status?: string
+  error?: string
 }

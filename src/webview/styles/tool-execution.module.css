@@ -1,6 +1,7 @@
 .root {
   display: flex;
   flex-direction: column;
+  color: var(--vscode-foreground);
 }
 
 .headerBar {
@@ -9,6 +10,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
 }
 
 .headerTitle {
@@ -16,6 +18,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
+  font-weight: bold;
   color: var(--vscode-sideBarTitle-foreground);
 }
 
@@ -29,6 +32,7 @@
   border-radius: 10px;
   font-size: 11px;
   font-weight: normal;
+  line-height: 1;
   letter-spacing: normal;
 }
 
@@ -39,12 +43,31 @@
 
 .statusBadge[data-status="error"] {
   background: var(--vscode-errorForeground);
-  color: var(--vscode-foreground);
+  color: var(--vscode-editor-background);
 }
 
 .headerControls {
   display: flex;
   gap: 8px;
+}
+
+.runAllButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.runAllButton:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.runAllButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .toolsList {
@@ -54,7 +77,7 @@
 }
 
 .toolGroup {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .toolGroupHeader {
@@ -62,38 +85,37 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
+  font-size: 12px;
+  text-transform: capitalize;
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
   color: var(--vscode-foreground);
-  opacity: 0.8;
+}
+
+.toolGroupHeader[data-status="error"] {
+  color: var(--vscode-errorForeground);
 }
 
 .toolCount {
   font-size: 10px;
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
 .toolItem {
   position: relative;
   margin: 4px 0;
+  border-left: 2px solid transparent;
 }
 
-.toolItem[data-status="running"]::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--vscode-progressBar-background);
+.toolItem[data-status="running"] {
+  border-left-color: var(--vscode-progressBar-background);
 }
 
-.toolItem[data-status="error"]::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--vscode-errorForeground);
+.toolItem[data-status="error"] {
+  border-left-color: var(--vscode-errorForeground);
+}
+
+.toolItem[data-status="rejected"] {
+  border-left-color: var(--vscode-disabledForeground);
 }
 
 .toolRow {
@@ -101,8 +123,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 12px;
-  min-height: 28px;
-  cursor: pointer;
+  background: var(--vscode-editor-background);
+  transition: background 0.2s;
 }
 
 .toolRow:hover {
@@ -111,7 +133,7 @@
 
 .toolName {
   font-size: 13px;
-  color: var(--vscode-foreground);
+  font-weight: 500;
 }
 
 .toolActions {
@@ -120,13 +142,11 @@
 }
 
 .actionButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 24px;
   height: 24px;
   background: none;
   border: none;
+  padding: 0;
   border-radius: 3px;
   color: var(--vscode-foreground);
   cursor: pointer;
@@ -137,17 +157,23 @@
 }
 
 .actionButton:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .toolContent {
-  padding: 0 12px 8px 32px;
-  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--vscode-editor-background);
+  border-left: 2px solid transparent;
+  font-size: 12px;
+}
+
+.argumentsContainer {
+  margin-bottom: 8px;
 }
 
 .argumentRow {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .argumentHeader {
@@ -158,27 +184,36 @@
 }
 
 .argumentKey {
+  font-weight: 600;
   color: var(--vscode-symbolIcon-propertyForeground);
-  font-weight: 500;
 }
 
 .argumentType {
   font-size: 11px;
   color: var(--vscode-foreground);
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .argumentValue {
-  margin: 0;
   padding: 8px;
-  background: var(--vscode-textBlockQuote-background);
   border-radius: 3px;
+  overflow-x: auto;
 }
 
 .argumentValue code {
   color: var(--vscode-foreground);
   white-space: pre-wrap;
   font-size: 12px;
+  line-height: 1.4;
+}
+
+.toolError {
+  font-size: 12px;
+  color: var(--vscode-errorForeground);
+  margin-top: 8px;
+  background: var(--vscode-editor-background);
+  padding: 4px 8px;
+  border-radius: 3px;
 }
 
 .emptyState {
@@ -190,15 +225,12 @@
   gap: 12px;
   color: var(--vscode-foreground);
   opacity: 0.6;
+  font-size: 13px;
+  text-align: center;
 }
 
 .emptyState .codicon {
   font-size: 32px;
-}
-
-.emptyState p {
-  font-size: 13px;
-  margin: 0;
 }
 
 /* Animation for the running state */
@@ -207,5 +239,7 @@
 }
 
 @keyframes spin {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }

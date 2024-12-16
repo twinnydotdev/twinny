@@ -14,6 +14,7 @@ import {
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ASSISTANT,
   DEFAULT_RELEVANT_CODE_COUNT,
   DEFAULT_RELEVANT_FILE_COUNT,
   DEFAULT_RERANK_THRESHOLD,
@@ -27,6 +28,7 @@ import {
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
+import { tools } from "../common/tool-definitions"
 import {
   FileItem,
   Message,
@@ -39,7 +41,7 @@ import {
 } from "../common/types"
 import { kebabToSentence } from "../webview/utils"
 
-import { streamResponse } from "./api"
+import { llm } from "./api"
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
 import { TwinnyProvider } from "./provider-manager"
@@ -49,11 +51,7 @@ import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
 import { Tools } from "./tools"
-import {
-  getChatDataFromProvider as getResponseData,
-  getLanguage,
-  updateLoadingMessage
-} from "./utils"
+import { getLanguage, getResponseData, updateLoadingMessage } from "./utils"
 
 export class ChatService extends Base {
   private _completion = ""
@@ -89,7 +87,7 @@ export class ChatService extends Base {
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this.setupSymmetryListeners()
-    this._tools = new Tools()
+    this._tools = new Tools(webView)
   }
 
   private setupSymmetryListeners() {
@@ -98,11 +96,11 @@ export class ChatService extends Base {
       (completion: string) => {
         this._webView?.postMessage({
           type: EVENT_NAME.twinnyOnCompletion,
-          value: {
-            completion: completion.trimStart(),
-            data: getLanguage()
+          data: {
+            content: completion.trimStart(),
+            role: ASSISTANT
           }
-        } as ServerMessage)
+        } as ServerMessage<Message>)
       }
     )
   }
@@ -300,27 +298,23 @@ export class ChatService extends Base {
       }
     }
 
-    const requestBody = createStreamRequestBody(provider.provider, {
-      model: provider.modelName,
-      numPredictChat: this.config.numPredictChat,
-      temperature: this.config.temperature,
-      messages,
-      keepAlive: this.config.keepAlive
-    })
+    const useToolsName = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyEnableTools}`
+    const toolsEnabled = this._context?.globalState.get(useToolsName) as number
+    const functionTools = toolsEnabled ? tools : undefined
+
+    const requestBody = createStreamRequestBody(
+      provider.provider,
+      {
+        model: provider.modelName,
+        numPredictChat: this.config.numPredictChat,
+        temperature: this.config.temperature,
+        messages,
+        keepAlive: this.config.keepAlive
+      },
+      functionTools
+    )
 
     return { requestOptions, requestBody }
-  }
-
-  public async runTool(call: {
-    name: string
-    arguments: Record<string, unknown>
-  }) {
-    const method = this._tools?.[call.name as keyof Tools]
-    if (method && typeof method === "function") {
-      const boundMethod = method.bind(this._tools) as any
-      const result = await boundMethod(call.arguments)
-      return result
-    }
   }
 
   async getMessageTools(data: {
@@ -342,95 +336,83 @@ export class ChatService extends Base {
     return tools
   }
 
-  private onResponseData = async (
-    response: StreamResponse,
-    onEnd?: (completion: string) => void
-  ) => {
-    const provider = this.getProvider()
-    if (!provider) return
-
+  private onLlmData = async (response: StreamResponse) => {
     try {
       const data = getResponseData(response)
 
-      console.log(data)
-      if (data.calls) {
-        const tools = await this.getMessageTools(data)
-
-        this._webView?.postMessage({
-          type: EVENT_NAME.twinnyOnCompletionEnd,
-          value: {
-            completion: "Twinny would like to use the following tools:",
-            tools,
-            data: getLanguage(),
-            type: this._promptTemplate
-          }
-        } as ServerMessage)
-
-        return
-      }
-
       this._completion = this._completion + data.content
-
-      if (onEnd) return
 
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyOnCompletion,
-        value: {
-          completion: this._completion.trimStart(),
-          data: getLanguage(),
-          type: this._promptTemplate
+        data: {
+          content: this._completion.trimStart(),
+          role: ASSISTANT
         }
-      } as ServerMessage)
-
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnCompletionEnd,
-        value: {
-          completion: this._completion.trimStart(),
-          data: getLanguage(),
-          type: this._promptTemplate
-        }
-      } as ServerMessage)
+      } as ServerMessage<Message>)
     } catch (error) {
       console.error("Error parsing JSON:", error)
       return
     }
   }
 
-  private onStreamEnd = (onEnd?: (completion: string) => void) => {
+  private onLlmEnd = async (response?: StreamResponse) => {
     this._statusBar.text = "$(code)"
     commands.executeCommand(
       "setContext",
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
-    if (onEnd) {
-      onEnd(this._completion)
+
+    if (response) {
+      const data = getResponseData(response)
+
+      if (data.calls) {
+        const tools = await this.getMessageTools(data)
+
+        this._webView?.postMessage({
+          type: EVENT_NAME.twinnyOnCompletionEnd,
+          data: {
+            content: "Twinny would like to use the following tools:",
+            role: ASSISTANT,
+            tools,
+            id: crypto.randomUUID()
+          }
+        } as ServerMessage<Message>)
+
+        return
+      }
+
       this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnCompletionEnd
-      } as ServerMessage)
+        type: EVENT_NAME.twinnyOnCompletionEnd,
+        data: {
+          content: data.content,
+          role: ASSISTANT
+        }
+      } as ServerMessage<Message>)
+
       return
     }
+
     this._webView?.postMessage({
       type: EVENT_NAME.twinnyOnCompletionEnd,
-      value: {
-        completion: this._completion.trimStart(),
-        data: getLanguage(),
-        type: this._promptTemplate
+      data: {
+        content: this._completion.trimStart(),
+        role: ASSISTANT
+      }
+    } as ServerMessage<Message>)
+  }
+
+  private onLlmError = (error: Error) => {
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyOnCompletionEnd,
+      data: {
+        content: `==## ERROR ##== : ${error.message}`,
+        role: ASSISTANT
       }
     } as ServerMessage)
   }
 
-  private onStreamError = (error: Error) => {
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnCompletionEnd,
-      value: {
-        error: true,
-        errorMessage: `==## ERROR ##== : ${error.message}` // Highlight errors on webview
-      }
-    } as ServerMessage)
-  }
-
-  private onStreamStart = (controller: AbortController) => {
+  private onLlmStart = (controller: AbortController) => {
     this._controller = controller
     commands.executeCommand(
       "setContext",
@@ -454,12 +436,11 @@ export class ChatService extends Base {
     )
     this._webView?.postMessage({
       type: EVENT_NAME.twinnyOnCompletionEnd,
-      value: {
-        completion: this._completion.trimStart(),
-        data: getLanguage(),
-        type: this._promptTemplate
+      data: {
+        content: this._completion.trimStart(),
+        role: ASSISTANT
       }
-    } as ServerMessage)
+    } as ServerMessage<Message>)
   }
 
   private buildTemplatePrompt = async (
@@ -484,39 +465,32 @@ export class ChatService extends Base {
 
   private streamResponse({
     requestBody,
-    requestOptions,
-    onEnd
+    requestOptions
   }: {
     requestBody: RequestBodyBase
     requestOptions: StreamRequestOptions
-    onEnd?: (completion: string) => void
   }) {
-    return streamResponse({
+    return llm({
       body: requestBody,
       options: requestOptions,
-      onData: (streamResponse) =>
-        this.onResponseData(streamResponse as StreamResponse, onEnd),
-      onEnd: () => this.onStreamEnd(onEnd),
-      onStart: this.onStreamStart,
-      onError: this.onStreamError
+      onStart: this.onLlmStart,
+      onData: this.onLlmData,
+      onEnd: this.onLlmEnd,
+      onError: this.onLlmError
     })
   }
 
   private sendEditorLanguage = () => {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySendLanguage,
-      value: {
-        data: getLanguage()
-      }
+      data: getLanguage()
     } as ServerMessage)
   }
 
   private focusChatTab = () => {
     this._webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
-      value: {
-        data: WEBUI_TABS.chat
-      }
+      data: WEBUI_TABS.chat
     } as ServerMessage<string>)
   }
 
@@ -703,11 +677,10 @@ export class ChatService extends Base {
       })
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
-        value: {
-          completion: kebabToSentence(template) + "\n\n" + "```\n" + selection,
-          data: getLanguage()
+        data: {
+          content: kebabToSentence(template) + "\n\n" + "```\n" + selection
         }
-      } as ServerMessage)
+      } as ServerMessage<Message>)
     }
 
     const systemMessage = {
@@ -748,7 +721,6 @@ export class ChatService extends Base {
   public async streamTemplateCompletion(
     promptTemplate: string,
     context?: string,
-    onEnd?: (completion: string) => void,
     skipMessage?: boolean
   ) {
     const messages = await this.getTemplateMessages(
@@ -760,6 +732,6 @@ export class ChatService extends Base {
 
     if (!request) return
     const { requestBody, requestOptions } = request
-    return this.streamResponse({ requestBody, requestOptions, onEnd })
+    return this.streamResponse({ requestBody, requestOptions })
   }
 }

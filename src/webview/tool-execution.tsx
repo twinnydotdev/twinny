@@ -9,8 +9,9 @@ const StatusIcon = ({ status }: { status: string }) => {
   const iconClass = {
     pending: "codicon-circle-outline",
     running: "codicon-sync codicon-modifier-spin",
-    success: "codicon-pass",
-    error: "codicon-error"
+    success: "codicon-check",
+    error: "codicon-error",
+    rejected: "codicon-trash"
   }[status]
 
   return <span className={`codicon ${iconClass} ${styles.statusIcon}`} />
@@ -18,47 +19,46 @@ const StatusIcon = ({ status }: { status: string }) => {
 
 interface ToolExecutionProps {
   message: Message
-  onRunTool?: (toolName: string) => void
-  onRejectTool?: (toolName: string) => void
+  onRunTool?: (message: Message, tool: Tool) => void
+  onRejectTool?: (message: Message, tool: Tool) => void
+  onRunAllTools?: (message: Message) => void
 }
 
-export default function ToolExecution({
+export function ToolExecution({
   message,
   onRunTool,
-  onRejectTool
+  onRejectTool,
+  onRunAllTools
 }: ToolExecutionProps) {
   const { t } = useTranslation()
   const tools = message.tools || {}
 
   if (!Object.keys(tools)?.length) {
-    return null
+    return (
+      <div className={styles.emptyState}>
+        <span className="codicon codicon-debug-disconnect" />
+        <p>{t("no-tools")}</p>
+      </div>
+    )
   }
 
-  const handleRunAll = () => {
-    Object.values(tools).forEach((tool) => {
-      if (tool.status !== "running") {
-        handleRunTool(tool)
-      }
-    })
+  const handleRunAll = (message: Message) => {
+    onRunAllTools?.(message)
   }
 
-  const handleRunTool = (tool: Tool) => {
-    onRunTool?.(tool.name)
+  const handleRunTool = (message: Message, tool: Tool) => {
+    onRunTool?.(message, tool)
   }
 
-  const handleRejectTool = (tool: Tool) => {
-    onRejectTool?.(tool.name)
+  const handleRejectTool = (message: Message, tool: Tool) => {
+    onRejectTool?.(message, tool)
   }
 
   const toolsByStatus = Object.values(tools).reduce((acc, tool) => {
     const status = tool.status || "pending"
     acc[status] = [...(acc[status] || []), tool]
     return acc
-  }, {} as Record<string, (typeof tools)[keyof typeof tools][]>)
-
-  const isAnyToolRunning = Object.values(tools).some(
-    (tool) => tool.status === "running"
-  )
+  }, {} as Record<string, Tool[]>)
 
   const runningCount = toolsByStatus.running?.length || 0
   const errorCount = toolsByStatus.error?.length || 0
@@ -82,8 +82,9 @@ export default function ToolExecution({
         <div className={styles.headerControls}>
           <VSCodeButton
             className={styles.runAllButton}
-            onClick={handleRunAll}
-            disabled={isAnyToolRunning}
+            disabled={runningCount > 0}
+            onClick={() => handleRunAll(message)}
+            title={t("run-all-tools")}
           >
             <span className="codicon codicon-play" />
             {t("run-all")}
@@ -92,10 +93,10 @@ export default function ToolExecution({
       </div>
 
       <div className={styles.toolsList}>
-        {["running", "error", "pending", "success"].map((status) =>
+        {["running", "error", "pending", "success", "rejected"].map((status) =>
           toolsByStatus[status]?.length ? (
             <div key={status} className={styles.toolGroup}>
-              <div className={styles.toolGroupHeader}>
+              <div className={styles.toolGroupHeader} data-status={status}>
                 <StatusIcon status={status} />
                 {t(status)}
                 <span className={styles.toolCount}>
@@ -112,18 +113,21 @@ export default function ToolExecution({
                     <span className={styles.toolName}>{t(tool.name)}</span>
                     <div className={styles.toolActions}>
                       <VSCodeButton
-                        onClick={() => handleRunTool(tool)}
+                        onClick={() => handleRunTool(message, tool)}
                         className={styles.actionButton}
                         disabled={tool.status === "running"}
                         appearance="icon"
+                        title={t("run-tool")}
                       >
                         <span className="codicon codicon-play" />
                       </VSCodeButton>
                       <VSCodeButton
-                        onClick={() => handleRejectTool(tool)}
+                        onClick={() => handleRejectTool(message, tool)}
                         className={styles.actionButton}
-                        disabled={tool.status === "running"}
-                        title={t("remove")}
+                        disabled={
+                          tool.status === "running" || tool.status === "success"
+                        }
+                        title={t("reject-tool")}
                         appearance="icon"
                       >
                         <span className="codicon codicon-trash" />
@@ -132,23 +136,26 @@ export default function ToolExecution({
                   </div>
 
                   <div className={styles.toolContent}>
-                    {Object.entries(tool.arguments).map(([key, value]) => (
-                      <div key={key} className={styles.argumentRow}>
-                        <div className={styles.argumentHeader}>
-                          <span className={styles.argumentKey}>{key}</span>
-                          <span className={styles.argumentType}>
-                            {typeof value}
-                          </span>
-                        </div>
-                        <pre className={styles.argumentValue}>
-                          {typeof value === "boolean" ? (
-                            <span>{value ? t("true") : t("false")}</span>
-                          ) : (
-                            value
-                          )}
-                        </pre>
-                      </div>
-                    ))}
+                    <div className={styles.argumentsContainer}>
+                      {Object.entries(tool.arguments || {}).map(
+                        ([key, value]) => (
+                          <div key={key} className={styles.argumentRow}>
+                            <div className={styles.argumentHeader}>
+                              <span className={styles.argumentKey}>{key}</span>
+                              <span className={styles.argumentType}>
+                                {typeof value}
+                              </span>
+                            </div>
+                            <div className={styles.argumentValue}>
+                              <pre>{JSON.stringify(value, null, 2)}</pre>
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+                    {!!tool.error && tool.status !== "success" && (
+                      <div className={styles.toolError}>{tool.error}</div>
+                    )}
                   </div>
                 </div>
               ))}
