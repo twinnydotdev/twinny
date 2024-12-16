@@ -318,7 +318,6 @@ export class ChatService extends Base {
     )
 
     if (response) {
-      console.log(response)
       const data = getResponseData(response)
 
       if (data.calls) {
