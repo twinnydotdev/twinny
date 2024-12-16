@@ -1,8 +1,16 @@
 import * as vscode from "vscode"
 
-import { ACTIVE_CHAT_PROVIDER_STORAGE_KEY, EVENT_NAME, EXTENSION_CONTEXT_NAME } from "../common/constants"
+import {
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME
+} from "../common/constants"
 import { tools } from "../common/tool-definitions"
-import { Message,StreamRequestOptions as LlmRequestOptions } from "../common/types"
+import {
+  Message,
+  StreamRequestOptions as LlmRequestOptions
+} from "../common/types"
 
 import { TwinnyProvider } from "./provider-manager"
 import { createStreamRequestBody } from "./provider-options"
@@ -11,7 +19,7 @@ export class Base {
   public config = vscode.workspace.getConfiguration("twinny")
   public context?: vscode.ExtensionContext
 
-  constructor (context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext) {
     this.context = context
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration("twinny")) {
@@ -24,6 +32,13 @@ export class Base {
   public getProvider = () => {
     const provider = this.context?.globalState.get<TwinnyProvider>(
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY
+    )
+    return provider
+  }
+
+  public getEmbeddingProvider = () => {
+    const provider = this.context?.globalState.get<TwinnyProvider>(
+      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
     )
     return provider
   }
@@ -63,7 +78,6 @@ export class Base {
 
     return { requestOptions, requestBody }
   }
-
 
   public updateConfig() {
     this.config = vscode.workspace.getConfiguration("twinny")

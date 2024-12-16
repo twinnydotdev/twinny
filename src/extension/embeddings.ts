@@ -43,7 +43,7 @@ export class EmbeddingDatabase extends Base {
   }
 
   public async fetchModelEmbedding(content: string) {
-    const provider = this.getProvider()
+    const provider = this.getEmbeddingProvider()
 
     if (!provider) return
 
