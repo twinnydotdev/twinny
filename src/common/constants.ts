@@ -125,7 +125,6 @@ export const TOOL_EVENT_NAME = {
   runAllTools: "run-all-tools",
   runTool: "run-tool",
   rejectTool: "run-on-tool",
-  toolUpdate: "twinny.tool-update",
 }
 
 export const PROVIDER_EVENT_NAME = {
