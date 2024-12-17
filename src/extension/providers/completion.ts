@@ -58,7 +58,7 @@ import { createStreamRequestBodyFim } from "../provider-options"
 import { TemplateProvider } from "../template-provider"
 import {
   getCurrentLineText,
-  getFimDataFromProvider as getFimProviderFimData,
+  getFimDataFromProvider,
   getIsMiddleOfString,
   getIsMultilineCompletion,
   getPrefixSuffix,
@@ -256,7 +256,7 @@ export class CompletionProvider
     )
 
     try {
-      const providerFimData = getFimProviderFimData(this._provider.provider, data)
+      const providerFimData = getFimDataFromProvider(this._provider.provider, data)
       if (providerFimData === undefined) return ""
 
       this._completion = this._completion + providerFimData
