@@ -3,6 +3,7 @@ import * as vscode from "vscode"
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME
 } from "../common/constants"
@@ -27,6 +28,13 @@ export class Base {
       }
       this.updateConfig()
     })
+  }
+
+  public getFimProvider = () => {
+    const provider = this.context?.globalState.get<TwinnyProvider>(
+      ACTIVE_FIM_PROVIDER_STORAGE_KEY
+    )
+    return provider
   }
 
   public getProvider = () => {

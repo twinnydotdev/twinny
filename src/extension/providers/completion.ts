@@ -58,7 +58,7 @@ import { createStreamRequestBodyFim } from "../provider-options"
 import { TemplateProvider } from "../template-provider"
 import {
   getCurrentLineText,
-  getFimDataFromProvider as getProviderFimData,
+  getFimDataFromProvider as getFimProviderFimData,
   getIsMiddleOfString,
   getIsMultilineCompletion,
   getPrefixSuffix,
@@ -135,7 +135,7 @@ export class CompletionProvider
     context: InlineCompletionContext
   ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
     const editor = window.activeTextEditor
-    this._provider = this.getProvider()
+    this._provider = this.getFimProvider()
     const isLastCompletionAccepted =
       this._acceptedLastCompletion && !this.config.enableSubsequentCompletions
 
@@ -200,7 +200,7 @@ export class CompletionProvider
     return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
       this._debouncer = setTimeout(() => {
         this._lock.acquire("twinny.completion", async () => {
-          const provider = this.getProvider()
+          const provider = this.getFimProvider()
           if (!provider) return
           const request = this.buildFimRequest(prompt, provider)
 
@@ -256,7 +256,7 @@ export class CompletionProvider
     )
 
     try {
-      const providerFimData = getProviderFimData(this._provider.provider, data)
+      const providerFimData = getFimProviderFimData(this._provider.provider, data)
       if (providerFimData === undefined) return ""
 
       this._completion = this._completion + providerFimData
