@@ -36,7 +36,7 @@ export const EmbeddingOptions = () => {
   const { context: maxChunkSize = "500", setContext: setMaxChunkSize } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize)
 
-  const { context: minChunkSize = "50", setContext: setMinChunkSize } =
+  const { context: minChunkSize = "200", setContext: setMinChunkSize } =
     useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyMinChunkSize)
 
   const { context: overlap = "20", setContext: setOverlap } =
@@ -142,7 +142,7 @@ export const EmbeddingOptions = () => {
       </div>
       <div>
         <div>
-          {t("max-chunk-size")}
+          {t("min-chunk-size")}
         </div>
         <VSCodeTextField
           value={minChunkSize}

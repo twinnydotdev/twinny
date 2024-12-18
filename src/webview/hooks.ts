@@ -663,8 +663,6 @@ export const useSymmetryConnection = () => {
     EXTENSION_SESSION_NAME.twinnySymmetryConnection
   )
 
-  console.log(symmetryConnectionSession)
-
   const {
     context: symmetryProviderStatus,
     setContext: setSymmetryProviderStatus
