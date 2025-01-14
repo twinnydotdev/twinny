@@ -85,7 +85,7 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnySymmetryTab"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnySymmetryTab || view == twinny.sidebar && twinnyReviewTab"
         },
         {
           "command": "twinny.review",
