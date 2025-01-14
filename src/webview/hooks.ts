@@ -284,24 +284,21 @@ export const useGithubPRs = () => {
 
 export const useProviders = () => {
   const [providers, setProviders] = useState<Record<string, TwinnyProvider>>({})
-  const [chatProvider, setChatProvider] = useState<TwinnyProvider>()
-  const [fimProvider, setFimProvider] = useState<TwinnyProvider>()
-  const [embeddingProvider, setEmbeddingProvider] = useState<TwinnyProvider>()
+  const [chatProvider, setChatProvider] = useState<TwinnyProvider | null>(null)
+  const [fimProvider, setFimProvider] = useState<TwinnyProvider | null>(null)
+  const [embeddingProvider, setEmbeddingProvider] =
+    useState<TwinnyProvider | null>(null)
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<
       Record<string, TwinnyProvider> | TwinnyProvider
     > = event.data
     if (message?.type === PROVIDER_EVENT_NAME.getAllProviders) {
-      if (message.data) {
-        const providers = message.data as Record<string, TwinnyProvider>
-        setProviders(providers)
-      }
+      const providers = message.data as Record<string, TwinnyProvider>
+      setProviders(providers || {})
     }
     if (message?.type === PROVIDER_EVENT_NAME.getActiveChatProvider) {
-      if (message.data) {
-        const provider = message.data as TwinnyProvider
-        setChatProvider(provider)
-      }
+      const provider = message.data as TwinnyProvider
+      setChatProvider(provider || null)
     }
     if (message?.type === PROVIDER_EVENT_NAME.getActiveFimProvider) {
       if (message.data) {
@@ -413,6 +410,28 @@ export const useProviders = () => {
   }
 }
 
+export const useModels = () => {
+  const [models, setModels] = useState<Record<string, any>>({})
+
+  const handler = (event: MessageEvent) => {
+    const message: ServerMessage<ApiModel[]> = event.data
+    if (message?.type === EVENT_NAME.twinnyGetModels) {
+      setModels(message?.data)
+    }
+    return () => window.removeEventListener("message", handler)
+  }
+
+  useEffect(() => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyGetModels
+    })
+    window.addEventListener("message", handler)
+    return () => window.removeEventListener("message", handler)
+  }, [])
+
+  return { models }
+}
+
 export const useConversationHistory = () => {
   const [conversations, setConversations] = useState<
     Record<string, Conversation>
@@ -513,7 +532,7 @@ export const useOllamaModels = () => {
   return { models }
 }
 
-const useAutosizeTextArea = (
+export const useAutosizeTextArea = (
   chatRef: React.RefObject<HTMLTextAreaElement> | null,
   value: string
 ) => {
@@ -781,4 +800,15 @@ export const useLocale = () => {
   return { locale, renderKey }
 }
 
-export default useAutosizeTextArea
+export const useEvent = (
+  eventName: string,
+  handler: ((event: any) => void) | null,
+  target: Window | HTMLElement = window
+) => {
+  useEffect(() => {
+    if (!handler || !target) return
+
+    target.addEventListener(eventName, handler)
+    return () => target.removeEventListener(eventName, handler)
+  }, [eventName, handler, target])
+}

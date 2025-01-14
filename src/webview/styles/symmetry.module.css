@@ -1,47 +1,176 @@
+.symmetryContainer {
+  padding: 0.5rem;
+}
+
 .symmetryPanel {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
+.symmetryPanel h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--vscode-foreground);
+  padding-bottom: 0.5rem;
+}
+
+.symmetryPanel h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--vscode-foreground);
+}
+
 .statusSection {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 0.85rem;
 }
 
-.statusContainer {
-  display: flex;
+.connected, .disconnected {
+  font-weight: 500;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
+}
+
+.connected::before, .disconnected::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .connected {
-  color: #4caf50;
-  font-weight: bold;
+  color: var(--vscode-testing-iconPassed);
+  background: color-mix(in srgb, var(--vscode-testing-iconPassed) 8%, transparent);
+}
+
+.connected::before {
+  background: var(--vscode-testing-iconPassed);
+  box-shadow: 0 0 4px var(--vscode-testing-iconPassed);
 }
 
 .disconnected {
-  color: #f44336;
-  font-weight: bold;
+  color: var(--vscode-testing-iconFailed);
+  background: color-mix(in srgb, var(--vscode-testing-iconFailed) 8%, transparent);
 }
 
-.checkboxLabel {
-  display: flex;
-  align-items: center;
+.disconnected::before {
+  background: var(--vscode-testing-iconFailed);
+}
+
+.providerInfo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 0.5rem;
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+  background: var(--vscode-textCodeBlock-background);
+  border-radius: 3px;
+}
+
+.providerInfo span {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.providerInfo b {
+  color: var(--vscode-foreground);
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 .buttonContainer {
   display: flex;
-  justify-content: flex-start;
+  margin: 0.5rem 0;
+}
+
+.buttonContainer vscode-button {
+  min-width: 90px;
+  transition: transform 0.2s ease;
+}
+
+.buttonContainer vscode-button:hover {
+  transform: translateY(-1px);
 }
 
 .dropdownContainer {
-  margin-bottom: 1rem;
+  margin: 0.5rem 0;
 }
 
 .dropdownContainer label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--vscode-foreground);
+}
+
+.dropdownContainer vscode-dropdown {
+  width: 100%;
+  max-width: 250px;
+}
+
+.checkboxContainer {
+  margin: 0.5rem 0;
+}
+
+.checkboxContainer vscode-checkbox {
+  font-size: 0.85rem;
+}
+
+.infoText {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--vscode-foreground);
+  opacity: 0.85;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--vscode-widget-border);
+  opacity: 0.8;
+}
+
+vscode-divider {
+  margin: 0.75rem 0;
+  opacity: 0.2;
+}
+
+a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+a:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.85rem;
+  padding: 0.1rem 0.3rem;
+  background: var(--vscode-textCodeBlock-background);
+  border-radius: 2px;
+}
+
+section {
+  padding: 0.5rem 0;
 }

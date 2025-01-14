@@ -109,13 +109,13 @@ export async function llm(request: LlmRequest) {
         onEnd?.()
       } else if (error.name === "TimeoutError") {
         onError?.(error)
-        log.logConsoleError(
-          Logger.ErrorType.Timeout,
+        log.logError(
+          "timeout",
           "Failed to establish connection",
           error
         )
       } else {
-        log.logConsoleError(Logger.ErrorType.Fetch_Error, "Fetch error", error)
+        log.logError("error", "Fetch error", error)
         onError?.(error)
         notifyKnownErrors(error)
       }
@@ -153,7 +153,7 @@ export async function fetchEmbedding(request: LlmRequest) {
     onData(data)
   } catch (error: unknown) {
     if (error instanceof Error) {
-      log.logConsoleError(Logger.ErrorType.Fetch_Error, "Fetch error", error)
+      log.logError("fetch_error", "Fetch error", error)
       notifyKnownErrors(error)
     }
   }

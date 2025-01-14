@@ -12,36 +12,27 @@ import {
 } from "@vscode/webview-ui-toolkit/react"
 import cn from "classnames"
 
+import { EVENT_NAME, USER, WORKSPACE_STORAGE_KEY } from "../common/constants"
 import {
-  ASSISTANT,
-  EVENT_NAME,
-  TOOL_EVENT_NAME,
-  USER,
-  WORKSPACE_STORAGE_KEY
-} from "../common/constants"
-import {
+  ChatCompletionMessage,
   ClientMessage,
   MentionType,
-  Message,
-  ServerMessage,
-  Tool
+  ServerMessage
 } from "../common/types"
 
 import { EmbeddingOptions } from "./embedding-options"
-import useAutosizeTextArea, {
+import {
+  useAutosizeTextArea,
   useConversationHistory,
-  useSelection,
   useSuggestion,
   useSymmetryConnection,
   useTheme,
   useWorkSpaceContext
 } from "./hooks"
-import { DisabledAutoScrollIcon, EnabledAutoScrollIcon } from "./icons"
-import ChatLoader from "./loader"
 import { Message as MessageComponent } from "./message"
 import { ProviderSelect } from "./provider-select"
-import { Suggestions } from "./suggestions"
-import { CustomKeyMap } from "./utils"
+import TypingIndicator from "./typing-indicator"
+import { CustomKeyMap  } from "./utils"
 
 import styles from "./styles/index.module.css"
 
@@ -59,13 +50,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const theme = useTheme()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState<Message[]>()
-  const [completion, setCompletion] = useState<Message | null>()
+  const [messages, setMessages] = useState<ChatCompletionMessage[]>()
+  const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const markdownRef = useRef<HTMLDivElement>(null)
   const { symmetryConnection } = useSymmetryConnection()
 
-  const { context: autoScrollContext, setContext: setAutoScrollContext } =
-    useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.autoScroll)
+  const disableAutoScrollRef = useRef(false)
+  const [, setIsAtBottom] = useState(true)
   const { context: showProvidersContext, setContext: setShowProvidersContext } =
     useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showProviders)
   const {
@@ -77,18 +68,79 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
 
-  const scrollToBottom = () => {
-    if (!autoScrollContext) return
-    setTimeout(() => {
-      if (markdownRef.current) {
-        markdownRef.current.scrollTop = markdownRef.current.scrollHeight
+  const scrollToBottom = useCallback(() => {
+    if (markdownRef.current) {
+      markdownRef.current.scrollTo({
+        top: markdownRef.current.scrollHeight,
+        behavior: "auto"
+      })
+    }
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    const el = markdownRef.current
+    if (!el) return
+
+    const isScrollable = el.scrollHeight > el.clientHeight
+
+    if (!isScrollable) {
+      setIsAtBottom(true)
+      disableAutoScrollRef.current = false
+      return
+    }
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    const nearBottom = distanceFromBottom < 50
+
+    if (nearBottom) {
+      setIsAtBottom(true)
+      disableAutoScrollRef.current = false
+    } else {
+      disableAutoScrollRef.current = true
+      setIsAtBottom(false)
+    }
+  }, [])
+
+  const handleWheel = useCallback((event: WheelEvent) => {
+    if (event.deltaY < 0) {
+      disableAutoScrollRef.current = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const el = markdownRef.current
+    if (!el) return
+
+    el.addEventListener("scroll", handleScroll)
+    el.addEventListener("wheel", handleWheel)
+
+    const ro = new ResizeObserver(() => {
+      const isScrollable = el.scrollHeight > el.clientHeight
+
+      // Force scroll to bottom when content first becomes scrollable
+      if (isScrollable && !disableAutoScrollRef.current) {
+        scrollToBottom()
       }
-    }, 200)
-  }
 
-  const selection = useSelection(scrollToBottom)
+      // Update scroll state
+      handleScroll()
+    })
+    ro.observe(el)
 
-  const handleCompletionEnd = (message: ServerMessage<Message>) => {
+    return () => {
+      el.removeEventListener("scroll", handleScroll)
+      el.removeEventListener("wheel", handleWheel)
+      ro.disconnect()
+    }
+  }, [handleScroll, handleWheel, scrollToBottom])
+
+  useEffect(() => {
+    if (!disableAutoScrollRef.current) {
+      scrollToBottom()
+    }
+  }, [messages, completion, isLoading, scrollToBottom])
+
+  const handleAddMessage = (message: ServerMessage<ChatCompletionMessage>) => {
     if (!message.data) {
       setCompletion(null)
       setIsLoading(false)
@@ -128,82 +180,71 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
     setCompletion(null)
     setIsLoading(false)
-    generatingRef.current = false
   }
 
-  const handleAddTemplateMessage = (message: ServerMessage<Message>) => {
-    if (stopRef.current) {
-      generatingRef.current = false
-      return
-    }
-    generatingRef.current = true
-    setIsLoading(false)
-    scrollToBottom()
-    setMessages((prev) => [...(prev || []), message.data])
-  }
-
-  const handleCompletionMessage = (message: ServerMessage<Message>) => {
-    if (stopRef.current) {
-      generatingRef.current = false
-      return
-    }
+  const handleCompletionMessage = (
+    message: ServerMessage<ChatCompletionMessage>
+  ) => {
     setCompletion(message.data)
-    scrollToBottom()
+    if (!disableAutoScrollRef.current) {
+      scrollToBottom()
+    }
   }
 
   const handleLoadingMessage = () => {
     setIsLoading(true)
-    if (autoScrollContext) scrollToBottom()
+    if (!disableAutoScrollRef.current) {
+      scrollToBottom()
+    }
   }
 
   const messageEventHandler = (event: MessageEvent) => {
     const message: ServerMessage = event.data
     switch (message.type) {
       case EVENT_NAME.twinnyAddMessage: {
-        handleAddTemplateMessage(message as ServerMessage<Message>)
+        handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
         break
       }
       case EVENT_NAME.twinnyOnCompletion: {
-        handleCompletionMessage(message as ServerMessage<Message>)
+        handleCompletionMessage(message as ServerMessage<ChatCompletionMessage>)
         break
       }
       case EVENT_NAME.twinnyOnLoading: {
         handleLoadingMessage()
         break
       }
-      case EVENT_NAME.twinnyOnCompletionEnd: {
-        handleCompletionEnd(message as ServerMessage<Message>)
-        break
-      }
-      case EVENT_NAME.twinnyStopGeneration: {
+      case EVENT_NAME.twinnyNewConversation: {
+        setMessages([])
         setCompletion(null)
+        setActiveConversation(undefined)
         generatingRef.current = false
         setIsLoading(false)
         chatRef.current?.focus()
-        setActiveConversation(undefined)
-        setMessages([])
         setTimeout(() => {
           stopRef.current = false
         }, 1000)
+        break
+      }
+      case EVENT_NAME.twinnyStopGeneration: {
+        setIsLoading(false)
+        setCompletion(null)
+        stopRef.current = false
+        generatingRef.current = false
+        setTimeout(() => {
+          chatRef.current?.focus()
+        }, 200)
       }
     }
   }
 
   const handleStopGeneration = () => {
-    stopRef.current = true
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyStopGeneration
     } as ClientMessage)
-    setCompletion(null)
-    setIsLoading(false)
-    generatingRef.current = false
-    setTimeout(() => {
-      chatRef.current?.focus()
-      stopRef.current = false
-    }, 200)
   }
 
   const handleRegenerateMessage = (index: number): void => {
+    generatingRef.current = true
     setIsLoading(true)
     setMessages((prev) => {
       if (!prev) return prev
@@ -239,6 +280,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }
 
   const handleEditMessage = (message: string, index: number): void => {
+    generatingRef.current = true
     setIsLoading(true)
     setMessages((prev) => {
       if (!prev) return prev
@@ -300,12 +342,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(true)
     clearEditor()
     setMessages((prevMessages) => {
-      const updatedMessages = [
+      const updatedMessages: ChatCompletionMessage[] = [
         ...(prevMessages || []),
         { role: USER, content: replaceMentionsInText(input, mentions) }
       ]
 
-      const clientMessage: ClientMessage<Message[], MentionType[]> = {
+      const clientMessage: ClientMessage<
+        ChatCompletionMessage[],
+        MentionType[]
+      > = {
         type: EVENT_NAME.twinnyChatMessage,
         data: updatedMessages,
         meta: mentions
@@ -321,30 +366,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
       return updatedMessages
     })
 
-    setTimeout(() => {
-      if (markdownRef.current) {
-        markdownRef.current.scrollTop = markdownRef.current.scrollHeight
-      }
-    }, 200)
+    if (!disableAutoScrollRef.current) {
+      scrollToBottom()
+    }
   }
 
   const clearEditor = useCallback(() => {
     editorRef.current?.commands.clearContent()
   }, [])
-
-  const handleToggleAutoScroll = () => {
-    setAutoScrollContext((prev) => {
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnySetWorkspaceContext,
-        key: WORKSPACE_STORAGE_KEY.autoScroll,
-        data: !prev
-      } as ClientMessage)
-
-      if (!prev) scrollToBottom()
-
-      return !prev
-    })
-  }
 
   const handleToggleProviderSelection = () => {
     if (showEmbeddingOptionsContext) handleToggleEmbeddingOptions()
@@ -370,43 +399,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
     })
   }
 
-  const handleScrollBottom = () => {
-    if (markdownRef.current) {
-      markdownRef.current.scrollTop = markdownRef.current.scrollHeight
-    }
-  }
-
   const handleNewConversation = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyNewConversation
     })
-  }
-
-  const handleRejectTool = (message: Message, tool: Tool) => {
-    global.vscode.postMessage({
-      type: TOOL_EVENT_NAME.rejectTool,
-      data: {
-        message,
-        tool
-      }
-    } as ClientMessage<{ message: Message; tool: Tool }>)
-  }
-
-  const handleRunTool = (message: Message, tool: Tool) => {
-    global.vscode.postMessage({
-      type: TOOL_EVENT_NAME.runTool,
-      data: {
-        message,
-        tool
-      }
-    } as ClientMessage<{ message: Message; tool: Tool }>)
-  }
-
-  const handleRunAllTools = (message: Message) => {
-    global.vscode.postMessage({
-      type: TOOL_EVENT_NAME.runAllTools,
-      data: message
-    } as ClientMessage<Message>)
   }
 
   useEffect(() => {
@@ -422,13 +418,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
     return () => {
       window.removeEventListener("message", messageEventHandler)
     }
-  }, [autoScrollContext])
+  }, [])
 
   useEffect(() => {
     if (conversation?.messages?.length) {
       return setMessages(conversation.messages)
     }
-  }, [conversation?.id, autoScrollContext, showProvidersContext])
+  }, [conversation?.id])
 
   const { suggestion, filePaths } = useSuggestion()
 
@@ -520,13 +516,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
               message={message}
               theme={theme}
               index={index}
-              onRejectTool={handleRejectTool}
-              onRunTool={handleRunTool}
-              onRunAllTools={handleRunAllTools}
             />
           ))}
           {isLoading && !completion ? (
-            <ChatLoader />
+            <div className={cn(styles.message, styles.assistantMessage)}>
+              <TypingIndicator />
+            </div>
           ) : (
             !!completion && (
               <MessageComponent
@@ -534,17 +529,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 isAssistant
                 theme={theme}
                 message={{
-                  ...completion,
-                  role: ASSISTANT
+                  ...completion
                 }}
               />
             )
           )}
         </div>
-        {!!selection.length && (
-          <Suggestions isDisabled={!!generatingRef.current} />
-        )}
-        {showProvidersContext && !symmetryConnection && <ProviderSelect />}
         {showProvidersContext && showEmbeddingOptionsContext && (
           <VSCodeDivider />
         )}
@@ -552,27 +542,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <EmbeddingOptions />
         )}
         <div className={styles.chatOptions}>
-          <div>
-            <VSCodeButton
-              onClick={handleToggleAutoScroll}
-              title={t("toggle-auto-scroll")}
-              appearance="icon"
-            >
-              {autoScrollContext ? (
-                <EnabledAutoScrollIcon />
-              ) : (
-                <DisabledAutoScrollIcon />
-              )}
-            </VSCodeButton>
-            <VSCodeButton
-              title={t("scroll-down")}
-              appearance="icon"
-              onClick={handleScrollBottom}
-            >
-              <span className="codicon codicon-arrow-down"></span>
-            </VSCodeButton>
-            <VSCodeBadge>{selection?.length}</VSCodeBadge>
-          </div>
           <div>
             {generatingRef.current && !symmetryConnection && (
               <VSCodeButton
@@ -584,6 +553,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 <span className="codicon codicon-debug-stop"></span>
               </VSCodeButton>
             )}
+          </div>
+          <div>
             {!symmetryConnection && (
               <>
                 <VSCodeButton
@@ -592,13 +563,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
                   onClick={handleToggleEmbeddingOptions}
                 >
                   <span className="codicon codicon-database"></span>
-                </VSCodeButton>
-                <VSCodeButton
-                  title={t("toggle-provider-selection")}
-                  appearance="icon"
-                  onClick={handleToggleProviderSelection}
-                >
-                  <span className="codicon codicon-keyboard"></span>
                 </VSCodeButton>
               </>
             )}
@@ -631,6 +595,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
             </div>
           </div>
         </form>
+        <ProviderSelect />
       </div>
     </VSCodePanelView>
   )

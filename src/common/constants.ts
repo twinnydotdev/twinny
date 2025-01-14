@@ -62,12 +62,12 @@ export const EVENT_NAME = {
   twinnyNewDocument: "twinny-new-document",
   twinnyNotification: "twinny-notification",
   twinnyOnCompletion: "twinny-on-completion",
-  twinnyOnCompletionEnd: "twinny-on-end",
   twinnyOnLoading: "twinny-on-loading",
   twinnyOpenDiff: "twinny-open-diff",
   twinnyRerankThresholdChanged: "twinny-rerank-threshold-changed",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
+  twinnySendRequestBody: "twinny-send-request-body",
   twinnySendSymmetryMessage: "twinny-send-symmetry-message",
   twinnySendSystemMessage: "twinny-send-system-message",
   twinnySendTheme: "twinny-send-theme",
@@ -84,6 +84,7 @@ export const EVENT_NAME = {
   twinnyStopSymmetryProvider: "twinny-stop-symmetry-provider",
   twinnySymmetryModels: "twinny-symmetry-models",
   twinnyTextSelection: "twinny-text-selection",
+  twinnyGetModels: "twinny-get-models",
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -121,12 +122,6 @@ export const CONVERSATION_EVENT_NAME = {
   setActiveConversation: "twinny.set-active-conversation",
 }
 
-export const TOOL_EVENT_NAME = {
-  runAllTools: "run-all-tools",
-  runTool: "run-tool",
-  rejectTool: "run-on-tool",
-}
-
 export const PROVIDER_EVENT_NAME = {
   addProvider: "twinny.add-provider",
   copyProvider: "twinny.copy-provider",
@@ -153,6 +148,7 @@ export const INFERENCE_PROVIDERS_STORAGE_KEY = "twinny.inference-providers"
 
 export const GLOBAL_STORAGE_KEY = {
   autoConnectSymmetryProvider: "twinny.autoConnectSymmetryProvider",
+  selectedModel: "twinny.selectedModel",
 }
 
 export const WORKSPACE_STORAGE_KEY = {
@@ -177,7 +173,6 @@ export const EXTENSION_SETTING_KEY = {
 export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: "twinnyConversationHistory",
   twinnyEnableRag: "twinnyEnableRag",
-  twinnyEnableTools: "twinnyEnableTools",
   twinnyGeneratingText: "twinnyGeneratingText",
   twinnyManageProviders: "twinnyManageProviders",
   twinnyManageTemplates: "twinnyManageTemplates",

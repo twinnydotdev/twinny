@@ -235,9 +235,9 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
       sidebarProvider.conversationHistory?.resetConversation()
-      sidebarProvider.newConversation()
+      sidebarProvider.newSymmetryConversation()
       sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration
+        type: EVENT_NAME.twinnyNewConversation
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {

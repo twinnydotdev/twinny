@@ -111,14 +111,14 @@ export class CompletionProvider
       model: provider.modelName,
       numPredictFim: this.config.numPredictFim,
       temperature: this.config.temperature,
-      keepAlive: this.config.eepAlive
+      keepAlive: this.config.keepAlive
     })
 
     const options: StreamRequestOptions = {
-      hostname: provider.apiHostname,
+      hostname: provider.apiHostname || "",
       port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
+      path: provider.apiPath || "",
+      protocol: provider.apiProtocol || "",
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -256,7 +256,10 @@ export class CompletionProvider
     )
 
     try {
-      const providerFimData = getFimDataFromProvider(this._provider.provider, data)
+      const providerFimData = getFimDataFromProvider(
+        this._provider.provider,
+        data
+      )
       if (providerFimData === undefined) return ""
 
       this._completion = this._completion + providerFimData
@@ -413,8 +416,16 @@ export class CompletionProvider
         const isCurrentFile = doc.fileName === currentFileName
         const isGitFile =
           doc.fileName.includes(".git") || doc.fileName.includes("git/")
-        const isIgnored = ig.ignores(doc.fileName)
-        return !isCurrentFile && !isGitFile && !isIgnored
+
+        const projectRoot = workspace.workspaceFolders?.[0].uri.fsPath || ""
+        const relativePath = path.relative(projectRoot, doc.fileName)
+
+        if (isGitFile) return false
+
+        const normalizedPath = relativePath.split(path.sep).join("/")
+        const isIgnored = ig.ignores(normalizedPath)
+
+        return !isCurrentFile && !isIgnored
       })
       .map((doc) => {
         const interaction = interactions.find((i) => i.name === doc.fileName)
@@ -587,8 +598,6 @@ export class CompletionProvider
       }
     )
   }
-
-
 
   public setAcceptedLastCompletion(value: boolean) {
     this._acceptedLastCompletion = value

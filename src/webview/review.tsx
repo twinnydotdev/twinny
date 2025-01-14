@@ -6,7 +6,7 @@ import { WORKSPACE_STORAGE_KEY } from "../common/constants"
 
 import { useGithubPRs, useGlobalContext } from "./hooks"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/review.module.css"
 
 export const Review = () => {
   const { t } = useTranslation()
@@ -45,13 +45,9 @@ export const Review = () => {
   }, [owner, repo])
 
   return (
-    <>
-      <h3>
-        {t("review-pull-requests")}
-      </h3>
-      <p>
-        {t("owner-repo-name")}
-      </p>
+    <div className={styles.reviewContainer}>
+      <h3>{t("review-pull-requests")}</h3>
+      <p>{t("owner-repo-name")}</p>
       <div className={styles.prInputContainer}>
         <VSCodeTextField
           value={owner ? owner : ""}
@@ -99,6 +95,6 @@ export const Review = () => {
           </ul>
         </div>
       )}
-    </>
+    </div>
   )
 }

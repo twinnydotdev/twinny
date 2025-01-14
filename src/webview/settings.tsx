@@ -9,7 +9,7 @@ import {
 import { useTemplates, useWorkSpaceContext } from "./hooks"
 import { kebabToSentence } from "./utils"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/settings.module.css"
 
 export const Settings = () => {
   const { t } = useTranslation()
@@ -60,43 +60,41 @@ export const Settings = () => {
   }
 
   return (
-    <>
-      <h3>
-        {t("edit-default-templates")}
-      </h3>
-      <p>
-        {t("edit-default-templates-description")}
-      </p>
-      <VSCodeButton onClick={handleEditDefaultTemplates}>
-        Open template editor
-      </VSCodeButton>
-      <h3>
-        {t("template-settings")}
-      </h3>
-      <p>
-        {t("template-settings-description")}
-      </p>
-      {templates &&
-        templates.map((templateName: string) => (
-          <div key={templateName} className={styles.vscodeCheckbox}>
-            <label htmlFor={templateName}>
-              <VSCodeCheckbox
-                id={templateName}
-                name={templateName}
-                value={templateName}
-                onClick={handleTemplateClick}
-                checked={selectedTemplatesContext?.includes(templateName)}
-              ></VSCodeCheckbox>
-              <span key={templateName}>{kebabToSentence(templateName)}</span>
-            </label>
-          </div>
-        ))}
-      <VSCodeButton
-        className={styles.resetTemplatesButton}
-        onClick={handleResetTemplates}
-      >
-        {t("reset-to-default")}
-      </VSCodeButton>
-    </>
+    <div className={styles.settingsContainer}>
+      <h3>{t("edit-default-templates")}</h3>
+      <p>{t("edit-default-templates-description")}</p>
+      <div className={styles.templateEditor}>
+        <VSCodeButton onClick={handleEditDefaultTemplates}>
+          {t("open-template-editor")}
+        </VSCodeButton>
+      </div>
+
+      <h3>{t("template-settings")}</h3>
+      <p>{t("template-settings-description")}</p>
+
+      <div className={styles.checkboxGroup}>
+        {templates &&
+          templates.map((templateName: string) => (
+            <div key={templateName} className={styles.checkboxItem}>
+              <label htmlFor={templateName}>
+                <VSCodeCheckbox
+                  id={templateName}
+                  name={templateName}
+                  value={templateName}
+                  onClick={handleTemplateClick}
+                  checked={selectedTemplatesContext?.includes(templateName)}
+                />
+                <span>{kebabToSentence(templateName)}</span>
+              </label>
+            </div>
+          ))}
+      </div>
+
+      <div className={styles.resetButton}>
+        <VSCodeButton onClick={handleResetTemplates}>
+          {t("reset-to-default")}
+        </VSCodeButton>
+      </div>
+    </div>
   )
 }

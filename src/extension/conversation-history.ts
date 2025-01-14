@@ -1,3 +1,4 @@
+import { ChatCompletionMessageParam } from "token.js"
 import { v4 as uuidv4 } from "uuid"
 import { ExtensionContext, Webview } from "vscode"
 
@@ -6,26 +7,13 @@ import {
   ACTIVE_CONVERSATION_STORAGE_KEY,
   CONVERSATION_EVENT_NAME,
   CONVERSATION_STORAGE_KEY,
-  EXTENSION_SESSION_NAME,
-  TITLE_GENERATION_PROMPT_MESAGE,
-  USER
 } from "../common/constants"
-import {
-  ClientMessage,
-  Conversation,
-  Message,
-  RequestBodyBase,
-  ServerMessage,
-  StreamRequestOptions
-} from "../common/types"
+import { ClientMessage, Conversation, ServerMessage } from "../common/types"
 
 import { Base } from "./base"
-import { llm } from "./llm"
 import { TwinnyProvider } from "./provider-manager"
-import { createStreamRequestBody } from "./provider-options"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
-import { getResponseData } from "./utils"
 
 type Conversations = Record<string, Conversation> | undefined
 
@@ -77,37 +65,6 @@ export class ConversationHistory extends Base {
     }
   }
 
-  streamConversationTitle({
-    requestBody,
-    requestOptions
-  }: {
-    requestBody: RequestBodyBase
-    requestOptions: StreamRequestOptions
-    onEnd?: (completion: string) => void
-  }): Promise<string> {
-    const provider = this.getProvider()
-
-    if (!provider) return Promise.resolve("")
-
-    return new Promise((resolve, reject) => {
-      try {
-        return llm({
-          body: requestBody,
-          options: requestOptions,
-          onData: (streamResponse) => {
-            const data = getResponseData(streamResponse)
-            this._title = this._title + data.content
-          },
-          onEnd: () => {
-            return resolve(this._title)
-          }
-        })
-      } catch (e) {
-        return reject(e)
-      }
-    })
-  }
-
   public getProvider = () => {
     return this.context?.globalState.get<TwinnyProvider>(
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY
@@ -128,58 +85,13 @@ export class ConversationHistory extends Base {
     }
   }
 
-  public buildStreamRequestTitle(messages?: Message[]) {
-    const provider = this.getProvider()
+  async getConversationTitle(
+    messages: ChatCompletionMessageParam[]
+  ): Promise<string | null> {
 
-    if (!provider || !messages?.length) return
+    const message = messages[0].content as string
 
-    const requestOptions = this.getRequestOptions(provider)
-
-    const requestBody = createStreamRequestBody(provider.provider, {
-      model: provider.modelName,
-      numPredictChat: this.config.numPredictChat,
-      temperature: this.config.temperature,
-      messages: [
-        ...messages,
-        {
-          role: USER,
-          content: TITLE_GENERATION_PROMPT_MESAGE
-        }
-      ],
-      keepAlive: this.config.keepAlive
-    })
-
-    return { requestOptions, requestBody }
-  }
-
-  public buildStreamRequest(messages?: Message[]) {
-    const provider = this.getProvider()
-
-    if (!provider || !messages?.length) return
-
-    const requestOptions = this.getRequestOptions(provider)
-
-    const requestBody = createStreamRequestBody(provider.provider, {
-      model: provider.modelName,
-      numPredictChat: this.config.numPredictChat,
-      temperature: this.config.temperature,
-      messages,
-      keepAlive: this.config.keepAlive
-    })
-
-    return { requestOptions, requestBody }
-  }
-
-  async getConversationTitle(messages: Message[]): Promise<string> {
-    const symmetryConnected = this._sessionManager?.get(
-      EXTENSION_SESSION_NAME.twinnySymmetryConnection
-    )
-    if (symmetryConnected) {
-      return Promise.resolve(`${messages[0].content?.substring(0, 50)}...`)
-    }
-    const request = this.buildStreamRequestTitle(messages)
-    if (!request) return ""
-    return await this.streamConversationTitle(request)
+    return Promise.resolve(`${message?.substring(0, 50)}...`)
   }
 
   getAllConversations() {
@@ -258,7 +170,7 @@ export class ConversationHistory extends Base {
     if (!conversation.messages.length || conversation.messages.length > 2)
       return
 
-    this._title = await this.getConversationTitle(conversation.messages)
+    this._title = await this.getConversationTitle(conversation.messages) || " "
     this.saveConversationEnd(conversation)
   }
 

@@ -1,3 +1,4 @@
+import { ChatCompletionMessageParam, TokenJS } from "token.js"
 import { commands, ExtensionContext, Webview } from "vscode"
 
 import {
@@ -8,26 +9,19 @@ import {
   USER,
   WEBUI_TABS
 } from "../common/constants"
-import {
-  ClientMessage,
-  Message,
-  RequestBodyBase,
-  ServerMessage,
-  StreamRequestOptions,
-  TemplateData
-} from "../common/types"
+import { ClientMessage, ServerMessage, TemplateData } from "../common/types"
 
 import { ConversationHistory } from "./conversation-history"
-import { llm } from "./llm"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
-import { getResponseData, updateLoadingMessage } from "./utils"
+import { updateLoadingMessage } from "./utils"
 
 export class GithubService extends ConversationHistory {
   private _completion = ""
   private _templateProvider: TemplateProvider
   private _controller?: AbortController
+  private _tokenJs: TokenJS | undefined
 
   constructor(
     context: ExtensionContext,
@@ -38,6 +32,13 @@ export class GithubService extends ConversationHistory {
   ) {
     super(context, webView, sessionManager, symmetryService)
     this._templateProvider = new TemplateProvider(templateDir)
+    const provider = this.getProvider()
+    if (!provider) return
+
+    this._tokenJs = new TokenJS({
+      baseURL: this.getProviderBaseUrl(provider),
+      apiKey: provider.apiKey
+    })
   }
 
   setUpEventListeners() {
@@ -133,16 +134,12 @@ export class GithubService extends ConversationHistory {
     const diff = await response.text()
     const prompt = await this.loadReviewTemplate(`${title} \n\n ${diff}`)
 
-    const messages = [
+    const messages: ChatCompletionMessageParam[] = [
       {
         role: USER,
         content: prompt
       }
     ]
-
-    const request = this.buildStreamRequest(messages)
-
-    if (!request) return
 
     this.focusChatTab()
 
@@ -166,67 +163,70 @@ export class GithubService extends ConversationHistory {
 
       updateLoadingMessage(this.webView, "Reviewing")
 
-      await this.streamCodeReview(request)
+      await this.streamCodeReview(messages)
     }, 500)
   }
 
-  streamCodeReview({
-    requestBody,
-    requestOptions
-  }: {
-    requestBody: RequestBodyBase
-    requestOptions: StreamRequestOptions
-    onEnd?: (completion: string) => void
-  }): Promise<string> {
+  public abort = () => {
+    this._controller?.abort()
+    commands.executeCommand(
+      "setContext",
+      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
+      false
+    )
+  }
+
+  async streamCodeReview(messages: ChatCompletionMessageParam[]) {
     const provider = this.getProvider()
 
-    if (!provider) return Promise.resolve("")
+    if (!provider) return
 
-    return new Promise((_, reject) => {
-      try {
-        return llm({
-          body: requestBody,
-          options: requestOptions,
-          onStart: (controller: AbortController) => {
-            this._controller = controller
-            this.webView?.onDidReceiveMessage((data: { type: string }) => {
-              if (data.type === EVENT_NAME.twinnyStopGeneration) {
-                this._controller?.abort()
-              }
-            })
-          },
-          onData: (streamResponse) => {
-            const provider = this.getProvider()
-            if (!provider) return
-
-            try {
-              const data = getResponseData(streamResponse)
-              this._completion = this._completion + data.content
-              this.webView.postMessage({
-                type: EVENT_NAME.twinnyOnCompletion,
-                data: {
-                  role: ASSISTANT,
-                  content: this._completion.trimStart()
-                }
-              } as ServerMessage<Message>)
-            } catch (error) {
-              console.error("Error parsing JSON:", error)
-              return
-            }
-          },
-          onError: (error: Error) => {
-            this.webView?.postMessage({
-              type: EVENT_NAME.twinnyOnCompletionEnd,
-              data: {
-                role: ASSISTANT,
-                content: `Something went wrong ${error.message}`
-              }
-            } as ServerMessage<Message>)
-          }
-        })
-      } catch (e) {
-        return reject(e)
-      }
+    this.setActiveConversation({
+      messages,
+      id: crypto.randomUUID(),
+      title: "Code Review",
     })
+
+    const result = await this._tokenJs?.chat.completions.create({
+      messages,
+      model: provider.modelName,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: provider.provider as any,
+      stream: true
+    })
+
+    if (!result) return
+
+    for await (const part of result) {
+      if (this._controller?.signal.aborted) {
+        break
+      }
+
+      if (part.choices[0].delta.content) {
+        this._completion += part.choices[0].delta.content
+      }
+
+      this.webView.postMessage({
+        type: EVENT_NAME.twinnyOnCompletion,
+        data: {
+          role: ASSISTANT,
+          content: this._completion
+        }
+      })
+    }
+
+    this.saveConversation({
+      messages: [
+        ...messages,
+        {
+          role: ASSISTANT,
+          content: this._completion,
+        }
+      ],
+      id: crypto.randomUUID(),
+      title: "Code Review",
+    })
+
+    this._completion = ""
   }
 }

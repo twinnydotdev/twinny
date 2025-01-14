@@ -1,17 +1,11 @@
-import { Base } from "../extension/base"
-
-export class Logger extends Base {
+export class Logger {
   private static instance: Logger
 
-  public static ErrorType = {
-    Default: 0, // default color
-    Fetch_Error: 91, // red -- fetch error
-    Abort: 90, // gray -- abort
-    Timeout: 33 // yellow -- timeout
-  }
-
-  constructor() {
-    super()
+  private static colorCodes: Record<string, number> = {
+    Default: 0,
+    FetchError: 91,
+    Abort: 90,
+    Timeout: 33
   }
 
   public static getInstance(): Logger {
@@ -22,27 +16,33 @@ export class Logger extends Base {
   }
 
   public log = (message: string) => {
-    if (!this.config.enableLogging) return
     console.log(`[twinny] ${message}`)
   }
 
-  public error = (err: NodeJS.ErrnoException) => {
-    if (!this.config.enableLogging) return
-    console.error(err.message)
+  public error = (error: Error | string) => {
+    const errorMessage = error instanceof Error ? error.message : error
+    console.error(`[twinny:ERROR] ${errorMessage}`)
   }
 
-  public logConsoleError(
-    errorKey: number,
+  public logError(errorType: string, message: string, error: Error | string) {
+    const colorCode = Logger.colorCodes[errorType] || Logger.colorCodes.Default
+    const formattedErrorMessage = this.formatErrorMessage(
+      colorCode,
+      message,
+      error
+    )
+    console.error(formattedErrorMessage)
+  }
+
+  private formatErrorMessage(
+    colorCode: number,
     message: string,
     error: Error | string
-  ): void {
-    const color = errorKey
-    const coloredMessage = `\x1b[91m [ERROR_twinny] \x1b[32m Message: ${message} \n \x1b[${color}m Error Type: ${
-      error instanceof Error ? error.name : "Unknown Error"
-    } \n  Error Message: ${
-      error instanceof Error ? error.message : error
-    } \n \x1b[31m`
-    console.error(coloredMessage, error)
+  ) {
+    const errorName = error instanceof Error ? error.name : "Unknown Error"
+    const errorMessage = error instanceof Error ? error.message : error
+    const coloredMessage = `\x1b[${colorCode}m [ERROR_twinny] \x1b[32m Message: ${message} \n \x1b[${colorCode}m Error Type: ${errorName} \n  Error Message: ${errorMessage} \n \x1b[31m`
+    return coloredMessage
   }
 }
 

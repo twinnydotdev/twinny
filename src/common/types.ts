@@ -1,5 +1,5 @@
-import type { JSONSchema7 } from "json-schema"
 import { serverMessageKeys } from "symmetry-core"
+import { ChatCompletionMessageParam } from "token.js"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
 import { ALL_BRACKETS } from "./constants"
@@ -9,21 +9,19 @@ export interface RequestBodyBase {
   stream: boolean
   n_predict?: number
   temperature?: number
+  messages?: ChatCompletionMessageParam[]
 }
 
 export interface RequestOptionsOllama extends RequestBodyBase {
   model: string
   keep_alive?: string | number
-  messages?: Message[] | Message
   prompt?: string
   input?: string
   options: Record<string, unknown>
 }
 
 export interface StreamBodyOpenAI extends RequestBodyBase {
-  messages?: Message[] | Message
   max_tokens: number
-  tools?: FunctionTool[]
 }
 
 export interface PrefixSuffix {
@@ -39,13 +37,6 @@ export interface RepositoryLevelData {
   relevanceScore: number
 }
 
-type ToolCall = {
-  function: {
-    name: string
-    arguments: Record<string, unknown>
-  }
-}
-
 export interface StreamResponse {
   model: string
   created_at: string
@@ -54,7 +45,6 @@ export interface StreamResponse {
   message: {
     content: string
     role: "assistant"
-    tool_calls?: ToolCall[]
   }
   done: boolean
   context: number[]
@@ -65,7 +55,6 @@ export interface StreamResponse {
   eval_count: number
   eval_duration: number
   type?: string
-  tool_calls?: ToolCall[]
   system_fingerprint: string
   choices: [
     {
@@ -77,16 +66,8 @@ export interface StreamResponse {
       message: {
         role: "assistant"
         content: string
-        tool_calls?: Array<{
-          id: string
-          type: "function"
-          function: {
-            name: string
-            arguments: string
-          }
-        }>
       }
-      finish_reason: "stop" | "tool_calls"
+      finish_reason: "stop"
     }
   ]
   usage: {
@@ -101,7 +82,10 @@ export interface LanguageType {
   languageId: string | undefined
 }
 
-export interface ClientMessage<T = string | boolean | Message[], Y = unknown> {
+export interface ClientMessage<
+  T = string | boolean | ChatCompletionMessage[],
+  Y = unknown
+> {
   data?: T
   meta?: Y
   type?: string
@@ -109,19 +93,12 @@ export interface ClientMessage<T = string | boolean | Message[], Y = unknown> {
 }
 
 export type ClientMessageWithData = ClientMessage<string | boolean> &
-  ClientMessage<Message[]> &
+  ClientMessage<ChatCompletionMessage[]> &
   ClientMessage<GithubPullRequestMessage>
 
 export interface ServerMessage<T = unknown> {
   type: string
   data: T
-}
-
-export interface Message {
-  role: string
-  content: string | undefined
-  tools?: Record<string, Tool>
-  id?: string
 }
 
 export interface GithubPullRequestMessage {
@@ -130,10 +107,15 @@ export interface GithubPullRequestMessage {
   number: number
 }
 
+export type ChatCompletionMessage = ChatCompletionMessageParam & {
+  id?: string
+  excludeFromApi?: boolean
+}
+
 export interface Conversation {
   id?: string
   title?: string
-  messages: Message[]
+  messages: ChatCompletionMessage[]
 }
 
 export const Theme = {
@@ -146,10 +128,15 @@ export interface DefaultTemplate {
   systemMessage?: string
 }
 
-export interface TemplateData extends Record<string, string | undefined> {
-  code: string
+export interface TemplateData
+  extends Record<string, string | undefined | null> {
+  code?: string
   systemMessage?: string
   language?: string
+  osName?: string
+  defaultShell?: string | null
+  homedir?: string
+  cwd?: string
 }
 
 export interface FimTemplateData extends Record<string, string | undefined> {
@@ -163,7 +150,7 @@ export interface FimTemplateData extends Record<string, string | undefined> {
 export interface ChatTemplateData {
   systemMessage?: string
   role: string
-  messages: Message[]
+  messages: ChatCompletionMessage[]
   code: string
   language?: string
 }
@@ -210,9 +197,12 @@ export const apiProviders = {
   LiteLLM: "litellm",
   LlamaCpp: "llamacpp",
   LMStudio: "lmstudio",
-  Ollama: "ollama",
   Oobabooga: "oobabooga",
-  OpenWebUI: "openwebui"
+  OpenWebUI: "openwebui",
+  OpenAICompatible: "openai-compatible",
+  Ollama: "Ollama",
+  Anthropic: "anthropic",
+  OpenAI: "openai"
 } as const
 
 export interface ApiModel {
@@ -307,7 +297,7 @@ export interface SymmetryModelProvider {
 
 export interface InferenceRequest {
   key: string
-  messages: Message[]
+  messages: ChatCompletionMessage[]
 }
 
 export interface ChunkOptions {
@@ -359,55 +349,3 @@ export interface LMStudioEmbedding {
   model: string
   usage: LMSEmbeddingUsage
 }
-
-export type FunctionTool = {
-  type: "function"
-  function: {
-    name: string
-    description: string
-    parameters: JSONSchema7
-  }
-}
-
-export interface Tool {
-  id: string
-  name: string
-  arguments: Record<string, unknown>
-  status?: string
-  error?: string
-}
-
-export interface CreateFileArgs {
-  path: string
-  content: string
-  openAfterCreate?: boolean
-  createIntermediateDirs?: boolean
-  fileTemplate?: string
-  permissions?: string
-}
-
-export interface RunCommandArgs {
-  command: string
-  cwd?: string
-  env?: Record<string, string>
-  shell?: string
-  timeout?: number
-  captureOutput?: boolean
-  runInBackground?: boolean
-}
-
-export interface OpenFileArgs {
-  path: string
-  preview?: boolean
-  viewColumn?: "beside" | "active" | "new"
-  encoding?: string
-  revealIfOpen?: boolean
-}
-
-export interface EditFileArgs {
-  path: string
-  edit: string
-  createIfNotExists?: boolean
-  backupBeforeEdit?: boolean
-}
-
