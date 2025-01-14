@@ -243,6 +243,10 @@ export class SymmetryService extends EventEmitter {
         content: this._completion.trimStart()
       }
     } as ServerMessage<ChatCompletionMessage>)
+
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyStopGeneration
+    } as ServerMessage<ChatCompletionMessage>)
     this._completion = ""
   }
 
