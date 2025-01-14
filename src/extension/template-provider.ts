@@ -3,7 +3,6 @@ import * as Handlebars from "handlebars"
 import * as path from "path"
 
 import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from "../common/constants"
-import { DefaultTemplate } from "../common/types"
 
 import { defaultTemplates } from "./templates"
 
@@ -120,7 +119,7 @@ export class TemplateProvider {
     return templateNames
   }
 
-  public async readTemplate<T extends DefaultTemplate>(
+  public async readTemplate<T>(
     templateName: string,
     data: T
   ) {

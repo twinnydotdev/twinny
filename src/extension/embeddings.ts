@@ -55,10 +55,10 @@ export class EmbeddingDatabase extends Base {
     }
 
     const requestOptions: RequestOptions = {
-      hostname: provider.apiHostname,
+      hostname: provider.apiHostname || "localhost",
       port: provider.apiPort,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
+      path: provider.apiPath || "/api/embed",
+      protocol: provider.apiProtocol || "http",
       method: "POST",
       headers: {
         "Content-Type": "application/json",

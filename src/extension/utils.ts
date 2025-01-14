@@ -38,14 +38,14 @@ import { logger } from "../common/logger"
 import {
   apiProviders,
   Bracket,
+  ChatCompletionMessage,
   ChunkOptions,
   LanguageType,
-  Message,
   PrefixSuffix,
   ServerMessage,
   ServerMessageKey,
   StreamResponse,
-  Theme
+  Theme,
 } from "../common/types"
 
 import { getParser } from "./parser"
@@ -312,19 +312,6 @@ export const getTheme = () => {
 }
 
 export const getResponseData = (data: StreamResponse) => {
-  const toolCalls = data?.choices?.[0]?.message?.tool_calls
-
-  if (toolCalls?.length) {
-    return {
-      type: "function_call" as const,
-      calls: toolCalls.map((call) => ({
-        id: call.id,
-        name: call.function.name,
-        arguments: JSON.parse(call.function.arguments)
-      }))
-    }
-  }
-
   return {
     type: "content" as const,
     content:
@@ -339,7 +326,7 @@ export const getFimDataFromProvider = (
   data: StreamResponse | undefined
 ) => {
   switch (provider) {
-    case apiProviders.Ollama:
+    case apiProviders.OpenAICompatible:
     case apiProviders.OpenWebUI:
       return data?.response
     case apiProviders.LlamaCpp:
@@ -637,48 +624,46 @@ export function readGitSubmodulesFile(): string[] | undefined {
 
 export async function getAllFilePaths(dirPath: string): Promise<string[]> {
   if (!dirPath) return []
-  let filePaths: string[] = []
-  const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
-  const submodules = readGitSubmodulesFile()
 
   const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ""
   const config = workspace.getConfiguration("twinny")
+  const submodules = readGitSubmodulesFile()
 
   const ig = ignore()
-
-  const embeddingIgnoredGlobs = config.get(
+  const embeddingIgnoredGlobs = config.get<string[]>(
     "embeddingIgnoredGlobs",
-    [] as string[]
+    []
   )
-
-  ig.add(embeddingIgnoredGlobs)
-  ig.add([".git", ".gitignore"])
+  ig.add([...embeddingIgnoredGlobs, ".git", ".gitignore"])
 
   const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
-
   if (fs.existsSync(gitIgnoreFilePath)) {
     ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
   }
 
+  const filePaths: string[] = []
+  const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
+
   for (const dirent of dirents) {
     const fullPath = path.join(dirPath, dirent.name)
-    const relativePath = path.relative(rootPath, fullPath)
+    const relativePath = "/" + path.relative(rootPath, fullPath)
 
-    if (submodules?.some((submodule) => fullPath.includes(submodule))) {
+    if (submodules?.some((submodule) => relativePath.includes(submodule))) {
       continue
     }
 
-    if (ig.ignores(relativePath)) {
+    if (ig.ignores(relativePath.slice(1))) {
       logger.log(`git-ignored: ${relativePath}`)
       continue
     }
 
     if (dirent.isDirectory()) {
-      filePaths = filePaths.concat(await getAllFilePaths(fullPath))
+      filePaths.push(...(await getAllFilePaths(fullPath)))
     } else if (dirent.isFile()) {
-      filePaths.push(fullPath)
+      filePaths.push(relativePath)
     }
   }
+
   return filePaths
 }
 
@@ -743,12 +728,14 @@ export const logStreamOptions = (opts: any) => {
   logger.log(logMessage)
 }
 
-const calculateTotalCharacters = (messages: Message[] | undefined): number => {
+const calculateTotalCharacters = (
+  messages: ChatCompletionMessage[] | undefined
+): number => {
   if (!Array.isArray(messages)) {
     return 0
   }
 
-  return messages.reduce((acc: number, msg: Message) => {
+  return messages.reduce((acc: number, msg: ChatCompletionMessage) => {
     return acc + (typeof msg.content === "string" ? msg.content.length : 0)
   }, 0)
 }

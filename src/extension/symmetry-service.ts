@@ -25,8 +25,8 @@ import {
   WEBUI_TABS
 } from "../common/constants"
 import {
+  ChatCompletionMessage,
   ClientMessage,
-  Message,
   Peer,
   ServerMessage,
   StreamResponse,
@@ -237,12 +237,12 @@ export class SymmetryService extends EventEmitter {
     if (!this._completion) return
 
     this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnCompletionEnd,
+      type: EVENT_NAME.twinnyAddMessage,
       data: {
         role: ASSISTANT,
         content: this._completion.trimStart()
       }
-    } as ServerMessage<Message>)
+    } as ServerMessage<ChatCompletionMessage>)
     this._completion = ""
   }
 
@@ -260,13 +260,13 @@ export class SymmetryService extends EventEmitter {
     }
 
     const config: ProviderConfig = {
-      apiHostname: provider.apiHostname,
+      apiHostname: provider.apiHostname || "localhost",
       apiKey: provider.apiKey,
       apiBasePath: provider.apiPath,
       apiChatPath: provider.apiPath,
       dataPath: configDir,
       apiPort: provider.apiPort || 8080,
-      apiProtocol: provider.apiProtocol,
+      apiProtocol: provider.apiProtocol || "http",
       apiProvider: provider.provider,
       dataCollectionEnabled: false,
       maxConnections: 10,

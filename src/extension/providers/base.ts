@@ -1,4 +1,5 @@
 import { serverMessageKeys } from "symmetry-core"
+import { ChatCompletionMessageParam, models } from "token.js"
 import * as vscode from "vscode"
 
 import {
@@ -12,11 +13,11 @@ import {
 import { logger } from "../../common/logger"
 import {
   ApiModel,
+  ChatCompletionMessage,
   ClientMessage,
   FileItem,
   InferenceRequest,
   LanguageType,
-  Message,
   ServerMessage,
   ThemeType
 } from "../../common/types"
@@ -37,7 +38,6 @@ import {
   getLanguage,
   getTextSelection,
   getTheme,
-  updateLoadingMessage
 } from "../utils"
 
 export class BaseProvider {
@@ -146,9 +146,12 @@ export class BaseProvider {
       [EVENT_NAME.twinnyNewConversation]: this.twinnyNewConversation,
       [EVENT_NAME.twinnyEditDefaultTemplates]: this.editDefaultTemplates,
       [EVENT_NAME.twinntGetLocale]: this.sendLocaleToWebView,
+      [EVENT_NAME.twinnyGetModels]: this.sendModelsToWebView,
+      [EVENT_NAME.twinnyStopGeneration]: this.destroyStream,
       [TWINNY_COMMAND_NAME.settings]: this.openSettings
     }
-    this.webView?.onDidReceiveMessage((message: ClientMessage<Message[]>) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.webView?.onDidReceiveMessage((message: any) => {
       const eventHandler = eventHandlers[message.type as string]
       if (eventHandler) eventHandler(message)
     })
@@ -162,6 +165,13 @@ export class BaseProvider {
     return this.context.globalState.get<TwinnyProvider>(
       ACTIVE_FIM_PROVIDER_STORAGE_KEY
     )
+  }
+
+  private sendModelsToWebView = () => {
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnyGetModels,
+      data: models,
+    })
   }
 
   private sendLocaleToWebView = () => {
@@ -182,7 +192,7 @@ export class BaseProvider {
     this.sendTextSelectionToWebView(text)
   }
 
-  public newConversation() {
+  public newSymmetryConversation() {
     this._symmetryService?.write(
       createSymmetryMessage(serverMessageKeys.newConversation)
     )
@@ -198,7 +208,8 @@ export class BaseProvider {
   }
 
   public destroyStream = () => {
-    this._chatService?.destroyStream()
+    this._chatService?.abort()
+    this.reviewService?.abort()
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyStopGeneration
     })
@@ -237,9 +248,9 @@ export class BaseProvider {
 
   private twinnyNewConversation = () => {
     this.conversationHistory?.resetConversation()
-    this.newConversation()
+    this.newSymmetryConversation()
     this.webView?.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration
+      type: EVENT_NAME.twinnyNewConversation
     } as ServerMessage<string>)
   }
 
@@ -327,7 +338,7 @@ export class BaseProvider {
     )
   }
 
-  private streamChatCompletion = async (data: ClientMessage<Message[]>) => {
+  private streamChatCompletion = async (data: ClientMessage<ChatCompletionMessageParam[]>) => {
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
@@ -337,9 +348,7 @@ export class BaseProvider {
         content: await this._templateProvider?.readSystemMessageTemplate()
       }
 
-      const messages = [systemMessage, ...(data.data as Message[])]
-
-      updateLoadingMessage(this.webView, "Using symmetry for inference")
+      const messages = [systemMessage, ...(data.data as ChatCompletionMessage[])]
 
       logger.log(`
         Using symmetry for inference
@@ -347,7 +356,7 @@ export class BaseProvider {
       `)
 
       return this._symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(serverMessageKeys.inference, {
+        createSymmetryMessage(serverMessageKeys.inference, {
           messages,
           key: SYMMETRY_EMITTER_KEY.inference
         })

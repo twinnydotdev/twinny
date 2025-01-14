@@ -1,3 +1,4 @@
+import { ReactNode } from "react"
 import { v4 as uuidv4 } from "uuid"
 import { ExtensionContext, Webview } from "vscode"
 
@@ -13,18 +14,20 @@ import {
 import { apiProviders, ClientMessage, ServerMessage } from "../common/types"
 
 export interface TwinnyProvider {
-  apiHostname: string
-  apiPath: string
+  apiHostname?: string
+  apiKey?: string
+  apiPath?: string
   apiPort?: number
-  apiProtocol: string
+  apiProtocol?: string
+  features?: string[]
+  fimTemplate?: string
   id: string
   label: string
+  logo?: ReactNode
   modelName: string
   provider: string
-  type: string
-  apiKey?: string
-  fimTemplate?: string
   repositoryLevel?: boolean
+  type: string
 }
 
 type Providers = Record<string, TwinnyProvider> | undefined
@@ -88,13 +91,13 @@ export class ProviderManager {
   getDefaultChatProvider() {
     return {
       apiHostname: "0.0.0.0",
-      apiPath: "/v1/chat/completions",
+      apiPath: "/v1",
       apiPort: 11434,
       apiProtocol: "http",
       id: uuidv4(),
-      label: "Ollama 7B Chat",
-      modelName: "codellama:7b-instruct",
-      provider: apiProviders.Ollama,
+      label: "OpenAI Compatible (localhost)",
+      modelName: "llama3.2:latest",
+      provider: apiProviders.OpenAICompatible,
       type: "chat",
     } as TwinnyProvider
   }
@@ -120,10 +123,10 @@ export class ProviderManager {
       apiPort: 11434,
       apiProtocol: "http",
       fimTemplate: FIM_TEMPLATE_FORMAT.codellama,
-      label: "Ollama 7B FIM",
+      label: "Ollama FIM",
       id: uuidv4(),
       modelName: "codellama:7b-code",
-      provider: apiProviders.Ollama,
+      provider: apiProviders.OpenAICompatible,
       type: "fim",
     } as TwinnyProvider
   }
@@ -256,6 +259,7 @@ export class ProviderManager {
     provider.id = uuidv4()
     providers[provider.id] = provider
     this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
+    this.setActiveChatProvider(provider)
     this.getAllProviders()
   }
 

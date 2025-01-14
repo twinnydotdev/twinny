@@ -75,7 +75,14 @@ export async function activate(context: ExtensionContext) {
 
   templateProvider.init()
 
+  const diffContentProvider = new (class implements vscode.TextDocumentContentProvider {
+		provideTextDocumentContent(uri: vscode.Uri): string {
+			return Buffer.from(uri.query, "base64").toString("utf-8")
+		}
+	})()
+
   context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider("twinny-diff", diffContentProvider),
     languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
       completionProvider
@@ -235,9 +242,9 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
       sidebarProvider.conversationHistory?.resetConversation()
-      sidebarProvider.newConversation()
+      sidebarProvider.newSymmetryConversation()
       sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration
+        type: EVENT_NAME.twinnyNewConversation
       } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {

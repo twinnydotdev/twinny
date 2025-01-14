@@ -8,10 +8,9 @@ import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, TWINNY, YOU } from "../common/constants"
-import { Message as MessageType, ThemeType, Tool } from "../common/types"
+import { ChatCompletionMessage, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
-import { ToolExecution } from "./tool-execution"
 
 import styles from "./styles/index.module.css"
 
@@ -20,14 +19,11 @@ interface MessageProps {
   index?: number
   isAssistant?: boolean
   isLoading?: boolean
-  message?: MessageType
+  message?: ChatCompletionMessage
   onDelete?: (index: number) => void
   onRegenerate?: (index: number) => void
   onUpdate?: (message: string, index: number) => void
   theme: ThemeType | undefined
-  onRejectTool?: (message: MessageType, tool: Tool) => void
-  onRunTool?: (message: MessageType, tool: Tool) => void
-  onRunAllTools?: (message: MessageType) => void
 }
 
 const CustomKeyMap = Extension.create({
@@ -65,20 +61,8 @@ export const Message: React.FC<MessageProps> = React.memo(
     onRegenerate,
     onUpdate,
     theme,
-    onRunTool,
-    onRejectTool,
-    onRunAllTools
-  }) => {
-    if (message?.tools)
-      return (
-        <ToolExecution
-          onRejectTool={onRejectTool}
-          onRunTool={onRunTool}
-          onRunAllTools={onRunAllTools}
-          message={message}
-        />
-      )
 
+  }) => {
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
 
@@ -225,7 +209,7 @@ export const Message: React.FC<MessageProps> = React.memo(
             remarkPlugins={[remarkGfm]}
             components={markdownComponents as Components}
           >
-            {message.content.trimStart()}
+            {(message.content as string).trimStart()}
           </Markdown>
         )}
       </div>

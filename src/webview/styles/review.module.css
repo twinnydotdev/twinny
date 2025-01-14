@@ -1,0 +1,90 @@
+.reviewContainer {
+  padding: 0.5rem;
+}
+
+.reviewContainer h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--vscode-foreground);
+}
+
+.reviewContainer h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.5rem;
+  color: var(--vscode-foreground);
+}
+
+.reviewContainer p {
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.75rem;
+  color: var(--vscode-foreground);
+  opacity: 0.9;
+}
+
+.prInputContainer {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  align-items: flex-start;
+}
+
+.prInputContainer vscode-text-field {
+  width: 180px;
+}
+
+.prButtonContainer {
+  margin: 0;
+}
+
+.prButtonContainer vscode-button {
+  height: 24px;
+  min-width: 90px;
+}
+
+.prListContainer {
+  margin-top: 0.75rem;
+}
+
+.prList {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0;
+}
+
+.prItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 3px;
+  margin-bottom: 0.35rem;
+  transition: background 0.2s ease;
+}
+
+.prTitle {
+  flex: 1;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.prTitle a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.prTitle a:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+.prItem vscode-button {
+  padding: 3px;
+  color: var(--vscode-icon-foreground);
+}
+
+.prItem vscode-button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}

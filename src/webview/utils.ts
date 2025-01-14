@@ -4,6 +4,39 @@ import { Extension } from "@tiptap/react"
 import { CodeLanguage, supportedLanguages } from "../common/languages"
 import { LanguageType } from "../common/types"
 
+interface DebounceOptions {
+  immediate?: boolean
+}
+
+export const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  wait: number,
+  options: DebounceOptions = {}
+): ((...args: Parameters<T>) => void) => {
+  let timeoutId: NodeJS.Timeout | null = null
+
+  return function (this: unknown, ...args: Parameters<T>) {
+    const later = () => {
+      timeoutId = null
+      if (!options.immediate) {
+        func.apply(this, args)
+      }
+    }
+
+    const callNow = options.immediate && !timeoutId
+
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+
+    timeoutId = setTimeout(later, wait)
+
+    if (callNow) {
+      func.apply(this, args)
+    }
+  }
+}
+
 export const getLanguageMatch = (
   language: LanguageType | undefined,
   className: string | undefined

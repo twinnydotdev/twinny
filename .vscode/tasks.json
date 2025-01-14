@@ -42,6 +42,12 @@
 			"problemMatcher": [],
 			"label": "npm: build",
 			"detail": "node scripts/build.mjs"
+		},
+		{
+			"type": "mix",
+			"task": "List deps",
+			"problemMatcher": [],
+			"label": "mix: List deps"
 		}
 	]
 }

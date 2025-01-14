@@ -1,5 +1,8 @@
 import * as fs from "fs/promises"
+import * as os from "os"
 import * as path from "path"
+import { CompletionResponseChunk, TokenJS  } from "token.js"
+import { CompletionStreaming, LLMProvider } from "token.js/dist/chat"
 import {
   commands,
   DiagnosticSeverity,
@@ -27,40 +30,41 @@ import {
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import {
+  ChatCompletionMessage,
   FileItem,
-  Message,
-  RequestBodyBase,
   ServerMessage,
-  StreamRequestOptions,
-  StreamResponse,
-  TemplateData,
-  Tool
+  TemplateData
 } from "../common/types"
 import { kebabToSentence } from "../webview/utils"
 
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
-import { llm } from "./llm"
 import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
-import { Tools } from "./tools"
-import { getLanguage, getResponseData, updateLoadingMessage } from "./utils"
+import { FileTreeProvider } from "./tree"
+import { getLanguage, updateLoadingMessage } from "./utils"
 
 export class ChatService extends Base {
   private _completion = ""
   private _controller?: AbortController
+  private _conversation: ChatCompletionMessage[] = []
   private _db?: EmbeddingDatabase
-  private _promptTemplate = ""
+  private _fileTreeProvider = new FileTreeProvider()
+  private _functionArguments = ""
+  private _functionId = ""
+  private _functionName = ""
+  private _isCollectingFunctionArgs = false
+  private _lastStreamingRequest?: CompletionStreaming<LLMProvider>
   private _reranker: Reranker
+  private _sessionManager: SessionManager | undefined
   private _statusBar: StatusBarItem
   private _symmetryService?: SymmetryService
   private _templateProvider?: TemplateProvider
+  private _tokenJs: TokenJS | undefined
   private _webView?: Webview
-  private _sessionManager: SessionManager | undefined
-  private _tools?: Tools
-  private _conversation: Message[] = []
+  private _isCancelled = false
 
   constructor(
     statusBar: StatusBarItem,
@@ -80,7 +84,6 @@ export class ChatService extends Base {
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this.setupSymmetryListeners()
-    this._tools = new Tools(webView, extensionContext)
   }
 
   private setupSymmetryListeners() {
@@ -93,7 +96,7 @@ export class ChatService extends Base {
             content: completion.trimStart(),
             role: ASSISTANT
           }
-        } as ServerMessage<Message>)
+        } as ServerMessage<ChatCompletionMessage>)
       }
     )
   }
@@ -106,7 +109,6 @@ export class ChatService extends Base {
     const table = `${workspace.name}-file-paths`
     if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
-
       if (!embedding) return []
 
       const relevantFileCountContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths}`
@@ -135,7 +137,6 @@ export class ChatService extends Base {
       rerankThresholdContext
     ) as number
     const rerankThreshold = stored || DEFAULT_RERANK_THRESHOLD
-
     return rerankThreshold
   }
 
@@ -146,26 +147,14 @@ export class ChatService extends Base {
     if (!this._db || !text || !workspace.name || !filePaths?.length) return []
 
     const rerankThreshold = this.getRerankThreshold()
-
-    logger.log(
-      `
-      Reranking threshold: ${rerankThreshold}
-    `.trim()
-    )
-
+    logger.log(`Reranking threshold: ${rerankThreshold}`)
     const fileNames = filePaths?.map((filePath) => path.basename(filePath))
-
     const scores = await this._reranker.rerank(text, fileNames)
-
     if (!scores) return []
 
-    const fileScorePairs: [string, number][] = filePaths.map(
-      (filePath, index) => {
-        return [filePath, scores[index]]
-      }
+    return filePaths.map(
+      (filePath, index) => [filePath, scores[index]] as [string, number]
     )
-
-    return fileScorePairs
   }
 
   private async readFileContent(
@@ -173,21 +162,13 @@ export class ChatService extends Base {
     maxFileSize: number = 5 * 1024
   ): Promise<string | null> {
     if (!filePath) return null
-
     try {
       const stats = await fs.stat(filePath)
-
-      if (stats.size > maxFileSize) {
-        return null
-      }
-
-      if (stats.size === 0) {
-        return ""
-      }
-
+      if (stats.size > maxFileSize) return null
+      if (stats.size === 0) return ""
       const content = await fs.readFile(filePath, "utf-8")
       return content
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -209,7 +190,6 @@ export class ChatService extends Base {
       const relevantCodeCount = Number(stored) || DEFAULT_RELEVANT_CODE_COUNT
 
       const embedding = await this._db.fetchModelEmbedding(text)
-
       if (!embedding) return ""
 
       const query = relevantFiles?.length
@@ -232,7 +212,6 @@ export class ChatService extends Base {
         )) || []
 
       const documents = [...embeddedDocuments, ...queryEmbeddedDocuments]
-
       const documentScores = await this._reranker.rerank(
         text,
         documents.map((item) => (item.content ? item.content.trim() : ""))
@@ -241,7 +220,6 @@ export class ChatService extends Base {
       if (!documentScores) return ""
 
       const readThreshould = rerankThreshold
-
       const readFileChunks = []
 
       for (let i = 0; i < relevantFiles.length; i++) {
@@ -267,134 +245,34 @@ export class ChatService extends Base {
     return ""
   }
 
-
-
-
-
-  async getMessageTools(data: {
-    type: "function_call"
-    calls: Tool[]
-  }): Promise<Record<string, Tool>> {
-    const tools: Record<string, Tool> = {}
-    if (!data.calls?.length) return {}
-
-    for (const call of data.calls) {
-      tools[call.name] = {
-        arguments: call.arguments,
-        name: call.name,
-        status: "pending",
-        id: call.id
-      }
-    }
-
-    return tools
-  }
-
-  private onLlmData = async (response: StreamResponse) => {
+  private async onPart(response: CompletionResponseChunk) {
     try {
-      const data = getResponseData(response)
+      const delta = response.choices[0]?.delta
 
-      this._completion = this._completion + data.content
-
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnCompletion,
-        data: {
-          content: this._completion.trimStart(),
-          role: ASSISTANT
-        }
-      } as ServerMessage<Message>)
+      if (delta?.content) {
+        this._completion += delta.content
+        await this._webView?.postMessage({
+          type: EVENT_NAME.twinnyOnCompletion,
+          data: {
+            content: this._completion.trimStart() || " ",
+            role: ASSISTANT
+          }
+        } as ServerMessage<ChatCompletionMessage>)
+      }
     } catch (error) {
-      console.error("Error parsing JSON:", error)
-      return
+      console.error("Error processing stream part:", error)
     }
   }
 
-  private onLlmEnd = async (response?: StreamResponse) => {
+  public abort = () => {
+    this._controller?.abort()
+    this._isCancelled = true
     this._statusBar.text = "$(code)"
     commands.executeCommand(
       "setContext",
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
-
-    if (response) {
-      const data = getResponseData(response)
-
-      if (data.calls) {
-        const tools = await this.getMessageTools(data)
-
-        this._webView?.postMessage({
-          type: EVENT_NAME.twinnyOnCompletionEnd,
-          data: {
-            content: "Twinny would like to use the following tools:",
-            role: ASSISTANT,
-            tools,
-            id: crypto.randomUUID()
-          }
-        } as ServerMessage<Message>)
-
-        return
-      }
-
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnCompletionEnd,
-        data: {
-          content: data.content,
-          role: ASSISTANT
-        }
-      } as ServerMessage<Message>)
-
-      return
-    }
-
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnCompletionEnd,
-      data: {
-        content: this._completion.trimStart(),
-        role: ASSISTANT
-      }
-    } as ServerMessage<Message>)
-  }
-
-  private onLlmError = (error: Error) => {
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnCompletionEnd,
-      data: {
-        content: `==## ERROR ##== : ${error.message}`,
-        role: ASSISTANT
-      }
-    } as ServerMessage)
-  }
-
-  private onLlmStart = (controller: AbortController) => {
-    this._controller = controller
-    commands.executeCommand(
-      "setContext",
-      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
-      true
-    )
-    this._webView?.onDidReceiveMessage((data: { type: string }) => {
-      if (data.type === EVENT_NAME.twinnyStopGeneration) {
-        this._controller?.abort()
-      }
-    })
-  }
-
-  public destroyStream = () => {
-    this._controller?.abort()
-    this._statusBar.text = "$(code)"
-    commands.executeCommand(
-      "setContext",
-      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
-      true
-    )
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnCompletionEnd,
-      data: {
-        content: this._completion.trimStart(),
-        role: ASSISTANT
-      }
-    } as ServerMessage<Message>)
   }
 
   private buildTemplatePrompt = async (
@@ -417,21 +295,55 @@ export class ChatService extends Base {
     return { prompt: prompt || "", selection: selectionContext }
   }
 
-  private callLlm({
-    requestBody,
-    requestOptions
-  }: {
-    requestBody: RequestBodyBase
-    requestOptions: StreamRequestOptions
-  }) {
-    return llm({
-      body: requestBody,
-      options: requestOptions,
-      onStart: this.onLlmStart,
-      onData: this.onLlmData,
-      onEnd: this.onLlmEnd,
-      onError: this.onLlmError
-    })
+  private async llm(requestBody: CompletionStreaming<LLMProvider>) {
+    this._controller = new AbortController()
+
+    this._lastStreamingRequest = requestBody
+    this._completion = ""
+    this._functionArguments = ""
+    this._functionName = ""
+    this._isCollectingFunctionArgs = false
+
+    if (!this._tokenJs || this._isCancelled) return
+
+    try {
+      const result = await this._tokenJs.chat.completions.create(requestBody)
+
+      for await (const part of result) {
+        if (this._controller?.signal.aborted) {
+          break
+        }
+
+        await this.onPart(part)
+      }
+
+      await this._webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        data: {
+          content: this._completion.trim(),
+          role: ASSISTANT
+        }
+      } as ServerMessage<ChatCompletionMessage>)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyStopGeneration
+      } as ServerMessage<ChatCompletionMessage>)
+
+      this._completion = ""
+    } catch (error) {
+      this._controller?.abort()
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyStopGeneration
+      } as ServerMessage<ChatCompletionMessage>)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        data: {
+          content: error instanceof Error ? error.message : String(error),
+          role: ASSISTANT
+        }
+      } as ServerMessage<ChatCompletionMessage>)
+    }
   }
 
   private sendEditorLanguage = () => {
@@ -476,20 +388,17 @@ export class ChatService extends Base {
     let combinedContext = ""
 
     const workspaceMentioned = text?.includes("@workspace")
-
     const problemsMentioned = text?.includes("@problems")
 
     if (symmetryConnected) return null
 
     let problemsContext = ""
-
     if (problemsMentioned) {
       problemsContext = this.getProblemsContext()
       if (problemsContext) combinedContext += problemsContext + "\n\n"
     }
 
     const prompt = text?.replace(/@workspace|@problems/g, "")
-
     let relevantFiles: [string, number][] | null = []
     let relevantCode: string | null = ""
 
@@ -535,33 +444,32 @@ export class ChatService extends Base {
   }
 
   public async streamChatCompletion(
-    messages: Message[],
+    messages: ChatCompletionMessage[],
     filePaths?: FileItem[]
   ) {
     this._completion = ""
+    this._isCancelled = false
     this.sendEditorLanguage()
-    const editor = window.activeTextEditor
-    const selection = editor?.selection
-    const userSelection = editor?.document.getText(selection)
     const lastMessage = messages[messages.length - 1]
-    const text = lastMessage.content
+    const text = lastMessage.content as string
 
-    const systemMessage = {
+    const systemPrompt =
+      (await this._templateProvider?.readTemplate<TemplateData>("system", {
+        cwd: workspace.workspaceFolders?.[0].uri.fsPath,
+        defaultShell: os.userInfo().shell,
+        osName: os.platform(),
+        homedir: os.homedir()
+      })) || ""
+
+    const systemMessage: ChatCompletionMessage = {
       role: SYSTEM,
-      content: await this._templateProvider?.readSystemMessageTemplate(
-        this._promptTemplate
-      )
+      content: systemPrompt
     }
 
     let additionalContext = ""
 
-    if (userSelection) {
-      additionalContext += `Selected Code:\n${userSelection}\n\n`
-    }
-
     const ragContext = await this.getRagContext(text)
-
-    const cleanedText = text?.replace(/@workspace/g, "").trim()
+    const cleanedText = text?.replace(/@workspace/g, "").trim() || " "
 
     if (ragContext) {
       additionalContext += `Additional Context:\n${ragContext}\n\n`
@@ -577,45 +485,44 @@ export class ChatService extends Base {
     }
 
     const provider = this.getProvider()
-
     if (!provider) return
 
-    this._conversation = []
+    this._tokenJs = new TokenJS({
+      baseURL: this.getProviderBaseUrl(provider),
+      apiKey: provider.apiKey
+    })
 
-    this._conversation.push(...messages.slice(0, -1))
+    this._conversation = messages.slice(0, -1)
+    this._conversation.unshift(systemMessage)
 
-    if (!provider.modelName.includes("claude")) {
-      this._conversation.unshift(systemMessage)
+    let finalUserMessageContent = cleanedText
+
+    if (additionalContext.trim()) {
+      finalUserMessageContent += `\n\n${additionalContext.trim()}`
     }
 
-    if (additionalContext) {
-      const lastMessageContent = `${cleanedText}\n\n${additionalContext.trim()}`
-      this._conversation.push({
-        role: USER,
-        content: lastMessageContent
-      })
-    } else {
-      this._conversation.push({
-        ...lastMessage,
-        content: cleanedText
-      })
-    }
-    updateLoadingMessage(this._webView, "Thinking")
-    const request = this.buildStreamRequest(this._conversation)
-    if (!request) return
-    const { requestBody, requestOptions } = request
-    return this.callLlm({ requestBody, requestOptions })
+    this._conversation.push({
+      role: USER,
+      content: finalUserMessageContent.trim() || " "
+    })
+
+    return this.llm({
+      messages: this._conversation.filter((m) => !m.excludeFromApi),
+      model: provider.modelName,
+      stream: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: provider.provider as any
+    })
   }
 
   public async getTemplateMessages(
     template: string,
     context?: string,
     skipMessage?: boolean
-  ): Promise<Message[]> {
+  ): Promise<ChatCompletionMessage[]> {
     this._statusBar.text = "$(loading~spin)"
     const { language } = getLanguage()
     this._completion = ""
-    this._promptTemplate = template
     this.sendEditorLanguage()
 
     const { prompt, selection } = await this.buildTemplatePrompt(
@@ -632,20 +539,14 @@ export class ChatService extends Base {
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         data: {
-          content: kebabToSentence(template) + "\n\n" + "```\n" + selection
+          content:
+            (kebabToSentence(template) + "\n\n" + "```\n" + selection).trim() ||
+            " "
         }
-      } as ServerMessage<Message>)
-    }
-
-    const systemMessage = {
-      role: SYSTEM,
-      content: await this._templateProvider?.readSystemMessageTemplate(
-        this._promptTemplate
-      )
+      } as ServerMessage<ChatCompletionMessage>)
     }
 
     let ragContext = undefined
-
     if (["explain"].includes(template)) {
       ragContext = await this.getRagContext(selection)
     }
@@ -655,21 +556,14 @@ export class ChatService extends Base {
       : prompt
 
     const provider = this.getProvider()
-
     if (!provider) return []
 
-    const conversation = []
-
-    conversation.push({
+    this._conversation.push({
       role: USER,
-      content: userContent
+      content: userContent.trim() || " "
     })
 
-    if (!provider.modelName.includes("claude")) {
-      conversation.unshift(systemMessage)
-    }
-
-    return conversation
+    return this._conversation
   }
 
   public async streamTemplateCompletion(
@@ -682,10 +576,21 @@ export class ChatService extends Base {
       context,
       skipMessage
     )
-    const request = this.buildStreamRequest(messages)
+    const provider = this.getProvider()
+    if (!provider) return []
 
-    if (!request) return
-    const { requestBody, requestOptions } = request
-    return this.callLlm({ requestBody, requestOptions })
+    this._tokenJs = new TokenJS({
+      baseURL: this.getProviderBaseUrl(provider),
+      apiKey: provider.apiKey
+    })
+
+    const requestBody: CompletionStreaming<LLMProvider> = {
+      messages,
+      model: provider.modelName,
+      stream: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: provider.provider as any
+    }
+    return this.llm(requestBody)
   }
 }

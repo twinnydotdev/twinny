@@ -12,12 +12,7 @@ vscode-text-field {
   width: 100%;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   line-height: 1.5;
 }
@@ -54,16 +49,18 @@ h5 {
 }
 
 h6 {
-  font-size: 0.7y;
+  font-size: 0.7em;
   margin-bottom: 0.5em;
   font-weight: 400;
 }
 
 pre {
   background-color: var(--vscode-textCodeBlock-background);
-  border-radius: 3px;
-  padding: 8px;
+  border-radius: 8px;
+  padding: 12px;
   overflow-x: auto;
+  margin: 12px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 code {
@@ -75,10 +72,33 @@ pre code {
   background-color: transparent;
 }
 
+/* Scrollbar Styling */
+.markdown::-webkit-scrollbar,
+.markdownFullScreen::-webkit-scrollbar {
+  width: 8px;
+}
+
+.markdown::-webkit-scrollbar-track,
+.markdownFullScreen::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown::-webkit-scrollbar-thumb,
+.markdownFullScreen::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background);
+  border-radius: 4px;
+}
+
+.markdown::-webkit-scrollbar-thumb:hover,
+.markdownFullScreen::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
 .container {
   display: flex;
   flex-direction: column;
-  height: 95vh;
+  height: 97vh;
+  position: relative;
 }
 
 .fullScreenActions {
@@ -96,7 +116,8 @@ pre code {
   padding-top: 20px;
   font-size: 14px;
   margin-top: 20px;
-  padding-right: 8px;
+  padding-right: 12px;
+  padding-left: 4px;
 }
 
 .markdownFullScreen {
@@ -118,7 +139,7 @@ pre code {
   overflow: hidden;
   position: absolute;
   text-overflow: ellipsis;
-  top: 0;
+  top: -13px;
   white-space: nowrap;
   width: calc(100% - 20px);
   z-index: 2;
@@ -126,20 +147,39 @@ pre code {
   line-height: 30px;
 }
 
+.providerSelect {
+  margin-top: 10px;
+}
+
+/* Message Styling */
 .message {
   position: relative;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  max-width: 85%;
+  opacity: 1;
+}
+
+@keyframes messageSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message::after {
   content: '';
   position: absolute;
-  bottom: -5px;
-  width: 10px;
-  height: 10px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
   transform: rotate(45deg);
+  transition: background-color 0.2s ease;
 }
 
 .message:first-child {
@@ -148,13 +188,14 @@ pre code {
 
 .message p {
   margin: 0;
+  line-height: 1.5;
 }
 
 .messageRole {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-weight: 600;
   font-size: 12px;
   min-height: 24px;
@@ -162,22 +203,20 @@ pre code {
 
 .userMessage {
   background-color: var(--vscode-editor-background);
-  align-self: flex-end;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .userMessage::after {
-  right: 10px;
+  right: 12px;
   background-color: var(--vscode-editor-background);
 }
 
 .assistantMessage {
-  align-self: flex-start;
+  align-self: stretch;
   background-color: var(--vscode-editorWidget-background);
-}
-
-.assistantMessage::after {
-  left: 10px;
-  background-color: var(--vscode-editorWidget-background);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  margin-left: auto;
+  width: 100%;
 }
 
 .messageOptions {
@@ -186,18 +225,59 @@ pre code {
   justify-content: flex-end;
 }
 
-.loading {
+/* Typing Indicator */
+.typingIndicator {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  align-self: stretch;
+  margin-left: auto;
+  width: 100%;
+  opacity: 1;
+  transition: opacity 0.15s ease-out;
+  will-change: opacity;
 }
 
+.typingDot {
+  width: 6px;
+  height: 6px;
+  background: var(--vscode-foreground);
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: typingAnimation 0.6s infinite ease-in-out;
+  will-change: transform, opacity;
+}
+
+.typingDot:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.typingDot:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+@keyframes typingAnimation {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 0.8;
+  }
+}
+
+/* Chat Input Area */
 .chatBox {
-  margin-top: 7px;
+  margin-top: 12px;
   position: relative;
+  transition: transform 0.2s ease;
 }
 
 .tiptap {
-  border-radius: 5px;
+  border-radius: 12px;
   box-sizing: border-box;
   position: relative;
   color: var(--input-foreground);
@@ -205,7 +285,7 @@ pre code {
   border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
   font-size: var(--type-ramp-base-font-size);
   line-height: var(--type-ramp-base-line-height);
-  padding: calc(var(--design-unit) * 2px + 1px);
+  padding: 12px 40px 12px 16px;
   width: 100%;
   min-width: var(--input-min-width);
   font-family: var(--vscode-font-family);
@@ -213,26 +293,41 @@ pre code {
   font-size: 14px;
   overflow: hidden;
   outline: none;
-  padding-right: 30px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tiptap:focus {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
 }
 
 .chatSubmit {
   position: absolute;
-  bottom: 1px;
-  right: 5px;
+  bottom: 8px;
+  right: 8px;
   cursor: pointer;
-  padding: 5px;
-  background-color: var(--input-background);
+  padding: 6px;
+  background-color: transparent;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chatSubmit:hover {
+  background-color: var(--vscode-inputOption-hoverBackground);
 }
 
 .chatOptions {
   display: flex;
   justify-content: space-between;
+  padding: 8px 0;
 }
 
 .chatOptions > div {
   display: flex;
-  gap: 3px;
+  gap: 6px;
   align-items: center;
   justify-content: space-between;
 }
@@ -243,6 +338,8 @@ pre code {
   max-height: 20px;
   white-space: nowrap;
   font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .chatOptions svg {
@@ -250,6 +347,7 @@ pre code {
   height: 18px;
 }
 
+/* Additional Styles */
 .send {
   display: flex;
   justify-content: flex-end;
@@ -385,7 +483,7 @@ pre code {
   outline: none;
 }
 
-:global(.tiptap:first-child ){
+:global(.tiptap:first-child) {
   margin-top: 0;
 }
 
@@ -409,7 +507,8 @@ pre code {
   position: relative;
 }
 
-.dropdownMenu button, :global(.tiptap .item) {
+.dropdownMenu button,
+:global(.tiptap .item) {
   border: none;
   color: var(--vscode-foreground);
   cursor: pointer;

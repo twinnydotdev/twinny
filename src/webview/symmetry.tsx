@@ -1,4 +1,4 @@
-import React, { useEffect } from "react"
+import React, { FormEventHandler, useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import {
   VSCodeButton,
@@ -12,6 +12,70 @@ import {
 import { useSymmetryConnection } from "./hooks"
 
 import styles from "./styles/symmetry.module.css"
+
+const ConnectionStatus = ({ isConnected, connecting }: { isConnected: boolean; connecting: boolean }) => (
+  <span className={isConnected ? styles.connected : styles.disconnected}>
+    {connecting
+      ? "Connecting..."
+      : isConnected
+      ? "Connected"
+      : "Not connected"}
+  </span>
+)
+
+const ProviderConnectionStatus = ({
+  isProviderConnected,
+  status
+}: {
+  isProviderConnected: boolean;
+  status: string | undefined;
+}) => (
+  <span className={isProviderConnected ? styles.connected : styles.disconnected}>
+    {status === "connecting"
+      ? "Connecting..."
+      : isProviderConnected
+      ? "Connected"
+      : "Not connected"}
+  </span>
+)
+
+type VSCodeDropdownHandler = ((e: Event) => unknown) & FormEventHandler<HTMLElement>
+
+const ModelSelector = ({
+  models,
+  selectedModel,
+  onChange,
+  t
+}: {
+  models: Array<{ id: number; model_name: string }>;
+  selectedModel: { id: number } | null;
+  onChange: VSCodeDropdownHandler;
+  t: (key: string) => string;
+}) => (
+  <div className={styles.dropdownContainer}>
+    <label htmlFor="modelSelect">{t("select-model")}</label>
+    {models.length ? (
+      <VSCodeDropdown
+        id="modelSelect"
+        value={selectedModel?.id.toString()}
+        onChange={onChange}
+      >
+        {Array.from(new Set(models.map((model) => model.model_name)))
+          .sort((a, b) => a.localeCompare(b))
+          .map((modelName) => {
+            const model = models.find((m) => m.model_name === modelName)
+            return (
+              <VSCodeOption key={modelName} value={model?.id.toString() ?? ""}>
+                {modelName}
+              </VSCodeOption>
+            )
+          })}
+      </VSCodeDropdown>
+    ) : (
+      <span>{t("loading-available-models")}</span>
+    )}
+  </div>
+)
 
 export const Symmetry = () => {
   const { t } = useTranslation()
@@ -36,39 +100,15 @@ export const Symmetry = () => {
     e: React.MouseEvent<HTMLInputElement, MouseEvent>
   ) => {
     const target = e.target as HTMLInputElement
-    console.log(target.checked, target.value)
     setAutoConnectProviderContext(target.checked)
   }
 
-  const handleModelChange = (e: unknown): void => {
-    const event = e as React.ChangeEvent<HTMLSelectElement>
-    const modelId = Number(event.target.value)
-    const newSelectedModel =
-      models.find((model) => model.id === modelId) || null
+  const handleModelChange: VSCodeDropdownHandler = (e) => {
+    const target = e.target as HTMLSelectElement
+    const modelId = Number(target.value)
+    const newSelectedModel = models.find((model) => model.id === modelId) || null
     setSelectedModel(newSelectedModel)
   }
-
-  const ConnectionStatus = () => (
-    <span className={isConnected ? styles.connected : styles.disconnected}>
-      {connecting
-        ? "Connecting..."
-        : isConnected
-        ? "Connected"
-        : "Not connected"}
-    </span>
-  )
-
-  const ProviderConnectionStatus = () => (
-    <span
-      className={isProviderConnected ? styles.connected : styles.disconnected}
-    >
-      {symmetryProviderStatus === "connecting"
-        ? "Connecting..."
-        : isProviderConnected
-        ? "Connected"
-        : "Not connected"}
-    </span>
-  )
 
   useEffect(() => {
     if (models.length > 0 && !selectedModel) {
@@ -77,65 +117,33 @@ export const Symmetry = () => {
   }, [models, selectedModel])
 
   return (
-    <div className={styles.symmetryContainer}>
-      <h3>
-        {t("symmetry-inference-network")}
-      </h3>
-      <VSCodePanelView>
-        <div className={styles.symmetryPanel}>
-          <h4>
-            {t("consumer-connection")}
-          </h4>
+    <VSCodePanelView className={styles.symmetryContainer}>
+      <div className={styles.symmetryPanel}>
+        <h3>{t("symmetry-inference-network")}</h3>
+
+        <section>
+          <h4>{t("consumer-connection")}</h4>
           <div className={styles.statusSection}>
-            <p>
-              {t("status")}: <ConnectionStatus />
-            </p>
+            <span>{t("status")}: <ConnectionStatus isConnected={isConnected} connecting={connecting} /></span>
           </div>
+
           {isConnected && (
             <div className={styles.providerInfo}>
-              <p>
-                <b>{t("provider-name")}:</b> {symmetryConnection?.name}
-              </p>
-              <p>
-                <b>{t("model-name")}:</b> {symmetryConnection?.modelName}
-              </p>
-              <p>
-                <b>{t("provider-type")}:</b> {symmetryConnection?.provider}
-              </p>
+              <span><b>{t("provider-name")}:</b> {symmetryConnection?.name}</span>
+              <span><b>{t("model-name")}:</b> {symmetryConnection?.modelName}</span>
+              <span><b>{t("provider-type")}:</b> {symmetryConnection?.provider}</span>
             </div>
           )}
+
           {!isConnected && (
-            <div className={styles.dropdownContainer}>
-              <label htmlFor="modelSelect">Select a model</label>
-              {models.length ? (
-                <VSCodeDropdown
-                  id="modelSelect"
-                  value={selectedModel?.id.toString()}
-                  onChange={handleModelChange}
-                >
-                  {Array.from(new Set(models.map((model) => model.model_name)))
-                    .sort((a, b) => a.localeCompare(b))
-                    .map((modelName) => {
-                      const model = models.find(
-                        (m) => m.model_name === modelName
-                      )
-                      return (
-                        <VSCodeOption
-                          key={modelName}
-                          value={model?.id.toString() ?? ""}
-                        >
-                          {modelName}
-                        </VSCodeOption>
-                      )
-                    })}
-                </VSCodeDropdown>
-              ) : (
-                <span>
-                  {t("loading-available-models")}
-                </span>
-              )}
-            </div>
+            <ModelSelector
+              models={models}
+              selectedModel={selectedModel}
+              onChange={handleModelChange}
+              t={t}
+            />
           )}
+
           <div className={styles.buttonContainer}>
             <VSCodeButton
               disabled={!selectedModel || connecting}
@@ -148,29 +156,33 @@ export const Symmetry = () => {
                 : t("connect")}
             </VSCodeButton>
           </div>
+        </section>
 
-          <VSCodeDivider />
+        <VSCodeDivider />
 
-          <h4>
-            {t("provider-connection")}
-          </h4>
-          <p>
-            {t("status")}: <ProviderConnectionStatus />
-          </p>
+        <section>
+          <h4>{t("provider-connection")}</h4>
+          <div className={styles.statusSection}>
+            <span>{t("status")}:
+              <ProviderConnectionStatus
+                isProviderConnected={isProviderConnected}
+                status={symmetryProviderStatus}
+              />
+            </span>
+          </div>
+
           <div className={styles.buttonContainer}>
             <VSCodeButton
-              onClick={
-                isProviderConnected ? disconnectAsProvider : connectAsProvider
-              }
+              onClick={isProviderConnected ? disconnectAsProvider : connectAsProvider}
             >
               {symmetryProviderStatus === "connecting"
                 ? t("connecting")
                 : isProviderConnected
                 ? t("disconnect")
-                : t("connect")
-              }
+                : t("connect")}
             </VSCodeButton>
           </div>
+
           <div className={styles.checkboxContainer}>
             <VSCodeCheckbox
               checked={autoConnectProviderContext}
@@ -179,63 +191,29 @@ export const Symmetry = () => {
               {t("auto-connect-as-provider")}
             </VSCodeCheckbox>
           </div>
-          {/* TODO Use Trans component */}
-          {isProviderConnected && (
-            <p>
-              You should now be visible on the{" "}
-              <a
-                href="https://twinny.dev/symmetry"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Symmetry providers page
-              </a>
-              . For a more permanent connection, consider using the{" "}
-              <code>symmetry-cli</code> package. Visit the{" "}
-              <a
-                href="https://github.com/twinnydotdev/symmetry-cli"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Symmetry CLI repository
-              </a>{" "}
-              to get started.
-            </p>
-          )}
 
-          <VSCodeDivider />
-          {/* TODO Use Trans component */}
-          <p>
-            For more information about Symmetry, please refer to our{" "}
-            <a
-              href="https://twinnydotdev.github.io/twinny-docs/general/symmetry"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              documentation
-            </a>
-            .
-          </p>
-        </div>
-      </VSCodePanelView>
-      <p>
-        {t("symmetry-description")}
-      </p>
-      <p>
-        {t("share-gpu-resources")}
-      </p>
-      {/* TODO Use Trans component */}
-      <p>
-        To explore available providers, visit the{" "}
-        <a
-          href="https://twinny.dev/symmetry"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Symmetry providers page
-        </a>
-        .
-      </p>
-    </div>
+          {isProviderConnected && (
+            <div className={styles.infoText}>
+              You should now be visible on the <a href="https://twinny.dev/symmetry" target="_blank" rel="noopener noreferrer">Symmetry providers page</a>.
+              For a more permanent connection, consider using the <code>symmetry-cli</code> package.
+              Visit the <a href="https://github.com/twinnydotdev/symmetry-cli" target="_blank" rel="noopener noreferrer">Symmetry CLI repository</a> to get started.
+            </div>
+          )}
+        </section>
+
+        <VSCodeDivider />
+
+        <footer className={styles.footer}>
+          <div className={styles.infoText}>
+            For more information about Symmetry, please refer to our <a href="https://twinnydotdev.github.io/twinny-docs/general/symmetry" target="_blank" rel="noopener noreferrer">documentation</a>.
+          </div>
+          <div className={styles.infoText}>{t("symmetry-description")}</div>
+          <div className={styles.infoText}>{t("share-gpu-resources")}</div>
+          <div className={styles.infoText}>
+            To explore available providers, visit the <a href="https://twinny.dev/symmetry" target="_blank" rel="noopener noreferrer">Symmetry providers page</a>.
+          </div>
+        </footer>
+      </div>
+    </VSCodePanelView>
   )
 }
