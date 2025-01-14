@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { VSCodeDropdown } from "@vscode/webview-ui-toolkit/react"
 
 import { ApiModel } from "../common/types"
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export const ModelSelect = ({ model, models, setModel }: Props) => {
+  const { t } = useTranslation()
   const handleOnChange = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
     const selectedValue = event?.target.value
@@ -33,7 +35,7 @@ export const ModelSelect = ({ model, models, setModel }: Props) => {
         })
       ) : (
         <option value="" disabled>
-          No models available
+          {t("no-models-available")}
         </option>
       )}
     </VSCodeDropdown>
