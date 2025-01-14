@@ -65,7 +65,7 @@ export const Settings = () => {
       <p>{t("edit-default-templates-description")}</p>
       <div className={styles.templateEditor}>
         <VSCodeButton onClick={handleEditDefaultTemplates}>
-          Open template editor
+          {t("open-template-editor")}
         </VSCodeButton>
       </div>
 
