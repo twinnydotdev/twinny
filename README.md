@@ -8,6 +8,12 @@ Free and private AI extension for Visual Studio Code.
 - [LiteLLM](https://github.com/BerriAI/litellm)
 - [Open WebUI](https://github.com/open-webui/open-webui)
 
+## Breaking Change - Version 3.21.0
+The chat functionality has been moved to the external [token.js](https://github.com/token-js/token.js/tree/main/src) library. If your existing provider configuration stops working:
+
+1. Reset and reconfigure your provider
+2. If issues persist, please open a GitHub issue
+
 ## 🚀 Getting Started
 Visit the [quick start guide](https://docs.twinny.dev) to get started.
 
