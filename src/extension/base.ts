@@ -32,7 +32,6 @@ export class Base {
   }
 
   public getProviderBaseUrl = (provider: TwinnyProvider) => {
-
     if (provider.provider === apiProviders.OpenAICompatible) {
       return `${provider.apiProtocol}://${provider.apiHostname}${
         provider.apiPort ? `:${provider.apiPort}` : ""
