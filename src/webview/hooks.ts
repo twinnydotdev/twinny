@@ -179,25 +179,6 @@ export const useLoading = () => {
   return loader
 }
 
-export const useRequestBody = () => {
-  const [loader, setLoader] = useState<string | undefined>()
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<string> = event.data
-    if (message?.type === EVENT_NAME.twinnySendRequestBody) {
-      setLoader(message?.data)
-    }
-    return () => window.removeEventListener("message", handler)
-  }
-  useEffect(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendLoader
-    })
-    window.addEventListener("message", handler)
-    return () => window.removeEventListener("message", handler)
-  }, [])
-  return loader
-}
-
 export const useLanguage = (): LanguageType | undefined => {
   const [language, setLanguage] = useState<LanguageType>()
   const handler = (event: MessageEvent) => {
