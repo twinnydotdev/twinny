@@ -138,6 +138,17 @@ export async function activate(context: ExtensionContext) {
         data: WEBUI_TABS.providers
       } as ServerMessage<string>)
     }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.embeddings, async () => {
+      commands.executeCommand(
+        "setContext",
+        EXTENSION_CONTEXT_NAME.twinnyEmbeddingsTab,
+        true
+      )
+      sidebarProvider.webView?.postMessage({
+        type: EVENT_NAME.twinnySetTab,
+        data: WEBUI_TABS.embeddings
+      } as ServerMessage<string>)
+    }),
     commands.registerCommand(
       TWINNY_COMMAND_NAME.twinnySymmetryTab,
       async () => {

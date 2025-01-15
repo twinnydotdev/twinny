@@ -6,7 +6,7 @@ import {
   VSCodeDivider,
   VSCodeDropdown,
   VSCodeOption,
-  VSCodeTextField,
+  VSCodeTextField
 } from "@vscode/webview-ui-toolkit/react"
 
 import {
@@ -27,7 +27,7 @@ export const EmbeddingOptions = () => {
     embeddingProvider,
     getProvidersByType,
     providers,
-    setActiveEmbeddingsProvider,
+    setActiveEmbeddingsProvider
   } = useProviders()
 
   const { context: rerankThreshold = 0.5, setContext: setRerankThreshold } =
@@ -52,7 +52,7 @@ export const EmbeddingOptions = () => {
 
   const handleEmbedDocuments = () => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyEmbedDocuments,
+      type: EVENT_NAME.twinnyEmbedDocuments
     } as ClientMessage<string[]>)
   }
 
@@ -113,6 +113,7 @@ export const EmbeddingOptions = () => {
 
   return (
     <div className={styles.embeddingOptions}>
+      <h3>{t("embeddings")}</h3>
       <div>
         <div>{t("embedding-provider")}</div>
         <VSCodeDropdown
@@ -130,9 +131,7 @@ export const EmbeddingOptions = () => {
         </VSCodeDropdown>
       </div>
       <div>
-        <div>
-          {t("max-chunk-size")}
-        </div>
+        <div>{t("max-chunk-size")}</div>
         <VSCodeTextField
           type={TextFieldType.text}
           value={maxChunkSize}
@@ -141,9 +140,7 @@ export const EmbeddingOptions = () => {
         />
       </div>
       <div>
-        <div>
-          {t("min-chunk-size")}
-        </div>
+        <div>{t("min-chunk-size")}</div>
         <VSCodeTextField
           value={minChunkSize}
           name="provider"
@@ -151,9 +148,7 @@ export const EmbeddingOptions = () => {
         />
       </div>
       <div>
-        <div>
-          {t("overlap-size")}
-        </div>
+        <div>{t("overlap-size")}</div>
         <VSCodeTextField
           value={overlap}
           name="provider"
@@ -165,22 +160,18 @@ export const EmbeddingOptions = () => {
           onClick={handleEmbedDocuments}
           className={styles.embedDocumentsButton}
         >
-         {t("embed-documents")}
+          {t("embed-documents")}
         </VSCodeButton>
       </div>
       <VSCodeDivider />
       <div>
-        <div>
-          {t("relevant-code-snippets")}
-        </div>
+        <div>{t("relevant-code-snippets")}</div>
         <VSCodeTextField
           value={codeSnippets}
           name="provider"
           onChange={(e) => handleRelevantCodeSnippetsChange(e)}
         />
-        <small>
-          {t("number-code-snippets")}
-        </small>
+        <small>{t("number-code-snippets")}</small>
       </div>
       <div>
         <div>Filepaths</div>
@@ -189,9 +180,7 @@ export const EmbeddingOptions = () => {
           name="provider"
           onChange={(e) => handleRelevantFilepathsChange(e)}
         />
-        <small>
-          {t("number-code-filepaths")}
-        </small>
+        <small>{t("number-code-filepaths")}</small>
       </div>
       <div>
         <div>
@@ -211,9 +200,7 @@ export const EmbeddingOptions = () => {
           step="0.01"
         />
         <div className={styles.sliderLabel}>
-          <small>
-            {t("rerank-threshold-description")}
-          </small>
+          <small>{t("rerank-threshold-description")}</small>
         </div>
       </div>
     </div>

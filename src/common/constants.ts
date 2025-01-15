@@ -92,6 +92,7 @@ export const TWINNY_COMMAND_NAME = {
   addTypes: "twinny.addTypes",
   conversationHistory: "twinny.conversationHistory",
   disable: "twinny.disable",
+  embeddings: "twinny.embeddings",
   enable: "twinny.enable",
   review: "twinny.review",
   explain: "twinny.explain",
@@ -184,6 +185,7 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyRerankThreshold: "twinnyRerankThreshold",
   twinnyReviewTab: "twinnyReviewTab",
   twinnySymmetryTab: "twinnySymmetryTab",
+  twinnyEmbeddingsTab: "twinnyEmbeddingsTab"
 }
 
 export const EXTENSION_SESSION_NAME = {
@@ -198,6 +200,7 @@ export const WEBUI_TABS = {
   review: "review",
   settings: "templates",
   symmetry: "symmetry",
+  embeddings: "embeddings"
 }
 
 export const FIM_TEMPLATE_FORMAT = {

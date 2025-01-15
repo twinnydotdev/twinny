@@ -1,19 +1,7 @@
-.symmetryContainer {
-  padding: 0.5rem;
-}
-
 .symmetryPanel {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.symmetryPanel h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0;
-  color: var(--vscode-foreground);
-  padding-bottom: 0.5rem;
 }
 
 .symmetryPanel h4 {

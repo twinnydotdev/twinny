@@ -85,7 +85,7 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnySymmetryTab || view == twinny.sidebar && twinnyReviewTab"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnySymmetryTab || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab"
         },
         {
           "command": "twinny.review",
@@ -108,24 +108,30 @@
           "when": "view == twinny.sidebar"
         },
         {
-          "command": "twinny.conversationHistory",
+          "command": "twinny.embeddings",
           "when": "view == twinny.sidebar",
-          "group": "navigation@5"
+          "group": "navigation@5",
+          "icon": "$(database)"
         },
         {
-          "command": "twinny.openPanelChat",
+          "command": "twinny.conversationHistory",
           "when": "view == twinny.sidebar",
           "group": "navigation@6"
         },
         {
-          "command": "twinny.newConversation",
+          "command": "twinny.openPanelChat",
           "when": "view == twinny.sidebar",
           "group": "navigation@7"
         },
         {
-          "command": "twinny.settings",
+          "command": "twinny.newConversation",
           "when": "view == twinny.sidebar",
           "group": "navigation@8"
+        },
+        {
+          "command": "twinny.settings",
+          "when": "view == twinny.sidebar",
+          "group": "navigation@9"
         }
       ]
     },
@@ -228,6 +234,12 @@
         "shortTitle": "Back to chat view",
         "title": "Back to chat view",
         "icon": "$(arrow-left)"
+      },
+      {
+        "command": "twinny.embeddings",
+        "shortTitle": "twinny embeddings",
+        "title": "Embedding options",
+        "icon": "$(database)"
       }
     ],
     "keybindings": [

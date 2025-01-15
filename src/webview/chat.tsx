@@ -7,12 +7,11 @@ import StarterKit from "@tiptap/starter-kit"
 import {
   VSCodeBadge,
   VSCodeButton,
-  VSCodeDivider,
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import cn from "classnames"
 
-import { EVENT_NAME, USER, WORKSPACE_STORAGE_KEY } from "../common/constants"
+import { EVENT_NAME, USER } from "../common/constants"
 import {
   ChatCompletionMessage,
   ClientMessage,
@@ -20,7 +19,6 @@ import {
   ServerMessage
 } from "../common/types"
 
-import { EmbeddingOptions } from "./embedding-options"
 import {
   useAutosizeTextArea,
   useConversationHistory,
@@ -28,7 +26,6 @@ import {
   useSuggestion,
   useSymmetryConnection,
   useTheme,
-  useWorkSpaceContext
 } from "./hooks"
 import { Message as MessageComponent } from "./message"
 import { ProviderSelect } from "./provider-select"
@@ -60,12 +57,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const disableAutoScrollRef = useRef(false)
   const [, setIsAtBottom] = useState(true)
-  const { context: showProvidersContext, setContext: setShowProvidersContext } =
-    useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showProviders)
-  const {
-    context: showEmbeddingOptionsContext,
-    setContext: setShowEmbeddingOptionsContext
-  } = useWorkSpaceContext<boolean>(WORKSPACE_STORAGE_KEY.showEmbeddingOptions)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
 
@@ -378,29 +369,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
     editorRef.current?.commands.clearContent()
   }, [])
 
-  const handleToggleProviderSelection = () => {
-    if (showEmbeddingOptionsContext) handleToggleEmbeddingOptions()
-    setShowProvidersContext((prev) => {
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnySetWorkspaceContext,
-        key: WORKSPACE_STORAGE_KEY.showProviders,
-        data: !prev
-      } as ClientMessage)
-      return !prev
-    })
-  }
-
-  const handleToggleEmbeddingOptions = () => {
-    if (showProvidersContext) handleToggleProviderSelection()
-    setShowEmbeddingOptionsContext((prev) => {
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnySetWorkspaceContext,
-        key: WORKSPACE_STORAGE_KEY.showEmbeddingOptions,
-        data: !prev
-      } as ClientMessage)
-      return !prev
-    })
-  }
 
   const handleNewConversation = () => {
     global.vscode.postMessage({
@@ -541,12 +509,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
-        {showProvidersContext && showEmbeddingOptionsContext && (
-          <VSCodeDivider />
-        )}
-        {showEmbeddingOptionsContext && !symmetryConnection && (
-          <EmbeddingOptions />
-        )}
         <div className={styles.chatOptions}>
           <div>
             {generatingRef.current && !symmetryConnection && (
@@ -561,17 +523,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
             )}
           </div>
           <div>
-            {!symmetryConnection && (
-              <>
-                <VSCodeButton
-                  title={t("toggle-embedding-options")}
-                  appearance="icon"
-                  onClick={handleToggleEmbeddingOptions}
-                >
-                  <span className="codicon codicon-database"></span>
-                </VSCodeButton>
-              </>
-            )}
             {!!symmetryConnection && (
               <a
                 href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}

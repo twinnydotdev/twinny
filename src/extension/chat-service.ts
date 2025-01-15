@@ -1,7 +1,7 @@
 import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
-import { CompletionResponseChunk, TokenJS  } from "token.js"
+import { CompletionResponseChunk, TokenJS } from "token.js"
 import { CompletionStreaming, LLMProvider } from "token.js/dist/chat"
 import {
   commands,
@@ -432,9 +432,17 @@ export class ChatService extends Base {
   private async loadFileContents(files?: FileItem[]): Promise<string> {
     if (!files?.length) return ""
     let fileContents = ""
+
     for (const file of files) {
       try {
-        const content = await fs.readFile(file.path, "utf-8")
+        // Get workspace root path
+        const workspaceFolders = workspace.workspaceFolders
+        if (!workspaceFolders) continue
+
+        // Construct proper file path
+        const filePath = path.join(workspaceFolders[0].uri.fsPath, file.path)
+
+        const content = await fs.readFile(filePath, "utf-8")
         fileContents += `File: ${file.name}\n\n${content}\n\n`
       } catch (error) {
         console.error(`Error reading file ${file.path}:`, error)

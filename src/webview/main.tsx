@@ -7,6 +7,7 @@ import { ServerMessage } from "../common/types"
 
 import { Chat } from "./chat"
 import { ConversationHistory } from "./conversation-history"
+import { EmbeddingOptions } from "./embedding-options"
 import { useLocale } from "./hooks"
 import { Providers } from "./providers"
 import { Review } from "./review"
@@ -17,7 +18,8 @@ const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.settings]: <Settings />,
   [WEBUI_TABS.providers]: <Providers />,
   [WEBUI_TABS.symmetry]: <Symmetry />,
-  [WEBUI_TABS.review]: <Review />
+  [WEBUI_TABS.review]: <Review />,
+  [WEBUI_TABS.embeddings]: <EmbeddingOptions />
 }
 
 interface MainProps {
