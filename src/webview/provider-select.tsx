@@ -30,17 +30,6 @@ export const ProviderSelect = () => {
     setContext: setSelectedModel
   } = useGlobalContext<string>(GLOBAL_STORAGE_KEY.selectedModel)
 
-  React.useEffect(() => {
-    if (chatProvider && providerModels.length && !selectedModel) {
-      const defaultModel = providerModels[0]
-      setSelectedModel(defaultModel)
-      setActiveChatProvider({
-        ...chatProvider,
-        modelName: defaultModel
-      })
-    }
-  }, [chatProvider?.id, providerModels.length])
-
   const handleChangeChatProvider = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
     const value = event.target.value
@@ -65,7 +54,7 @@ export const ProviderSelect = () => {
             .sort((a, b) => a.modelName.localeCompare(b.modelName))
             .map((provider, index) => (
               <VSCodeOption key={index} value={provider.id}>
-                {`${provider.label} (${provider.modelName})`}
+                {provider.label}
               </VSCodeOption>
             ))}
         </VSCodeDropdown>

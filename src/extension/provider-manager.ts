@@ -6,10 +6,12 @@ import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+  EVENT_NAME,
   FIM_TEMPLATE_FORMAT,
+  GLOBAL_STORAGE_KEY,
   INFERENCE_PROVIDERS_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
-  WEBUI_TABS,
+  WEBUI_TABS
 } from "../common/constants"
 import { apiProviders, ClientMessage, ServerMessage } from "../common/types"
 
@@ -84,7 +86,7 @@ export class ProviderManager {
   public focusProviderTab = () => {
     this._webView.postMessage({
       type: PROVIDER_EVENT_NAME.focusProviderTab,
-      data: WEBUI_TABS.providers,
+      data: WEBUI_TABS.providers
     } as ServerMessage<string>)
   }
 
@@ -98,7 +100,7 @@ export class ProviderManager {
       label: "OpenAI Compatible (localhost)",
       modelName: "llama3.2:latest",
       provider: apiProviders.OpenAICompatible,
-      type: "chat",
+      type: "chat"
     } as TwinnyProvider
   }
 
@@ -112,7 +114,7 @@ export class ProviderManager {
       label: "Ollama Embedding",
       modelName: "all-minilm:latest",
       provider: apiProviders.Ollama,
-      type: "embedding",
+      type: "embedding"
     } as TwinnyProvider
   }
 
@@ -126,8 +128,8 @@ export class ProviderManager {
       label: "Ollama FIM",
       id: uuidv4(),
       modelName: "codellama:7b-code",
-      provider: apiProviders.OpenAICompatible,
-      type: "fim",
+      provider: apiProviders.Ollama,
+      type: "fim"
     } as TwinnyProvider
   }
 
@@ -195,7 +197,7 @@ export class ProviderManager {
     const providers = this.getProviders() || {}
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getAllProviders,
-      data: providers,
+      data: providers
     })
   }
 
@@ -205,7 +207,7 @@ export class ProviderManager {
     )
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveChatProvider,
-      data: provider,
+      data: provider
     })
     return provider
   }
@@ -216,7 +218,7 @@ export class ProviderManager {
     )
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveFimProvider,
-      data: provider,
+      data: provider
     })
     return provider
   }
@@ -227,7 +229,7 @@ export class ProviderManager {
     )
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
-      data: provider,
+      data: provider
     })
     return provider
   }
@@ -260,6 +262,14 @@ export class ProviderManager {
     providers[provider.id] = provider
     this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
     this.setActiveChatProvider(provider)
+
+    if (provider.type === "chat") {
+      this._context.globalState.update(
+        `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.selectedModel}`,
+        provider?.modelName
+      )
+    }
+
     this.getAllProviders()
   }
 

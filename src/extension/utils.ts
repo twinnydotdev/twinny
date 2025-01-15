@@ -327,6 +327,7 @@ export const getFimDataFromProvider = (
 ) => {
   switch (provider) {
     case apiProviders.OpenAICompatible:
+    case apiProviders.Ollama:
     case apiProviders.OpenWebUI:
       return data?.response
     case apiProviders.LlamaCpp:

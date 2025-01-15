@@ -157,7 +157,6 @@ export const Providers = () => {
       default:
         return (
           <>
-            {/* Chat Providers */}
             <div className={styles.providerHeader}>
               <h4>{t("chat-provider")}</h4>
               <div className={styles.providersButtons}>
@@ -214,7 +213,6 @@ export const Providers = () => {
 
             <VSCodeDivider />
 
-            {/* FIM Providers */}
             <div className={styles.providerHeader}>
               <h4>{t("fim-provider")}</h4>
               <VSCodeButton appearance="icon" onClick={handleAddFim}>
@@ -262,7 +260,7 @@ export const Providers = () => {
               ))}
 
             <VSCodeDivider />
-            {/* Embedding Providers */}
+
             <div className={styles.providerHeader}>
               <h4>{t("embedding-provider")}</h4>
               <div className={styles.providersButtons}>
@@ -381,7 +379,8 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
 
   const getModelInput = () => {
     if (
-      formState.provider === apiProviders.OpenAICompatible &&
+      (formState.provider === apiProviders.OpenAICompatible ||
+        formState.provider === apiProviders.Ollama) &&
       hasOllamaModels
     ) {
       return (

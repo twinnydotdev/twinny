@@ -200,7 +200,7 @@ export const apiProviders = {
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
   OpenAICompatible: "openai-compatible",
-  Ollama: "Ollama",
+  Ollama: "ollama",
   Anthropic: "anthropic",
   OpenAI: "openai"
 } as const
