@@ -24,6 +24,7 @@ import { EmbeddingOptions } from "./embedding-options"
 import {
   useAutosizeTextArea,
   useConversationHistory,
+  useSelection,
   useSuggestion,
   useSymmetryConnection,
   useTheme,
@@ -31,6 +32,7 @@ import {
 } from "./hooks"
 import { Message as MessageComponent } from "./message"
 import { ProviderSelect } from "./provider-select"
+import { Suggestions } from "./suggestions"
 import TypingIndicator from "./typing-indicator"
 import { CustomKeyMap  } from "./utils"
 
@@ -48,6 +50,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const editorRef = useRef<Editor | null>(null)
   const stopRef = useRef(false)
   const theme = useTheme()
+  const selection = useSelection()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [messages, setMessages] = useState<ChatCompletionMessage[]>()
@@ -535,6 +538,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
             )
           )}
         </div>
+        {!!selection.length && (
+          <Suggestions isDisabled={!!generatingRef.current} />
+        )}
         {showProvidersContext && showEmbeddingOptionsContext && (
           <VSCodeDivider />
         )}

@@ -376,6 +376,7 @@ pre code {
   display: flex;
   flex-wrap: wrap;
   width: 100%;
+  padding-top: 5px;
 }
 
 .suggestion {
