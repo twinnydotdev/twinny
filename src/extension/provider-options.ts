@@ -19,6 +19,7 @@ export function createStreamRequestBodyFim(
   switch (provider) {
     case apiProviders.OpenAICompatible:
     case apiProviders.OpenWebUI:
+    case apiProviders.Ollama:
       return {
         model: options.model,
         prompt,
