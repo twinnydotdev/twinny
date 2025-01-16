@@ -41,7 +41,6 @@ import {
 } from "../utils"
 
 export class BaseProvider {
-  private _chatService: ChatService | undefined
   private _diffManager = new DiffManager()
   private _embeddingDatabase: EmbeddingDatabase | undefined
   private _fileTreeProvider: FileTreeProvider
@@ -51,6 +50,7 @@ export class BaseProvider {
   private _symmetryService?: SymmetryService
   private _templateDir: string | undefined
   private _templateProvider: TemplateProvider
+  public chatService: ChatService | undefined
   public context: vscode.ExtensionContext
   public conversationHistory: ConversationHistory | undefined
   public reviewService: ReviewService | undefined
@@ -87,7 +87,7 @@ export class BaseProvider {
       this.context
     )
 
-    this._chatService = new ChatService(
+    this.chatService = new ChatService(
       this._statusBarItem,
       this._templateDir,
       this.context,
@@ -208,7 +208,7 @@ export class BaseProvider {
   }
 
   public destroyStream = () => {
-    this._chatService?.abort()
+    this.chatService?.abort()
     this.reviewService?.abort()
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyStopGeneration
@@ -219,8 +219,8 @@ export class BaseProvider {
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
-    if (symmetryConnected && this._chatService) {
-      const messages = await this._chatService.getTemplateMessages(template)
+    if (symmetryConnected && this.chatService) {
+      const messages = await this.chatService.getTemplateMessages(template)
       logger.log(`
         Using symmetry for inference
         Messages: ${JSON.stringify(messages)}
@@ -232,7 +232,7 @@ export class BaseProvider {
         })
       )
     }
-    this._chatService?.streamTemplateCompletion(template)
+    this.chatService?.streamTemplateCompletion(template)
   }
 
   public getGitCommitMessage = async () => {
@@ -363,7 +363,7 @@ export class BaseProvider {
       )
     }
 
-    this._chatService?.streamChatCompletion(
+    this.chatService?.streamChatCompletion(
       data.data || [],
       data.meta as FileItem[]
     )

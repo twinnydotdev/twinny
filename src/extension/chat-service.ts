@@ -530,6 +530,10 @@ export class ChatService extends Base {
     })
   }
 
+  public resetConversation () {
+    this._conversation = []
+  }
+
   public async getTemplateMessages(
     template: string,
     context?: string,
