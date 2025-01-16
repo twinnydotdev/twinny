@@ -29,7 +29,6 @@ import {
   ClientMessage,
   Peer,
   ServerMessage,
-  StreamResponse,
   SymmetryConnection,
   SymmetryMessage,
   SymmetryModelProvider
@@ -40,9 +39,7 @@ import { SessionManager } from "./session-manager"
 import { SymmetryWs } from "./symmetry-ws"
 import {
   createSymmetryMessage,
-  getResponseData,
   safeParseJson,
-  safeParseJsonResponse,
   updateSymmetryStatus
 } from "./utils"
 
@@ -194,38 +191,13 @@ export class SymmetryService extends EventEmitter {
   private setupProviderListeners(peer: Peer) {
     peer.on("data", (chunk: Buffer) => {
       const response = chunk.toString()
-      if (response.includes(serverMessageKeys.inferenceEnded))
+      if (response.includes(serverMessageKeys.inferenceEnded)) {
         this.handleInferenceEnd()
-      this.handleIncomingData(chunk, (response: StreamResponse) =>
-        this.processResponseData(response)
-      )
-    })
-  }
-
-  private processResponseData(response: StreamResponse) {
-    if (!this._symmetryProvider) return
-    const data = getResponseData(response)
-    this._completion += data.content
-    if (data) this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
-  }
-
-  private handleIncomingData = (
-    chunk: Buffer,
-    cb: (data: StreamResponse) => void
-  ) => {
-    let buffer = ""
-    buffer += chunk
-    let position
-    while ((position = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.substring(0, position)
-      buffer = buffer.substring(position + 1)
-      try {
-        const json = safeParseJsonResponse(line)
-        if (json) cb(json)
-      } catch (e) {
-        console.error("Error parsing JSON:", e)
+        return
       }
-    }
+      this._completion += response
+      if (this._completion) this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
+    })
   }
 
   private handleInferenceEnd() {
