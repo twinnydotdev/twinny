@@ -30,6 +30,7 @@ import {
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import {
+  apiProviders,
   ChatCompletionMessage,
   FileItem,
   ServerMessage,
@@ -44,7 +45,11 @@ import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
 import { FileTreeProvider } from "./tree"
-import { getLanguage, updateLoadingMessage } from "./utils"
+import {
+  getIsOpenAICompatible,
+  getLanguage,
+  updateLoadingMessage
+} from "./utils"
 
 export class ChatService extends Base {
   private _completion = ""
@@ -518,8 +523,10 @@ export class ChatService extends Base {
       messages: this._conversation.filter((m) => !m.excludeFromApi),
       model: provider.modelName,
       stream: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: provider.provider as any
+      provider: getIsOpenAICompatible(provider)
+        ? apiProviders.OpenAICompatible
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        : (provider.provider as any)
     })
   }
 
@@ -596,8 +603,10 @@ export class ChatService extends Base {
       messages,
       model: provider.modelName,
       stream: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: provider.provider as any
+      provider: getIsOpenAICompatible(provider)
+        ? apiProviders.OpenAICompatible
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        : (provider.provider as any)
     }
     return this.llm(requestBody)
   }

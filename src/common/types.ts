@@ -199,10 +199,8 @@ export const apiProviders = {
   LMStudio: "lmstudio",
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
-  OpenAICompatible: "openai-compatible",
   Ollama: "ollama",
-  Anthropic: "anthropic",
-  OpenAI: "openai"
+  OpenAICompatible: "openai-compatible",
 } as const
 
 export interface ApiModel {

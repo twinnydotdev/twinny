@@ -9,13 +9,13 @@ import {
   USER,
   WEBUI_TABS
 } from "../common/constants"
-import { ClientMessage, ServerMessage, TemplateData } from "../common/types"
+import { apiProviders, ClientMessage, ServerMessage, TemplateData } from "../common/types"
 
 import { ConversationHistory } from "./conversation-history"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
-import { updateLoadingMessage } from "./utils"
+import { getIsOpenAICompatible, updateLoadingMessage } from "./utils"
 
 export class GithubService extends ConversationHistory {
   private _completion = ""
@@ -190,9 +190,11 @@ export class GithubService extends ConversationHistory {
     const result = await this._tokenJs?.chat.completions.create({
       messages,
       model: provider.modelName,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: provider.provider as any,
-      stream: true
+      stream: true,
+      provider: getIsOpenAICompatible(provider)
+        ? apiProviders.OpenAICompatible
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        : (provider.provider as any),
     })
 
     if (!result) return

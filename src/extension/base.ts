@@ -5,9 +5,9 @@ import {
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   ACTIVE_FIM_PROVIDER_STORAGE_KEY
 } from "../common/constants"
-import { apiProviders } from "../common/types"
 
 import { TwinnyProvider } from "./provider-manager"
+import { getIsOpenAICompatible } from "./utils"
 
 export class Base {
   public config = vscode.workspace.getConfiguration("twinny")
@@ -32,7 +32,7 @@ export class Base {
   }
 
   public getProviderBaseUrl = (provider: TwinnyProvider) => {
-    if (provider.provider === apiProviders.OpenAICompatible) {
+    if (getIsOpenAICompatible(provider)) {
       return `${provider.apiProtocol}://${provider.apiHostname}${
         provider.apiPort ? `:${provider.apiPort}` : ""
       }${provider.apiPath ? provider.apiPath : ""}`

@@ -49,6 +49,7 @@ import {
 } from "../common/types"
 
 import { getParser } from "./parser"
+import { TwinnyProvider } from "./provider-manager"
 
 const execAsync = util.promisify(exec)
 
@@ -319,6 +320,11 @@ export const getResponseData = (data: StreamResponse) => {
       data.choices[0].message?.content ||
       ""
   }
+}
+
+export const getIsOpenAICompatible = (provider: TwinnyProvider) => {
+  const providers = Object.values(apiProviders) as string []
+  return providers.includes(provider.provider)
 }
 
 export const getFimDataFromProvider = (
