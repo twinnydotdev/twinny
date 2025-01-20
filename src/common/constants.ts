@@ -126,7 +126,7 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
 export const API_PROVIDERS = {
   Anthropic: "anthropic",
   OpenAI: "openai",
-  Mistral: "misrtal",
+  Mistral: "mistral",
   LlamaCpp: "llamacpp",
   Groq: "groq",
   OpenRouter: "openrouter",
