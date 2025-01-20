@@ -6,8 +6,7 @@ import {
   VSCodeTextField
 } from "@vscode/webview-ui-toolkit/react"
 
-import { GLOBAL_STORAGE_KEY } from "../common/constants"
-import { apiProviders } from "../common/types"
+import { API_PROVIDERS, GLOBAL_STORAGE_KEY } from "../common/constants"
 
 import { useGlobalContext, useModels, useOllamaModels, useProviders } from "./hooks"
 
@@ -21,7 +20,7 @@ export const ProviderSelect = () => {
     useProviders()
 
   const providerModels =
-    chatProvider?.provider === apiProviders.OpenAICompatible
+    chatProvider?.provider === API_PROVIDERS.Ollama
       ? ollamaModels.models?.map(({ name }) => name) || []
       : models[chatProvider?.provider as keyof typeof models]?.models || []
 

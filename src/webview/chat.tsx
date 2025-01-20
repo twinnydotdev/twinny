@@ -84,7 +84,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
 
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    const nearBottom = distanceFromBottom < 50
+    const nearBottom = distanceFromBottom < 5
 
     if (nearBottom) {
       setIsAtBottom(true)

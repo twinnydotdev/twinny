@@ -5,9 +5,9 @@ import ignore from "ignore"
 import path from "path"
 import * as vscode from "vscode"
 
+import { API_PROVIDERS } from "../common/constants"
 import { logger } from "../common/logger"
 import {
-  apiProviders,
   EmbeddedDocument,
   Embedding,
   LMStudioEmbedding,
@@ -253,7 +253,7 @@ export class EmbeddingDatabase extends Base {
     provider: TwinnyProvider,
     response: T
   ): number[] {
-    if (provider.provider === apiProviders.LMStudio) {
+    if (provider.provider === API_PROVIDERS.LMStudio) {
       return (response as LMStudioEmbedding).data?.[0].embedding
     }
 

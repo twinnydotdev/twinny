@@ -7,6 +7,7 @@ import { TwinnyProvider } from "../extension/provider-manager"
 import {
   SvgAnthropic,
   SvgCohere,
+  SvgDeepseek,
   SvgGemini,
   SvgGroq,
   SvgMistral,
@@ -49,6 +50,16 @@ const providers: TwinnyProvider[] = [
     modelName: "claude-3-opus-20240229",
     provider: "anthropic",
     type: "chat"
+  },
+  {
+    label: "Deepseek",
+    logo: <SvgDeepseek />,
+    id: "openai-default",
+    modelName: "deepseek-chat",
+    provider: "openai-compatible",
+    type: "chat",
+    apiHostname: "api.deepseek.com",
+    apiProtocol: "https"
   },
   {
     label: "Groq",

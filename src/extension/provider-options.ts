@@ -1,6 +1,5 @@
-import { USER } from "../common/constants"
+import { API_PROVIDERS, USER } from "../common/constants"
 import {
-  apiProviders,
   RequestBodyBase,
   RequestOptionsOllama,
   StreamBodyOpenAI,
@@ -17,9 +16,9 @@ export function createStreamRequestBodyFim(
   }
 ): RequestBodyBase | RequestOptionsOllama | StreamBodyOpenAI {
   switch (provider) {
-    case apiProviders.OpenAICompatible:
-    case apiProviders.OpenWebUI:
-    case apiProviders.Ollama:
+    case API_PROVIDERS.OpenAICompatible:
+    case API_PROVIDERS.OpenWebUI:
+    case API_PROVIDERS.Ollama:
       return {
         model: options.model,
         prompt,
@@ -32,7 +31,7 @@ export function createStreamRequestBodyFim(
           num_predict: options.numPredictFim,
         },
       }
-    case apiProviders.LMStudio:
+    case API_PROVIDERS.LMStudio:
       return {
         model: options.model,
         prompt,
@@ -40,15 +39,15 @@ export function createStreamRequestBodyFim(
         temperature: options.temperature,
         max_tokens: options.numPredictFim,
       }
-    case apiProviders.LlamaCpp:
-    case apiProviders.Oobabooga:
+    case API_PROVIDERS.LlamaCpp:
+    case API_PROVIDERS.Oobabooga:
       return {
         prompt,
         stream: true,
         temperature: options.temperature,
         max_tokens: options.numPredictFim,
       }
-    case apiProviders.LiteLLM:
+    case API_PROVIDERS.LiteLLM:
       return {
         messages: [{ content: prompt, role: USER }],
         model: options.model,

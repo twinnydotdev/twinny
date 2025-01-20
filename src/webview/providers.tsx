@@ -11,10 +11,10 @@ import {
 } from "@vscode/webview-ui-toolkit/react"
 
 import {
+  API_PROVIDERS,
   DEFAULT_PROVIDER_FORM_VALUES,
   FIM_TEMPLATE_FORMAT
 } from "../common/constants"
-import { apiProviders } from "../common/types"
 import { TwinnyProvider } from "../extension/provider-manager"
 
 import { DefaultProviderSelect } from "./default-providers"
@@ -379,8 +379,7 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
 
   const getModelInput = () => {
     if (
-      (formState.provider === apiProviders.OpenAICompatible ||
-        formState.provider === apiProviders.Ollama) &&
+      (formState.provider === API_PROVIDERS.Ollama) &&
       hasOllamaModels
     ) {
       return (
@@ -481,7 +480,7 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
             onChange={handleChangeDropdown}
             value={formState.provider}
           >
-            {Object.values(apiProviders).map((type, index) => (
+            {Object.values(API_PROVIDERS).map((type, index) => (
               <VSCodeOption key={index} value={type}>
                 {type}
               </VSCodeOption>

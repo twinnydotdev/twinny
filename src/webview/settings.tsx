@@ -50,7 +50,7 @@ export const Settings = () => {
     })
   }
 
-  const handleResetTemplates = () => {
+  const handleClearSelection = () => {
     saveTemplates(DEFAULT_ACTION_TEMPLATES)
     setSelectedTemplatesContext(DEFAULT_ACTION_TEMPLATES)
   }
@@ -91,8 +91,8 @@ export const Settings = () => {
       </div>
 
       <div className={styles.resetButton}>
-        <VSCodeButton onClick={handleResetTemplates}>
-          {t("reset-to-default")}
+        <VSCodeButton onClick={handleClearSelection}>
+          {t("clear")}
         </VSCodeButton>
       </div>
     </div>

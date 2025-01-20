@@ -30,7 +30,7 @@ export const URL_SYMMETRY_WS = "https://twinny.dev/ws"
 export const defaultChunkOptions = {
   maxSize: 500,
   minSize: 50,
-  overlap: 50,
+  overlap: 50
 }
 
 export const EVENT_NAME = {
@@ -84,7 +84,7 @@ export const EVENT_NAME = {
   twinnyStopSymmetryProvider: "twinny-stop-symmetry-provider",
   twinnySymmetryModels: "twinny-symmetry-models",
   twinnyTextSelection: "twinny-text-selection",
-  twinnyGetModels: "twinny-get-models",
+  twinnyGetModels: "twinny-get-models"
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -110,7 +110,30 @@ export const TWINNY_COMMAND_NAME = {
   stopGeneration: "twinny.stopGeneration",
   templateCompletion: "twinny.templateCompletion",
   templates: "twinny.templates",
-  twinnySymmetryTab: "twinny.symmetry",
+  twinnySymmetryTab: "twinny.symmetry"
+}
+
+export const OPEN_AI_COMPATIBLE_PROVIDERS = {
+  LiteLLM: "litellm",
+  Deepseek: "deepseek",
+  LMStudio: "lmstudio",
+  Oobabooga: "oobabooga",
+  OpenWebUI: "openwebui",
+  Ollama: "ollama",
+  OpenAICompatible: "openai-compatible"
+}
+
+export const API_PROVIDERS = {
+  Anthropic: "anthropic",
+  OpenAI: "openai",
+  Mistal: "mistal",
+  LlamaCpp: "llamacpp",
+  Groq: "groq",
+  OpenRouter: "openrouter",
+  Cohere: "cohere",
+  Perplexity: "perplexity",
+  Gemini: "gemini",
+  ...OPEN_AI_COMPATIBLE_PROVIDERS,
 }
 
 export const CONVERSATION_EVENT_NAME = {
@@ -120,7 +143,7 @@ export const CONVERSATION_EVENT_NAME = {
   removeConversation: "twinny.remove-conversation",
   saveConversation: "twinny.save-conversation",
   saveLastConversation: "twinny.save-last-conversation",
-  setActiveConversation: "twinny.set-active-conversation",
+  setActiveConversation: "twinny.set-active-conversation"
 }
 
 export const PROVIDER_EVENT_NAME = {
@@ -136,7 +159,7 @@ export const PROVIDER_EVENT_NAME = {
   setActiveChatProvider: "twinny.set-active-chat-provider",
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
-  updateProvider: "twinny.update-provider",
+  updateProvider: "twinny.update-provider"
 }
 
 export const ACTIVE_CONVERSATION_STORAGE_KEY = "twinny.active-conversation"
@@ -149,7 +172,7 @@ export const INFERENCE_PROVIDERS_STORAGE_KEY = "twinny.inference-providers"
 
 export const GLOBAL_STORAGE_KEY = {
   autoConnectSymmetryProvider: "twinny.autoConnectSymmetryProvider",
-  selectedModel: "twinny.selectedModel",
+  selectedModel: "twinny.selectedModel"
 }
 
 export const WORKSPACE_STORAGE_KEY = {
@@ -161,14 +184,14 @@ export const WORKSPACE_STORAGE_KEY = {
   showEmbeddingOptions: "showEmbeddingOptions",
   showProviders: "showProviders",
   reviewOwner: "reviewOwner",
-  reviewRepo: "reviewRepo",
+  reviewRepo: "reviewRepo"
 }
 
 export const EXTENSION_SETTING_KEY = {
   apiProvider: "apiProvider",
   apiProviderFim: "apiProviderFim",
   chatModelName: "chatModelName",
-  fimModelName: "fimModelName",
+  fimModelName: "fimModelName"
 }
 
 export const EXTENSION_CONTEXT_NAME = {
@@ -190,7 +213,7 @@ export const EXTENSION_CONTEXT_NAME = {
 
 export const EXTENSION_SESSION_NAME = {
   twinnySymmetryConnection: "twinnySymmetryConnection",
-  twinnySymmetryConnectionProvider: "twinnySymmetryConnectionProvider",
+  twinnySymmetryConnectionProvider: "twinnySymmetryConnectionProvider"
 }
 
 export const WEBUI_TABS = {
@@ -213,7 +236,7 @@ export const FIM_TEMPLATE_FORMAT = {
   deepseek: "deepseek",
   llama: "llama",
   stableCode: "stable-code",
-  starcoder: "starcoder",
+  starcoder: "starcoder"
 }
 
 export const STOP_LLAMA = ["<EOT>"]
@@ -223,7 +246,7 @@ export const STOP_DEEPSEEK = [
   "<｜fim▁hole｜>",
   "<｜fim▁end｜>",
   "<END>",
-  "<｜end▁of▁sentence｜>",
+  "<｜end▁of▁sentence｜>"
 ]
 
 export const STOP_STARCODER = [
@@ -231,7 +254,7 @@ export const STOP_STARCODER = [
   "<file_sep>",
   "<file_sep>",
   "<fim_prefix>",
-  "<repo_name>",
+  "<repo_name>"
 ]
 
 export const STOP_QWEN = [
@@ -242,7 +265,7 @@ export const STOP_QWEN = [
   "<|im_start|>",
   "<|repo_name|>",
   "<|fim_pad|>",
-  "<|cursor|>",
+  "<|cursor|>"
 ]
 
 export const STOP_CODEGEMMA = ["<|file_separator|>", "<|end_of_turn|>", "<eos>"]
@@ -251,12 +274,7 @@ export const STOP_CODESTRAL = ["[PREFIX]", "[SUFFIX]"]
 
 export const DEFAULT_TEMPLATE_NAMES = defaultTemplates.map(({ name }) => name)
 
-export const DEFAULT_ACTION_TEMPLATES = [
-  "refactor",
-  "add-tests",
-  "add-types",
-  "explain",
-]
+export const DEFAULT_ACTION_TEMPLATES = []
 
 export const DEFAULT_PROVIDER_FORM_VALUES = {
   apiHostname: "0.0.0.0",
@@ -269,12 +287,12 @@ export const DEFAULT_PROVIDER_FORM_VALUES = {
   modelName: "",
   name: "",
   provider: "ollama",
-  type: "chat",
+  type: "chat"
 }
 
 export const GITHUB_EVENT_NAME = {
   getPullRequests: "github.getPullRequests",
-  getPullRequestReview: "github.getPullRequestReview",
+  getPullRequestReview: "github.getPullRequestReview"
 }
 
 export const TITLE_GENERATION_PROMPT_MESAGE = `
@@ -338,7 +356,7 @@ export const WASM_LANGUAGES: { [key: string]: string } = {
   toml: "toml",
   ts: "typescript",
   tsx: "tsx",
-  vue: "vue",
+  vue: "vue"
 }
 
 export const DEFAULT_RELEVANT_FILE_COUNT = 10
@@ -351,7 +369,7 @@ export const MULTILINE_OUTSIDE = [
   "identifier",
   "interface_body",
   "interface",
-  "program",
+  "program"
 ]
 
 export const MULTILINE_INSIDE = [
@@ -364,7 +382,7 @@ export const MULTILINE_INSIDE = [
   "object_type",
   "object",
   "parenthesized_expression",
-  "statement_block",
+  "statement_block"
 ]
 
 export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
@@ -372,11 +390,11 @@ export const MULTILINE_TYPES = [...MULTILINE_OUTSIDE, ...MULTILINE_INSIDE]
 export const MULTI_LINE_DELIMITERS = ["\n\n", "\r\n\r\n"]
 
 export const SYMMETRY_EMITTER_KEY = {
-  inference: "inference",
+  inference: "inference"
 }
 
 //Define an array containing all the error messages that need to be detected when fetch error occurred
 export const knownErrorMessages = [
-"First parameter has member 'readable' that is not a ReadableStream.", //This error occurs When plugins such as Fitten Code are enabled
-"The 'transform.readable' property must be an instance of ReadableStream. Received an instance of h" //When you try to enable the Node.js compatibility mode Compat to solve the problem, this error may pop up
-];
+  "First parameter has member 'readable' that is not a ReadableStream.", //This error occurs When plugins such as Fitten Code are enabled
+  "The 'transform.readable' property must be an instance of ReadableStream. Received an instance of h" //When you try to enable the Node.js compatibility mode Compat to solve the problem, this error may pop up
+]

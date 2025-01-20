@@ -15,6 +15,7 @@ import {
 } from "vscode"
 
 import {
+  API_PROVIDERS,
   ASSISTANT,
   DEFAULT_RELEVANT_CODE_COUNT,
   DEFAULT_RELEVANT_FILE_COUNT,
@@ -30,7 +31,6 @@ import {
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import {
-  apiProviders,
   ChatCompletionMessage,
   FileItem,
   ServerMessage,
@@ -524,7 +524,7 @@ export class ChatService extends Base {
       model: provider.modelName,
       stream: true,
       provider: getIsOpenAICompatible(provider)
-        ? apiProviders.OpenAICompatible
+        ? API_PROVIDERS.OpenAICompatible
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         : (provider.provider as any)
     })
@@ -608,7 +608,7 @@ export class ChatService extends Base {
       model: provider.modelName,
       stream: true,
       provider: getIsOpenAICompatible(provider)
-        ? apiProviders.OpenAICompatible
+        ? API_PROVIDERS.OpenAICompatible
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         : (provider.provider as any)
     }

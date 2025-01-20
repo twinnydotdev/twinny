@@ -1,5 +1,5 @@
 import { serverMessageKeys } from "symmetry-core"
-import { ChatCompletionMessageParam, models } from "token.js"
+import { ChatCompletionMessageParam } from "token.js"
 import * as vscode from "vscode"
 
 import {
@@ -11,6 +11,7 @@ import {
   TWINNY_COMMAND_NAME,
 } from "../../common/constants"
 import { logger } from "../../common/logger"
+import { models } from "../../common/models"
 import {
   ApiModel,
   ChatCompletionMessage,

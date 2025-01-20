@@ -2,7 +2,7 @@ import { serverMessageKeys } from "symmetry-core"
 import { ChatCompletionMessageParam } from "token.js"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
-import { ALL_BRACKETS } from "./constants"
+import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
 
 export interface RequestBodyBase {
@@ -193,16 +193,6 @@ export interface UiTabs {
   [key: string]: JSX.Element
 }
 
-export const apiProviders = {
-  LiteLLM: "litellm",
-  LlamaCpp: "llamacpp",
-  LMStudio: "lmstudio",
-  Oobabooga: "oobabooga",
-  OpenWebUI: "openwebui",
-  Ollama: "ollama",
-  OpenAICompatible: "openai-compatible",
-} as const
-
 export interface ApiModel {
   parent_model: string
   format: string
@@ -251,7 +241,7 @@ export interface InferenceProvider {
   apiProtocol?: string
   modelName?: string
   name: string
-  type: (typeof apiProviders)[keyof typeof apiProviders]
+  type: (typeof API_PROVIDERS)[keyof typeof API_PROVIDERS]
 }
 
 export interface Peer {

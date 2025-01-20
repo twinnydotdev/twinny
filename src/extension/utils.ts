@@ -21,6 +21,7 @@ import { SyntaxNode } from "web-tree-sitter"
 
 import {
   ALL_BRACKETS,
+  API_PROVIDERS,
   CLOSING_BRACKETS,
   defaultChunkOptions,
   EVENT_NAME,
@@ -28,6 +29,7 @@ import {
   knownErrorMessages,
   MULTILINE_TYPES,
   NORMALIZE_REGEX,
+  OPEN_AI_COMPATIBLE_PROVIDERS,
   OPENING_BRACKETS,
   QUOTES,
   SKIP_DECLARATION_SYMBOLS,
@@ -36,7 +38,6 @@ import {
 import { supportedLanguages } from "../common/languages"
 import { logger } from "../common/logger"
 import {
-  apiProviders,
   Bracket,
   ChatCompletionMessage,
   ChunkOptions,
@@ -323,7 +324,7 @@ export const getResponseData = (data: StreamResponse) => {
 }
 
 export const getIsOpenAICompatible = (provider: TwinnyProvider) => {
-  const providers = Object.values(apiProviders) as string []
+  const providers = Object.values(OPEN_AI_COMPATIBLE_PROVIDERS) as string []
   return providers.includes(provider.provider)
 }
 
@@ -332,13 +333,13 @@ export const getFimDataFromProvider = (
   data: StreamResponse | undefined
 ) => {
   switch (provider) {
-    case apiProviders.OpenAICompatible:
-    case apiProviders.Ollama:
-    case apiProviders.OpenWebUI:
+    case API_PROVIDERS.OpenAICompatible:
+    case API_PROVIDERS.Ollama:
+    case API_PROVIDERS.OpenWebUI:
       return data?.response
-    case apiProviders.LlamaCpp:
+    case API_PROVIDERS.LlamaCpp:
       return data?.content
-    case apiProviders.LiteLLM:
+    case API_PROVIDERS.LiteLLM:
       return data?.choices[0].delta.content
     default:
       if (!data?.choices.length) return

@@ -2,6 +2,7 @@ import { ChatCompletionMessageParam, TokenJS } from "token.js"
 import { commands, ExtensionContext, Webview } from "vscode"
 
 import {
+  API_PROVIDERS,
   ASSISTANT,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
@@ -9,7 +10,7 @@ import {
   USER,
   WEBUI_TABS
 } from "../common/constants"
-import { apiProviders, ClientMessage, ServerMessage, TemplateData } from "../common/types"
+import { ClientMessage, ServerMessage, TemplateData } from "../common/types"
 
 import { ConversationHistory } from "./conversation-history"
 import { SessionManager } from "./session-manager"
@@ -192,7 +193,7 @@ export class GithubService extends ConversationHistory {
       model: provider.modelName,
       stream: true,
       provider: getIsOpenAICompatible(provider)
-        ? apiProviders.OpenAICompatible
+        ? API_PROVIDERS.OpenAICompatible
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         : (provider.provider as any),
     })

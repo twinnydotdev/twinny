@@ -6,6 +6,7 @@ import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+  API_PROVIDERS,
   EVENT_NAME,
   FIM_TEMPLATE_FORMAT,
   GLOBAL_STORAGE_KEY,
@@ -13,7 +14,7 @@ import {
   PROVIDER_EVENT_NAME,
   WEBUI_TABS
 } from "../common/constants"
-import { apiProviders, ClientMessage, ServerMessage } from "../common/types"
+import { ClientMessage, ServerMessage } from "../common/types"
 
 export interface TwinnyProvider {
   apiHostname?: string
@@ -99,7 +100,7 @@ export class ProviderManager {
       id: uuidv4(),
       label: "OpenAI Compatible (localhost)",
       modelName: "llama3.2:latest",
-      provider: apiProviders.OpenAICompatible,
+      provider: API_PROVIDERS.OpenAICompatible,
       type: "chat"
     } as TwinnyProvider
   }
@@ -113,7 +114,7 @@ export class ProviderManager {
       id: uuidv4(),
       label: "Ollama Embedding",
       modelName: "all-minilm:latest",
-      provider: apiProviders.Ollama,
+      provider: API_PROVIDERS.Ollama,
       type: "embedding"
     } as TwinnyProvider
   }
@@ -128,7 +129,7 @@ export class ProviderManager {
       label: "Ollama FIM",
       id: uuidv4(),
       modelName: "codellama:7b-code",
-      provider: apiProviders.Ollama,
+      provider: API_PROVIDERS.Ollama,
       type: "fim"
     } as TwinnyProvider
   }
