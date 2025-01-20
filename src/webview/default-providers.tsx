@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
+import { API_PROVIDERS } from "../common/constants"
 import { TwinnyProvider } from "../extension/provider-manager"
 
 import {
@@ -32,7 +33,7 @@ const providers: TwinnyProvider[] = [
     apiProtocol: "http",
     id: "openai-compatible-default",
     modelName: "llama3.2:latest",
-    provider: "openai-compatible",
+    provider: API_PROVIDERS.OpenAI,
     type: "chat"
   },
   {
@@ -40,7 +41,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgOpenAI />,
     id: "openai-default",
     modelName: "gpt-4o",
-    provider: "openai",
+    provider: API_PROVIDERS.OpenAI,
     type: "chat"
   },
   {
@@ -48,7 +49,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgAnthropic />,
     id: "anthropic-default",
     modelName: "claude-3-opus-20240229",
-    provider: "anthropic",
+    provider: API_PROVIDERS.Anthropic,
     type: "chat"
   },
   {
@@ -56,7 +57,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgDeepseek />,
     id: "openai-default",
     modelName: "deepseek-chat",
-    provider: "openai-compatible",
+    provider: API_PROVIDERS.Deepseek,
     type: "chat",
     apiHostname: "api.deepseek.com",
     apiProtocol: "https"
@@ -67,7 +68,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgGroq />,
     id: "groq-default",
     modelName: "llama2-70b-4096",
-    provider: "groq",
+    provider: API_PROVIDERS.Groq,
     type: "chat"
   },
   {
@@ -75,7 +76,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgOpenRouter />,
     id: "openrouter-default",
     modelName: "openai/gpt-4",
-    provider: "openrouter",
+    provider: API_PROVIDERS.OpenRouter,
     type: "chat"
   },
   {
@@ -83,7 +84,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgCohere />,
     id: "cohere",
     modelName: "command-r-plus",
-    provider: "cohere",
+    provider: API_PROVIDERS.Cohere,
     type: "chat"
   },
   {
@@ -91,7 +92,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgPerplexity />,
     id: "perplexity",
     modelName: "llama-3-sonar-small-32k-chat",
-    provider: "perplexity",
+    provider: API_PROVIDERS.Perplexity,
     type: "chat"
   },
   {
@@ -99,7 +100,7 @@ const providers: TwinnyProvider[] = [
     logo: <SvgGemini />,
     id: "gemini",
     modelName: "gemini-1.5-pro",
-    provider: "gemini",
+    provider: API_PROVIDERS.Gemini,
     type: "chat"
   },
   {
@@ -108,7 +109,7 @@ const providers: TwinnyProvider[] = [
     apiPath: "/v1",
     id: "mistral",
     modelName: "mistral-small-latest",
-    provider: "mistral",
+    provider: API_PROVIDERS.Mistral,
     type: "chat"
   }
 ]

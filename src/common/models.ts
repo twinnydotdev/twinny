@@ -8,6 +8,6 @@ export const models = {
     supportsStreaming: ["deepseek-chat"],
     supportsJSON: [],
     supportsImages: [],
-    supportsToolCalls: [],
-}
+    supportsToolCalls: []
+  }
 }
