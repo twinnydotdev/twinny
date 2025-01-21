@@ -396,7 +396,7 @@ export class CompletionProvider
     const currentFileName = this._document?.fileName || ""
     const openTextDocuments = workspace.textDocuments
     const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ""
-    const ig = ignore()
+    const ig = ignore({ allowRelativePaths: true })
 
     const embeddingIgnoredGlobs = this.config.get(
       "embeddingIgnoredGlobs",
