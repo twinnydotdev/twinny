@@ -33,7 +33,7 @@ const providers: TwinnyProvider[] = [
     apiProtocol: "http",
     id: "openai-compatible-default",
     modelName: "llama3.2:latest",
-    provider: API_PROVIDERS.OpenAI,
+    provider: API_PROVIDERS.OpenAICompatible,
     type: "chat"
   },
   {
