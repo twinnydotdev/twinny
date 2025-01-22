@@ -81,3 +81,12 @@ export const CustomKeyMap = Extension.create({
     }
   },
 })
+
+export const getThinkingMessage = (content: string): { thinking: string | null; message: string } => {
+  const thinkMatch = content.match(/<(?:think|thinking)>([\s\S]*?)(?:<\/(?:think|thinking)>|$)/);
+  if (!thinkMatch) return { thinking: null, message: content };
+
+  const thinking = thinkMatch[1].trim();
+  const message = content.replace(/<(?:think|thinking)>[\s\S]*?(?:<\/(?:think|thinking)>|$)/, "").trim();
+  return { thinking, message };
+};

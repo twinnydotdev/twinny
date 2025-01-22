@@ -116,8 +116,6 @@ pre code {
   padding-top: 20px;
   font-size: 14px;
   margin-top: 20px;
-  padding-right: 12px;
-  padding-left: 4px;
 }
 
 .markdownFullScreen {
@@ -152,13 +150,12 @@ pre code {
 }
 
 .message {
-  padding: 8px 13px;
   border-radius: 12px;
   margin-bottom: 16px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   font-size: 1rem;
   line-height: 1.5;
-  width: 95%;
+  padding: 8px;
 }
 
 .message-container {
@@ -186,6 +183,7 @@ pre code {
 }
 
 .userMessage {
+  padding: 8px 13px;
   background-color: var(--vscode-editor-background);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
@@ -193,6 +191,32 @@ pre code {
 .assistantMessage {
   background-color: var(--vscode-editorWidget-background);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.thinkingSection {
+  background-color: var(--vscode-editor-background);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  color: var(--vscode-descriptionForeground);
+}
+
+.thinkingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.thinkingContent {
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+.thinkingContent.collapsed {
+  max-height: 0;
 }
 
 .messageOptions {

@@ -522,7 +522,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
               </VSCodeButton>
             )}
           </div>
+
           <div>
+            <VSCodeBadge>{selection?.length}</VSCodeBadge>
             {!!symmetryConnection && (
               <a
                 href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}

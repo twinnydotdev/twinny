@@ -463,6 +463,9 @@ export class ChatService extends Base {
     this._completion = ""
     this._isCancelled = false
     this.sendEditorLanguage()
+    const editor = window.activeTextEditor
+    const selection = editor?.selection
+    const userSelection = editor?.document.getText(selection)
     const lastMessage = messages[messages.length - 1]
     const text = lastMessage.content as string
 
@@ -480,6 +483,10 @@ export class ChatService extends Base {
     }
 
     let additionalContext = ""
+
+    if (userSelection) {
+      additionalContext += `Selected Code:\n${userSelection}\n\n`
+    }
 
     const ragContext = await this.getRagContext(text)
     const cleanedText = text?.replace(/@workspace/g, "").trim() || " "

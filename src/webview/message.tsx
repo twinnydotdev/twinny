@@ -11,6 +11,7 @@ import { ASSISTANT, TWINNY, YOU } from "../common/constants"
 import { ChatCompletionMessage, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
+import { getThinkingMessage } from "./utils"
 
 import styles from "./styles/index.module.css"
 
@@ -61,8 +62,8 @@ export const Message: React.FC<MessageProps> = React.memo(
     onRegenerate,
     onUpdate,
     theme,
-
   }) => {
+    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true);
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
 
@@ -141,6 +142,8 @@ export const Message: React.FC<MessageProps> = React.memo(
 
     if (!message?.content) return null
 
+    const { thinking, message: messageContent } = getThinkingMessage(message.content as string)
+
     return (
       <div
         className={`${styles.message} ${
@@ -149,6 +152,22 @@ export const Message: React.FC<MessageProps> = React.memo(
             : styles.userMessage
         }`}
       >
+        {thinking && (
+          <div className={styles.thinkingSection}>
+            <div
+              className={styles.thinkingHeader}
+              onClick={() => setIsThinkingCollapsed(!isThinkingCollapsed)}
+            >
+              <span>Thinking</span>
+              <span className={`codicon ${isThinkingCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"}`}></span>
+            </div>
+            <div className={`${styles.thinkingContent} ${isThinkingCollapsed ? styles.collapsed : ""}`}>
+              <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents as Components}>
+                {thinking}
+              </Markdown>
+            </div>
+          </div>
+        )}
         <div className={styles.messageRole}>
           <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
           <div className={styles.messageOptions}>
@@ -209,7 +228,7 @@ export const Message: React.FC<MessageProps> = React.memo(
             remarkPlugins={[remarkGfm]}
             components={markdownComponents as Components}
           >
-            {(message.content as string).trimStart()}
+            {messageContent.trimStart()}
           </Markdown>
         )}
       </div>
