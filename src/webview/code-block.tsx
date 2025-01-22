@@ -7,6 +7,7 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import { ASSISTANT, EVENT_NAME } from "../common/constants"
 import { LanguageType, Theme, ThemeType } from "../common/types"
 
+import { useToast } from "./toast"
 import { getLanguageMatch } from "./utils"
 
 import styles from "./styles/index.module.css"
@@ -25,12 +26,14 @@ const global = globalThis as any
 export const CodeBlock = (props: CodeBlockProps) => {
   const { t } = useTranslation()
   const { children, language, className, theme, role } = props
+  const { Toast, showToast } = useToast()
 
   const lang = getLanguageMatch(language, className)
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     const text = String(children).replace(/^\n/, "")
-    navigator.clipboard.writeText(text)
+    await navigator.clipboard.writeText(text)
+    showToast(t("copied-to-clipboard"))
   }
 
   const handleNewDocument = () => {
@@ -56,6 +59,7 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   return (
     <>
+      {Toast}
       <SyntaxHighlighter
         children={String(children).trimStart().replace(/\n$/, "")}
         style={theme === Theme.Dark ? vscDarkPlus : vs}

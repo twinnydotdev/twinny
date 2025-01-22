@@ -526,16 +526,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <div>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
             {!!symmetryConnection && (
-              <a
-                href={`https://twinny.dev/symmetry/?id=${symmetryConnection.id}`}
+               <VSCodeBadge
+                title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
               >
-                {/* TODO interpolate */}
-                <VSCodeBadge
-                  title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
-                >
-                  ⚡️ {symmetryConnection?.name}
-                </VSCodeBadge>
-              </a>
+                ⚡️ {symmetryConnection?.name}
+              </VSCodeBadge>
             )}
           </div>
         </div>
@@ -554,7 +549,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
             </div>
           </div>
         </form>
-        <ProviderSelect />
+        {!symmetryConnection && (
+          <ProviderSelect />
+        )}
       </div>
     </VSCodePanelView>
   )
