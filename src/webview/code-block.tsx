@@ -1,4 +1,4 @@
-import React, { ReactNode } from "react"
+import { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { vs,vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
@@ -7,6 +7,7 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import { ASSISTANT, EVENT_NAME } from "../common/constants"
 import { LanguageType, Theme, ThemeType } from "../common/types"
 
+import { useTheme } from "./hooks"
 import { useToast } from "./toast"
 import { getLanguageMatch } from "./utils"
 
@@ -25,9 +26,9 @@ const global = globalThis as any
 
 export const CodeBlock = (props: CodeBlockProps) => {
   const { t } = useTranslation()
-  const { children, language, className, theme, role } = props
+  const { children, language, className, role } = props
   const { Toast, showToast } = useToast()
-
+  const theme = useTheme()
   const lang = getLanguageMatch(language, className)
 
   const handleCopy = async () => {
@@ -103,4 +104,4 @@ export const CodeBlock = (props: CodeBlockProps) => {
   )
 }
 
-export default React.memo(CodeBlock)
+export default CodeBlock

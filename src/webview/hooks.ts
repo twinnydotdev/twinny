@@ -20,10 +20,12 @@ import {
   GITHUB_EVENT_NAME,
   GLOBAL_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
+  topLevelItems,
   WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import {
   ApiModel,
+  CategoryType,
   ClientMessage,
   Conversation,
   FileItem,
@@ -142,13 +144,12 @@ export const useWorkSpaceContext = <T>(key: string) => {
 }
 
 export const useTheme = () => {
-  const [theme, setTheme] = useState<ThemeType | undefined>()
+  const [theme, setTheme] = useState<ThemeType>("Dark")
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<ThemeType> = event.data
     if (message?.type === EVENT_NAME.twinnySendTheme) {
       setTheme(message?.data)
     }
-    return () => window.removeEventListener("message", handler)
   }
   useEffect(() => {
     global.vscode.postMessage({
@@ -577,27 +578,46 @@ export const useSuggestion = () => {
 
   const getFilePaths = useCallback(() => filePaths, [filePaths])
 
-  const items = useCallback(
+  const suggestionItems = useCallback(
     ({ query }: { query: string }) => {
       const filePaths = getFilePaths()
-      const fileItems: FileItem[] = filePaths.map((path) => ({
-        name: path.split("/").pop() || "",
-        path: path
-      }))
-      const defaultItems: FileItem[] = [
-        { name: "workspace", path: "workspace" },
-        { name: "problems", path: "problems" }
-      ]
-      return Promise.resolve(
-        [...defaultItems, ...fileItems]
-          .filter((item) =>
-            item.name.toLowerCase().startsWith(query.toLowerCase())
-          )
-          .slice(0, 10)
-      )
+      const fileItems = createFileItems(filePaths)
+      const allItems = [...topLevelItems, ...fileItems]
+      const filteredItems = filterItems(allItems, query)
+      const groupedItems = groupItemsByCategory(filteredItems)
+      const sortedItems = sortItemsByCategory(groupedItems)
+
+      return Promise.resolve(sortedItems)
     },
     [getFilePaths]
   )
+
+  const createFileItems = (filePaths: string[]): FileItem[] =>
+    filePaths.map((path) => ({
+      name: path.split("/").pop() || "",
+      path,
+      category: "files"
+    }))
+
+  const filterItems = (items: FileItem[], query: string): FileItem[] =>
+    items.filter((item) =>
+      item.name.toLowerCase().startsWith(query.toLowerCase())
+    )
+
+  const groupItemsByCategory = (
+    items: FileItem[]
+  ): Record<string, FileItem[]> =>
+    items.reduce((acc, item) => {
+      acc[item.category] = [...(acc[item.category] || []), item]
+      return acc
+    }, {} as Record<string, FileItem[]>)
+
+  const orderedCategories: CategoryType[] = ["workspace", "problems", "files"]
+
+  const sortItemsByCategory = (
+    groupedItems: Record<string, FileItem[]>
+  ): FileItem[] =>
+    orderedCategories.flatMap((category) => groupedItems[category] || [])
 
   const render = useCallback(() => {
     let reactRenderer: ReactRenderer<
@@ -622,7 +642,7 @@ export const useSuggestion = () => {
           showOnCreate: true,
           interactive: true,
           trigger: "manual",
-          placement: "bottom-start"
+          placement: "top-start"
         })
       },
 
@@ -658,10 +678,10 @@ export const useSuggestion = () => {
 
   const suggestion = useMemo(
     () => ({
-      items,
+      items: suggestionItems,
       render
     }),
-    [items, render]
+    [suggestionItems, render]
   )
 
   return {

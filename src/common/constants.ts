@@ -1,5 +1,7 @@
 import { defaultTemplates } from "../extension/templates"
 
+import { FileItem } from "./types"
+
 export const EXTENSION_NAME = "@ext:rjmacarthy.twinny"
 export const ASSISTANT = "assistant"
 export const USER = "user"
@@ -17,6 +19,8 @@ export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
+export const FILE_PATH_REGEX =
+  /(?:^|\s|`)(@\/[^\s`]+|\.\/[^\s`]+|(?:[\w-]+\/)*[\w-]+\.(?:jsx?|tsx?|css|scss|html|json|md|py|java|cpp|h|rs|go|php|rb|swift|kt|cs|fs|elm|lua|sql|yml|yaml|toml|xml|conf|ini|sh|bash|zsh|ps1))(?=\s|$|`)/g
 export const QUOTES_REGEX = /["'`]/g
 export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ["="]
@@ -64,6 +68,7 @@ export const EVENT_NAME = {
   twinnyOnCompletion: "twinny-on-completion",
   twinnyOnLoading: "twinny-on-loading",
   twinnyOpenDiff: "twinny-open-diff",
+  twinnyOpenFile: "twinny-open-file",
   twinnyRerankThresholdChanged: "twinny-rerank-threshold-changed",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
@@ -133,7 +138,7 @@ export const API_PROVIDERS = {
   Cohere: "cohere",
   Perplexity: "perplexity",
   Gemini: "gemini",
-  ...OPEN_AI_COMPATIBLE_PROVIDERS,
+  ...OPEN_AI_COMPATIBLE_PROVIDERS
 }
 
 export const CONVERSATION_EVENT_NAME = {
@@ -178,6 +183,7 @@ export const GLOBAL_STORAGE_KEY = {
 export const WORKSPACE_STORAGE_KEY = {
   autoScroll: "autoScroll",
   chatMessage: "chatMessage",
+  contextFiles: "contextFiles",
   downloadCancelled: "downloadCancelled",
   selectedTemplates: "selectedTemplates",
   selection: "selection",
@@ -397,4 +403,9 @@ export const SYMMETRY_EMITTER_KEY = {
 export const knownErrorMessages = [
   "First parameter has member 'readable' that is not a ReadableStream.", //This error occurs When plugins such as Fitten Code are enabled
   "The 'transform.readable' property must be an instance of ReadableStream. Received an instance of h" //When you try to enable the Node.js compatibility mode Compat to solve the problem, this error may pop up
+]
+
+export const topLevelItems: FileItem[] = [
+  { name: "workspace", path: "", category: "workspace" },
+  { name: "problems", path: "", category: "problems" }
 ]

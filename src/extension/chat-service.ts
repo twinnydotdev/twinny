@@ -40,6 +40,7 @@ import { kebabToSentence } from "../webview/utils"
 
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
+import { FileHandler } from "./file-handler"
 import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
@@ -70,6 +71,7 @@ export class ChatService extends Base {
   private _tokenJs: TokenJS | undefined
   private _webView?: Webview
   private _isCancelled = false
+  private _fileHandler: FileHandler
 
   constructor(
     statusBar: StatusBarItem,
@@ -88,6 +90,7 @@ export class ChatService extends Base {
     this._db = db
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
+    this._fileHandler = new FileHandler(webView)
     this.setupSymmetryListeners()
   }
 
@@ -440,11 +443,9 @@ export class ChatService extends Base {
 
     for (const file of files) {
       try {
-        // Get workspace root path
         const workspaceFolders = workspace.workspaceFolders
         if (!workspaceFolders) continue
 
-        // Construct proper file path
         const filePath = path.join(workspaceFolders[0].uri.fsPath, file.path)
 
         const content = await fs.readFile(filePath, "utf-8")

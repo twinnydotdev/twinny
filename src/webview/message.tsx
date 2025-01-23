@@ -1,19 +1,29 @@
 import React, { useCallback, useEffect, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import Markdown, { Components } from "react-markdown"
+import { Node } from "@tiptap/pm/model"
 import { EditorContent, Extension, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
-import { ASSISTANT, TWINNY, YOU } from "../common/constants"
-import { ChatCompletionMessage, ThemeType } from "../common/types"
+import {
+  ASSISTANT,
+  EVENT_NAME,
+  FILE_PATH_REGEX,
+  TWINNY,
+  YOU
+} from "../common/constants"
+import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
 import { getThinkingMessage } from "./utils"
 
 import styles from "./styles/index.module.css"
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 
 interface MessageProps {
   conversationLength?: number
@@ -21,9 +31,10 @@ interface MessageProps {
   isAssistant?: boolean
   isLoading?: boolean
   message?: ChatCompletionMessage
+  messages?: ChatCompletionMessage[]
   onDelete?: (index: number) => void
-  onRegenerate?: (index: number) => void
-  onUpdate?: (message: string, index: number) => void
+  onRegenerate?: (index: number, mentions: MentionType[] | undefined) => void
+  onUpdate?: (message: string, index: number, mentions: MentionType[] | undefined) => void
   theme: ThemeType | undefined
 }
 
@@ -62,8 +73,9 @@ export const Message: React.FC<MessageProps> = React.memo(
     onRegenerate,
     onUpdate,
     theme,
+    messages,
   }) => {
-    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true);
+    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true)
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
 
@@ -72,8 +84,10 @@ export const Message: React.FC<MessageProps> = React.memo(
       []
     )
     const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
+
     const handleRegenerate = useCallback(
-      () => onRegenerate?.(index),
+      () =>
+        onRegenerate?.(index, getMentions(index -1)),
       [onRegenerate, index]
     )
 
@@ -87,9 +101,36 @@ export const Message: React.FC<MessageProps> = React.memo(
       if (message?.content === content) {
         return setEditing(false)
       }
-      onUpdate?.(content || "", index)
+      onUpdate?.(content || "", index, getMentions(index))
       setEditing(false)
     }, [message?.content, onUpdate, index])
+
+    const getMentions = (index: number) => {
+      if (!messages?.length) return
+      const message = messages[index]
+      if (!editor) return
+      const doc = Node.fromJSON(editor.schema, {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: message.content }] }
+        ]
+      })
+      const mentions: MentionType[] = []
+
+      doc.descendants((node) => {
+        if (node.isText && node.text) {
+          let match
+          while ((match = FILE_PATH_REGEX.exec(node.text)) !== null) {
+            mentions.push({
+              name: match[1],
+              path: match[1].replace("@", "")
+            })
+          }
+        }
+      })
+
+      return mentions
+    }
 
     const editor = useEditor(
       {
@@ -111,14 +152,65 @@ export const Message: React.FC<MessageProps> = React.memo(
       }
     }, [editor, message?.content])
 
+    const handleOpenFile = useCallback((filePath: string) => {
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnyOpenFile,
+        data: filePath.replace(/^@/, "")
+      })
+    }, [])
+
+    const processContent = useCallback(
+      (text: string) => {
+        const parts = text.split(FILE_PATH_REGEX)
+
+        return (
+          <>
+            {parts.map((part, index) => {
+              const trimmedPart = part.trim()
+              const isFilePath = FILE_PATH_REGEX.test(trimmedPart)
+
+              if (isFilePath) {
+                const displayPart = trimmedPart.replace("@", "")
+
+                return (
+                  <span
+                    key={`file-${index}`}
+                    onClick={() => handleOpenFile(trimmedPart)}
+                    className={styles.fileLink}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {displayPart}
+                  </span>
+                )
+              }
+
+              return part
+            })}
+          </>
+        )
+      },
+      [handleOpenFile]
+    )
+
+    const renderCode = useCallback(
+      ({ children }: { children: React.ReactNode }) => {
+        if (typeof children === "string") {
+          return <code>{processContent(children)}</code>
+        }
+        return <code>{children}</code>
+      },
+      [processContent]
+    )
+
     const renderPre = useCallback(
       ({ children }: { children: React.ReactNode }) => {
         if (React.isValidElement(children)) {
           return (
             <MemoizedCodeBlock
               role={message?.role}
-              theme={theme}
               {...children.props}
+              theme={theme}
             />
           )
         }
@@ -127,22 +219,46 @@ export const Message: React.FC<MessageProps> = React.memo(
       [message?.role, theme]
     )
 
-    const renderCode = useCallback(
-      ({ children }: { children: React.ReactNode }) => <code>{children}</code>,
-      []
-    )
-
     const markdownComponents = useMemo(
       () => ({
+        code: renderCode,
         pre: renderPre,
-        code: renderCode
+        p: ({
+          children,
+          ...props
+        }: React.HTMLAttributes<HTMLParagraphElement> & {
+          children: React.ReactNode
+        }) => {
+          if (typeof children === "string") {
+            return <p {...props}>{processContent(children)}</p>
+          }
+          if (Array.isArray(children)) {
+            return (
+              <p {...props}>
+                {children.map((child, i) => {
+                  if (typeof child === "string") {
+                    return (
+                      <React.Fragment key={i}>
+                        {processContent(child)}
+                      </React.Fragment>
+                    )
+                  }
+                  return child
+                })}
+              </p>
+            )
+          }
+          return <p {...props}>{children}</p>
+        }
       }),
-      [renderPre, renderCode]
+      [renderCode, processContent]
     )
 
     if (!message?.content) return null
 
-    const { thinking, message: messageContent } = getThinkingMessage(message.content as string)
+    const { thinking, message: messageContent } = getThinkingMessage(
+      message.content as string
+    )
 
     return (
       <div
@@ -158,11 +274,26 @@ export const Message: React.FC<MessageProps> = React.memo(
               className={styles.thinkingHeader}
               onClick={() => setIsThinkingCollapsed(!isThinkingCollapsed)}
             >
-              <span>Thinking</span>
-              <span className={`codicon ${isThinkingCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"}`}></span>
+              <span>
+                {t("thinking")}
+              </span>
+              <span
+                className={`codicon ${
+                  isThinkingCollapsed
+                    ? "codicon-chevron-right"
+                    : "codicon-chevron-down"
+                }`}
+              ></span>
             </div>
-            <div className={`${styles.thinkingContent} ${isThinkingCollapsed ? styles.collapsed : ""}`}>
-              <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents as Components}>
+            <div
+              className={`${styles.thinkingContent} ${
+                isThinkingCollapsed ? styles.collapsed : ""
+              }`}
+            >
+              <Markdown
+                remarkPlugins={[remarkGfm]}
+                components={markdownComponents as Components}
+              >
                 {thinking}
               </Markdown>
             </div>

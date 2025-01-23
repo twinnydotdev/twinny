@@ -66,10 +66,7 @@ export class SymmetryService extends EventEmitter {
     super()
     this._webView = webView
     this._sessionManager = sessionManager
-    this._providerSwarm
-    this._providerPeer
     this._context = context
-    this._providerTopic
     const autoConnectProvider = this._context.globalState.get(
       `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.autoConnectSymmetryProvider}`
     )
