@@ -49,7 +49,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       const orderedCategories: CategoryType[] = [
         "workspace",
         "problems",
-        "files",
+        "files"
       ]
       const availableCategories = new Set(
         props.items.map((item) => item.category)
@@ -65,9 +65,11 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
     const selectItem = (index: number) => {
       if (!selectedCategory) {
         const category = categories[index]
-        const isTopLevel = topLevelItems.some(item => item.category === category)
+        const isTopLevel = topLevelItems.some(
+          (item) => item.category === category
+        )
         if (isTopLevel) {
-          const item = props.items.find(i => i.category === category)
+          const item = props.items.find((i) => i.category === category)
           if (item) {
             props.command({ id: item.name, label: item.name })
           }
@@ -78,7 +80,10 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       } else {
         const item = categoryItems[index]
         if (item) {
-          props.command({ id: item.path || item.name, label: item.path || item.name })
+          props.command({
+            id: item.path || item.name,
+            label: item.path || item.name
+          })
         }
       }
     }
@@ -128,7 +133,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
           return true
         }
 
-        if (event.key === "Backspace" || event.key === "Escape") {
+        if (event.key === "Escape") {
           if (selectedCategory) {
             setSelectedCategory(null)
             setSelectedIndex(0)
@@ -141,9 +146,11 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       }
     }))
 
-    if (props.items.length === 1) {
-      selectItem(0)
-      return null
+    if (props.items.every((item) => item.category === "files")) {
+      if (!selectedCategory) {
+        setSelectedCategory("files")
+        setSelectedIndex(0)
+      }
     }
 
     if (!categories.length) {
