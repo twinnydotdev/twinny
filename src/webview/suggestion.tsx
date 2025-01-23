@@ -5,6 +5,8 @@ import { ReactRenderer } from "@tiptap/react"
 import { SuggestionKeyDownProps,SuggestionProps } from "@tiptap/suggestion"
 import tippy, { Instance as TippyInstance } from "tippy.js"
 
+import { CategoryType, FileItem } from "../common/types"
+
 import {
   MentionList,
   MentionListProps,
@@ -12,9 +14,37 @@ import {
 } from "./mention-list"
 
 export const getSuggestions = (fileList: string[]) => ({
-  items: ({ query }: { query: string }): string[] => {
-    return ["workspace", "problems", ...fileList].filter((item) =>
-      item.toLowerCase().startsWith(query.toLowerCase())
+  items: ({ query }: { query: string }): FileItem[] => {
+    const topLevelItems: FileItem[] = [
+      {
+        name: "Workspace",
+        path: "workspace",
+        category: "workspace" as CategoryType
+      },
+      {
+        name: "Problems",
+        path: "problems",
+        category: "problems" as CategoryType
+      },
+      {
+        name: "Terminal",
+        path: "terminal",
+        category: "terminal" as CategoryType
+      }
+    ]
+
+    const fileItems = fileList.map(file => {
+      const isFolder = !file.includes(".");
+      return {
+        name: file.split("/").pop() || file,
+        path: file,
+        category: isFolder ? "folders" as CategoryType : "files" as CategoryType
+      };
+    })
+
+    const allItems = [...topLevelItems, ...fileItems]
+    return allItems.filter((item) =>
+      item.path.toLowerCase().startsWith(query.toLowerCase())
     )
   },
 
@@ -45,7 +75,7 @@ export const getSuggestions = (fileList: string[]) => ({
           showOnCreate: true,
           interactive: true,
           trigger: "manual",
-          placement: "bottom-start",
+          placement: "top-start",
         })
       },
 

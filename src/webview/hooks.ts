@@ -581,64 +581,55 @@ export const useSuggestion = () => {
   const suggestionItems = useCallback(
     ({ query }: { query: string }) => {
       const filePaths = getFilePaths()
-      const fileItems: FileItem[] = filePaths.map((path) => {
-        const name = path.split("/").pop() || ""
-        const isDirectory = !path.includes(".")
-        return {
-          name,
-          path,
-          category: isDirectory ? "folders" : "files"
-        }
-      })
+      const fileItems = createFileItems(filePaths)
+      const allItems = [...topLevelItems, ...fileItems]
+      const filteredItems = filterItems(allItems, query)
+      const groupedItems = groupItemsByCategory(filteredItems)
+      const sortedItems = sortItemsByCategory(groupedItems)
 
-      const specialItems: FileItem[] = [
-        { name: "workspace", path: "workspace", category: "files" },
-        { name: "problems", path: "problems", category: "files" }
-      ]
-
-      const defaultItems: FileItem[] = [
-        { name: "terminal", path: "terminal", category: "terminal" }
-      ]
-
-      const allItems = [...specialItems, ...defaultItems, ...fileItems]
-      const filteredItems = allItems.filter((item) =>
-        item.name.toLowerCase().startsWith(query.toLowerCase())
-      )
-
-      // Group items by category, keeping special items at top
-      const specialFilteredItems = filteredItems.filter(item =>
-        item.path === "workspace" || item.path === "problems"
-      )
-
-      const remainingFilteredItems = filteredItems.filter(item =>
-        item.path !== "workspace" && item.path !== "problems"
-      )
-
-      // Group remaining items by category
-      const groupedItems = remainingFilteredItems.reduce<Record<string, FileItem[]>>((acc, item) => {
-        if (!acc[item.category]) {
-          acc[item.category] = []
-        }
-        acc[item.category].push(item)
-        return acc
-      }, {})
-
-      // Order categories
-      const orderedCategories: CategoryType[] = ["files", "folders", "terminal"]
-      const sortedItems = [
-        ...specialFilteredItems,
-        ...orderedCategories.reduce<FileItem[]>((acc, category) => {
-          if (groupedItems[category]) {
-            acc.push(...groupedItems[category])
-          }
-          return acc
-        }, [])
-      ]
-
-      return Promise.resolve(sortedItems.slice(0, 10))
+      return Promise.resolve(sortedItems)
     },
     [getFilePaths]
   )
+
+  const createFileItems = (filePaths: string[]): FileItem[] =>
+    filePaths.map((path) => ({
+      name: path.split("/").pop() || "",
+      path,
+      category: path.includes(".") ? "files" : "folders"
+    }))
+
+  const topLevelItems: FileItem[] = [
+    { name: "workspace", path: "", category: "workspace" },
+    { name: "problems", path: "", category: "problems" },
+    { name: "terminal", path: "terminal", category: "terminal" }
+  ]
+
+  const filterItems = (items: FileItem[], query: string): FileItem[] =>
+    items.filter((item) =>
+      item.name.toLowerCase().startsWith(query.toLowerCase())
+    )
+
+  const groupItemsByCategory = (
+    items: FileItem[]
+  ): Record<string, FileItem[]> =>
+    items.reduce((acc, item) => {
+      acc[item.category] = [...(acc[item.category] || []), item]
+      return acc
+    }, {} as Record<string, FileItem[]>)
+
+  const orderedCategories: CategoryType[] = [
+    "workspace",
+    "problems",
+    "terminal",
+    "files",
+    "folders"
+  ]
+
+  const sortItemsByCategory = (
+    groupedItems: Record<string, FileItem[]>
+  ): FileItem[] =>
+    orderedCategories.flatMap((category) => groupedItems[category] || [])
 
   const render = useCallback(() => {
     let reactRenderer: ReactRenderer<

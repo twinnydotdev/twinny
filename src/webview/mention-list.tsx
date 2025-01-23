@@ -23,6 +23,10 @@ const getCategoryIcon = (category: CategoryType): string => {
       return "folder"
     case "terminal":
       return "terminal"
+    case "workspace":
+      return "root-folder"
+    case "problems":
+      return "warning"
   }
 }
 
@@ -45,7 +49,13 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       useState<CategoryType | null>(null)
 
     const categories = useMemo(() => {
-      const orderedCategories: CategoryType[] = ["files", "folders", "terminal"]
+      const orderedCategories: CategoryType[] = [
+        "workspace",
+        "problems",
+        "files",
+        "folders",
+        "terminal"
+      ]
       const availableCategories = new Set(
         props.items.map((item) => item.category)
       )
@@ -83,16 +93,19 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       selectItem(selectedIndex)
     }
 
-    const backHandler = () => {
-      if (selectedCategory) {
-        setSelectedCategory(null)
-        setSelectedIndex(0)
-        return true
-      }
-      return false
-    }
+    useEffect(() => {
+      setSelectedIndex(0)
+    }, [props.items, selectedCategory])
 
-    useEffect(() => setSelectedIndex(0), [props.items, selectedCategory])
+    // Add effect to handle scrolling when selectedIndex changes
+    useEffect(() => {
+      const selectedElement = document.querySelector(
+        `.${styles.dropdownSelected}`
+      )
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: "nearest", behavior: "auto" })
+      }
+    }, [selectedIndex])
 
     useImperativeHandle(ref, () => ({
       onKeyDown: ({ event }: { event: KeyboardEvent }) => {
@@ -111,8 +124,13 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
           return true
         }
 
-        if (event.key === "Escape" || event.key === "Backspace") {
-          return backHandler()
+        if (event.key === "Backspace" || event.key === "Escape") {
+          if (selectedCategory) {
+            setSelectedCategory(null)
+            setSelectedIndex(0)
+            return true
+          }
+          return false
         }
 
         return false
@@ -123,17 +141,12 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       return <div className="item">{t("no-result")}</div>
     }
 
+    console.log(categories)
+
     return (
       <div className={styles.dropdownMenu}>
         {selectedCategory ? (
           <>
-            <div className={styles.categoryHeader}>
-              <span className={styles.backButton} onClick={backHandler}>
-                <i className="codicon codicon-chevron-left" />
-              </span>
-              {selectedCategory.charAt(0).toUpperCase() +
-                selectedCategory.slice(1)}
-            </div>
             {categoryItems.map((item, index) => (
               <button
                 className={cx(styles.dropdownItem, {

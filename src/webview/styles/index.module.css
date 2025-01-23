@@ -500,8 +500,10 @@ code {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  overflow: auto;
+  overflow-y: auto;
   position: relative;
+  max-height: 300px;
+  min-width: 250px;
 }
 
 .dropdownItem {
