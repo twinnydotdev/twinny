@@ -377,7 +377,7 @@ export function safeParseJsonResponse(
       return JSON.parse(stringBuffer.split("data:")[1])
     }
     return JSON.parse(stringBuffer)
-  } catch (e) {
+  } catch {
     return undefined
   }
 }
@@ -387,7 +387,7 @@ export function safeParseJsonStringBuffer(
 ): unknown | undefined {
   try {
     return JSON.parse(stringBuffer.replace(NORMALIZE_REGEX, ""))
-  } catch (e) {
+  } catch {
     return undefined
   }
 }
@@ -395,7 +395,7 @@ export function safeParseJsonStringBuffer(
 export function safeParseJson<T>(data: string): T | undefined {
   try {
     return JSON.parse(data)
-  } catch (e) {
+  } catch {
     return undefined
   }
 }
@@ -625,7 +625,7 @@ export function readGitSubmodulesFile(): string[] | undefined {
       }
     })
     return submodulePaths
-  } catch (e) {
+  } catch {
     return undefined
   }
 }

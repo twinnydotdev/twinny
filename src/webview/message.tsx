@@ -34,7 +34,7 @@ interface MessageProps {
   messages?: ChatCompletionMessage[]
   onDelete?: (index: number) => void
   onRegenerate?: (index: number, mentions: MentionType[] | undefined) => void
-  onUpdate?: (message: string, index: number) => void
+  onUpdate?: (message: string, index: number, mentions: MentionType[] | undefined) => void
   theme: ThemeType | undefined
 }
 
@@ -84,9 +84,10 @@ export const Message: React.FC<MessageProps> = React.memo(
       []
     )
     const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
+
     const handleRegenerate = useCallback(
       () =>
-        onRegenerate?.(index, getMentions(index)),
+        onRegenerate?.(index, getMentions(index -1)),
       [onRegenerate, index]
     )
 
@@ -100,13 +101,13 @@ export const Message: React.FC<MessageProps> = React.memo(
       if (message?.content === content) {
         return setEditing(false)
       }
-      onUpdate?.(content || "", index)
+      onUpdate?.(content || "", index, getMentions(index))
       setEditing(false)
     }, [message?.content, onUpdate, index])
 
     const getMentions = (index: number) => {
       if (!messages?.length) return
-      const message = messages[index -1]
+      const message = messages[index]
       if (!editor) return
       const doc = Node.fromJSON(editor.schema, {
         type: "doc",
@@ -208,8 +209,8 @@ export const Message: React.FC<MessageProps> = React.memo(
           return (
             <MemoizedCodeBlock
               role={message?.role}
-              theme={theme}
               {...children.props}
+              theme={theme}
             />
           )
         }
@@ -273,7 +274,9 @@ export const Message: React.FC<MessageProps> = React.memo(
               className={styles.thinkingHeader}
               onClick={() => setIsThinkingCollapsed(!isThinkingCollapsed)}
             >
-              <span>Thinking</span>
+              <span>
+                {t("thinking")}
+              </span>
               <span
                 className={`codicon ${
                   isThinkingCollapsed

@@ -277,7 +277,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     })
   }
 
-  const handleEditMessage = (message: string, index: number): void => {
+  const handleEditMessage = (message: string, index: number, mentions: MentionType[] | undefined): void => {
     generatingRef.current = true
     setIsLoading(true)
     setMessages((prev) => {
@@ -290,7 +290,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       global.vscode.postMessage({
         type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages
+        data: updatedMessages,
+        meta: mentions
       } as ClientMessage)
 
       return updatedMessages

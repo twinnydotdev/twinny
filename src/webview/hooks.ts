@@ -144,13 +144,12 @@ export const useWorkSpaceContext = <T>(key: string) => {
 }
 
 export const useTheme = () => {
-  const [theme, setTheme] = useState<ThemeType | undefined>()
+  const [theme, setTheme] = useState<ThemeType>("Dark")
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<ThemeType> = event.data
     if (message?.type === EVENT_NAME.twinnySendTheme) {
       setTheme(message?.data)
     }
-    return () => window.removeEventListener("message", handler)
   }
   useEffect(() => {
     global.vscode.postMessage({

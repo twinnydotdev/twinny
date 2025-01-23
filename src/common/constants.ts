@@ -20,7 +20,7 @@ export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
 export const FILE_PATH_REGEX =
-  /(?:^|\s|`)(@\/[^\s`]+|\.\/[^\s`]+|(?:[\w-]+\/)*[\w-]+\.[a-zA-Z0-9]+)(?=\s|$|`)/g
+  /(?:^|\s|`)(@\/[^\s`]+|\.\/[^\s`]+|(?:[\w-]+\/)*[\w-]+\.(?:jsx?|tsx?|css|scss|html|json|md|py|java|cpp|h|rs|go|php|rb|swift|kt|cs|fs|elm|lua|sql|yml|yaml|toml|xml|conf|ini|sh|bash|zsh|ps1))(?=\s|$|`)/g
 export const QUOTES_REGEX = /["'`]/g
 export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ["="]

@@ -152,7 +152,6 @@ a:hover {
 }
 
 code {
-  font-family: var(--vscode-editor-font-family);
   font-size: 0.85rem;
   padding: 0.1rem 0.3rem;
   background: transparent;

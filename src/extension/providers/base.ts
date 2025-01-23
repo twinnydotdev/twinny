@@ -183,7 +183,10 @@ export class BaseProvider {
   }
 
   private handleThemeChange = () => {
-    this.sendThemeToWebView()
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnySendTheme,
+      data: getTheme()
+    } as ServerMessage<ThemeType>)
   }
 
   private handleTextSelection = (
@@ -402,7 +405,10 @@ export class BaseProvider {
   }
 
   private getTheme = () => {
-    this.sendThemeToWebView()
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnySendTheme,
+      data: getTheme()
+    } as ServerMessage<ThemeType>)
   }
 
   private getCurrentLanguage = () => {
@@ -451,14 +457,6 @@ export class BaseProvider {
 
   private twinnyHideBackButton() {
     vscode.commands.executeCommand(TWINNY_COMMAND_NAME.hideBackButton)
-  }
-
-  // Helper methods
-  private sendThemeToWebView() {
-    this.webView?.postMessage({
-      type: EVENT_NAME.twinnySendTheme,
-      data: getTheme()
-    } as ServerMessage<ThemeType>)
   }
 
   private sendTextSelectionToWebView(text: string) {

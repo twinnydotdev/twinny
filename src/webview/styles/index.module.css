@@ -61,10 +61,11 @@ pre {
   overflow-x: auto;
   margin: 12px 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-family: inherit;
 }
 
 code {
-  font-family: var(--vscode-editor-font-family);
+  font-family: inherit;
   font-size: 1rem !important;
 }
 
@@ -151,7 +152,8 @@ code {
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   font-size: 1rem;
   line-height: 1.5;
-  padding: 8px;
+  padding: 5px 10px;
+  margin-right: 10px;
 }
 
 .message-container {
@@ -194,7 +196,7 @@ code {
   border-radius: 8px;
   padding: 8px;
   margin-bottom: 12px;
-  font-size: 0.9rem;
+  font-size: var(--small-font-size);
   color: var(--vscode-descriptionForeground);
 }
 
@@ -468,9 +470,17 @@ code {
   margin: 0;
 }
 
+:root {
+  --mention-border-radius: 0.4rem;
+  --small-font-size: 0.9rem;
+  --smaller-font-size: 0.85em;
+  --dropdown-padding: 0.4rem;
+  --dropdown-gap: 0.1rem;
+}
+
 :global(.tiptap .mention) {
   background-color: var(--vscode-inputOption-activeBackground);
-  border-radius: 0.4rem;
+  border-radius: var(--mention-border-radius);
   box-decoration-break: clone;
   color: var(--vscode-inputOption-activeForeground);
   padding: 1px 2px 2px 2px;
