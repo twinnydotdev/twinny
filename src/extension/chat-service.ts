@@ -40,6 +40,7 @@ import { kebabToSentence } from "../webview/utils"
 
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
+import { FileHandler } from "./file-handler"
 import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
@@ -70,6 +71,7 @@ export class ChatService extends Base {
   private _tokenJs: TokenJS | undefined
   private _webView?: Webview
   private _isCancelled = false
+  private _fileHandler: FileHandler
 
   constructor(
     statusBar: StatusBarItem,
@@ -88,6 +90,7 @@ export class ChatService extends Base {
     this._db = db
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
+    this._fileHandler = new FileHandler(webView)
     this.setupSymmetryListeners()
   }
 

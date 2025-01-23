@@ -68,10 +68,6 @@ code {
   font-size: 1rem !important;
 }
 
-pre code {
-  background-color: transparent;
-}
-
 /* Scrollbar Styling */
 .markdown::-webkit-scrollbar,
 .markdownFullScreen::-webkit-scrollbar {
@@ -508,7 +504,37 @@ pre code {
   position: relative;
 }
 
-.dropdownMenu button,
+.dropdownItem {
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  background-color: transparent;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.itemPath {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.itemName {
+  font-weight: 500;
+}
+
+.itemFullPath {
+  font-size: 0.85em;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 :global(.tiptap .item) {
   border: none;
   color: var(--vscode-foreground);
@@ -571,3 +597,54 @@ pre code {
 .prTitle a {
   color: var(--vscode-textLink-foreground);
 }
+
+.fileLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: var(--vscode-editor-background);
+  cursor: pointer;
+  border: 1px solid var(--vscode-editorWidget-border);
+  color: var(--vscode-foreground);
+  font-family: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.fileLink:hover {
+  background: var(--vscode-inputOption-hoverBackground);
+}
+.fileLink > span {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.codeBlockWrapper {
+  position: relative;
+  background-color: var(--vscode-textCodeBlock-background);
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+.codeOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  padding: inherit;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 1rem;
+  line-height: inherit;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.codeOverlay .fileLink {
+  pointer-events: auto;
+  margin: 0 2px;
+}
+
+

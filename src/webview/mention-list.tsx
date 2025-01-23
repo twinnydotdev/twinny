@@ -29,7 +29,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       const item = props.items[index]
 
       if (item) {
-        props.command({ id: item.path, label: item.name })
+        props.command({ id: item.path, label: item.path })
       }
     }
 
@@ -75,13 +75,18 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
         {props.items.length ? (
           props.items.map((item: FileItem, index: number) => (
             <button
-              className={cx({
+              className={cx(styles.dropdownItem, {
                 [styles.dropdownSelected]: index === selectedIndex,
               })}
               key={index}
               onClick={() => selectItem(index)}
             >
-              {item.name}
+              <span className={styles.itemPath}>
+                <span className={styles.itemName}>{item.name}</span>
+                {item.path !== item.name && (
+                  <span className={styles.itemFullPath}>{item.path}</span>
+                )}
+              </span>
             </button>
           ))
         ) : (

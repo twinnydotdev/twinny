@@ -17,6 +17,7 @@ export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
+export const FILE_PATH_REGEX = /(?:^|\s|`)(@\/[^\s`]+|\.\/[^\s`]+|(?:[\w-]+\/)*[\w-]+\.[a-zA-Z0-9]+)(?=\s|$|`)/g
 export const QUOTES_REGEX = /["'`]/g
 export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ["="]
@@ -64,6 +65,7 @@ export const EVENT_NAME = {
   twinnyOnCompletion: "twinny-on-completion",
   twinnyOnLoading: "twinny-on-loading",
   twinnyOpenDiff: "twinny-open-diff",
+  twinnyOpenFile: "twinny-open-file",
   twinnyRerankThresholdChanged: "twinny-rerank-threshold-changed",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",

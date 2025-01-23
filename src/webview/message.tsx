@@ -7,13 +7,22 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
-import { ASSISTANT, TWINNY, YOU } from "../common/constants"
+import {
+  ASSISTANT,
+  EVENT_NAME,
+  FILE_PATH_REGEX,
+  TWINNY,
+  YOU
+} from "../common/constants"
 import { ChatCompletionMessage, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
 import { getThinkingMessage } from "./utils"
 
 import styles from "./styles/index.module.css"
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 
 interface MessageProps {
   conversationLength?: number
@@ -61,9 +70,9 @@ export const Message: React.FC<MessageProps> = React.memo(
     onDelete,
     onRegenerate,
     onUpdate,
-    theme,
+    theme
   }) => {
-    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true);
+    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true)
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
 
@@ -111,6 +120,57 @@ export const Message: React.FC<MessageProps> = React.memo(
       }
     }, [editor, message?.content])
 
+    const handleOpenFile = useCallback((filePath: string) => {
+      global.vscode.postMessage({
+        type: EVENT_NAME.twinnyOpenFile,
+        data: filePath.replace(/^@/, "")
+      })
+    }, [])
+
+    const processContent = useCallback(
+      (text: string) => {
+        const parts = text.split(FILE_PATH_REGEX)
+
+        return (
+          <>
+            {parts.map((part, index) => {
+              const trimmedPart = part.trim()
+              const isFilePath = FILE_PATH_REGEX.test(trimmedPart)
+
+              if (isFilePath) {
+                const displayPart = trimmedPart.replace("@", "")
+
+                return (
+                  <span
+                    key={`file-${index}`}
+                    onClick={() => handleOpenFile(trimmedPart)}
+                    className={styles.fileLink}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {displayPart}
+                  </span>
+                )
+              }
+
+              return part
+            })}
+          </>
+        )
+      },
+      [handleOpenFile]
+    )
+
+    const renderCode = useCallback(
+      ({ children }: { children: React.ReactNode }) => {
+        if (typeof children === "string") {
+          return <code>{processContent(children)}</code>
+        }
+        return <code>{children}</code>
+      },
+      [processContent]
+    )
+
     const renderPre = useCallback(
       ({ children }: { children: React.ReactNode }) => {
         if (React.isValidElement(children)) {
@@ -127,22 +187,46 @@ export const Message: React.FC<MessageProps> = React.memo(
       [message?.role, theme]
     )
 
-    const renderCode = useCallback(
-      ({ children }: { children: React.ReactNode }) => <code>{children}</code>,
-      []
-    )
-
     const markdownComponents = useMemo(
       () => ({
+        code: renderCode,
         pre: renderPre,
-        code: renderCode
+        p: ({
+          children,
+          ...props
+        }: React.HTMLAttributes<HTMLParagraphElement> & {
+          children: React.ReactNode
+        }) => {
+          if (typeof children === "string") {
+            return <p {...props}>{processContent(children)}</p>
+          }
+          if (Array.isArray(children)) {
+            return (
+              <p {...props}>
+                {children.map((child, i) => {
+                  if (typeof child === "string") {
+                    return (
+                      <React.Fragment key={i}>
+                        {processContent(child)}
+                      </React.Fragment>
+                    )
+                  }
+                  return child
+                })}
+              </p>
+            )
+          }
+          return <p {...props}>{children}</p>
+        }
       }),
-      [renderPre, renderCode]
+      [renderCode, processContent]
     )
 
     if (!message?.content) return null
 
-    const { thinking, message: messageContent } = getThinkingMessage(message.content as string)
+    const { thinking, message: messageContent } = getThinkingMessage(
+      message.content as string
+    )
 
     return (
       <div
@@ -159,10 +243,23 @@ export const Message: React.FC<MessageProps> = React.memo(
               onClick={() => setIsThinkingCollapsed(!isThinkingCollapsed)}
             >
               <span>Thinking</span>
-              <span className={`codicon ${isThinkingCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"}`}></span>
+              <span
+                className={`codicon ${
+                  isThinkingCollapsed
+                    ? "codicon-chevron-right"
+                    : "codicon-chevron-down"
+                }`}
+              ></span>
             </div>
-            <div className={`${styles.thinkingContent} ${isThinkingCollapsed ? styles.collapsed : ""}`}>
-              <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents as Components}>
+            <div
+              className={`${styles.thinkingContent} ${
+                isThinkingCollapsed ? styles.collapsed : ""
+              }`}
+            >
+              <Markdown
+                remarkPlugins={[remarkGfm]}
+                components={markdownComponents as Components}
+              >
                 {thinking}
               </Markdown>
             </div>
