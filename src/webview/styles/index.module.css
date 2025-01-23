@@ -638,35 +638,3 @@ code {
   font-size: 14px;
   opacity: 0.8;
 }
-
-.contextFiles {
-  padding: 5px;
-}
-
-.contextFilesTitle {
-  font-size: 11px;
-  color: var(--vscode-foreground);
-  margin-bottom: 5px;
-}
-
-.contextFilesList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.contextFile {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 5px;
-  border-radius: 3px;
-  background-color: var(--vscode-button-secondaryBackground);
-  font-size: 12px;
-}
-
-.contextFile span {
-  color: var(--vscode-button-secondaryForeground);
-}
-
-

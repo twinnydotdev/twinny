@@ -106,7 +106,6 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       setSelectedIndex(0)
     }, [props.items, selectedCategory])
 
-    // Add effect to handle scrolling when selectedIndex changes
     useEffect(() => {
       const selectedElement = document.querySelector(
         `.${styles.dropdownSelected}`
