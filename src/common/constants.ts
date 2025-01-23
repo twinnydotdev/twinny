@@ -183,6 +183,7 @@ export const GLOBAL_STORAGE_KEY = {
 export const WORKSPACE_STORAGE_KEY = {
   autoScroll: "autoScroll",
   chatMessage: "chatMessage",
+  contextFiles: "contextFiles",
   downloadCancelled: "downloadCancelled",
   selectedTemplates: "selectedTemplates",
   selection: "selection",

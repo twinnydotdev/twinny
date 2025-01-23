@@ -369,7 +369,7 @@ export class BaseProvider {
 
     this.chatService?.streamChatCompletion(
       data.data || [],
-      data.meta as FileItem[]
+      data.meta as FileItem[],
     )
   }
 

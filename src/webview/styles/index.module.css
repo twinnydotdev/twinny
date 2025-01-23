@@ -627,71 +627,10 @@ code {
 .fileLink:hover {
   background: var(--vscode-inputOption-hoverBackground);
 }
+
 .fileLink > span {
   display: inline-block;
   vertical-align: middle;
-}
-
-.codeBlockWrapper {
-  position: relative;
-  background-color: var(--vscode-textCodeBlock-background);
-  border-radius: 8px;
-  margin: 12px 0;
-}
-
-.codeOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  padding: inherit;
-  font-family: var(--vscode-editor-font-family);
-  font-size: 1rem;
-  line-height: inherit;
-  white-space: pre;
-  overflow-x: auto;
-}
-.codeOverlay .fileLink {
-  pointer-events: auto;
-  margin: 0 2px;
-}
-
-.categoryHeader {
-  padding: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--vscode-foreground);
-  background: var(--vscode-editorWidget-background);
-  border-bottom: 1px solid var(--vscode-editorWidget-border);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.backButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 3px;
-  color: var(--vscode-foreground);
-  opacity: 0.8;
-  margin-right: 4px;
-}
-
-.backButton:hover {
-  background: var(--vscode-inputOption-hoverBackground);
-  opacity: 1;
-}
-
-.backButton i {
-  font-size: 14px;
 }
 
 .dropdownItem i {
@@ -700,5 +639,34 @@ code {
   opacity: 0.8;
 }
 
+.contextFiles {
+  padding: 5px;
+}
+
+.contextFilesTitle {
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  margin-bottom: 5px;
+}
+
+.contextFilesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.contextFile {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background-color: var(--vscode-button-secondaryBackground);
+  font-size: 12px;
+}
+
+.contextFile span {
+  color: var(--vscode-button-secondaryForeground);
+}
 
 

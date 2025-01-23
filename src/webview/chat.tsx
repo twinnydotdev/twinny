@@ -25,7 +25,7 @@ import {
   useSelection,
   useSuggestion,
   useSymmetryConnection,
-  useTheme
+  useTheme,
 } from "./hooks"
 import { Message as MessageComponent } from "./message"
 import { ProviderSelect } from "./provider-select"

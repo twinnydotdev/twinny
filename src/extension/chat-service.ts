@@ -443,11 +443,9 @@ export class ChatService extends Base {
 
     for (const file of files) {
       try {
-        // Get workspace root path
         const workspaceFolders = workspace.workspaceFolders
         if (!workspaceFolders) continue
 
-        // Construct proper file path
         const filePath = path.join(workspaceFolders[0].uri.fsPath, file.path)
 
         const content = await fs.readFile(filePath, "utf-8")
