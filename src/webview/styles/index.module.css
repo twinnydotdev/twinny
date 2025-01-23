@@ -647,20 +647,34 @@ code {
 }
 
 .categoryHeader {
-  padding: 6px 8px 4px;
-  font-size: 11px;
+  padding: 8px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
   color: var(--vscode-descriptionForeground);
   background: var(--vscode-editorWidget-background);
-  border-top: 1px solid var(--vscode-editorWidget-border);
   border-bottom: 1px solid var(--vscode-editorWidget-border);
-  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.categoryHeader:first-child {
-  margin-top: 0;
-  border-top: none;
+.backButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.backButton:hover {
+  background: var(--vscode-inputOption-hoverBackground);
+}
+
+.dropdownItem i {
+  margin-right: 8px;
+  font-size: 14px;
+  opacity: 0.8;
 }
 
 
