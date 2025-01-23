@@ -580,21 +580,46 @@ export const useSuggestion = () => {
   const items = useCallback(
     ({ query }: { query: string }) => {
       const filePaths = getFilePaths()
-      const fileItems: FileItem[] = filePaths.map((path) => ({
-        name: path.split("/").pop() || "",
-        path: path
-      }))
+      const fileItems: FileItem[] = filePaths.map((path) => {
+        const name = path.split("/").pop() || ""
+        const isDirectory = !path.includes(".")
+        return {
+          name,
+          path,
+          category: isDirectory ? "folders" : "files"
+        }
+      })
+
       const defaultItems: FileItem[] = [
-        { name: "workspace", path: "workspace" },
-        { name: "problems", path: "problems" }
+        { name: "workspace", path: "workspace", category: "workspace" },
+        { name: "problems", path: "problems", category: "problems" },
+        { name: "terminal", path: "terminal", category: "terminal" }
       ]
-      return Promise.resolve(
-        [...defaultItems, ...fileItems]
-          .filter((item) =>
-            item.name.toLowerCase().startsWith(query.toLowerCase())
-          )
-          .slice(0, 10)
+
+      const allItems = [...defaultItems, ...fileItems]
+      const filteredItems = allItems.filter((item) =>
+        item.name.toLowerCase().startsWith(query.toLowerCase())
       )
+
+      // Group items by category
+      const groupedItems = filteredItems.reduce<Record<string, FileItem[]>>((acc, item) => {
+        if (!acc[item.category]) {
+          acc[item.category] = []
+        }
+        acc[item.category].push(item)
+        return acc
+      }, {})
+
+      // Order categories
+      const orderedCategories = ["workspace", "files", "folders", "terminal", "problems"]
+      const sortedItems = orderedCategories.reduce<FileItem[]>((acc, category) => {
+        if (groupedItems[category]) {
+          acc.push(...groupedItems[category])
+        }
+        return acc
+      }, [])
+
+      return Promise.resolve(sortedItems.slice(0, 10))
     },
     [getFilePaths]
   )

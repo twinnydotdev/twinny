@@ -641,10 +641,27 @@ code {
   white-space: pre;
   overflow-x: auto;
 }
-
 .codeOverlay .fileLink {
   pointer-events: auto;
   margin: 0 2px;
 }
+
+.categoryHeader {
+  padding: 6px 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-editorWidget-background);
+  border-top: 1px solid var(--vscode-editorWidget-border);
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
+  margin-top: 2px;
+}
+
+.categoryHeader:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+
 
 

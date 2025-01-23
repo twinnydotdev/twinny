@@ -73,22 +73,39 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
     return (
       <div className={styles.dropdownMenu}>
         {props.items.length ? (
-          props.items.map((item: FileItem, index: number) => (
-            <button
-              className={cx(styles.dropdownItem, {
-                [styles.dropdownSelected]: index === selectedIndex,
-              })}
-              key={index}
-              onClick={() => selectItem(index)}
-            >
-              <span className={styles.itemPath}>
-                <span className={styles.itemName}>{item.name}</span>
-                {item.path !== item.name && (
-                  <span className={styles.itemFullPath}>{item.path}</span>
-                )}
-              </span>
-            </button>
-          ))
+          <>
+            {(() => {
+              let currentCategory = "";
+              return props.items.map((item: FileItem, index: number) => {
+                const elements = [];
+                if (currentCategory !== item.category) {
+                  currentCategory = item.category;
+                  elements.push(
+                    <div key={`category-${currentCategory}`} className={styles.categoryHeader}>
+                      {currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1)}
+                    </div>
+                  );
+                }
+                elements.push(
+                  <button
+                    className={cx(styles.dropdownItem, {
+                      [styles.dropdownSelected]: index === selectedIndex,
+                    })}
+                    key={index}
+                    onClick={() => selectItem(index)}
+                  >
+                    <span className={styles.itemPath}>
+                      <span className={styles.itemName}>{item.name}</span>
+                      {item.path !== item.name && (
+                        <span className={styles.itemFullPath}>{item.path}</span>
+                      )}
+                    </span>
+                  </button>
+                );
+                return elements;
+              }).flat();
+            })()}
+          </>
         ) : (
           <div className="item">{t("no-result")}</div>
         )}

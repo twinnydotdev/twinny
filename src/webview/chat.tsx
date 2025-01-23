@@ -25,13 +25,13 @@ import {
   useSelection,
   useSuggestion,
   useSymmetryConnection,
-  useTheme,
+  useTheme
 } from "./hooks"
 import { Message as MessageComponent } from "./message"
 import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
 import TypingIndicator from "./typing-indicator"
-import { CustomKeyMap  } from "./utils"
+import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/index.module.css"
 
@@ -237,7 +237,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
     } as ClientMessage)
   }
 
-  const handleRegenerateMessage = (index: number): void => {
+  const handleRegenerateMessage = (
+    index: number,
+    mentions: MentionType[] | undefined
+  ): void => {
     generatingRef.current = true
     setIsLoading(true)
     setMessages((prev) => {
@@ -246,7 +249,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       global.vscode.postMessage({
         type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages
+        data: updatedMessages,
+        meta: mentions
       } as ClientMessage)
 
       return updatedMessages
@@ -369,7 +373,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
     editorRef.current?.commands.clearContent()
   }, [])
 
-
   const handleNewConversation = () => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyNewConversation
@@ -485,6 +488,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
               isAssistant={index % 2 !== 0}
               conversationLength={messages?.length}
               message={message}
+              messages={messages}
               theme={theme}
               index={index}
             />
@@ -499,6 +503,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 isLoading={false}
                 isAssistant
                 theme={theme}
+                messages={messages}
                 message={{
                   ...completion
                 }}
@@ -526,7 +531,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <div>
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
             {!!symmetryConnection && (
-               <VSCodeBadge
+              <VSCodeBadge
                 title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
               >
                 ⚡️ {symmetryConnection?.name}
@@ -549,9 +554,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
             </div>
           </div>
         </form>
-        {!symmetryConnection && (
-          <ProviderSelect />
-        )}
+        {!symmetryConnection && <ProviderSelect />}
       </div>
     </VSCodePanelView>
   )

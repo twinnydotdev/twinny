@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import Markdown, { Components } from "react-markdown"
+import { Node } from "@tiptap/pm/model"
 import { EditorContent, Extension, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
@@ -14,7 +15,7 @@ import {
   TWINNY,
   YOU
 } from "../common/constants"
-import { ChatCompletionMessage, ThemeType } from "../common/types"
+import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
 import { getThinkingMessage } from "./utils"
@@ -30,8 +31,9 @@ interface MessageProps {
   isAssistant?: boolean
   isLoading?: boolean
   message?: ChatCompletionMessage
+  messages?: ChatCompletionMessage[]
   onDelete?: (index: number) => void
-  onRegenerate?: (index: number) => void
+  onRegenerate?: (index: number, mentions: MentionType[] | undefined) => void
   onUpdate?: (message: string, index: number) => void
   theme: ThemeType | undefined
 }
@@ -70,7 +72,8 @@ export const Message: React.FC<MessageProps> = React.memo(
     onDelete,
     onRegenerate,
     onUpdate,
-    theme
+    theme,
+    messages,
   }) => {
     const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true)
     const { t } = useTranslation()
@@ -82,7 +85,8 @@ export const Message: React.FC<MessageProps> = React.memo(
     )
     const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
     const handleRegenerate = useCallback(
-      () => onRegenerate?.(index),
+      () =>
+        onRegenerate?.(index, getMentions(index)),
       [onRegenerate, index]
     )
 
@@ -99,6 +103,33 @@ export const Message: React.FC<MessageProps> = React.memo(
       onUpdate?.(content || "", index)
       setEditing(false)
     }, [message?.content, onUpdate, index])
+
+    const getMentions = (index: number) => {
+      if (!messages?.length) return
+      const message = messages[index -1]
+      if (!editor) return
+      const doc = Node.fromJSON(editor.schema, {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: message.content }] }
+        ]
+      })
+      const mentions: MentionType[] = []
+
+      doc.descendants((node) => {
+        if (node.isText && node.text) {
+          let match
+          while ((match = FILE_PATH_REGEX.exec(node.text)) !== null) {
+            mentions.push({
+              name: match[1],
+              path: match[1].replace("@", "")
+            })
+          }
+        }
+      })
+
+      return mentions
+    }
 
     const editor = useEditor(
       {

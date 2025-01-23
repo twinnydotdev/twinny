@@ -307,6 +307,7 @@ export type EmbeddedDocument = {
 export interface FileItem {
   name: string
   path: string
+  category: "files" | "folders" | "terminal" | "problems" | "workspace"
 }
 
 export interface MentionType {

@@ -315,7 +315,7 @@ export class BaseProvider {
         type: EVENT_NAME.twinnyFetchOllamaModels,
         data: models
       } as ServerMessage<ApiModel[]>)
-    } catch (e) {
+    } catch {
       return
     }
   }
