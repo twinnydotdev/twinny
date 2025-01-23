@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react"
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState
+} from "react"
 import { useTranslation } from "react-i18next"
 import { Editor } from "@tiptap/core"
 import { MentionNodeAttrs } from "@tiptap/extension-mention"
@@ -11,16 +17,12 @@ import styles from "./styles/index.module.css"
 
 const getCategoryIcon = (category: CategoryType): string => {
   switch (category) {
-    case "workspace":
-      return "root-folder"
     case "files":
       return "file"
     case "folders":
       return "folder"
     case "terminal":
       return "terminal"
-    case "problems":
-      return "warning"
   }
 }
 
@@ -39,17 +41,20 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
   (props, ref) => {
     const { t } = useTranslation()
     const [selectedIndex, setSelectedIndex] = useState(0)
-    const [selectedCategory, setSelectedCategory] = useState<CategoryType | null>(null)
+    const [selectedCategory, setSelectedCategory] =
+      useState<CategoryType | null>(null)
 
     const categories = useMemo(() => {
-      const orderedCategories: CategoryType[] = ["workspace", "files", "folders", "terminal", "problems"]
-      const availableCategories = new Set(props.items.map(item => item.category))
-      return orderedCategories.filter(cat => availableCategories.has(cat))
+      const orderedCategories: CategoryType[] = ["files", "folders", "terminal"]
+      const availableCategories = new Set(
+        props.items.map((item) => item.category)
+      )
+      return orderedCategories.filter((cat) => availableCategories.has(cat))
     }, [props.items])
 
     const categoryItems = useMemo(() => {
       if (!selectedCategory) return []
-      return props.items.filter(item => item.category === selectedCategory)
+      return props.items.filter((item) => item.category === selectedCategory)
     }, [props.items, selectedCategory])
 
     const selectItem = (index: number) => {
@@ -111,7 +116,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
         }
 
         return false
-      },
+      }
     }))
 
     if (!categories.length) {
@@ -126,12 +131,13 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
               <span className={styles.backButton} onClick={backHandler}>
                 <i className="codicon codicon-chevron-left" />
               </span>
-              {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
+              {selectedCategory.charAt(0).toUpperCase() +
+                selectedCategory.slice(1)}
             </div>
             {categoryItems.map((item, index) => (
               <button
                 className={cx(styles.dropdownItem, {
-                  [styles.dropdownSelected]: index === selectedIndex,
+                  [styles.dropdownSelected]: index === selectedIndex
                 })}
                 key={index}
                 onClick={() => selectItem(index)}
@@ -149,7 +155,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
           categories.map((category, index) => (
             <button
               className={cx(styles.dropdownItem, {
-                [styles.dropdownSelected]: index === selectedIndex,
+                [styles.dropdownSelected]: index === selectedIndex
               })}
               key={category}
               onClick={() => selectItem(index)}

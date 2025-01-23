@@ -24,6 +24,7 @@ import {
 } from "../common/constants"
 import {
   ApiModel,
+  CategoryType,
   ClientMessage,
   Conversation,
   FileItem,
@@ -577,7 +578,7 @@ export const useSuggestion = () => {
 
   const getFilePaths = useCallback(() => filePaths, [filePaths])
 
-  const items = useCallback(
+  const suggestionItems = useCallback(
     ({ query }: { query: string }) => {
       const filePaths = getFilePaths()
       const fileItems: FileItem[] = filePaths.map((path) => {
@@ -590,19 +591,31 @@ export const useSuggestion = () => {
         }
       })
 
+      const specialItems: FileItem[] = [
+        { name: "workspace", path: "workspace", category: "files" },
+        { name: "problems", path: "problems", category: "files" }
+      ]
+
       const defaultItems: FileItem[] = [
-        { name: "workspace", path: "workspace", category: "workspace" },
-        { name: "problems", path: "problems", category: "problems" },
         { name: "terminal", path: "terminal", category: "terminal" }
       ]
 
-      const allItems = [...defaultItems, ...fileItems]
+      const allItems = [...specialItems, ...defaultItems, ...fileItems]
       const filteredItems = allItems.filter((item) =>
         item.name.toLowerCase().startsWith(query.toLowerCase())
       )
 
-      // Group items by category
-      const groupedItems = filteredItems.reduce<Record<string, FileItem[]>>((acc, item) => {
+      // Group items by category, keeping special items at top
+      const specialFilteredItems = filteredItems.filter(item =>
+        item.path === "workspace" || item.path === "problems"
+      )
+
+      const remainingFilteredItems = filteredItems.filter(item =>
+        item.path !== "workspace" && item.path !== "problems"
+      )
+
+      // Group remaining items by category
+      const groupedItems = remainingFilteredItems.reduce<Record<string, FileItem[]>>((acc, item) => {
         if (!acc[item.category]) {
           acc[item.category] = []
         }
@@ -611,13 +624,16 @@ export const useSuggestion = () => {
       }, {})
 
       // Order categories
-      const orderedCategories = ["workspace", "files", "folders", "terminal", "problems"]
-      const sortedItems = orderedCategories.reduce<FileItem[]>((acc, category) => {
-        if (groupedItems[category]) {
-          acc.push(...groupedItems[category])
-        }
-        return acc
-      }, [])
+      const orderedCategories: CategoryType[] = ["files", "folders", "terminal"]
+      const sortedItems = [
+        ...specialFilteredItems,
+        ...orderedCategories.reduce<FileItem[]>((acc, category) => {
+          if (groupedItems[category]) {
+            acc.push(...groupedItems[category])
+          }
+          return acc
+        }, [])
+      ]
 
       return Promise.resolve(sortedItems.slice(0, 10))
     },
@@ -647,7 +663,7 @@ export const useSuggestion = () => {
           showOnCreate: true,
           interactive: true,
           trigger: "manual",
-          placement: "bottom-start"
+          placement: "top-start"
         })
       },
 
@@ -683,10 +699,10 @@ export const useSuggestion = () => {
 
   const suggestion = useMemo(
     () => ({
-      items,
+      items: suggestionItems,
       render
     }),
-    [items, render]
+    [suggestionItems, render]
   )
 
   return {

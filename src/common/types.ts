@@ -304,7 +304,7 @@ export type EmbeddedDocument = {
   file: string
 }
 
-export type CategoryType = "workspace" | "files" | "folders" | "terminal" | "problems"
+export type CategoryType = "files" | "folders" | "terminal"
 
 export interface FileItem {
   name: string

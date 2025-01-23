@@ -650,12 +650,15 @@ code {
   padding: 8px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--vscode-descriptionForeground);
+  color: var(--vscode-foreground);
   background: var(--vscode-editorWidget-background);
   border-bottom: 1px solid var(--vscode-editorWidget-border);
   display: flex;
   align-items: center;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .backButton {
@@ -663,12 +666,20 @@ code {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 2px;
+  padding: 4px;
   border-radius: 3px;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+  margin-right: 4px;
 }
 
 .backButton:hover {
   background: var(--vscode-inputOption-hoverBackground);
+  opacity: 1;
+}
+
+.backButton i {
+  font-size: 14px;
 }
 
 .dropdownItem i {
