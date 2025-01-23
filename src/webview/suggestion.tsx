@@ -25,11 +25,6 @@ export const getSuggestions = (fileList: string[]) => ({
         name: "Problems",
         path: "problems",
         category: "problems" as CategoryType
-      },
-      {
-        name: "Terminal",
-        path: "terminal",
-        category: "terminal" as CategoryType
       }
     ]
 

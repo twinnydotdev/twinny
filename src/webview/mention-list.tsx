@@ -11,6 +11,7 @@ import { Editor } from "@tiptap/core"
 import { MentionNodeAttrs } from "@tiptap/extension-mention"
 import cx from "classnames"
 
+import { topLevelItems } from "../common/constants"
 import { CategoryType, FileItem } from "../common/types"
 
 import styles from "./styles/index.module.css"
@@ -19,10 +20,6 @@ const getCategoryIcon = (category: CategoryType): string => {
   switch (category) {
     case "files":
       return "file"
-    case "folders":
-      return "folder"
-    case "terminal":
-      return "terminal"
     case "workspace":
       return "root-folder"
     case "problems":
@@ -53,8 +50,6 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
         "workspace",
         "problems",
         "files",
-        "folders",
-        "terminal"
       ]
       const availableCategories = new Set(
         props.items.map((item) => item.category)
@@ -69,12 +64,21 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
 
     const selectItem = (index: number) => {
       if (!selectedCategory) {
-        setSelectedCategory(categories[index])
-        setSelectedIndex(0)
+        const category = categories[index]
+        const isTopLevel = topLevelItems.some(item => item.category === category)
+        if (isTopLevel) {
+          const item = props.items.find(i => i.category === category)
+          if (item) {
+            props.command({ id: item.name, label: item.name })
+          }
+        } else {
+          setSelectedCategory(category)
+          setSelectedIndex(0)
+        }
       } else {
         const item = categoryItems[index]
         if (item) {
-          props.command({ id: item.path, label: item.path })
+          props.command({ id: item.path || item.name, label: item.path || item.name })
         }
       }
     }
@@ -137,11 +141,14 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       }
     }))
 
+    if (props.items.length === 1) {
+      selectItem(0)
+      return null
+    }
+
     if (!categories.length) {
       return <div className="item">{t("no-result")}</div>
     }
-
-    console.log(categories)
 
     return (
       <div className={styles.dropdownMenu}>

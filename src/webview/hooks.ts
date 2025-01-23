@@ -20,6 +20,7 @@ import {
   GITHUB_EVENT_NAME,
   GLOBAL_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
+  topLevelItems,
   WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import {
@@ -596,14 +597,8 @@ export const useSuggestion = () => {
     filePaths.map((path) => ({
       name: path.split("/").pop() || "",
       path,
-      category: path.includes(".") ? "files" : "folders"
+      category: "files"
     }))
-
-  const topLevelItems: FileItem[] = [
-    { name: "workspace", path: "", category: "workspace" },
-    { name: "problems", path: "", category: "problems" },
-    { name: "terminal", path: "terminal", category: "terminal" }
-  ]
 
   const filterItems = (items: FileItem[], query: string): FileItem[] =>
     items.filter((item) =>
@@ -618,13 +613,7 @@ export const useSuggestion = () => {
       return acc
     }, {} as Record<string, FileItem[]>)
 
-  const orderedCategories: CategoryType[] = [
-    "workspace",
-    "problems",
-    "terminal",
-    "files",
-    "folders"
-  ]
+  const orderedCategories: CategoryType[] = ["workspace", "problems", "files"]
 
   const sortItemsByCategory = (
     groupedItems: Record<string, FileItem[]>
