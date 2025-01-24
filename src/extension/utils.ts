@@ -46,7 +46,7 @@ import {
   ServerMessage,
   ServerMessageKey,
   StreamResponse,
-  Theme,
+  Theme
 } from "../common/types"
 
 import { getParser } from "./parser"
@@ -294,10 +294,44 @@ export const getIsMultilineCompletion = ({
 }) => {
   if (!node) return false
 
+  const editor = window.activeTextEditor
+  if (!editor) return false
+
+  const position = editor.selection.active
+  const lineText = editor.document.lineAt(position.line).text.trim()
+
+  const isBlockStart =
+    lineText.endsWith("{") || lineText.endsWith("=>") || lineText.endsWith("(")
+  const isInMultilineContext =
+    node.parent && MULTILINE_TYPES.includes(node.parent.type)
+
+  const isDeclaration =
+    node.type.includes("declaration") ||
+    node.type.includes("definition") ||
+    node.type === "class" ||
+    node.type === "interface"
+
+  const currentIndent = lineText.length - lineText.trimStart().length
+  const hasProperIndentation = currentIndent > 0
+  const isComplexNode =
+    node.childCount > 2 || (node.parent && node.parent.childCount > 2)
+  const isInCodeBlock =
+    MULTILINE_TYPES.includes(node.type) || isInMultilineContext
+
+  const isLineEnd =
+    lineText.trimEnd().endsWith(";") ||
+    lineText.trimEnd().endsWith("{") ||
+    lineText.trimEnd().endsWith("=>")
+
   const isMultilineCompletion =
     !getHasLineTextBeforeAndAfter() &&
     !isCursorInEmptyString() &&
-    MULTILINE_TYPES.includes(node.type)
+    (isInCodeBlock || isDeclaration) &&
+    (isBlockStart ||
+      hasProperIndentation ||
+      isComplexNode ||
+      isLineEnd ||
+      !prefixSuffix?.suffix.trim())
 
   return !!(isMultilineCompletion || !prefixSuffix?.suffix.trim())
 }
@@ -324,7 +358,7 @@ export const getResponseData = (data: StreamResponse) => {
 }
 
 export const getIsOpenAICompatible = (provider: TwinnyProvider) => {
-  const providers = Object.values(OPEN_AI_COMPATIBLE_PROVIDERS) as string []
+  const providers = Object.values(OPEN_AI_COMPATIBLE_PROVIDERS) as string[]
   return providers.includes(provider.provider)
 }
 
