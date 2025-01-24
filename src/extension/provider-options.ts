@@ -32,6 +32,7 @@ export function createStreamRequestBodyFim(
         },
       }
     case API_PROVIDERS.LMStudio:
+    case API_PROVIDERS.Deepseek:
       return {
         model: options.model,
         prompt,

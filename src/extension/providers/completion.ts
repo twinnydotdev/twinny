@@ -220,7 +220,7 @@ export class CompletionProvider
                 }
               }
             })
-          } catch (error) {
+          } catch {
             this.onError()
             reject([])
           }
@@ -242,7 +242,7 @@ export class CompletionProvider
         this._parser?.parse(this._document.getText()),
         this._position
       )
-    } catch (e) {
+    } catch {
       return
     }
   }
@@ -290,60 +290,64 @@ export class CompletionProvider
         return this._completion
       }
 
-      const isMultilineCompletionRequired =
+      const shouldSwitchToMultiline =
         !this._isMultilineCompletion &&
         this.config.multilineCompletionsEnabled &&
         this._chunkCount >= MIN_COMPLETION_CHUNKS &&
         LINE_BREAK_REGEX.test(this._completion.trimStart())
-      if (isMultilineCompletionRequired) {
+
+      if (shouldSwitchToMultiline) {
+        this._isMultilineCompletion = true
         logger.log(
-          `Streaming response end due to multiline not required  ${this._nonce} \nCompletion: ${this._completion}`
+          `Switching to multiline mode at ${this._nonce} \nCompletion so far: ${this._completion}`
         )
-        return this._completion
       }
 
       try {
-        if (this._nodeAtPosition) {
-          const takeFirst =
-            MULTILINE_OUTSIDE.includes(this._nodeAtPosition?.type) ||
-            (MULTILINE_INSIDE.includes(this._nodeAtPosition?.type) &&
-              this._nodeAtPosition?.childCount > 2)
+        if (!this._nodeAtPosition || !this._parser) return ""
 
-          const lineText = getCurrentLineText(this._position) || ""
-          if (!this._parser) return ""
+        const lineText = getCurrentLineText(this._position) || ""
 
-          if (providerFimData.includes("\n")) {
-            const { rootNode } = this._parser.parse(
-              `${lineText}${this._completion}`
-            )
+        const nodeType = this._nodeAtPosition.type
+        const parentType = this._nodeAtPosition.parent?.type
+        const isTopLevelNode = MULTILINE_OUTSIDE.includes(nodeType)
+        const isNestedNode = MULTILINE_INSIDE.includes(nodeType)
+        const hasComplexStructure = this._nodeAtPosition.childCount > 2
 
-            const { hasError } = rootNode
+        const isInCodeBlock = isTopLevelNode ||
+          (isNestedNode && (hasComplexStructure || parentType === "program"))
 
+        if (providerFimData.includes("\n")) {
+          const tree = this._parser.parse(`${lineText}${this._completion}`)
+          const rootNode = tree.rootNode
+
+          const isComplete = this.isCompleteSyntaxTree(rootNode)
+
+          const hasBalancedDelimiters = this.hasBalancedDelimiters(this._completion)
+
+          if (
+            this._isMultilineCompletion &&
+            this._chunkCount >= 2 &&
+            isInCodeBlock &&
+            !rootNode.hasError
+          ) {
             if (
-              this._parser &&
-              this._nodeAtPosition &&
-              this._isMultilineCompletion &&
-              this._chunkCount >= 2 &&
-              takeFirst &&
-              !hasError
+              isComplete ||
+              hasBalancedDelimiters ||
+              MULTI_LINE_DELIMITERS.some(d => this._completion.endsWith(d))
             ) {
-              if (
-                MULTI_LINE_DELIMITERS.some((delimiter) =>
-                  this._completion.endsWith(delimiter)
-                )
-              ) {
-                logger.log(
-                  `Streaming response end due to delimiter ${this._nonce} \nCompletion: ${this._completion}`
-                )
-                return this._completion
-              }
+              logger.log(
+                `Streaming response end due to complete syntax at ${this._nonce}\nCompletion: ${this._completion}`
+              )
+              return this._completion
             }
           }
         }
       } catch (e) {
-        // Currently doesnt catch when parser fucks up
-        console.error(e)
-        this.abortCompletion()
+        logger.log(`Parser error at ${this._nonce}: ${e}`)
+        if (this._chunkCount > 5) {
+          this.abortCompletion()
+        }
       }
 
       if (getLineBreakCount(this._completion) >= this.config.maxLines) {
@@ -621,6 +625,55 @@ export class CompletionProvider
       Using custom FIM template fim.bhs?: ${this._usingFimTemplate}
     `.trim()
     )
+  }
+
+  private isCompleteSyntaxTree(node: SyntaxNode): boolean {
+    if (!node) return false
+
+    if (MULTILINE_OUTSIDE.includes(node.type)) {
+      return !node.hasError && this.hasBalancedBraces(node.text)
+    }
+
+    if (MULTILINE_INSIDE.includes(node.type)) {
+      return !node.hasError && node.childCount > 0
+    }
+
+    return node.children.every(child => this.isCompleteSyntaxTree(child))
+  }
+
+  private hasBalancedDelimiters(text: string): boolean {
+    const stack: string[] = []
+    const openDelims = ["{", "(", "[", "<"]
+    const closeDelims = ["}", ")", "]", ">"]
+
+    for (const char of text) {
+      const openIndex = openDelims.indexOf(char)
+      if (openIndex !== -1) {
+        stack.push(char)
+        continue
+      }
+
+      const closeIndex = closeDelims.indexOf(char)
+      if (closeIndex !== -1) {
+        if (stack.length === 0) return false
+        const lastOpen = stack.pop()
+        if (openDelims.indexOf(lastOpen!) !== closeIndex) return false
+      }
+    }
+
+    return stack.length === 0
+  }
+
+  private hasBalancedBraces(text: string): boolean {
+    let braceCount = 0
+
+    for (const char of text) {
+      if (char === "{") braceCount++
+      if (char === "}") braceCount--
+      if (braceCount < 0) return false
+    }
+
+    return braceCount === 0
   }
 
   private provideInlineCompletion(): InlineCompletionItem[] {

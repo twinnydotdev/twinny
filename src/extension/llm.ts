@@ -71,7 +71,7 @@ export async function llm(request: LlmRequest) {
               try {
                 const json = safeParseJsonResponse(line)
                 if (json) onData(json)
-              } catch (e) {
+              } catch {
                 onError?.(new Error("Error parsing JSON data from event"))
               }
             }
@@ -82,7 +82,7 @@ export async function llm(request: LlmRequest) {
                 const json = safeParseJsonResponse(buffer)
                 if (!json) return
                 onData(json)
-              } catch (e) {
+              } catch {
                 onError?.(new Error("Error parsing JSON data from event"))
               }
             }
