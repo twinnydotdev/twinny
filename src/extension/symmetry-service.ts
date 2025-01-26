@@ -12,6 +12,7 @@ import {
   serverMessageKeys,
   SymmetryClient
 } from "symmetry-core"
+import { CompletionResponseChunk } from "token.js"
 import { commands, ExtensionContext, Webview, workspace } from "vscode"
 
 import {
@@ -192,7 +193,10 @@ export class SymmetryService extends EventEmitter {
         this.handleInferenceEnd()
         return
       }
-      this._completion += response
+      const part: CompletionResponseChunk | undefined = safeParseJson(response)
+      if (!part) return
+      this._completion += part.choices[0].delta.content
+      if (!this._completion) return
       if (this._completion) this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
     })
   }
