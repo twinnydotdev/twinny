@@ -10,6 +10,7 @@ import {
 import { MentionNodeAttrs } from "@tiptap/extension-mention"
 import { ReactRenderer } from "@tiptap/react"
 import { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion"
+import Fuse from "fuse.js"
 import i18next from "i18next"
 import tippy, { Instance as TippyInstance } from "tippy.js"
 
@@ -583,7 +584,17 @@ export const useSuggestion = () => {
       const filePaths = getFilePaths()
       const fileItems = createFileItems(filePaths)
       const allItems = [...topLevelItems, ...fileItems]
-      const filteredItems = filterItems(allItems, query)
+
+      const fuse = new Fuse(allItems, {
+        keys: ["name", "path"],
+        threshold: 0.4,
+        includeScore: true
+      })
+
+      const filteredItems = query
+        ? fuse.search(query).map(result => result.item)
+        : allItems
+
       const groupedItems = groupItemsByCategory(filteredItems)
       const sortedItems = sortItemsByCategory(groupedItems)
 
@@ -598,11 +609,6 @@ export const useSuggestion = () => {
       path,
       category: "files"
     }))
-
-  const filterItems = (items: FileItem[], query: string): FileItem[] =>
-    items.filter((item) =>
-      item.name.toLowerCase().startsWith(query.toLowerCase())
-    )
 
   const groupItemsByCategory = (
     items: FileItem[]
@@ -743,6 +749,12 @@ export const useSymmetryConnection = () => {
     } as ClientMessage)
   }
 
+  const getModels = () => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyGetSymmetryModels
+    })
+  }
+
   const handler = (event: MessageEvent) => {
     const message: ServerMessage<
       SymmetryConnection | string | SymmetryModelProvider[]
@@ -785,16 +797,17 @@ export const useSymmetryConnection = () => {
   return {
     autoConnectProviderContext,
     connectAsProvider,
-    models,
-    selectedModel,
-    setSelectedModel,
     connecting,
     connectToSymmetry,
     disconnectAsProvider,
     disconnectSymmetry,
+    getModels,
     isConnected: symmetryConnectionSession !== undefined,
     isProviderConnected,
+    models,
+    selectedModel,
     setAutoConnectProviderContext,
+    setSelectedModel,
     symmetryConnection: symmetryConnectionSession,
     symmetryProviderStatus
   }
