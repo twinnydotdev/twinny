@@ -366,11 +366,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [memoizedSuggestion])
 
   const scrollToBottomAuto = useCallback(() => {
-		virtuosoRef.current?.scrollTo({
-			top: Number.MAX_SAFE_INTEGER,
-			behavior: "auto",
-		})
-	}, [])
+    virtuosoRef.current?.scrollTo({
+      top: Number.MAX_SAFE_INTEGER,
+      behavior: "auto"
+    })
+  }, [])
 
   useEffect(() => {
     if (virtuosoRef.current && isAtBottom) {
@@ -379,10 +379,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [completion, messages])
 
   useEffect(() => {
-		setTimeout(() => {
+    setTimeout(() => {
       scrollToBottomAuto()
     }, 0)
-	}, [messages?.length])
+  }, [messages?.length])
 
   return (
     <VSCodePanelView>
