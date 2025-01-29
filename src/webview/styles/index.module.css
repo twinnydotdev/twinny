@@ -186,6 +186,10 @@ code {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
+.userMessage .mention {
+  margin-left: 2px;
+}
+
 .assistantMessage {
   background-color: var(--vscode-editorWidget-background);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
@@ -610,7 +614,7 @@ code {
   color: var(--vscode-textLink-foreground);
 }
 
-.fileLink {
+:global(.mention) {
   display: inline-flex;
   align-items: center;
   padding: 1px 3px;
@@ -624,11 +628,11 @@ code {
   white-space: nowrap;
 }
 
-.fileLink:hover {
+:global(.mention:hover) {
   background: var(--vscode-inputOption-hoverBackground);
 }
 
-.fileLink > span {
+:global(.mention > span) {
   display: inline-block;
   vertical-align: middle;
 }

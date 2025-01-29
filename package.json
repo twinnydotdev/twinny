@@ -502,6 +502,7 @@
     "async-lock": "^1.4.1",
     "b4a": "^1.6.6",
     "classnames": "^2.5.1",
+    "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",

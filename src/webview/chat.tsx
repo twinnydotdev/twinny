@@ -305,10 +305,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         node.content.forEach((innerNode: JSONContent) => {
           if (innerNode.type === "mention" && innerNode.attrs) {
             mentions.push({
-              name:
-                innerNode.attrs.label ||
-                innerNode.attrs.id.split("/").pop() ||
-                "",
+              name: innerNode.attrs.label,
               path: innerNode.attrs.id
             })
           }
@@ -319,18 +316,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
     return mentions
   }
 
-  const replaceMentionsInText = useCallback(
-    (text: string, mentions: MentionType[]): string => {
-      return mentions.reduce(
-        (result, mention) => result.replace(mention.path, `@${mention.name}`),
-        text
-      )
-    },
-    []
-  )
-
   const handleSubmitForm = () => {
-    const input = editorRef.current?.getText().trim()
+    const input = editorRef.current?.getHTML()
 
     if (!input || generatingRef.current) return
 
@@ -340,10 +327,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
     setIsLoading(true)
     clearEditor()
+
     setMessages((prevMessages) => {
       const updatedMessages: ChatCompletionMessage[] = [
         ...(prevMessages || []),
-        { role: USER, content: replaceMentionsInText(input, mentions) }
+        { role: USER, content: input }
       ]
 
       const clientMessage: ClientMessage<
@@ -403,6 +391,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const { suggestion, filePaths } = useSuggestion()
 
+
+
   const memoizedSuggestion = useMemo(
     () => suggestion,
     [JSON.stringify(filePaths)]
@@ -418,10 +408,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           },
           suggestion: memoizedSuggestion,
           renderText({ node }) {
-            if (node.attrs.name) {
-              return `${node.attrs.name ?? node.attrs.id}`
-            }
-            return node.attrs.id ?? ""
+            return node.attrs.label
           }
         }),
         CustomKeyMap.configure({
@@ -429,7 +416,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           clearEditor
         }),
         Placeholder.configure({
-          placeholder: t("placeholder") // "How can twinny help you today?",
+          placeholder: t("placeholder")
         })
       ]
     },

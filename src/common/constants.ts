@@ -19,8 +19,7 @@ export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
-export const FILE_PATH_REGEX =
-  /(?:^|\s|`)(@\/[^\s`]+|\.\/[^\s`]+|(?:[\w-]+\/)*[\w-]+\.(?:jsx?|tsx?|css|scss|html|json|md|py|java|cpp|h|rs|go|php|rb|swift|kt|cs|fs|elm|lua|sql|yml|yaml|toml|xml|conf|ini|sh|bash|zsh|ps1))(?=\s|$|`)/g
+export const FILE_NAME_REGEX = /(?:^|\s|`)(?:@\/|\.\/|(?:[\w-]+\/)*)?\.?[\w.-]+\.(?:jsx?|tsx?|css|s[ac]ss|less|styl|html?|json|jsonc|md|markdown|py|ipynb|java|class|jar|cpp|hpp|cc|hh|c|h|rs|go|php|rb|swift|kt|gradle|m|mm|cs|fs|fsx|elm|lua|sql|ya?ml|toml|xml|conf|ini|env|sh|bash|zsh|ps1|bat|cmd|txt|log|text|doc|rtf|pdf|lock|editorconfig|gitignore|eslintrc|prettier|babelrc|d\.ts|test\.tsx?|spec\.tsx?|snap|svg|graphql|gql|proto|vue|svelte|astro|razor|cshtml|aspx?|jsx?\.map|tsx?\.map|min\.js|chunk\.js|bundle\.js)(?=\s|$|`)/g;
 export const QUOTES_REGEX = /["'`]/g
 export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ["="]
