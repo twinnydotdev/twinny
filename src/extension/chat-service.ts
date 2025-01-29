@@ -1,3 +1,4 @@
+import * as cheerio from "cheerio"
 import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
@@ -468,8 +469,13 @@ export class ChatService extends Base {
     const selection = editor?.selection
     const userSelection = editor?.document.getText(selection)
     const lastMessage = messages[messages.length - 1]
-    const text = lastMessage.content as string
 
+    const stripHtml = (html: string): string => {
+      const $ = cheerio.load(html)
+      return $.root().text().trim()
+    }
+
+    const text = stripHtml(lastMessage.content as string)
     const systemPrompt =
       (await this._templateProvider?.readTemplate<TemplateData>("system", {
         cwd: workspace.workspaceFolders?.[0].uri.fsPath,
@@ -533,12 +539,12 @@ export class ChatService extends Base {
       stream: true,
       provider: getIsOpenAICompatible(provider)
         ? API_PROVIDERS.OpenAICompatible
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        : (provider.provider as any)
+        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (provider.provider as any)
     })
   }
 
-  public resetConversation () {
+  public resetConversation() {
     this._conversation = []
   }
 
@@ -617,8 +623,8 @@ export class ChatService extends Base {
       stream: true,
       provider: getIsOpenAICompatible(provider)
         ? API_PROVIDERS.OpenAICompatible
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        : (provider.provider as any)
+        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (provider.provider as any)
     }
     return this.llm(requestBody)
   }

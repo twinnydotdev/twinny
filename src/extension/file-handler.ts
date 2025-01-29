@@ -27,7 +27,9 @@ export class FileHandler {
     return ig
   }
 
-  private async getClosestFilePathMatch(targetPath: string): Promise<string | undefined> {
+  private async getClosestFilePathMatch(
+    targetPath: string
+  ): Promise<string | undefined> {
     if (!vscode.workspace.workspaceFolders) {
       return undefined
     }
@@ -36,17 +38,20 @@ export class FileHandler {
     const ig = this.getIgnoreHandler()
 
     const filePaths = files
-      .map(file => vscode.workspace.asRelativePath(file))
-      .filter(relativePath => !ig.ignores(relativePath))
+      .map((file) => vscode.workspace.asRelativePath(file))
+      .filter((relativePath) => !ig.ignores(relativePath))
 
     if (filePaths.length === 0) {
       return undefined
     }
 
-    const targetParts = path.basename(targetPath).replace(/\.[^/.]+$/, "").split(/[^a-zA-Z0-9]+/)
-    const matchingPath = filePaths.find(p => {
+    const targetParts = path
+      .basename(targetPath)
+      .replace(/\.[^/.]+$/, "")
+      .split(/[^a-zA-Z0-9]+/)
+    const matchingPath = filePaths.find((p) => {
       const fileName = path.basename(p).replace(/\.[^/.]+$/, "")
-      return targetParts.every(part =>
+      return targetParts.every((part) =>
         fileName.toLowerCase().includes(part.toLowerCase())
       )
     })
@@ -55,11 +60,13 @@ export class FileHandler {
       return matchingPath
     }
 
-    const dirMatch = filePaths.find(p => {
+    const dirMatch = filePaths.find((p) => {
       const normalizedTarget = targetPath.toLowerCase()
       const normalizedPath = p.toLowerCase()
-      return normalizedPath.includes(normalizedTarget) ||
-             normalizedTarget.includes(normalizedPath)
+      return (
+        normalizedPath.includes(normalizedTarget) ||
+        normalizedTarget.includes(normalizedPath)
+      )
     })
 
     return dirMatch
@@ -68,7 +75,10 @@ export class FileHandler {
   public async handleOpenFile(message: ServerMessage<string>) {
     const filePath = message.data
     if (filePath && vscode.workspace.workspaceFolders) {
-      const fullPath = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, filePath)
+      const fullPath = path.join(
+        vscode.workspace.workspaceFolders[0].uri.fsPath,
+        filePath
+      )
       try {
         const doc = await vscode.workspace.openTextDocument(fullPath)
         await vscode.window.showTextDocument(doc)
@@ -88,10 +98,15 @@ export class FileHandler {
               `File "${filePath}" not found. Opened similar file: "${similarFile}"`
             )
           } catch (innerError) {
-            console.error(`Error opening similar file ${similarFile}:`, innerError)
+            console.error(
+              `Error opening similar file ${similarFile}:`,
+              innerError
+            )
           }
         } else {
-          vscode.window.showInformationMessage(`File "${filePath}" not found and no similar files found.`)
+          vscode.window.showInformationMessage(
+            `File "${filePath}" not found and no similar files found.`
+          )
         }
       }
     } else {
@@ -100,10 +115,12 @@ export class FileHandler {
   }
 
   public registerHandlers() {
-    this._webview.onDidReceiveMessage(async (message: ServerMessage<string>) => {
-      if (message.type === EVENT_NAME.twinnyOpenFile) {
-        await this.handleOpenFile(message as ServerMessage<string>)
+    this._webview.onDidReceiveMessage(
+      async (message: ServerMessage<string>) => {
+        if (message.type === EVENT_NAME.twinnyOpenFile) {
+          await this.handleOpenFile(message as ServerMessage<string>)
+        }
       }
-    })
+    )
   }
 }

@@ -6,7 +6,6 @@ import path from "path"
 import * as vscode from "vscode"
 
 import { API_PROVIDERS } from "../common/constants"
-import { logger } from "../common/logger"
 import {
   EmbeddedDocument,
   Embedding,
@@ -109,7 +108,6 @@ export class EmbeddingDatabase extends Base {
       }
 
       if (ig.ignores(relativePath)) {
-        logger.log(`git-ignored: ${relativePath}`)
         continue
       }
 
@@ -234,7 +232,7 @@ export class EmbeddingDatabase extends Base {
       const query = table?.vectorSearch(vector).limit(limit)
       if (where) query?.where(where)
       return query?.toArray()
-    } catch (e) {
+    } catch {
       return undefined
     }
   }

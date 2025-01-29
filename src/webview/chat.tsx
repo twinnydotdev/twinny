@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso"
 import Mention from "@tiptap/extension-mention"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Editor, EditorContent, JSONContent, useEditor } from "@tiptap/react"
@@ -10,6 +11,7 @@ import {
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import cn from "classnames"
+import DOMPurify from "dompurify"
 
 import { EVENT_NAME, USER } from "../common/constants"
 import {
@@ -25,7 +27,7 @@ import {
   useSelection,
   useSuggestion,
   useSymmetryConnection,
-  useTheme,
+  useTheme
 } from "./hooks"
 import { Message as MessageComponent } from "./message"
 import { ProviderSelect } from "./provider-select"
@@ -50,89 +52,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const selection = useSelection()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
+  const [isAtBottom, setIsAtBottom] = useState(false)
   const [messages, setMessages] = useState<ChatCompletionMessage[]>()
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
-  const markdownRef = useRef<HTMLDivElement>(null)
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { symmetryConnection } = useSymmetryConnection()
 
-  const disableAutoScrollRef = useRef(false)
-  const [, setIsAtBottom] = useState(true)
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
-
-  const scrollToBottom = useCallback(() => {
-    if (markdownRef.current) {
-      markdownRef.current.scrollTo({
-        top: markdownRef.current.scrollHeight,
-        behavior: "auto"
-      })
-    }
-  }, [])
-
-  const handleScroll = useCallback(() => {
-    const el = markdownRef.current
-    if (!el) return
-
-    const isScrollable = el.scrollHeight > el.clientHeight
-
-    if (!isScrollable) {
-      setIsAtBottom(true)
-      disableAutoScrollRef.current = false
-      return
-    }
-
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    const nearBottom = distanceFromBottom < 5
-
-    if (nearBottom) {
-      setIsAtBottom(true)
-      disableAutoScrollRef.current = false
-    } else {
-      disableAutoScrollRef.current = true
-      setIsAtBottom(false)
-    }
-  }, [])
-
-  const handleWheel = useCallback((event: WheelEvent) => {
-    if (event.deltaY < 0) {
-      disableAutoScrollRef.current = true
-    }
-  }, [])
-
-  useEffect(() => {
-    const el = markdownRef.current
-    if (!el) return
-
-    el.addEventListener("scroll", handleScroll)
-    el.addEventListener("wheel", handleWheel)
-
-    const ro = new ResizeObserver(() => {
-      const isScrollable = el.scrollHeight > el.clientHeight
-
-      // Force scroll to bottom when content first becomes scrollable
-      if (isScrollable && !disableAutoScrollRef.current) {
-        scrollToBottom()
-      }
-
-      // Update scroll state
-      handleScroll()
-    })
-    ro.observe(el)
-
-    return () => {
-      el.removeEventListener("scroll", handleScroll)
-      el.removeEventListener("wheel", handleWheel)
-      ro.disconnect()
-    }
-  }, [handleScroll, handleWheel, scrollToBottom])
-
-  useEffect(() => {
-    if (!disableAutoScrollRef.current) {
-      scrollToBottom()
-    }
-  }, [messages, completion, isLoading, scrollToBottom])
 
   const handleAddMessage = (message: ServerMessage<ChatCompletionMessage>) => {
     if (!message.data) {
@@ -180,16 +109,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
     message: ServerMessage<ChatCompletionMessage>
   ) => {
     setCompletion(message.data)
-    if (!disableAutoScrollRef.current) {
-      scrollToBottom()
-    }
   }
 
   const handleLoadingMessage = () => {
     setIsLoading(true)
-    if (!disableAutoScrollRef.current) {
-      scrollToBottom()
-    }
   }
 
   const messageEventHandler = (event: MessageEvent) => {
@@ -277,7 +200,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
     })
   }
 
-  const handleEditMessage = (message: string, index: number, mentions: MentionType[] | undefined): void => {
+  const handleEditMessage = (
+    message: string,
+    index: number,
+    mentions: MentionType[] | undefined
+  ): void => {
     generatingRef.current = true
     setIsLoading(true)
     setMessages((prev) => {
@@ -305,10 +232,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         node.content.forEach((innerNode: JSONContent) => {
           if (innerNode.type === "mention" && innerNode.attrs) {
             mentions.push({
-              name:
-                innerNode.attrs.label ||
-                innerNode.attrs.id.split("/").pop() ||
-                "",
+              name: innerNode.attrs.label,
               path: innerNode.attrs.id
             })
           }
@@ -319,18 +243,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
     return mentions
   }
 
-  const replaceMentionsInText = useCallback(
-    (text: string, mentions: MentionType[]): string => {
-      return mentions.reduce(
-        (result, mention) => result.replace(mention.path, `@${mention.name}`),
-        text
-      )
-    },
-    []
-  )
-
   const handleSubmitForm = () => {
-    const input = editorRef.current?.getText().trim()
+    const input = editorRef.current?.getHTML()
 
     if (!input || generatingRef.current) return
 
@@ -340,10 +254,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
     setIsLoading(true)
     clearEditor()
+
     setMessages((prevMessages) => {
       const updatedMessages: ChatCompletionMessage[] = [
         ...(prevMessages || []),
-        { role: USER, content: replaceMentionsInText(input, mentions) }
+        { role: USER, content: input }
       ]
 
       const clientMessage: ClientMessage<
@@ -360,14 +275,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
         messages: updatedMessages
       })
 
+      virtuosoRef.current?.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      })
+
       global.vscode.postMessage(clientMessage)
 
       return updatedMessages
     })
-
-    if (!disableAutoScrollRef.current) {
-      scrollToBottom()
-    }
   }
 
   const clearEditor = useCallback(() => {
@@ -389,7 +305,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
   useEffect(() => {
     window.addEventListener("message", messageEventHandler)
     editorRef.current?.commands.focus()
-    scrollToBottom()
     return () => {
       window.removeEventListener("message", messageEventHandler)
     }
@@ -418,10 +333,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           },
           suggestion: memoizedSuggestion,
           renderText({ node }) {
-            if (node.attrs.name) {
-              return `${node.attrs.name ?? node.attrs.id}`
-            }
-            return node.attrs.id ?? ""
+            return node.attrs.label
           }
         }),
         CustomKeyMap.configure({
@@ -429,7 +341,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           clearEditor
         }),
         Placeholder.configure({
-          placeholder: t("placeholder") // "How can twinny help you today?",
+          placeholder: t("placeholder")
         })
       ]
     },
@@ -453,6 +365,25 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
   }, [memoizedSuggestion])
 
+  const scrollToBottomAuto = useCallback(() => {
+    virtuosoRef.current?.scrollTo({
+      top: Number.MAX_SAFE_INTEGER,
+      behavior: "auto"
+    })
+  }, [])
+
+  useEffect(() => {
+    if (virtuosoRef.current && isAtBottom) {
+      scrollToBottomAuto()
+    }
+  }, [completion, messages])
+
+  useEffect(() => {
+    setTimeout(() => {
+      scrollToBottomAuto()
+    }, 0)
+  }, [messages?.length])
+
   return (
     <VSCodePanelView>
       <div className={styles.container}>
@@ -468,18 +399,27 @@ export const Chat = (props: ChatProps): JSX.Element => {
           </div>
         )}
         <h4 className={styles.title}>
-          {conversation?.title
-            ? conversation?.title
-            : generatingRef.current && <span>New conversation</span>}
+          {conversation?.title ? (
+            <span
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(conversation?.title)
+              }}
+            />
+          ) : (
+            generatingRef.current && <span>New conversation</span>
+          )}
         </h4>
-        <div
-          className={cn({
-            [styles.markdown]: !fullScreen,
-            [styles.markdownFullScreen]: fullScreen
-          })}
-          ref={markdownRef}
-        >
-          {messages?.map((message, index) => (
+        <Virtuoso
+          ref={virtuosoRef}
+          data={messages || []}
+          alignToBottom
+          initialTopMostItemIndex={messages?.length ? messages.length - 1 : 0}
+          defaultItemHeight={50}
+          overscan={200}
+          increaseViewportBy={{ top: 3_000, bottom: Number.MAX_SAFE_INTEGER }}
+          atBottomStateChange={(isAtBottom) => setIsAtBottom(isAtBottom)}
+          atBottomThreshold={10}
+          itemContent={(index, message) => (
             <MessageComponent
               key={index}
               onRegenerate={handleRegenerateMessage}
@@ -493,25 +433,31 @@ export const Chat = (props: ChatProps): JSX.Element => {
               theme={theme}
               index={index}
             />
-          ))}
-          {isLoading && !completion ? (
-            <div className={cn(styles.message, styles.assistantMessage)}>
-              <TypingIndicator />
-            </div>
-          ) : (
-            !!completion && (
-              <MessageComponent
-                isLoading={false}
-                isAssistant
-                theme={theme}
-                messages={messages}
-                message={{
-                  ...completion
-                }}
-              />
-            )
           )}
-        </div>
+          components={{
+            Footer: () => (
+              <>
+                {isLoading && !completion ? (
+                  <div className={cn(styles.message, styles.assistantMessage)}>
+                    <TypingIndicator />
+                  </div>
+                ) : (
+                  !!completion && (
+                    <MessageComponent
+                      isLoading={false}
+                      isAssistant
+                      theme={theme}
+                      messages={messages}
+                      message={{
+                        ...completion
+                      }}
+                    />
+                  )
+                )}
+              </>
+            )
+          }}
+        />
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}

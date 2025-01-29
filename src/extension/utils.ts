@@ -695,7 +695,6 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
     }
 
     if (ig.ignores(relativePath.slice(1))) {
-      logger.log(`git-ignored: ${relativePath}`)
       continue
     }
 

@@ -92,6 +92,7 @@ export const Symmetry = () => {
     isProviderConnected,
     setAutoConnectProviderContext,
     models,
+    getModels,
     selectedModel,
     setSelectedModel,
   } = useSymmetryConnection()
@@ -115,6 +116,10 @@ export const Symmetry = () => {
       setSelectedModel(models[0])
     }
   }, [models, selectedModel])
+
+  useEffect(() => {
+    getModels()
+  }, [])
 
   return (
     <VSCodePanelView className={styles.symmetryContainer}>

@@ -81,8 +81,8 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
         const item = categoryItems[index]
         if (item) {
           props.command({
-            id: item.path || item.name,
-            label: item.path || item.name
+            id: item.path,
+            label: item.name
           })
         }
       }

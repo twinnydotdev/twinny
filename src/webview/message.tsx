@@ -1,23 +1,20 @@
-import React, { useCallback, useEffect, useMemo } from "react"
+import React, { useCallback, useEffect, useMemo, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import Markdown, { Components } from "react-markdown"
-import { Node } from "@tiptap/pm/model"
-import { EditorContent, Extension, useEditor } from "@tiptap/react"
+import Mention from "@tiptap/extension-mention"
+import { Editor, EditorContent, Extension, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
+import DOMPurify from "dompurify"
 import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
-import {
-  ASSISTANT,
-  EVENT_NAME,
-  FILE_PATH_REGEX,
-  TWINNY,
-  YOU
-} from "../common/constants"
+import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
+import { useSuggestion } from "./hooks"
+import { MentionExtension } from "./mention-extention"
 import { getThinkingMessage } from "./utils"
 
 import styles from "./styles/index.module.css"
@@ -34,7 +31,11 @@ interface MessageProps {
   messages?: ChatCompletionMessage[]
   onDelete?: (index: number) => void
   onRegenerate?: (index: number, mentions: MentionType[] | undefined) => void
-  onUpdate?: (message: string, index: number, mentions: MentionType[] | undefined) => void
+  onUpdate?: (
+    message: string,
+    index: number,
+    mentions: MentionType[] | undefined
+  ) => void
   theme: ThemeType | undefined
 }
 
@@ -42,11 +43,6 @@ const CustomKeyMap = Extension.create({
   name: "messageKeyMap",
   addKeyboardShortcuts() {
     return {
-      Enter: ({ editor }) => {
-        if (!editor.getText().trim().length) return false
-        this.options.handleToggleSave()
-        return true
-      },
       "Mod-Enter": ({ editor }) => {
         editor.commands.insertContent("\n")
         return true
@@ -85,126 +81,209 @@ export const Message: React.FC<MessageProps> = React.memo(
     )
     const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
 
-    const handleRegenerate = useCallback(
-      () =>
-        onRegenerate?.(index, getMentions(index -1)),
-      [onRegenerate, index]
-    )
-
-    const handleToggleCancel = useCallback(() => {
-      setEditing(false)
-      editor?.commands.setContent(message?.content as string)
-    }, [message?.content])
-
-    const handleToggleSave = useCallback(() => {
-      const content = editor?.storage.markdown.getMarkdown()
-      if (message?.content === content) {
-        return setEditing(false)
-      }
-      onUpdate?.(content || "", index, getMentions(index))
-      setEditing(false)
-    }, [message?.content, onUpdate, index])
-
-    const getMentions = (index: number) => {
-      if (!messages?.length) return
-      const message = messages[index]
-      if (!editor) return
-      const doc = Node.fromJSON(editor.schema, {
-        type: "doc",
-        content: [
-          { type: "paragraph", content: [{ type: "text", text: message.content }] }
-        ]
-      })
+    const extractMentionsFromHtml = (content: string): MentionType[] => {
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(content, "text/html")
       const mentions: MentionType[] = []
 
-      doc.descendants((node) => {
-        if (node.isText && node.text) {
-          let match
-          while ((match = FILE_PATH_REGEX.exec(node.text)) !== null) {
-            mentions.push({
-              name: match[1],
-              path: match[1].replace("@", "")
-            })
-          }
+      doc.querySelectorAll(".mention").forEach((mention) => {
+        const path = mention.getAttribute("data-id")
+        const label = mention.getAttribute("data-label")
+        if (path && label) {
+          mentions.push({
+            name: label,
+            path: path
+          })
         }
       })
 
       return mentions
     }
 
-    const editor = useEditor(
-      {
-        extensions: [
-          StarterKit,
-          CustomKeyMap.configure({
-            handleToggleSave
-          }),
-          TiptapMarkdown
-        ],
-        content: message?.content
-      },
-      [index]
-    )
+    const handleRegenerate = useCallback(() => {
+      if (!messages?.length) return
+      const lastMessage = messages[index - 1]
+      const mentions = extractMentionsFromHtml(lastMessage?.content as string)
+      onRegenerate?.(index, mentions)
+    }, [onRegenerate, index])
 
-    useEffect(() => {
-      if (editor && message?.content && message.content !== editor.getText()) {
-        editor.commands.setContent(message.content)
+    const handleToggleCancel = useCallback(() => {
+      setEditing(false)
+      editorRef.current?.commands.setContent(message?.content as string)
+    }, [message?.content])
+
+    const handleToggleSave = useCallback(() => {
+      const editorContent = editorRef.current?.getHTML()
+      if (!editorContent) {
+        return setEditing(false)
       }
-    }, [editor, message?.content])
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(editorContent, "text/html")
+      const mentions = Array.from(doc.querySelectorAll(".mention")).map(
+        (mention) => {
+          const filePath = mention.getAttribute("data-id")
+          const label = mention.getAttribute("data-label")
+          if (filePath && label) {
+            mention.outerHTML = `<span class="mention" data-type="mention" data-id="${filePath}" data-label="${label}">@${label}</span>`
+          }
+          return { name: label, path: filePath }
+        }
+      )
+
+      const finalContent = doc.body.innerHTML
+      if (message?.content === finalContent) {
+        return setEditing(false)
+      }
+
+      onUpdate?.(
+        finalContent,
+        index,
+        mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
+      )
+      setEditing(false)
+    }, [message?.content, onUpdate, index])
 
     const handleOpenFile = useCallback((filePath: string) => {
       global.vscode.postMessage({
         type: EVENT_NAME.twinnyOpenFile,
-        data: filePath.replace(/^@/, "")
+        data: filePath
       })
     }, [])
 
-    const processContent = useCallback(
-      (text: string) => {
-        const parts = text.split(FILE_PATH_REGEX)
+    const { suggestion, filePaths } = useSuggestion()
+
+    const memoizedSuggestion = useMemo(
+      () => suggestion,
+      [JSON.stringify(filePaths)]
+    )
+
+    const editorRef = useRef<Editor | null>(null)
+
+    const editor = useEditor(
+      {
+        extensions: [
+          Mention.configure({
+            HTMLAttributes: {
+              class: "mention"
+            },
+            suggestion: memoizedSuggestion,
+            renderText({ node }) {
+              return `@${node.attrs.label}`
+            }
+          }),
+          StarterKit,
+          TiptapMarkdown,
+          MentionExtension,
+          CustomKeyMap.configure({
+            handleToggleSave
+          })
+        ],
+        content: message?.content,
+        editorProps: {
+          attributes: {
+            class: styles.editor
+          },
+          handleDOMEvents: {
+            paste: (view, event) => {
+              event.preventDefault()
+              const text =
+                event.clipboardData?.getData("text/html") ||
+                event.clipboardData?.getData("text/plain")
+              if (text) {
+                view.dispatch(view.state.tr.insertText(text))
+              }
+              return true
+            }
+          }
+        },
+        onFocus: () => {
+          if (editorRef.current) {
+            editorRef.current.commands.focus("end")
+          }
+        }
+      },
+      [memoizedSuggestion]
+    )
+
+    useEffect(() => {
+      if (editor) {
+        editorRef.current = editor
+      }
+    }, [editor])
+
+    useEffect(() => {
+      if (
+        editorRef.current &&
+        message?.content &&
+        message.content !== editorRef.current.getText()
+      ) {
+        editorRef.current.commands.setContent(message.content)
+      }
+    }, [message?.content])
+
+    useEffect(() => {
+      if (editorRef.current) {
+        const mentionExtension =
+          editorRef.current.extensionManager.extensions.find(
+            (extension) => extension.name === "mention"
+          )
+        if (mentionExtension) {
+          mentionExtension.options.suggestion = memoizedSuggestion
+          editorRef.current.commands.focus()
+        }
+      }
+    }, [memoizedSuggestion])
+
+    const renderContent = useCallback(
+      (htmlContent: string) => {
+        const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
+          ALLOWED_TAGS: [
+            "span",
+            "p",
+            "pre",
+            "code",
+            "strong",
+            "em",
+            "br",
+            "a",
+            "ul",
+            "ol",
+            "li"
+          ],
+          ALLOWED_ATTR: [
+            "class",
+            "data-type",
+            "data-id",
+            "data-label",
+            "language"
+          ]
+        })
 
         return (
-          <>
-            {parts.map((part, index) => {
-              const trimmedPart = part.trim()
-              const isFilePath = FILE_PATH_REGEX.test(trimmedPart)
-
-              if (isFilePath) {
-                const displayPart = trimmedPart.replace("@", "")
-
-                return (
-                  <span
-                    key={`file-${index}`}
-                    onClick={() => handleOpenFile(trimmedPart)}
-                    className={styles.fileLink}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    {displayPart}
-                  </span>
-                )
+          <div
+            className={styles.messageContent}
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+            onClick={(e) => {
+              const target = e.target as HTMLElement
+              const mention = target.closest(".mention")
+              if (mention) {
+                const filePath = mention.getAttribute("data-id")
+                if (filePath) {
+                  handleOpenFile(filePath)
+                }
               }
-
-              return part
-            })}
-          </>
+            }}
+          />
         )
       },
       [handleOpenFile]
     )
 
-    const renderCode = useCallback(
-      ({ children }: { children: React.ReactNode }) => {
-        if (typeof children === "string") {
-          return <code>{processContent(children)}</code>
-        }
-        return <code>{children}</code>
-      },
-      [processContent]
-    )
-
-    const renderPre = useCallback(
-      ({ children }: { children: React.ReactNode }) => {
+    const renderCodeBlock = useCallback(
+      ({
+        children,
+        ...props
+      }: { children: React.ReactNode } & React.HTMLProps<HTMLPreElement>) => {
         if (React.isValidElement(children)) {
           return (
             <MemoizedCodeBlock
@@ -214,44 +293,29 @@ export const Message: React.FC<MessageProps> = React.memo(
             />
           )
         }
-        return <pre>{children}</pre>
+        return <pre {...props}>{children}</pre>
       },
       [message?.role, theme]
     )
 
     const markdownComponents = useMemo(
-      () => ({
-        code: renderCode,
-        pre: renderPre,
-        p: ({
-          children,
-          ...props
-        }: React.HTMLAttributes<HTMLParagraphElement> & {
-          children: React.ReactNode
-        }) => {
-          if (typeof children === "string") {
-            return <p {...props}>{processContent(children)}</p>
+      () =>
+        ({
+          pre: renderCodeBlock,
+          p: ({
+            children,
+            ...props
+          }: React.HTMLAttributes<HTMLParagraphElement>) => {
+            if (
+              typeof children === "string" &&
+              children.includes("class=\"mention\"")
+            ) {
+              return renderContent(children)
+            }
+            return <p {...props}>{children}</p>
           }
-          if (Array.isArray(children)) {
-            return (
-              <p {...props}>
-                {children.map((child, i) => {
-                  if (typeof child === "string") {
-                    return (
-                      <React.Fragment key={i}>
-                        {processContent(child)}
-                      </React.Fragment>
-                    )
-                  }
-                  return child
-                })}
-              </p>
-            )
-          }
-          return <p {...props}>{children}</p>
-        }
-      }),
-      [renderCode, processContent]
+        } as Components),
+      [renderCodeBlock, renderContent]
     )
 
     if (!message?.content) return null
@@ -274,16 +338,14 @@ export const Message: React.FC<MessageProps> = React.memo(
               className={styles.thinkingHeader}
               onClick={() => setIsThinkingCollapsed(!isThinkingCollapsed)}
             >
-              <span>
-                {t("thinking")}
-              </span>
+              <span>{t("thinking")}</span>
               <span
                 className={`codicon ${
                   isThinkingCollapsed
                     ? "codicon-chevron-right"
                     : "codicon-chevron-down"
                 }`}
-              ></span>
+              />
             </div>
             <div
               className={`${styles.thinkingContent} ${
@@ -292,7 +354,7 @@ export const Message: React.FC<MessageProps> = React.memo(
             >
               <Markdown
                 remarkPlugins={[remarkGfm]}
-                components={markdownComponents as Components}
+                components={markdownComponents}
               >
                 {thinking}
               </Markdown>
@@ -309,14 +371,14 @@ export const Message: React.FC<MessageProps> = React.memo(
                   appearance="icon"
                   onClick={handleToggleCancel}
                 >
-                  <span className="codicon codicon-close"></span>
+                  <span className="codicon codicon-close" />
                 </MemoizedVSCodeButton>
                 <MemoizedVSCodeButton
                   title={t("save-edit")}
                   appearance="icon"
                   onClick={handleToggleSave}
                 >
-                  <span className="codicon codicon-check"></span>
+                  <span className="codicon codicon-check" />
                 </MemoizedVSCodeButton>
               </>
             )}
@@ -328,7 +390,7 @@ export const Message: React.FC<MessageProps> = React.memo(
                   appearance="icon"
                   onClick={handleToggleEditing}
                 >
-                  <span className="codicon codicon-edit"></span>
+                  <span className="codicon codicon-edit" />
                 </MemoizedVSCodeButton>
                 <MemoizedVSCodeButton
                   disabled={isLoading || conversationLength <= 2}
@@ -336,7 +398,7 @@ export const Message: React.FC<MessageProps> = React.memo(
                   appearance="icon"
                   onClick={handleDelete}
                 >
-                  <span className="codicon codicon-trash"></span>
+                  <span className="codicon codicon-trash" />
                 </MemoizedVSCodeButton>
               </>
             )}
@@ -347,22 +409,23 @@ export const Message: React.FC<MessageProps> = React.memo(
                 appearance="icon"
                 onClick={handleRegenerate}
               >
-                <span className="codicon codicon-sync"></span>
+                <span className="codicon codicon-sync" />
               </MemoizedVSCodeButton>
             )}
           </div>
         </div>
         {editing ? (
           <EditorContent className={styles.tiptap} editor={editor} />
-        ) : (
-          <Markdown
-            remarkPlugins={[remarkGfm]}
-            components={markdownComponents as Components}
-          >
+        ) : message.role === ASSISTANT ? (
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {messageContent.trimStart()}
           </Markdown>
+        ) : (
+          renderContent(messageContent.trimStart())
         )}
       </div>
     )
   }
 )
+
+export default Message
