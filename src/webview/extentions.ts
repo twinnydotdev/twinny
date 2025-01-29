@@ -34,17 +34,16 @@ export const MentionExtension = Node.create({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   renderHTML({ node }: any) {
-    const { dataId, dataLabel } = node.attrs
-    console.log(node)
+    const { dataId, dataLabel, id, label } = node.attrs
     return [
       "span",
       mergeAttributes({
         class: "mention",
         "data-type": "mention",
-        "data-id": dataId,
-        "data-label": dataLabel
+        "data-id": dataId || id,
+        "data-label": dataLabel || label
       }),
-      `@${dataLabel}`
+      `@${dataLabel || label}`
     ]
   },
 

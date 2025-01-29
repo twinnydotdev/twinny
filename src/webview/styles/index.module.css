@@ -142,6 +142,10 @@ code {
   line-height: 30px;
 }
 
+.title p {
+  margin: 0;
+}
+
 .providerSelect {
   margin-top: 10px;
 }

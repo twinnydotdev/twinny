@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
+import DOMPurify from "dompurify"
 
 import { EVENT_NAME } from "../common/constants"
 import { Conversation } from "../common/types"
@@ -15,19 +16,19 @@ interface ConversationHistoryProps {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
-  const  { t } = useTranslation()
+  const { t } = useTranslation()
   const {
     conversations: savedConversations,
     setActiveConversation,
     removeConversation,
-    clearAllConversations,
+    clearAllConversations
   } = useConversationHistory()
 
   const handleSetConversation = (conversation: Conversation) => {
     setActiveConversation(conversation)
     onSelect()
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyHideBackButton,
+      type: EVENT_NAME.twinnyHideBackButton
     })
   }
 
@@ -37,6 +38,12 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   ) => {
     event.stopPropagation()
     removeConversation(conversation)
+  }
+
+  function stripHtml(html: string) {
+    const tmp = document.createElement("DIV")
+    tmp.innerHTML = html
+    return tmp.textContent || tmp.innerText || ""
   }
 
   const handleClearAllConversations = () => clearAllConversations()
@@ -58,7 +65,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
             className={styles.conversation}
             key={conversation.id}
           >
-            <div>{conversation.title?.substring(0, 100)}...</div>
+            <div>{DOMPurify.sanitize(stripHtml(conversation.title || ""))}</div>
             <VSCodeButton
               appearance="icon"
               onClick={(e) => handleRemoveConversation(e, conversation)}
@@ -68,9 +75,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
           </div>
         ))
       ) : (
-        <p>
-          {t("nothing-to-see-here")}
-        </p>
+        <p>{t("nothing-to-see-here")}</p>
       )}
     </div>
   )

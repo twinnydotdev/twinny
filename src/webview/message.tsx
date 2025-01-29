@@ -1,12 +1,8 @@
-import React, { useCallback, useEffect, useMemo } from "react"
+import React, { useCallback, useEffect, useMemo, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import Markdown, { Components } from "react-markdown"
 import Mention from "@tiptap/extension-mention"
-import {
-  EditorContent,
-  Extension,
-  useEditor
-} from "@tiptap/react"
+import { Editor, EditorContent, Extension, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import DOMPurify from "dompurify"
@@ -62,8 +58,6 @@ const CustomKeyMap = Extension.create({
 const MemoizedCodeBlock = React.memo(CodeBlock)
 const MemoizedVSCodeButton = React.memo(VSCodeButton)
 
-
-
 export const Message: React.FC<MessageProps> = React.memo(
   ({
     conversationLength = 0,
@@ -74,7 +68,8 @@ export const Message: React.FC<MessageProps> = React.memo(
     onDelete,
     onRegenerate,
     onUpdate,
-    theme
+    theme,
+    messages,
   }) => {
     const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true)
     const { t } = useTranslation()
@@ -106,17 +101,19 @@ export const Message: React.FC<MessageProps> = React.memo(
     }
 
     const handleRegenerate = useCallback(() => {
-      const mentions = extractMentionsFromHtml(message?.content as string)
+      if (!messages?.length) return
+      const lastMessage = messages[index - 1]
+      const mentions = extractMentionsFromHtml(lastMessage?.content as string)
       onRegenerate?.(index, mentions)
-    }, [onRegenerate, index, message?.content])
+    }, [onRegenerate, index])
 
     const handleToggleCancel = useCallback(() => {
       setEditing(false)
-      editor?.commands.setContent(message?.content as string)
+      editorRef.current?.commands.setContent(message?.content as string)
     }, [message?.content])
 
     const handleToggleSave = useCallback(() => {
-      const editorContent = editor?.getHTML()
+      const editorContent = editorRef.current?.getHTML()
       if (!editorContent) {
         return setEditing(false)
       }
@@ -155,26 +152,33 @@ export const Message: React.FC<MessageProps> = React.memo(
       })
     }, [])
 
-    const { suggestion } = useSuggestion()
+    const { suggestion, filePaths } = useSuggestion()
+
+    const memoizedSuggestion = useMemo(
+      () => suggestion,
+      [JSON.stringify(filePaths)]
+    )
+
+    const editorRef = useRef<Editor | null>(null)
 
     const editor = useEditor(
       {
         extensions: [
-          StarterKit,
           Mention.configure({
             HTMLAttributes: {
               class: "mention"
             },
-            suggestion,
+            suggestion: memoizedSuggestion,
             renderText({ node }) {
-              return node.attrs.label
+              return `@${node.attrs.label}`
             }
           }),
+          StarterKit,
+          TiptapMarkdown,
+          MentionExtension,
           CustomKeyMap.configure({
             handleToggleSave
-          }),
-          TiptapMarkdown,
-          MentionExtension
+          })
         ],
         content: message?.content,
         editorProps: {
@@ -193,16 +197,44 @@ export const Message: React.FC<MessageProps> = React.memo(
               return true
             }
           }
+        },
+        onFocus: () => {
+          if (editorRef.current) {
+            editorRef.current.commands.focus("end")
+          }
         }
       },
-      [index]
+      [memoizedSuggestion]
     )
 
     useEffect(() => {
-      if (editor && message?.content && message.content !== editor.getText()) {
-        editor.commands.setContent(message.content)
+      if (editor) {
+        editorRef.current = editor
       }
-    }, [editor, message?.content])
+    }, [editor])
+
+    useEffect(() => {
+      if (
+        editorRef.current &&
+        message?.content &&
+        message.content !== editorRef.current.getText()
+      ) {
+        editorRef.current.commands.setContent(message.content)
+      }
+    }, [message?.content])
+
+    useEffect(() => {
+      if (editorRef.current) {
+        const mentionExtension =
+          editorRef.current.extensionManager.extensions.find(
+            (extension) => extension.name === "mention"
+          )
+        if (mentionExtension) {
+          mentionExtension.options.suggestion = memoizedSuggestion
+          editorRef.current.commands.focus()
+        }
+      }
+    }, [memoizedSuggestion])
 
     const renderContent = useCallback(
       (htmlContent: string) => {

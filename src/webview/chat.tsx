@@ -10,6 +10,7 @@ import {
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import cn from "classnames"
+import DOMPurify from "dompurify"
 
 import { EVENT_NAME, USER } from "../common/constants"
 import {
@@ -456,7 +457,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
         )}
         <h4 className={styles.title}>
           {conversation?.title
-            ? conversation?.title
+            ? <span dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(conversation?.title)
+            }} />
             : generatingRef.current && <span>New conversation</span>}
         </h4>
         <div
