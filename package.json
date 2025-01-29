@@ -457,6 +457,7 @@
   "devDependencies": {
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
     "@types/async-lock": "^1.4.2",
+    "@types/cheerio": "^0.22.35",
     "@types/js-yaml": "^4.0.9",
     "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.6",
@@ -501,6 +502,7 @@
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
     "async-lock": "^1.4.1",
     "b4a": "^1.6.6",
+    "cheerio": "^1.0.0",
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",

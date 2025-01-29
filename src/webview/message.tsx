@@ -13,8 +13,8 @@ import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
-import { MentionExtension } from "./extentions"
 import { useSuggestion } from "./hooks"
+import { MentionExtension } from "./mention-extention"
 import { getThinkingMessage } from "./utils"
 
 import styles from "./styles/index.module.css"
@@ -117,7 +117,6 @@ export const Message: React.FC<MessageProps> = React.memo(
       if (!editorContent) {
         return setEditing(false)
       }
-      // Preserve mentions by finding them in the editor HTML and reconstructing them
       const parser = new DOMParser()
       const doc = parser.parseFromString(editorContent, "text/html")
       const mentions = Array.from(doc.querySelectorAll(".mention")).map(
@@ -125,7 +124,6 @@ export const Message: React.FC<MessageProps> = React.memo(
           const filePath = mention.getAttribute("data-id")
           const label = mention.getAttribute("data-label")
           if (filePath && label) {
-            // Replace the mention element with the proper HTML structure
             mention.outerHTML = `<span class="mention" data-type="mention" data-id="${filePath}" data-label="${label}">@${label}</span>`
           }
           return { name: label, path: filePath }

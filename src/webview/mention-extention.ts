@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/react"
 
 export const MentionExtension = Node.create({
-  name: "mention",
+  name: "mention-extension",
   inline: true,
   group: "inline",
   draggable: false,
