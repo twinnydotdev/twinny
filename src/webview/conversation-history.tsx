@@ -50,6 +50,13 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
 
   const conversations = Object.values(savedConversations).reverse()
 
+  const getTitle = (conversation: Conversation) => {
+    return (
+      DOMPurify.sanitize(stripHtml(conversation.title || "")) ||
+      "Random conversation"
+    )
+  }
+
   return (
     <div>
       <h3>
@@ -65,7 +72,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
             className={styles.conversation}
             key={conversation.id}
           >
-            <div>{DOMPurify.sanitize(stripHtml(conversation.title || ""))}</div>
+            <div>{getTitle(conversation)}</div>
             <VSCodeButton
               appearance="icon"
               onClick={(e) => handleRemoveConversation(e, conversation)}
