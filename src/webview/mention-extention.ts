@@ -1,6 +1,11 @@
-import { mergeAttributes, Node } from "@tiptap/react"
+import { mergeAttributes, Node } from "@tiptap/core"
 
-export const MentionExtension = Node.create({
+interface MentionAttributes {
+  dataId: string | null
+  dataLabel: string | null
+}
+
+export const MentionExtension = Node.create<MentionAttributes>({
   name: "mention-extension",
   inline: true,
   group: "inline",
@@ -21,29 +26,27 @@ export const MentionExtension = Node.create({
     return [
       {
         tag: "span[data-type=\"mention\"]",
-        getAttrs: (dom) => {
-          const element = dom as HTMLElement
+        getAttrs: (dom): MentionAttributes | null => {
+          if (!(dom instanceof HTMLElement)) return null
           return {
-            dataId: element.getAttribute("data-id"),
-            dataLabel: element.getAttribute("data-label")
+            dataId: dom.getAttribute("data-id"),
+            dataLabel: dom.getAttribute("data-label")
           }
         }
       }
     ]
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  renderHTML({ node }: any) {
-    const { dataId, dataLabel, id, label } = node.attrs
+  renderHTML({ node, HTMLAttributes }) {
     return [
       "span",
-      mergeAttributes({
+      mergeAttributes(HTMLAttributes, {
         class: "mention",
         "data-type": "mention",
-        "data-id": dataId || id,
-        "data-label": dataLabel || label
+        "data-id": node.attrs.dataId,
+        "data-label": node.attrs.dataLabel
       }),
-      `@${dataLabel || label}`
+      `@${node.attrs.dataLabel}`
     ]
   },
 
