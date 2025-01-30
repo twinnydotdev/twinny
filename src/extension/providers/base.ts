@@ -22,7 +22,7 @@ import {
   ServerMessage,
   ThemeType
 } from "../../common/types"
-import { ChatService } from "../chat-service"
+import { ChatService } from "../chat"
 import { ConversationHistory } from "../conversation-history"
 import { DiffManager } from "../diff"
 import { EmbeddingDatabase } from "../embeddings"
@@ -367,7 +367,7 @@ export class BaseProvider {
       )
     }
 
-    this.chatService?.streamChatCompletion(
+    this.chatService?.completion(
       data.data || [],
       data.meta as FileItem[],
     )
