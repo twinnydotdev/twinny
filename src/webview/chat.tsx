@@ -414,9 +414,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
           data={messages || []}
           alignToBottom
           initialTopMostItemIndex={messages?.length ? messages.length - 1 : 0}
-          defaultItemHeight={50}
-          overscan={200}
-          increaseViewportBy={{ top: 3_000, bottom: Number.MAX_SAFE_INTEGER }}
+          defaultItemHeight={200}
+          overscan={1000}
+          increaseViewportBy={{ top: 10_000, bottom: Number.MAX_SAFE_INTEGER }}
+          followOutput={true}
           atBottomStateChange={(isAtBottom) => setIsAtBottom(isAtBottom)}
           atBottomThreshold={10}
           itemContent={(index, message) => (
