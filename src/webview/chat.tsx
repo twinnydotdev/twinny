@@ -433,6 +433,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
               messages={messages}
               theme={theme}
               index={index}
+              onHeightChange={() => {
+                if (virtuosoRef.current && isAtBottom) {
+                  scrollToBottomAuto()
+                }
+              }}
             />
           )}
           components={{

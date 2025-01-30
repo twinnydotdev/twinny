@@ -36,6 +36,7 @@ interface MessageProps {
     index: number,
     mentions: MentionType[] | undefined
   ) => void
+  onHeightChange?: () => void
   theme: ThemeType | undefined
 }
 
@@ -68,12 +69,23 @@ export const Message: React.FC<MessageProps> = React.memo(
     onDelete,
     onRegenerate,
     onUpdate,
+    onHeightChange,
     theme,
     messages,
   }) => {
     const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true)
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
+    const messageRef = useRef<HTMLDivElement>(null)
+    const prevHeightRef = useRef<number>(0)
+
+    useEffect(() => {
+      const currentHeight = messageRef.current?.offsetHeight
+      if (currentHeight && currentHeight !== prevHeightRef.current) {
+        prevHeightRef.current = currentHeight
+        onHeightChange?.()
+      }
+    }, [isThinkingCollapsed, editing, message?.content])
 
     const handleToggleEditing = useCallback(
       () => setEditing((prev) => !prev),
@@ -140,7 +152,7 @@ export const Message: React.FC<MessageProps> = React.memo(
         index,
         mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
       )
-      setEditing(false)
+      setEditing(false);
     }, [message?.content, onUpdate, index])
 
     const handleOpenFile = useCallback((filePath: string) => {
@@ -217,7 +229,7 @@ export const Message: React.FC<MessageProps> = React.memo(
         message?.content &&
         message.content !== editorRef.current.getText()
       ) {
-        editorRef.current.commands.setContent(message.content)
+        editorRef.current.commands.setContent(message.content);
       }
     }, [message?.content])
 
@@ -326,6 +338,7 @@ export const Message: React.FC<MessageProps> = React.memo(
 
     return (
       <div
+        ref={messageRef}
         className={`${styles.message} ${
           message.role === ASSISTANT
             ? styles.assistantMessage
