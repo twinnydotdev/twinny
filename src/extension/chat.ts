@@ -3,7 +3,11 @@ import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
 import { CompletionResponseChunk, TokenJS } from "token.js"
-import { CompletionStreaming, LLMProvider } from "token.js/dist/chat"
+import {
+  CompletionNonStreaming,
+  CompletionStreaming,
+  LLMProvider
+} from "token.js/dist/chat"
 import {
   commands,
   DiagnosticSeverity,
@@ -31,6 +35,7 @@ import {
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
+import { models } from "../common/models"
 import {
   ChatCompletionMessage,
   FileItem,
@@ -64,6 +69,7 @@ export class ChatService extends Base {
   private _functionName = ""
   private _isCollectingFunctionArgs = false
   private _lastStreamingRequest?: CompletionStreaming<LLMProvider>
+  private _lastRequest?: CompletionNonStreaming<LLMProvider>
   private _reranker: Reranker
   private _sessionManager: SessionManager | undefined
   private _statusBar: StatusBarItem
@@ -304,7 +310,48 @@ export class ChatService extends Base {
     return { prompt: prompt || "", selection: selectionContext }
   }
 
-  private async llm(requestBody: CompletionStreaming<LLMProvider>) {
+  private async llmNoStream(requestBody: CompletionNonStreaming<LLMProvider>) {
+    this._controller = new AbortController()
+
+    this._lastRequest = requestBody
+    this._completion = ""
+    this._functionArguments = ""
+    this._functionName = ""
+    this._isCollectingFunctionArgs = false
+
+    if (!this._tokenJs || this._isCancelled) return
+
+    try {
+      const result = await this._tokenJs.chat.completions.create(requestBody)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyStopGeneration
+      } as ServerMessage<ChatCompletionMessage>)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        data: {
+          content: result.choices[0].message.content,
+          role: ASSISTANT
+        }
+      } as ServerMessage<ChatCompletionMessage>)
+    } catch (error) {
+      this._controller?.abort()
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyStopGeneration
+      } as ServerMessage<ChatCompletionMessage>)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        data: {
+          content: error instanceof Error ? error.message : String(error),
+          role: ASSISTANT
+        }
+      } as ServerMessage<ChatCompletionMessage>)
+    }
+  }
+
+  private async llmStream(requestBody: CompletionStreaming<LLMProvider>) {
     this._controller = new AbortController()
 
     this._lastStreamingRequest = requestBody
@@ -458,7 +505,7 @@ export class ChatService extends Base {
     return fileContents.trim()
   }
 
-  public async streamChatCompletion(
+  public async completion(
     messages: ChatCompletionMessage[],
     filePaths?: FileItem[]
   ) {
@@ -533,15 +580,37 @@ export class ChatService extends Base {
       content: finalUserMessageContent.trim() || " "
     })
 
-    return this.llm({
-      messages: this._conversation.filter((m) => !m.excludeFromApi),
-      model: provider.modelName,
-      stream: true,
-      provider: getIsOpenAICompatible(provider)
-        ? API_PROVIDERS.OpenAICompatible
-        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (provider.provider as any)
-    })
+    const supportsStreaming =
+      models[provider?.provider as keyof typeof models]?.supportsStreaming
+
+    let stream = true
+
+    if (Array.isArray(supportsStreaming)) {
+      if (!supportsStreaming.includes(provider.modelName)) {
+        stream = false
+      }
+    }
+
+    if (stream) {
+      return this.llmStream({
+        messages: this._conversation,
+        model: provider.modelName,
+        stream,
+        provider: getIsOpenAICompatible(provider)
+          ? API_PROVIDERS.OpenAICompatible
+          : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (provider.provider as any)
+      })
+    } else {
+      return this.llmNoStream({
+        messages: this._conversation.filter((m) => m.role !== "system"),
+        model: provider.modelName,
+        provider: getIsOpenAICompatible(provider)
+          ? API_PROVIDERS.OpenAICompatible
+          : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (provider.provider as any)
+      })
+    }
   }
 
   public resetConversation() {
@@ -626,6 +695,6 @@ export class ChatService extends Base {
         : // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (provider.provider as any)
     }
-    return this.llm(requestBody)
+    return this.llmStream(requestBody)
   }
 }
