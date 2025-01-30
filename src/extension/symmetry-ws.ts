@@ -22,7 +22,7 @@ export class SymmetryWs {
       try {
         const parsedData = JSON.parse(data.toString())
         this._modelData = parsedData?.allPeers?.filter(
-          (peer: any) => peer.online
+          (peer: any) => peer.online && peer.healthy
         )
         this._webView?.postMessage({
           type: EVENT_NAME.twinnySymmetryModels,

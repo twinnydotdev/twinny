@@ -36,6 +36,7 @@ interface MessageProps {
     index: number,
     mentions: MentionType[] | undefined
   ) => void
+  onHeightChange?: () => void
   theme: ThemeType | undefined
 }
 
@@ -58,6 +59,68 @@ const CustomKeyMap = Extension.create({
 const MemoizedCodeBlock = React.memo(CodeBlock)
 const MemoizedVSCodeButton = React.memo(VSCodeButton)
 
+interface ThinkingSectionProps {
+  thinking: string;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  markdownComponents: Components;
+}
+
+const ThinkingSection = React.memo(({ thinking, isCollapsed: initialCollapsed, onToggle, markdownComponents }: ThinkingSectionProps) => {
+  const { t } = useTranslation()
+  const [isCollapsed, setIsCollapsed] = React.useState(initialCollapsed)
+  const prevThinkingRef = useRef(thinking)
+  const isStreamingRef = useRef(false)
+
+  useEffect(() => {
+    // If thinking content changed and is longer, we're streaming
+    if (thinking.length > prevThinkingRef.current.length) {
+      isStreamingRef.current = true
+      setIsCollapsed(false) // Auto-expand during streaming
+    } else {
+      isStreamingRef.current = false
+    }
+    prevThinkingRef.current = thinking
+  }, [thinking])
+
+  const handleToggle = useCallback(() => {
+    if (!isStreamingRef.current) {
+      setIsCollapsed(prev => !prev)
+      onToggle()
+    }
+  }, [onToggle])
+
+  return (
+    <div className={styles.thinkingSection}>
+      <div
+        className={styles.thinkingHeader}
+        onClick={handleToggle}
+      >
+        <span>{t("thinking")}</span>
+        <span
+          className={`codicon ${
+            isCollapsed
+              ? "codicon-chevron-right"
+              : "codicon-chevron-down"
+          }`}
+        />
+      </div>
+      <div
+        className={`${styles.thinkingContent} ${
+          isCollapsed ? styles.collapsed : ""
+        }`}
+      >
+        <Markdown
+          remarkPlugins={[remarkGfm]}
+          components={markdownComponents}
+        >
+          {thinking}
+        </Markdown>
+      </div>
+    </div>
+  )
+})
+
 export const Message: React.FC<MessageProps> = React.memo(
   ({
     conversationLength = 0,
@@ -68,12 +131,27 @@ export const Message: React.FC<MessageProps> = React.memo(
     onDelete,
     onRegenerate,
     onUpdate,
+    onHeightChange,
     theme,
     messages,
   }) => {
-    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(true)
+    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
+    const messageRef = useRef<HTMLDivElement>(null)
+    const prevHeightRef = useRef<number>(0)
+
+    const handleThinkingToggle = useCallback(() => {
+      setIsThinkingCollapsed(prev => !prev)
+    }, [])
+
+    useEffect(() => {
+      const currentHeight = messageRef.current?.offsetHeight
+      if (currentHeight && currentHeight !== prevHeightRef.current) {
+        prevHeightRef.current = currentHeight
+        onHeightChange?.()
+      }
+    }, [isThinkingCollapsed, editing, message?.content])
 
     const handleToggleEditing = useCallback(
       () => setEditing((prev) => !prev),
@@ -140,7 +218,7 @@ export const Message: React.FC<MessageProps> = React.memo(
         index,
         mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
       )
-      setEditing(false)
+      setEditing(false);
     }, [message?.content, onUpdate, index])
 
     const handleOpenFile = useCallback((filePath: string) => {
@@ -217,7 +295,7 @@ export const Message: React.FC<MessageProps> = React.memo(
         message?.content &&
         message.content !== editorRef.current.getText()
       ) {
-        editorRef.current.commands.setContent(message.content)
+        editorRef.current.commands.setContent(message.content);
       }
     }, [message?.content])
 
@@ -326,6 +404,7 @@ export const Message: React.FC<MessageProps> = React.memo(
 
     return (
       <div
+        ref={messageRef}
         className={`${styles.message} ${
           message.role === ASSISTANT
             ? styles.assistantMessage
@@ -333,33 +412,12 @@ export const Message: React.FC<MessageProps> = React.memo(
         }`}
       >
         {thinking && (
-          <div className={styles.thinkingSection}>
-            <div
-              className={styles.thinkingHeader}
-              onClick={() => setIsThinkingCollapsed(!isThinkingCollapsed)}
-            >
-              <span>{t("thinking")}</span>
-              <span
-                className={`codicon ${
-                  isThinkingCollapsed
-                    ? "codicon-chevron-right"
-                    : "codicon-chevron-down"
-                }`}
-              />
-            </div>
-            <div
-              className={`${styles.thinkingContent} ${
-                isThinkingCollapsed ? styles.collapsed : ""
-              }`}
-            >
-              <Markdown
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
-              >
-                {thinking}
-              </Markdown>
-            </div>
-          </div>
+          <ThinkingSection
+            thinking={thinking}
+            isCollapsed={isThinkingCollapsed}
+            onToggle={handleThinkingToggle}
+            markdownComponents={markdownComponents}
+          />
         )}
         <div className={styles.messageRole}>
           <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>

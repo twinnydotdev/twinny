@@ -94,8 +94,9 @@ code {
 .container {
   display: flex;
   flex-direction: column;
-  height: 97vh;
+  height: 96vh;
   position: relative;
+  margin-top: 10px;
 }
 
 .fullScreenActions {
@@ -134,7 +135,7 @@ code {
   overflow: hidden;
   position: absolute;
   text-overflow: ellipsis;
-  top: -13px;
+  top: -27px;
   white-space: nowrap;
   width: calc(100% - 20px);
   z-index: 2;
@@ -214,15 +215,27 @@ code {
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.thinkingHeader:hover {
+  background-color: var(--vscode-inputOption-hoverBackground);
 }
 
 .thinkingContent {
   overflow: hidden;
-  transition: max-height 0.3s ease-out;
+  transition: all 0.3s ease-out;
+  opacity: 1;
+  max-height: 1000px; /* Large enough to contain content */
+  margin-top: 8px;
 }
 
 .thinkingContent.collapsed {
   max-height: 0;
+  opacity: 0;
+  margin-top: 0;
 }
 
 .messageOptions {
@@ -645,4 +658,40 @@ code {
   margin-right: 8px;
   font-size: 14px;
   opacity: 0.8;
+}
+
+/* File context */
+
+.fileItems {
+  display: flex;
+  margin-top: 20px;
+  padding-bottom: 5px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  background-color: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  margin: 2px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  max-width: fit-content;
+  cursor: pointer;
+  transition: all 0.3 ease-in-out;
+}
+
+.fileItem:hover {
+  background: var(--vscode-inputOption-hoverBackground);
+}
+
+.removeButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--vscode-dangerForeground);
+  font-size: 12px;
+  padding: 0 4px;
 }

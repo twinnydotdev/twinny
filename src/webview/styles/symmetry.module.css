@@ -20,20 +20,14 @@
 
 .connected, .disconnected {
   font-weight: 500;
-  padding: 0.15rem 0.4rem;
+  padding: 0.15rem;
   border-radius: 3px;
   font-size: 0.8rem;
   transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-}
-
-.connected::before, .disconnected::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  margin-left: 5px;
   display: inline-block;
 }
 
@@ -42,18 +36,9 @@
   background: color-mix(in srgb, var(--vscode-testing-iconPassed) 8%, transparent);
 }
 
-.connected::before {
-  background: var(--vscode-testing-iconPassed);
-  box-shadow: 0 0 4px var(--vscode-testing-iconPassed);
-}
-
 .disconnected {
   color: var(--vscode-testing-iconFailed);
   background: color-mix(in srgb, var(--vscode-testing-iconFailed) 8%, transparent);
-}
-
-.disconnected::before {
-  background: var(--vscode-testing-iconFailed);
 }
 
 .providerInfo {

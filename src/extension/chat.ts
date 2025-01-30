@@ -3,7 +3,11 @@ import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
 import { CompletionResponseChunk, TokenJS } from "token.js"
-import { CompletionStreaming, LLMProvider } from "token.js/dist/chat"
+import {
+  CompletionNonStreaming,
+  CompletionStreaming,
+  LLMProvider
+} from "token.js/dist/chat"
 import {
   commands,
   DiagnosticSeverity,
@@ -27,12 +31,15 @@ import {
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
-  WEBUI_TABS
+  WEBUI_TABS,
+  WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
+import { models } from "../common/models"
 import {
   ChatCompletionMessage,
+  ContextFile,
   FileItem,
   ServerMessage,
   TemplateData
@@ -42,6 +49,7 @@ import { kebabToSentence } from "../webview/utils"
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
 import { FileHandler } from "./file-handler"
+import { TwinnyProvider } from "./provider-manager"
 import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
@@ -53,7 +61,7 @@ import {
   updateLoadingMessage
 } from "./utils"
 
-export class ChatService extends Base {
+export class Chat extends Base {
   private _completion = ""
   private _controller?: AbortController
   private _conversation: ChatCompletionMessage[] = []
@@ -64,6 +72,7 @@ export class ChatService extends Base {
   private _functionName = ""
   private _isCollectingFunctionArgs = false
   private _lastStreamingRequest?: CompletionStreaming<LLMProvider>
+  private _lastRequest?: CompletionNonStreaming<LLMProvider>
   private _reranker: Reranker
   private _sessionManager: SessionManager | undefined
   private _statusBar: StatusBarItem
@@ -304,7 +313,48 @@ export class ChatService extends Base {
     return { prompt: prompt || "", selection: selectionContext }
   }
 
-  private async llm(requestBody: CompletionStreaming<LLMProvider>) {
+  private async llmNoStream(requestBody: CompletionNonStreaming<LLMProvider>) {
+    this._controller = new AbortController()
+
+    this._lastRequest = requestBody
+    this._completion = ""
+    this._functionArguments = ""
+    this._functionName = ""
+    this._isCollectingFunctionArgs = false
+
+    if (!this._tokenJs || this._isCancelled) return
+
+    try {
+      const result = await this._tokenJs.chat.completions.create(requestBody)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyStopGeneration
+      } as ServerMessage<ChatCompletionMessage>)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        data: {
+          content: result.choices[0].message.content,
+          role: ASSISTANT
+        }
+      } as ServerMessage<ChatCompletionMessage>)
+    } catch (error) {
+      this._controller?.abort()
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyStopGeneration
+      } as ServerMessage<ChatCompletionMessage>)
+
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        data: {
+          content: error instanceof Error ? error.message : String(error),
+          role: ASSISTANT
+        }
+      } as ServerMessage<ChatCompletionMessage>)
+    }
+  }
+
+  private async llmStream(requestBody: CompletionStreaming<LLMProvider>) {
     this._controller = new AbortController()
 
     this._lastStreamingRequest = requestBody
@@ -458,90 +508,98 @@ export class ChatService extends Base {
     return fileContents.trim()
   }
 
-  public async streamChatCompletion(
-    messages: ChatCompletionMessage[],
-    filePaths?: FileItem[]
-  ) {
-    this._completion = ""
-    this._isCancelled = false
-    this.sendEditorLanguage()
-    const editor = window.activeTextEditor
-    const selection = editor?.selection
-    const userSelection = editor?.document.getText(selection)
-    const lastMessage = messages[messages.length - 1]
-
-    const stripHtml = (html: string): string => {
-      const $ = cheerio.load(html)
-      return $.root().text().trim()
-    }
-
-    const text = stripHtml(lastMessage.content as string)
-    const systemPrompt =
+  private async getSystemPrompt(): Promise<string> {
+    return (
       (await this._templateProvider?.readTemplate<TemplateData>("system", {
         cwd: workspace.workspaceFolders?.[0].uri.fsPath,
         defaultShell: os.userInfo().shell,
         osName: os.platform(),
         homedir: os.homedir()
       })) || ""
-
-    const systemMessage: ChatCompletionMessage = {
-      role: SYSTEM,
-      content: systemPrompt
-    }
-
-    let additionalContext = ""
-
-    if (userSelection) {
-      additionalContext += `Selected Code:\n${userSelection}\n\n`
-    }
-
-    const ragContext = await this.getRagContext(text)
-    const cleanedText = text?.replace(/@workspace/g, "").trim() || " "
-
-    if (ragContext) {
-      additionalContext += `Additional Context:\n${ragContext}\n\n`
-    }
-
-    filePaths = filePaths?.filter(
-      (filepath) =>
-        filepath.name !== "workspace" && filepath.name !== "problems"
     )
-    const fileContents = await this.loadFileContents(filePaths)
-    if (fileContents) {
-      additionalContext += `File Contents:\n${fileContents}\n\n`
-    }
+  }
 
-    const provider = this.getProvider()
-    if (!provider) return
+  private async buildAdditionalContext(
+    userSelection: string | undefined,
+    text: string,
+    filePaths?: FileItem[]
+  ): Promise<string> {
+    let context = userSelection ? `Selected Code:\n${userSelection}\n\n` : ""
+    const ragContext = await this.getRagContext(text)
+    if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
 
+    const workspaceFiles =
+      this.context?.workspaceState.get<ContextFile[]>(
+        WORKSPACE_STORAGE_KEY.contextFiles
+      ) || []
+    const allFilePaths = [...(filePaths || []), ...workspaceFiles]
+
+    const fileContents = await this.loadFileContents(
+      allFilePaths.filter(
+        (filepath) => !["workspace", "problems"].includes(filepath.name)
+      )
+    )
+    if (fileContents) context += `File Contents:\n${fileContents}\n\n`
+
+    return context
+  }
+
+  private setupTokenJS(provider: TwinnyProvider) {
     this._tokenJs = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
       apiKey: provider.apiKey
     })
+  }
 
-    this._conversation = messages.slice(0, -1)
-    this._conversation.unshift(systemMessage)
-
-    let finalUserMessageContent = cleanedText
-
-    if (additionalContext.trim()) {
-      finalUserMessageContent += `\n\n${additionalContext.trim()}`
-    }
-
-    this._conversation.push({
+  private buildConversation(
+    messages: ChatCompletionMessage[],
+    systemMessage: ChatCompletionMessage,
+    cleanedText: string,
+    additionalContext: string
+  ): ChatCompletionMessage[] {
+    const conversation = [systemMessage, ...messages.slice(0, -1)]
+    conversation.push({
       role: USER,
-      content: finalUserMessageContent.trim() || " "
+      content: `${cleanedText}\n\n${additionalContext.trim()}`.trim() || " "
     })
+    return conversation
+  }
 
-    return this.llm({
-      messages: this._conversation.filter((m) => !m.excludeFromApi),
+  private shouldUseStreaming(provider: TwinnyProvider): boolean {
+    const supportsStreaming =
+      models[provider?.provider as keyof typeof models]?.supportsStreaming
+    return Array.isArray(supportsStreaming)
+      ? supportsStreaming.includes(provider.modelName)
+      : true
+  }
+
+  private getStreamOptions(
+    provider: TwinnyProvider
+  ): CompletionStreaming<LLMProvider> {
+    return {
+      messages: this._conversation,
       model: provider.modelName,
       stream: true,
-      provider: getIsOpenAICompatible(provider)
-        ? API_PROVIDERS.OpenAICompatible
-        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (provider.provider as any)
-    })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: this.getProviderType(provider) as any
+    }
+  }
+
+  private getNoStreamOptions(
+    provider: TwinnyProvider
+  ): CompletionNonStreaming<LLMProvider> {
+    return {
+      messages: this._conversation.filter((m) => m.role !== "system"),
+      model: provider.modelName,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provider: this.getProviderType(provider) as any
+    }
+  }
+
+  private getProviderType(provider: TwinnyProvider) {
+    return getIsOpenAICompatible(provider)
+      ? API_PROVIDERS.OpenAICompatible
+      : provider.provider
   }
 
   public resetConversation() {
@@ -599,12 +657,59 @@ export class ChatService extends Base {
     return this._conversation
   }
 
-  public async streamTemplateCompletion(
+  public async completion(
+    messages: ChatCompletionMessage[],
+    filePaths?: FileItem[]
+  ) {
+    this._completion = ""
+    this._isCancelled = false
+    this.sendEditorLanguage()
+
+    const editor = window.activeTextEditor
+    const userSelection = editor?.document.getText(editor.selection)
+    const lastMessage = messages[messages.length - 1]
+
+    const stripHtml = (html: string): string =>
+      cheerio.load(html).root().text().trim()
+    const text = stripHtml(lastMessage.content as string)
+
+    const systemPrompt = await this.getSystemPrompt()
+    const systemMessage: ChatCompletionMessage = {
+      role: SYSTEM,
+      content: systemPrompt
+    }
+
+    const additionalContext = await this.buildAdditionalContext(
+      userSelection,
+      text,
+      filePaths
+    )
+    const cleanedText = text?.replace(/@workspace/g, "").trim() || " "
+
+    const provider = this.getProvider()
+    if (!provider) return
+
+    this.setupTokenJS(provider)
+    this._conversation = this.buildConversation(
+      messages,
+      systemMessage,
+      cleanedText,
+      additionalContext
+    )
+
+    const stream = this.shouldUseStreaming(provider)
+
+    return stream
+      ? this.llmStream(this.getStreamOptions(provider))
+      : this.llmNoStream(this.getNoStreamOptions(provider))
+  }
+
+  public async templateCompletion(
     promptTemplate: string,
     context?: string,
     skipMessage?: boolean
   ) {
-    const messages = await this.getTemplateMessages(
+    this._conversation = await this.getTemplateMessages(
       promptTemplate,
       context,
       skipMessage
@@ -612,20 +717,12 @@ export class ChatService extends Base {
     const provider = this.getProvider()
     if (!provider) return []
 
-    this._tokenJs = new TokenJS({
-      baseURL: this.getProviderBaseUrl(provider),
-      apiKey: provider.apiKey
-    })
+    this.setupTokenJS(provider)
 
-    const requestBody: CompletionStreaming<LLMProvider> = {
-      messages,
-      model: provider.modelName,
-      stream: true,
-      provider: getIsOpenAICompatible(provider)
-        ? API_PROVIDERS.OpenAICompatible
-        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (provider.provider as any)
-    }
-    return this.llm(requestBody)
+    const stream = this.shouldUseStreaming(provider)
+
+    return stream
+      ? this.llmStream(this.getStreamOptions(provider))
+      : this.llmNoStream(this.getNoStreamOptions(provider))
   }
 }
