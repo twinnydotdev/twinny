@@ -99,9 +99,10 @@ export class ProviderManager {
       apiProtocol: "http",
       id: uuidv4(),
       label: "OpenAI Compatible (localhost)",
-      modelName: "llama3.2:latest",
-      provider: API_PROVIDERS.OpenAICompatible,
-      type: "chat"
+      modelName: "codellama:7b-instruct",
+      provider: API_PROVIDERS.Ollama,
+      type: "chat",
+      apiKey: "dummy-api-key-required-for-localhost"
     } as TwinnyProvider
   }
 
