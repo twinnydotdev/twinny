@@ -19,7 +19,8 @@ export const ALL_BRACKETS = [...OPENING_BRACKETS, ...CLOSING_BRACKETS] as const
 export const BRACKET_REGEX = /^[()[\]{}]+$/
 export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const LINE_BREAK_REGEX = /\r?\n|\r|\n/g
-export const FILE_NAME_REGEX = /(?:^|\s|`)(?:@\/|\.\/|(?:[\w-]+\/)*)?\.?[\w.-]+\.(?:jsx?|tsx?|css|s[ac]ss|less|styl|html?|json|jsonc|md|markdown|py|ipynb|java|class|jar|cpp|hpp|cc|hh|c|h|rs|go|php|rb|swift|kt|gradle|m|mm|cs|fs|fsx|elm|lua|sql|ya?ml|toml|xml|conf|ini|env|sh|bash|zsh|ps1|bat|cmd|txt|log|text|doc|rtf|pdf|lock|editorconfig|gitignore|eslintrc|prettier|babelrc|d\.ts|test\.tsx?|spec\.tsx?|snap|svg|graphql|gql|proto|vue|svelte|astro|razor|cshtml|aspx?|jsx?\.map|tsx?\.map|min\.js|chunk\.js|bundle\.js)(?=\s|$|`)/g;
+export const FILE_NAME_REGEX =
+  /(?:^|\s|`)(?:@\/|\.\/|(?:[\w-]+\/)*)?\.?[\w.-]+\.(?:jsx?|tsx?|css|s[ac]ss|less|styl|html?|json|jsonc|md|markdown|py|ipynb|java|class|jar|cpp|hpp|cc|hh|c|h|rs|go|php|rb|swift|kt|gradle|m|mm|cs|fs|fsx|elm|lua|sql|ya?ml|toml|xml|conf|ini|env|sh|bash|zsh|ps1|bat|cmd|txt|log|text|doc|rtf|pdf|lock|editorconfig|gitignore|eslintrc|prettier|babelrc|d\.ts|test\.tsx?|spec\.tsx?|snap|svg|graphql|gql|proto|vue|svelte|astro|razor|cshtml|aspx?|jsx?\.map|tsx?\.map|min\.js|chunk\.js|bundle\.js)(?=\s|$|`)/g
 export const QUOTES_REGEX = /["'`]/g
 export const MAX_CONTEXT_LINE_COUNT = 200
 export const SKIP_DECLARATION_SYMBOLS = ["="]
@@ -89,7 +90,10 @@ export const EVENT_NAME = {
   twinnySymmetryModels: "twinny-symmetry-models",
   twinnyGetSymmetryModels: "twinny-get-symmetry-models",
   twinnyTextSelection: "twinny-text-selection",
-  twinnyGetModels: "twinny-get-models"
+  twinnyGetModels: "twinny-get-models",
+  twinnyAddOpenFilesToContext: "twinny-add-open-file-to-context",
+  twinnyGetContextFiles: "twinny-get-context-files",
+  twinnyRemoveContextFile: "twinny-remove-context-file"
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -115,7 +119,9 @@ export const TWINNY_COMMAND_NAME = {
   stopGeneration: "twinny.stopGeneration",
   templateCompletion: "twinny.templateCompletion",
   templates: "twinny.templates",
-  twinnySymmetryTab: "twinny.symmetry"
+  twinnySymmetryTab: "twinny.symmetry",
+  addFileToContext: "twinny.addFileToContext",
+  getContextFiles: "twinny.getContextFiles"
 }
 
 export const OPEN_AI_COMPATIBLE_PROVIDERS = {

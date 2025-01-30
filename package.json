@@ -79,6 +79,10 @@
         {
           "when": "editorTextFocus",
           "command": "twinny.generateDocs"
+        },
+        {
+          "when": "editorTextFocus",
+          "command": "twinny.addFileToContext"
         }
       ],
       "view/title": [
@@ -240,6 +244,10 @@
         "shortTitle": "twinny embeddings",
         "title": "Embedding options",
         "icon": "$(database)"
+      },
+      {
+        "command": "twinny.addFileToContext",
+        "title": "Twinny - Add file to context"
       }
     ],
     "keybindings": [

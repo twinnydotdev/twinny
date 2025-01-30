@@ -9,6 +9,7 @@ import {
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   TWINNY_COMMAND_NAME,
+  WORKSPACE_STORAGE_KEY
 } from "../../common/constants"
 import { logger } from "../../common/logger"
 import { models } from "../../common/models"
@@ -16,6 +17,7 @@ import {
   ApiModel,
   ChatCompletionMessage,
   ClientMessage,
+  ContextFile,
   FileItem,
   InferenceRequest,
   LanguageType,
@@ -38,7 +40,7 @@ import {
   getGitChanges,
   getLanguage,
   getTextSelection,
-  getTheme,
+  getTheme
 } from "../utils"
 
 export class BaseProvider {
@@ -149,6 +151,8 @@ export class BaseProvider {
       [EVENT_NAME.twinntGetLocale]: this.sendLocaleToWebView,
       [EVENT_NAME.twinnyGetModels]: this.sendModelsToWebView,
       [EVENT_NAME.twinnyStopGeneration]: this.destroyStream,
+      [EVENT_NAME.twinnyGetContextFiles]: this.getContextFiles,
+      [EVENT_NAME.twinnyRemoveContextFile]: this.removeContextFile,
       [TWINNY_COMMAND_NAME.settings]: this.openSettings
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,7 +175,7 @@ export class BaseProvider {
   private sendModelsToWebView = () => {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyGetModels,
-      data: models,
+      data: models
     })
   }
 
@@ -239,6 +243,50 @@ export class BaseProvider {
     this.chat?.templateCompletion(template)
   }
 
+  addFileToContext = (file: ContextFile) => {
+    const files =
+      this.context?.workspaceState.get<ContextFile[]>(
+        WORKSPACE_STORAGE_KEY.contextFiles
+      ) || []
+    const isUnique = !files.some(
+      (existingFile) => existingFile.path === file.path
+    )
+    if (isUnique) {
+      const updatedFiles = [...files, file]
+      this.saveContextFiles(updatedFiles)
+      this.notifyWebView(updatedFiles)
+    }
+  }
+
+  getContextFiles = () => {
+    const files =
+      this.context?.workspaceState.get<ContextFile[]>(
+        WORKSPACE_STORAGE_KEY.contextFiles
+      ) || []
+    this.notifyWebView(files)
+  }
+
+  removeContextFile = (data: { data: string }) => {
+    const files =
+      this.context?.workspaceState.get<ContextFile[]>(
+        WORKSPACE_STORAGE_KEY.contextFiles
+      ) || []
+    const updatedFiles = files.filter((file) => file.path !== data.data)
+    this.saveContextFiles(updatedFiles)
+    this.notifyWebView(updatedFiles)
+  }
+
+  private saveContextFiles = (files: ContextFile[]) => {
+    this.context?.workspaceState.update(WORKSPACE_STORAGE_KEY.contextFiles, files)
+  }
+
+  private notifyWebView = (files: ContextFile[]) => {
+    this.webView?.postMessage({
+      type: EVENT_NAME.twinnyAddOpenFilesToContext,
+      data: files
+    } as ServerMessage<ContextFile[]>)
+  }
+
   public getGitCommitMessage = async () => {
     const diff = await getGitChanges()
     if (!diff.length) {
@@ -265,7 +313,7 @@ export class BaseProvider {
   private setTab = (tab: ClientMessage) => {
     this.webView?.postMessage({
       type: EVENT_NAME.twinnySetTab,
-      data: tab,
+      data: tab
     } as ServerMessage<string>)
   }
 
@@ -288,7 +336,7 @@ export class BaseProvider {
     const config = vscode.workspace.getConfiguration("twinny")
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyGetConfigValue,
-      data: config.get(message.key),
+      data: config.get(message.key)
     } as ServerMessage<string>)
   }
 
@@ -342,7 +390,9 @@ export class BaseProvider {
     )
   }
 
-  private streamChatCompletion = async (data: ClientMessage<ChatCompletionMessageParam[]>) => {
+  private streamChatCompletion = async (
+    data: ClientMessage<ChatCompletionMessageParam[]>
+  ) => {
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
@@ -352,7 +402,10 @@ export class BaseProvider {
         content: await this._templateProvider?.readSystemMessageTemplate()
       }
 
-      const messages = [systemMessage, ...(data.data as ChatCompletionMessage[])]
+      const messages = [
+        systemMessage,
+        ...(data.data as ChatCompletionMessage[])
+      ]
 
       logger.log(`
         Using symmetry for inference
@@ -367,10 +420,7 @@ export class BaseProvider {
       )
     }
 
-    this.chat?.completion(
-      data.data || [],
-      data.meta as FileItem[],
-    )
+    this.chat?.completion(data.data || [], data.meta as FileItem[])
   }
 
   private getSelectedText = () => {

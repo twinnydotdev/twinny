@@ -24,6 +24,7 @@ import {
 import {
   useAutosizeTextArea,
   useConversationHistory,
+  useFileContext,
   useSelection,
   useSuggestion,
   useSymmetryConnection,
@@ -57,6 +58,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { symmetryConnection } = useSymmetryConnection()
+  const { files, removeFile } = useFileContext()
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -348,6 +350,20 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [memoizedSuggestion]
   )
 
+  const handleOpenFile = useCallback((filePath: string) => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyOpenFile,
+      data: filePath
+    })
+  }, [])
+
+  const scrollToBottomAuto = useCallback(() => {
+    virtuosoRef.current?.scrollTo({
+      top: Number.MAX_SAFE_INTEGER,
+      behavior: "auto"
+    })
+  }, [])
+
   useAutosizeTextArea(chatRef, editorRef.current?.getText() || "")
 
   useEffect(() => {
@@ -364,13 +380,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
       })
     }
   }, [memoizedSuggestion])
-
-  const scrollToBottomAuto = useCallback(() => {
-    virtuosoRef.current?.scrollTo({
-      top: Number.MAX_SAFE_INTEGER,
-      behavior: "auto"
-    })
-  }, [])
 
   useEffect(() => {
     if (virtuosoRef.current && isAtBottom) {
@@ -409,6 +418,29 @@ export const Chat = (props: ChatProps): JSX.Element => {
             generatingRef.current && <span>New conversation</span>
           )}
         </h4>
+        {!!files.length && (
+          <div className={styles.fileItems}>
+            {files.map((file, index) => (
+              <div
+                title={file.path}
+                key={index}
+                className={styles.fileItem}
+                onClick={() => handleOpenFile(file.path)}
+              >
+                {file.name}
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeFile(file.path)
+                  }}
+                  data-id={file.path}
+                  className="codicon codicon-close"
+                ></span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <Virtuoso
           ref={virtuosoRef}
           data={messages || []}

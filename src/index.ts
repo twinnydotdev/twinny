@@ -27,9 +27,7 @@ import { FullScreenProvider } from "./extension/providers/panel"
 import { SidebarProvider } from "./extension/providers/sidebar"
 import { SessionManager } from "./extension/session-manager"
 import { TemplateProvider } from "./extension/template-provider"
-import {
-  delayExecution,
-} from "./extension/utils"
+import { delayExecution } from "./extension/utils"
 import { getLineBreakCount } from "./webview/utils"
 
 export async function activate(context: ExtensionContext) {
@@ -255,6 +253,17 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")
       fullScreenProvider.createOrShowPanel()
+    }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.addFileToContext, () => {
+      const editor = window.activeTextEditor
+      if (editor) {
+        const currentFile = {
+          name: path.basename(editor.document.uri.fsPath),
+          path: workspace.asRelativePath(editor.document.uri.fsPath),
+          category: "files" as const
+        }
+        sidebarProvider.addFileToContext(currentFile)
+      }
     }),
     workspace.onDidCloseTextDocument((document) => {
       const filePath = document.uri.fsPath

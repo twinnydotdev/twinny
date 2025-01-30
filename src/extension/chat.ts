@@ -31,13 +31,15 @@ import {
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
-  WEBUI_TABS
+  WEBUI_TABS,
+  WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   ChatCompletionMessage,
+  ContextFile,
   FileItem,
   ServerMessage,
   TemplateData
@@ -525,12 +527,20 @@ export class Chat extends Base {
     let context = userSelection ? `Selected Code:\n${userSelection}\n\n` : ""
     const ragContext = await this.getRagContext(text)
     if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
+
+    const workspaceFiles =
+      this.context?.workspaceState.get<ContextFile[]>(
+        WORKSPACE_STORAGE_KEY.contextFiles
+      ) || []
+    const allFilePaths = [...(filePaths || []), ...workspaceFiles]
+
     const fileContents = await this.loadFileContents(
-      filePaths?.filter(
+      allFilePaths.filter(
         (filepath) => !["workspace", "problems"].includes(filepath.name)
       )
     )
     if (fileContents) context += `File Contents:\n${fileContents}\n\n`
+
     return context
   }
 
@@ -563,7 +573,9 @@ export class Chat extends Base {
       : true
   }
 
-  private getStreamOptions(provider: TwinnyProvider): CompletionStreaming<LLMProvider> {
+  private getStreamOptions(
+    provider: TwinnyProvider
+  ): CompletionStreaming<LLMProvider> {
     return {
       messages: this._conversation,
       model: provider.modelName,
@@ -573,7 +585,9 @@ export class Chat extends Base {
     }
   }
 
-  private getNoStreamOptions(provider: TwinnyProvider): CompletionNonStreaming<LLMProvider> {
+  private getNoStreamOptions(
+    provider: TwinnyProvider
+  ): CompletionNonStreaming<LLMProvider> {
     return {
       messages: this._conversation.filter((m) => m.role !== "system"),
       model: provider.modelName,
@@ -695,16 +709,20 @@ export class Chat extends Base {
     context?: string,
     skipMessage?: boolean
   ) {
-    this._conversation = await this.getTemplateMessages(promptTemplate, context, skipMessage);
-    const provider = this.getProvider();
-    if (!provider) return [];
+    this._conversation = await this.getTemplateMessages(
+      promptTemplate,
+      context,
+      skipMessage
+    )
+    const provider = this.getProvider()
+    if (!provider) return []
 
-    this.setupTokenJS(provider);
+    this.setupTokenJS(provider)
 
-    const stream = this.shouldUseStreaming(provider);
+    const stream = this.shouldUseStreaming(provider)
 
     return stream
       ? this.llmStream(this.getStreamOptions(provider))
-      : this.llmNoStream(this.getNoStreamOptions(provider));
+      : this.llmNoStream(this.getNoStreamOptions(provider))
   }
 }

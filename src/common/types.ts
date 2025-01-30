@@ -340,3 +340,9 @@ export interface LMStudioEmbedding {
   model: string
   usage: LMSEmbeddingUsage
 }
+
+export interface ContextFile {
+  name: string;
+  path: string;
+  category: "files";
+}
