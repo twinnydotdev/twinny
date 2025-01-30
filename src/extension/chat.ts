@@ -59,7 +59,7 @@ import {
   updateLoadingMessage
 } from "./utils"
 
-export class ChatService extends Base {
+export class Chat extends Base {
   private _completion = ""
   private _controller?: AbortController
   private _conversation: ChatCompletionMessage[] = []

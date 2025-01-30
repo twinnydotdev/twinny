@@ -22,7 +22,7 @@ import {
   ServerMessage,
   ThemeType
 } from "../../common/types"
-import { ChatService } from "../chat"
+import { Chat } from "../chat"
 import { ConversationHistory } from "../conversation-history"
 import { DiffManager } from "../diff"
 import { EmbeddingDatabase } from "../embeddings"
@@ -51,7 +51,7 @@ export class BaseProvider {
   private _symmetryService?: SymmetryService
   private _templateDir: string | undefined
   private _templateProvider: TemplateProvider
-  public chatService: ChatService | undefined
+  public chat: Chat | undefined
   public context: vscode.ExtensionContext
   public conversationHistory: ConversationHistory | undefined
   public reviewService: ReviewService | undefined
@@ -88,7 +88,7 @@ export class BaseProvider {
       this.context
     )
 
-    this.chatService = new ChatService(
+    this.chat = new Chat(
       this._statusBarItem,
       this._templateDir,
       this.context,
@@ -212,7 +212,7 @@ export class BaseProvider {
   }
 
   public destroyStream = () => {
-    this.chatService?.abort()
+    this.chat?.abort()
     this.reviewService?.abort()
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyStopGeneration
@@ -223,8 +223,8 @@ export class BaseProvider {
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
     )
-    if (symmetryConnected && this.chatService) {
-      const messages = await this.chatService.getTemplateMessages(template)
+    if (symmetryConnected && this.chat) {
+      const messages = await this.chat.getTemplateMessages(template)
       logger.log(`
         Using symmetry for inference
         Messages: ${JSON.stringify(messages)}
@@ -236,7 +236,7 @@ export class BaseProvider {
         })
       )
     }
-    this.chatService?.templateCompletion(template)
+    this.chat?.templateCompletion(template)
   }
 
   public getGitCommitMessage = async () => {
@@ -367,7 +367,7 @@ export class BaseProvider {
       )
     }
 
-    this.chatService?.completion(
+    this.chat?.completion(
       data.data || [],
       data.meta as FileItem[],
     )
