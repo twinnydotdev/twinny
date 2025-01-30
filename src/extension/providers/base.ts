@@ -236,7 +236,7 @@ export class BaseProvider {
         })
       )
     }
-    this.chatService?.streamTemplateCompletion(template)
+    this.chatService?.templateCompletion(template)
   }
 
   public getGitCommitMessage = async () => {
