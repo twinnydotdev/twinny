@@ -494,18 +494,18 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
         <div className={styles.chatOptions}>
-          {!isAtBottom && (
-            <div className={styles.scrollToBottom}>
-              <MemoizedVSCodeButton
-                appearance="icon"
-                onClick={scrollToBottom}
-                title={t("scroll-to-bottom")}
-              >
-                <i className="codicon codicon-arrow-down" />
-              </MemoizedVSCodeButton>
-            </div>
-          )}
           <div>
+            {!isAtBottom && (
+              <div className={styles.scrollToBottom}>
+                <MemoizedVSCodeButton
+                  appearance="icon"
+                  onClick={scrollToBottom}
+                  title={t("scroll-to-bottom")}
+                >
+                  <i className="codicon codicon-arrow-down" />
+                </MemoizedVSCodeButton>
+              </div>
+            )}
             {generatingRef.current && !symmetryConnection && (
               <MemoizedVSCodeButton
                 type="button"
