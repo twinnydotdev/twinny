@@ -405,7 +405,10 @@ export class BaseProvider {
       const messages = [
         systemMessage,
         ...(data.data as ChatCompletionMessage[])
-      ]
+      ].map(m => ({
+        ...m,
+        content: this.chat?.stripHtml(m.content as string)
+      }))
 
       logger.log(`
         Using symmetry for inference

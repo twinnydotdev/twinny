@@ -10,6 +10,7 @@ import {
   VSCodeButton,
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
+import * as cheerio from "cheerio"
 import cn from "classnames"
 import DOMPurify from "dompurify"
 
@@ -256,7 +257,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const handleSubmitForm = useCallback(() => {
     const input = editorRef.current?.getHTML()
 
-    if (!input || generatingRef.current) return
+    const text = cheerio.load(input || "").root().text().trim()
+
+    if (!text || generatingRef.current || !input) return
 
     generatingRef.current = true
 

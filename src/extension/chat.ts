@@ -1,4 +1,3 @@
-import * as cheerio from "cheerio"
 import * as fs from "fs/promises"
 import * as os from "os"
 import * as path from "path"
@@ -559,7 +558,7 @@ export class Chat extends Base {
     })
   }
 
-  private buildConversation(
+  private buildAndCleanConversation(
     messages: ChatCompletionMessage[],
     systemMessage: ChatCompletionMessage,
     cleanedText: string,
@@ -568,9 +567,12 @@ export class Chat extends Base {
     const conversation = [systemMessage, ...messages.slice(0, -1)]
     conversation.push({
       role: USER,
-      content: `${cleanedText}\n\n${additionalContext.trim()}`.trim() || " "
+      content: this.stripHtml(`${cleanedText}\n\n${additionalContext.trim()}`.trim() || " ")
     })
-    return conversation
+    return conversation.map((m) => ({
+      ...m,
+      content: this.stripHtml(m.content as string || "")
+    }))
   }
 
   private shouldUseStreaming(provider: TwinnyProvider): boolean {
@@ -659,11 +661,12 @@ export class Chat extends Base {
 
     this._conversation.push({
       role: USER,
-      content: userContent.trim() || " "
+      content: this.stripHtml(userContent.trim() || " ")
     })
 
     return this._conversation
   }
+
 
   public async completion(
     messages: ChatCompletionMessage[],
@@ -677,9 +680,6 @@ export class Chat extends Base {
     const userSelection = editor?.document.getText(editor.selection)
     const lastMessage = messages[messages.length - 1]
 
-    const stripHtml = (html: string): string =>
-      cheerio.load(html).root().text().trim()
-    const text = stripHtml(lastMessage.content as string)
 
     const systemPrompt = await this.getSystemPrompt()
     const systemMessage: ChatCompletionMessage = {
@@ -687,18 +687,20 @@ export class Chat extends Base {
       content: systemPrompt
     }
 
+    const message = lastMessage.content as string
+
     const additionalContext = await this.buildAdditionalContext(
       userSelection,
-      text,
+      message as string,
       filePaths
     )
-    const cleanedText = text?.replace(/@workspace/g, "").trim() || " "
+    const cleanedText = message?.replace(/@workspace/g, "").trim() || " "
 
     const provider = this.getProvider()
     if (!provider) return
 
     this.setupTokenJS(provider)
-    this._conversation = this.buildConversation(
+    this._conversation = this.buildAndCleanConversation(
       messages,
       systemMessage,
       cleanedText,

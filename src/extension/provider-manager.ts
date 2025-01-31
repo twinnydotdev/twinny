@@ -262,7 +262,6 @@ export class ProviderManager {
     provider.id = uuidv4()
     providers[provider.id] = provider
     this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
-    this.setActiveChatProvider(provider)
 
     if (provider.type === "chat") {
       this._context.globalState.update(
