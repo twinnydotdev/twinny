@@ -227,8 +227,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
         meta: mentions
       } as ClientMessage)
 
-      console.log("here")
-
       return updatedMessages
     })
   }
