@@ -339,6 +339,15 @@ code {
   background-color: var(--vscode-inputOption-hoverBackground);
 }
 
+.scrollToBottom {
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.scrollToBottom:hover {
+  opacity: 1;
+}
+
 .chatOptions {
   display: flex;
   justify-content: space-between;

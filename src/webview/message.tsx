@@ -31,7 +31,7 @@ interface MessageProps {
   messages?: ChatCompletionMessage[]
   onDelete?: (index: number) => void
   onRegenerate?: (index: number, mentions: MentionType[] | undefined) => void
-  onUpdate?: (
+  onEdit?: (
     message: string,
     index: number,
     mentions: MentionType[] | undefined
@@ -130,7 +130,7 @@ export const Message: React.FC<MessageProps> = React.memo(
     message,
     onDelete,
     onRegenerate,
-    onUpdate,
+    onEdit,
     onHeightChange,
     theme,
     messages,
@@ -213,13 +213,13 @@ export const Message: React.FC<MessageProps> = React.memo(
         return setEditing(false)
       }
 
-      onUpdate?.(
+      onEdit?.(
         finalContent,
         index,
         mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
       )
       setEditing(false);
-    }, [message?.content, onUpdate, index])
+    }, [message?.content, onEdit, index])
 
     const handleOpenFile = useCallback((filePath: string) => {
       global.vscode.postMessage({
