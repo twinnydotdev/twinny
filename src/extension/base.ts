@@ -1,4 +1,3 @@
-import * as cheerio from "cheerio"
 import * as vscode from "vscode"
 
 import {
@@ -55,10 +54,6 @@ export class Base {
     )
     return provider
   }
-
-  public stripHtml (html: string){
-    return cheerio.load(html).root().text().trim()
- }
 
   public updateConfig() {
     this.config = vscode.workspace.getConfiguration("twinny")

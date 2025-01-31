@@ -27,7 +27,6 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_SESSION_NAME,
-  OPEN_AI_COMPATIBLE_PROVIDERS,
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
@@ -544,17 +543,10 @@ export class Chat extends Base {
     return context
   }
 
-  private getApiKey = (provider: TwinnyProvider) => {
-    if (Object.values(OPEN_AI_COMPATIBLE_PROVIDERS).includes(provider.provider)) {
-      return provider.apiKey || ""
-    }
-    return undefined
-  }
-
   private setupTokenJS(provider: TwinnyProvider) {
     this._tokenJs = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
-      apiKey: this.getApiKey(provider)
+      apiKey: provider.apiKey
     })
   }
 
@@ -567,11 +559,11 @@ export class Chat extends Base {
     const conversation = [systemMessage, ...messages.slice(0, -1)]
     conversation.push({
       role: USER,
-      content: this.stripHtml(`${cleanedText}\n\n${additionalContext.trim()}`.trim() || " ")
+      content: `${cleanedText}\n\n${additionalContext.trim()}`.trim() || " "
     })
     return conversation.map((m) => ({
       ...m,
-      content: this.stripHtml(m.content as string || "")
+      content: m.content as string || ""
     }))
   }
 
@@ -661,7 +653,7 @@ export class Chat extends Base {
 
     this._conversation.push({
       role: USER,
-      content: this.stripHtml(userContent.trim() || " ")
+      content: userContent.trim() || " "
     })
 
     return this._conversation
