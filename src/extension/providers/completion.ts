@@ -494,19 +494,22 @@ export class CompletionProvider
     for (const interaction of interactions) {
       const filePath = interaction.name
 
-      if (!filePath) return
-
+      if (!filePath) continue
       if (filePath.toString().match(".git")) continue
-
-      const uri = Uri.file(filePath)
-
       if (currentFileName === filePath) continue
 
+      const uri = Uri.file(filePath)
       const activeLines = interaction.activeLines
 
-      const document = await workspace.openTextDocument(uri)
-      const lineCount = document.lineCount
+      let document;
+      try {
+        document = await workspace.openTextDocument(uri)
+      } catch (error) {
+        console.warn(`Failed to open file: ${filePath}`, error)
+        continue
+      }
 
+      const lineCount = document.lineCount
       if (lineCount > MAX_CONTEXT_LINE_COUNT) {
         const averageLine =
           activeLines.reduce((acc, curr) => acc + curr.line, 0) /
