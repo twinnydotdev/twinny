@@ -197,7 +197,8 @@ export class SymmetryService extends EventEmitter {
       if (!part) return
       this._completion += part.choices[0].delta.content
       if (!this._completion) return
-      if (this._completion) this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
+      if (this._completion)
+        this.emit(SYMMETRY_EMITTER_KEY.inference, this._completion)
     })
   }
 
@@ -236,6 +237,8 @@ export class SymmetryService extends EventEmitter {
       fs.mkdirSync(configDir, { recursive: true })
     }
 
+    const existingConfig = this.getExistingConfig(configPath)
+
     const config: ProviderConfig = {
       apiHostname: provider.apiHostname || "localhost",
       apiKey: provider.apiKey,
@@ -252,7 +255,7 @@ export class SymmetryService extends EventEmitter {
       public: true,
       serverKey: this._config.symmetryServerKey,
       systemMessage: "",
-      userSecret: ""
+      userSecret: existingConfig?.userSecret || ""
     }
 
     const symmetryConfiguration = yaml.dump(config)
@@ -260,6 +263,13 @@ export class SymmetryService extends EventEmitter {
     fs.promises.writeFile(configPath, symmetryConfiguration, "utf8")
 
     return config
+  }
+
+  private getExistingConfig(configPath: string): ProviderConfig | null {
+    if (fs.existsSync(configPath)) {
+      return yaml.load(fs.readFileSync(configPath, "utf8")) as ProviderConfig
+    }
+    return null
   }
 
   private async readProviderConfig(): Promise<ProviderConfig> {
