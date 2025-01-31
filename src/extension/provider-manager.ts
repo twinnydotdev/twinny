@@ -102,7 +102,6 @@ export class ProviderManager {
       modelName: "codellama:7b-instruct",
       provider: API_PROVIDERS.Ollama,
       type: "chat",
-      apiKey: "dummy-api-key-required-for-localhost"
     } as TwinnyProvider
   }
 

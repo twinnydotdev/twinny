@@ -547,7 +547,7 @@ export class Chat extends Base {
   private setupTokenJS(provider: TwinnyProvider) {
     this._tokenJs = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
-      apiKey: provider.apiKey
+      apiKey: provider.apiKey || ""
     })
   }
 

@@ -25,7 +25,7 @@ interface ProviderSelectProps {
 }
 const providers: TwinnyProvider[] = [
   {
-    label: "OpenAi Compatible (localhost)",
+    label: "Ollama",
     logo: <SvgOllama />,
     apiHostname: "localhost",
     apiPort: 11434,
@@ -35,7 +35,18 @@ const providers: TwinnyProvider[] = [
     modelName: "codellama:7b-instruct",
     provider: API_PROVIDERS.Ollama,
     type: "chat",
-    apiKey: "dummy-api-key-required-for-localhost"
+  },
+  {
+    label: "Localhost OpenAI Compatible Server",
+    logo: <SvgOpenAI />,
+    apiHostname: "localhost",
+    apiPort: 11434,
+    apiPath: "/v1",
+    apiProtocol: "http",
+    id: "openai-compatible-default",
+    modelName: "codellama:7b-instruct",
+    provider: API_PROVIDERS.OpenAICompatible,
+    type: "chat",
   },
   {
     label: "OpenAI",

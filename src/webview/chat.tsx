@@ -443,8 +443,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
     )
   }
 
-  const scrollToBottom = useCallback(() => {
-    virtuosoRef.current?.scrollToIndex({ index: "LAST" })
+  const scrollToBottom = useCallback((behavior?: ScrollBehavior | undefined) => {
+    virtuosoRef.current?.scrollTo({
+      top: Number.MAX_SAFE_INTEGER,
+      behavior: behavior || "auto"
+    })
   }, [])
 
   useEffect(() => {
@@ -485,10 +488,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
           ref={virtuosoRef}
           data={messages}
           initialTopMostItemIndex={messages?.length}
-          defaultItemHeight={500}
+          defaultItemHeight={800}
           atBottomStateChange={setIsAtBottom}
           itemContent={itemContent}
           atBottomThreshold={20}
+          alignToBottom
         />
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
@@ -499,7 +503,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
               <div className={styles.scrollToBottom}>
                 <MemoizedVSCodeButton
                   appearance="icon"
-                  onClick={scrollToBottom}
+                  onClick={() => scrollToBottom("smooth")}
                   title={t("scroll-to-bottom")}
                 >
                   <i className="codicon codicon-arrow-down" />
