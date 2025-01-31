@@ -57,18 +57,19 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const selection = useSelection()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
-  const [, setIsAtBottom] = useState(true)
   const [messages, setMessages] = useState<ChatCompletionMessage[]>([])
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { symmetryConnection } = useSymmetryConnection()
   const { files, removeFile } = useFileContext()
   const shouldScrollRef = useRef(true)
+  const [isAtBottom, setIsAtBottom] = useState(true)
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
+
 
   const handleAddMessage = (message: ServerMessage<ChatCompletionMessage>) => {
     if (!message.data) {
@@ -442,24 +443,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
     )
   }
 
-  // const scrollToBottomAuto = useCallback(() => {
-  //   virtuosoRef.current?.scrollTo({
-  //     top: Number.MAX_SAFE_INTEGER,
-  //     behavior: "auto"
-  //   })
-  // }, [])
+  const scrollToBottom = useCallback(() => {
+    virtuosoRef.current?.scrollToIndex({ index: "LAST" })
+  }, [])
 
-  // useEffect(() => {
-  //   if (virtuosoRef.current && isAtBottom) {
-  //     scrollToBottomAuto()
-  //   }
-  // }, [completion, messages])
-
-  // useEffect(() => {
-  //   setTimeout(() => {
-  //     scrollToBottomAuto()
-  //   }, 0)
-  // }, [messages?.length])
+  useEffect(() => {
+    if (virtuosoRef.current && isAtBottom) {
+      scrollToBottom()
+    }
+  }, [completion, messages, scrollToBottom, isAtBottom])
 
   return (
     <VSCodePanelView>
@@ -492,18 +484,27 @@ export const Chat = (props: ChatProps): JSX.Element => {
         <Virtuoso
           ref={virtuosoRef}
           data={messages}
-          initialTopMostItemIndex={messages?.length ? messages.length - 1 : 0}
-          defaultItemHeight={200}
-          overscan={1000}
-          followOutput={true}
+          initialTopMostItemIndex={messages?.length}
+          defaultItemHeight={500}
           atBottomStateChange={setIsAtBottom}
           itemContent={itemContent}
-          alignToBottom
+          atBottomThreshold={20}
         />
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
         <div className={styles.chatOptions}>
+          {!isAtBottom && (
+            <div className={styles.scrollToBottom}>
+              <MemoizedVSCodeButton
+                appearance="icon"
+                onClick={scrollToBottom}
+                title={t("scroll-to-bottom")}
+              >
+                <i className="codicon codicon-arrow-down" />
+              </MemoizedVSCodeButton>
+            </div>
+          )}
           <div>
             {generatingRef.current && !symmetryConnection && (
               <MemoizedVSCodeButton
