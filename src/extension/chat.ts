@@ -28,6 +28,7 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_SESSION_NAME,
+  OPEN_AI_COMPATIBLE_PROVIDERS,
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
@@ -544,10 +545,17 @@ export class Chat extends Base {
     return context
   }
 
+  private getApiKey = (provider: TwinnyProvider) => {
+    if (Object.values(OPEN_AI_COMPATIBLE_PROVIDERS).includes(provider.provider)) {
+      return provider.apiKey || ""
+    }
+    return undefined
+  }
+
   private setupTokenJS(provider: TwinnyProvider) {
     this._tokenJs = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
-      apiKey: provider.apiKey || ""
+      apiKey: this.getApiKey(provider)
     })
   }
 
