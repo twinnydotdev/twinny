@@ -191,9 +191,6 @@ export const Message: React.FC<MessageProps> = React.memo(
     }, [message?.content])
 
     const handleToggleSave = useCallback(() => {
-
-      console.log("OK")
-
       const editorContent = editorRef.current?.getHTML()
       if (!editorContent) {
         return setEditing(false)
@@ -215,8 +212,6 @@ export const Message: React.FC<MessageProps> = React.memo(
       if (message?.content === finalContent) {
         return setEditing(false)
       }
-
-      console.log("OK")
 
       onEdit?.(
         finalContent,
