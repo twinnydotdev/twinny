@@ -71,7 +71,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
 
-
   const handleAddMessage = (message: ServerMessage<ChatCompletionMessage>) => {
     if (!message.data) {
       setCompletion(null)
@@ -219,7 +218,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       const updatedMessages = [
         ...prev.slice(0, index),
-        { ...prev[index], content: message }
+        {
+          ...prev[index],
+          content: message
+            .replace(/<p>/g, "")
+            .replace(/<\/p>/g, "<br>")
+            .replace(/<br>$/, "")
+        }
       ]
 
       global.vscode.postMessage({
@@ -255,9 +260,17 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   const handleSubmitForm = useCallback(() => {
-    const input = editorRef.current?.getHTML()
+    const input = editorRef.current
+      ?.getHTML()
+      .replace(/<p>/g, "")
+      .replace(/<\/p>/g, "<br>")
+      .replace(/<br>$/, "")
 
-    const text = cheerio.load(input || "").root().text().trim()
+    const text = cheerio
+      .load(input || "")
+      .root()
+      .text()
+      .trim()
 
     if (!text || generatingRef.current || !input) return
 
@@ -422,7 +435,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       messages: messages,
       onDelete: handleDeleteMessage,
       onEdit: handleEditMessage,
-      onRegenerate: handleRegenerateMessage,
+      onRegenerate: handleRegenerateMessage
     }
 
     return (
@@ -444,12 +457,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
     )
   }
 
-  const scrollToBottom = useCallback((behavior?: ScrollBehavior | undefined) => {
-    virtuosoRef.current?.scrollTo({
-      top: Number.MAX_SAFE_INTEGER,
-      behavior: behavior || "auto"
-    })
-  }, [])
+  const scrollToBottom = useCallback(
+    (behavior?: ScrollBehavior | undefined) => {
+      virtuosoRef.current?.scrollTo({
+        top: Number.MAX_SAFE_INTEGER,
+        behavior: behavior || "auto"
+      })
+    },
+    []
+  )
 
   useEffect(() => {
     if (virtuosoRef.current && isAtBottom) {
