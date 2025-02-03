@@ -10,11 +10,13 @@ import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
+import { AssistantMessageContent } from "../common/parse-assistant-message"
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import { CodeBlock } from "./code-block"
 import { useSuggestion } from "./hooks"
 import { MentionExtension } from "./mention-extention"
+import { ToolCard } from "./tool-use"
 import { getThinkingMessage } from "./utils"
 
 import styles from "./styles/index.module.css"
@@ -60,66 +62,93 @@ const MemoizedCodeBlock = React.memo(CodeBlock)
 const MemoizedVSCodeButton = React.memo(VSCodeButton)
 
 interface ThinkingSectionProps {
-  thinking: string;
-  isCollapsed: boolean;
-  onToggle: () => void;
-  markdownComponents: Components;
+  thinking: string
+  isCollapsed: boolean
+  onToggle: () => void
+  markdownComponents: Components
 }
 
-const ThinkingSection = React.memo(({ thinking, isCollapsed: initialCollapsed, onToggle, markdownComponents }: ThinkingSectionProps) => {
-  const { t } = useTranslation()
-  const [isCollapsed, setIsCollapsed] = React.useState(initialCollapsed)
-  const prevThinkingRef = useRef(thinking)
-  const isStreamingRef = useRef(false)
+const ThinkingSection = React.memo(
+  ({
+    thinking,
+    isCollapsed: initialCollapsed,
+    onToggle,
+    markdownComponents
+  }: ThinkingSectionProps) => {
+    const { t } = useTranslation()
+    const [isCollapsed, setIsCollapsed] = React.useState(initialCollapsed)
+    const prevThinkingRef = useRef(thinking)
+    const isStreamingRef = useRef(false)
 
-  useEffect(() => {
-    // If thinking content changed and is longer, we're streaming
-    if (thinking.length > prevThinkingRef.current.length) {
-      isStreamingRef.current = true
-      setIsCollapsed(false) // Auto-expand during streaming
-    } else {
-      isStreamingRef.current = false
-    }
-    prevThinkingRef.current = thinking
-  }, [thinking])
 
-  const handleToggle = useCallback(() => {
-    if (!isStreamingRef.current) {
-      setIsCollapsed(prev => !prev)
-      onToggle()
-    }
-  }, [onToggle])
+    useEffect(() => {
+      if (thinking.length > prevThinkingRef.current.length) {
+        isStreamingRef.current = true
+        setIsCollapsed(false)
+      } else {
+        isStreamingRef.current = false
+      }
+      prevThinkingRef.current = thinking
+    }, [thinking])
 
-  return (
-    <div className={styles.thinkingSection}>
-      <div
-        className={styles.thinkingHeader}
-        onClick={handleToggle}
-      >
-        <span>{t("thinking")}</span>
-        <span
-          className={`codicon ${
-            isCollapsed
-              ? "codicon-chevron-right"
-              : "codicon-chevron-down"
+    const handleToggle = useCallback(() => {
+      if (!isStreamingRef.current) {
+        setIsCollapsed((prev) => !prev)
+        onToggle()
+      }
+    }, [onToggle])
+
+    return (
+      <div className={styles.thinkingSection}>
+        <div className={styles.thinkingHeader} onClick={handleToggle}>
+          <span>{t("thinking")}</span>
+          <span
+            className={`codicon ${
+              isCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"
+            }`}
+          />
+        </div>
+        <div
+          className={`${styles.thinkingContent} ${
+            isCollapsed ? styles.collapsed : ""
           }`}
-        />
-      </div>
-      <div
-        className={`${styles.thinkingContent} ${
-          isCollapsed ? styles.collapsed : ""
-        }`}
-      >
-        <Markdown
-          remarkPlugins={[remarkGfm]}
-          components={markdownComponents}
         >
-          {thinking}
-        </Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {thinking}
+          </Markdown>
+        </div>
       </div>
-    </div>
-  )
-})
+    )
+  }
+)
+
+const renderMessageBlock = (
+  block: AssistantMessageContent,
+  markdownComponents: Components,
+  setToolStatuses: React.Dispatch<React.SetStateAction<Record<string, "accepted" | "rejected" | "running">>>
+) => {
+  if (block.type === "text") {
+    return (
+      <Markdown
+        key={block.content}
+        remarkPlugins={[remarkGfm]}
+        components={markdownComponents}
+      >
+        {block.content.trimStart()}
+      </Markdown>
+    )
+  } else {
+    return (
+      <ToolCard
+        onUpdate={(id, status) =>
+          setToolStatuses((prev) => ({ ...prev, [id]: status }))
+        }
+        key={block.name}
+        toolUse={block}
+      />
+    )
+  }
+}
 
 export const Message: React.FC<MessageProps> = React.memo(
   ({
@@ -133,16 +162,19 @@ export const Message: React.FC<MessageProps> = React.memo(
     onEdit,
     onHeightChange,
     theme,
-    messages,
+    messages
   }) => {
     const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
     const { t } = useTranslation()
     const [editing, setEditing] = React.useState<boolean>(false)
     const messageRef = useRef<HTMLDivElement>(null)
     const prevHeightRef = useRef<number>(0)
+    const [, setToolStatuses] = React.useState<
+    Record<string, "accepted" | "rejected" | "running">
+  >({})
 
     const handleThinkingToggle = useCallback(() => {
-      setIsThinkingCollapsed(prev => !prev)
+      setIsThinkingCollapsed((prev) => !prev)
     }, [])
 
     useEffect(() => {
@@ -218,7 +250,7 @@ export const Message: React.FC<MessageProps> = React.memo(
         index,
         mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
       )
-      setEditing(false);
+      setEditing(false)
     }, [message?.content, onEdit, index])
 
     const handleOpenFile = useCallback((filePath: string) => {
@@ -295,7 +327,7 @@ export const Message: React.FC<MessageProps> = React.memo(
         message?.content &&
         message.content !== editorRef.current.getText()
       ) {
-        editorRef.current.commands.setContent(message.content);
+        editorRef.current.commands.setContent(message.content)
       }
     }, [message?.content])
 
@@ -398,7 +430,7 @@ export const Message: React.FC<MessageProps> = React.memo(
 
     if (!message?.content) return null
 
-    const { thinking, message: messageContent } = getThinkingMessage(
+    const { thinking, messageBlocks } = getThinkingMessage(
       message.content as string
     )
 
@@ -475,11 +507,13 @@ export const Message: React.FC<MessageProps> = React.memo(
         {editing ? (
           <EditorContent className={styles.tiptap} editor={editor} />
         ) : message.role === ASSISTANT ? (
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {messageContent.trimStart()}
-          </Markdown>
+          <div className={styles.messageContent}>
+            {messageBlocks.map((block) =>
+              renderMessageBlock(block, markdownComponents, setToolStatuses)
+            )}
+          </div>
         ) : (
-          renderContent(messageContent.trimStart())
+          renderContent((message.content as string).trimStart())
         )}
       </div>
     )

@@ -44,7 +44,7 @@ export class TemplateProvider {
           fs.writeFileSync(`${destFile}.hbs`, template, "utf8")
         }
       })
-    } catch (e) {
+    } catch {
       console.log(`Problem creating default templates "${this._basePath}`)
     }
   }
@@ -68,7 +68,7 @@ export class TemplateProvider {
           }
         )
       })
-    } catch (e) {
+    } catch {
       console.log(`Problem reading template "${path}`)
       return Promise.reject()
     }

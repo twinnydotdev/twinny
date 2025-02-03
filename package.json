@@ -213,7 +213,7 @@
         "command": "twinny.newConversation",
         "shortTitle": "New chat",
         "title": "Start a new chat",
-        "icon": "$(comment-discussion)"
+        "icon": "$(plus)"
       },
       {
         "command": "twinny.templates",
@@ -527,6 +527,7 @@
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
     "react": "^18.2.0",
+    "react-diff-viewer-continued": "^3.4.0",
     "react-dom": "^18.2.0",
     "react-i18next": "^15.1.1",
     "react-markdown": "^9.0.1",
