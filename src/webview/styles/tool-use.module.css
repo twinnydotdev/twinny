@@ -140,8 +140,6 @@
 }
 
 .successCard {
-  border-color: var(--vscode-testing-iconPassed);
-  background-color: var(--vscode-terminal-ansiGreen);
   color: var(--vscode-editor-background);
 }
 

@@ -46,8 +46,37 @@ export class FileTreeProvider {
 
   async listFilesAsString() {
     const allFiles = await getAllFilePaths(this._workspaceRoot)
+    const visibleFiles = await this.getVisibleFiles()
+    const openTabs = await this.getOpenTabs()
 
-    return allFiles.join("\n")
+    let output = "<environment_details>\n"
+    output += "# VSCode Visible Files\n"
+    output += visibleFiles.join("\n") + "\n"
+    output += "# VSCode Open Tabs\n"
+    output += openTabs.join("\n") + "\n"
+    output += "# All Files\n"
+    output += allFiles.join("\n")
+    output += "</environment_details>"
+
+    return output
+  }
+
+  private async getVisibleFiles(): Promise<string[]> {
+    const visibleFiles = await vscode.workspace.findFiles(
+      "**/*",
+      "**/node_modules/**"
+    )
+    return visibleFiles.map((file) => vscode.workspace.asRelativePath(file))
+  }
+
+  private async getOpenTabs(): Promise<string[]> {
+    return vscode.window.tabGroups.all
+      .flatMap((group) => group.tabs)
+      .filter((tab) => tab.input instanceof vscode.TabInputText)
+      .map((tab) =>
+        vscode.workspace.asRelativePath((tab.input as vscode.TabInputText).uri)
+      )
+      .filter((relativePath) => !this._ignoreRules.ignores(relativePath))
   }
 
   private generateFileTree(dir: string, prefix = ""): string {
