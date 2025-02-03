@@ -1,3 +1,4 @@
+import * as cp from "child_process"
 import { distance } from "fastest-levenshtein"
 import * as fs from "fs"
 import * as path from "path"
@@ -23,6 +24,21 @@ interface ListCodeDefinitionNamesToolUse extends ToolUse {
   name: "list_code_definition_names"
   params: {
     path?: string
+  }
+}
+
+interface ExecuteCommandToolUse extends ToolUse {
+  name: "execute_command"
+  params: {
+    command: string
+  }
+}
+
+interface WriteToFileToolUse extends ToolUse {
+  name: "write_to_file"
+  params: {
+    path: string
+    content: string
   }
 }
 
@@ -59,7 +75,9 @@ export class ToolHandler {
     } = toolUse.params
 
     if (!path || !diff) {
-      vscode.window.showErrorMessage("Missing required parameters for replace_in_file")
+      vscode.window.showErrorMessage(
+        "Missing required parameters for replace_in_file"
+      )
       return
     }
 
@@ -79,7 +97,8 @@ export class ToolHandler {
       let content = document.getText()
 
       // Find all diff blocks using regex
-      const diffBlockRegex = /<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
+      const diffBlockRegex =
+        /<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
       const diffBlocks = Array.from(diff.matchAll(diffBlockRegex))
 
       if (diffBlocks.length === 0) {
@@ -128,7 +147,8 @@ export class ToolHandler {
         }
 
         // Preserve indentation of the first line
-        const originalIndent = contentLines[bestMatchStart].match(/^[\t ]*/)?.[0] || ""
+        const originalIndent =
+          contentLines[bestMatchStart].match(/^[\t ]*/)?.[0] || ""
         const replaceLines = replaceContent.split("\n")
         const indentedReplaceContent = replaceLines
           .map((line, i) => (i === 0 ? line : originalIndent + line))
@@ -171,115 +191,219 @@ export class ToolHandler {
   }
 
   private async handleAcceptToolUse(message: ServerMessage<ToolUse>) {
-      const toolUse = message.data
-      if (!toolUse) return
+    const toolUse = message.data
+    if (!toolUse) return
 
-      switch (toolUse.name) {
-        case "replace_in_file":
-          await this.handleReplaceInFile(toolUse as ReplaceInFileToolUse)
-          // Save the file after applying changes
-          await this.openAndSaveFile(toolUse.params.path)
-          break
-        case "list_code_definition_names":
-          await this.handleListCodeDefinitionNames(toolUse as ListCodeDefinitionNamesToolUse)
-          break
-        default:
-          vscode.window.showErrorMessage(`Unsupported tool: ${toolUse.name}`)
-      }
+    switch (toolUse.name) {
+      case "replace_in_file":
+        await this.handleReplaceInFile(toolUse as ReplaceInFileToolUse)
+        // Save the file after applying changes
+        await this.openAndSaveFile(toolUse.params.path)
+        break
+      case "list_code_definition_names":
+        await this.handleListCodeDefinitionNames(
+          toolUse as ListCodeDefinitionNamesToolUse
+        )
+        break
+      case "execute_command":
+        await this.handleExecuteCommand(toolUse as ExecuteCommandToolUse)
+        break
+      case "write_to_file":
+        await this.handleWriteToFile(toolUse as WriteToFileToolUse)
+        break
+      default:
+        vscode.window.showErrorMessage(`Unsupported tool: ${toolUse.name}`)
+    }
+  }
+
+  private async handleWriteToFile(toolUse: WriteToFileToolUse) {
+    const { path, content } = toolUse.params
+
+    if (!path || content === undefined) {
+      vscode.window.showErrorMessage(
+        "Missing required parameters for write_to_file"
+      )
+      return
     }
 
-    private async handleListCodeDefinitionNames(toolUse: ListCodeDefinitionNamesToolUse) {
-      const { path: directoryPath } = toolUse.params
-
-      if (!directoryPath) {
-        vscode.window.showErrorMessage("Missing required parameter 'path' for list_code_definition_names")
+    try {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("No workspace folder open")
         return
       }
 
-      try {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
-        if (!workspaceFolder) {
-          vscode.window.showErrorMessage("No workspace folder open")
-          return
+      const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path)
+      const writeData = Buffer.from(content, "utf8")
+      await vscode.workspace.fs.writeFile(fullPath, writeData)
+
+      vscode.window.showInformationMessage(`File written successfully: ${path}`)
+
+      // Send the result back to the webview
+      this._webview.postMessage({
+        type: EVENT_NAME.twinnyToolUseResult,
+        data: {
+          name: "write_to_file",
+          result: `File written successfully: ${path}`
         }
+      })
+    } catch (error) {
+      vscode.window.showErrorMessage(`Error writing file: ${error}`)
+    }
+  }
 
-        const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, directoryPath).fsPath
-        const definitions = await this.getCodeDefinitions(fullPath)
+  private async handleExecuteCommand(toolUse: ExecuteCommandToolUse) {
+    const { command } = toolUse.params
 
-        // Send the result back to the webview
-        this._webview.postMessage({
-          type: EVENT_NAME.twinnyToolUseResult,
-          data: {
-            name: "list_code_definition_names",
-            result: definitions.join("\n")
+    if (!command) {
+      vscode.window.showErrorMessage(
+        "Missing required parameter 'command' for execute_command"
+      )
+      return
+    }
+
+    try {
+      const { stdout, stderr } = await new Promise<{
+        stdout: string
+        stderr: string
+      }>((resolve, reject) => {
+        cp.exec(
+          command,
+          { cwd: vscode.workspace.rootPath },
+          (error, stdout, stderr) => {
+            if (error) {
+              reject(error)
+            } else {
+              resolve({ stdout, stderr })
+            }
           }
-        })
+        )
+      })
 
-      } catch (error) {
-        vscode.window.showErrorMessage(`Error listing code definitions: ${error}`)
-      }
-    }
+      const result = stdout || stderr
+      vscode.window.showInformationMessage(
+        `Command executed successfully: ${command}`
+      )
 
-    private async getCodeDefinitions(directoryPath: string): Promise<string[]> {
-      const definitions: string[] = []
-
-      const files = await this.getFilesRecursively(directoryPath)
-      for (const file of files) {
-        const parser = await getParser(file)
-        if (parser) {
-          const content = await fs.promises.readFile(file, "utf8")
-          const tree = parser.parse(content)
-          const fileDefinitions = this.extractDefinitions(tree.rootNode, path.basename(file))
-          definitions.push(...fileDefinitions)
+      // Send the result back to the webview
+      this._webview.postMessage({
+        type: EVENT_NAME.twinnyToolUseResult,
+        data: {
+          name: "execute_command",
+          result: result
         }
-      }
+      })
+    } catch (error) {
+      vscode.window.showErrorMessage(`Error executing command: ${error}`)
+    }
+  }
 
-      return definitions
+  private async handleListCodeDefinitionNames(
+    toolUse: ListCodeDefinitionNamesToolUse
+  ) {
+    const { path: directoryPath } = toolUse.params
+
+    if (!directoryPath) {
+      vscode.window.showErrorMessage(
+        "Missing required parameter 'path' for list_code_definition_names"
+      )
+      return
     }
 
-    private async getFilesRecursively(dir: string): Promise<string[]> {
-      const dirents = await fs.promises.readdir(dir, { withFileTypes: true })
-      const files = await Promise.all(dirents.map((dirent) => {
+    try {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("No workspace folder open")
+        return
+      }
+
+      const fullPath = vscode.Uri.joinPath(
+        workspaceFolder.uri,
+        directoryPath
+      ).fsPath
+      const definitions = await this.getCodeDefinitions(fullPath)
+
+      // Send the result back to the webview
+      this._webview.postMessage({
+        type: EVENT_NAME.twinnyToolUseResult,
+        data: {
+          name: "list_code_definition_names",
+          result: definitions.join("\n")
+        }
+      })
+    } catch (error) {
+      vscode.window.showErrorMessage(`Error listing code definitions: ${error}`)
+    }
+  }
+
+  private async getCodeDefinitions(directoryPath: string): Promise<string[]> {
+    const definitions: string[] = []
+
+    const files = await this.getFilesRecursively(directoryPath)
+    for (const file of files) {
+      const parser = await getParser(file)
+      if (parser) {
+        const content = await fs.promises.readFile(file, "utf8")
+        const tree = parser.parse(content)
+        const fileDefinitions = this.extractDefinitions(
+          tree.rootNode,
+          path.basename(file)
+        )
+        definitions.push(...fileDefinitions)
+      }
+    }
+
+    return definitions
+  }
+
+  private async getFilesRecursively(dir: string): Promise<string[]> {
+    const dirents = await fs.promises.readdir(dir, { withFileTypes: true })
+    const files = await Promise.all(
+      dirents.map((dirent) => {
         const res = path.resolve(dir, dirent.name)
         return dirent.isDirectory() ? this.getFilesRecursively(res) : res
-      }))
-      return Array.prototype.concat(...files)
-    }
+      })
+    )
+    return Array.prototype.concat(...files)
+  }
 
-    private extractDefinitions(node: Parser.SyntaxNode, fileName: string): string[] {
-      const definitions: string[] = []
+  private extractDefinitions(
+    node: Parser.SyntaxNode,
+    fileName: string
+  ): string[] {
+    const definitions: string[] = []
 
-      if (this.isDefinition(node)) {
-        const name = this.getDefinitionName(node)
-        if (name) {
-          definitions.push(`${fileName}: ${node.type} ${name}`)
-        }
+    if (this.isDefinition(node)) {
+      const name = this.getDefinitionName(node)
+      if (name) {
+        definitions.push(`${fileName}: ${node.type} ${name}`)
       }
-
-      for (const child of node.children) {
-        definitions.push(...this.extractDefinitions(child, fileName))
-      }
-
-      return definitions
     }
 
-    private isDefinition(node: Parser.SyntaxNode): boolean {
-      const definitionTypes = [
-        "function_declaration",
-        "method_definition",
-        "class_declaration",
-        "interface_declaration",
-        "enum_declaration",
-        "const_declaration",
-        "variable_declaration"
-      ]
-      return definitionTypes.includes(node.type)
+    for (const child of node.children) {
+      definitions.push(...this.extractDefinitions(child, fileName))
     }
 
-    private getDefinitionName(node: Parser.SyntaxNode): string | null {
-      const nameNode = node.childForFieldName("name")
-      return nameNode ? nameNode.text : null
-    }
+    return definitions
+  }
+
+  private isDefinition(node: Parser.SyntaxNode): boolean {
+    const definitionTypes = [
+      "function_declaration",
+      "method_definition",
+      "class_declaration",
+      "interface_declaration",
+      "enum_declaration",
+      "const_declaration",
+      "variable_declaration"
+    ]
+    return definitionTypes.includes(node.type)
+  }
+
+  private getDefinitionName(node: Parser.SyntaxNode): string | null {
+    const nameNode = node.childForFieldName("name")
+    return nameNode ? nameNode.text : null
+  }
 
   private async openAndSaveFile(path?: string) {
     if (!path) {
