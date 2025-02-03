@@ -36,25 +36,25 @@ export const ToolCard: React.FC<ToolCardProps> = ({
   const theme = useTheme()
   const { Toast, showToast } = useToast()
 
-  const handleRun = () => {
+  const handleRun = useCallback(() => {
     if (onRun) onRun(toolUse)
     if (onUpdate) onUpdate(toolUse.id, "running")
-  }
+  }, [onRun, onUpdate, toolUse])
 
-  const handleAccept = () => {
+  const handleAccept = useCallback(() => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyAcceptToolUse,
       data: toolUse
     })
     if (onAccept) onAccept(toolUse)
     if (onUpdate) onUpdate(toolUse.id, "accepted")
-  }
+  }, [onAccept, onUpdate, toolUse])
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     const text = JSON.stringify(toolUse, null, 2)
     await navigator.clipboard.writeText(text)
     showToast(t("copied-to-clipboard"))
-  }
+  }, [toolUse, showToast, t])
 
   const handleOpenFile = useCallback((filePath: string | undefined) => {
     global.vscode.postMessage({
@@ -63,10 +63,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({
     })
   }, [])
 
-  const rawMessageSection = (
+  const RawMessageSection = () => (
     <div className={styles.rawMessage}>
       <details>
-        <summary>Show Raw Message</summary>
+        <summary>{t("show-raw-message")}</summary>
         <div className={styles.rawMessageContent}>
           <pre>{JSON.stringify(toolUse, null, 2)}</pre>
           <div className={styles.rawMessageActions}>
@@ -83,75 +83,77 @@ export const ToolCard: React.FC<ToolCardProps> = ({
     </div>
   )
 
-  // Special branch for attempt_completion tool use.
-  if (toolUse.name === "attempt_completion") {
-    return (
-      <div className={`${styles.toolCard} ${styles.successCard}`}>
-        <div className={styles.toolHeader}>
-          <span className={styles.toolName}>{t(toolUse.name)}</span>
-        </div>
-        <div className={styles.toolBody}>
-          <div className={styles.toolParams}>
-            {toolUse.params.result && (
-              <div className={styles.paramRow}>
-                <pre className={styles.paramValue}>{toolUse.params.result}</pre>
-              </div>
-            )}
-            {toolUse.params.command && (
-              <div className={styles.paramRow}>
-                <pre className={styles.paramValue}>
-                  {toolUse.params.command}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className={styles.toolFooter}>
-          {toolUse.params.command && (
-            <VSCodeButton appearance="primary" onClick={handleRun}>
-              {t("run-command")}
-            </VSCodeButton>
-          )}
-        </div>
-        {rawMessageSection}
+  const AttemptCompletionCard = () => (
+    <div className={`${styles.toolCard} ${styles.successCard}`}>
+      <div className={styles.toolHeader}>
+        <span className={styles.toolName}>{t(toolUse.name)}</span>
       </div>
-    )
-  }
+      <div className={styles.toolBody}>
+        {toolUse.params.result && (
+          <div className={styles.paramRow}>
+            <pre className={styles.paramValue}>{toolUse.params.result}</pre>
+          </div>
+        )}
+        {toolUse.params.command && (
+          <div className={styles.paramRow}>
+            <pre className={styles.paramValue}>{toolUse.params.command}</pre>
+          </div>
+        )}
+      </div>
+      <div className={styles.toolFooter}>
+        {toolUse.params.command && (
+          <VSCodeButton appearance="primary" onClick={handleRun}>
+            {t("run-command")}
+          </VSCodeButton>
+        )}
+      </div>
+      <RawMessageSection />
+    </div>
+  )
 
   const showDiffViewer =
     (toolUse.name === "replace_in_file" && toolUse.params.diff) ||
     (toolUse.name === "write_to_file" && toolUse.params.content)
 
-  let actionButtons = null
-  if (toolUse.name === "execute_command") {
-    actionButtons = (
-      <div className={styles.toolFooter}>
-        <VSCodeButton appearance="primary" onClick={handleRun}>
-          {t("run-command")}
-        </VSCodeButton>
-      </div>
-    )
-  } else if (
-    toolUse.name === "write_to_file" ||
-    toolUse.name === "replace_in_file"
-  ) {
-    actionButtons = (
-      <div className={styles.toolFooter}>
-        <VSCodeButton appearance="primary" onClick={handleAccept}>
-          {t("accept")}
-        </VSCodeButton>
-      </div>
-    )
+  const ActionButtons = () => {
+    if (toolUse.name === "execute_command") {
+      return (
+        <div className={styles.toolFooter}>
+          <VSCodeButton appearance="primary" onClick={handleRun}>
+            {t("run-command")}
+          </VSCodeButton>
+        </div>
+      )
+    } else if (
+      toolUse.name === "write_to_file" ||
+      toolUse.name === "replace_in_file"
+    ) {
+      return (
+        <div className={styles.toolFooter}>
+          <VSCodeButton appearance="primary" onClick={handleAccept}>
+            {t("accept")}
+          </VSCodeButton>
+        </div>
+      )
+    }
+    return null
   }
 
-  const highlightSyntax = (str: string) => (
-    <SyntaxHighlighter
-      language="javascript"
-      style={theme === Theme.Dark ? vscDarkPlus : vs}
-    >
-      {str}
-    </SyntaxHighlighter>
+  const highlightSyntax = useCallback(
+    (str: string) => (
+      <SyntaxHighlighter
+        language="javascript"
+        style={theme === Theme.Dark ? vscDarkPlus : vs}
+      >
+        {str}
+      </SyntaxHighlighter>
+    ),
+    [theme]
   )
+
+  if (toolUse.name === "attempt_completion") {
+    return <AttemptCompletionCard />
+  }
 
   return (
     <div className={styles.toolCard}>
@@ -171,30 +173,29 @@ export const ToolCard: React.FC<ToolCardProps> = ({
         {showDiffViewer ? (
           <div className={styles.diffViewer}>
             {toolUse.name === "replace_in_file" && toolUse.params.diff ? (
-              <>
-                {parseDiffBlocks(toolUse.params.diff).map((block, index) => (
-                  <ReactDiffViewer
-                    key={index}
-                    oldValue={block.oldText}
-                    newValue={block.newText}
-                    splitView={false}
-                    useDarkTheme={true}
-                    compareMethod={DiffMethod.WORDS}
-                    renderContent={highlightSyntax}
-                    styles={diffViewerStyles}
-                    hideLineNumbers
-                    showDiffOnly
-                  />
-                ))}
-              </>
+              parseDiffBlocks(toolUse.params.diff).map((block, index) => (
+                <ReactDiffViewer
+                  key={index}
+                  oldValue={block.oldText}
+                  newValue={block.newText}
+                  splitView={false}
+                  useDarkTheme={theme === Theme.Dark}
+                  compareMethod={DiffMethod.WORDS}
+                  renderContent={highlightSyntax}
+                  styles={diffViewerStyles}
+                  hideLineNumbers
+                  showDiffOnly
+                />
+              ))
             ) : toolUse.name === "write_to_file" && toolUse.params.content ? (
               <ReactDiffViewer
                 oldValue=""
                 newValue={toolUse.params.content.trim()}
                 splitView={false}
-                useDarkTheme={true}
+                useDarkTheme={theme === Theme.Dark}
                 compareMethod={DiffMethod.WORDS}
                 renderContent={highlightSyntax}
+                styles={diffViewerStyles}
                 hideLineNumbers
                 showDiffOnly
               />
@@ -211,8 +212,8 @@ export const ToolCard: React.FC<ToolCardProps> = ({
           </div>
         )}
       </div>
-      {actionButtons}
-      {rawMessageSection}
+      <ActionButtons />
+      <RawMessageSection />
     </div>
   )
 }
