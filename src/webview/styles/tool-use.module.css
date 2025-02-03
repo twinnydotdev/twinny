@@ -1,0 +1,109 @@
+.toolUse {
+  border: 1px solid var(--vscode-editor-lineHighlightBorder);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 8px 0;
+  background-color: var(--vscode-editor-background);
+}
+
+.toolHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.toolName {
+  font-weight: bold;
+  color: var(--vscode-editor-foreground);
+  flex-shrink: 0;
+}
+
+.filePath {
+  color: var(--vscode-textLink-foreground);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-grow: 1;
+  cursor: pointer;
+}
+
+.toolParams {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toolFooter {
+  margin-bottom: 20px;
+}
+
+.toolFooter vscode-button {
+  margin-right: 5px;
+}
+
+.paramRow {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.paramName {
+  color: var(--vscode-textPreformat-foreground);
+  font-weight: bold;
+  min-width: 80px;
+}
+
+.paramValue {
+  color: var(--vscode-editor-foreground);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.diffViewer {
+  margin-top: 12px;
+  border: 1px solid var(--vscode-editor-lineHighlightBorder);
+  border-radius: 2px;
+}
+
+.diffViewer pre {
+  padding: 0 !important;
+  margin: 0 !important;
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 11pt !important;
+  background: none !important;
+}
+
+.diffViewer code {
+  font-size: 11pt !important;
+}
+
+.diffViewer :global(.diff-gutter) {
+  background-color: var(--vscode-editor-background);
+}
+
+.diffViewer :global(.diff-code) {
+  background-color: var(--vscode-editor-background);
+}
+
+.rawMessage {
+  margin: 10px 0;
+  font-size: 11px;
+  color: var(--vscode-editor-foreground);
+}
+
+.rawMessage summary {
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground);
+}
+
+.rawMessageActions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0;
+}

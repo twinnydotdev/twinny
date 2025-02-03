@@ -34,7 +34,7 @@ import {
   WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 import { CodeLanguageDetails } from "../common/languages"
-import { logger } from "../common/logger"
+import { Logger, logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   ChatCompletionMessage,
@@ -59,6 +59,8 @@ import {
   getLanguage,
   updateLoadingMessage
 } from "./utils"
+
+const log = Logger.getInstance()
 
 export class Chat extends Base {
   private _completion = ""
@@ -323,6 +325,8 @@ export class Chat extends Base {
 
     if (!this._tokenJs || this._isCancelled) return
 
+    log.log(JSON.stringify(requestBody, null, 2))
+
     try {
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
@@ -363,6 +367,8 @@ export class Chat extends Base {
     this._isCollectingFunctionArgs = false
 
     if (!this._tokenJs || this._isCancelled) return
+
+    log.log(JSON.stringify(requestBody, null, 2))
 
     try {
       const result = await this._tokenJs.chat.completions.create(requestBody)
@@ -531,6 +537,7 @@ export class Chat extends Base {
       this.context?.workspaceState.get<ContextFile[]>(
         WORKSPACE_STORAGE_KEY.contextFiles
       ) || []
+
     const allFilePaths = [...(filePaths || []), ...workspaceFiles]
 
     const fileContents = await this.loadFileContents(
@@ -538,6 +545,11 @@ export class Chat extends Base {
         (filepath) => !["workspace", "problems"].includes(filepath.name)
       )
     )
+
+    const files = await this._fileTreeProvider.listFilesAsString()
+
+    if (files) context += `<file_structure>\n\n${files}</file_structure>:\n\n`
+
     if (fileContents) context += `File Contents:\n${fileContents}\n\n`
 
     return context
@@ -563,7 +575,7 @@ export class Chat extends Base {
     })
     return conversation.map((m) => ({
       ...m,
-      content: m.content as string || ""
+      content: (m.content as string) || ""
     }))
   }
 
@@ -659,7 +671,6 @@ export class Chat extends Base {
     return this._conversation
   }
 
-
   public async completion(
     messages: ChatCompletionMessage[],
     filePaths?: FileItem[]
@@ -671,7 +682,6 @@ export class Chat extends Base {
     const editor = window.activeTextEditor
     const userSelection = editor?.document.getText(editor.selection)
     const lastMessage = messages[messages.length - 1]
-
 
     const systemPrompt = await this.getSystemPrompt()
     const systemMessage: ChatCompletionMessage = {

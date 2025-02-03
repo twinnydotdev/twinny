@@ -93,7 +93,9 @@ export const EVENT_NAME = {
   twinnyGetModels: "twinny-get-models",
   twinnyAddOpenFilesToContext: "twinny-add-open-file-to-context",
   twinnyGetContextFiles: "twinny-get-context-files",
-  twinnyRemoveContextFile: "twinny-remove-context-file"
+  twinnyRemoveContextFile: "twinny-remove-context-file",
+  twinnyAcceptToolUse: "twinny-accept-tool-use",
+  twinnyRejectToolUse: "twinny-reject-tool-use",
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -415,3 +417,60 @@ export const topLevelItems: FileItem[] = [
   { name: "workspace", path: "", category: "workspace" },
   { name: "problems", path: "", category: "problems" }
 ]
+
+export const diffViewerStyles = {
+  variables: {
+    light: {
+      diffViewerBackground: "#fff",
+      diffViewerColor: "#212529",
+      addedBackground: "#e6ffed",
+      addedColor: "#24292e",
+      removedBackground: "#ffeef0",
+      removedColor: "#24292e",
+      wordAddedBackground: "#acf2bd",
+      wordRemovedBackground: "#fdb8c0",
+      addedGutterBackground: "#cdffd8",
+      removedGutterBackground: "#ffdce0",
+      gutterBackground: "#f7f7f7",
+      gutterBackgroundDark: "#f3f1f1",
+      highlightBackground: "#fffbdd",
+      highlightGutterBackground: "#fff5b1",
+      codeFoldGutterBackground: "#dbedff",
+      codeFoldBackground: "#f1f8ff",
+      emptyLineBackground: "#fafbfc",
+      gutterColor: "#212529",
+      addedGutterColor: "#212529",
+      removedGutterColor: "#212529",
+      codeFoldContentColor: "#212529",
+      diffViewerTitleBackground: "#fafbfc",
+      diffViewerTitleColor: "#212529",
+      diffViewerTitleBorderColor: "#eee"
+    },
+    dark: {
+      diffViewerBackground: "#1e1e1e",
+      diffViewerColor: "#d4d4d4",
+      addedBackground: "#1C4532", // Darker but more visible green
+      addedColor: "#98FEB3", // Brighter green text
+      removedBackground: "#601B1F", // Darker but more visible red
+      removedColor: "#FFA3A3", // Brighter red text
+      wordAddedBackground: "#236E4A", // Slightly lighter green for word changes
+      wordRemovedBackground: "#8B3E44", // Slightly lighter red for word changes
+      addedGutterBackground: "#133926",
+      removedGutterBackground: "#4D1519",
+      gutterBackground: "#252526",
+      gutterBackgroundDark: "#1e1e1e",
+      highlightBackground: "#264f78",
+      highlightGutterBackground: "#2b2b2b",
+      codeFoldGutterBackground: "#333333",
+      codeFoldBackground: "#2d2d2d",
+      emptyLineBackground: "#1e1e1e",
+      gutterColor: "#858585",
+      addedGutterColor: "#7CCC7C", // More visible green
+      removedGutterColor: "#FF7B7B", // More visible red
+      codeFoldContentColor: "#cfcfcf",
+      diffViewerTitleBackground: "#2d2d2d",
+      diffViewerTitleColor: "#d4d4d4",
+      diffViewerTitleBorderColor: "#444444"
+    }
+  }
+}

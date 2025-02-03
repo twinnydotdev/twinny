@@ -3,9 +3,7 @@ import ignore, { Ignore } from "ignore"
 import * as path from "path"
 import * as vscode from "vscode"
 
-import {
-  getAllFilePaths,
-} from "./utils"
+import { getAllFilePaths } from "./utils"
 
 export class FileTreeProvider {
   private _ignoreRules: Ignore
@@ -44,6 +42,12 @@ export class FileTreeProvider {
     }
 
     return ig
+  }
+
+  async listFilesAsString() {
+    const allFiles = await getAllFilePaths(this._workspaceRoot)
+
+    return allFiles.join("\n")
   }
 
   private generateFileTree(dir: string, prefix = ""): string {

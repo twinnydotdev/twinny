@@ -34,6 +34,7 @@ import { GithubService as ReviewService } from "../review-service"
 import { SessionManager } from "../session-manager"
 import { SymmetryService } from "../symmetry-service"
 import { TemplateProvider } from "../template-provider"
+import { ToolHandler } from "../tool-handler"
 import { FileTreeProvider } from "../tree"
 import {
   createSymmetryMessage,
@@ -116,6 +117,8 @@ export class BaseProvider {
     )
 
     new ProviderManager(this.context, this.webView)
+
+    new ToolHandler(this.webView)
   }
 
   private registerEventListeners() {
@@ -277,7 +280,10 @@ export class BaseProvider {
   }
 
   private saveContextFiles = (files: ContextFile[]) => {
-    this.context?.workspaceState.update(WORKSPACE_STORAGE_KEY.contextFiles, files)
+    this.context?.workspaceState.update(
+      WORKSPACE_STORAGE_KEY.contextFiles,
+      files
+    )
   }
 
   private notifyWebView = (files: ContextFile[]) => {
@@ -405,7 +411,7 @@ export class BaseProvider {
       const messages = [
         systemMessage,
         ...(data.data as ChatCompletionMessage[])
-      ].map(m => ({
+      ].map((m) => ({
         ...m,
         content: m.content
       }))

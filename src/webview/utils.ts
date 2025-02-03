@@ -2,6 +2,10 @@ import { MentionPluginKey } from "@tiptap/extension-mention"
 import { Extension } from "@tiptap/react"
 
 import { CodeLanguage, supportedLanguages } from "../common/languages"
+import {
+  AssistantMessageContent,
+  parseAssistantMessage
+} from "../common/parse-assistant-message"
 import { LanguageType } from "../common/types"
 
 export const getLanguageMatch = (
@@ -55,7 +59,6 @@ export const getModelShortName = (name: string) => {
   return name
 }
 
-
 export const CustomKeyMap = Extension.create({
   name: "chatKeyMap",
 
@@ -77,16 +80,72 @@ export const CustomKeyMap = Extension.create({
       "Shift-Enter": ({ editor }) => {
         editor.commands.insertContent("\n")
         return true
-      },
+      }
     }
-  },
+  }
 })
 
-export const getThinkingMessage = (content: string): { thinking: string | null; message: string } => {
-  const thinkMatch = content.match(/<(?:think|thinking)>([\s\S]*?)(?:<\/(?:think|thinking)>|$)/);
-  if (!thinkMatch) return { thinking: null, message: content };
+export const getThinkingMessage = (content: string) => {
+  const contentBlocks = parseAssistantMessage(content)
+  console.log(contentBlocks)
+  const thinkingBlocks: string[] = []
+  const messageBlocks: AssistantMessageContent[] = []
 
-  const thinking = thinkMatch[1].trim();
-  const message = content.replace(/<(?:think|thinking)>[\s\S]*?(?:<\/(?:think|thinking)>|$)/, "").trim();
-  return { thinking, message };
-};
+  let isInThinking = false
+
+  for (const block of contentBlocks) {
+    if (block.type === "text") {
+      const lines = block.content.split("\n")
+      for (const line of lines) {
+        if (line.startsWith("<thinking>")) {
+          isInThinking = true
+          continue
+        }
+        if (line.startsWith("</thinking>")) {
+          isInThinking = false
+          continue
+        }
+        if (isInThinking) {
+          thinkingBlocks.push(line)
+        } else if (line.trim()) {
+          messageBlocks.push({ type: "text", content: line, partial: false })
+        }
+      }
+    } else {
+      messageBlocks.push(block)
+    }
+  }
+
+  return {
+    thinking: thinkingBlocks.join("\n"),
+    messageBlocks,
+    message: messageBlocks
+      .map((block) => {
+        if (block.type === "text") {
+          return block.content
+        }
+        return ""
+      })
+      .join("\n")
+  }
+}
+
+export const parseDiffBlocks = (diffContent: string) => {
+  const regex =
+    /<<<<<<< (?:SEARCH\n)?([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
+  let match
+  const blocks: { oldText: string; newText: string }[] = []
+
+  while ((match = regex.exec(diffContent)) !== null) {
+    blocks.push({
+      oldText: match[1].trim(),
+      newText: match[2].trim()
+    })
+  }
+
+  if (blocks.length === 0) {
+    blocks.push({ oldText: diffContent, newText: diffContent })
+  }
+
+  return blocks
+}
