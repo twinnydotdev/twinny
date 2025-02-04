@@ -8,13 +8,12 @@ export interface TextContent {
 
 export const toolUseNames = [
   "execute_command",
-  "read_file",
+  "read_files",
   "write_to_file",
   "replace_in_file",
   "search_files",
   "list_files",
   "list_code_definition_names",
-  "browser_action",
   "ask_followup_question",
   "plan_mode_response",
   "attempt_completion"
@@ -27,6 +26,7 @@ export const toolParamNames = [
   "command",
   "requires_approval",
   "path",
+  "paths",
   "content",
   "diff",
   "regex",
@@ -70,9 +70,9 @@ export interface ExecuteCommandToolUse extends ToolUse {
   >
 }
 
-export interface ReadFileToolUse extends ToolUse {
-  name: "read_file"
-  params: Partial<Pick<Record<ToolParamName, string>, "path">>
+export interface ReadFilesToolUse extends ToolUse {
+  name: "read_files"
+  params: Partial<Pick<Record<ToolParamName, string>, "paths">>
 }
 
 export interface WriteToFileToolUse extends ToolUse {
@@ -100,16 +100,6 @@ export interface ListFilesToolUse extends ToolUse {
 export interface ListCodeDefinitionNamesToolUse extends ToolUse {
   name: "list_code_definition_names"
   params: Partial<Pick<Record<ToolParamName, string>, "path">>
-}
-
-export interface BrowserActionToolUse extends ToolUse {
-  name: "browser_action"
-  params: Partial<
-    Pick<
-      Record<ToolParamName, string>,
-      "action" | "url" | "coordinate" | "text"
-    >
-  >
 }
 
 export interface AskFollowupQuestionToolUse extends ToolUse {

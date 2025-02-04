@@ -1,6 +1,8 @@
 import * as fs from "fs"
 import * as Handlebars from "handlebars"
+import * as os from "os"
 import * as path from "path"
+import { workspace } from "vscode"
 
 import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from "../common/constants"
 
@@ -49,28 +51,21 @@ export class TemplateProvider {
     }
   }
 
-  public readSystemMessageTemplate(templateName?: string) {
-    const defaultPath = `${this._basePath}/system.hbs`
-
-    /* allow custom system messages, per templated task */
-    const templatePrefix = templateName ? `${templateName}-` : ""
-    const templatePath = `${this._basePath}/${templatePrefix}system.hbs`
-
-    const path = fs.existsSync(templatePath) ? templatePath : defaultPath
+  public async readSystemMessageTemplate(agent?: boolean) {
     try {
-      return new Promise<string>((resolve, reject) => {
-        fs.readFile(
-          path,
-          { encoding: "utf-8" },
-          (err, templateString: string) => {
-            if (err) return reject(err)
-            resolve(templateString)
-          }
-        )
+      const systemTemplateName = "system"
+      const template =
+        agent ? `agent-${systemTemplateName}` : systemTemplateName
+
+      return await this.readTemplate(template, {
+        cwd: workspace.workspaceFolders?.[0].uri.fsPath,
+        defaultShell: os.userInfo().shell,
+        osName: os.platform(),
+        homedir: os.homedir()
       })
-    } catch {
-      console.log(`Problem reading template "${path}`)
-      return Promise.reject()
+    } catch (error) {
+      console.error(`Problem reading system template: ${error}`)
+      return Promise.reject(error)
     }
   }
 
@@ -119,18 +114,12 @@ export class TemplateProvider {
     return templateNames
   }
 
-  public async readTemplate<T>(
-    templateName: string,
-    data: T
-  ) {
+  public async readTemplate<T>(templateName: string, data: T) {
     try {
       const template: HandlebarsTemplateDelegate<T> =
         await this.compileTemplateFromFile(templateName)
 
-      const result = template({
-        ...data,
-        systemMessage: await this.readSystemMessageTemplate(templateName),
-      })
+      const result = template(data)
       return result
     } catch (error) {
       console.error("Error rendering the template:", error)

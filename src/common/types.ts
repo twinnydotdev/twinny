@@ -4,6 +4,7 @@ import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
 import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
+import { ToolUse } from "./parse-assistant-message"
 
 export interface RequestBodyBase {
   stream: boolean
@@ -345,4 +346,36 @@ export interface ContextFile {
   name: string;
   path: string;
   category: "files";
+}
+
+
+export interface ReplaceInFileToolUse extends ToolUse {
+  name: "replace_in_file"
+  params: {
+    path?: string
+    diff?: string
+    fuzzyThreshold?: number
+  }
+}
+
+export interface ListCodeDefinitionNamesToolUse extends ToolUse {
+  name: "list_code_definition_names"
+  params: {
+    path?: string
+  }
+}
+
+export interface ExecuteCommandToolUse extends ToolUse {
+  name: "execute_command"
+  params: {
+    command: string
+  }
+}
+
+export interface WriteToFileToolUse extends ToolUse {
+  name: "write_to_file"
+  params: {
+    path: string
+    content: string
+  }
 }

@@ -125,6 +125,7 @@
   "toggle-defaults": "View default configuration",
   "toggle-embedding-options": "Toggle embedding options on/off",
   "toggle-provider-selection": "Toggle provider selection",
+  "read_files": "Read files",
   "tools": "Tools",
   "type": "Type",
   "write_to_file": "Write to File"

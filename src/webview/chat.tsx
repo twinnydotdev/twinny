@@ -22,6 +22,7 @@ import {
   ServerMessage
 } from "../common/types"
 
+import { ModeToggle } from "./components/mode-toggle"
 import {
   useAutosizeTextArea,
   useConversationHistory,
@@ -127,6 +128,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
     switch (message.type) {
       case EVENT_NAME.twinnyAddMessage: {
         handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
+        break
+      }
+      case EVENT_NAME.twinnyToolUseResult: {
+        const { name, result } = event.data
+        handleAddMessage({
+          data: {
+            content: `${name} ${result}`
+          }
+        } as ServerMessage<ChatCompletionMessage>)
         break
       }
       case EVENT_NAME.twinnyOnCompletion: {
@@ -539,6 +549,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
             )}
           </div>
           <div>
+            <ModeToggle />
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
             {!!symmetryConnection && (
               <VSCodeBadge

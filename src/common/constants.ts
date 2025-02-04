@@ -97,6 +97,7 @@ export const EVENT_NAME = {
   twinnyAcceptToolUse: "twinny-accept-tool-use",
   twinnyRejectToolUse: "twinny-reject-tool-use",
   twinnyToolUseResult:  "twinny-tool-use-result",
+  twinnyReadFiles: "twinny-read-files"
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -183,6 +184,8 @@ export const ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY =
 export const ACTIVE_FIM_PROVIDER_STORAGE_KEY = "twinny.active-fim-provider"
 export const CONVERSATION_STORAGE_KEY = "twinny.conversations"
 export const INFERENCE_PROVIDERS_STORAGE_KEY = "twinny.inference-providers"
+export const AGENT_STORAGE_KEY = "twinny.agent"
+
 
 export const GLOBAL_STORAGE_KEY = {
   autoConnectSymmetryProvider: "twinny.autoConnectSymmetryProvider",
@@ -223,7 +226,8 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyRerankThreshold: "twinnyRerankThreshold",
   twinnyReviewTab: "twinnyReviewTab",
   twinnySymmetryTab: "twinnySymmetryTab",
-  twinnyEmbeddingsTab: "twinnyEmbeddingsTab"
+  twinnyEmbeddingsTab: "twinnyEmbeddingsTab",
+  twinnyMode: "twinnyMode",
 }
 
 export const EXTENSION_SESSION_NAME = {

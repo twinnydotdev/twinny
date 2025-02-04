@@ -87,7 +87,6 @@ export const CustomKeyMap = Extension.create({
 
 export const getThinkingMessage = (content: string) => {
   const contentBlocks = parseAssistantMessage(content)
-  console.log(contentBlocks)
   const thinkingBlocks: string[] = []
   const messageBlocks: AssistantMessageContent[] = []
 

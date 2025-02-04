@@ -1,0 +1,93 @@
+.toggleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0;
+  padding: 0 8px;
+}
+
+.modeLabel {
+  font-size: 10px;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+}
+
+.toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+  width: 40px;
+  height: 20px;
+  position: relative;
+}
+
+.track {
+  position: relative;
+  border-radius: 10px;
+  background: var(--vscode-badge-background);
+  height: 100%;
+  width: 100%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.thumb {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.thumb.active {
+  transform: translateX(20px);
+  background: #ffffff;
+}
+
+.track.active {
+  background: var(--button-primary-background);
+}
+
+.agentOnIcon,
+.agentOffIcon {
+  font-size: 14px;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.toggle:hover .track {
+  background: var(--button-primary-background);
+}
+
+.toggle:focus-visible .track {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.thumb.active + .icons .agentOffIcon {
+  opacity: 0.4;
+}
+
+.thumb:not(.active) + .icons .agentOnIcon {
+  opacity: 0.4;
+}
+
+.toggle:active .thumb {
+  transform: scale(0.9) translateX(20px);
+}
+
+.toggle:active .thumb:not(.active) {
+  transform: scale(0.9);
+}
+
+.icons .codicon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

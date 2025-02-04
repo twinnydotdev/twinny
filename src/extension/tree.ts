@@ -44,21 +44,25 @@ export class FileTreeProvider {
     return ig
   }
 
-  async listFilesAsString() {
-    const allFiles = await getAllFilePaths(this._workspaceRoot)
-    const visibleFiles = await this.getVisibleFiles()
-    const openTabs = await this.getOpenTabs()
+  async getEnvironmentDetails() {
+    try {
+      const allFiles = await getAllFilePaths(this._workspaceRoot)
+      const visibleFiles = await this.getVisibleFiles()
+      const openTabs = await this.getOpenTabs()
 
-    let output = "<environment_details>\n"
-    output += "# VSCode Visible Files\n"
-    output += visibleFiles.join("\n") + "\n"
-    output += "# VSCode Open Tabs\n"
-    output += openTabs.join("\n") + "\n"
-    output += "# All Files\n"
-    output += allFiles.join("\n")
-    output += "</environment_details>"
+      let output = "<environment_details>\n"
+      output += "# VSCode Visible Files\n"
+      output += visibleFiles.join("\n") + "\n"
+      output += "# VSCode Open Tabs\n"
+      output += openTabs.join("\n") + "\n"
+      output += "# All Files\n"
+      output += allFiles.join("\n")
+      output += "</environment_details>"
 
-    return output
+      return output
+    } catch {
+      return ""
+    }
   }
 
   private async getVisibleFiles(): Promise<string[]> {

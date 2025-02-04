@@ -138,13 +138,3 @@
   justify-content: flex-end;
   margin-top: 8px;
 }
-
-.successCard {
-  color: var(--vscode-editor-background);
-}
-
-.successCard .toolName,
-.successCard .paramName,
-.successCard .paramValue {
-  color: var(--vscode-editor-background);
-}

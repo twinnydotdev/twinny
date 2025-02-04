@@ -1,12 +1,11 @@
 import * as fs from "fs/promises"
-import * as os from "os"
 import * as path from "path"
-import { CompletionResponseChunk, TokenJS } from "token.js"
 import {
   CompletionNonStreaming,
   CompletionStreaming,
   LLMProvider
 } from "token.js/dist/chat"
+import { CompletionResponseChunk, TokenJS } from "twinny-token.js"
 import {
   commands,
   DiagnosticSeverity,
@@ -37,6 +36,10 @@ import { CodeLanguageDetails } from "../common/languages"
 import { Logger, logger } from "../common/logger"
 import { models } from "../common/models"
 import {
+  parseAssistantMessage,
+  ToolUse
+} from "../common/parse-assistant-message"
+import {
   ChatCompletionMessage,
   ContextFile,
   FileItem,
@@ -53,6 +56,7 @@ import { Reranker } from "./reranker"
 import { SessionManager } from "./session-manager"
 import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
+import { ToolHandler } from "./tool-handler"
 import { FileTreeProvider } from "./tree"
 import {
   getIsOpenAICompatible,
@@ -83,6 +87,16 @@ export class Chat extends Base {
   private _webView?: Webview
   private _isCancelled = false
   private _fileHandler: FileHandler
+  private _toolHandler: ToolHandler
+
+  private resetState() {
+    this._completion = ""
+    this._functionArguments = ""
+    this._functionName = ""
+    this._functionId = ""
+    this._isCollectingFunctionArgs = false
+    this._isCancelled = false
+  }
 
   constructor(
     statusBar: StatusBarItem,
@@ -102,6 +116,7 @@ export class Chat extends Base {
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this._fileHandler = new FileHandler(webView)
+    this._toolHandler = new ToolHandler(this._webView)
     this.setupSymmetryListeners()
   }
 
@@ -270,17 +285,141 @@ export class Chat extends Base {
 
       if (delta?.content) {
         this._completion += delta.content
-        await this._webView?.postMessage({
-          type: EVENT_NAME.twinnyOnCompletion,
-          data: {
-            content: this._completion.trimStart() || " ",
-            role: ASSISTANT
-          }
-        } as ServerMessage<ChatCompletionMessage>)
+
+        if (this.hasOpenToolTag() && !this.hasClosedToolTag()) {
+          return
+        }
+
+        // Parse the completion to check for tool use
+        const parsedBlocks = parseAssistantMessage(this._completion)
+        const toolBlock = parsedBlocks.find(
+          (block) =>
+            block.type === "tool_use" &&
+            [
+              "execute_command",
+              "read_files",
+              "list_files",
+              "list_code_definition_names",
+              "search_files"
+            ].includes(block.name)
+        )
+
+        if (toolBlock?.type === "tool_use") {
+          this.abort()
+          await this.handleToolUse(toolBlock)
+          return
+        }
+
+        await this.updateWebView()
       }
     } catch (error) {
       console.error("Error processing stream part:", error)
     }
+  }
+
+  private hasOpenToolTag(): boolean {
+    const toolTags = [
+      "execute_command",
+      "read_files",
+      "list_files",
+      "list_code_definition_names",
+      "search_files"
+    ]
+    return toolTags.some((tag) => this._completion.includes(`<${tag}>`))
+  }
+
+  private hasClosedToolTag(): boolean {
+    const toolTags = [
+      "execute_command",
+      "read_files",
+      "list_files",
+      "list_code_definition_names",
+      "search_files"
+    ]
+    return toolTags.some((tag) => this._completion.includes(`</${tag}>`))
+  }
+
+  private async handleToolUse(toolBlock: ToolUse) {
+    await this.addMessageToConversation()
+    await this.notifyWebView()
+    this._completion = ""
+
+    try {
+      const toolResult = await this._toolHandler.handleAcceptToolUse({
+        data: toolBlock,
+        type: toolBlock.type
+      })
+
+      this.addToolResultToConversation(toolResult)
+      await this.continueConversation()
+    } catch (error) {
+      console.error("Error handling tool use:", error)
+      // Add error message to conversation
+      this._webView?.postMessage({
+        type: EVENT_NAME.twinnyAddMessage,
+        data: {
+          content: error instanceof Error ? error.message : String(error),
+          role: ASSISTANT
+        }
+      } as ServerMessage<ChatCompletionMessage>)
+    }
+  }
+
+  private async addMessageToConversation() {
+    this._conversation.push({
+      role: ASSISTANT,
+      content: this._completion.trim()
+    })
+  }
+
+  private async notifyWebView() {
+    await this._webView?.postMessage({
+      type: EVENT_NAME.twinnyAddMessage,
+      data: {
+        content: this._completion.trim(),
+        role: ASSISTANT
+      }
+    } as ServerMessage<ChatCompletionMessage>)
+
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyStopGeneration
+    } as ServerMessage<ChatCompletionMessage>)
+  }
+
+  private addToolResultToConversation(toolResult: string) {
+    this._conversation.push({
+      role: USER,
+      content: toolResult
+    })
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyAddMessage,
+      data: {
+        role: USER,
+        content: toolResult
+      }
+    } as ServerMessage<ChatCompletionMessage>)
+  }
+
+  private async continueConversation() {
+    const provider = this.getProvider()
+    if (provider) {
+      this.setupTokenJS(provider)
+      if (this.shouldUseStreaming(provider)) {
+        await this.llmStream(this.getStreamOptions(provider))
+      } else {
+        await this.llmNoStream(this.getNoStreamOptions(provider))
+      }
+    }
+  }
+
+  private async updateWebView() {
+    await this._webView?.postMessage({
+      type: EVENT_NAME.twinnyOnCompletion,
+      data: {
+        content: this._completion.trimStart() || " ",
+        role: ASSISTANT
+      }
+    } as ServerMessage<ChatCompletionMessage>)
   }
 
   public abort = () => {
@@ -292,6 +431,9 @@ export class Chat extends Base {
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyStopGeneration
+    } as ServerMessage<ChatCompletionMessage>)
   }
 
   private buildTemplatePrompt = async (
@@ -359,12 +501,8 @@ export class Chat extends Base {
 
   private async llmStream(requestBody: CompletionStreaming<LLMProvider>) {
     this._controller = new AbortController()
-
+    this.resetState()
     this._lastStreamingRequest = requestBody
-    this._completion = ""
-    this._functionArguments = ""
-    this._functionName = ""
-    this._isCollectingFunctionArgs = false
 
     if (!this._tokenJs || this._isCancelled) return
 
@@ -374,6 +512,8 @@ export class Chat extends Base {
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
       for await (const part of result) {
+        this._controller = new AbortController()
+
         if (this._controller?.signal.aborted) {
           break
         }
@@ -514,14 +654,8 @@ export class Chat extends Base {
   }
 
   private async getSystemPrompt(): Promise<string> {
-    return (
-      (await this._templateProvider?.readTemplate<TemplateData>("system", {
-        cwd: workspace.workspaceFolders?.[0].uri.fsPath,
-        defaultShell: os.userInfo().shell,
-        osName: os.platform(),
-        homedir: os.homedir()
-      })) || ""
-    )
+    const mode = this.getIsTwinnyAgent()
+    return (await this._templateProvider?.readSystemMessageTemplate(mode)) || ""
   }
 
   private async buildAdditionalContext(
@@ -529,6 +663,7 @@ export class Chat extends Base {
     text: string,
     filePaths?: FileItem[]
   ): Promise<string> {
+    const agent = this.getIsTwinnyAgent()
     let context = userSelection ? `Selected Code:\n${userSelection}\n\n` : ""
     const ragContext = await this.getRagContext(text)
     if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
@@ -546,9 +681,11 @@ export class Chat extends Base {
       )
     )
 
-    const files = await this._fileTreeProvider.listFilesAsString()
-
-    if (files) context += `<file_structure>\n\n${files}</file_structure>:\n\n`
+    if (agent) {
+      const environmentDetails =
+        await this._fileTreeProvider.getEnvironmentDetails()
+      context += environmentDetails
+    }
 
     if (fileContents) context += `File Contents:\n${fileContents}\n\n`
 
@@ -558,7 +695,12 @@ export class Chat extends Base {
   private setupTokenJS(provider: TwinnyProvider) {
     this._tokenJs = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
-      apiKey: provider.apiKey
+      apiKey: provider.apiKey,
+      anthropic: {
+        caching: {
+          systemMessage: true,
+        }
+      }
     })
   }
 

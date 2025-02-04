@@ -63,6 +63,13 @@ export const ToolCard: React.FC<ToolCardProps> = ({
     })
   }, [])
 
+  const handleReadFiles = useCallback(() => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyReadFiles,
+      data: toolUse.params
+    })
+  }, [toolUse])
+
   const RawMessageSection = () => (
     <div className={styles.rawMessage}>
       <details>
@@ -121,6 +128,14 @@ export const ToolCard: React.FC<ToolCardProps> = ({
         <div className={styles.toolFooter}>
           <VSCodeButton appearance="primary" onClick={handleRun}>
             {t("run-command")}
+          </VSCodeButton>
+        </div>
+      )
+    } else if (toolUse.name === "read_files") {
+      return (
+        <div className={styles.toolFooter}>
+          <VSCodeButton appearance="primary" onClick={handleReadFiles}>
+            {t("Read file")}
           </VSCodeButton>
         </div>
       )

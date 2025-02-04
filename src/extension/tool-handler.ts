@@ -6,43 +6,18 @@ import * as vscode from "vscode"
 import Parser from "web-tree-sitter"
 
 import { EVENT_NAME } from "../common/constants"
-import { ToolUse } from "../common/parse-assistant-message"
+import {
+  ExecuteCommandToolUse,
+  ListCodeDefinitionNamesToolUse,
+  ReplaceInFileToolUse,
+  ToolUse,
+  WriteToFileToolUse
+} from "../common/parse-assistant-message"
 import { ServerMessage } from "../common/types"
 
 import { getParser } from "./parser"
 
-interface ReplaceInFileToolUse extends ToolUse {
-  name: "replace_in_file"
-  params: {
-    path?: string
-    diff?: string
-    fuzzyThreshold?: number
-  }
-}
-
-interface ListCodeDefinitionNamesToolUse extends ToolUse {
-  name: "list_code_definition_names"
-  params: {
-    path?: string
-  }
-}
-
-interface ExecuteCommandToolUse extends ToolUse {
-  name: "execute_command"
-  params: {
-    command: string
-  }
-}
-
-interface WriteToFileToolUse extends ToolUse {
-  name: "write_to_file"
-  params: {
-    path: string
-    content: string
-  }
-}
-
-const DEFAULT_FUZZY_THRESHOLD = 0.9 // 90% similarity required by default
+const DEFAULT_FUZZY_THRESHOLD = 0.9
 
 function getSimilarity(original: string, search: string): number {
   if (search === "") return 1
@@ -68,37 +43,32 @@ export class ToolHandler {
   }
 
   private async handleReplaceInFile(toolUse: ReplaceInFileToolUse) {
-    const {
-      path,
-      diff,
-      fuzzyThreshold = DEFAULT_FUZZY_THRESHOLD
-    } = toolUse.params
+    const { path, diff } = toolUse.params
 
     if (!path || !diff) {
-      vscode.window.showErrorMessage(
-        "Missing required parameters for replace_in_file"
-      )
+      vscode.window.showErrorMessage("Missing required parameters for replace_in_file")
       return
     }
 
     try {
-      // Get the workspace folder
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
         vscode.window.showErrorMessage("No workspace folder open")
         return
       }
 
-      // Get the full file path
       const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path)
 
-      // Read the file content
-      const document = await vscode.workspace.openTextDocument(fullPath)
-      let content = document.getText()
+      // Create directory structure if it doesn't exist
+      const dirUri = vscode.Uri.joinPath(fullPath, "..")
+      try {
+        await vscode.workspace.fs.createDirectory(dirUri)
+      } catch {
+        // Ignore if directory already exists
+      }
 
-      // Find all diff blocks using regex
-      const diffBlockRegex =
-        /<<<<<<< SEARCH\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
+      // Modified regex to handle empty search content
+      const diffBlockRegex = /<<<<<<< SEARCH\n?([\s\S]*?)\n?=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
       const diffBlocks = Array.from(diff.matchAll(diffBlockRegex))
 
       if (diffBlocks.length === 0) {
@@ -106,8 +76,25 @@ export class ToolHandler {
         return
       }
 
+      let content: string
+      let isNewFile = false
+      try {
+        const document = await vscode.workspace.openTextDocument(fullPath)
+        content = document.getText()
+      } catch {
+        // File doesn't exist, mark as new file
+        isNewFile = true
+        content = ""
+      }
+
       // Process each diff block
       for (const [, searchContent, replaceContent] of diffBlocks) {
+        // If file is new or search content is empty, just use replace content
+        if (isNewFile || !searchContent.trim()) {
+          content = replaceContent
+          continue
+        }
+
         // Split content into lines for line-by-line comparison
         const searchLines = searchContent.split("\n")
         const contentLines = content.split("\n")
@@ -131,11 +118,11 @@ export class ToolHandler {
         }
 
         // If no match meets the threshold, show warning and continue to next block
-        if (bestMatchScore < fuzzyThreshold) {
+        if (bestMatchScore < DEFAULT_FUZZY_THRESHOLD) {
           vscode.window.showWarningMessage(
             `Skipping block - No sufficiently similar match found (${Math.floor(
               bestMatchScore * 100
-            )}% similar, needs ${Math.floor(fuzzyThreshold * 100)}%)`
+            )}% similar, needs ${Math.floor(DEFAULT_FUZZY_THRESHOLD * 100)}%)`
           )
           continue
         }
@@ -147,8 +134,7 @@ export class ToolHandler {
         }
 
         // Preserve indentation of the first line
-        const originalIndent =
-          contentLines[bestMatchStart].match(/^[\t ]*/)?.[0] || ""
+        const originalIndent = contentLines[bestMatchStart].match(/^[\t ]*/)?.[0] || ""
         const replaceLines = replaceContent.split("\n")
         const indentedReplaceContent = replaceLines
           .map((line, i) => (i === 0 ? line : originalIndent + line))
@@ -159,78 +145,81 @@ export class ToolHandler {
           content.substring(0, matchPosition) +
           indentedReplaceContent +
           content.substring(matchPosition + bestMatchLength)
+      }
+
+      // Write the final content
+      if (isNewFile) {
+        await vscode.workspace.fs.writeFile(fullPath, Buffer.from(content))
+        vscode.window.showInformationMessage("Successfully created new file with content")
+      } else {
+        const document = await vscode.workspace.openTextDocument(fullPath)
+        const edit = new vscode.WorkspaceEdit()
+        edit.replace(
+          fullPath,
+          new vscode.Range(
+            document.positionAt(0),
+            document.positionAt(document.getText().length)
+          ),
+          content
+        )
+
+        const success = await vscode.workspace.applyEdit(edit)
+        if (!success) {
+          vscode.window.showErrorMessage("Failed to apply edits")
+          return
+        }
 
         vscode.window.showInformationMessage(
-          `Applied change block (${Math.floor(bestMatchScore * 100)}% match)`
+          `Successfully applied all changes (${diffBlocks.length} blocks)`
         )
       }
-
-      // Create and apply the final edit
-      const edit = new vscode.WorkspaceEdit()
-      edit.replace(
-        fullPath,
-        new vscode.Range(
-          document.positionAt(0),
-          document.positionAt(document.getText().length)
-        ),
-        content
-      )
-
-      const success = await vscode.workspace.applyEdit(edit)
-      if (!success) {
-        vscode.window.showErrorMessage("Failed to apply edits")
-        return
-      }
-
-      vscode.window.showInformationMessage(
-        `Successfully applied all changes (${diffBlocks.length} blocks)`
-      )
     } catch (error) {
       vscode.window.showErrorMessage(`Error applying changes: ${error}`)
     }
   }
 
-  private async handleAcceptToolUse(message: ServerMessage<ToolUse>) {
+  public async handleAcceptToolUse(message: ServerMessage<ToolUse>): Promise<string> {
     const toolUse = message.data
-    if (!toolUse) return
+    if (!toolUse) return ""
 
     switch (toolUse.name) {
       case "replace_in_file":
         await this.handleReplaceInFile(toolUse as ReplaceInFileToolUse)
         // Save the file after applying changes
-        await this.openAndSaveFile(toolUse.params.path)
-        break
+        return await this.openAndSaveFile(toolUse.params.path)
       case "list_code_definition_names":
-        await this.handleListCodeDefinitionNames(
+        return await this.handleListCodeDefinitionNames(
           toolUse as ListCodeDefinitionNamesToolUse
         )
-        break
+      case "read_files": {
+        const paths = toolUse.params.paths?.split(",")
+        return await this.handleReadFiles(paths)
+      }
       case "execute_command":
-        await this.handleExecuteCommand(toolUse as ExecuteCommandToolUse)
-        break
+        return await this.handleExecuteCommand(toolUse as ExecuteCommandToolUse)
       case "write_to_file":
-        await this.handleWriteToFile(toolUse as WriteToFileToolUse)
-        break
+        return await this.handleWriteToFile(toolUse as WriteToFileToolUse)
       default:
         vscode.window.showErrorMessage(`Unsupported tool: ${toolUse.name}`)
+        return ""
     }
   }
 
-  private async handleWriteToFile(toolUse: WriteToFileToolUse) {
+  private async handleWriteToFile(toolUse: WriteToFileToolUse): Promise<string>  {
     const { path, content } = toolUse.params
 
     if (!path || content === undefined) {
       vscode.window.showErrorMessage(
         "Missing required parameters for write_to_file"
       )
-      return
+      return "Missing required parameters for write_to_file"
     }
 
     try {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
         vscode.window.showErrorMessage("No workspace folder open")
-        return
+        return "No workspace folder open"
       }
 
       const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path)
@@ -239,27 +228,21 @@ export class ToolHandler {
 
       vscode.window.showInformationMessage(`File written successfully: ${path}`)
 
-      // Send the result back to the webview
-      this._webview.postMessage({
-        type: EVENT_NAME.twinnyToolUseResult,
-        data: {
-          name: "write_to_file",
-          result: `File written successfully: ${path}`
-        }
-      })
+      return `File written successfully: ${path}`
     } catch (error) {
       vscode.window.showErrorMessage(`Error writing file: ${error}`)
+      return `Error writing file: ${error}`
     }
   }
 
-  private async handleExecuteCommand(toolUse: ExecuteCommandToolUse) {
+  private async handleExecuteCommand(toolUse: ExecuteCommandToolUse): Promise<string> {
     const { command } = toolUse.params
 
     if (!command) {
       vscode.window.showErrorMessage(
         "Missing required parameter 'command' for execute_command"
       )
-      return
+      return ""
     }
 
     try {
@@ -285,36 +268,30 @@ export class ToolHandler {
         `Command executed successfully: ${command}`
       )
 
-      // Send the result back to the webview
-      this._webview.postMessage({
-        type: EVENT_NAME.twinnyToolUseResult,
-        data: {
-          name: "execute_command",
-          result: result
-        }
-      })
+      return `Command executed successfully: ${command} : ${result}`
     } catch (error) {
       vscode.window.showErrorMessage(`Error executing command: ${error}`)
+      return ""
     }
   }
 
   private async handleListCodeDefinitionNames(
     toolUse: ListCodeDefinitionNamesToolUse
-  ) {
+  ): Promise<string>  {
     const { path: directoryPath } = toolUse.params
 
     if (!directoryPath) {
       vscode.window.showErrorMessage(
         "Missing required parameter 'path' for list_code_definition_names"
       )
-      return
+      return "Missing required parameter 'path' for list_code_definition_names"
     }
 
     try {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
         vscode.window.showErrorMessage("No workspace folder open")
-        return
+        return "No workspace folder open"
       }
 
       const fullPath = vscode.Uri.joinPath(
@@ -323,16 +300,10 @@ export class ToolHandler {
       ).fsPath
       const definitions = await this.getCodeDefinitions(fullPath)
 
-      // Send the result back to the webview
-      this._webview.postMessage({
-        type: EVENT_NAME.twinnyToolUseResult,
-        data: {
-          name: "list_code_definition_names",
-          result: definitions.join("\n")
-        }
-      })
+      return definitions.join("\n")
     } catch (error) {
       vscode.window.showErrorMessage(`Error listing code definitions: ${error}`)
+      return `Error listing code definitions: ${error}`
     }
   }
 
@@ -405,17 +376,17 @@ export class ToolHandler {
     return nameNode ? nameNode.text : null
   }
 
-  private async openAndSaveFile(path?: string) {
+  private async openAndSaveFile(path?: string): Promise<string> {
     if (!path) {
       vscode.window.showErrorMessage("No file path provided for saving")
-      return
+      return "No file path provided for saving"
     }
 
     try {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
         vscode.window.showErrorMessage("No workspace folder open")
-        return
+        return "No workspace folder open"
       }
 
       const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path)
@@ -424,8 +395,36 @@ export class ToolHandler {
       await vscode.window.showTextDocument(document, { preview: false })
       await document.save()
       vscode.window.showInformationMessage(`File saved: ${path}`)
+      return `File saved ${path}`
     } catch (error) {
       vscode.window.showErrorMessage(`Error saving file: ${error}`)
+      return `Error saving file: ${error}`
+    }
+  }
+
+  private async handleReadFiles(paths: string[] | undefined): Promise<string> {
+    try {
+      if (!paths?.length) return "No files provided for reading"
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("No workspace folder open")
+        return "No workspace folder open"
+      }
+
+      const results = await Promise.all(
+        paths.map(async (path) => {
+          const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path)
+          const content = await vscode.workspace.fs.readFile(fullPath)
+          return `<file_content>${path}\n${Buffer.from(content).toString(
+            "utf8"
+          )}</file_content>`
+        })
+      )
+
+      return results.join("\n")
+    } catch (error) {
+      vscode.window.showErrorMessage(`Error reading files: ${error}`)
+      return `Error reading files: ${error}`
     }
   }
 

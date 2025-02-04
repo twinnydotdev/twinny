@@ -3,8 +3,9 @@ import * as vscode from "vscode"
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
-  ACTIVE_FIM_PROVIDER_STORAGE_KEY
-} from "../common/constants"
+  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+  AGENT_STORAGE_KEY,
+  EVENT_NAME} from "../common/constants"
 
 import { TwinnyProvider } from "./provider-manager"
 import { getIsOpenAICompatible } from "./utils"
@@ -30,6 +31,14 @@ export class Base {
     )
     return provider
   }
+
+  public getIsTwinnyAgent = () => {
+    const mode = this.context?.globalState.get<boolean>(
+      `${EVENT_NAME.twinnyGlobalContext}-${AGENT_STORAGE_KEY}`
+    )
+    return mode
+  }
+
 
   public getProviderBaseUrl = (provider: TwinnyProvider) => {
     if (getIsOpenAICompatible(provider)) {

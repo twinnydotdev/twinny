@@ -556,7 +556,7 @@ export class CompletionProvider
 
     if (this._provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
       const systemMessage =
-        await this._templateProvider.readSystemMessageTemplate("fim-system.hbs")
+        await this._templateProvider.readTemplate("fim-system", {})
 
       const fimTemplate =
         await this._templateProvider.readTemplate<FimTemplateData>("fim", {
