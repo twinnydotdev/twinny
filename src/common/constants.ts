@@ -96,6 +96,7 @@ export const EVENT_NAME = {
   twinnyRemoveContextFile: "twinny-remove-context-file",
   twinnyAcceptToolUse: "twinny-accept-tool-use",
   twinnyRejectToolUse: "twinny-reject-tool-use",
+  twinnyRunToolUse: "twinny-run-tool-use",
   twinnyToolUseResult:  "twinny-tool-use-result",
   twinnyReadFiles: "twinny-read-files"
 }

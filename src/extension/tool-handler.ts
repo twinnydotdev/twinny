@@ -15,6 +15,7 @@ import {
 } from "../common/parse-assistant-message"
 import { ServerMessage } from "../common/types"
 
+import { Base } from "./base"
 import { getParser } from "./parser"
 
 const DEFAULT_FUZZY_THRESHOLD = 0.9
@@ -37,8 +38,12 @@ function getSimilarity(original: string, search: string): number {
   return 1 - dist / maxLength
 }
 
-export class ToolHandler {
-  constructor(private readonly _webview: vscode.Webview) {
+export class ToolHandler extends Base {
+  constructor(
+    context: vscode.ExtensionContext,
+    private readonly _webview: vscode.Webview
+  ) {
+    super(context)
     this.registerHandlers()
   }
 
@@ -46,7 +51,9 @@ export class ToolHandler {
     const { path, diff } = toolUse.params
 
     if (!path || !diff) {
-      vscode.window.showErrorMessage("Missing required parameters for replace_in_file")
+      vscode.window.showErrorMessage(
+        "Missing required parameters for replace_in_file"
+      )
       return
     }
 
@@ -68,7 +75,8 @@ export class ToolHandler {
       }
 
       // Modified regex to handle empty search content
-      const diffBlockRegex = /<<<<<<< SEARCH\n?([\s\S]*?)\n?=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
+      const diffBlockRegex =
+        /<<<<<<< SEARCH\n?([\s\S]*?)\n?=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
       const diffBlocks = Array.from(diff.matchAll(diffBlockRegex))
 
       if (diffBlocks.length === 0) {
@@ -134,7 +142,8 @@ export class ToolHandler {
         }
 
         // Preserve indentation of the first line
-        const originalIndent = contentLines[bestMatchStart].match(/^[\t ]*/)?.[0] || ""
+        const originalIndent =
+          contentLines[bestMatchStart].match(/^[\t ]*/)?.[0] || ""
         const replaceLines = replaceContent.split("\n")
         const indentedReplaceContent = replaceLines
           .map((line, i) => (i === 0 ? line : originalIndent + line))
@@ -150,7 +159,9 @@ export class ToolHandler {
       // Write the final content
       if (isNewFile) {
         await vscode.workspace.fs.writeFile(fullPath, Buffer.from(content))
-        vscode.window.showInformationMessage("Successfully created new file with content")
+        vscode.window.showInformationMessage(
+          "Successfully created new file with content"
+        )
       } else {
         const document = await vscode.workspace.openTextDocument(fullPath)
         const edit = new vscode.WorkspaceEdit()
@@ -178,7 +189,9 @@ export class ToolHandler {
     }
   }
 
-  public async handleAcceptToolUse(message: ServerMessage<ToolUse>): Promise<string> {
+  public async handleAcceptToolUse(
+    message: ServerMessage<ToolUse>
+  ): Promise<string> {
     const toolUse = message.data
     if (!toolUse) return ""
 
@@ -205,7 +218,9 @@ export class ToolHandler {
     }
   }
 
-  private async handleWriteToFile(toolUse: WriteToFileToolUse): Promise<string>  {
+  private async handleWriteToFile(
+    toolUse: WriteToFileToolUse
+  ): Promise<string> {
     const { path, content } = toolUse.params
 
     if (!path || content === undefined) {
@@ -235,7 +250,9 @@ export class ToolHandler {
     }
   }
 
-  private async handleExecuteCommand(toolUse: ExecuteCommandToolUse): Promise<string> {
+  private async handleExecuteCommand(
+    toolUse: ExecuteCommandToolUse
+  ): Promise<string> {
     const { command } = toolUse.params
 
     if (!command) {
@@ -264,11 +281,9 @@ export class ToolHandler {
       })
 
       const result = stdout || stderr
-      vscode.window.showInformationMessage(
-        `Command executed successfully: ${command}`
-      )
-
-      return `Command executed successfully: ${command} : ${result}`
+      const message = `Command executed successfully: ${command} : ${result}`
+      this.emit("resolve-tool-result", message)
+      return message
     } catch (error) {
       vscode.window.showErrorMessage(`Error executing command: ${error}`)
       return ""
@@ -277,7 +292,7 @@ export class ToolHandler {
 
   private async handleListCodeDefinitionNames(
     toolUse: ListCodeDefinitionNamesToolUse
-  ): Promise<string>  {
+  ): Promise<string> {
     const { path: directoryPath } = toolUse.params
 
     if (!directoryPath) {
@@ -434,6 +449,11 @@ export class ToolHandler {
         switch (message.type) {
           case EVENT_NAME.twinnyAcceptToolUse:
             await this.handleAcceptToolUse(message)
+            break
+          case EVENT_NAME.twinnyRunToolUse:
+            await this.handleExecuteCommand(
+              message.data as ExecuteCommandToolUse
+            )
             break
           case EVENT_NAME.twinnyRejectToolUse:
             // Handle rejection if needed

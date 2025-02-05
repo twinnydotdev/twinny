@@ -116,8 +116,9 @@ export class Chat extends Base {
     this._sessionManager = sessionManager
     this._symmetryService = symmetryService
     this._fileHandler = new FileHandler(webView)
-    this._toolHandler = new ToolHandler(this._webView)
+    this._toolHandler = new ToolHandler(extensionContext, this._webView)
     this.setupSymmetryListeners()
+    this.toolResultListener()
   }
 
   private setupSymmetryListeners() {
@@ -127,7 +128,7 @@ export class Chat extends Base {
         this._webView?.postMessage({
           type: EVENT_NAME.twinnyOnCompletion,
           data: {
-            content: completion.trimStart(),
+            content: completion.trimStart() || " ",
             role: ASSISTANT
           }
         } as ServerMessage<ChatCompletionMessage>)
@@ -254,7 +255,7 @@ export class Chat extends Base {
       if (!documentScores) return ""
 
       const readThreshould = rerankThreshold
-      const readFileChunks = []
+      const readFileChunks: (string | null)[] = []
 
       for (let i = 0; i < relevantFiles.length; i++) {
         if (relevantFiles[i][1] > readThreshould) {
@@ -286,6 +287,7 @@ export class Chat extends Base {
       if (delta?.content) {
         this._completion += delta.content
 
+        // If there's an open tool tag without a closing tag, wait for more content.
         if (this.hasOpenToolTag() && !this.hasClosedToolTag()) {
           return
         }
@@ -304,13 +306,18 @@ export class Chat extends Base {
             ].includes(block.name)
         )
 
-        if (toolBlock?.type === "tool_use") {
-          this.abort()
+        if (toolBlock && toolBlock.type === "tool_use") {
           await this.handleToolUse(toolBlock)
           return
         }
 
-        await this.updateWebView()
+        this._webView?.postMessage({
+          type: EVENT_NAME.twinnyOnCompletion,
+          data: {
+            content: this._completion.trimStart() || " ",
+            role: ASSISTANT
+          }
+        } as ServerMessage<ChatCompletionMessage>)
       }
     } catch (error) {
       console.error("Error processing stream part:", error)
@@ -339,26 +346,44 @@ export class Chat extends Base {
     return toolTags.some((tag) => this._completion.includes(`</${tag}>`))
   }
 
+  public toolResultListener() {
+    this._toolHandler.on("resolve-tool-result", async (toolResult: string) => {
+      this.addToolResultToConversation(toolResult)
+      this.continueConversation()
+    })
+  }
+
   private async handleToolUse(toolBlock: ToolUse) {
     await this.addMessageToConversation()
-    await this.notifyWebView()
+
     this._completion = ""
+    let toolResult: string
 
     try {
-      const toolResult = await this._toolHandler.handleAcceptToolUse({
-        data: toolBlock,
-        type: toolBlock.type
-      })
+      if (toolBlock.name === "execute_command") {
+        this._webView?.postMessage({
+          type: EVENT_NAME.twinnyStopGeneration
+        } as ServerMessage<ChatCompletionMessage>)
 
-      this.addToolResultToConversation(toolResult)
+        return this.abort()
+      } else {
+        toolResult = await this._toolHandler.handleAcceptToolUse({
+          data: toolBlock,
+          type: toolBlock.type
+        })
+
+        this.addToolResultToConversation(toolResult)
+      }
+
       await this.continueConversation()
     } catch (error) {
       console.error("Error handling tool use:", error)
-      // Add error message to conversation
+      // Send a non-empty error message to the UI.
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         data: {
-          content: error instanceof Error ? error.message : String(error),
+          content:
+            (error instanceof Error ? error.message : String(error)) || " ",
           role: ASSISTANT
         }
       } as ServerMessage<ChatCompletionMessage>)
@@ -368,34 +393,29 @@ export class Chat extends Base {
   private async addMessageToConversation() {
     this._conversation.push({
       role: ASSISTANT,
-      content: this._completion.trim()
+      content: this._completion.trim() || " "
     })
-  }
-
-  private async notifyWebView() {
-    await this._webView?.postMessage({
-      type: EVENT_NAME.twinnyAddMessage,
-      data: {
-        content: this._completion.trim(),
-        role: ASSISTANT
-      }
-    } as ServerMessage<ChatCompletionMessage>)
 
     this._webView?.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration
+      type: EVENT_NAME.twinnyAddMessage,
+      data: {
+        role: ASSISTANT,
+        content: this._completion.trim() || " "
+      }
     } as ServerMessage<ChatCompletionMessage>)
   }
 
   private addToolResultToConversation(toolResult: string) {
+    const safeResult = toolResult.trim() || " "
     this._conversation.push({
       role: USER,
-      content: toolResult
+      content: safeResult
     })
     this._webView?.postMessage({
       type: EVENT_NAME.twinnyAddMessage,
       data: {
         role: USER,
-        content: toolResult
+        content: safeResult
       }
     } as ServerMessage<ChatCompletionMessage>)
   }
@@ -410,16 +430,6 @@ export class Chat extends Base {
         await this.llmNoStream(this.getNoStreamOptions(provider))
       }
     }
-  }
-
-  private async updateWebView() {
-    await this._webView?.postMessage({
-      type: EVENT_NAME.twinnyOnCompletion,
-      data: {
-        content: this._completion.trimStart() || " ",
-        role: ASSISTANT
-      }
-    } as ServerMessage<ChatCompletionMessage>)
   }
 
   public abort = () => {
@@ -458,7 +468,6 @@ export class Chat extends Base {
 
   private async llmNoStream(requestBody: CompletionNonStreaming<LLMProvider>) {
     this._controller = new AbortController()
-
     this._lastRequest = requestBody
     this._completion = ""
     this._functionArguments = ""
@@ -472,14 +481,16 @@ export class Chat extends Base {
     try {
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
+      // Ensure we send a stop-generation message
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyStopGeneration
       } as ServerMessage<ChatCompletionMessage>)
 
+      // Ensure non-empty content with fallback if necessary
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         data: {
-          content: result.choices[0].message.content,
+          content: (result.choices[0].message.content || " ").trim(),
           role: ASSISTANT
         }
       } as ServerMessage<ChatCompletionMessage>)
@@ -492,7 +503,8 @@ export class Chat extends Base {
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         data: {
-          content: error instanceof Error ? error.message : String(error),
+          content:
+            (error instanceof Error ? error.message : String(error)) || " ",
           role: ASSISTANT
         }
       } as ServerMessage<ChatCompletionMessage>)
@@ -500,6 +512,7 @@ export class Chat extends Base {
   }
 
   private async llmStream(requestBody: CompletionStreaming<LLMProvider>) {
+    // Create a single abort controller for the entire stream
     this._controller = new AbortController()
     this.resetState()
     this._lastStreamingRequest = requestBody
@@ -512,26 +525,25 @@ export class Chat extends Base {
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
       for await (const part of result) {
-        this._controller = new AbortController()
-
-        if (this._controller?.signal.aborted) {
+        if (this._controller.signal.aborted) {
           break
         }
-
         await this.onPart(part)
       }
-
-      await this._webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: {
-          content: this._completion.trim(),
-          role: ASSISTANT
-        }
-      } as ServerMessage<ChatCompletionMessage>)
 
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyStopGeneration
       } as ServerMessage<ChatCompletionMessage>)
+
+      if (this._completion) {
+        await this._webView?.postMessage({
+          type: EVENT_NAME.twinnyAddMessage,
+          data: {
+            content: this._completion.trim(),
+            role: ASSISTANT
+          }
+        } as ServerMessage<ChatCompletionMessage>)
+      }
 
       this._completion = ""
     } catch (error) {
@@ -543,7 +555,8 @@ export class Chat extends Base {
       this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
         data: {
-          content: error instanceof Error ? error.message : String(error),
+          content:
+            (error instanceof Error ? error.message : String(error)) || " ",
           role: ASSISTANT
         }
       } as ServerMessage<ChatCompletionMessage>)
@@ -698,7 +711,7 @@ export class Chat extends Base {
       apiKey: provider.apiKey,
       anthropic: {
         caching: {
-          systemMessage: true,
+          systemMessage: true
         }
       }
     })
@@ -717,7 +730,7 @@ export class Chat extends Base {
     })
     return conversation.map((m) => ({
       ...m,
-      content: (m.content as string) || ""
+      content: (m.content as string) || " "
     }))
   }
 
@@ -788,7 +801,8 @@ export class Chat extends Base {
         data: {
           content:
             (kebabToSentence(template) + "\n\n" + "```\n" + selection).trim() ||
-            " "
+            " ",
+          role: ASSISTANT
         }
       } as ServerMessage<ChatCompletionMessage>)
     }
@@ -805,6 +819,7 @@ export class Chat extends Base {
     const provider = this.getProvider()
     if (!provider) return []
 
+    // Ensure the message is not empty
     this._conversation.push({
       role: USER,
       content: userContent.trim() || " "

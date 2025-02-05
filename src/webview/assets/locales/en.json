@@ -10,6 +10,7 @@
   "applicable-ollama": "Applicable for some providers like Ollama",
   "ask_followup_question": "Ask Follow-up Question",
   "attempt_completion": "Task complete!",
+  "run-command": "Run command",
   "auto-connect-as-provider": "Auto connect as provider",
   "automatic": "Automatic",
   "back": "Back",

@@ -10,10 +10,10 @@ import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
-import { AssistantMessageContent } from "../common/parse-assistant-message"
+import { ToolUse } from "../common/parse-assistant-message"
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
-import { CodeBlock } from "./code-block"
+import CodeBlock from "./code-block"
 import { useSuggestion } from "./hooks"
 import { MentionExtension } from "./mention-extention"
 import { ToolCard } from "./tool-use"
@@ -58,9 +58,6 @@ const CustomKeyMap = Extension.create({
   }
 })
 
-const MemoizedCodeBlock = React.memo(CodeBlock)
-const MemoizedVSCodeButton = React.memo(VSCodeButton)
-
 interface ThinkingSectionProps {
   thinking: string
   isCollapsed: boolean
@@ -68,456 +65,479 @@ interface ThinkingSectionProps {
   markdownComponents: Components
 }
 
-const ThinkingSection = React.memo(
-  ({
-    thinking,
-    isCollapsed: initialCollapsed,
-    onToggle,
-    markdownComponents
-  }: ThinkingSectionProps) => {
-    const { t } = useTranslation()
-    const [isCollapsed, setIsCollapsed] = React.useState(initialCollapsed)
-    const prevThinkingRef = useRef(thinking)
-    const isStreamingRef = useRef(false)
+const ThinkingSection = ({
+  thinking,
+  isCollapsed: initialCollapsed,
+  onToggle,
+  markdownComponents
+}: ThinkingSectionProps) => {
+  const { t } = useTranslation()
+  const [isCollapsed, setIsCollapsed] = React.useState(initialCollapsed)
+  const prevThinkingRef = useRef(thinking)
+  const isStreamingRef = useRef(false)
 
-
-    useEffect(() => {
-      if (thinking.length > prevThinkingRef.current.length) {
-        isStreamingRef.current = true
-        setIsCollapsed(false)
-      } else {
-        isStreamingRef.current = false
-      }
-      prevThinkingRef.current = thinking
-    }, [thinking])
-
-    const handleToggle = useCallback(() => {
-      if (!isStreamingRef.current) {
-        setIsCollapsed((prev) => !prev)
-        onToggle()
-      }
-    }, [onToggle])
-
-    return (
-      <div className={styles.thinkingSection}>
-        <div className={styles.thinkingHeader} onClick={handleToggle}>
-          <span>{t("thinking")}</span>
-          <span
-            className={`codicon ${
-              isCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"
-            }`}
-          />
-        </div>
-        <div
-          className={`${styles.thinkingContent} ${
-            isCollapsed ? styles.collapsed : ""
-          }`}
-        >
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {thinking}
-          </Markdown>
-        </div>
-      </div>
-    )
-  }
-)
-
-const renderMessageBlock = (
-  block: AssistantMessageContent,
-  markdownComponents: Components,
-  setToolStatuses: React.Dispatch<React.SetStateAction<Record<string, "accepted" | "rejected" | "running">>>
-) => {
-  if (block.type === "text") {
-    return (
-      <Markdown
-        key={block.content}
-        remarkPlugins={[remarkGfm]}
-        components={markdownComponents}
-      >
-        {block.content.trimStart()}
-      </Markdown>
-    )
-  } else {
-    return (
-      <ToolCard
-        onUpdate={(id, status) =>
-          setToolStatuses((prev) => ({ ...prev, [id]: status }))
-        }
-        key={block.name}
-        toolUse={block}
-      />
-    )
-  }
-}
-
-export const Message: React.FC<MessageProps> = React.memo(
-  ({
-    conversationLength = 0,
-    index = 0,
-    isAssistant,
-    isLoading,
-    message,
-    onDelete,
-    onRegenerate,
-    onEdit,
-    onHeightChange,
-    theme,
-    messages
-  }) => {
-    const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
-    const { t } = useTranslation()
-    const [editing, setEditing] = React.useState<boolean>(false)
-    const messageRef = useRef<HTMLDivElement>(null)
-    const prevHeightRef = useRef<number>(0)
-    const [, setToolStatuses] = React.useState<
-    Record<string, "accepted" | "rejected" | "running">
-  >({})
-
-    const handleThinkingToggle = useCallback(() => {
-      setIsThinkingCollapsed((prev) => !prev)
-    }, [])
-
-    useEffect(() => {
-      const currentHeight = messageRef.current?.offsetHeight
-      if (currentHeight && currentHeight !== prevHeightRef.current) {
-        prevHeightRef.current = currentHeight
-        onHeightChange?.()
-      }
-    }, [isThinkingCollapsed, editing, message?.content])
-
-    const handleToggleEditing = useCallback(
-      () => setEditing((prev) => !prev),
-      []
-    )
-    const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
-
-    const extractMentionsFromHtml = (content: string): MentionType[] => {
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(content, "text/html")
-      const mentions: MentionType[] = []
-
-      doc.querySelectorAll(".mention").forEach((mention) => {
-        const path = mention.getAttribute("data-id")
-        const label = mention.getAttribute("data-label")
-        if (path && label) {
-          mentions.push({
-            name: label,
-            path: path
-          })
-        }
-      })
-
-      return mentions
+  useEffect(() => {
+    if (thinking.length > prevThinkingRef.current.length) {
+      isStreamingRef.current = true
+      setIsCollapsed(false)
+    } else {
+      isStreamingRef.current = false
     }
+    prevThinkingRef.current = thinking
+  }, [thinking])
 
-    const handleRegenerate = useCallback(() => {
-      if (!messages?.length) return
-      const lastMessage = messages[index - 1]
-      const mentions = extractMentionsFromHtml(lastMessage?.content as string)
-      onRegenerate?.(index, mentions)
-    }, [onRegenerate, index])
+  const handleToggle = useCallback(() => {
+    if (!isStreamingRef.current) {
+      setIsCollapsed((prev) => !prev)
+      onToggle()
+    }
+  }, [onToggle])
 
-    const handleToggleCancel = useCallback(() => {
-      setEditing(false)
-      editorRef.current?.commands.setContent(message?.content as string)
-    }, [message?.content])
-
-    const handleToggleSave = useCallback(() => {
-      const editorContent = editorRef.current?.getHTML()
-      if (!editorContent) {
-        return setEditing(false)
-      }
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(editorContent, "text/html")
-      const mentions = Array.from(doc.querySelectorAll(".mention")).map(
-        (mention) => {
-          const filePath = mention.getAttribute("data-id")
-          const label = mention.getAttribute("data-label")
-          if (filePath && label) {
-            mention.outerHTML = `<span class="mention" data-type="mention" data-id="${filePath}" data-label="${label}">@${label}</span>`
-          }
-          return { name: label, path: filePath }
-        }
-      )
-
-      const finalContent = doc.body.innerHTML
-      if (message?.content === finalContent) {
-        return setEditing(false)
-      }
-
-      onEdit?.(
-        finalContent,
-        index,
-        mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
-      )
-      setEditing(false)
-    }, [message?.content, onEdit, index])
-
-    const handleOpenFile = useCallback((filePath: string) => {
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyOpenFile,
-        data: filePath
-      })
-    }, [])
-
-    const { suggestion, filePaths } = useSuggestion()
-
-    const memoizedSuggestion = useMemo(
-      () => suggestion,
-      [JSON.stringify(filePaths)]
-    )
-
-    const editorRef = useRef<Editor | null>(null)
-
-    const editor = useEditor(
-      {
-        extensions: [
-          Mention.configure({
-            HTMLAttributes: {
-              class: "mention"
-            },
-            suggestion: memoizedSuggestion,
-            renderText({ node }) {
-              return `@${node.attrs.label}`
-            }
-          }),
-          StarterKit,
-          TiptapMarkdown,
-          MentionExtension,
-          CustomKeyMap.configure({
-            handleToggleSave
-          })
-        ],
-        content: message?.content,
-        editorProps: {
-          attributes: {
-            class: styles.editor
-          },
-          handleDOMEvents: {
-            paste: (view, event) => {
-              event.preventDefault()
-              const text =
-                event.clipboardData?.getData("text/html") ||
-                event.clipboardData?.getData("text/plain")
-              if (text) {
-                view.dispatch(view.state.tr.insertText(text))
-              }
-              return true
-            }
-          }
-        },
-        onFocus: () => {
-          if (editorRef.current) {
-            editorRef.current.commands.focus("end")
-          }
-        }
-      },
-      [memoizedSuggestion]
-    )
-
-    useEffect(() => {
-      if (editor) {
-        editorRef.current = editor
-      }
-    }, [editor])
-
-    useEffect(() => {
-      if (
-        editorRef.current &&
-        message?.content &&
-        message.content !== editorRef.current.getText()
-      ) {
-        editorRef.current.commands.setContent(message.content)
-      }
-    }, [message?.content])
-
-    useEffect(() => {
-      if (editorRef.current) {
-        const mentionExtension =
-          editorRef.current.extensionManager.extensions.find(
-            (extension) => extension.name === "mention"
-          )
-        if (mentionExtension) {
-          mentionExtension.options.suggestion = memoizedSuggestion
-          editorRef.current.commands.focus()
-        }
-      }
-    }, [memoizedSuggestion])
-
-    const renderContent = useCallback(
-      (htmlContent: string) => {
-        const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
-          ALLOWED_TAGS: [
-            "span",
-            "p",
-            "pre",
-            "code",
-            "strong",
-            "em",
-            "br",
-            "a",
-            "ul",
-            "ol",
-            "li"
-          ],
-          ALLOWED_ATTR: [
-            "class",
-            "data-type",
-            "data-id",
-            "data-label",
-            "language"
-          ]
-        })
-
-        return (
-          <div
-            className={styles.messageContent}
-            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-            onClick={(e) => {
-              const target = e.target as HTMLElement
-              const mention = target.closest(".mention")
-              if (mention) {
-                const filePath = mention.getAttribute("data-id")
-                if (filePath) {
-                  handleOpenFile(filePath)
-                }
-              }
-            }}
-          />
-        )
-      },
-      [handleOpenFile]
-    )
-
-    const renderCodeBlock = useCallback(
-      ({
-        children,
-        ...props
-      }: { children: React.ReactNode } & React.HTMLProps<HTMLPreElement>) => {
-        if (React.isValidElement(children)) {
-          return (
-            <MemoizedCodeBlock
-              role={message?.role}
-              {...children.props}
-              theme={theme}
-            />
-          )
-        }
-        return <pre {...props}>{children}</pre>
-      },
-      [message?.role, theme]
-    )
-
-    const markdownComponents = useMemo(
-      () =>
-        ({
-          pre: renderCodeBlock,
-          p: ({
-            children,
-            ...props
-          }: React.HTMLAttributes<HTMLParagraphElement>) => {
-            if (
-              typeof children === "string" &&
-              children.includes("class=\"mention\"")
-            ) {
-              return renderContent(children)
-            }
-            return <p {...props}>{children}</p>
-          }
-        } as Components),
-      [renderCodeBlock, renderContent]
-    )
-
-    if (!message?.content) return null
-
-    const { thinking, messageBlocks } = getThinkingMessage(
-      message.content as string
-    )
-
-    return (
+  return (
+    <div className={styles.thinkingSection}>
+      <div className={styles.thinkingHeader} onClick={handleToggle}>
+        <span>{t("thinking")}</span>
+        <span
+          className={`codicon ${
+            isCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"
+          }`}
+        />
+      </div>
       <div
-        ref={messageRef}
-        className={`${styles.message} ${
-          message.role === ASSISTANT
-            ? styles.assistantMessage
-            : styles.userMessage
+        className={`${styles.thinkingContent} ${
+          isCollapsed ? styles.collapsed : ""
         }`}
       >
-        {thinking && (
-          <ThinkingSection
-            thinking={thinking}
-            isCollapsed={isThinkingCollapsed}
-            onToggle={handleThinkingToggle}
-            markdownComponents={markdownComponents}
-          />
-        )}
-        <div className={styles.messageRole}>
-          <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
-          <div className={styles.messageOptions}>
-            {editing && !isAssistant && (
-              <>
-                <MemoizedVSCodeButton
-                  title={t("cancel-edit")}
-                  appearance="icon"
-                  onClick={handleToggleCancel}
-                >
-                  <span className="codicon codicon-close" />
-                </MemoizedVSCodeButton>
-                <MemoizedVSCodeButton
-                  title={t("save-edit")}
-                  appearance="icon"
-                  onClick={handleToggleSave}
-                >
-                  <span className="codicon codicon-check" />
-                </MemoizedVSCodeButton>
-              </>
-            )}
-            {!editing && !isAssistant && (
-              <>
-                <MemoizedVSCodeButton
-                  disabled={isLoading}
-                  title={t("edit-message")}
-                  appearance="icon"
-                  onClick={handleToggleEditing}
-                >
-                  <span className="codicon codicon-edit" />
-                </MemoizedVSCodeButton>
-                <MemoizedVSCodeButton
-                  disabled={isLoading || conversationLength <= 2}
-                  title={t("delete-message")}
-                  appearance="icon"
-                  onClick={handleDelete}
-                >
-                  <span className="codicon codicon-trash" />
-                </MemoizedVSCodeButton>
-              </>
-            )}
-            {!editing && isAssistant && (
-              <MemoizedVSCodeButton
-                disabled={isLoading}
-                title={t("regenerate-message")}
-                appearance="icon"
-                onClick={handleRegenerate}
-              >
-                <span className="codicon codicon-sync" />
-              </MemoizedVSCodeButton>
-            )}
-          </div>
-        </div>
-        {editing ? (
-          <EditorContent className={styles.tiptap} editor={editor} />
-        ) : message.role === ASSISTANT ? (
-          <div className={styles.messageContent}>
-            {messageBlocks.map((block) =>
-              renderMessageBlock(block, markdownComponents, setToolStatuses)
-            )}
-          </div>
-        ) : (
-          renderContent((message.content as string).trimStart())
-        )}
+        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          {thinking}
+        </Markdown>
       </div>
-    )
+    </div>
+  )
+}
+
+export const Message: React.FC<MessageProps> = ({
+  conversationLength = 0,
+  index = 0,
+  isAssistant,
+  isLoading,
+  message,
+  onDelete,
+  onRegenerate,
+  onEdit,
+  onHeightChange,
+  theme,
+  messages
+}) => {
+  const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
+  const { t } = useTranslation()
+  const [editing, setEditing] = React.useState<boolean>(false)
+  const messageRef = useRef<HTMLDivElement>(null)
+  const prevHeightRef = useRef<number>(0)
+
+  const handleThinkingToggle = useCallback(() => {
+    setIsThinkingCollapsed((prev) => !prev)
+  }, [])
+
+  useEffect(() => {
+    const currentHeight = messageRef.current?.offsetHeight
+    if (currentHeight && currentHeight !== prevHeightRef.current) {
+      prevHeightRef.current = currentHeight
+      onHeightChange?.()
+    }
+  }, [isThinkingCollapsed, editing, message?.content])
+
+  const handleToggleEditing = useCallback(() => setEditing((prev) => !prev), [])
+  const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
+
+  const extractMentionsFromHtml = (content: string): MentionType[] => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(content, "text/html")
+    const mentions: MentionType[] = []
+
+    doc.querySelectorAll(".mention").forEach((mention) => {
+      const path = mention.getAttribute("data-id")
+      const label = mention.getAttribute("data-label")
+      if (path && label) {
+        mentions.push({
+          name: label,
+          path: path
+        })
+      }
+    })
+
+    return mentions
   }
-)
+
+  const handleRegenerate = useCallback(() => {
+    if (!messages?.length) return
+    const lastMessage = messages[index - 1]
+    const mentions = extractMentionsFromHtml(lastMessage?.content as string)
+    onRegenerate?.(index, mentions)
+  }, [onRegenerate, index])
+
+  const handleToggleCancel = useCallback(() => {
+    setEditing(false)
+    editorRef.current?.commands.setContent(message?.content as string)
+  }, [message?.content])
+
+  const handleToggleSave = useCallback(() => {
+    const editorContent = editorRef.current?.getHTML()
+    if (!editorContent) {
+      return setEditing(false)
+    }
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(editorContent, "text/html")
+    const mentions = Array.from(doc.querySelectorAll(".mention")).map(
+      (mention) => {
+        const filePath = mention.getAttribute("data-id")
+        const label = mention.getAttribute("data-label")
+        if (filePath && label) {
+          mention.outerHTML = `<span class="mention" data-type="mention" data-id="${filePath}" data-label="${label}">@${label}</span>`
+        }
+        return { name: label, path: filePath }
+      }
+    )
+
+    const finalContent = doc.body.innerHTML
+    if (message?.content === finalContent) {
+      return setEditing(false)
+    }
+
+    onEdit?.(
+      finalContent,
+      index,
+      mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
+    )
+    setEditing(false)
+  }, [message?.content, onEdit, index])
+
+  const handleOpenFile = useCallback((filePath: string) => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyOpenFile,
+      data: filePath
+    })
+  }, [])
+
+  const { suggestion, filePaths } = useSuggestion()
+
+  const memoizedSuggestion = useMemo(
+    () => suggestion,
+    [JSON.stringify(filePaths)]
+  )
+
+  const editorRef = useRef<Editor | null>(null)
+
+  const editor = useEditor(
+    {
+      extensions: [
+        Mention.configure({
+          HTMLAttributes: {
+            class: "mention"
+          },
+          suggestion: memoizedSuggestion,
+          renderText({ node }) {
+            return `@${node.attrs.label}`
+          }
+        }),
+        StarterKit,
+        TiptapMarkdown,
+        MentionExtension,
+        CustomKeyMap.configure({
+          handleToggleSave
+        })
+      ],
+      content: message?.content,
+      editorProps: {
+        attributes: {
+          class: styles.editor
+        },
+        handleDOMEvents: {
+          paste: (view, event) => {
+            event.preventDefault()
+            const text =
+              event.clipboardData?.getData("text/html") ||
+              event.clipboardData?.getData("text/plain")
+            if (text) {
+              view.dispatch(view.state.tr.insertText(text))
+            }
+            return true
+          }
+        }
+      },
+      onFocus: () => {
+        if (editorRef.current) {
+          editorRef.current.commands.focus("end")
+        }
+      }
+    },
+    [memoizedSuggestion]
+  )
+
+  useEffect(() => {
+    if (editorRef.current) {
+      const mentionExtension =
+        editorRef.current.extensionManager.extensions.find(
+          (extension) => extension.name === "mention"
+        )
+      if (mentionExtension) {
+        mentionExtension.options.suggestion = memoizedSuggestion
+        editorRef.current.commands.focus()
+      }
+    }
+  }, [memoizedSuggestion])
+
+  const renderContent = useCallback(
+    (htmlContent: string) => {
+      const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
+        ALLOWED_TAGS: [
+          "span",
+          "p",
+          "pre",
+          "code",
+          "strong",
+          "em",
+          "br",
+          "a",
+          "ul",
+          "ol",
+          "li"
+        ],
+        ALLOWED_ATTR: [
+          "class",
+          "data-type",
+          "data-id",
+          "data-label",
+          "language"
+        ]
+      })
+
+      return (
+        <div
+          className={styles.messageContent}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+          onClick={(e) => {
+            const target = e.target as HTMLElement
+            const mention = target.closest(".mention")
+            if (mention) {
+              const filePath = mention.getAttribute("data-id")
+              if (filePath) {
+                handleOpenFile(filePath)
+              }
+            }
+          }}
+        />
+      )
+    },
+    [handleOpenFile]
+  )
+
+  const renderCodeBlock = useCallback(
+    ({
+      children,
+      ...props
+    }: { children: React.ReactNode } & React.HTMLProps<HTMLPreElement>) => {
+      if (React.isValidElement(children)) {
+        return (
+          <CodeBlock role={message?.role} {...children.props} theme={theme} />
+        )
+      }
+      return <pre {...props}>{children}</pre>
+    },
+    [message?.role, theme]
+  )
+
+  const markdownComponents = useMemo(
+    () =>
+      ({
+        pre: renderCodeBlock,
+        p: ({
+          children,
+          ...props
+        }: React.HTMLAttributes<HTMLParagraphElement>) => {
+          if (
+            typeof children === "string" &&
+            children.includes("class=\"mention\"")
+          ) {
+            return renderContent(children)
+          }
+          return <p {...props}>{children}</p>
+        }
+      } as Components),
+    [renderCodeBlock, renderContent]
+  )
+
+  const onAccept = useCallback(
+    () => {
+      console.log("OK")
+    },
+    [
+      /* dependencies */
+    ]
+  )
+
+  const onRun = (toolUse: ToolUse) => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyRunToolUse,
+      data: toolUse
+    })
+  }
+
+  const onUpdate = useCallback(
+    () => {
+      console.log("OK")
+    },
+    [
+      /* dependencies */
+    ]
+  )
+
+  if (!message?.content) return null
+
+  const { thinking, messageBlocks } = getThinkingMessage(
+    message.content as string
+  )
+
+  return (
+    <div
+      ref={messageRef}
+      key={message.content as string}
+      className={`${styles.message} ${
+        message.role === ASSISTANT
+          ? styles.assistantMessage
+          : styles.userMessage
+      }`}
+    >
+      {thinking && (
+        <ThinkingSection
+          thinking={thinking}
+          isCollapsed={isThinkingCollapsed}
+          onToggle={handleThinkingToggle}
+          markdownComponents={markdownComponents}
+        />
+      )}
+      <div className={styles.messageRole}>
+        <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
+        <div className={styles.messageOptions}>
+          {editing && !isAssistant && (
+            <>
+              <VSCodeButton
+                title={t("cancel-edit")}
+                appearance="icon"
+                onClick={handleToggleCancel}
+              >
+                <span className="codicon codicon-close" />
+              </VSCodeButton>
+              <VSCodeButton
+                title={t("save-edit")}
+                appearance="icon"
+                onClick={handleToggleSave}
+              >
+                <span className="codicon codicon-check" />
+              </VSCodeButton>
+            </>
+          )}
+          {!editing && !isAssistant && (
+            <>
+              <VSCodeButton
+                disabled={isLoading}
+                title={t("edit-message")}
+                appearance="icon"
+                onClick={handleToggleEditing}
+              >
+                <span className="codicon codicon-edit" />
+              </VSCodeButton>
+              <VSCodeButton
+                disabled={isLoading || conversationLength <= 2}
+                title={t("delete-message")}
+                appearance="icon"
+                onClick={handleDelete}
+              >
+                <span className="codicon codicon-trash" />
+              </VSCodeButton>
+            </>
+          )}
+          {!editing && isAssistant && (
+            <VSCodeButton
+              disabled={isLoading}
+              title={t("regenerate-message")}
+              appearance="icon"
+              onClick={handleRegenerate}
+            >
+              <span className="codicon codicon-sync" />
+            </VSCodeButton>
+          )}
+        </div>
+      </div>
+      {editing ? (
+        <EditorContent className={styles.tiptap} editor={editor} />
+      ) : message.role === ASSISTANT ? (
+        <div className={styles.messageContent}>
+          {messageBlocks.map((block) =>
+            block.type === "tool_use" ? (
+              <>
+                <ToolCard
+                  onRun={onRun}
+                  onUpdate={onUpdate}
+                  onAccept={onAccept}
+                  key={`${block.name}-${block.id}`}
+                  toolUse={block}
+                />
+                <div className={styles.toolFooter}>
+                  {block.name === "execute_command" && (
+                    <VSCodeButton
+                      appearance="primary"
+                      onClick={() => onRun(block)}
+                      onFocus={(e) => e.currentTarget.blur()}
+                    >
+                      {t("run-command")}
+                    </VSCodeButton>
+                  )}
+                  {block.name === "read_files" && (
+                    <VSCodeButton
+                      appearance="primary"
+                      onClick={() => onRun(block)}
+                    >
+                      {t("Read file")}
+                    </VSCodeButton>
+                  )}
+                  {(block.name === "write_to_file" ||
+                    block.name === "replace_in_file") && (
+                    <VSCodeButton appearance="primary" onClick={onAccept}>
+                      {t("accept")}
+                    </VSCodeButton>
+                  )}
+                </div>
+                <div className={styles.rawMessage}>
+                  <details>
+                    <summary>{t("show-raw-message")}</summary>
+                    <div className={styles.rawMessageContent}>
+                      <pre>{JSON.stringify(block, null, 2)}</pre>
+                      <div className={styles.rawMessageActions}>
+                        <VSCodeButton title={t("copy-code")} appearance="icon">
+                          <span className="codicon codicon-copy"></span>
+                        </VSCodeButton>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </>
+            ) : (
+              <Markdown
+                key={block.content}
+                remarkPlugins={[remarkGfm]}
+                components={markdownComponents}
+              >
+                {block.content.trimStart()}
+              </Markdown>
+            )
+          )}
+        </div>
+      ) : (
+        renderContent((message.content as string).trimStart())
+      )}
+    </div>
+  )
+}
 
 export default Message

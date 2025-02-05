@@ -47,9 +47,6 @@ interface ChatProps {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
 
-const MemoizedMessageComponent = React.memo(MessageComponent)
-const MemoizedVSCodeButton = React.memo(VSCodeButton)
-
 export const Chat = (props: ChatProps): JSX.Element => {
   const { fullScreen } = props
   const generatingRef = useRef(false)
@@ -429,7 +426,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     const isLastMessage = index === messages?.length - 1
 
     const renderMessage = (role: string, key: string, props: object) => (
-      <MemoizedMessageComponent
+      <MessageComponent
         key={`${role}-${key}`}
         isAssistant={role === "assistant"}
         message={message}
@@ -488,13 +485,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
       <div className={styles.container}>
         {!!fullScreen && (
           <div className={styles.fullScreenActions}>
-            <MemoizedVSCodeButton
+            <VSCodeButton
               onClick={handleNewConversation}
               appearance="icon"
               title={t("new-conversation")}
             >
               <i className="codicon codicon-comment-discussion" />
-            </MemoizedVSCodeButton>
+            </VSCodeButton>
           </div>
         )}
         <h4 className={styles.title}>
@@ -528,24 +525,24 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <div>
             {!isAtBottom && (
               <div className={styles.scrollToBottom}>
-                <MemoizedVSCodeButton
+                <VSCodeButton
                   appearance="icon"
                   onClick={() => scrollToBottom("smooth")}
                   title={t("scroll-to-bottom")}
                 >
                   <i className="codicon codicon-arrow-down" />
-                </MemoizedVSCodeButton>
+                </VSCodeButton>
               </div>
             )}
             {generatingRef.current && !symmetryConnection && (
-              <MemoizedVSCodeButton
+              <VSCodeButton
                 type="button"
                 appearance="icon"
                 onClick={handleStopGeneration}
                 aria-label={t("stop-generation")}
               >
                 <span className="codicon codicon-debug-stop"></span>
-              </MemoizedVSCodeButton>
+              </VSCodeButton>
             )}
           </div>
           <div>

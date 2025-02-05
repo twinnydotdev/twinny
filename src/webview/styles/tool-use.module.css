@@ -53,16 +53,6 @@
   gap: 8px;
 }
 
-.toolFooter {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.toolFooter vscode-button {
-  margin-left: 8px;
-}
-
 .paramRow {
   display: flex;
   gap: 12px;

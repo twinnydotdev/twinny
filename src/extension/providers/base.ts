@@ -118,7 +118,7 @@ export class BaseProvider {
 
     new ProviderManager(this.context, this.webView)
 
-    new ToolHandler(this.webView)
+    new ToolHandler(this.context, this.webView)
   }
 
   private registerEventListeners() {

@@ -704,3 +704,13 @@ code {
   font-size: 12px;
   padding: 0 4px;
 }
+
+.toolFooter {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.toolFooter vscode-button {
+  margin-left: 8px;
+}

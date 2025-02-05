@@ -1,3 +1,4 @@
+import { EventEmitter } from "stream"
 import * as vscode from "vscode"
 
 import {
@@ -10,11 +11,12 @@ import {
 import { TwinnyProvider } from "./provider-manager"
 import { getIsOpenAICompatible } from "./utils"
 
-export class Base {
+export class Base extends EventEmitter {
   public config = vscode.workspace.getConfiguration("twinny")
   public context?: vscode.ExtensionContext
 
   constructor(context: vscode.ExtensionContext) {
+    super()
     this.context = context
 
     vscode.workspace.onDidChangeConfiguration((event) => {
