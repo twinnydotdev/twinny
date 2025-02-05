@@ -500,8 +500,7 @@ export class CompletionProvider
       let document;
       try {
         document = await workspace.openTextDocument(uri)
-      } catch (error) {
-        console.warn(`Failed to open file: ${filePath}`, error)
+      } catch {
         continue
       }
 
