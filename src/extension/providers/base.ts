@@ -407,7 +407,7 @@ export class BaseProvider {
         ...(data.data as ChatCompletionMessage[])
       ].map(m => ({
         ...m,
-        content: this.chat?.stripHtml(m.content as string)
+        content: m.content
       }))
 
       logger.log(`
