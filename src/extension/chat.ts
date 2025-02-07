@@ -37,7 +37,7 @@ import { Logger, logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   parseAssistantMessage,
-  ToolUse
+  ToolUse,
 } from "../common/parse-assistant-message"
 import {
   ChatCompletionMessage,
@@ -287,28 +287,22 @@ export class Chat extends Base {
       if (delta?.content) {
         this._completion += delta.content
 
+        console.log(this._completion)
+
         // If there's an open tool tag without a closing tag, wait for more content.
         if (this.hasOpenToolTag() && !this.hasClosedToolTag()) {
           return
         }
 
         // Parse the completion to check for tool use
-        const parsedBlocks = parseAssistantMessage(this._completion)
-        const toolBlock = parsedBlocks.find(
-          (block) =>
-            block.type === "tool_use" &&
-            [
-              "execute_command",
-              "read_files",
-              "list_files",
-              "list_code_definition_names",
-              "search_files"
-            ].includes(block.name)
-        )
+        const tools = parseAssistantMessage(this._completion)
 
-        if (toolBlock && toolBlock.type === "tool_use") {
-          await this.handleToolUse(toolBlock)
-          return
+        for (const tool of tools) {
+          if (tool && tool.type === "tool_use" && !tool.partial) {
+            await this.addMessageToConversation()
+            this._completion = ""
+            this.abort()
+          }
         }
 
         this._webView?.postMessage({
@@ -317,7 +311,7 @@ export class Chat extends Base {
             content: this._completion.trimStart() || " ",
             role: ASSISTANT
           }
-        } as ServerMessage<ChatCompletionMessage>)
+        })
       }
     } catch (error) {
       console.error("Error processing stream part:", error)
@@ -347,60 +341,49 @@ export class Chat extends Base {
   }
 
   public toolResultListener() {
-    this._toolHandler.on("resolve-tool-result", async (toolResult: string) => {
-      this.addToolResultToConversation(toolResult)
+    this._toolHandler.on("resolve-tool-result", async (toolResult: {
+      message: ToolUse,
+      result: string
+    }) => {
+      this.addToolResultToConversation(toolResult.result)
       this.continueConversation()
     })
   }
 
-  private async handleToolUse(toolBlock: ToolUse) {
-    await this.addMessageToConversation()
+  private trimContentAfterLastTool(content: string): string {
+  const toolTags = [
+    "execute_command",
+    "read_files",
+    "list_files",
+    "list_code_definition_names",
+    "search_files"
+  ];
 
-    this._completion = ""
-    let toolResult: string
-
-    try {
-      if (toolBlock.name === "execute_command") {
-        this._webView?.postMessage({
-          type: EVENT_NAME.twinnyStopGeneration
-        } as ServerMessage<ChatCompletionMessage>)
-
-        return this.abort()
-      } else {
-        toolResult = await this._toolHandler.handleAcceptToolUse({
-          data: toolBlock,
-          type: toolBlock.type
-        })
-
-        this.addToolResultToConversation(toolResult)
-      }
-
-      await this.continueConversation()
-    } catch (error) {
-      console.error("Error handling tool use:", error)
-      // Send a non-empty error message to the UI.
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: {
-          content:
-            (error instanceof Error ? error.message : String(error)) || " ",
-          role: ASSISTANT
-        }
-      } as ServerMessage<ChatCompletionMessage>)
+  let lastIndex = -1;
+  for (const tag of toolTags) {
+    const closeTagIndex = content.lastIndexOf(`</${tag}>`);
+    if (closeTagIndex > lastIndex) {
+      lastIndex = closeTagIndex + `</${tag}>`.length;
     }
   }
 
+  return lastIndex !== -1 ? content.slice(0, lastIndex).trim() : content;
+}
+
+
   private async addMessageToConversation() {
+    const content = this.trimContentAfterLastTool(this._completion.trim() || " ");
+
     this._conversation.push({
       role: ASSISTANT,
-      content: this._completion.trim() || " "
+      content: content || " "
     })
 
     this._webView?.postMessage({
       type: EVENT_NAME.twinnyAddMessage,
       data: {
         role: ASSISTANT,
-        content: this._completion.trim() || " "
+        content: content || " "
       }
     } as ServerMessage<ChatCompletionMessage>)
   }
@@ -522,6 +505,7 @@ export class Chat extends Base {
     log.log(JSON.stringify(requestBody, null, 2))
 
     try {
+      console.log(requestBody)
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
       for await (const part of result) {
@@ -676,7 +660,7 @@ export class Chat extends Base {
     text: string,
     filePaths?: FileItem[]
   ): Promise<string> {
-    const agent = this.getIsTwinnyAgent()
+    const isAgent = this.getIsTwinnyAgent()
     let context = userSelection ? `Selected Code:\n${userSelection}\n\n` : ""
     const ragContext = await this.getRagContext(text)
     if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
@@ -694,7 +678,7 @@ export class Chat extends Base {
       )
     )
 
-    if (agent) {
+    if (isAgent) {
       const environmentDetails =
         await this._fileTreeProvider.getEnvironmentDetails()
       context += environmentDetails

@@ -11,13 +11,15 @@ import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { ToolUse } from "../common/parse-assistant-message"
+// import { ToolUse } from "../common/parse-assistant-message"
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import CodeBlock from "./code-block"
+import { CollapsibleSection } from "./collapsible-section"
 import { useSuggestion } from "./hooks"
 import { MentionExtension } from "./mention-extention"
 import { ToolCard } from "./tool-use"
-import { getThinkingMessage } from "./utils"
+import { getThinkingMessage as parseMessage } from "./utils"
 
 import styles from "./styles/index.module.css"
 
@@ -58,64 +60,6 @@ const CustomKeyMap = Extension.create({
   }
 })
 
-interface ThinkingSectionProps {
-  thinking: string
-  isCollapsed: boolean
-  onToggle: () => void
-  markdownComponents: Components
-}
-
-const ThinkingSection = ({
-  thinking,
-  isCollapsed: initialCollapsed,
-  onToggle,
-  markdownComponents
-}: ThinkingSectionProps) => {
-  const { t } = useTranslation()
-  const [isCollapsed, setIsCollapsed] = React.useState(initialCollapsed)
-  const prevThinkingRef = useRef(thinking)
-  const isStreamingRef = useRef(false)
-
-  useEffect(() => {
-    if (thinking.length > prevThinkingRef.current.length) {
-      isStreamingRef.current = true
-      setIsCollapsed(false)
-    } else {
-      isStreamingRef.current = false
-    }
-    prevThinkingRef.current = thinking
-  }, [thinking])
-
-  const handleToggle = useCallback(() => {
-    if (!isStreamingRef.current) {
-      setIsCollapsed((prev) => !prev)
-      onToggle()
-    }
-  }, [onToggle])
-
-  return (
-    <div className={styles.thinkingSection}>
-      <div className={styles.thinkingHeader} onClick={handleToggle}>
-        <span>{t("thinking")}</span>
-        <span
-          className={`codicon ${
-            isCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"
-          }`}
-        />
-      </div>
-      <div
-        className={`${styles.thinkingContent} ${
-          isCollapsed ? styles.collapsed : ""
-        }`}
-      >
-        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {thinking}
-        </Markdown>
-      </div>
-    </div>
-  )
-}
-
 export const Message: React.FC<MessageProps> = ({
   conversationLength = 0,
   index = 0,
@@ -129,15 +73,10 @@ export const Message: React.FC<MessageProps> = ({
   theme,
   messages
 }) => {
-  const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
   const { t } = useTranslation()
   const [editing, setEditing] = React.useState<boolean>(false)
   const messageRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef<number>(0)
-
-  const handleThinkingToggle = useCallback(() => {
-    setIsThinkingCollapsed((prev) => !prev)
-  }, [])
 
   useEffect(() => {
     const currentHeight = messageRef.current?.offsetHeight
@@ -145,7 +84,7 @@ export const Message: React.FC<MessageProps> = ({
       prevHeightRef.current = currentHeight
       onHeightChange?.()
     }
-  }, [isThinkingCollapsed, editing, message?.content])
+  }, [editing, message?.content])
 
   const handleToggleEditing = useCallback(() => setEditing((prev) => !prev), [])
   const handleDelete = useCallback(() => onDelete?.(index), [onDelete, index])
@@ -367,41 +306,25 @@ export const Message: React.FC<MessageProps> = ({
     [renderCodeBlock, renderContent]
   )
 
-  const onAccept = useCallback(
-    () => {
-      console.log("OK")
-    },
-    [
-      /* dependencies */
-    ]
-  )
-
   const onRun = (toolUse: ToolUse) => {
     global.vscode.postMessage({
-      type: EVENT_NAME.twinnyRunToolUse,
+      type: EVENT_NAME.twinnyToolUse,
       data: toolUse
     })
   }
 
-  const onUpdate = useCallback(
-    () => {
-      console.log("OK")
-    },
-    [
-      /* dependencies */
-    ]
-  )
-
   if (!message?.content) return null
 
-  const { thinking, messageBlocks } = getThinkingMessage(
-    message.content as string
-  )
+  const { thinking, messageBlocks } = parseMessage(message.content as string)
+
+  useEffect(() => {
+    if (editor) editorRef.current = editor
+    editorRef.current?.commands.focus()
+  }, [editor])
 
   return (
     <div
       ref={messageRef}
-      key={message.content as string}
       className={`${styles.message} ${
         message.role === ASSISTANT
           ? styles.assistantMessage
@@ -409,10 +332,9 @@ export const Message: React.FC<MessageProps> = ({
       }`}
     >
       {thinking && (
-        <ThinkingSection
-          thinking={thinking}
-          isCollapsed={isThinkingCollapsed}
-          onToggle={handleThinkingToggle}
+        <CollapsibleSection
+          content={thinking}
+          title={t("thinking")}
           markdownComponents={markdownComponents}
         />
       )}
@@ -470,43 +392,30 @@ export const Message: React.FC<MessageProps> = ({
         </div>
       </div>
       {editing ? (
-        <EditorContent className={styles.tiptap} editor={editor} />
-      ) : message.role === ASSISTANT ? (
+        <EditorContent className={styles.tiptap} editor={editorRef.current} />
+      ) : messageBlocks.some(({ type }) => type === "tool_use") ? (
         <div className={styles.messageContent}>
           {messageBlocks.map((block) =>
             block.type === "tool_use" ? (
-              <>
-                <ToolCard
-                  onRun={onRun}
-                  onUpdate={onUpdate}
-                  onAccept={onAccept}
-                  key={`${block.name}-${block.id}`}
-                  toolUse={block}
-                />
+              <React.Fragment key={`${block.type}`}>
+                {block.name.endsWith("_result") ? (
+                  <CollapsibleSection
+                    title={t("result")}
+                    content={block.params.content || ""}
+                    markdownComponents={markdownComponents}
+                  />
+                ) : (
+                  <>
+                    <ToolCard toolUse={block} />
+                  </>
+                )}
                 <div className={styles.toolFooter}>
-                  {block.name === "execute_command" && (
-                    <VSCodeButton
-                      appearance="primary"
-                      onClick={() => onRun(block)}
-                      onFocus={(e) => e.currentTarget.blur()}
-                    >
-                      {t("run-command")}
-                    </VSCodeButton>
-                  )}
-                  {block.name === "read_files" && (
-                    <VSCodeButton
-                      appearance="primary"
-                      onClick={() => onRun(block)}
-                    >
-                      {t("Read file")}
-                    </VSCodeButton>
-                  )}
-                  {(block.name === "write_to_file" ||
-                    block.name === "replace_in_file") && (
-                    <VSCodeButton appearance="primary" onClick={onAccept}>
-                      {t("accept")}
-                    </VSCodeButton>
-                  )}
+                  <VSCodeButton
+                    onClick={() => onRun(block)}
+                    appearance="primary"
+                  >
+                    {t(block.name)}
+                  </VSCodeButton>
                 </div>
                 <div className={styles.rawMessage}>
                   <details>
@@ -521,7 +430,7 @@ export const Message: React.FC<MessageProps> = ({
                     </div>
                   </details>
                 </div>
-              </>
+              </React.Fragment>
             ) : (
               <Markdown
                 key={block.content}

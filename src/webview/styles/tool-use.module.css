@@ -1,30 +1,13 @@
 .toolCard {
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: 8px;
-  padding: 16px;
   margin: 16px 0;
-  background-color: var(--vscode-editor-background);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: box-shadow 0.3s ease;
-}
-
-.toolCard:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .toolHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  gap: 16px;
-}
-
-.toolName {
-  font-weight: 600;
-  color: var(--vscode-editor-foreground);
-  font-size: 16px;
-  flex-shrink: 0;
+  margin-bottom: 5px;
 }
 
 .filePath {
@@ -88,43 +71,4 @@
   box-shadow: none;
   font-size: 11pt !important;
   background: none !important;
-}
-
-.diffViewer code {
-  font-size: 13px !important;
-}
-
-.diffViewer :global(.diff-gutter),
-.diffViewer :global(.diff-code) {
-  background-color: var(--vscode-editor-background);
-}
-
-.rawMessage {
-  margin-top: 16px;
-  font-size: 13px;
-  color: var(--vscode-editor-foreground);
-}
-
-.rawMessage summary {
-  cursor: pointer;
-  color: var(--vscode-textLink-foreground);
-  font-weight: 600;
-  transition: color 0.2s ease;
-}
-
-.rawMessage summary:hover {
-  color: var(--vscode-textLink-activeForeground);
-}
-
-.rawMessageContent {
-  margin-top: 8px;
-  padding: 8px;
-  background-color: var(--vscode-editor-inactiveSelectionBackground);
-  border-radius: 4px;
-}
-
-.rawMessageActions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
 }

@@ -6,19 +6,12 @@ import * as vscode from "vscode"
 import Parser from "web-tree-sitter"
 
 import { EVENT_NAME } from "../common/constants"
-import {
-  ExecuteCommandToolUse,
-  ListCodeDefinitionNamesToolUse,
-  ReplaceInFileToolUse,
-  ToolUse,
-  WriteToFileToolUse
-} from "../common/parse-assistant-message"
+import { ToolUse } from "../common/parse-assistant-message"
 import { ServerMessage } from "../common/types"
 
 import { Base } from "./base"
 import { getParser } from "./parser"
-
-const DEFAULT_FUZZY_THRESHOLD = 0.9
+import { FileTreeProvider } from "./tree"
 
 function getSimilarity(original: string, search: string): number {
   if (search === "") return 1
@@ -38,6 +31,81 @@ function getSimilarity(original: string, search: string): number {
   return 1 - dist / maxLength
 }
 
+export function addLineNumbers(content: string, startLine: number = 1): string {
+  const lines = content.split("\n")
+  const maxLineNumberWidth = String(startLine + lines.length - 1).length
+  return lines
+    .map((line, index) => {
+      const lineNumber = String(startLine + index).padStart(
+        maxLineNumberWidth,
+        " "
+      )
+      return `${lineNumber} | ${line}`
+    })
+    .join("\n")
+}
+// Checks if every line in the content has line numbers prefixed (e.g., "1 | content" or "123 | content")
+// Line numbers must be followed by a single pipe character (not double pipes)
+export function everyLineHasLineNumbers(content: string): boolean {
+  const lines = content.split(/\r?\n/)
+  return (
+    lines.length > 0 && lines.every((line) => /^\s*\d+\s+\|(?!\|)/.test(line))
+  )
+}
+
+// Strips line numbers from content while preserving the actual content
+// Handles formats like "1 | content", " 12 | content", "123 | content"
+// Preserves content that naturally starts with pipe characters
+export function stripLineNumbers(content: string): string {
+  // Split into lines to handle each line individually
+  const lines = content.split(/\r?\n/)
+
+  // Process each line
+  const processedLines = lines.map((line) => {
+    // Match line number pattern and capture everything after the pipe
+    const match = line.match(/^\s*\d+\s+\|(?!\|)\s?(.*)$/)
+    return match ? match[1] : line
+  })
+
+  // Join back with original line endings
+  const lineEnding = content.includes("\r\n") ? "\r\n" : "\n"
+  return processedLines.join(lineEnding)
+}
+
+/**
+ * Truncates multi-line output while preserving context from both the beginning and end.
+ * When truncation is needed, it keeps 20% of the lines from the start and 80% from the end,
+ * with a clear indicator of how many lines were omitted in between.
+ *
+ * @param content The multi-line string to truncate
+ * @param lineLimit Optional maximum number of lines to keep. If not provided or 0, returns the original content
+ * @returns The truncated string with an indicator of omitted lines, or the original content if no truncation needed
+ *
+ * @example
+ * // With 10 line limit on 25 lines of content:
+ * // - Keeps first 2 lines (20% of 10)
+ * // - Keeps last 8 lines (80% of 10)
+ * // - Adds "[...15 lines omitted...]" in between
+ */
+export function truncateOutput(content: string, lineLimit?: number): string {
+  if (!lineLimit) {
+    return content
+  }
+
+  const lines = content.split("\n")
+  if (lines.length <= lineLimit) {
+    return content
+  }
+
+  const beforeLimit = Math.floor(lineLimit * 0.2) // 20% of lines before
+  const afterLimit = lineLimit - beforeLimit // remaining 80% after
+  return [
+    ...lines.slice(0, beforeLimit),
+    `\n[...${lines.length - lineLimit} lines omitted...]\n`,
+    ...lines.slice(-afterLimit)
+  ].join("\n")
+}
+
 export class ToolHandler extends Base {
   constructor(
     context: vscode.ExtensionContext,
@@ -47,118 +115,227 @@ export class ToolHandler extends Base {
     this.registerHandlers()
   }
 
-  private async handleReplaceInFile(toolUse: ReplaceInFileToolUse) {
-    const { path, diff } = toolUse.params
+  private async handleReplaceInFile(message: ServerMessage<ToolUse>) {
+    // Extract parameters
+    const path = message.data.params.path as string
+    const diff = message.data.params.diff as string
+    const startLine = message.data.params.start_line
+      ? Number(message.data.params.start_line)
+      : undefined
+    const endLine = message.data.params.end_line
+      ? Number(message.data.params.end_line)
+      : undefined
+    const DEFAULT_FUZZY_THRESHOLD = 1.0
+    const BUFFER_LINES = 20
 
     if (!path || !diff) {
       vscode.window.showErrorMessage(
         "Missing required parameters for replace_in_file"
       )
-      return
+      return ""
     }
 
     try {
+      // Get workspace folder and file URI
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
         vscode.window.showErrorMessage("No workspace folder open")
-        return
+        return ""
       }
-
       const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path)
 
-      // Create directory structure if it doesn't exist
+      // Ensure directory exists
       const dirUri = vscode.Uri.joinPath(fullPath, "..")
       try {
         await vscode.workspace.fs.createDirectory(dirUri)
       } catch {
-        // Ignore if directory already exists
+        console.log("err")
       }
 
-      // Modified regex to handle empty search content
-      const diffBlockRegex =
-        /<<<<<<< SEARCH\n?([\s\S]*?)\n?=======\n([\s\S]*?)\n>>>>>>> REPLACE/g
-      const diffBlocks = Array.from(diff.matchAll(diffBlockRegex))
-
-      if (diffBlocks.length === 0) {
-        vscode.window.showErrorMessage("No valid diff blocks found")
-        return
-      }
-
-      let content: string
+      // Read original file content if exists
+      let originalContent: string
       let isNewFile = false
       try {
         const document = await vscode.workspace.openTextDocument(fullPath)
-        content = document.getText()
+        originalContent = document.getText()
       } catch {
-        // File doesn't exist, mark as new file
         isNewFile = true
-        content = ""
+        originalContent = ""
       }
 
-      // Process each diff block
-      for (const [, searchContent, replaceContent] of diffBlocks) {
-        // If file is new or search content is empty, just use replace content
-        if (isNewFile || !searchContent.trim()) {
-          content = replaceContent
-          continue
+      // Extract the SEARCH/REPLACE diff block
+      const match = diff.match(
+        /<<<<<<< SEARCH\n([\s\S]*?)\n?=======\n([\s\S]*?)\n?>>>>>>> REPLACE/
+      )
+      if (!match) {
+        vscode.window.showErrorMessage(
+          "Invalid diff format - missing required SEARCH/REPLACE sections"
+        )
+        return ""
+      }
+      let [, searchContent, replaceContent] = match
+
+      // Strip line numbers if present
+      if (
+        everyLineHasLineNumbers(searchContent) &&
+        everyLineHasLineNumbers(replaceContent)
+      ) {
+        searchContent = stripLineNumbers(searchContent)
+        replaceContent = stripLineNumbers(replaceContent)
+      }
+
+      // Determine file line ending
+      const lineEnding = originalContent.includes("\r\n") ? "\r\n" : "\n"
+
+      // Split diff and file content into lines
+      const searchLines =
+        searchContent === "" ? [] : searchContent.split(/\r?\n/)
+      const replaceLines =
+        replaceContent === "" ? [] : replaceContent.split(/\r?\n/)
+      const originalLines = originalContent.split(/\r?\n/)
+
+      // Validate empty search requires a specified insertion line
+      if (searchLines.length === 0 && startLine === undefined) {
+        vscode.window.showErrorMessage(
+          "Empty search content requires start_line to be specified"
+        )
+        return ""
+      }
+      if (
+        searchLines.length === 0 &&
+        startLine !== undefined &&
+        endLine !== undefined &&
+        startLine !== endLine
+      ) {
+        vscode.window.showErrorMessage(
+          `Empty search content requires start_line and end_line to be the same (got ${startLine}-${endLine})`
+        )
+        return ""
+      }
+
+      // Find best match in original content using fuzzy search
+      let matchIndex = -1
+      let bestMatchScore = 0
+      const searchChunk = searchLines.join("\n")
+
+      // If a line range is provided, try an exact match first.
+      let searchStartIndex = 0
+      let searchEndIndex = originalLines.length
+      if (startLine !== undefined && endLine !== undefined) {
+        const exactStartIndex = startLine - 1
+        const exactEndIndex = endLine - 1
+        if (
+          exactStartIndex < 0 ||
+          exactEndIndex >= originalLines.length ||
+          exactStartIndex > exactEndIndex
+        ) {
+          vscode.window.showErrorMessage(
+            `Line range ${startLine}-${endLine} is invalid (file has ${originalLines.length} lines)`
+          )
+          return ""
         }
+        const originalChunk = originalLines
+          .slice(exactStartIndex, exactEndIndex + 1)
+          .join("\n")
+        const similarity = getSimilarity(originalChunk, searchChunk)
+        if (similarity >= DEFAULT_FUZZY_THRESHOLD) {
+          matchIndex = exactStartIndex
+          bestMatchScore = similarity
+        } else {
+          // Expand search bounds with a buffer if exact match fails
+          searchStartIndex = Math.max(0, startLine - (BUFFER_LINES + 1))
+          searchEndIndex = Math.min(
+            originalLines.length,
+            endLine + BUFFER_LINES
+          )
+        }
+      }
 
-        // Split content into lines for line-by-line comparison
-        const searchLines = searchContent.split("\n")
-        const contentLines = content.split("\n")
-
-        // Find best matching position using fuzzy search
-        let bestMatchStart = -1
-        let bestMatchScore = 0
-        let bestMatchLength = 0
-
-        for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
-          const contentChunk = contentLines
-            .slice(i, i + searchLines.length)
-            .join("\n")
-          const similarity = getSimilarity(contentChunk, searchContent)
-
-          if (similarity > bestMatchScore) {
-            bestMatchScore = similarity
-            bestMatchStart = i
-            bestMatchLength = contentChunk.length
+      // Perform a middle-out fuzzy search if no match was found yet
+      if (matchIndex === -1) {
+        const midPoint = Math.floor((searchStartIndex + searchEndIndex) / 2)
+        let leftIndex = midPoint
+        let rightIndex = midPoint + 1
+        while (
+          leftIndex >= searchStartIndex ||
+          rightIndex <= searchEndIndex - searchLines.length
+        ) {
+          if (leftIndex >= searchStartIndex) {
+            const originalChunk = originalLines
+              .slice(leftIndex, leftIndex + searchLines.length)
+              .join("\n")
+            const similarity = getSimilarity(originalChunk, searchChunk)
+            if (similarity > bestMatchScore) {
+              bestMatchScore = similarity
+              matchIndex = leftIndex
+            }
+            leftIndex--
+          }
+          if (rightIndex <= searchEndIndex - searchLines.length) {
+            const originalChunk = originalLines
+              .slice(rightIndex, rightIndex + searchLines.length)
+              .join("\n")
+            const similarity = getSimilarity(originalChunk, searchChunk)
+            if (similarity > bestMatchScore) {
+              bestMatchScore = similarity
+              matchIndex = rightIndex
+            }
+            rightIndex++
           }
         }
-
-        // If no match meets the threshold, show warning and continue to next block
-        if (bestMatchScore < DEFAULT_FUZZY_THRESHOLD) {
-          vscode.window.showWarningMessage(
-            `Skipping block - No sufficiently similar match found (${Math.floor(
-              bestMatchScore * 100
-            )}% similar, needs ${Math.floor(DEFAULT_FUZZY_THRESHOLD * 100)}%)`
-          )
-          continue
-        }
-
-        // Calculate the character position from line number
-        let matchPosition = 0
-        for (let i = 0; i < bestMatchStart; i++) {
-          matchPosition += contentLines[i].length + 1 // +1 for newline
-        }
-
-        // Preserve indentation of the first line
-        const originalIndent =
-          contentLines[bestMatchStart].match(/^[\t ]*/)?.[0] || ""
-        const replaceLines = replaceContent.split("\n")
-        const indentedReplaceContent = replaceLines
-          .map((line, i) => (i === 0 ? line : originalIndent + line))
-          .join("\n")
-
-        // Update the content with the replacement
-        content =
-          content.substring(0, matchPosition) +
-          indentedReplaceContent +
-          content.substring(matchPosition + bestMatchLength)
       }
 
-      // Write the final content
+      // Require sufficient similarity threshold
+      if (matchIndex === -1 || bestMatchScore < DEFAULT_FUZZY_THRESHOLD) {
+        vscode.window.showErrorMessage(
+          `No sufficiently similar match found (${Math.floor(
+            bestMatchScore * 100
+          )}% similar, needs ${Math.floor(DEFAULT_FUZZY_THRESHOLD * 100)}%)`
+        )
+        return ""
+      }
+
+      // Preserve the indentation of the matched content
+      const matchedLines = originalLines.slice(
+        matchIndex,
+        matchIndex + searchLines.length
+      )
+      const originalIndents = matchedLines.map(
+        (line) => (line.match(/^[\t ]*/) || [""])[0]
+      )
+      const searchIndents = searchLines.map(
+        (line) => (line.match(/^[\t ]*/) || [""])[0]
+      )
+      const indentedReplaceLines = replaceLines.map((line) => {
+        const matchedIndent = originalIndents[0] || ""
+        const currentIndentMatch = line.match(/^[\t ]*/)
+        const currentIndent = currentIndentMatch ? currentIndentMatch[0] : ""
+        const searchBaseIndent = searchIndents[0] || ""
+        const searchBaseLevel = searchBaseIndent.length
+        const currentLevel = currentIndent.length
+        const relativeLevel = currentLevel - searchBaseLevel
+        const finalIndent =
+          relativeLevel < 0
+            ? matchedIndent.slice(
+                0,
+                Math.max(0, matchedIndent.length + relativeLevel)
+              )
+            : matchedIndent + currentIndent.slice(searchBaseLevel)
+        return finalIndent + line.trim()
+      })
+
+      // Replace the search block with the new indented content
+      const beforeMatch = originalLines.slice(0, matchIndex)
+      const afterMatch = originalLines.slice(matchIndex + searchLines.length)
+      const finalContent = [
+        ...beforeMatch,
+        ...indentedReplaceLines,
+        ...afterMatch
+      ].join(lineEnding)
+
+      // Write the updated content back to the file
       if (isNewFile) {
-        await vscode.workspace.fs.writeFile(fullPath, Buffer.from(content))
+        await vscode.workspace.fs.writeFile(fullPath, Buffer.from(finalContent))
         vscode.window.showInformationMessage(
           "Successfully created new file with content"
         )
@@ -171,57 +348,24 @@ export class ToolHandler extends Base {
             document.positionAt(0),
             document.positionAt(document.getText().length)
           ),
-          content
+          finalContent
         )
-
         const success = await vscode.workspace.applyEdit(edit)
-        if (!success) {
-          vscode.window.showErrorMessage("Failed to apply edits")
-          return
-        }
-
-        vscode.window.showInformationMessage(
-          `Successfully applied all changes (${diffBlocks.length} blocks)`
-        )
+        if (!success) return ""
+        await vscode.workspace.openTextDocument(fullPath)
       }
+      return await this.handleOpenAndSaveFile(message)
     } catch (error) {
       vscode.window.showErrorMessage(`Error applying changes: ${error}`)
-    }
-  }
-
-  public async handleAcceptToolUse(
-    message: ServerMessage<ToolUse>
-  ): Promise<string> {
-    const toolUse = message.data
-    if (!toolUse) return ""
-
-    switch (toolUse.name) {
-      case "replace_in_file":
-        await this.handleReplaceInFile(toolUse as ReplaceInFileToolUse)
-        // Save the file after applying changes
-        return await this.openAndSaveFile(toolUse.params.path)
-      case "list_code_definition_names":
-        return await this.handleListCodeDefinitionNames(
-          toolUse as ListCodeDefinitionNamesToolUse
-        )
-      case "read_files": {
-        const paths = toolUse.params.paths?.split(",")
-        return await this.handleReadFiles(paths)
-      }
-      case "execute_command":
-        return await this.handleExecuteCommand(toolUse as ExecuteCommandToolUse)
-      case "write_to_file":
-        return await this.handleWriteToFile(toolUse as WriteToFileToolUse)
-      default:
-        vscode.window.showErrorMessage(`Unsupported tool: ${toolUse.name}`)
-        return ""
+      return ""
     }
   }
 
   private async handleWriteToFile(
-    toolUse: WriteToFileToolUse
+    message: ServerMessage<ToolUse>
   ): Promise<string> {
-    const { path, content } = toolUse.params
+    const content = message.data.params.content
+    const path = message.data.params.path
 
     if (!path || content === undefined) {
       vscode.window.showErrorMessage(
@@ -243,6 +387,11 @@ export class ToolHandler extends Base {
 
       vscode.window.showInformationMessage(`File written successfully: ${path}`)
 
+      this.emit("resolve-tool-result", {
+        message,
+        result: `File written successfully: ${path}`
+      })
+
       return `File written successfully: ${path}`
     } catch (error) {
       vscode.window.showErrorMessage(`Error writing file: ${error}`)
@@ -251,9 +400,9 @@ export class ToolHandler extends Base {
   }
 
   private async handleExecuteCommand(
-    toolUse: ExecuteCommandToolUse
+    message: ServerMessage<ToolUse>
   ): Promise<string> {
-    const { command } = toolUse.params
+    const command = message.data.params.command
 
     if (!command) {
       vscode.window.showErrorMessage(
@@ -262,40 +411,84 @@ export class ToolHandler extends Base {
       return ""
     }
 
+    // Display the command to the user
+    vscode.window.showInformationMessage(`Executing command: ${command}`)
+
     try {
-      const { stdout, stderr } = await new Promise<{
-        stdout: string
-        stderr: string
-      }>((resolve, reject) => {
-        cp.exec(
-          command,
-          { cwd: vscode.workspace.rootPath },
-          (error, stdout, stderr) => {
-            if (error) {
-              reject(error)
-            } else {
-              resolve({ stdout, stderr })
-            }
-          }
-        )
-      })
+      const workspaceFolders = vscode.workspace.workspaceFolders
+      if (!workspaceFolders?.length) {
+        throw new Error("No workspace folder open")
+      }
+
+      const { stdout, stderr } = await this.executeCommandNonInteractive(
+        command,
+        workspaceFolders[0].uri.fsPath
+      )
 
       const result = stdout || stderr
-      const message = `Command executed successfully: ${command} : ${result}`
-      this.emit("resolve-tool-result", message)
-      return message
+      const resultMessage = `Command executed: ${command}\nResult: ${result}`
+      this.emit("resolve-tool-result", {
+        message,
+        result: resultMessage
+      })
+      return resultMessage
     } catch (error) {
-      vscode.window.showErrorMessage(`Error executing command: ${error}`)
+      const errorMessage = `Error executing command: ${error}`
+      this.emit("resolve-tool-result", {
+        message,
+        result: errorMessage
+      })
+      vscode.window.showErrorMessage(errorMessage)
       return ""
     }
   }
 
-  private async handleListCodeDefinitionNames(
-    toolUse: ListCodeDefinitionNamesToolUse
-  ): Promise<string> {
-    const { path: directoryPath } = toolUse.params
+  private executeCommandNonInteractive(
+    command: string,
+    cwd: string,
+    timeout = 60000,
+    successRegex = /(ready in|Local:|server running at|listening on|webpack \d+\.\d+\.\d+|development server running at|server started|compiled successfully|\d+\.\d+\.\d+\.\d+:\d+|localhost:\d+|started server on|server is running on|vite \d+\.\d+\.\d+|starting development server|webpack compiled|listening at http|server listening on|dev server running at|webpack: compiled|started server|ready on|available on|project is running at|app running at|successfully compiled|build complete|VITE v\d+\.\d+\.\d+|local:.+:\d+|network:.+:\d+|➜\s+local:\s+http|➜\s+network:\s+http|ready in \d+m?s|\d+ modules? transformed|http:\/\/localhost:\d+)/i
+  ): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+      const childProcess = cp.spawn(command, [], {
+        cwd,
+        shell: true,
+        stdio: ["ignore", "pipe", "pipe"]
+      })
 
-    if (!directoryPath) {
+      let stdout = ""
+      let stderr = ""
+
+      childProcess.stdout.on("data", (data) => {
+        stdout += data.toString()
+        console.log(stdout)
+        if (successRegex.test(stdout)) {
+          resolve({ stdout, stderr })
+        }
+      })
+
+      childProcess.stderr.on("data", (data) => {
+        stderr += data.toString()
+      })
+
+      const timeoutId = setTimeout(() => {
+        childProcess.kill()
+        reject(new Error(`Command timed out after ${timeout / 1000} seconds`))
+      }, timeout)
+
+      childProcess.on("error", (error) => {
+        clearTimeout(timeoutId)
+        reject(error)
+      })
+    })
+  }
+
+  private async handleListCodeDefinitionNames(
+    message: ServerMessage<ToolUse>
+  ): Promise<string> {
+    const path = message.data.params.path
+
+    if (!path) {
       vscode.window.showErrorMessage(
         "Missing required parameter 'path' for list_code_definition_names"
       )
@@ -309,11 +502,13 @@ export class ToolHandler extends Base {
         return "No workspace folder open"
       }
 
-      const fullPath = vscode.Uri.joinPath(
-        workspaceFolder.uri,
-        directoryPath
-      ).fsPath
+      const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path).fsPath
       const definitions = await this.getCodeDefinitions(fullPath)
+
+      this.emit("resolve-tool-result", {
+        message,
+        result: definitions.join("\n")
+      })
 
       return definitions.join("\n")
     } catch (error) {
@@ -391,7 +586,11 @@ export class ToolHandler extends Base {
     return nameNode ? nameNode.text : null
   }
 
-  private async openAndSaveFile(path?: string): Promise<string> {
+  private async handleOpenAndSaveFile(
+    message: ServerMessage<ToolUse>
+  ): Promise<string> {
+    const path = message.data.params.path
+
     if (!path) {
       vscode.window.showErrorMessage("No file path provided for saving")
       return "No file path provided for saving"
@@ -410,6 +609,12 @@ export class ToolHandler extends Base {
       await vscode.window.showTextDocument(document, { preview: false })
       await document.save()
       vscode.window.showInformationMessage(`File saved: ${path}`)
+
+      this.emit("resolve-tool-result", {
+        message,
+        result: `File saved ${path}`
+      })
+
       return `File saved ${path}`
     } catch (error) {
       vscode.window.showErrorMessage(`Error saving file: ${error}`)
@@ -417,9 +622,11 @@ export class ToolHandler extends Base {
     }
   }
 
-  private async handleReadFiles(paths: string[] | undefined): Promise<string> {
+  private async handleReadFiles(message: ServerMessage<ToolUse>): Promise<string> {
     try {
+      const paths = message.data.params.paths
       if (!paths?.length) return "No files provided for reading"
+
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
         vscode.window.showErrorMessage("No workspace folder open")
@@ -427,37 +634,87 @@ export class ToolHandler extends Base {
       }
 
       const results = await Promise.all(
-        paths.map(async (path) => {
-          const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, path)
+        paths.split(",").map(async (path) => {
+          const relativePath = path
+            .replace(workspaceFolder.uri.path, "")
+            .replace(/^\//, "")
+          const fullPath = vscode.Uri.joinPath(
+            workspaceFolder.uri,
+            relativePath
+          )
           const content = await vscode.workspace.fs.readFile(fullPath)
-          return `<file_content>${path}\n${Buffer.from(content).toString(
-            "utf8"
-          )}</file_content>`
+          const lines = Buffer.from(content).toString("utf8").split("\n")
+          const numberedLines = lines
+            .slice(0, -1)  // Remove last line
+            .map((line, index) => `${index + 1} | ${line}`)
+            .join("\n")
+          return `${relativePath}\n${numberedLines}`
         })
       )
 
-      return results.join("\n")
+      const xmlResult = `<read_files_result><params><content>${results.join("\n")}\n</content></params></read_files_result>`
+
+      this.emit("resolve-tool-result", {
+        message,
+        result: xmlResult
+      })
+
+      return xmlResult
     } catch (error) {
       vscode.window.showErrorMessage(`Error reading files: ${error}`)
       return `Error reading files: ${error}`
     }
   }
 
+  private async handleListFiles(
+    message: ServerMessage<ToolUse>
+  ): Promise<string> {
+    try {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("No workspace folder open")
+        return "No workspace folder open"
+      }
+
+      const fileTreeProvider = new FileTreeProvider()
+
+      const result = await fileTreeProvider.getEnvironmentDetails()
+
+      this.emit("resolve-tool-result", {
+        message,
+        result
+      })
+
+      return result
+    } catch (error) {
+      vscode.window.showErrorMessage(`Error listing files: ${error}`)
+      return `Error listing files: ${error}`
+    }
+  }
+
   public registerHandlers() {
     this._webview.onDidReceiveMessage(
       async (message: ServerMessage<ToolUse>) => {
-        switch (message.type) {
-          case EVENT_NAME.twinnyAcceptToolUse:
-            await this.handleAcceptToolUse(message)
-            break
-          case EVENT_NAME.twinnyRunToolUse:
-            await this.handleExecuteCommand(
-              message.data as ExecuteCommandToolUse
+        if (message.type !== EVENT_NAME.twinnyToolUse) return
+        switch (message.data.name) {
+          case "replace_in_file":
+            return await this.handleReplaceInFile(message)
+          case "list_code_definition_names":
+            return await this.handleListCodeDefinitionNames(message)
+          case "read_files": {
+            return await this.handleReadFiles(message)
+          }
+          case "execute_command":
+            return await this.handleExecuteCommand(message)
+          case "write_to_file":
+            return await this.handleWriteToFile(message)
+          case "list_files":
+            return await this.handleListFiles(message)
+          default:
+            vscode.window.showErrorMessage(
+              `Unsupported tool: ${message.data.name}`
             )
-            break
-          case EVENT_NAME.twinnyRejectToolUse:
-            // Handle rejection if needed
-            break
+            return ""
         }
       }
     )

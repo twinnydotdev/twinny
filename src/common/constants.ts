@@ -94,11 +94,7 @@ export const EVENT_NAME = {
   twinnyAddOpenFilesToContext: "twinny-add-open-file-to-context",
   twinnyGetContextFiles: "twinny-get-context-files",
   twinnyRemoveContextFile: "twinny-remove-context-file",
-  twinnyAcceptToolUse: "twinny-accept-tool-use",
-  twinnyRejectToolUse: "twinny-reject-tool-use",
-  twinnyRunToolUse: "twinny-run-tool-use",
-  twinnyToolUseResult:  "twinny-tool-use-result",
-  twinnyReadFiles: "twinny-read-files"
+  twinnyToolUse: "twinny-tool-use",
 }
 
 export const TWINNY_COMMAND_NAME = {

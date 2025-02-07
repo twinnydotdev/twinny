@@ -11,7 +11,6 @@ import {
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import * as cheerio from "cheerio"
-import cn from "classnames"
 import DOMPurify from "dompurify"
 
 import { EVENT_NAME, USER } from "../common/constants"
@@ -32,10 +31,9 @@ import {
   useSymmetryConnection,
   useTheme
 } from "./hooks"
-import { Message as MessageComponent } from "./message"
+import MessageItem from "./message-item"
 import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
-import TypingIndicator from "./typing-indicator"
 import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/index.module.css"
@@ -62,7 +60,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const { symmetryConnection } = useSymmetryConnection()
   const { files, removeFile } = useFileContext()
   const shouldScrollRef = useRef(true)
-  const [isAtBottom, setIsAtBottom] = useState(true)
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -125,15 +122,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
     switch (message.type) {
       case EVENT_NAME.twinnyAddMessage: {
         handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
-        break
-      }
-      case EVENT_NAME.twinnyToolUseResult: {
-        const { name, result } = event.data
-        handleAddMessage({
-          data: {
-            content: `${name} ${result}`
-          }
-        } as ServerMessage<ChatCompletionMessage>)
         break
       }
       case EVENT_NAME.twinnyOnCompletion: {
@@ -420,66 +408,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [handleOpenFile, removeFile]
   )
 
-  const itemContent = (index: number, message: ChatCompletionMessage) => {
-    const isUserMessage = message.role === "user"
-    const isAgentMessage = message.role === "assistant"
-    const isLastMessage = index === messages?.length - 1
-
-    const renderMessage = (role: string, key: string, props: object) => (
-      <MessageComponent
-        key={`${role}-${key}`}
-        isAssistant={role === "assistant"}
-        message={message}
-        theme={theme}
-        index={index}
-        {...props}
-      />
-    )
-
-    const props = {
-      conversationLength: messages?.length,
-      isLoading: isLoading || generatingRef.current,
-      messages: messages,
-      onDelete: handleDeleteMessage,
-      onEdit: handleEditMessage,
-      onRegenerate: handleRegenerateMessage
-    }
-
-    return (
-      <>
-        {isUserMessage && renderMessage("user", `${index - 1}`, props)}
-        {isAgentMessage && renderMessage("assistant", `${index}`, props)}
-        {completion &&
-          isLastMessage &&
-          renderMessage("assistant", `${index}`, {
-            ...props,
-            message: completion
-          })}
-        {isLoading && !completion && isLastMessage && (
-          <div className={cn(styles.message, styles.assistantMessage)}>
-            <TypingIndicator />
-          </div>
-        )}
-      </>
-    )
-  }
-
-  const scrollToBottom = useCallback(
-    (behavior?: ScrollBehavior | undefined) => {
-      virtuosoRef.current?.scrollTo({
-        top: Number.MAX_SAFE_INTEGER,
-        behavior: behavior || "auto"
-      })
-    },
-    []
-  )
-
-  useEffect(() => {
-    if (virtuosoRef.current && isAtBottom) {
-      scrollToBottom()
-    }
-  }, [completion, messages, scrollToBottom, isAtBottom])
-
   return (
     <VSCodePanelView>
       <div className={styles.container}>
@@ -509,12 +437,38 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <div className={styles.fileItems}>{files.map(renderFileItem)}</div>
         )}
         <Virtuoso
+          followOutput
           ref={virtuosoRef}
           data={messages}
           initialTopMostItemIndex={messages?.length}
           defaultItemHeight={800}
-          atBottomStateChange={setIsAtBottom}
-          itemContent={itemContent}
+          itemContent={useCallback(
+            (index: number) => (
+              <MessageItem
+                key={`message-list-${index}`}
+                handleDeleteMessage={handleDeleteMessage}
+                handleEditMessage={handleEditMessage}
+                handleRegenerateMessage={handleRegenerateMessage}
+                isLoading={isLoading}
+                message={messages[index]}
+                index={index}
+                completion={completion}
+                theme={theme}
+                generatingRef={generatingRef}
+                messages={messages}
+              />
+            ),
+            [
+              handleDeleteMessage,
+              handleEditMessage,
+              handleRegenerateMessage,
+              isLoading,
+              messages,
+              completion,
+              theme,
+              generatingRef
+            ]
+          )}
           atBottomThreshold={20}
           alignToBottom
         />
@@ -523,17 +477,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
         )}
         <div className={styles.chatOptions}>
           <div>
-            {!isAtBottom && (
-              <div className={styles.scrollToBottom}>
-                <VSCodeButton
-                  appearance="icon"
-                  onClick={() => scrollToBottom("smooth")}
-                  title={t("scroll-to-bottom")}
-                >
-                  <i className="codicon codicon-arrow-down" />
-                </VSCodeButton>
-              </div>
-            )}
             {generatingRef.current && !symmetryConnection && (
               <VSCodeButton
                 type="button"

@@ -6,7 +6,7 @@ export interface TextContent {
   partial: boolean
 }
 
-export const toolUseNames = [
+export const toolNames = [
   "execute_command",
   "read_files",
   "write_to_file",
@@ -19,16 +19,34 @@ export const toolUseNames = [
   "attempt_completion"
 ] as const
 
-// Converts array of tool call names into a union type ("execute_command" | "read_file" | ...)
-export type ToolUseName = (typeof toolUseNames)[number]
+export const toolResponseNames = [
+  "ask_followup_question_result",
+  "attempt_completion_result",
+  "list_code_definition_names_result",
+  "list_files_result",
+  "plan_mode_response_result",
+  "read_files_result",
+  "replace_in_file_result",
+  "search_files_result",
+  "write_to_file_result",
+]
 
-export const toolParamNames = [
+const allToolNames = [
+  ...toolNames,
+  ...toolResponseNames,
+]
+
+export type ToolName = (typeof toolNames)[number]
+
+export const parameterNames = [
   "command",
   "requires_approval",
   "path",
   "paths",
   "content",
   "diff",
+  "start_line",
+  "end_line",
   "regex",
   "file_pattern",
   "recursive",
@@ -45,80 +63,98 @@ export const toolParamNames = [
   "result"
 ] as const
 
-export type ToolParamName = (typeof toolParamNames)[number]
+export type ParamName = (typeof parameterNames)[number]
 
 export interface ToolUse {
   type: "tool_use"
-  id: string
-  name: ToolUseName
-  // params is a partial record, allowing only some or none of the possible parameters to be used
-  params: Partial<Record<ToolParamName, string>>
+  name: ToolName
+  params: Partial<Record<ParamName, string>>
   partial: boolean
-}
-
-let toolUseCounter = 0;
-
-function generateUniqueId(): string {
-  return `tool_${Date.now()}_${toolUseCounter++}`;
 }
 
 export interface ExecuteCommandToolUse extends ToolUse {
   name: "execute_command"
-  // Pick<Record<ToolParamName, string>, "command"> makes "command" required, but Partial<> makes it optional
   params: Partial<
-    Pick<Record<ToolParamName, string>, "command" | "requires_approval">
+    Pick<Record<ParamName, string>, "command" | "requires_approval">
   >
 }
 
 export interface ReadFilesToolUse extends ToolUse {
   name: "read_files"
-  params: Partial<Pick<Record<ToolParamName, string>, "paths">>
+  params: Partial<Pick<Record<ParamName, string>, "paths">>
 }
 
 export interface WriteToFileToolUse extends ToolUse {
   name: "write_to_file"
-  params: Partial<Pick<Record<ToolParamName, string>, "path" | "content">>
+  params: Partial<Pick<Record<ParamName, string>, "path" | "content">>
 }
 
 export interface ReplaceInFileToolUse extends ToolUse {
   name: "replace_in_file"
-  params: Partial<Pick<Record<ToolParamName, string>, "path" | "diff">>
+  params: Partial<
+    Pick<
+      Record<ParamName, string>,
+      "path" | "diff" | "start_line" | "end_line"
+    >
+  >
 }
 
 export interface SearchFilesToolUse extends ToolUse {
   name: "search_files"
   params: Partial<
-    Pick<Record<ToolParamName, string>, "path" | "regex" | "file_pattern">
+    Pick<Record<ParamName, string>, "path" | "regex" | "file_pattern">
   >
 }
 
 export interface ListFilesToolUse extends ToolUse {
   name: "list_files"
-  params: Partial<Pick<Record<ToolParamName, string>, "path" | "recursive">>
+  params: Partial<Pick<Record<ParamName, string>, "path" | "recursive">>
 }
 
 export interface ListCodeDefinitionNamesToolUse extends ToolUse {
   name: "list_code_definition_names"
-  params: Partial<Pick<Record<ToolParamName, string>, "path">>
+  params: Partial<Pick<Record<ParamName, string>, "path">>
 }
 
 export interface AskFollowupQuestionToolUse extends ToolUse {
   name: "ask_followup_question"
-  params: Partial<Pick<Record<ToolParamName, string>, "question">>
+  params: Partial<Pick<Record<ParamName, string>, "question">>
 }
 
 export interface AttemptCompletionToolUse extends ToolUse {
   name: "attempt_completion"
-  params: Partial<Pick<Record<ToolParamName, string>, "result" | "command">>
+  params: Partial<Pick<Record<ParamName, string>, "result" | "command">>
 }
 
-export function parseAssistantMessage(assistantMessage: string) {
+function replaceHtmlEntities(text: string) {
+  // Create a map of HTML entities to their corresponding characters
+  const entityMap = {
+    "&lt;": "<",
+    "&gt;": ">",
+    "&amp;": "&",
+    "&quot;": "\"",
+    "&#39;": "'",
+    "&nbsp;": " "
+  };
+
+  // Replace all entities with their corresponding characters
+  let decodedText = text;
+  Object.entries(entityMap).forEach(([entity, char]) => {
+    const regex = new RegExp(entity, "g");
+    decodedText = decodedText.replace(regex, char);
+  });
+
+  return decodedText;
+}
+
+export function parseAssistantMessage(message: string) {
+  const assistantMessage = replaceHtmlEntities(message)
   const contentBlocks: AssistantMessageContent[] = []
   let currentTextContent: TextContent | undefined = undefined
   let currentTextContentStartIndex = 0
   let currentToolUse: ToolUse | undefined = undefined
   let currentToolUseStartIndex = 0
-  let currentParamName: ToolParamName | undefined = undefined
+  let currentParamName: ParamName | undefined = undefined
   let currentParamValueStartIndex = 0
   let accumulator = ""
 
@@ -126,51 +162,41 @@ export function parseAssistantMessage(assistantMessage: string) {
     const char = assistantMessage[i]
     accumulator += char
 
-    // there should not be a param without a tool use
     if (currentToolUse && currentParamName) {
       const currentParamValue = accumulator.slice(currentParamValueStartIndex)
       const paramClosingTag = `</${currentParamName}>`
       if (currentParamValue.endsWith(paramClosingTag)) {
-        // end of param value
         currentToolUse.params[currentParamName] = currentParamValue
           .slice(0, -paramClosingTag.length)
           .trim()
         currentParamName = undefined
         continue
       } else {
-        // partial param value is accumulating
         continue
       }
     }
-
-    // no currentParamName
 
     if (currentToolUse) {
       const currentToolValue = accumulator.slice(currentToolUseStartIndex)
       const toolUseClosingTag = `</${currentToolUse.name}>`
       if (currentToolValue.endsWith(toolUseClosingTag)) {
-        // end of a tool use
         currentToolUse.partial = false
         contentBlocks.push(currentToolUse)
         currentToolUse = undefined
         continue
       } else {
-        const possibleParamOpeningTags = toolParamNames.map(
+        const possibleParamOpeningTags = parameterNames.map(
           (name) => `<${name}>`
         )
         for (const paramOpeningTag of possibleParamOpeningTags) {
           if (accumulator.endsWith(paramOpeningTag)) {
-            // start of a new parameter
-            currentParamName = paramOpeningTag.slice(1, -1) as ToolParamName
+            currentParamName = paramOpeningTag.slice(1, -1) as ParamName
             currentParamValueStartIndex = accumulator.length
             break
           }
         }
 
-        // there's no current param, and not starting a new param
-
-        // special case for write_to_file where file contents could contain the closing tag, in which case the param would have closed and we end up with the rest of the file contents here. To work around this, we get the string between the starting content tag and the LAST content tag.
-        const contentParamName: ToolParamName = "content"
+        const contentParamName: ParamName = "content"
         if (
           currentToolUse.name === "write_to_file" &&
           accumulator.endsWith(`</${contentParamName}>`)
@@ -192,30 +218,24 @@ export function parseAssistantMessage(assistantMessage: string) {
           }
         }
 
-        // partial tool value is accumulating
         continue
       }
     }
 
-    // no currentToolUse
-
     let didStartToolUse = false
-    const possibleToolUseOpeningTags = toolUseNames.map((name) => `<${name}>`)
+    const possibleToolUseOpeningTags = allToolNames.map((name) => `<${name}>`)
     for (const toolUseOpeningTag of possibleToolUseOpeningTags) {
       if (accumulator.endsWith(toolUseOpeningTag)) {
-        // start of a new tool use
         currentToolUse = {
           type: "tool_use",
-          name: toolUseOpeningTag.slice(1, -1) as ToolUseName,
+          name: toolUseOpeningTag.slice(1, -1) as ToolName,
           params: {},
-          id: generateUniqueId(),
           partial: true
         }
+        console.log("started tool use", currentToolUse)
         currentToolUseStartIndex = accumulator.length
-        // this also indicates the end of the current text content
         if (currentTextContent) {
           currentTextContent.partial = false
-          // remove the partially accumulated tool use tag from the end of text (<tool)
           currentTextContent.content = currentTextContent.content
             .slice(0, -toolUseOpeningTag.slice(0, -1).length)
             .trim()
@@ -229,7 +249,6 @@ export function parseAssistantMessage(assistantMessage: string) {
     }
 
     if (!didStartToolUse) {
-      // no tool use, so it must be text either at the beginning or between tools
       if (currentTextContent === undefined) {
         currentTextContentStartIndex = i
       }
@@ -242,9 +261,7 @@ export function parseAssistantMessage(assistantMessage: string) {
   }
 
   if (currentToolUse) {
-    // stream did not complete tool call, add it as partial
     if (currentParamName) {
-      // tool call has a parameter that was not completed
       currentToolUse.params[currentParamName] = accumulator
         .slice(currentParamValueStartIndex)
         .trim()
@@ -252,9 +269,7 @@ export function parseAssistantMessage(assistantMessage: string) {
     contentBlocks.push(currentToolUse)
   }
 
-  // Note: it doesnt matter if check for currentToolUse or currentTextContent, only one of them will be defined since only one can be partial at a time
   if (currentTextContent) {
-    // stream did not complete text content, add it as partial
     contentBlocks.push(currentTextContent)
   }
 

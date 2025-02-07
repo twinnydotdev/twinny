@@ -348,16 +348,6 @@ export interface ContextFile {
   category: "files";
 }
 
-
-export interface ReplaceInFileToolUse extends ToolUse {
-  name: "replace_in_file"
-  params: {
-    path?: string
-    diff?: string
-    fuzzyThreshold?: number
-  }
-}
-
 export interface ListCodeDefinitionNamesToolUse extends ToolUse {
   name: "list_code_definition_names"
   params: {
