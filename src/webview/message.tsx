@@ -313,6 +313,16 @@ export const Message: React.FC<MessageProps> = ({
     })
   }
 
+  const onDiff = (block: ToolUse) => {
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyToolUse,
+      data: {
+        ...block,
+        name: "view_diff",
+      }
+    })
+  }
+
   if (!message?.content) return null
 
   const { thinking, messageBlocks } = parseMessage(message.content as string)
@@ -410,6 +420,14 @@ export const Message: React.FC<MessageProps> = ({
                   </>
                 )}
                 <div className={styles.toolFooter}>
+                  {block.name === "apply_diff" && (
+                    <VSCodeButton
+                      onClick={() => onDiff(block)}
+                      appearance="primary"
+                    >
+                      View diff
+                    </VSCodeButton>
+                  )}
                   <VSCodeButton
                     onClick={() => onRun(block)}
                     appearance="primary"

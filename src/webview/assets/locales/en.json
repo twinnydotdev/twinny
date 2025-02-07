@@ -93,7 +93,7 @@
   "relevant-code-snippets": "Relevant code snippets",
   "relevant-file-paths": "Relevant file paths",
   "remove": "Remove",
-  "replace_in_file": "Replace in File",
+  "apply_diff": "Suggested changes",
   "repository-level": "Repository level",
   "rerank-probability-threshold": "Rerank probability threshold",
   "rerank-threshold-description": "The lower the threshold, the more likely a result is to be included.",

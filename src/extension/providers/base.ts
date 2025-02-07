@@ -91,6 +91,13 @@ export class BaseProvider {
       this.context
     )
 
+    this.conversationHistory = new ConversationHistory(
+      this.context,
+      this.webView,
+      this._sessionManager,
+      this._symmetryService
+    )
+
     this.chat = new Chat(
       this._statusBarItem,
       this._templateDir,
@@ -98,14 +105,8 @@ export class BaseProvider {
       this.webView,
       this._embeddingDatabase,
       this._sessionManager,
-      this._symmetryService
-    )
-
-    this.conversationHistory = new ConversationHistory(
-      this.context,
-      this.webView,
-      this._sessionManager,
-      this._symmetryService
+      this._symmetryService,
+      this.conversationHistory,
     )
 
     this.reviewService = new ReviewService(

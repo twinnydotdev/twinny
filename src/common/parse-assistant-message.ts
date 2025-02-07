@@ -10,7 +10,8 @@ export const toolNames = [
   "execute_command",
   "read_files",
   "write_to_file",
-  "replace_in_file",
+  "apply_diff",
+  "view_diff",
   "search_files",
   "list_files",
   "list_code_definition_names",
@@ -26,7 +27,7 @@ export const toolResponseNames = [
   "list_files_result",
   "plan_mode_response_result",
   "read_files_result",
-  "replace_in_file_result",
+  "apply_diff_result",
   "search_files_result",
   "write_to_file_result",
 ]
@@ -89,8 +90,8 @@ export interface WriteToFileToolUse extends ToolUse {
   params: Partial<Pick<Record<ParamName, string>, "path" | "content">>
 }
 
-export interface ReplaceInFileToolUse extends ToolUse {
-  name: "replace_in_file"
+export interface ApplyDiffTool extends ToolUse {
+  name: "apply_diff"
   params: Partial<
     Pick<
       Record<ParamName, string>,

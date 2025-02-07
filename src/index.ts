@@ -73,6 +73,20 @@ export async function activate(context: ExtensionContext) {
 
   templateProvider.init()
 
+  const diffContentProvider = new (class
+    implements vscode.TextDocumentContentProvider
+  {
+    provideTextDocumentContent(uri: vscode.Uri): string {
+      return Buffer.from(uri.query, "base64").toString("utf-8")
+    }
+  })()
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      "twinny-diff",
+      diffContentProvider
+    )
+  )
+
   context.subscriptions.push(
     languages.registerInlineCompletionItemProvider(
       { pattern: "**" },

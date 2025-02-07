@@ -1,16 +1,11 @@
 import React, { useCallback } from "react"
-import ReactDiffViewer, { DiffMethod } from "react-diff-viewer-continued"
 import { useTranslation } from "react-i18next"
-import SyntaxHighlighter from "react-syntax-highlighter"
-import { vs } from "react-syntax-highlighter/dist/esm/styles/hljs"
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 
-import { diffViewerStyles, EVENT_NAME } from "../common/constants"
+import { EVENT_NAME } from "../common/constants"
 import { ToolUse } from "../common/parse-assistant-message"
-import { Theme } from "../common/types"
 
 import { CollapsibleSection } from "./collapsible-section"
-import { useTheme } from "./hooks"
+import DiffSummary from "./diff-summary"
 import { parseDiffBlocks } from "./utils"
 
 import styles from "./styles/tool-use.module.css"
@@ -23,23 +18,10 @@ interface ToolCardProps {
 const global = globalThis as any
 export const ToolCard: React.FC<ToolCardProps> = ({ toolUse }) => {
   const { t } = useTranslation()
-  const theme = useTheme()
 
   const showDiffViewer =
-    (toolUse.name === "replace_in_file" && toolUse.params.diff) ||
+    (toolUse.name === "apply_diff" && toolUse.params.diff) ||
     (toolUse.name === "write_to_file" && toolUse.params.content)
-
-  const highlightSyntax = useCallback(
-    (str: string) => (
-      <SyntaxHighlighter
-        language="javascript"
-        style={theme === Theme.Dark ? vscDarkPlus : vs}
-      >
-        {str}
-      </SyntaxHighlighter>
-    ),
-    [theme]
-  )
 
   const AttemptCompletionCard = () => (
     <div className={`${styles.toolCard} ${styles.successCard}`}>
@@ -75,7 +57,6 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse }) => {
   return (
     <div className={styles.toolCard}>
       <div className={styles.toolHeader}>
-        <span className={styles.toolName}>{t(toolUse.name)}</span>
         {toolUse.params.path && (
           <span
             onClick={() => handleOpenFile(toolUse.params.path)}
@@ -88,37 +69,22 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse }) => {
       <div className={styles.toolBody}>
         {showDiffViewer ? (
           <div className={styles.diffViewer}>
-            {toolUse.name === "replace_in_file" && toolUse.params.diff ? (
-              parseDiffBlocks(toolUse.params.diff).map((block, index) => (
-                <CollapsibleSection title="Diff">
-                  <ReactDiffViewer
-                    key={index}
-                    oldValue={block.oldText}
-                    newValue={block.newText}
-                    splitView={false}
-                    useDarkTheme={theme === Theme.Dark}
-                    compareMethod={DiffMethod.WORDS}
-                    renderContent={highlightSyntax}
-                    styles={diffViewerStyles}
-                    hideLineNumbers
-                    showDiffOnly
-                  />
-                </CollapsibleSection>
+            {toolUse.name === "apply_diff" && toolUse.params.diff ? (
+              parseDiffBlocks(toolUse.params.diff).map((block) => (
+                <>
+                  <CollapsibleSection title={t(toolUse.name)}>
+                    <DiffSummary
+                      oldValue={block.oldText}
+                      newValue={block.newText}
+                    />
+                  </CollapsibleSection>
+                </>
               ))
             ) : toolUse.name === "write_to_file" && toolUse.params.content ? (
-              <CollapsibleSection title="Diff">
-                <ReactDiffViewer
-                  oldValue=""
-                  newValue={toolUse.params.content.trim()}
-                  splitView={false}
-                  useDarkTheme={theme === Theme.Dark}
-                  compareMethod={DiffMethod.WORDS}
-                  renderContent={highlightSyntax}
-                  styles={diffViewerStyles}
-                  hideLineNumbers
-                  showDiffOnly
-                />
-              </CollapsibleSection>
+              <DiffSummary
+                oldValue=""
+                newValue={toolUse.params.content.trim()}
+              />
             ) : null}
           </div>
         ) : (

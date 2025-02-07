@@ -343,9 +343,9 @@ export interface LMStudioEmbedding {
 }
 
 export interface ContextFile {
-  name: string;
-  path: string;
-  category: "files";
+  name: string
+  path: string
+  category: "files"
 }
 
 export interface ListCodeDefinitionNamesToolUse extends ToolUse {

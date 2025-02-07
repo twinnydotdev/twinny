@@ -71,20 +71,6 @@ export class ConversationHistory extends Base {
     )
   }
 
-  private getRequestOptions(provider: TwinnyProvider) {
-    return {
-      hostname: provider.apiHostname,
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
-      }
-    }
-  }
-
   async getConversationTitle(
     messages: ChatCompletionMessageParam[]
   ): Promise<string | null> {

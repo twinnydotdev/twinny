@@ -202,6 +202,10 @@ code {
   user-select: none;
   border-radius: 4px;
   transition: background-color 0.2s ease;
+  background-color: var(--vscode-editorWidget-background);
+}
+
+.collapseHeader:hover {
   background-color: var(--vscode-inputOption-hoverBackground);
 }
 
@@ -210,7 +214,7 @@ code {
   overflow: auto;
   transition: all 0.3s ease-out;
   opacity: 1;
-  max-height: 500px;
+  max-height: 400px;
   margin-top: 8px;
   position: relative;
 }
@@ -231,10 +235,10 @@ code {
 }
 
 .collapseContent.collapsed {
-  max-height: 120px;
+  max-height: 0px;
   opacity: 1;
-  margin-top: 8px;
-  padding: 8px;
+  margin-top: 0;
+  padding: 0;
 }
 
 .collapseContent:not(.collapsed)::after {

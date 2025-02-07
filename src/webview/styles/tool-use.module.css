@@ -12,18 +12,17 @@
 
 .filePath {
   color: var(--vscode-textLink-foreground);
-  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex-grow: 1;
   cursor: pointer;
   transition: color 0.2s ease;
+  margin-left: 5px;
 }
 
 .filePath:hover {
   color: var(--vscode-textLink-activeForeground);
-  text-decoration: underline;
 }
 
 .toolBody {

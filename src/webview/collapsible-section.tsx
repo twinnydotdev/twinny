@@ -1,11 +1,10 @@
 import React, { ReactNode } from "react"
-import Markdown, { Components } from "react-markdown"
-import remarkGfm from "remark-gfm"
+import { Components } from "react-markdown"
 
 import styles from "./styles/index.module.css"
 
 interface CollapsibleSectionProps {
-  title: string
+  title: string | ReactNode
   content?: string
   markdownComponents?: Components
   children?: ReactNode
@@ -13,7 +12,6 @@ interface CollapsibleSectionProps {
 
 export const CollapsibleSection = ({
   content,
-  markdownComponents,
   title,
   children
 }: CollapsibleSectionProps) => {
@@ -39,16 +37,7 @@ export const CollapsibleSection = ({
         }`}
       >
         <div className={styles.fadeContent}>
-          {children ? (
-            children
-          ) : (
-            <Markdown
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents}
-            >
-              {content}
-            </Markdown>
-          )}
+          {children ? children : content}
         </div>
       </div>
     </div>

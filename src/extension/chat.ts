@@ -37,7 +37,7 @@ import { Logger, logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   parseAssistantMessage,
-  ToolUse,
+  ToolUse
 } from "../common/parse-assistant-message"
 import {
   ChatCompletionMessage,
@@ -49,6 +49,7 @@ import {
 import { kebabToSentence } from "../webview/utils"
 
 import { Base } from "./base"
+import { ConversationHistory } from "./conversation-history"
 import { EmbeddingDatabase } from "./embeddings"
 import { FileHandler } from "./file-handler"
 import { TwinnyProvider } from "./provider-manager"
@@ -88,6 +89,7 @@ export class Chat extends Base {
   private _isCancelled = false
   private _fileHandler: FileHandler
   private _toolHandler: ToolHandler
+  private _conversationHistory: ConversationHistory
 
   private resetState() {
     this._completion = ""
@@ -105,7 +107,8 @@ export class Chat extends Base {
     webView: Webview,
     db: EmbeddingDatabase | undefined,
     sessionManager: SessionManager | undefined,
-    symmetryService: SymmetryService
+    symmetryService: SymmetryService,
+    conversationHistory: ConversationHistory
   ) {
     super(extensionContext)
     this._webView = webView
@@ -117,8 +120,12 @@ export class Chat extends Base {
     this._symmetryService = symmetryService
     this._fileHandler = new FileHandler(webView)
     this._toolHandler = new ToolHandler(extensionContext, this._webView)
+    this._conversationHistory = conversationHistory
     this.setupSymmetryListeners()
     this.toolResultListener()
+    this._conversation =
+      conversationHistory.getActiveConversation()?.messages ?? []
+    console.log(this._conversation)
   }
 
   private setupSymmetryListeners() {
@@ -341,38 +348,39 @@ export class Chat extends Base {
   }
 
   public toolResultListener() {
-    this._toolHandler.on("resolve-tool-result", async (toolResult: {
-      message: ToolUse,
-      result: string
-    }) => {
-      this.addToolResultToConversation(toolResult.result)
-      this.continueConversation()
-    })
+    this._toolHandler.on(
+      "resolve-tool-result",
+      async (toolResult: { message: ToolUse; result: string }) => {
+        this.addToolResultToConversation(toolResult.result)
+        this.continueConversation()
+      }
+    )
   }
 
   private trimContentAfterLastTool(content: string): string {
-  const toolTags = [
-    "execute_command",
-    "read_files",
-    "list_files",
-    "list_code_definition_names",
-    "search_files"
-  ];
+    const toolTags = [
+      "execute_command",
+      "read_files",
+      "list_files",
+      "list_code_definition_names",
+      "search_files"
+    ]
 
-  let lastIndex = -1;
-  for (const tag of toolTags) {
-    const closeTagIndex = content.lastIndexOf(`</${tag}>`);
-    if (closeTagIndex > lastIndex) {
-      lastIndex = closeTagIndex + `</${tag}>`.length;
+    let lastIndex = -1
+    for (const tag of toolTags) {
+      const closeTagIndex = content.lastIndexOf(`</${tag}>`)
+      if (closeTagIndex > lastIndex) {
+        lastIndex = closeTagIndex + `</${tag}>`.length
+      }
     }
+
+    return lastIndex !== -1 ? content.slice(0, lastIndex).trim() : content
   }
 
-  return lastIndex !== -1 ? content.slice(0, lastIndex).trim() : content;
-}
-
-
   private async addMessageToConversation() {
-    const content = this.trimContentAfterLastTool(this._completion.trim() || " ");
+    const content = this.trimContentAfterLastTool(
+      this._completion.trim() || " "
+    )
 
     this._conversation.push({
       role: ASSISTANT,
@@ -652,7 +660,16 @@ export class Chat extends Base {
 
   private async getSystemPrompt(): Promise<string> {
     const mode = this.getIsTwinnyAgent()
-    return (await this._templateProvider?.readSystemMessageTemplate(mode)) || ""
+    const message =
+      (await this._templateProvider?.readSystemMessageTemplate(mode)) || ""
+    const isAgent = this.getIsTwinnyAgent()
+
+    if (isAgent) {
+      const additionalContext = await this._fileTreeProvider.getEnvironmentDetails()
+      return `${message} ${additionalContext}`
+    }
+
+    return message
   }
 
   private async buildAdditionalContext(
@@ -660,7 +677,6 @@ export class Chat extends Base {
     text: string,
     filePaths?: FileItem[]
   ): Promise<string> {
-    const isAgent = this.getIsTwinnyAgent()
     let context = userSelection ? `Selected Code:\n${userSelection}\n\n` : ""
     const ragContext = await this.getRagContext(text)
     if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
@@ -677,12 +693,6 @@ export class Chat extends Base {
         (filepath) => !["workspace", "problems"].includes(filepath.name)
       )
     )
-
-    if (isAgent) {
-      const environmentDetails =
-        await this._fileTreeProvider.getEnvironmentDetails()
-      context += environmentDetails
-    }
 
     if (fileContents) context += `File Contents:\n${fileContents}\n\n`
 
