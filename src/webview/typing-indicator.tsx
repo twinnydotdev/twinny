@@ -4,7 +4,7 @@ import styles from "./styles/index.module.css"
 
 const TypingIndicator = () => {
   return (
-    <div>
+    <div className={styles.message}>
       <span className={styles.messageRole}>twinny</span>
       <div className={styles.typingIndicator}>
         <div className={styles.typingDot}></div>

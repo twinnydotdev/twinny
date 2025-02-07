@@ -11,7 +11,6 @@ import {
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import * as cheerio from "cheerio"
-import cn from "classnames"
 import DOMPurify from "dompurify"
 
 import { EVENT_NAME, USER } from "../common/constants"
@@ -31,10 +30,9 @@ import {
   useSymmetryConnection,
   useTheme
 } from "./hooks"
-import { Message as MessageComponent } from "./message"
+import MessageItem from "./message-item"
 import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
-import TypingIndicator from "./typing-indicator"
 import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/index.module.css"
@@ -45,9 +43,6 @@ interface ChatProps {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
-
-const MemoizedMessageComponent = React.memo(MessageComponent)
-const MemoizedVSCodeButton = React.memo(VSCodeButton)
 
 export const Chat = (props: ChatProps): JSX.Element => {
   const { fullScreen } = props
@@ -63,8 +58,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { symmetryConnection } = useSymmetryConnection()
   const { files, removeFile } = useFileContext()
-  const shouldScrollRef = useRef(true)
-  const [isAtBottom, setIsAtBottom] = useState(true)
+  const [isBottom, setIsBottom] = useState(false)
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -305,8 +299,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       return updatedMessages
     })
-
-    shouldScrollRef.current = true
   }, [])
 
   const handleNewConversation = useCallback(() => {
@@ -391,6 +383,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
   }, [memoizedSuggestion])
 
+  const scrollToBottom = useCallback(() => {
+    virtuosoRef.current?.scrollTo({
+      top: Infinity,
+      behavior: "instant"
+    })
+  }, [])
+
   const renderFileItem = useCallback(
     (file: { path: string; name: string }) => (
       <div
@@ -413,78 +412,46 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [handleOpenFile, removeFile]
   )
 
-  const itemContent = (index: number, message: ChatCompletionMessage) => {
-    const isUserMessage = message.role === "user"
-    const isAgentMessage = message.role === "assistant"
-    const isLastMessage = index === messages?.length - 1
-
-    const renderMessage = (role: string, key: string, props: object) => (
-      <MemoizedMessageComponent
-        key={`${role}-${key}`}
-        isAssistant={role === "assistant"}
-        message={message}
-        theme={theme}
+  const itemContent = useCallback(
+    (index: number) => (
+      <MessageItem
+        key={`message-list-${index}`}
+        handleDeleteMessage={handleDeleteMessage}
+        handleEditMessage={handleEditMessage}
+        handleRegenerateMessage={handleRegenerateMessage}
+        isLoading={isLoading}
+        message={messages[index]}
         index={index}
-        {...props}
+        completion={completion}
+        theme={theme}
+        generatingRef={generatingRef}
+        messages={messages}
       />
-    )
-
-    const props = {
-      conversationLength: messages?.length,
-      isLoading: isLoading || generatingRef.current,
-      messages: messages,
-      onDelete: handleDeleteMessage,
-      onEdit: handleEditMessage,
-      onRegenerate: handleRegenerateMessage
-    }
-
-    return (
-      <>
-        {isUserMessage && renderMessage("user", `${index - 1}`, props)}
-        {isAgentMessage && renderMessage("assistant", `${index}`, props)}
-        {completion &&
-          isLastMessage &&
-          renderMessage("assistant", `${index}`, {
-            ...props,
-            message: completion
-          })}
-        {isLoading && !completion && isLastMessage && (
-          <div className={cn(styles.message, styles.assistantMessage)}>
-            <TypingIndicator />
-          </div>
-        )}
-      </>
-    )
-  }
-
-  const scrollToBottom = useCallback(
-    (behavior?: ScrollBehavior | undefined) => {
-      virtuosoRef.current?.scrollTo({
-        top: Number.MAX_SAFE_INTEGER,
-        behavior: behavior || "auto"
-      })
-    },
-    []
+    ),
+    [
+      handleDeleteMessage,
+      handleEditMessage,
+      handleRegenerateMessage,
+      isLoading,
+      messages,
+      completion,
+      theme,
+      generatingRef
+    ]
   )
-
-  useEffect(() => {
-    if (virtuosoRef.current && isAtBottom) {
-      scrollToBottom()
-    }
-  }, [completion, messages, scrollToBottom, isAtBottom])
 
   return (
     <VSCodePanelView>
       <div className={styles.container}>
         {!!fullScreen && (
           <div className={styles.fullScreenActions}>
-            <MemoizedVSCodeButton
+            <VSCodeButton
               onClick={handleNewConversation}
               appearance="icon"
               title={t("new-conversation")}
             >
               <i className="codicon codicon-comment-discussion" />
-            </MemoizedVSCodeButton>
+            </VSCodeButton>
           </div>
         )}
         <h4 className={styles.title}>
@@ -502,13 +469,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <div className={styles.fileItems}>{files.map(renderFileItem)}</div>
         )}
         <Virtuoso
+          followOutput
           ref={virtuosoRef}
           data={messages}
           initialTopMostItemIndex={messages?.length}
           defaultItemHeight={800}
-          atBottomStateChange={setIsAtBottom}
           itemContent={itemContent}
           atBottomThreshold={20}
+          atBottomStateChange={(bottom) => setIsBottom(bottom)}
           alignToBottom
         />
         {!!selection.length && (
@@ -516,26 +484,26 @@ export const Chat = (props: ChatProps): JSX.Element => {
         )}
         <div className={styles.chatOptions}>
           <div>
-            {!isAtBottom && (
+            {!isBottom && (
               <div className={styles.scrollToBottom}>
-                <MemoizedVSCodeButton
+                <VSCodeButton
                   appearance="icon"
-                  onClick={() => scrollToBottom("smooth")}
+                  onClick={scrollToBottom}
                   title={t("scroll-to-bottom")}
                 >
                   <i className="codicon codicon-arrow-down" />
-                </MemoizedVSCodeButton>
+                </VSCodeButton>
               </div>
             )}
             {generatingRef.current && !symmetryConnection && (
-              <MemoizedVSCodeButton
+              <VSCodeButton
                 type="button"
                 appearance="icon"
                 onClick={handleStopGeneration}
                 aria-label={t("stop-generation")}
               >
                 <span className="codicon codicon-debug-stop"></span>
-              </MemoizedVSCodeButton>
+              </VSCodeButton>
             )}
           </div>
           <div>
