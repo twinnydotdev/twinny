@@ -209,36 +209,25 @@ code {
   background-color: var(--vscode-inputOption-hoverBackground);
 }
 
+.collapsibleTitle {
+  display: flex;
+  justify-content: space-between;
+}
+
 .collapseContent {
   padding: 8px;
   overflow: auto;
-  transition: all 0.3s ease-out;
+  transition: min-height 0.3s ease-in-out, max-height 0.3s ease-in-out, opacity 0.2s ease-in-out;
   opacity: 1;
   max-height: 400px;
-  margin-top: 8px;
   position: relative;
-}
-
-.collapseContent::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 50px;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    var(--vscode-editor-background)
-  );
-  pointer-events: none;
+  min-height: 22px;
 }
 
 .collapseContent.collapsed {
   max-height: 0px;
   opacity: 1;
   margin-top: 0;
-  padding: 0;
 }
 
 .collapseContent:not(.collapsed)::after {

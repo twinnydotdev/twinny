@@ -74,9 +74,7 @@
 
 .diffSummary {
   padding: 8px;
-  font-family: var(--vscode-editor-font-family);
   font-size: 12px;
-  border-bottom: 1px solid var(--vscode-panel-border);
 }
 
 .addedColor {

@@ -58,14 +58,6 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse }) => {
   return (
     <div className={styles.toolCard}>
       <div className={styles.toolHeader}>
-        {toolUse.params.path && (
-          <span
-            onClick={() => handleOpenFile(toolUse.params.path)}
-            className={styles.filePath}
-          >
-            {toolUse.params.path}
-          </span>
-        )}
       </div>
       <div className={styles.toolBody}>
         {showDiffViewer ? (
@@ -83,11 +75,18 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse }) => {
 
                 return (
                   <>
-                    <div className={styles.diffSummary}>
-                      <span className={styles.addedColor}>+{addedLines}</span>{" "}
-                      <span className={styles.removedColor}>-{removedLines}</span>
-                    </div>
-                    <CollapsibleSection title={t(toolUse.name)}>
+                    <CollapsibleSection title={
+                      <div className={styles.collapsibleTitle}>
+                        <span onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenFile(toolUse.params.path)
+                        }}>{toolUse.params.path}</span>
+                        <span className={styles.diffSummary}>
+                          <span className={styles.addedColor}>+{addedLines}</span>{" "}
+                          <span className={styles.removedColor}>-{removedLines}</span>
+                        </span>
+                      </div>
+                    }>
                       <DiffSummary diff={diff} />
                     </CollapsibleSection>
                   </>
