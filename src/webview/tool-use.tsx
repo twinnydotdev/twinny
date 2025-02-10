@@ -1,5 +1,6 @@
 import React, { useCallback } from "react"
 import { useTranslation } from "react-i18next"
+import { diffLines } from "diff"
 
 import { EVENT_NAME } from "../common/constants"
 import { ToolUse } from "../common/parse-assistant-message"
@@ -70,21 +71,51 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse }) => {
         {showDiffViewer ? (
           <div className={styles.diffViewer}>
             {toolUse.name === "apply_diff" && toolUse.params.diff ? (
-              parseDiffBlocks(toolUse.params.diff).map((block) => (
-                <>
-                  <CollapsibleSection title={t(toolUse.name)}>
-                    <DiffSummary
-                      oldValue={block.oldText}
-                      newValue={block.newText}
-                    />
-                  </CollapsibleSection>
-                </>
-              ))
+              parseDiffBlocks(toolUse.params.diff).map((block) => {
+                const diff = diffLines(block.oldText, block.newText);
+                let addedLines = 0;
+                let removedLines = 0;
+
+                diff.forEach((part) => {
+                  if (part.added) addedLines += part.count || 0;
+                  if (part.removed) removedLines += part.count || 0;
+                });
+
+                return (
+                  <>
+                    <div className={styles.diffSummary}>
+                      <span className={styles.addedColor}>+{addedLines}</span>{" "}
+                      <span className={styles.removedColor}>-{removedLines}</span>
+                    </div>
+                    <CollapsibleSection title={t(toolUse.name)}>
+                      <DiffSummary diff={diff} />
+                    </CollapsibleSection>
+                  </>
+                );
+              })
             ) : toolUse.name === "write_to_file" && toolUse.params.content ? (
-              <DiffSummary
-                oldValue=""
-                newValue={toolUse.params.content.trim()}
-              />
+              <>
+                {(() => {
+                  const diff = diffLines("", toolUse.params.content.trim());
+                  let addedLines = 0;
+                  let removedLines = 0;
+
+                  diff.forEach((part) => {
+                    if (part.added) addedLines += part.count || 0;
+                    if (part.removed) removedLines += part.count || 0;
+                  });
+
+                  return (
+                    <>
+                      <div className={styles.diffSummary}>
+                        <span className={styles.addedColor}>+{addedLines}</span>{" "}
+                        <span className={styles.removedColor}>-{removedLines}</span>
+                      </div>
+                      <DiffSummary diff={diff} />
+                    </>
+                  );
+                })()}
+              </>
             ) : null}
           </div>
         ) : (

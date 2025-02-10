@@ -380,11 +380,11 @@ export class ToolHandler extends Base {
     }
   }
 
-  private async handleReadFiles(
+  private async handleReadFile(
     message: ServerMessage<ToolUse>
   ): Promise<string> {
     try {
-      const paths = message.data.params.paths
+      const paths = message.data.params.path
       if (!paths?.length) return "No files provided for reading"
 
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
@@ -412,16 +412,16 @@ export class ToolHandler extends Base {
         })
       )
 
-      const xmlResult = `<read_files_result><params><content>${results.join(
+      const result = `<read_file_result><params><content>${results.join(
         "\n"
-      )}\n</content></params></read_files_result>`
+      )}\n</content></params></read_file_result>`
 
       this.emit("resolve-tool-result", {
         message,
-        result: xmlResult
+        result: result
       })
 
-      return xmlResult
+      return result
     } catch (error) {
       vscode.window.showErrorMessage(`Error reading files: ${error}`)
       return `Error reading files: ${error}`
@@ -842,8 +842,8 @@ export class ToolHandler extends Base {
             return await this.handleApplyDiff(message)
           case "list_code_definition_names":
             return await this.handleListCodeDefinitionNames(message)
-          case "read_files":
-            return await this.handleReadFiles(message)
+          case "read_file":
+            return await this.handleReadFile(message)
           case "execute_command":
             return await this.handleExecuteCommand(message)
           case "write_to_file":

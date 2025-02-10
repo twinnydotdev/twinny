@@ -1,15 +1,3 @@
-.summary {
-  margin-bottom: 1rem;
-}
-
-.addedColor {
-  color: #3fb950;
-}
-
-.removedColor {
-  color: #da3633;
-}
-
 .added {
   background: #2ea04326;
   padding: 0.2rem;
@@ -21,12 +9,10 @@
 }
 
 .diffBlock {
-  background: var(--vscode-diff-background, #f7f7f7);
   overflow-x: auto;
   white-space: pre-wrap;
 }
 
 .diffHeader {
-  color: var(--vscode-diff-header, gray);
   font-weight: bold;
 }

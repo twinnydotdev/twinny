@@ -318,7 +318,7 @@ export const Message: React.FC<MessageProps> = ({
       type: EVENT_NAME.twinnyToolUse,
       data: {
         ...block,
-        name: "view_diff",
+        name: "view_diff"
       }
     })
   }
@@ -421,19 +421,31 @@ export const Message: React.FC<MessageProps> = ({
                 )}
                 <div className={styles.toolFooter}>
                   {block.name === "apply_diff" && (
+                    <>
                     <VSCodeButton
                       onClick={() => onDiff(block)}
                       appearance="primary"
                     >
                       View diff
                     </VSCodeButton>
+                    <VSCodeButton
+                        onClick={() => onRun(block)}
+                        appearance="primary"
+                      >
+                        {t(block.name)}
+                      </VSCodeButton>
+                    </>
                   )}
-                  <VSCodeButton
-                    onClick={() => onRun(block)}
-                    appearance="primary"
-                  >
-                    {t(block.name)}
-                  </VSCodeButton>
+                  {block.name === "read_file" && (
+                    <>
+                      <VSCodeButton
+                        onClick={() => onRun(block)}
+                        appearance="primary"
+                      >
+                        {t(block.name)}
+                      </VSCodeButton>
+                    </>
+                  )}
                 </div>
                 <div className={styles.rawMessage}>
                   <details>

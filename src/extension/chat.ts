@@ -328,7 +328,7 @@ export class Chat extends Base {
   private hasOpenToolTag(): boolean {
     const toolTags = [
       "execute_command",
-      "read_files",
+      "read_file",
       "list_files",
       "list_code_definition_names",
       "search_files"
@@ -339,7 +339,7 @@ export class Chat extends Base {
   private hasClosedToolTag(): boolean {
     const toolTags = [
       "execute_command",
-      "read_files",
+      "read_file",
       "list_files",
       "list_code_definition_names",
       "search_files"
@@ -360,7 +360,7 @@ export class Chat extends Base {
   private trimContentAfterLastTool(content: string): string {
     const toolTags = [
       "execute_command",
-      "read_files",
+      "read_file",
       "list_files",
       "list_code_definition_names",
       "search_files"

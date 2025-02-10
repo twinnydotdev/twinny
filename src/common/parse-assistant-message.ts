@@ -8,7 +8,7 @@ export interface TextContent {
 
 export const toolNames = [
   "execute_command",
-  "read_files",
+  "read_file",
   "write_to_file",
   "apply_diff",
   "view_diff",
@@ -26,7 +26,7 @@ export const toolResponseNames = [
   "list_code_definition_names_result",
   "list_files_result",
   "plan_mode_response_result",
-  "read_files_result",
+  "read_file_result",
   "apply_diff_result",
   "search_files_result",
   "write_to_file_result",
@@ -43,7 +43,6 @@ export const parameterNames = [
   "command",
   "requires_approval",
   "path",
-  "paths",
   "content",
   "diff",
   "start_line",
@@ -80,9 +79,9 @@ export interface ExecuteCommandToolUse extends ToolUse {
   >
 }
 
-export interface ReadFilesToolUse extends ToolUse {
-  name: "read_files"
-  params: Partial<Pick<Record<ParamName, string>, "paths">>
+export interface ReadFileToolUse extends ToolUse {
+  name: "read_file"
+  params: Partial<Pick<Record<ParamName, string>, "path">>
 }
 
 export interface WriteToFileToolUse extends ToolUse {
