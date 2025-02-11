@@ -380,7 +380,7 @@ export class ToolHandler extends Base {
     }
   }
 
-  private async handleReadFile(
+  public async handleReadFile(
     message: ServerMessage<ToolUse>
   ): Promise<string> {
     try {

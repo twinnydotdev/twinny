@@ -149,7 +149,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun, acti
             <div className={styles.collapsibleTitle}>
               <div>
                 <span>
-                  Read file{" "}
+                  Reading file{" "}
                 </span>
                 <span className={styles.fileLink} onClick={(e) => {
                   e.stopPropagation()
@@ -172,7 +172,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun, acti
               )}
             </div>
           }>
-            Twinny wants to read a file.
+            Twinny is reading the file at the path specified.
           </ToolDetails>
         )}
         {toolUse.name === "ask_followup_question" && (

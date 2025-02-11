@@ -4,7 +4,7 @@ import { Extension } from "@tiptap/react"
 import { CodeLanguage, supportedLanguages } from "../common/languages"
 import {
   AssistantMessageContent,
-  toolParser as parseMessage
+  toolParser
 } from "../common/tool-parser"
 import { LanguageType } from "../common/types"
 
@@ -86,7 +86,7 @@ export const CustomKeyMap = Extension.create({
 })
 
 export const getThinkingMessage = (content: string) => {
-  const contentBlocks = parseMessage(content)
+  const contentBlocks = toolParser(content)
   const thinkingBlocks: string[] = []
   const messageBlocks: AssistantMessageContent[] = []
 

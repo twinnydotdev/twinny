@@ -1,11 +1,11 @@
 import * as fs from "fs/promises"
 import * as path from "path"
+import { CompletionResponseChunk, TokenJS } from "token.js"
 import {
   CompletionNonStreaming,
   CompletionStreaming,
   LLMProvider
 } from "token.js/dist/chat"
-import { CompletionResponseChunk, TokenJS } from "twinny-token.js"
 import {
   commands,
   DiagnosticSeverity,
@@ -36,6 +36,7 @@ import { CodeLanguageDetails } from "../common/languages"
 import { Logger, logger } from "../common/logger"
 import { models } from "../common/models"
 import {
+  allTools,
   toolParser,
   ToolUse
 } from "../common/tool-parser"
@@ -293,19 +294,32 @@ export class Chat extends Base {
       if (delta?.content) {
         this._completion += delta.content
 
-        console.log(this._completion)
-
-        // If there's an open tool tag without a closing tag, wait for more content.
         if (this.hasOpenToolTag() && !this.hasClosedToolTag()) {
           return
         }
 
-        // Parse the completion to check for tool use
         const tools = toolParser(this._completion)
 
         for (const tool of tools) {
           if (tool && tool.type === "tool_use" && !tool.partial) {
+            const toolName = tool.name
+
+            if (toolName === "apply_diff") {
+              this._toolHandler.handleViewDiff({
+                data: tool,
+                type: EVENT_NAME.twinnyToolUse,
+              })
+            }
+
+            if (toolName === "read_file") {
+              this._toolHandler.handleReadFile({
+                data: tool,
+                type: EVENT_NAME.twinnyToolUse,
+              })
+            }
+
             await this.addMessageToConversation()
+
             this._completion = ""
             this.abort()
           }
@@ -358,23 +372,15 @@ export class Chat extends Base {
   }
 
   private trimContentAfterLastTool(content: string): string {
-    const toolTags = [
-      "execute_command",
-      "read_file",
-      "list_files",
-      "list_code_definition_names",
-      "search_files"
-    ]
-
-    let lastIndex = -1
-    for (const tag of toolTags) {
-      const closeTagIndex = content.lastIndexOf(`</${tag}>`)
+    let lastIndex = -1;
+    for (const tag of allTools) {
+      const closeTagIndex = content.lastIndexOf(`</${tag}>`);
       if (closeTagIndex > lastIndex) {
-        lastIndex = closeTagIndex + `</${tag}>`.length
+        lastIndex = closeTagIndex + `</${tag}>`.length;
       }
     }
 
-    return lastIndex !== -1 ? content.slice(0, lastIndex).trim() : content
+    return lastIndex !== -1 ? content.slice(0, lastIndex).trim() : content.trim();
   }
 
   private async addMessageToConversation() {
@@ -400,7 +406,10 @@ export class Chat extends Base {
     const safeResult = toolResult.trim() || " "
     this._conversation.push({
       role: USER,
-      content: safeResult
+      content: safeResult,
+      cache_control: {
+        type: "ephemeral"
+      }
     })
     this._webView?.postMessage({
       type: EVENT_NAME.twinnyAddMessage,
@@ -513,7 +522,6 @@ export class Chat extends Base {
     log.log(JSON.stringify(requestBody, null, 2))
 
     try {
-      console.log(requestBody)
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
       for await (const part of result) {
@@ -703,11 +711,6 @@ export class Chat extends Base {
     this._tokenJs = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
       apiKey: provider.apiKey,
-      anthropic: {
-        caching: {
-          systemMessage: true
-        }
-      }
     })
   }
 
@@ -837,7 +840,10 @@ export class Chat extends Base {
     const systemPrompt = await this.getSystemPrompt()
     const systemMessage: ChatCompletionMessage = {
       role: SYSTEM,
-      content: systemPrompt
+      content: systemPrompt,
+      cache_control: {
+        type: "ephemeral"
+      }
     }
 
     const message = lastMessage.content as string

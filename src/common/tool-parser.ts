@@ -6,7 +6,7 @@ export interface TextContent {
   partial: boolean
 }
 
-export const toolNames = [
+export const tools = [
   "execute_command",
   "read_file",
   "write_to_file",
@@ -20,7 +20,7 @@ export const toolNames = [
   "attempt_completion"
 ] as const
 
-export const toolResponseNames = [
+export const toolResponses = [
   "ask_followup_question_result",
   "attempt_completion_result",
   "list_code_definition_names_result",
@@ -32,12 +32,10 @@ export const toolResponseNames = [
   "write_to_file_result",
 ]
 
-const allToolNames = [
-  ...toolNames,
-  ...toolResponseNames,
+export const allTools = [
+  ...tools,
+  ...toolResponses,
 ]
-
-export type ToolName = (typeof allToolNames)[number]
 
 export const parameterNames = [
   "command",
@@ -64,6 +62,7 @@ export const parameterNames = [
 ] as const
 
 export type ParamName = (typeof parameterNames)[number]
+export type ToolName = (typeof allTools)[number]
 
 export interface ToolUse {
   type: "tool_use"
@@ -223,7 +222,7 @@ export function toolParser(message: string) {
     }
 
     let didStartToolUse = false
-    const possibleToolUseOpeningTags = allToolNames.map((name) => `<${name}>`)
+    const possibleToolUseOpeningTags = allTools.map((name) => `<${name}>`)
     for (const toolUseOpeningTag of possibleToolUseOpeningTags) {
       if (accumulator.endsWith(toolUseOpeningTag)) {
         currentToolUse = {

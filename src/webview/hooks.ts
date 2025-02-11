@@ -884,3 +884,20 @@ export const useFileContext = () => {
 
   return { files, removeFile }
 }
+
+export const useGenerating = () => {
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === "generatingUpdate") {
+        setIsGenerating(event.data.isGenerating);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  return isGenerating;
+};

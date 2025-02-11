@@ -1,0 +1,36 @@
+.skeletonContainer {
+  padding: 1rem;
+  width: 100%;
+}
+
+.skeletonLine {
+  height: 1rem;
+  background: var(--vscode-textBlockQuote-background);
+  margin-bottom: 0.75rem;
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonLine:nth-child(1) {
+  width: 100%;
+}
+
+.skeletonLine:nth-child(2) {
+  width: 85%;
+}
+
+.skeletonLine:nth-child(3) {
+  width: 70%;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
