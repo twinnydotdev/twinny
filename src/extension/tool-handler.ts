@@ -414,7 +414,7 @@ export class ToolHandler extends Base {
 
       const result = `<read_file_result><params><content>${results.join(
         "\n"
-      )}\n</content></params></read_file_result>`
+      )}\n</content><path>${message.data.params.path}</path></params></read_file_result>`
 
       this.emit("resolve-tool-result", {
         message,

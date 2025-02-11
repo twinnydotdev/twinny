@@ -37,7 +37,7 @@ const allToolNames = [
   ...toolResponseNames,
 ]
 
-export type ToolName = (typeof toolNames)[number]
+export type ToolName = (typeof allToolNames)[number]
 
 export const parameterNames = [
   "command",

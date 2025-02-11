@@ -16,9 +16,9 @@ import styles from "./styles/index.module.css"
 interface CodeBlockProps {
   className?: string
   children?: ReactNode
-  language: LanguageType | undefined
-  theme: ThemeType
-  role: string | undefined
+  language?: LanguageType | undefined
+  theme?: ThemeType
+  role?: string | undefined
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

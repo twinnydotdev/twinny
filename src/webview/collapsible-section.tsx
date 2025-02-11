@@ -24,12 +24,7 @@ export const CollapsibleSection = ({
   return (
     <div className={styles.collapseSection}>
       <div className={styles.collapseHeader} onClick={handleToggle}>
-        <span>{title}</span>
-        <span
-          className={`codicon ${
-            isExpanded ? "codicon-chevron-down" : "codicon-chevron-right"
-          }`}
-        />
+        {title}
       </div>
       <div
         className={`${styles.collapseContent} ${

@@ -408,45 +408,13 @@ export const Message: React.FC<MessageProps> = ({
           {messageBlocks.map((block) =>
             block.type === "tool_use" ? (
               <React.Fragment key={`${block.type}`}>
-                {block.name.endsWith("_result") ? (
-                  <CollapsibleSection
-                    title={t("result")}
-                    content={block.params.content || ""}
-                    markdownComponents={markdownComponents}
+                <>
+                  <ToolCard
+                    toolUse={block}
+                    onDiff={onDiff}
+                    onRun={onRun}
                   />
-                ) : (
-                  <>
-                    <ToolCard toolUse={block} />
-                  </>
-                )}
-                <div className={styles.toolFooter}>
-                  {block.name === "apply_diff" && (
-                    <>
-                    <VSCodeButton
-                      onClick={() => onDiff(block)}
-                      appearance="primary"
-                    >
-                      View diff
-                    </VSCodeButton>
-                    <VSCodeButton
-                        onClick={() => onRun(block)}
-                        appearance="primary"
-                      >
-                        {t(block.name)}
-                      </VSCodeButton>
-                    </>
-                  )}
-                  {block.name === "read_file" && (
-                    <>
-                      <VSCodeButton
-                        onClick={() => onRun(block)}
-                        appearance="primary"
-                      >
-                        {t(block.name)}
-                      </VSCodeButton>
-                    </>
-                  )}
-                </div>
+                </>
                 <div className={styles.rawMessage}>
                   <details>
                     <summary>{t("show-raw-message")}</summary>
