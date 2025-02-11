@@ -1,56 +1,56 @@
-import React from "react";
-import { createPatch } from "diff";
-
-import styles from "./styles/diff.module.css";
-
-interface Change {
-  count?: number;
-  added?: boolean;
-  removed?: boolean;
-  value: string;
-}
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Change, createPatch } from "diff";
 
 interface DiffSummaryProps {
   diff: Change[];
   fileName?: string;
 }
 
-const DiffSummary = ({
-  diff,
-  fileName = "file",
-}: DiffSummaryProps) => {
-  // Generate unified diff (unidiff)
+const DiffSummary = ({ diff, fileName = "file" }: DiffSummaryProps) => {
+  // Generate unified diff
   const unidiff = createPatch(
     fileName,
-    diff.filter((p: Change) => p.removed || !p.added).map((p: Change) => p.value).join(""),
-    diff.filter((p: Change) => p.added || !p.removed).map((p: Change) => p.value).join(""),
+    diff.filter(p => p.removed || !p.added).map(p => p.value).join(""),
+    diff.filter(p => p.added || !p.removed).map(p => p.value).join(""),
     "Old",
     "New"
-  );
+  ).replace("\\ No newline at end of file", "")
 
-  // Split unidiff output into lines
+  // Split into lines while preserving diff markers
   const lines = unidiff.split("\n");
 
-  const getLineClass = (line: string) => {
-    if (line.startsWith("@@")) return styles.hunkHeader;
-    if (line.startsWith("---") || line.startsWith("+++")) return styles.diffHeader;
-    if (line.startsWith("+") && !line.startsWith("+++")) return styles.added;
-    if (line.startsWith("-") && !line.startsWith("---")) return styles.removed;
-    return "";
+  const getLineStyle = (line: string) => {
+    const baseStyle = { display: "block", width: "100%" };
+
+    if (line.startsWith("@@")) {
+      return { ...baseStyle, backgroundColor: "#1C1C1C" };
+    }
+    if (line.startsWith("---") || line.startsWith("+++")) {
+      return { ...baseStyle, backgroundColor: "#1C1C1C" };
+    }
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      return { ...baseStyle, backgroundColor: "#1E3217" };
+    }
+    if (line.startsWith("-") && !line.startsWith("---")) {
+      return { ...baseStyle, backgroundColor: "#3C1F1F" };
+    }
+    return baseStyle;
   };
 
   return (
-    <div className={styles.container}>
-      <pre className={styles.diffBlock}>
-        {lines.map((line, index) => {
-          const lineClass = getLineClass(line);
-          return (
-            <div key={index} className={lineClass}>
-              {line}
-            </div>
-          );
+    <div>
+      <SyntaxHighlighter
+        language="typescript"
+        style={vscDarkPlus}
+        wrapLines={true}
+        showLineNumbers={true}
+        lineProps={lineNumber => ({
+          style: getLineStyle(lines[lineNumber - 1])
         })}
-      </pre>
+      >
+        {unidiff}
+      </SyntaxHighlighter>
     </div>
   );
 };

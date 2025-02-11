@@ -36,9 +36,9 @@ import { CodeLanguageDetails } from "../common/languages"
 import { Logger, logger } from "../common/logger"
 import { models } from "../common/models"
 import {
-  parseAssistantMessage,
+  toolParser,
   ToolUse
-} from "../common/parse-assistant-message"
+} from "../common/tool-parser"
 import {
   ChatCompletionMessage,
   ContextFile,
@@ -302,7 +302,7 @@ export class Chat extends Base {
         }
 
         // Parse the completion to check for tool use
-        const tools = parseAssistantMessage(this._completion)
+        const tools = toolParser(this._completion)
 
         for (const tool of tools) {
           if (tool && tool.type === "tool_use" && !tool.partial) {

@@ -4,8 +4,8 @@ import { Extension } from "@tiptap/react"
 import { CodeLanguage, supportedLanguages } from "../common/languages"
 import {
   AssistantMessageContent,
-  parseAssistantMessage as parseMessage
-} from "../common/parse-assistant-message"
+  toolParser as parseMessage
+} from "../common/tool-parser"
 import { LanguageType } from "../common/types"
 
 export const getLanguageMatch = (

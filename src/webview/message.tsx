@@ -9,14 +9,13 @@ import DOMPurify from "dompurify"
 import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
-import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
-import { ToolUse } from "../common/parse-assistant-message"
-// import { ToolUse } from "../common/parse-assistant-message"
+import { AGENT_STORAGE_KEY, ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
+import { ToolUse } from "../common/tool-parser"
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import CodeBlock from "./code-block"
 import { CollapsibleSection } from "./collapsible-section"
-import { useSuggestion } from "./hooks"
+import { useGlobalContext, useSuggestion } from "./hooks"
 import { MentionExtension } from "./mention-extention"
 import { ToolCard } from "./tool-use"
 import { getThinkingMessage as parseMessage } from "./utils"
@@ -77,6 +76,8 @@ export const Message: React.FC<MessageProps> = ({
   const [editing, setEditing] = React.useState<boolean>(false)
   const messageRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef<number>(0)
+  const { context: agentActive = false } =
+    useGlobalContext<boolean>(AGENT_STORAGE_KEY)
 
   useEffect(() => {
     const currentHeight = messageRef.current?.offsetHeight
@@ -288,21 +289,21 @@ export const Message: React.FC<MessageProps> = ({
 
   const markdownComponents = useMemo(
     () =>
-      ({
-        pre: renderCodeBlock,
-        p: ({
-          children,
-          ...props
-        }: React.HTMLAttributes<HTMLParagraphElement>) => {
-          if (
-            typeof children === "string" &&
-            children.includes("class=\"mention\"")
-          ) {
-            return renderContent(children)
-          }
-          return <p {...props}>{children}</p>
+    ({
+      pre: renderCodeBlock,
+      p: ({
+        children,
+        ...props
+      }: React.HTMLAttributes<HTMLParagraphElement>) => {
+        if (
+          typeof children === "string" &&
+          children.includes("class=\"mention\"")
+        ) {
+          return renderContent(children)
         }
-      } as Components),
+        return <p {...props}>{children}</p>
+      }
+    } as Components),
     [renderCodeBlock, renderContent]
   )
 
@@ -335,11 +336,10 @@ export const Message: React.FC<MessageProps> = ({
   return (
     <div
       ref={messageRef}
-      className={`${styles.message} ${
-        message.role === ASSISTANT
-          ? styles.assistantMessage
-          : styles.userMessage
-      }`}
+      className={`${styles.message} ${message.role === ASSISTANT
+        ? styles.assistantMessage
+        : styles.userMessage
+        }`}
     >
       {thinking && (
         <CollapsibleSection
@@ -349,7 +349,11 @@ export const Message: React.FC<MessageProps> = ({
         />
       )}
       <div className={styles.messageRole}>
-        <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
+        <span>
+          {!agentActive && (
+            <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
+          )}
+        </span>
         <div className={styles.messageOptions}>
           {editing && !isAssistant && (
             <>
@@ -379,14 +383,16 @@ export const Message: React.FC<MessageProps> = ({
               >
                 <span className="codicon codicon-edit" />
               </VSCodeButton>
-              <VSCodeButton
-                disabled={isLoading || conversationLength <= 2}
-                title={t("delete-message")}
-                appearance="icon"
-                onClick={handleDelete}
-              >
-                <span className="codicon codicon-trash" />
-              </VSCodeButton>
+              {!agentActive && (
+                <VSCodeButton
+                  disabled={isLoading || conversationLength <= 2}
+                  title={t("delete-message")}
+                  appearance="icon"
+                  onClick={handleDelete}
+                >
+                  <span className="codicon codicon-trash" />
+                </VSCodeButton>
+              )}
             </>
           )}
           {!editing && isAssistant && (
@@ -415,19 +421,6 @@ export const Message: React.FC<MessageProps> = ({
                     onRun={onRun}
                   />
                 </>
-                <div className={styles.rawMessage}>
-                  <details>
-                    <summary>{t("show-raw-message")}</summary>
-                    <div className={styles.rawMessageContent}>
-                      <pre>{JSON.stringify(block, null, 2)}</pre>
-                      <div className={styles.rawMessageActions}>
-                        <VSCodeButton title={t("copy-code")} appearance="icon">
-                          <span className="codicon codicon-copy"></span>
-                        </VSCodeButton>
-                      </div>
-                    </div>
-                  </details>
-                </div>
               </React.Fragment>
             ) : (
               <Markdown

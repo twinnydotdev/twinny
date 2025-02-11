@@ -1,12 +1,13 @@
 import React, { useCallback } from "react"
 import { useTranslation } from "react-i18next"
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import { diffLines } from "diff"
 
 import { EVENT_NAME } from "../common/constants"
-import { ToolUse } from "../common/parse-assistant-message"
+import { ToolUse } from "../common/tool-parser"
 
-import CodeBlock from "./code-block"
 import { CollapsibleSection } from "./collapsible-section"
 import DiffSummary from "./diff-summary"
 import { parseDiffBlocks } from "./utils"
@@ -57,19 +58,6 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
 
   return (
     <div className={styles.toolCard}>
-      <div className={styles.toolHeader}>
-        <span className={styles.toolName}>{t(toolUse.name)}</span>
-        <VSCodeButton
-          onClick={(e) => {
-            e.stopPropagation()
-            onRun(toolUse)
-          }}
-          appearance="icon"
-          title={`Run ${toolUse.name}`}
-        >
-          <span className="codicon codicon-play" />
-        </VSCodeButton>
-      </div>
       <div className={styles.toolBody}>
         {toolUse.name === "apply_diff" && toolUse.params.diff && (
           parseDiffBlocks(toolUse.params.diff).map((block) => {
@@ -87,7 +75,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
                 <CollapsibleSection title={
                   <div className={styles.collapsibleTitle}>
                     <div>
-                      <span onClick={(e) => {
+                      <span>
+                        Edit file {" "}
+                      </span>
+                      <span className={styles.fileLink} onClick={(e) => {
                         e.stopPropagation()
                         handleOpenFile(toolUse.params.path)
                       }}>{toolUse.params.path}</span>
@@ -155,7 +146,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
             <CollapsibleSection title={
               <div className={styles.collapsibleTitle}>
                 <div>
-                  <span onClick={(e) => {
+                  <span>
+                    Read file{" "}
+                  </span>
+                  <span className={styles.fileLink} onClick={(e) => {
                     e.stopPropagation()
                     handleOpenFile(toolUse.params.path)
                   }}>{toolUse.params.path}</span>
@@ -178,21 +172,43 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
             </CollapsibleSection>
           </>
         )}
+        {toolUse.name === "ask_followup_question" && (
+          <>
+            <CollapsibleSection title={
+              <div className={styles.collapsibleTitle}>
+                <div>
+                  <span>
+                    Followup question:{" "}
+                  </span>
+                </div>
+              </div>
+            }>
+              {toolUse.params.question}
+            </CollapsibleSection>
+          </>
+        )}
         {toolUse.name === "read_file_result" && (
           <>
             <CollapsibleSection title={
               <div className={styles.collapsibleTitle}>
                 <div>
-                  <span onClick={(e) => {
+                  <span>
+                    File read succesful {" "}
+                  </span>
+                  <span className={styles.fileLink} onClick={(e) => {
                     e.stopPropagation()
                     handleOpenFile(toolUse.params.path)
                   }}>{toolUse.params.path}</span>
                 </div>
               </div>
             }>
-              <CodeBlock>
-                {toolUse.params.content}
-              </CodeBlock>
+              <SyntaxHighlighter
+                language="typescript"
+                style={vscDarkPlus}
+                wrapLines={true}
+              >
+                 {toolUse.params.content || ""}
+              </SyntaxHighlighter>
             </CollapsibleSection>
           </>
         )}
@@ -201,19 +217,23 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
             <CollapsibleSection title={
               <div className={styles.collapsibleTitle}>
                 <div>
-                  <span onClick={(e) => {
+                  <span className={styles.addedColor}>
+                    Change applied succesfully {" "}
+                  </span>
+                  <span className={styles.fileLink} onClick={(e) => {
                     e.stopPropagation()
                     handleOpenFile(toolUse.params.path)
                   }}>{toolUse.params.path}</span>
                 </div>
-                <div>
-                  Change applied succesfully
-                </div>
               </div>
             }>
-              <CodeBlock>
-                {toolUse.params.content}
-              </CodeBlock>
+              <SyntaxHighlighter
+                language="typescript"
+                style={vscDarkPlus}
+                wrapLines={true}
+              >
+                 {toolUse.params.content || ""}
+              </SyntaxHighlighter>
             </CollapsibleSection>
           </>
         )}

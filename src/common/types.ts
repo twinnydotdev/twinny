@@ -4,7 +4,7 @@ import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
 import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
-import { ToolUse } from "./parse-assistant-message"
+import { ToolUse } from "./tool-parser"
 
 export interface RequestBodyBase {
   stream: boolean

@@ -6,7 +6,7 @@ import * as vscode from "vscode"
 import Parser from "web-tree-sitter"
 
 import { EVENT_NAME } from "../common/constants"
-import { ToolUse } from "../common/parse-assistant-message"
+import { ToolUse } from "../common/tool-parser"
 import { ServerMessage } from "../common/types"
 
 import { Base } from "./base"

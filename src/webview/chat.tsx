@@ -442,6 +442,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           data={messages}
           initialTopMostItemIndex={messages?.length}
           defaultItemHeight={800}
+          overscan={300}
           itemContent={useCallback(
             (index: number) => (
               <MessageItem

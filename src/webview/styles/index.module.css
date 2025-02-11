@@ -12,6 +12,28 @@ vscode-text-field {
   width: 100%;
 }
 
+:global(*::-webkit-scrollbar) {
+  width: 8px;
+}
+
+:global(*::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+:global(*::-webkit-scrollbar-thumb) {
+  background: var(--vscode-scrollbarSlider-background);
+  border-radius: 4px;
+}
+
+:global(*::-webkit-scrollbar-thumb:hover) {
+  background: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+:global(*) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+}
+
 h1,
 h2,
 h3,
@@ -205,10 +227,6 @@ code {
   background-color: var(--vscode-editorWidget-background);
 }
 
-.collapseHeader:hover {
-  background-color: var(--vscode-inputOption-hoverBackground);
-}
-
 .collapsibleTitle {
   display: flex;
   justify-content: space-between;
@@ -217,21 +235,7 @@ code {
 .collapseContent {
   padding: 8px;
   overflow: auto;
-  transition: min-height 0.3s ease-in-out, max-height 0.3s ease-in-out, opacity 0.2s ease-in-out;
-  opacity: 1;
-  max-height: 400px;
-  position: relative;
-  min-height: 22px;
-}
-
-.collapseContent.collapsed {
-  max-height: 0px;
-  opacity: 1;
-  margin-top: 0;
-}
-
-.collapseContent:not(.collapsed)::after {
-  display: none;
+  max-height: 200px;
 }
 
 .messageOptions {

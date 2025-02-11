@@ -13,7 +13,12 @@
     "rootDir": "src",
     "sourceMap": true,
     "strict": true,
+    "types": ["node", "jest"],
     "target": "ES2020",
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node"
   },
   "exclude": ["node_modules", ".vscode-test", "out", "scripts", "assets"]
 }
