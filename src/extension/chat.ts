@@ -125,7 +125,6 @@ export class Chat extends Base {
     this.toolResultListener()
     this._conversation =
       conversationHistory.getActiveConversation()?.messages ?? []
-    console.log(this._conversation)
   }
 
   private setupSymmetryListeners() {
@@ -319,6 +318,7 @@ export class Chat extends Base {
             role: ASSISTANT
           }
         })
+
       }
     } catch (error) {
       console.error("Error processing stream part:", error)

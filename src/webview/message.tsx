@@ -14,9 +14,9 @@ import { ToolUse } from "../common/tool-parser"
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
 import CodeBlock from "./code-block"
-import { CollapsibleSection } from "./collapsible-section"
 import { useGlobalContext, useSuggestion } from "./hooks"
 import { MentionExtension } from "./mention-extention"
+import { ToolDetails } from "./tool-section"
 import { ToolCard } from "./tool-use"
 import { getThinkingMessage as parseMessage } from "./utils"
 
@@ -342,7 +342,7 @@ export const Message: React.FC<MessageProps> = ({
         }`}
     >
       {thinking && (
-        <CollapsibleSection
+        <ToolDetails
           content={thinking}
           title={t("thinking")}
           markdownComponents={markdownComponents}
@@ -416,6 +416,7 @@ export const Message: React.FC<MessageProps> = ({
               <React.Fragment key={`${block.type}`}>
                 <>
                   <ToolCard
+                    active={index + 1 === messages?.length}
                     toolUse={block}
                     onDiff={onDiff}
                     onRun={onRun}

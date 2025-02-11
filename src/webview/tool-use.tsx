@@ -8,8 +8,8 @@ import { diffLines } from "diff"
 import { EVENT_NAME } from "../common/constants"
 import { ToolUse } from "../common/tool-parser"
 
-import { CollapsibleSection } from "./collapsible-section"
 import DiffSummary from "./diff-summary"
+import { ToolDetails } from "./tool-section"
 import { parseDiffBlocks } from "./utils"
 
 import styles from "./styles/tool-use.module.css"
@@ -18,11 +18,12 @@ interface ToolCardProps {
   toolUse: ToolUse
   onDiff: (toolUse: ToolUse) => void
   onRun: (toolUse: ToolUse) => void
+  active: boolean
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any
-export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) => {
+export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun, active }) => {
   const { t } = useTranslation()
 
   const AttemptCompletionCard = () => (
@@ -72,7 +73,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
 
             return (
               <>
-                <CollapsibleSection title={
+                <ToolDetails title={
                   <div className={styles.collapsibleTitle}>
                     <div>
                       <span>
@@ -87,32 +88,34 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
                         <span className={styles.removedColor}>-{removedLines}</span>
                       </span>
                     </div>
-                    <div>
-                      <VSCodeButton
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDiff(toolUse)
-                        }}
-                        appearance="icon"
-                        title="View diff"
-                      >
-                        <span className="codicon codicon-diff" />
-                      </VSCodeButton>
-                      <VSCodeButton
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onRun(toolUse)
-                        }}
-                        appearance="icon"
-                        title="Apply diff"
-                      >
-                        <span className="codicon codicon-check" />
-                      </VSCodeButton>
-                    </div>
+                    {active && (
+                      <div>
+                        <VSCodeButton
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onDiff(toolUse)
+                          }}
+                          appearance="icon"
+                          title="View diff"
+                        >
+                          <span className="codicon codicon-diff" />
+                        </VSCodeButton>
+                        <VSCodeButton
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onRun(toolUse)
+                          }}
+                          appearance="icon"
+                          title="Apply diff"
+                        >
+                          <span className="codicon codicon-check" />
+                        </VSCodeButton>
+                      </div>
+                    )}
                   </div>
                 }>
                   <DiffSummary diff={diff} />
-                </CollapsibleSection>
+                </ToolDetails>
               </>
             );
           })
@@ -142,18 +145,18 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
           </>
         )}
         {toolUse.name === "read_file" && (
-          <>
-            <CollapsibleSection title={
-              <div className={styles.collapsibleTitle}>
-                <div>
-                  <span>
-                    Read file{" "}
-                  </span>
-                  <span className={styles.fileLink} onClick={(e) => {
-                    e.stopPropagation()
-                    handleOpenFile(toolUse.params.path)
-                  }}>{toolUse.params.path}</span>
-                </div>
+          <ToolDetails title={
+            <div className={styles.collapsibleTitle}>
+              <div>
+                <span>
+                  Read file{" "}
+                </span>
+                <span className={styles.fileLink} onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenFile(toolUse.params.path)
+                }}>{toolUse.params.path}</span>
+              </div>
+              {active && (
                 <div>
                   <VSCodeButton
                     onClick={(e) => {
@@ -166,15 +169,15 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
                     <span className="codicon codicon-check" />
                   </VSCodeButton>
                 </div>
-              </div>
-            }>
-              Twinny wants to read a file.
-            </CollapsibleSection>
-          </>
+              )}
+            </div>
+          }>
+            Twinny wants to read a file.
+          </ToolDetails>
         )}
         {toolUse.name === "ask_followup_question" && (
           <>
-            <CollapsibleSection title={
+            <ToolDetails title={
               <div className={styles.collapsibleTitle}>
                 <div>
                   <span>
@@ -184,12 +187,12 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
               </div>
             }>
               {toolUse.params.question}
-            </CollapsibleSection>
+            </ToolDetails>
           </>
         )}
         {toolUse.name === "read_file_result" && (
           <>
-            <CollapsibleSection title={
+            <ToolDetails title={
               <div className={styles.collapsibleTitle}>
                 <div>
                   <span>
@@ -206,15 +209,19 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
                 language="typescript"
                 style={vscDarkPlus}
                 wrapLines={true}
+                showLineNumbers={false}
+                lineNumberStyle={{
+                  display: "none"
+                }}
               >
-                 {toolUse.params.content || ""}
+                {toolUse.params.content || ""}
               </SyntaxHighlighter>
-            </CollapsibleSection>
+            </ToolDetails>
           </>
         )}
         {toolUse.name === "apply_diff_result" && (
           <>
-            <CollapsibleSection title={
+            <ToolDetails title={
               <div className={styles.collapsibleTitle}>
                 <div>
                   <span className={styles.addedColor}>
@@ -232,9 +239,9 @@ export const ToolCard: React.FC<ToolCardProps> = ({ toolUse, onDiff, onRun }) =>
                 style={vscDarkPlus}
                 wrapLines={true}
               >
-                 {toolUse.params.content || ""}
+                {toolUse.params.content || ""}
               </SyntaxHighlighter>
-            </CollapsibleSection>
+            </ToolDetails>
           </>
         )}
       </div>

@@ -11,14 +11,14 @@ const DiffSummary = ({ diff, fileName = "file" }: DiffSummaryProps) => {
   // Generate unified diff
   const unidiff = createPatch(
     fileName,
-    diff.filter(p => p.removed || !p.added).map(p => p.value).join(""),
-    diff.filter(p => p.added || !p.removed).map(p => p.value).join(""),
+    diff.filter(p => p.removed || !p.added).map(p => p.value).join("") + "\n",
+    diff.filter(p => p.added || !p.removed).map(p => p.value).join("") + "\n",
     "Old",
     "New"
-  ).replace("\\ No newline at end of file", "")
+  );
 
-  // Split into lines while preserving diff markers
-  const lines = unidiff.split("\n");
+  // Split into lines and remove the "No newline" message
+  const lines = unidiff.split("\n").filter(line => !line.includes("No newline at end of file"));
 
   const getLineStyle = (line: string) => {
     const baseStyle = { display: "block", width: "100%" };
@@ -43,13 +43,14 @@ const DiffSummary = ({ diff, fileName = "file" }: DiffSummaryProps) => {
       <SyntaxHighlighter
         language="typescript"
         style={vscDarkPlus}
-        wrapLines={true}
-        showLineNumbers={true}
+        wrapLines
+        showLineNumbers
+        lineNumberStyle={{ display: "none" }}
         lineProps={lineNumber => ({
           style: getLineStyle(lines[lineNumber - 1])
         })}
       >
-        {unidiff}
+        {lines.join("\n")}
       </SyntaxHighlighter>
     </div>
   );

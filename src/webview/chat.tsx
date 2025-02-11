@@ -441,8 +441,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
           ref={virtuosoRef}
           data={messages}
           initialTopMostItemIndex={messages?.length}
-          defaultItemHeight={800}
-          overscan={300}
+          defaultItemHeight={200}
+          overscan={1000}
           itemContent={useCallback(
             (index: number) => (
               <MessageItem

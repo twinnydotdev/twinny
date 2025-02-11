@@ -207,7 +207,7 @@ code {
   margin-left: 2px;
 }
 
-.collapseSection {
+.toolDetails {
   background-color: var(--vscode-editor-background);
   margin-bottom: 12px;
   font-size: var(--small-font-size);
@@ -215,7 +215,7 @@ code {
   width: 100%;
 }
 
-.collapseHeader {
+.toolHeader {
   padding: 8px;
   display: flex;
   align-items: center;
@@ -232,7 +232,7 @@ code {
   justify-content: space-between;
 }
 
-.collapseContent {
+.toolContent {
   padding: 8px;
   overflow: auto;
   max-height: 200px;
