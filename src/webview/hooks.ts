@@ -29,7 +29,7 @@ import {
   CategoryType,
   ClientMessage,
   Conversation,
-  FileItem,
+  FileContextItem,
   GitHubPr,
   LanguageType,
   ServerMessage,
@@ -603,7 +603,7 @@ export const useSuggestion = () => {
     [getFilePaths]
   )
 
-  const createFileItems = (filePaths: string[]): FileItem[] =>
+  const createFileItems = (filePaths: string[]): FileContextItem[] =>
     filePaths.map((path) => ({
       name: path.split("/").pop() || "",
       path,
@@ -611,18 +611,18 @@ export const useSuggestion = () => {
     }))
 
   const groupItemsByCategory = (
-    items: FileItem[]
-  ): Record<string, FileItem[]> =>
+    items: FileContextItem[]
+  ): Record<string, FileContextItem[]> =>
     items.reduce((acc, item) => {
       acc[item.category] = [...(acc[item.category] || []), item]
       return acc
-    }, {} as Record<string, FileItem[]>)
+    }, {} as Record<string, FileContextItem[]>)
 
   const orderedCategories: CategoryType[] = ["workspace", "problems", "files"]
 
   const sortItemsByCategory = (
-    groupedItems: Record<string, FileItem[]>
-  ): FileItem[] =>
+    groupedItems: Record<string, FileContextItem[]>
+  ): FileContextItem[] =>
     orderedCategories.flatMap((category) => groupedItems[category] || [])
 
   const render = useCallback(() => {

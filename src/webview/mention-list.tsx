@@ -12,7 +12,7 @@ import { MentionNodeAttrs } from "@tiptap/extension-mention"
 import cx from "classnames"
 
 import { topLevelItems } from "../common/constants"
-import { CategoryType, FileItem } from "../common/types"
+import { CategoryType, FileContextItem } from "../common/types"
 
 import styles from "./styles/index.module.css"
 
@@ -28,7 +28,7 @@ const getCategoryIcon = (category: CategoryType): string => {
 }
 
 export interface MentionListProps {
-  items: FileItem[]
+  items: FileContextItem[]
   command: (attrs: MentionNodeAttrs) => void
   editor: Editor
   range: Range

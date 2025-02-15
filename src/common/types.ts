@@ -306,7 +306,7 @@ export type EmbeddedDocument = {
 
 export type CategoryType = "files" | "workspace" | "problems"
 
-export interface FileItem {
+export interface FileContextItem {
   name: string
   path: string
   category: CategoryType

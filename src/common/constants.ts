@@ -1,6 +1,6 @@
 import { defaultTemplates } from "../extension/templates"
 
-import { FileItem } from "./types"
+import { FileContextItem } from "./types"
 
 export const EXTENSION_NAME = "@ext:rjmacarthy.twinny"
 export const ASSISTANT = "assistant"
@@ -411,7 +411,7 @@ export const knownErrorMessages = [
   "The 'transform.readable' property must be an instance of ReadableStream. Received an instance of h" //When you try to enable the Node.js compatibility mode Compat to solve the problem, this error may pop up
 ]
 
-export const topLevelItems: FileItem[] = [
+export const topLevelItems: FileContextItem[] = [
   { name: "workspace", path: "", category: "workspace" },
   { name: "problems", path: "", category: "problems" }
 ]

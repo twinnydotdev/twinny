@@ -18,7 +18,7 @@ import {
   ChatCompletionMessage,
   ClientMessage,
   ContextFile,
-  FileItem,
+  FileContextItem,
   InferenceRequest,
   LanguageType,
   ServerMessage,
@@ -423,7 +423,7 @@ export class BaseProvider {
       )
     }
 
-    this.chat?.completion(data.data || [], data.meta as FileItem[])
+    this.chat?.completion(data.data || [], data.meta as FileContextItem[])
   }
 
   private getSelectedText = () => {

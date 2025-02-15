@@ -39,7 +39,7 @@ import { models } from "../common/models"
 import {
   ChatCompletionMessage,
   ContextFile,
-  FileItem,
+  FileContextItem,
   ServerMessage,
   TemplateData
 } from "../common/types"
@@ -487,7 +487,7 @@ export class Chat extends Base {
     return combinedContext.trim() || null
   }
 
-  private async loadFileContents(files?: FileItem[]): Promise<string> {
+  private async loadFileContents(files?: FileContextItem[]): Promise<string> {
     if (!files?.length) return ""
     let fileContents = ""
 
@@ -519,12 +519,15 @@ export class Chat extends Base {
   }
 
   private async buildAdditionalContext(
-    userSelection: string | undefined,
-    text: string,
-    filePaths?: FileItem[]
+    messageContent: string,
+    filePaths?: FileContextItem[]
   ): Promise<string> {
+
+    const editor = window.activeTextEditor
+    const userSelection = editor?.document.getText(editor.selection)
+
     let context = userSelection ? `Selected Code:\n${userSelection}\n\n` : ""
-    const ragContext = await this.getRagContext(text)
+    const ragContext = await this.getRagContext(messageContent)
     if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
 
     const workspaceFiles =
@@ -543,28 +546,55 @@ export class Chat extends Base {
     return context
   }
 
-  private setupTokenJS(provider: TwinnyProvider) {
+  private instantiateTokenJS(provider: TwinnyProvider) {
     this._tokenJs = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
       apiKey: provider.apiKey
     })
   }
 
-  private buildAndCleanConversation(
+  private async buildConversation(
     messages: ChatCompletionMessage[],
-    systemMessage: ChatCompletionMessage,
-    cleanedText: string,
-    additionalContext: string
-  ): ChatCompletionMessage[] {
+    fileContexts: FileContextItem[] | undefined
+  ): Promise<ChatCompletionMessage[]> {
+
+    const systemMessage: ChatCompletionMessage = {
+      role: SYSTEM,
+      content: await this.getSystemPrompt()
+    }
+
+    const lastMessage = messages[messages.length - 1]
+
+    const messageContent = lastMessage.content?.toString() || ""
+
+    const additionalContext = await this.buildAdditionalContext(
+      messageContent,
+      fileContexts
+    )
+
     const conversation = [systemMessage, ...messages.slice(0, -1)]
+
     conversation.push({
       role: USER,
-      content: `${cleanedText}\n\n${additionalContext.trim()}`.trim() || " "
+      content: `${lastMessage.content}\n\n${additionalContext.trim()}`.trim() || " "
     })
-    return conversation.map((m) => ({
-      ...m,
-      content: m.content as string || ""
-    }))
+
+    return conversation.map((message) => {
+      const stringContent = message.content as string
+
+      if ([SYSTEM, ASSISTANT].includes(message.role)) return message
+
+      return {
+        ...message,
+        content: stringContent.replace(/&lt;/g, "<")
+        .replace(/@problems/g, "").trim()
+        .replace(/@workspace/g, "").trim()
+        .replace(/&amp;/g, "&")
+        .replace(/&gt;/g, ">")
+        .replace(/<span[^>]*data-type="mention"[^>]*>(.*?)<\/span>/g, "$1")
+        .trimStart()
+      }
+    })
   }
 
   private shouldUseStreaming(provider: TwinnyProvider): boolean {
@@ -662,41 +692,22 @@ export class Chat extends Base {
 
   public async completion(
     messages: ChatCompletionMessage[],
-    filePaths?: FileItem[]
+    fileContexts?: FileContextItem[]
   ) {
     this._completion = ""
     this._isCancelled = false
     this.sendEditorLanguage()
 
-    const editor = window.activeTextEditor
-    const userSelection = editor?.document.getText(editor.selection)
-    const lastMessage = messages[messages.length - 1]
-
-
-    const systemPrompt = await this.getSystemPrompt()
-    const systemMessage: ChatCompletionMessage = {
-      role: SYSTEM,
-      content: systemPrompt
-    }
-
-    const message = lastMessage.content as string
-
-    const additionalContext = await this.buildAdditionalContext(
-      userSelection,
-      message as string,
-      filePaths
-    )
-    const cleanedText = message?.replace(/@workspace/g, "").trim() || " "
 
     const provider = this.getProvider()
+
     if (!provider) return
 
-    this.setupTokenJS(provider)
-    this._conversation = this.buildAndCleanConversation(
+    this.instantiateTokenJS(provider)
+
+    this._conversation = await this.buildConversation(
       messages,
-      systemMessage,
-      cleanedText,
-      additionalContext
+      fileContexts,
     )
 
     const stream = this.shouldUseStreaming(provider)
@@ -719,7 +730,7 @@ export class Chat extends Base {
     const provider = this.getProvider()
     if (!provider) return []
 
-    this.setupTokenJS(provider)
+    this.instantiateTokenJS(provider)
 
     const stream = this.shouldUseStreaming(provider)
 
