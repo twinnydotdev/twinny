@@ -4,19 +4,15 @@ Twinny 是一个免费的 Visual Studio Code AI 扩展，提供强大的 AI 辅�
 
 ## 支持的提供商
 
-- localhost OpenAI/Ollama 兼容 API（默认）
-- [Anthropic](https://www.anthropic.com)
+- localhost OpenAI/Ollama Compatible API (default)
 - [OpenAI](https://openai.com)
+- [Anthropic](https://www.anthropic.com)
+- [OpenRouter](https://openrouter.ai)
+- [Deepseek](https://www.deepseek.com)
+- [Cohere](https://www.cohere.ai)
 - [Mistral AI](https://mistral.ai)
 - [Perplexity](https://www.perplexity.ai)
 - [Groq](https://groq.com)
-- [OpenRouter](https://openrouter.ai)
-
-## 重大变更 - 版本 3.21.0
-
-聊天功能已移至 [token.js](https://github.com/token-js/token.js/tree/main/src)。如果遇到任何问题：
-1. 重置并重新配置您的提供商
-2. 如果问题仍然存在，请在 GitHub 上提出问题
 
 ## 🚀 开始使用
 

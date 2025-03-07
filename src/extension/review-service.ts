@@ -1,4 +1,4 @@
-import { ChatCompletionMessageParam, TokenJS } from "token.js"
+import { ChatCompletionMessageParam, TokenJS } from "fluency.js"
 import { commands, ExtensionContext, Webview } from "vscode"
 
 import {

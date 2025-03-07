@@ -12,7 +12,7 @@ import {
   serverMessageKeys,
   SymmetryClient
 } from "symmetry-core"
-import { CompletionResponseChunk } from "token.js"
+import { CompletionResponseChunk } from "fluency.js"
 import { commands, ExtensionContext, Webview, workspace } from "vscode"
 
 import {

@@ -1,4 +1,4 @@
-import { models as baseModels } from "token.js"
+import { models as baseModels } from "fluency.js"
 
 export const models = {
   ...baseModels,

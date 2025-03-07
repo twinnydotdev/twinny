@@ -1,4 +1,4 @@
-import { ChatCompletionMessageParam } from "token.js"
+import { ChatCompletionMessageParam } from "fluency.js"
 import { v4 as uuidv4 } from "uuid"
 import { ExtensionContext, Webview } from "vscode"
 

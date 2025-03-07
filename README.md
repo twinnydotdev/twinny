@@ -5,18 +5,14 @@ Twinny is a free AI extension for Visual Studio Code, offering powerful AI-assis
 ## Supported Providers
 
 - localhost OpenAI/Ollama Compatible API (default)
-- [Anthropic](https://www.anthropic.com)
 - [OpenAI](https://openai.com)
+- [Anthropic](https://www.anthropic.com)
+- [OpenRouter](https://openrouter.ai)
+- [Deepseek](https://www.deepseek.com)
+- [Cohere](https://www.cohere.ai)
 - [Mistral AI](https://mistral.ai)
 - [Perplexity](https://www.perplexity.ai)
 - [Groq](https://groq.com)
-- [OpenRouter](https://openrouter.ai)
-
-## Breaking Change - Version 3.21.0
-
-The chat functionality has been moved to [token.js](https://github.com/token-js/token.js/tree/main/src). If you experience any issues:
-1. Reset and reconfigure your provider
-2. If problems persist, please open a GitHub issue
 
 ## 🚀 Getting Started
 
