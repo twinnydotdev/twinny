@@ -1,3 +1,4 @@
+import { distance } from "fastest-levenshtein"
 import { Position, Range, TextEditor } from "vscode"
 
 import { CLOSING_BRACKETS, OPENING_BRACKETS, QUOTES } from "../common/constants"
@@ -158,33 +159,14 @@ export class CompletionFormatter {
    * Higher values indicate more similarity
    */
   protected calculateStringSimilarity(str1: string, str2: string): number {
-    if (str1 === str2) return 1.0
-    if (str1.length === 0 || str2.length === 0) return 0.0
+    if (str1 === str2) return 1.0;
+    if (str1.length === 0 || str2.length === 0) return 0.0;
 
-    // Simple implementation of Levenshtein distance for similarity
-    const len1 = str1.length
-    const len2 = str2.length
-    const maxLen = Math.max(len1, len2)
-
-    // Use dynamic programming to calculate edit distance
-    const dp: number[][] = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(0))
-
-    for (let i = 0; i <= len1; i++) dp[i][0] = i
-    for (let j = 0; j <= len2; j++) dp[0][j] = j
-
-    for (let i = 1; i <= len1; i++) {
-      for (let j = 1; j <= len2; j++) {
-        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1
-        dp[i][j] = Math.min(
-          dp[i - 1][j] + 1,      // deletion
-          dp[i][j - 1] + 1,      // insertion
-          dp[i - 1][j - 1] + cost // substitution
-        )
-      }
-    }
+    const maxLen = Math.max(str1.length, str2.length);
+    const levenshteinDistance = distance(str1, str2);
 
     // Convert distance to similarity score (0 to 1)
-    return 1 - (dp[len1][len2] / maxLen)
+    return 1 - (levenshteinDistance / maxLen);
   }
 
   /**
@@ -505,55 +487,6 @@ export class CompletionFormatter {
   }
 
   /**
-   * Handles HTML/XML tags to ensure proper tag completion
-   */
-  protected handleHtmlTags(): this {
-    // Only process if we're in an HTML-like language
-    const htmlLikeLanguages = ["html", "xml", "jsx", "tsx", "vue", "svelte"];
-    if (!htmlLikeLanguages.includes(this.languageId || "")) {
-      return this;
-    }
-
-    // Check if we're completing a tag
-    if (this.completion.includes("<") && !this.completion.includes(">")) {
-      // If we're starting a tag but not completing it, add the closing bracket
-      if (this.completion.endsWith("<")) {
-        this.completion += ">";
-      }
-      // If we're in the middle of a tag name, complete the tag
-      else if (/^<\w+$/.test(this.completion)) {
-        this.completion += ">";
-      }
-    }
-
-    // Check if we're completing a self-closing tag
-    if (this.completion.includes("<") && !this.completion.includes("/>") &&
-        ["img", "br", "hr", "input", "meta", "link"].some(tag =>
-          this.completion.includes(`<${tag}`) || this.completion.includes(`<${tag} `))) {
-      if (this.completion.endsWith(">")) {
-        // Convert to self-closing tag
-        this.completion = this.completion.slice(0, -1) + "/>";
-      }
-    }
-
-    // Check if we need to add a closing tag
-    const openTagMatch = this.completion.match(/<(\w+)(?:\s+[^>]*)?>/);
-    if (openTagMatch && !this.completion.includes(`</${openTagMatch[1]}>`) &&
-        !["img", "br", "hr", "input", "meta", "link"].includes(openTagMatch[1])) {
-      // Add closing tag if not already present and not a self-closing tag
-      if (!this.completion.endsWith("/>") && !this.completion.includes(`</${openTagMatch[1]}`)) {
-        this.completion += `</${openTagMatch[1]}>`;
-      }
-    }
-
-    if (this.isDebugEnabled) {
-      console.log(`After handleHtmlTags: ${this.completion}`);
-    }
-
-    return this;
-  }
-
-  /**
    * Formats the completion by applying various formatting rules
    */
   public format(completion: string): string {
@@ -572,7 +505,6 @@ export class CompletionFormatter {
       .removeDuplicateText()
       .skipMiddleOfWord()
       .skipSimilarCompletions()
-      .handleHtmlTags()
       .trimStart()
       .getCompletion()
   }
