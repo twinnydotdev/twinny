@@ -12,16 +12,16 @@ import { getLanguage } from "./utils"
  * to provide better inline completions in the editor.
  */
 export class CompletionFormatter {
-  private editor: TextEditor
-  private cursorPosition: Position
+  protected editor: TextEditor
+  public cursorPosition: Position
   private lineText: string
-  private textAfterCursor: string
+  public textAfterCursor: string
   private charAfterCursor: string
   private charBeforeCursor: string
-  private completion = ""
+  protected completion = ""
   private normalizedCompletion = ""
   private originalCompletion = ""
-  private languageId: string | undefined
+  public languageId: string | undefined
   private isDebugEnabled = false
 
   constructor(editor: TextEditor) {
@@ -64,7 +64,7 @@ export class CompletionFormatter {
    * Matches brackets in the completion to ensure they are balanced
    * and handles nested brackets correctly
    */
-  private matchCompletionBrackets(): this {
+  protected matchCompletionBrackets(): this {
     let accumulatedCompletion = ""
     const openBrackets: Bracket[] = []
     let inString = false
@@ -113,7 +113,7 @@ export class CompletionFormatter {
   /**
    * Ignores blank lines in the completion
    */
-  private ignoreBlankLines(): this {
+  protected ignoreBlankLines(): this {
     if (
       this.completion.trimStart() === "" &&
       this.originalCompletion !== "\n"
@@ -131,7 +131,7 @@ export class CompletionFormatter {
   /**
    * Normalizes text by trimming and handling special characters
    */
-  private normalize(text: string): string {
+  protected normalize(text: string): string {
     // Basic normalization - trim whitespace
     let normalized = text.trim()
 
@@ -157,7 +157,7 @@ export class CompletionFormatter {
    * Calculates string similarity score between 0 and 1
    * Higher values indicate more similarity
    */
-  private calculateStringSimilarity(str1: string, str2: string): number {
+  protected calculateStringSimilarity(str1: string, str2: string): number {
     if (str1 === str2) return 1.0
     if (str1.length === 0 || str2.length === 0) return 0.0
 
@@ -191,7 +191,7 @@ export class CompletionFormatter {
    * Removes duplicate text between the completion and the text after the cursor
    * Uses an optimized algorithm to find the longest overlap
    */
-  private removeDuplicateText(): this {
+  protected removeDuplicateText(): this {
     const after = this.normalize(this.textAfterCursor)
     if (!after || !this.completion) return this
 
@@ -224,7 +224,7 @@ export class CompletionFormatter {
    * Checks if the cursor is in the middle of a word or identifier
    * Considers language-specific identifier patterns
    */
-  private isCursorAtMiddleOfWord(): boolean {
+  protected isCursorAtMiddleOfWord(): boolean {
     // Default check for word characters
     const isAfterWord = /\w/.test(this.charAfterCursor)
     const isBeforeWord = /\w/.test(this.charBeforeCursor)
@@ -257,7 +257,7 @@ export class CompletionFormatter {
   /**
    * Removes unnecessary quotes when the cursor is in the middle of a word
    */
-  private removeUnnecessaryMiddleQuotes(): this {
+  protected removeUnnecessaryMiddleQuotes(): this {
     if (this.isCursorAtMiddleOfWord()) {
       if (QUOTES.includes(this.completion.charAt(0))) {
         this.completion = this.completion.slice(1)
@@ -278,7 +278,7 @@ export class CompletionFormatter {
   /**
    * Removes duplicate quotes between the completion and the text after the cursor
    */
-  private removeDuplicateQuotes(): this {
+  protected removeDuplicateQuotes(): this {
     const trimmedCharAfterCursor = this.charAfterCursor.trim()
     const normalizedCompletion = this.normalize(this.completion)
     const lastCharOfCompletion = normalizedCompletion.charAt(
@@ -323,7 +323,7 @@ export class CompletionFormatter {
   /**
    * Prevents duplicate lines by checking if the completion matches upcoming lines
    */
-  private preventDuplicateLine(): this {
+  protected preventDuplicateLine(): this {
     const lineCount = this.editor.document.lineCount
     const originalNormalized = this.normalize(this.originalCompletion)
 
@@ -373,7 +373,7 @@ export class CompletionFormatter {
   /**
    * Skips completion if the cursor is in the middle of a word
    */
-  private skipMiddleOfWord(): this {
+  protected skipMiddleOfWord(): this {
     if (this.isCursorAtMiddleOfWord()) {
       this.completion = ""
     }
@@ -388,7 +388,7 @@ export class CompletionFormatter {
   /**
    * Skips completions that are very similar to the text after the cursor
    */
-  private skipSimilarCompletions(): this {
+  protected skipSimilarCompletions(): this {
     const { document } = this.editor
     const textAfter = document.getText(
       new Range(
@@ -410,42 +410,9 @@ export class CompletionFormatter {
   }
 
   /**
-   * Applies language-specific indentation to the completion
-   */
-  private applyIndentation(): this {
-    // Only process if there's content and we're at the start of a line
-    if (!this.completion || this.cursorPosition.character > 0) {
-      return this
-    }
-
-    const lines = this.completion.split("\n")
-    if (lines.length <= 1) {
-      return this
-    }
-
-    // Get the indentation of the current line
-    const currentIndent = this.lineText.match(/^\s*/)?.[0] || ""
-
-    // Apply indentation to all lines except the first one
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim()) {  // Only indent non-empty lines
-        lines[i] = currentIndent + lines[i]
-      }
-    }
-
-    this.completion = lines.join("\n")
-
-    if (this.isDebugEnabled) {
-      console.log(`After applyIndentation: ${this.completion}`)
-    }
-
-    return this
-  }
-
-  /**
    * Returns the final completion
    */
-  private getCompletion = () => {
+  protected getCompletion = () => {
     if (this.completion.trim().length === 0) {
       this.completion = ""
     }
@@ -455,7 +422,7 @@ export class CompletionFormatter {
   /**
    * Trims whitespace from the start of the completion
    */
-  private trimStart(): this {
+  protected trimStart(): this {
     const firstNonSpaceIndex = this.completion.search(/\S/)
     if (
       firstNonSpaceIndex > 0 &&
@@ -538,6 +505,55 @@ export class CompletionFormatter {
   }
 
   /**
+   * Handles HTML/XML tags to ensure proper tag completion
+   */
+  protected handleHtmlTags(): this {
+    // Only process if we're in an HTML-like language
+    const htmlLikeLanguages = ["html", "xml", "jsx", "tsx", "vue", "svelte"];
+    if (!htmlLikeLanguages.includes(this.languageId || "")) {
+      return this;
+    }
+
+    // Check if we're completing a tag
+    if (this.completion.includes("<") && !this.completion.includes(">")) {
+      // If we're starting a tag but not completing it, add the closing bracket
+      if (this.completion.endsWith("<")) {
+        this.completion += ">";
+      }
+      // If we're in the middle of a tag name, complete the tag
+      else if (/^<\w+$/.test(this.completion)) {
+        this.completion += ">";
+      }
+    }
+
+    // Check if we're completing a self-closing tag
+    if (this.completion.includes("<") && !this.completion.includes("/>") &&
+        ["img", "br", "hr", "input", "meta", "link"].some(tag =>
+          this.completion.includes(`<${tag}`) || this.completion.includes(`<${tag} `))) {
+      if (this.completion.endsWith(">")) {
+        // Convert to self-closing tag
+        this.completion = this.completion.slice(0, -1) + "/>";
+      }
+    }
+
+    // Check if we need to add a closing tag
+    const openTagMatch = this.completion.match(/<(\w+)(?:\s+[^>]*)?>/);
+    if (openTagMatch && !this.completion.includes(`</${openTagMatch[1]}>`) &&
+        !["img", "br", "hr", "input", "meta", "link"].includes(openTagMatch[1])) {
+      // Add closing tag if not already present and not a self-closing tag
+      if (!this.completion.endsWith("/>") && !this.completion.includes(`</${openTagMatch[1]}`)) {
+        this.completion += `</${openTagMatch[1]}>`;
+      }
+    }
+
+    if (this.isDebugEnabled) {
+      console.log(`After handleHtmlTags: ${this.completion}`);
+    }
+
+    return this;
+  }
+
+  /**
    * Formats the completion by applying various formatting rules
    */
   public format(completion: string): string {
@@ -556,8 +572,9 @@ export class CompletionFormatter {
       .removeDuplicateText()
       .skipMiddleOfWord()
       .skipSimilarCompletions()
-      .applyIndentation()
+      .handleHtmlTags()
       .trimStart()
       .getCompletion()
   }
 }
+
