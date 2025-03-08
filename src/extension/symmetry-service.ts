@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import b4a from "b4a"
+import { CompletionResponseChunk } from "fluency.js"
 import fs from "fs"
 import crypto from "hypercore-crypto"
 import Hyperswarm from "hyperswarm"
@@ -12,7 +13,6 @@ import {
   serverMessageKeys,
   SymmetryClient
 } from "symmetry-core"
-import { CompletionResponseChunk } from "fluency.js"
 import { commands, ExtensionContext, Webview, workspace } from "vscode"
 
 import {
@@ -243,7 +243,6 @@ export class SymmetryService extends EventEmitter {
       apiHostname: provider.apiHostname || "localhost",
       apiKey: provider.apiKey,
       apiBasePath: provider.apiPath,
-      apiChatPath: provider.apiPath,
       dataPath: configDir,
       apiPort: provider.apiPort || 8080,
       apiProtocol: provider.apiProtocol || "http",
@@ -298,7 +297,7 @@ export class SymmetryService extends EventEmitter {
       if (fs.existsSync(configPath)) {
         config = await this.readProviderConfig()
         const updates: Partial<ProviderConfig> = {}
-        if (!config.apiChatPath) updates.apiChatPath = provider.apiPath
+        if (!config.apiBasePath) updates.apiBasePath = provider.apiPath
         if (!config.dataPath) updates.dataPath = configDir
 
         const updatedConfig = { ...config, ...updates }
