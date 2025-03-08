@@ -22,6 +22,7 @@ import Parser, { SyntaxNode } from "web-tree-sitter"
 import "string_score"
 
 import {
+  CLOSING_BRACKETS,
   FIM_TEMPLATE_FORMAT,
   LINE_BREAK_REGEX,
   MAX_CONTEXT_LINE_COUNT,
@@ -29,11 +30,13 @@ import {
   MIN_COMPLETION_CHUNKS,
   MULTI_LINE_DELIMITERS,
   MULTILINE_INSIDE,
-  MULTILINE_OUTSIDE
+  MULTILINE_OUTSIDE,
+  OPENING_BRACKETS
 } from "../../common/constants"
 import { supportedLanguages } from "../../common/languages"
 import { logger } from "../../common/logger"
 import {
+  Bracket,
   FimTemplateData,
   PrefixSuffix,
   RepositoryLevelData as RepositoryDocment,
@@ -290,6 +293,7 @@ export class CompletionProvider
         return this._completion
       }
 
+
       const isMultilineCompletionRequired =
         !this._isMultilineCompletion &&
         this.config.multilineCompletionsEnabled &&
@@ -309,7 +313,19 @@ export class CompletionProvider
             (MULTILINE_INSIDE.includes(this._nodeAtPosition?.type) &&
               this._nodeAtPosition?.childCount > 2)
 
+
           const lineText = getCurrentLineText(this._position) || ""
+          const contextBeforeCompletion = this._prefixSuffix?.prefix || ""
+
+
+          const isInsideFunction =
+            contextBeforeCompletion.includes("=>") ||
+            contextBeforeCompletion.includes("function") ||
+            this._nodeAtPosition?.type.includes("function") ||
+            this._nodeAtPosition?.type.includes("method") ||
+            this._nodeAtPosition?.parent?.type.includes("function") ||
+            this._nodeAtPosition?.parent?.type.includes("method");
+
           if (!this._parser) return ""
 
           if (providerFimData.includes("\n")) {
@@ -319,21 +335,90 @@ export class CompletionProvider
 
             const { hasError } = rootNode
 
+            const openBrackets: string[] = [];
+            let isBalanced = true;
+
+            for (const char of this._completion) {
+              if (OPENING_BRACKETS.includes(char as Bracket)) {
+                openBrackets.push(char);
+              } else if (CLOSING_BRACKETS.includes(char as Bracket)) {
+                const lastOpen = openBrackets.pop();
+
+                if (!lastOpen || !this.isMatchingBracket(lastOpen as Bracket, char)) {
+                  isBalanced = false;
+                  break;
+                }
+              }
+            }
+
+            const hasSubstantialContent = this._completion.trim().length > 20;
+            const hasCompleteSyntax = openBrackets.length === 0 && isBalanced;
+
+            const hasEndPattern = /\}\s*$|\)\s*$|\]\s*$|;\s*$/.test(this._completion);
+
+            const endsWithEmptyLine = /\n\s*\n\s*$/.test(this._completion);
+
+            const lines = this._completion.split("\n");
+            const lastLineIndent = lines.length > 1 ?
+              lines[lines.length - 1].length - lines[lines.length - 1].trimStart().length : 0;
+            const firstLineIndent = lines.length > 0 ?
+              lines[0].length - lines[0].trimStart().length : 0;
+            const indentationReturned = lines.length > 2 && lastLineIndent <= firstLineIndent;
+
+            const structuralBoundaryPattern = /\}\s*\n(\s*)\S+/m.test(this._completion);
+
+            if (isInsideFunction && this._completion.includes("}")) {
+              const lastClosingBraceIndex = this._completion.lastIndexOf("}");
+
+              if (hasCompleteSyntax) {
+                const contentAfterBrace = this._completion.substring(lastClosingBraceIndex + 1).trim();
+
+                if (!contentAfterBrace || /^\s*\n\s*\S+/.test(contentAfterBrace)) {
+                  this._completion = this._completion.substring(0, lastClosingBraceIndex + 1);
+                  logger.log(
+                    `Trimmed completion at function end: ${this._nonce} \nCompletion: ${this._completion}`
+                  )
+                  return this._completion;
+                }
+              }
+            }
+
+            if (structuralBoundaryPattern && hasCompleteSyntax) {
+              const match = this._completion.match(/\}\s*\n(\s*)\S+/m);
+              if (match && match.index !== undefined) {
+                const closingBracePos = match.index + 1;
+
+                const indentAfterBrace = match[1].length;
+                if (indentAfterBrace <= firstLineIndent) {
+                  this._completion = this._completion.substring(0, closingBracePos);
+                  logger.log(
+                    `Trimmed completion at structural boundary: ${this._nonce} \nCompletion: ${this._completion}`
+                  )
+                  return this._completion;
+                }
+              }
+            }
+
             if (
               this._parser &&
               this._nodeAtPosition &&
               this._isMultilineCompletion &&
               this._chunkCount >= 2 &&
-              takeFirst &&
-              !hasError
+              (takeFirst || hasCompleteSyntax) &&
+              !hasError &&
+              (hasEndPattern || endsWithEmptyLine || indentationReturned ||
+               (hasSubstantialContent && hasCompleteSyntax))
             ) {
               if (
                 MULTI_LINE_DELIMITERS.some((delimiter) =>
                   this._completion.endsWith(delimiter)
-                )
+                ) ||
+                endsWithEmptyLine ||
+                (hasEndPattern && hasCompleteSyntax) ||
+                (structuralBoundaryPattern && hasCompleteSyntax)
               ) {
                 logger.log(
-                  `Streaming response end due to delimiter ${this._nonce} \nCompletion: ${this._completion}`
+                  `Streaming response end due to completion detection ${this._nonce} \nCompletion: ${this._completion}`
                 )
                 return this._completion
               }
@@ -341,16 +426,13 @@ export class CompletionProvider
           }
         }
       } catch (e) {
-        // Currently doesnt catch when parser fucks up
         console.error(e)
         this.abortCompletion()
       }
 
       if (getLineBreakCount(this._completion) >= this.config.maxLines) {
         logger.log(
-          `
-            Streaming response end due to max line count ${this._nonce} \nCompletion: ${this._completion}
-          `
+          `Streaming response end due to max line count ${this._nonce} \nCompletion: ${this._completion}`
         )
         return this._completion
       }
@@ -360,6 +442,15 @@ export class CompletionProvider
       console.error(e)
       return ""
     }
+  }
+
+  private isMatchingBracket(open: Bracket, close: string): boolean {
+    const pairs: Record<Bracket, string> = {
+      "(": ")",
+      "[": "]",
+      "{": "}"
+    };
+    return pairs[open] === close;
   }
 
   private onEnd(resolve: (completion: ResolvedInlineCompletion) => void) {

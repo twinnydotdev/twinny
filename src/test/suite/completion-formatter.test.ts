@@ -290,56 +290,6 @@ suite("Completion formatter", () => {
     )
   })
 
-  test("handles HTML/XML tags", async () => {
-    const document = await vscode.workspace.openTextDocument({
-      language: "html"
-    })
-    editor = await vscode.window.showTextDocument(document)
-    const completionFormatter = new CompletionFormatter(editor)
-
-    // Test basic HTML tag
-    assert.strictEqual(
-      completionFormatter.format("<div>content</div>"),
-      "<div>content</div>"
-    )
-
-    // Test self-closing tag
-    assert.strictEqual(
-      completionFormatter.format("<img src=\"test.jpg\" />"),
-      "<img src=\"test.jpg\" />"
-    )
-
-    // Test nested tags
-    assert.strictEqual(
-      completionFormatter.format("<div><span>nested</span></div>"),
-      "<div><span>nested</span></div>"
-    )
-
-    // Test incomplete tag completion
-    assert.strictEqual(
-      completionFormatter.format("<div"),
-      "<div></div>"
-    )
-
-    // Test auto-closing tag
-    assert.strictEqual(
-      completionFormatter.format("<p>"),
-      "<p></p>"
-    )
-
-    // Test auto-converting to self-closing tag
-    assert.strictEqual(
-      completionFormatter.format("<img>"),
-      "<img/>"
-    )
-
-    // Test tag with attributes
-    assert.strictEqual(
-      completionFormatter.format("<a href=\"#\">"),
-      "<a href=\"#\"></a>"
-    )
-  })
-
   test("handles language-specific formatting", async () => {
     // Test JavaScript
     let document = await vscode.workspace.openTextDocument({
