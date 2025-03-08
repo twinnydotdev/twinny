@@ -14,6 +14,11 @@
     "sourceMap": true,
     "strict": true,
     "target": "ES2020",
+    "skipLibCheck": true,
+    "typeRoots": [
+      "node_modules/@types",
+      "src/common/types.ts"
+    ]
   },
   "exclude": ["node_modules", ".vscode-test", "out", "scripts", "assets"]
 }

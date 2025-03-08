@@ -1,5 +1,5 @@
+import { ChatCompletionMessageParam, models } from "fluency.js"
 import { serverMessageKeys } from "symmetry-core"
-import { ChatCompletionMessageParam } from "fluency.js"
 import * as vscode from "vscode"
 
 import {
@@ -12,7 +12,6 @@ import {
   WORKSPACE_STORAGE_KEY
 } from "../../common/constants"
 import { logger } from "../../common/logger"
-import { models } from "../../common/models"
 import {
   ApiModel,
   ChatCompletionMessage,
