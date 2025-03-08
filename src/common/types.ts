@@ -1,5 +1,5 @@
-import { serverMessageKeys } from "symmetry-core"
 import { ChatCompletionMessageParam } from "fluency.js"
+import { serverMessageKeys } from "symmetry-core"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
 import { ALL_BRACKETS, API_PROVIDERS } from "./constants"

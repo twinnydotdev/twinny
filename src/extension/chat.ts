@@ -1,12 +1,12 @@
-import * as fs from "fs/promises"
-import * as os from "os"
-import * as path from "path"
 import { CompletionResponseChunk, TokenJS } from "fluency.js"
 import {
   CompletionNonStreaming,
   CompletionStreaming,
   LLMProvider
 } from "fluency.js/dist/chat"
+import * as fs from "fs/promises"
+import * as os from "os"
+import * as path from "path"
 import {
   commands,
   DiagnosticSeverity,
