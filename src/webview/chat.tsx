@@ -386,7 +386,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const scrollToBottom = useCallback(() => {
     virtuosoRef.current?.scrollTo({
       top: Infinity,
-      behavior: "instant"
+      behavior: "auto"
     })
   }, [])
 

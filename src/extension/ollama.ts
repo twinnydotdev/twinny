@@ -18,7 +18,7 @@ export class OllamaService {
       const response = await fetch(`${this._baseUrl}${resource}`)
       const { models } = await response.json()
       return Array.isArray(models) ? [...new Set(models)] : []
-    } catch (err) {
+    } catch {
       return []
     }
   }

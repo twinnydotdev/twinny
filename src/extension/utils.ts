@@ -285,6 +285,9 @@ export const getPreviousLineIsOpeningBracket = () => {
   return getIsOnlyOpeningBrackets(previousLineCharacter)
 }
 
+/**
+ * Determines if a completion should be multiline based on syntax structure and context.
+ */
 export const getIsMultilineCompletion = ({
   node,
   prefixSuffix
@@ -298,36 +301,99 @@ export const getIsMultilineCompletion = ({
   if (!editor) return false
 
   const position = editor.selection.active
-  const lineText = editor.document.lineAt(position.line).text.trim()
+  const document = editor.document
+  const lineText = document.lineAt(position.line).text
+  const trimmedLineText = lineText.trim()
 
+  // Get the raw line text and its indentation
+  const currentIndent = lineText.length - lineText.trimStart().length
+
+  // Check if we're in a string or comment
+  const isInStringOrComment =
+    node.type.includes("string") ||
+    node.type.includes("comment") ||
+    node.type.includes("template")
+
+  // Check for block start indicators (expanded list)
   const isBlockStart =
-    lineText.endsWith("{") || lineText.endsWith("=>") || lineText.endsWith("(")
-  const isInMultilineContext =
-    node.parent && MULTILINE_TYPES.includes(node.parent.type)
+    trimmedLineText.endsWith("{") ||
+    trimmedLineText.endsWith("=>") ||
+    trimmedLineText.endsWith("(") ||
+    trimmedLineText.endsWith("[") ||
+    trimmedLineText.endsWith(":")
 
+  // Check if we're in a multiline context based on node types
+  const isInMultilineContext =
+    (node.parent && MULTILINE_TYPES.includes(node.parent.type)) ||
+    MULTILINE_TYPES.includes(node.type)
+
+  // Check if we're in a declaration or definition (expanded)
   const isDeclaration =
     node.type.includes("declaration") ||
     node.type.includes("definition") ||
     node.type === "class" ||
-    node.type === "interface"
+    node.type === "interface" ||
+    node.type.includes("function") ||
+    node.type.includes("method")
 
-  const currentIndent = lineText.length - lineText.trimStart().length
+  // Check for proper indentation
   const hasProperIndentation = currentIndent > 0
+
+  // Check if the node is complex (has multiple children)
   const isComplexNode =
     node.childCount > 2 || (node.parent && node.parent.childCount > 2)
+
+  // Check if we're in a code block
   const isInCodeBlock =
     MULTILINE_TYPES.includes(node.type) || isInMultilineContext
 
+  // Check if the line ends with specific characters (expanded)
   const isLineEnd =
-    lineText.trimEnd().endsWith(";") ||
-    lineText.trimEnd().endsWith("{") ||
-    lineText.trimEnd().endsWith("=>")
+    trimmedLineText.endsWith(";") ||
+    trimmedLineText.endsWith("{") ||
+    trimmedLineText.endsWith("=>") ||
+    trimmedLineText.endsWith("(") ||
+    trimmedLineText.endsWith("[") ||
+    trimmedLineText.endsWith(":")
 
+  // Check if there's an unclosed bracket/parenthesis
+  let unclosedBrackets = 0
+  for (const char of trimmedLineText) {
+    if (OPENING_BRACKETS.includes(char as Bracket)) {
+      unclosedBrackets++
+    } else if (CLOSING_BRACKETS.includes(char as Bracket)) {
+      unclosedBrackets--
+    }
+  }
+  const hasUnclosedBrackets = unclosedBrackets > 0
+
+  // Check if the next line is indented (suggesting a block)
+  let nextLineIndented = false
+  if (position.line + 1 < document.lineCount) {
+    const nextLine = document.lineAt(position.line + 1).text
+    const nextLineIndent = nextLine.length - nextLine.trimStart().length
+    nextLineIndented = nextLineIndent > currentIndent
+  }
+
+  // Check if we're at the start of a new block
+  const isStartOfBlock =
+    isBlockStart ||
+    hasUnclosedBrackets ||
+    nextLineIndented
+
+  // Check if we're in a context where multiline completion makes sense
+  const isMultilineContext =
+    isInCodeBlock ||
+    isDeclaration ||
+    isInMultilineContext ||
+    isStartOfBlock
+
+  // Final decision based on all factors
   const isMultilineCompletion =
     !getHasLineTextBeforeAndAfter() &&
     !isCursorInEmptyString() &&
-    (isInCodeBlock || isDeclaration) &&
-    (isBlockStart ||
+    (isMultilineContext || isInStringOrComment) &&
+    (isStartOfBlock ||
       hasProperIndentation ||
       isComplexNode ||
       isLineEnd ||
