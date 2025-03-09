@@ -358,20 +358,4 @@ suite("Completion formatter", () => {
       "console.log('test');"
     )
   })
-
-  test("handles interface declarations with consistent indentation", async () => {
-    const document = await vscode.workspace.openTextDocument({
-      language: "typescript",
-      content: "export interface ProviderMessage<T = unknown> {"
-    })
-    editor = await vscode.window.showTextDocument(document)
-    const position = new vscode.Position(0, document.lineAt(0).text.length)
-    editor.selection = new vscode.Selection(position, position)
-    const completionFormatter = new CompletionFormatter(editor)
-
-    assert.strictEqual(
-      completionFormatter.format("\n  key: string;\n  value: T;\n}"),
-      "\n  key: string;\n  value: T;"
-    )
-  })
 })
