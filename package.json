@@ -357,7 +357,7 @@
           },
           "order": 8,
           "type": "number",
-          "default": 30,
+          "default": 40,
           "markdownDescription": "Sets the maximum number of lines for multi-line completions. Only applies when `twinny.multilineCompletionsEnabled` is `true`."
         },
         "twinny.fileContextEnabled": {
