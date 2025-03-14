@@ -102,8 +102,6 @@ export class BaseProvider {
     this.conversationHistory = new ConversationHistory(
       this.context,
       this.webView,
-      this._sessionManager,
-      this._symmetryService
     )
 
     this.reviewService = new ReviewService(

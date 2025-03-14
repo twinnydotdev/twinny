@@ -135,6 +135,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
       case EVENT_NAME.twinnyNewConversation: {
         setMessages([])
         setCompletion(null)
+        setActiveConversation({
+          id: uuidv4(),
+          title: "New conversation",
+          messages: []
+        });
         generatingRef.current = false
         setIsLoading(false)
         chatRef.current?.focus()
@@ -277,19 +282,19 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(true)
     clearEditor()
 
+    const conversationId = conversation?.id || uuidv4();
+
     setMessages((prevMessages) => {
       const updatedMessages: ChatCompletionMessage[] = [
         ...(prevMessages || []),
         { role: USER, content: input }
       ]
-
-      // Create a conversation object with ID to save
       const currentConversation = {
-        id: conversation?.id || uuidv4(), // Use existing ID or generate a new one
-        messages: updatedMessages
+        id: conversationId,
+        messages: updatedMessages,
+        title: conversation?.title || "New conversation"
       };
 
-      // Include the conversation ID in the client message
       const clientMessage: ClientMessage<
         ChatCompletionMessage[],
         MentionType[]
@@ -297,30 +302,27 @@ export const Chat = (props: ChatProps): JSX.Element => {
         type: EVENT_NAME.twinnyChatMessage,
         data: updatedMessages,
         meta: mentions,
-        key: currentConversation.id // Pass the conversation ID as the key
+        key: conversationId // Pass the conversation ID as the key
       }
 
-      // Save the conversation with its ID
       saveLastConversation(currentConversation)
+      setActiveConversation(currentConversation)
 
       global.vscode.postMessage(clientMessage)
 
       return updatedMessages
     })
-  }, [])
+  }, [
+    conversation?.id
+  ])
 
   const handleNewConversation = useCallback(() => {
-    // Create a new conversation with a unique ID
-    const newConversationId = uuidv4();
-
-    // Set the new conversation as active with the generated ID
     setActiveConversation({
-      id: newConversationId,
+      id: uuidv4(),
       title: "New conversation",
       messages: []
     });
 
-    // Then notify the extension to reset the conversation
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyNewConversation
     })
@@ -487,7 +489,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
         {!!files.length && (
           <div className={styles.fileItems}>{files.map(renderFileItem)}</div>
         )}
-        {conversation?.id}
         <Virtuoso
           followOutput
           ref={virtuosoRef}

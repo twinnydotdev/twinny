@@ -712,6 +712,9 @@ export class Chat extends Base {
     this._isCancelled = false
     this.sendEditorLanguage()
 
+    // Debug log to track the conversation ID being received
+    console.log("Received completion request with conversation ID:", conversationId)
+
     const provider = this.getProvider()
 
     if (!provider) return

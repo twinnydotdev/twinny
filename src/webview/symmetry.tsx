@@ -91,13 +91,11 @@ export const Symmetry = () => {
     autoConnectProviderContext,
     isProviderConnected,
     setAutoConnectProviderContext,
-    providers,
+    models,
     getModels,
     selectedModel,
     setSelectedModel,
   } = useSymmetryConnection()
-
-  console.log()
 
   const handleAutoConnectProviderChange = (
     e: React.MouseEvent<HTMLInputElement, MouseEvent>
@@ -109,24 +107,21 @@ export const Symmetry = () => {
   const handleModelChange: VSCodeDropdownHandler = (e) => {
     const target = e.target as HTMLSelectElement
     const modelId = Number(target.value)
-    const newSelectedModel = providers.find((model) => model.id === modelId) || null
+    const newSelectedModel = models.find((model) => model.id === modelId) || null
     setSelectedModel(newSelectedModel)
   }
 
   useEffect(() => {
-    if (providers.length > 0 && !selectedModel) {
-      // Check if llama3.2:latest is in the list of models
-      const llama32Model = providers.find(provider => provider.name === "twinny-symmetry")
+    if (models.length > 0 && !selectedModel) {
+      const symmetryProvider = models.find(provider => provider.name === "twinny-symmetry")
 
-      if (llama32Model) {
-        // If llama3.2:latest is found, select it
-        setSelectedModel(llama32Model)
+      if (symmetryProvider) {
+        setSelectedModel(symmetryProvider)
       } else {
-        // Otherwise default to the first model in the list
-        setSelectedModel(providers[0])
+        setSelectedModel(models[0])
       }
     }
-  }, [providers, selectedModel])
+  }, [models, selectedModel])
 
   useEffect(() => {
     getModels()
@@ -153,7 +148,7 @@ export const Symmetry = () => {
 
           {!isConnected && (
             <ModelSelector
-              models={providers}
+              models={models}
               selectedModel={selectedModel}
               onChange={handleModelChange}
               t={t}

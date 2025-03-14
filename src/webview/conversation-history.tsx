@@ -24,8 +24,6 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
     clearAllConversations
   } = useConversationHistory()
 
-  console.log(savedConversations)
-
   const handleSetConversation = (conversation: Conversation) => {
     setActiveConversation(conversation)
     onSelect()

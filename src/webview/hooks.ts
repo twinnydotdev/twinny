@@ -464,6 +464,7 @@ export const useConversationHistory = () => {
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
       data: conversation
     } as ClientMessage<Conversation | undefined>)
+
     setConversation(conversation)
   }
 
@@ -489,7 +490,8 @@ export const useConversationHistory = () => {
         setConversations(message.data as Record<string, Conversation>)
       }
       if (message?.type === CONVERSATION_EVENT_NAME.setActiveConversation) {
-        setConversation(message.data as Conversation)
+        const conversationData = message.data as Conversation;
+        setConversation(conversationData)
       }
     }
   }
