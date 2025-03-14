@@ -261,3 +261,17 @@
   display: flex;
   gap: 4px;
 }
+
+.modelLoader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  height: 20px;
+}
+
+.loaderText {
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+}

@@ -38,6 +38,7 @@ import { logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   ChatCompletionMessage,
+  CompletionStreamingWithId,
   ContextFile,
   FileContextItem,
   ServerMessage,
@@ -353,7 +354,7 @@ export class Chat extends Base {
     }
   }
 
-  private async llmStream(requestBody: CompletionStreaming<LLMProvider>) {
+  private async llmStream(requestBody: CompletionStreamingWithId) {
     this._controller = new AbortController()
 
     this._lastStreamingRequest = requestBody
@@ -555,12 +556,14 @@ export class Chat extends Base {
 
   private async buildConversation(
     messages: ChatCompletionMessage[],
-    fileContexts: FileContextItem[] | undefined
+    fileContexts: FileContextItem[] | undefined,
+    id?: string // Add parameter for conversation ID
   ): Promise<ChatCompletionMessage[]> {
 
     const systemMessage: ChatCompletionMessage = {
       role: SYSTEM,
-      content: await this.getSystemPrompt()
+      content: await this.getSystemPrompt(),
+      id // Add conversation ID to system message
     }
 
     const lastMessage = messages[messages.length - 1]
@@ -576,16 +579,24 @@ export class Chat extends Base {
 
     conversation.push({
       role: USER,
-      content: `${lastMessage.content}\n\n${additionalContext.trim()}`.trim() || " "
+      content: `${lastMessage.content}\n\n${additionalContext.trim()}`.trim() || " ",
+      id // Add conversation ID to user message
     })
 
     return conversation.map((message) => {
       const stringContent = message.content as string
 
-      if ([SYSTEM, ASSISTANT].includes(message.role)) return message
+      if ([SYSTEM, ASSISTANT].includes(message.role)) {
+        // Preserve the conversationId if it exists
+        return {
+          ...message,
+          conversationId: id || message.id
+        }
+      }
 
       return {
         ...message,
+        conversationId: id || message.id, // Preserve the conversationId
         content: stringContent.replace(/&lt;/g, "<")
         .replace(/@problems/g, "").trim()
         .replace(/@workspace/g, "").trim()
@@ -606,12 +617,14 @@ export class Chat extends Base {
   }
 
   private getStreamOptions(
-    provider: TwinnyProvider
-  ): CompletionStreaming<LLMProvider> {
+    provider: TwinnyProvider,
+    conversationId?: string
+  ): CompletionStreamingWithId {
     return {
       messages: this._conversation,
       model: provider.modelName,
       stream: true,
+      id: conversationId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       provider: this.getProviderType(provider) as any
     }
@@ -692,12 +705,15 @@ export class Chat extends Base {
 
   public async completion(
     messages: ChatCompletionMessage[],
-    fileContexts?: FileContextItem[]
+    fileContexts?: FileContextItem[],
+    conversationId?: string // Add parameter for conversation ID
   ) {
     this._completion = ""
     this._isCancelled = false
     this.sendEditorLanguage()
 
+    // Debug log to track the conversation ID being received
+    console.log("Received completion request with conversation ID:", conversationId)
 
     const provider = this.getProvider()
 
@@ -708,12 +724,13 @@ export class Chat extends Base {
     this._conversation = await this.buildConversation(
       messages,
       fileContexts,
+      conversationId // Pass the conversation ID to buildConversation
     )
 
     const stream = this.shouldUseStreaming(provider)
 
     return stream
-      ? this.llmStream(this.getStreamOptions(provider))
+      ? this.llmStream(this.getStreamOptions(provider, conversationId))
       : this.llmNoStream(this.getNoStreamOptions(provider))
   }
 

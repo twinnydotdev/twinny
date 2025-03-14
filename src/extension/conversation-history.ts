@@ -1,5 +1,4 @@
 import { ChatCompletionMessageParam } from "fluency.js"
-import { v4 as uuidv4 } from "uuid"
 import { ExtensionContext, Webview } from "vscode"
 
 import {
@@ -12,27 +11,18 @@ import { ClientMessage, Conversation, ServerMessage } from "../common/types"
 
 import { Base } from "./base"
 import { TwinnyProvider } from "./provider-manager"
-import { SessionManager } from "./session-manager"
-import { SymmetryService } from "./symmetry-service"
 
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory extends Base {
   public webView: Webview
-  private _sessionManager: SessionManager | undefined
-  private _symmetryService: SymmetryService
-  private _title = ""
 
   constructor(
     context: ExtensionContext,
     webView: Webview,
-    sessionManager: SessionManager | undefined,
-    symmetryService: SymmetryService
   ) {
     super(context)
     this.webView = webView
-    this._sessionManager = sessionManager
-    this._symmetryService = symmetryService
     this.setUpEventListeners()
   }
 
@@ -85,13 +75,11 @@ export class ConversationHistory extends Base {
     }
   }
 
-  async getConversationTitle(
+  getConversationTitle(
     messages: ChatCompletionMessageParam[]
-  ): Promise<string | null> {
-
+  ):string | undefined {
     const message = messages[0].content as string
-
-    return Promise.resolve(`${message?.substring(0, 50)}...`)
+    return `${message?.substring(0, 50)}...`
   }
 
   getAllConversations() {
@@ -115,12 +103,15 @@ export class ConversationHistory extends Base {
   }
 
   updateConversation(conversation: Conversation) {
-    const conversations = this.getConversations() || {}
     if (!conversation.id) return
+
+    const conversations = this.getConversations() || {}
+
     this.context?.globalState.update(CONVERSATION_STORAGE_KEY, {
       ...conversations,
       [conversation.id]: conversation
     })
+
     this.setActiveConversation(conversation)
   }
 
@@ -129,16 +120,19 @@ export class ConversationHistory extends Base {
       ACTIVE_CONVERSATION_STORAGE_KEY,
       conversation
     )
+
     this.webView?.postMessage({
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
       data: conversation
     } as ServerMessage<Conversation>)
+
     this.getAllConversations()
   }
 
   getActiveConversation() {
     const conversation: Conversation | undefined =
       this.context?.globalState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
+
     this.setActiveConversation(conversation)
     return conversation
   }
@@ -161,31 +155,13 @@ export class ConversationHistory extends Base {
 
   async saveConversation(conversation: Conversation) {
     const activeConversation = this.getActiveConversation()
-    if (activeConversation)
+
+    if (activeConversation) {
       return this.updateConversation({
         ...activeConversation,
-        messages: conversation.messages
+        messages: conversation.messages,
+        title: this.getConversationTitle(conversation.messages)
       })
-
-    if (!conversation.messages.length || conversation.messages.length > 2)
-      return
-
-    this._title = await this.getConversationTitle(conversation.messages) || " "
-    this.saveConversationEnd(conversation)
-  }
-
-  private saveConversationEnd(conversation: Conversation) {
-    const id = uuidv4()
-    const conversations = this.getConversations()
-    if (!conversations) return
-    const newConversation: Conversation = {
-      id,
-      title: this._title || "",
-      messages: conversation.messages
     }
-    conversations[id] = newConversation
-    this.context?.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
-    this.setActiveConversation(newConversation)
-    this._title = ""
   }
 }

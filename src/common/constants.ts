@@ -131,6 +131,7 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
   Ollama: "ollama",
+  Twinny: "twinny",
   OpenAICompatible: "openai-compatible"
 }
 

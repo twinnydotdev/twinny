@@ -464,6 +464,7 @@ export const useConversationHistory = () => {
       type: CONVERSATION_EVENT_NAME.setActiveConversation,
       data: conversation
     } as ClientMessage<Conversation | undefined>)
+
     setConversation(conversation)
   }
 
@@ -489,7 +490,8 @@ export const useConversationHistory = () => {
         setConversations(message.data as Record<string, Conversation>)
       }
       if (message?.type === CONVERSATION_EVENT_NAME.setActiveConversation) {
-        setConversation(message.data as Conversation)
+        const conversationData = message.data as Conversation;
+        setConversation(conversationData)
       }
     }
   }
@@ -698,7 +700,7 @@ export const useSuggestion = () => {
 
 export const useSymmetryConnection = () => {
   const [connecting, setConnecting] = useState(false)
-  const [models, setModels] = useState<SymmetryModelProvider[]>([])
+  const [providers, setModels] = useState<SymmetryModelProvider[]>([])
   const [selectedModel, setSelectedModel] =
     useState<SymmetryModelProvider | null>(null)
   const {
@@ -804,7 +806,7 @@ export const useSymmetryConnection = () => {
     getModels,
     isConnected: symmetryConnectionSession !== undefined,
     isProviderConnected,
-    models,
+    providers,
     selectedModel,
     setAutoConnectProviderContext,
     setSelectedModel,

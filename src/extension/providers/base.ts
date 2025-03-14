@@ -102,8 +102,6 @@ export class BaseProvider {
     this.conversationHistory = new ConversationHistory(
       this.context,
       this.webView,
-      this._sessionManager,
-      this._symmetryService
     )
 
     this.reviewService = new ReviewService(
@@ -422,7 +420,11 @@ export class BaseProvider {
       )
     }
 
-    this.chat?.completion(data.data || [], data.meta as FileContextItem[])
+    this.chat?.completion(
+      data.data || [],
+      data.meta as FileContextItem[],
+      data.key // Pass the conversation ID
+    )
   }
 
   private getSelectedText = () => {

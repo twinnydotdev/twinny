@@ -1,4 +1,5 @@
 import { ChatCompletionMessageParam } from "fluency.js"
+import { CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { serverMessageKeys } from "symmetry-core"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
@@ -109,7 +110,10 @@ export interface GithubPullRequestMessage {
 
 export type ChatCompletionMessage = ChatCompletionMessageParam & {
   id?: string
-  excludeFromApi?: boolean
+}
+
+export type CompletionStreamingWithId = CompletionStreaming<LLMProvider> & {
+  id?: string
 }
 
 export interface Conversation {

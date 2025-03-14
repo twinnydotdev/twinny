@@ -93,14 +93,13 @@ export class ProviderManager {
 
   getDefaultChatProvider() {
     return {
-      apiHostname: "0.0.0.0",
+      apiHostname: "twinny.dev",
       apiPath: "/v1",
-      apiPort: 11434,
-      apiProtocol: "http",
-      id: uuidv4(),
-      label: "OpenAI Compatible (localhost)",
-      modelName: "codellama:7b-instruct",
-      provider: API_PROVIDERS.Ollama,
+      apiProtocol: "https",
+      id: "symmetry-default",
+      label: "Twinny.dev (Symmetry)",
+      modelName: "llama3.2:latest",
+      provider: API_PROVIDERS.Twinny,
       type: "chat",
     } as TwinnyProvider
   }
