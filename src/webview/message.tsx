@@ -24,7 +24,6 @@ import styles from "./styles/index.module.css"
 const global = globalThis as any
 
 interface MessageProps {
-  conversationLength?: number
   index?: number
   isAssistant?: boolean
   isLoading?: boolean
@@ -119,7 +118,6 @@ const ThinkingSection = React.memo(
 )
 
 export const Message: React.FC<MessageProps> = ({
-  conversationLength = 0,
   index = 0,
   isAssistant,
   isLoading,
@@ -373,6 +371,8 @@ export const Message: React.FC<MessageProps> = ({
   const { thinking, message: messageContent } = getThinkingMessage(
     message.content as string
   )
+
+  const conversationLength = messages?.length || 0
 
   useEffect(() => {
     if (editor) editorRef.current = editor

@@ -17,7 +17,7 @@ export const ProviderSelect = () => {
   const { t } = useTranslation()
   const ollamaModels = useOllamaModels()
   const { models } = useModels()
-  const { providers: symmetryProviders } = useSymmetryConnection()
+  const { models: symmetryProviders } = useSymmetryConnection()
   const { getProvidersByType, setActiveChatProvider, providers, chatProvider } =
     useProviders()
 

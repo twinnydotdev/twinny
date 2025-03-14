@@ -84,7 +84,7 @@ export interface LanguageType {
 }
 
 export interface ClientMessage<
-  T = string | boolean | Conversation,
+  T = string | boolean | ChatCompletionMessage[],
   Y = unknown
 > {
   data?: T

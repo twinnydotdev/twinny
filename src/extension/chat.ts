@@ -38,9 +38,7 @@ import { logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   ChatCompletionMessage,
-  CompletionStreamingId,
   ContextFile,
-  Conversation,
   FileContextItem,
   ServerMessage,
   TemplateData
@@ -608,16 +606,14 @@ export class Chat extends Base {
   }
 
   private getStreamOptions(
-    provider: TwinnyProvider,
-    conversationId?: string,
-  ): CompletionStreamingId {
+    provider: TwinnyProvider
+  ): CompletionStreaming<LLMProvider> {
     return {
       messages: this._conversation,
       model: provider.modelName,
       stream: true,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: this.getProviderType(provider) as any,
-      conversationId,
+      provider: this.getProviderType(provider) as any
     }
   }
 
@@ -693,9 +689,10 @@ export class Chat extends Base {
     return this._conversation
   }
 
+
   public async completion(
-    conversation: Conversation,
-    fileContexts?: FileContextItem[],
+    messages: ChatCompletionMessage[],
+    fileContexts?: FileContextItem[]
   ) {
     this._completion = ""
     this._isCancelled = false
@@ -709,14 +706,14 @@ export class Chat extends Base {
     this.instantiateTokenJS(provider)
 
     this._conversation = await this.buildConversation(
-      conversation.messages,
+      messages,
       fileContexts,
     )
 
     const stream = this.shouldUseStreaming(provider)
 
     return stream
-      ? this.llmStream(this.getStreamOptions(provider, conversation.id))
+      ? this.llmStream(this.getStreamOptions(provider))
       : this.llmNoStream(this.getNoStreamOptions(provider))
   }
 

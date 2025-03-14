@@ -438,9 +438,7 @@ export const useConversationHistory = () => {
   const [conversations, setConversations] = useState<
     Record<string, Conversation>
   >({})
-  const [conversation, setConversation] = useState<Conversation>({
-    messages: []
-  })
+  const [conversation, setConversation] = useState<Conversation>()
 
   const getConversations = () => {
     global.vscode.postMessage({
@@ -461,14 +459,19 @@ export const useConversationHistory = () => {
     } as ClientMessage<Conversation>)
   }
 
-  const saveLastConversation = (conversation: Conversation) => {
-    setConversation((prev) => {
-      global.vscode.postMessage({
-        type: CONVERSATION_EVENT_NAME.saveConversation,
-        data: { ...prev, ...conversation }
-      } as ClientMessage<Conversation>)
-      return { ...prev, ...conversation }
-    })
+  const setActiveConversation = (conversation: Conversation | undefined) => {
+    global.vscode.postMessage({
+      type: CONVERSATION_EVENT_NAME.setActiveConversation,
+      data: conversation
+    } as ClientMessage<Conversation | undefined>)
+    setConversation(conversation)
+  }
+
+  const saveLastConversation = (conversation: Conversation | undefined) => {
+    global.vscode.postMessage({
+      type: CONVERSATION_EVENT_NAME.saveConversation,
+      data: conversation
+    } as ClientMessage<Conversation>)
   }
 
   const clearAllConversations = () => {
@@ -506,6 +509,7 @@ export const useConversationHistory = () => {
     removeConversation,
     saveLastConversation,
     clearAllConversations,
+    setActiveConversation
   }
 }
 
@@ -694,7 +698,7 @@ export const useSuggestion = () => {
 
 export const useSymmetryConnection = () => {
   const [connecting, setConnecting] = useState(false)
-  const [providers, setProviders] = useState<SymmetryModelProvider[]>([])
+  const [models, setModels] = useState<SymmetryModelProvider[]>([])
   const [selectedModel, setSelectedModel] =
     useState<SymmetryModelProvider | null>(null)
   const {
@@ -768,7 +772,7 @@ export const useSymmetryConnection = () => {
     }
 
     if (message?.type === EVENT_NAME.twinnySymmetryModels) {
-      setProviders(message?.data as SymmetryModelProvider[])
+      setModels(message?.data as SymmetryModelProvider[])
     }
     return () => window.removeEventListener("message", handler)
   }
@@ -800,7 +804,7 @@ export const useSymmetryConnection = () => {
     getModels,
     isConnected: symmetryConnectionSession !== undefined,
     isProviderConnected,
-    providers,
+    models,
     selectedModel,
     setAutoConnectProviderContext,
     setSelectedModel,
