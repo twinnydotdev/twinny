@@ -170,12 +170,17 @@ export class ConversationHistory extends Base {
     if (!conversation.messages.length || conversation.messages.length > 2)
       return
 
+    const conversationId = conversation.messages.find(m => m.id)?.id;
+    if (conversationId) {
+      conversation.id = conversationId;
+    }
+
     this._title = await this.getConversationTitle(conversation.messages) || " "
     this.saveConversationEnd(conversation)
   }
 
   private saveConversationEnd(conversation: Conversation) {
-    const id = uuidv4()
+    const id = conversation.id || uuidv4()
     const conversations = this.getConversations()
     if (!conversations) return
     const newConversation: Conversation = {

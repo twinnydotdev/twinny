@@ -110,11 +110,10 @@ export interface GithubPullRequestMessage {
 
 export type ChatCompletionMessage = ChatCompletionMessageParam & {
   id?: string
-  excludeFromApi?: boolean
 }
 
 export type CompletionStreamingId = CompletionStreaming<LLMProvider> & {
-  conversationId?: string
+  id?: string
 }
 
 export interface Conversation {

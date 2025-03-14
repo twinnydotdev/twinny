@@ -1,4 +1,4 @@
-import { models } from "fluency.js"
+import { ChatCompletionMessageParam, models } from "fluency.js"
 import { serverMessageKeys } from "symmetry-core"
 import * as vscode from "vscode"
 
@@ -17,7 +17,6 @@ import {
   ChatCompletionMessage,
   ClientMessage,
   ContextFile,
-  Conversation,
   FileContextItem,
   InferenceRequest,
   LanguageType,
@@ -103,6 +102,8 @@ export class BaseProvider {
     this.conversationHistory = new ConversationHistory(
       this.context,
       this.webView,
+      this._sessionManager,
+      this._symmetryService
     )
 
     this.reviewService = new ReviewService(
@@ -389,7 +390,7 @@ export class BaseProvider {
   }
 
   private streamChatCompletion = async (
-    data: ClientMessage<Conversation>
+    data: ClientMessage<ChatCompletionMessageParam[]>
   ) => {
     const symmetryConnected = this._sessionManager?.get(
       EXTENSION_SESSION_NAME.twinnySymmetryConnection
@@ -402,7 +403,7 @@ export class BaseProvider {
 
       const messages = [
         systemMessage,
-        ...(data.data?.messages as ChatCompletionMessage[])
+        ...(data.data as ChatCompletionMessage[])
       ].map(m => ({
         ...m,
         content: m.content
@@ -421,11 +422,10 @@ export class BaseProvider {
       )
     }
 
-    if (!data.data) return
-
     this.chat?.completion(
-      data.data,
-      data.meta as FileContextItem[]
+      data.data || [],
+      data.meta as FileContextItem[],
+      data.key // Pass the conversation ID
     )
   }
 
