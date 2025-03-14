@@ -7,8 +7,9 @@ import {
 } from "@vscode/webview-ui-toolkit/react"
 
 import { API_PROVIDERS, GLOBAL_STORAGE_KEY } from "../common/constants"
+import { SymmetryModelProvider } from "../common/types"
 
-import { useGlobalContext, useModels, useOllamaModels, useProviders } from "./hooks"
+import { useGlobalContext, useModels, useOllamaModels, useProviders, useSymmetryConnection } from "./hooks"
 
 import styles from "./styles/providers.module.css"
 
@@ -16,13 +17,16 @@ export const ProviderSelect = () => {
   const { t } = useTranslation()
   const ollamaModels = useOllamaModels()
   const { models } = useModels()
+  const { providers: symmetryProviders } = useSymmetryConnection()
   const { getProvidersByType, setActiveChatProvider, providers, chatProvider } =
     useProviders()
 
   const providerModels =
     chatProvider?.provider === API_PROVIDERS.Ollama
       ? ollamaModels.models?.map(({ name }) => name) || []
-      : models[chatProvider?.provider as keyof typeof models]?.models || []
+      : chatProvider?.provider === API_PROVIDERS.Twinny
+        ? symmetryProviders.map((provider: SymmetryModelProvider) => provider.model_name) || []
+        : models[chatProvider?.provider as keyof typeof models]?.models || []
 
   const {
     context: selectedModel,

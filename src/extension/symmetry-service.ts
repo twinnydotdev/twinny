@@ -246,12 +246,10 @@ export class SymmetryService extends EventEmitter {
       dataPath: configDir,
       apiPort: provider.apiPort || 8080,
       apiProtocol: provider.apiProtocol || "http",
-      apiProvider: provider.provider,
       dataCollectionEnabled: false,
       maxConnections: 10,
       modelName: provider.modelName,
       name: os.hostname(),
-      public: true,
       serverKey: this._config.symmetryServerKey,
       systemMessage: "",
       userSecret: existingConfig?.userSecret || ""

@@ -12,27 +12,20 @@ import { ClientMessage, Conversation, ServerMessage } from "../common/types"
 
 import { Base } from "./base"
 import { TwinnyProvider } from "./provider-manager"
-import { SessionManager } from "./session-manager"
-import { SymmetryService } from "./symmetry-service"
 
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory extends Base {
   public webView: Webview
-  private _sessionManager: SessionManager | undefined
-  private _symmetryService: SymmetryService
   private _title = ""
 
   constructor(
     context: ExtensionContext,
     webView: Webview,
-    sessionManager: SessionManager | undefined,
-    symmetryService: SymmetryService
   ) {
     super(context)
     this.webView = webView
-    this._sessionManager = sessionManager
-    this._symmetryService = symmetryService
+
     this.setUpEventListeners()
   }
 
@@ -71,20 +64,6 @@ export class ConversationHistory extends Base {
     )
   }
 
-  private getRequestOptions(provider: TwinnyProvider) {
-    return {
-      hostname: provider.apiHostname,
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
-      }
-    }
-  }
-
   async getConversationTitle(
     messages: ChatCompletionMessageParam[]
   ): Promise<string | null> {
@@ -109,9 +88,12 @@ export class ConversationHistory extends Base {
     return conversations
   }
 
-  resetConversation() {
+  async resetConversation() {
     this.context?.globalState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
-    this.setActiveConversation(undefined)
+    const conversation = await this.saveConversation({
+      messages: []
+    })
+    this.setActiveConversation(conversation)
   }
 
   updateConversation(conversation: Conversation) {
@@ -122,6 +104,7 @@ export class ConversationHistory extends Base {
       [conversation.id]: conversation
     })
     this.setActiveConversation(conversation)
+    return conversation
   }
 
   setActiveConversation(conversation: Conversation | undefined) {
@@ -159,7 +142,7 @@ export class ConversationHistory extends Base {
     this.setActiveConversation(undefined)
   }
 
-  async saveConversation(conversation: Conversation) {
+  async saveConversation(conversation: Conversation): Promise<Conversation | undefined> {
     const activeConversation = this.getActiveConversation()
     if (activeConversation)
       return this.updateConversation({
@@ -167,15 +150,12 @@ export class ConversationHistory extends Base {
         messages: conversation.messages
       })
 
-    if (!conversation.messages.length || conversation.messages.length > 2)
-      return
-
-    this._title = await this.getConversationTitle(conversation.messages) || " "
-    this.saveConversationEnd(conversation)
+    return this.saveConversationEnd(conversation)
   }
 
   private saveConversationEnd(conversation: Conversation) {
-    const id = uuidv4()
+    let id = conversation.id
+    if (!id) id = uuidv4()
     const conversations = this.getConversations()
     if (!conversations) return
     const newConversation: Conversation = {
@@ -187,5 +167,6 @@ export class ConversationHistory extends Base {
     this.context?.globalState.update(CONVERSATION_STORAGE_KEY, conversations)
     this.setActiveConversation(newConversation)
     this._title = ""
+    return newConversation
   }
 }

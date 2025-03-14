@@ -17,6 +17,7 @@ import { EVENT_NAME, USER } from "../common/constants"
 import {
   ChatCompletionMessage,
   ClientMessage,
+  Conversation,
   MentionType,
   ServerMessage
 } from "../common/types"
@@ -53,14 +54,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const selection = useSelection()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
-  const [messages, setMessages] = useState<ChatCompletionMessage[]>([])
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { symmetryConnection } = useSymmetryConnection()
   const { files, removeFile } = useFileContext()
   const [isBottom, setIsBottom] = useState(false)
 
-  const { conversation, saveLastConversation, setActiveConversation } =
+  const { conversation, saveLastConversation } =
     useConversationHistory()
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
@@ -73,28 +73,28 @@ export const Chat = (props: ChatProps): JSX.Element => {
       return
     }
 
-    setMessages((prev) => {
-      if (message.data.id) {
-        const existingIndex = prev?.findIndex((m) => m.id === message.data.id)
+    const prev = conversation.messages
 
-        if (existingIndex !== -1) {
-          const updatedMessages = [...(prev || [])]
-          updatedMessages[existingIndex || 0] = message.data
+    if (message.data.id) {
+      const existingIndex = prev?.findIndex((m) => m.id === message.data.id)
 
-          saveLastConversation({
-            ...conversation,
-            messages: updatedMessages
-          })
-          return updatedMessages
-        }
+      if (existingIndex !== -1) {
+        const updatedMessages = [...(prev || [])]
+        updatedMessages[existingIndex || 0] = message.data
+
+        saveLastConversation({
+          ...conversation,
+          messages: updatedMessages
+        })
+        return
       }
+    }
 
-      const messages = [...(prev || []), message.data]
-      saveLastConversation({
-        ...conversation,
-        messages: messages
-      })
-      return messages
+    const messages = [...(prev || []), message.data]
+
+    saveLastConversation({
+      ...conversation,
+      messages,
     })
 
     setTimeout(() => {
@@ -132,9 +132,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
         break
       }
       case EVENT_NAME.twinnyNewConversation: {
-        setMessages([])
+        saveLastConversation({ messages: [] })
         setCompletion(null)
-        setActiveConversation(undefined)
         generatingRef.current = false
         setIsLoading(false)
         chatRef.current?.focus()
@@ -165,38 +164,34 @@ export const Chat = (props: ChatProps): JSX.Element => {
     index: number,
     mentions: MentionType[] | undefined
   ): void => {
+    if (!conversation) return
     generatingRef.current = true
     setIsLoading(true)
-    setMessages((prev) => {
-      if (!prev) return prev
-      const updatedMessages = prev.slice(0, index)
-
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions
-      } as ClientMessage)
-
-      return updatedMessages
+    saveLastConversation({
+      ...conversation,
+      messages: conversation.messages.slice(0, index)
     })
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyChatMessage,
+      data: conversation,
+      meta: mentions
+    } as ClientMessage)
   }
 
   const handleDeleteMessage = (index: number): void => {
-    setMessages((prev) => {
-      if (!prev || prev.length === 0) return prev
-      if (prev.length === 2) return prev
+    const prev = conversation.messages
 
-      const updatedMessages = [
-        ...prev.slice(0, index),
-        ...prev.slice(index + 2)
-      ]
+    if (!prev || prev.length === 0) return
+    if (prev.length === 2) return
 
-      saveLastConversation({
-        ...conversation,
-        messages: updatedMessages
-      })
+    const updatedMessages = [
+      ...prev.slice(0, index),
+      ...prev.slice(index + 2)
+    ]
 
-      return updatedMessages
+    saveLastConversation({
+      ...conversation,
+      messages: updatedMessages
     })
   }
 
@@ -207,10 +202,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
   ): void => {
     generatingRef.current = true
     setIsLoading(true)
-    setMessages((prev) => {
-      if (!prev) return prev
-
-      const updatedMessages = [
+    const prev = conversation.messages || []
+    saveLastConversation({
+      ...conversation,
+      messages: [
         ...prev.slice(0, index),
         {
           ...prev[index],
@@ -220,15 +215,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
             .replace(/<br>$/, "")
         }
       ]
-
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions
-      } as ClientMessage)
-
-      return updatedMessages
     })
+    global.vscode.postMessage({
+      type: EVENT_NAME.twinnyChatMessage,
+      data: conversation,
+      meta: mentions
+    } as ClientMessage)
   }
 
   const getMentions = useCallback(() => {
@@ -275,30 +267,38 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(true)
     clearEditor()
 
-    setMessages((prevMessages) => {
-      const updatedMessages: ChatCompletionMessage[] = [
-        ...(prevMessages || []),
+    saveLastConversation({
+      ...conversation,
+      messages: [
+        ...conversation.messages,
         { role: USER, content: input }
       ]
+    })
 
-      const clientMessage: ClientMessage<
-        ChatCompletionMessage[],
+    const clientMessage: ClientMessage<
+        Conversation,
         MentionType[]
       > = {
         type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
+        data: {
+          ...conversation,
+          messages: [
+            ...conversation.messages,
+            { role: USER, content: input }
+          ]
+        },
         meta: mentions
       }
 
       saveLastConversation({
         ...conversation,
-        messages: updatedMessages
+        messages: [
+          ...conversation.messages,
+          { role: USER, content: input }
+        ]
       })
 
       global.vscode.postMessage(clientMessage)
-
-      return updatedMessages
-    })
   }, [])
 
   const handleNewConversation = useCallback(() => {
@@ -329,10 +329,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   useEffect(() => {
-    if (conversation?.messages?.length) {
-      setMessages(conversation.messages)
+    if (conversation.messages?.length) {
+      saveLastConversation(conversation)
     }
-  }, [conversation?.id])
+  }, [conversation.id])
 
   const { suggestion, filePaths } = useSuggestion()
 
@@ -420,12 +420,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
         handleEditMessage={handleEditMessage}
         handleRegenerateMessage={handleRegenerateMessage}
         isLoading={isLoading}
-        message={messages[index]}
+        message={conversation.messages[index] || []}
         index={index}
         completion={completion}
         theme={theme}
         generatingRef={generatingRef}
-        messages={messages}
+        messages={conversation.messages}
       />
     ),
     [
@@ -433,7 +433,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       handleEditMessage,
       handleRegenerateMessage,
       isLoading,
-      messages,
+      conversation.messages,
       completion,
       theme,
       generatingRef
@@ -455,10 +455,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
           </div>
         )}
         <h4 className={styles.title}>
-          {conversation?.title ? (
+          {conversation.title ? (
             <span
               dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(conversation?.title)
+                __html: DOMPurify.sanitize(conversation.title)
               }}
             />
           ) : (
@@ -468,11 +468,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
         {!!files.length && (
           <div className={styles.fileItems}>{files.map(renderFileItem)}</div>
         )}
+        {conversation.id}
         <Virtuoso
           followOutput
           ref={virtuosoRef}
-          data={messages}
-          initialTopMostItemIndex={messages?.length}
+          data={conversation.messages}
+          initialTopMostItemIndex={conversation.messages?.length}
           defaultItemHeight={800}
           itemContent={itemContent}
           atBottomThreshold={20}
