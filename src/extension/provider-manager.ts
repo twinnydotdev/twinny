@@ -96,7 +96,7 @@ export class ProviderManager {
       apiHostname: "twinny.dev",
       apiPath: "/v1",
       apiProtocol: "https",
-      id: uuidv4(),
+      id: "symmetry-default",
       label: "Twinny.dev (Symmetry)",
       modelName: "llama3.2:latest",
       provider: API_PROVIDERS.Twinny,
@@ -143,17 +143,6 @@ export class ProviderManager {
     const provider = this.getDefaultChatProvider()
     if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
       this.addDefaultProvider(provider)
-
-      // Send an introduction message when a user hasn't set up a provider
-      setTimeout(() => {
-        this._webView?.postMessage({
-          type: EVENT_NAME.twinnyAddMessage,
-          data: {
-            role: "assistant",
-            content: "👋 Welcome to Twinny! I'm currently using a default provider (twinny.dev) to help you get started. To set up your own provider, click the plug icon in the top right corner. You can choose from various providers like OpenAI, Anthropic, or connect to a local model through Ollama."
-          }
-        });
-      }, 1000);
     }
     return provider
   }

@@ -38,7 +38,7 @@ import { logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   ChatCompletionMessage,
-  CompletionStreamingId,
+  CompletionStreamingWithId,
   ContextFile,
   FileContextItem,
   ServerMessage,
@@ -354,7 +354,7 @@ export class Chat extends Base {
     }
   }
 
-  private async llmStream(requestBody: CompletionStreamingId) {
+  private async llmStream(requestBody: CompletionStreamingWithId) {
     this._controller = new AbortController()
 
     this._lastStreamingRequest = requestBody
@@ -619,7 +619,7 @@ export class Chat extends Base {
   private getStreamOptions(
     provider: TwinnyProvider,
     conversationId?: string
-  ): CompletionStreamingId {
+  ): CompletionStreamingWithId {
     return {
       messages: this._conversation,
       model: provider.modelName,

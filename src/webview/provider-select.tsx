@@ -1,10 +1,9 @@
-import React from "react"
+import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   VSCodeDropdown,
   VSCodeOption,
-  VSCodeTextField
-} from "@vscode/webview-ui-toolkit/react"
+  VSCodeTextField} from "@vscode/webview-ui-toolkit/react"
 
 import { API_PROVIDERS, GLOBAL_STORAGE_KEY } from "../common/constants"
 import { SymmetryModelProvider } from "../common/types"
@@ -13,20 +12,68 @@ import { useGlobalContext, useModels, useOllamaModels, useProviders, useSymmetry
 
 import styles from "./styles/providers.module.css"
 
+// Simple loader component for model loading
+const ModelLoader = () => {
+  const { t } = useTranslation()
+  const [dots, setDots] = useState("")
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prevDots) => {
+        switch (prevDots) {
+          case "":
+            return "."
+          case ".":
+            return ".."
+          case "..":
+            return "..."
+          default:
+            return ""
+        }
+      })
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className={styles.modelLoader}>
+      <span className={styles.loaderText}>{t("Loading models")}{dots}</span>
+    </div>
+  )
+}
+
 export const ProviderSelect = () => {
   const { t } = useTranslation()
   const ollamaModels = useOllamaModels()
   const { models } = useModels()
-  const { models: symmetryProviders } = useSymmetryConnection()
+  const { providers: symmetryProviders } = useSymmetryConnection()
   const { getProvidersByType, setActiveChatProvider, providers, chatProvider } =
     useProviders()
 
+  const chatProviders = Object.values(getProvidersByType("chat"))
+    .sort((a, b) => a.modelName.localeCompare(b.modelName))
+
+  const isActiveProviderInList = chatProvider && chatProviders.some(p => p.id === chatProvider.id)
+  const effectiveProvider = isActiveProviderInList ? chatProvider : (chatProviders[0] || null)
+
+  React.useEffect(() => {
+    if (chatProvider && !isActiveProviderInList && chatProviders.length > 0) {
+      const firstProvider = chatProviders[0]
+      const defaultModel = models[firstProvider.provider as keyof typeof models]?.models?.[0] || firstProvider.modelName
+      setActiveChatProvider({
+        ...firstProvider,
+        modelName: defaultModel
+      })
+    }
+  }, [chatProvider, chatProviders, isActiveProviderInList])
+
   const providerModels =
-    chatProvider?.provider === API_PROVIDERS.Ollama
+    effectiveProvider?.provider === API_PROVIDERS.Ollama
       ? ollamaModels.models?.map(({ name }) => name) || []
-      : chatProvider?.provider === API_PROVIDERS.Twinny
+      : effectiveProvider?.provider === API_PROVIDERS.Twinny
         ? symmetryProviders.map((provider: SymmetryModelProvider) => provider.model_name) || []
-        : models[chatProvider?.provider as keyof typeof models]?.models || []
+        : models[effectiveProvider?.provider as keyof typeof models]?.models || []
 
   const {
     context: selectedModel,
@@ -49,30 +96,28 @@ export const ProviderSelect = () => {
     <div className={styles.providerSelector}>
       <div>
         <VSCodeDropdown
-          value={chatProvider?.id || ""}
+          value={effectiveProvider?.id || ""}
           name="provider"
           onChange={handleChangeChatProvider}
         >
-          {Object.values(getProvidersByType("chat"))
-            .sort((a, b) => a.modelName.localeCompare(b.modelName))
-            .map((provider, index) => (
-              <VSCodeOption key={index} value={provider.id}>
-                {provider.label}
-              </VSCodeOption>
-            ))}
+          {chatProviders.map((provider, index) => (
+            <VSCodeOption key={index} value={provider.id}>
+              {provider.label}
+            </VSCodeOption>
+          ))}
         </VSCodeDropdown>
       </div>
       <div>
-        {chatProvider?.id && providerModels.length > 0 ? (
+        {effectiveProvider?.id && providerModels.length > 0 ? (
           <VSCodeDropdown
             value={selectedModel || providerModels[0] || ""}
             name="model"
             onChange={(e: unknown) => {
               const event = e as React.ChangeEvent<HTMLSelectElement>
               setSelectedModel(event.target.value)
-              if (chatProvider) {
+              if (effectiveProvider) {
                 setActiveChatProvider({
-                  ...chatProvider,
+                  ...effectiveProvider,
                   modelName: event.target.value
                 })
               }
@@ -87,18 +132,20 @@ export const ProviderSelect = () => {
               </VSCodeOption>
             ))}
           </VSCodeDropdown>
+        ) : effectiveProvider?.provider === API_PROVIDERS.Twinny && symmetryProviders.length === 0 ? (
+          <ModelLoader />
         ) : (
           <VSCodeTextField
-            value={selectedModel || chatProvider?.modelName || ""}
+            value={selectedModel || effectiveProvider?.modelName || ""}
             placeholder={t("Enter model name")}
             onChange={(e: unknown) => {
               const event = e as React.ChangeEvent<HTMLInputElement>
               const value = event.target.value.trim()
               if (!value) return
               setSelectedModel(value)
-              if (chatProvider) {
+              if (effectiveProvider) {
                 setActiveChatProvider({
-                  ...chatProvider,
+                  ...effectiveProvider,
                   modelName: value
                 })
               }

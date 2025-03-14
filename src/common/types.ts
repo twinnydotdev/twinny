@@ -112,7 +112,7 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
   id?: string
 }
 
-export type CompletionStreamingId = CompletionStreaming<LLMProvider> & {
+export type CompletionStreamingWithId = CompletionStreaming<LLMProvider> & {
   id?: string
 }
 

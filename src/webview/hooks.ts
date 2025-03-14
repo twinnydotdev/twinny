@@ -700,7 +700,7 @@ export const useSuggestion = () => {
 
 export const useSymmetryConnection = () => {
   const [connecting, setConnecting] = useState(false)
-  const [models, setModels] = useState<SymmetryModelProvider[]>([])
+  const [providers, setModels] = useState<SymmetryModelProvider[]>([])
   const [selectedModel, setSelectedModel] =
     useState<SymmetryModelProvider | null>(null)
   const {
@@ -806,7 +806,7 @@ export const useSymmetryConnection = () => {
     getModels,
     isConnected: symmetryConnectionSession !== undefined,
     isProviderConnected,
-    models,
+    providers,
     selectedModel,
     setAutoConnectProviderContext,
     setSelectedModel,

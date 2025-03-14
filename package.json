@@ -89,16 +89,11 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnySymmetryTab || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab"
         },
         {
           "command": "twinny.review",
           "group": "navigation@1",
-          "when": "view == twinny.sidebar"
-        },
-        {
-          "command": "twinny.symmetry",
-          "group": "navigation@2",
           "when": "view == twinny.sidebar"
         },
         {
@@ -190,12 +185,6 @@
         "shortTitle": "twinny code reviewer",
         "title": "Code reviewer",
         "icon": "$(git-pull-request)"
-      },
-      {
-        "command": "twinny.symmetry",
-        "shortTitle": "twinny symmetry network",
-        "title": "Symmetry network settings",
-        "icon": "$(mirror-public)"
       },
       {
         "command": "twinny.conversationHistory",

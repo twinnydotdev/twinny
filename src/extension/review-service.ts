@@ -13,8 +13,6 @@ import {
 import { ClientMessage, ServerMessage, TemplateData } from "../common/types"
 
 import { ConversationHistory } from "./conversation-history"
-import { SessionManager } from "./session-manager"
-import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
 import { getIsOpenAICompatible, updateLoadingMessage } from "./utils"
 
@@ -27,11 +25,9 @@ export class GithubService extends ConversationHistory {
   constructor(
     context: ExtensionContext,
     webView: Webview,
-    sessionManager: SessionManager | undefined,
-    symmetryService: SymmetryService,
     templateDir: string | undefined
   ) {
-    super(context, webView, sessionManager, symmetryService)
+    super(context, webView)
     this._templateProvider = new TemplateProvider(templateDir)
     const provider = this.getProvider()
     if (!provider) return
