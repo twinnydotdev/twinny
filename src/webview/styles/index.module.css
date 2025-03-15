@@ -67,6 +67,7 @@ pre {
 code {
   font-family: inherit;
   font-size: 1rem !important;
+  background-color: transparent !important;
 }
 
 /* Scrollbar Styling */
