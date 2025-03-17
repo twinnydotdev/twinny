@@ -243,11 +243,8 @@ export class SymmetryService extends EventEmitter {
       apiHostname: provider.apiHostname || "localhost",
       apiKey: provider.apiKey,
       apiBasePath: provider.apiPath,
-      dataPath: configDir,
-      apiPort: provider.apiPort || 8080,
+      apiPort: provider.apiPort || 11434,
       apiProtocol: provider.apiProtocol || "http",
-      dataCollectionEnabled: false,
-      maxConnections: 10,
       modelName: provider.modelName,
       name: os.hostname(),
       serverKey: this._config.symmetryServerKey,
@@ -296,7 +293,6 @@ export class SymmetryService extends EventEmitter {
         config = await this.readProviderConfig()
         const updates: Partial<ProviderConfig> = {}
         if (!config.apiBasePath) updates.apiBasePath = provider.apiPath
-        if (!config.dataPath) updates.dataPath = configDir
 
         const updatedConfig = { ...config, ...updates }
         await fs.promises.writeFile(
