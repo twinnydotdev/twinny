@@ -16,7 +16,7 @@ Twinny is a free AI extension for Visual Studio Code, offering powerful AI-assis
 
 ## 🚀 Getting Started
 
-For a quick start guide, visit our [documentation](https://docs.twinny.dev).
+For a quick start guide, visit our [documentation](https://twinnydotdev.github.io/twinny-docs/).
 
 ## Main Features
 
