@@ -351,7 +351,7 @@ export class ProviderManager {
     const chatProvider = this.addDefaultChatProvider()
     const fimProvider = this.addDefaultFimProvider()
     const embeddingsProvider = this.addDefaultEmbeddingsProvider()
-    this.addTwinnyProvider()
+    this.addProvider(this.getTwinnyProvider())
     this.focusProviderTab()
     this.setActiveChatProvider(chatProvider)
     this.setActiveFimProvider(fimProvider)
