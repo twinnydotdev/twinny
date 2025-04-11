@@ -79,6 +79,7 @@ export class BaseProvider {
     this.webView = webView
     this.initializeServices()
     this.registerEventListeners()
+    logger.log("Webview registered successfully")
   }
 
   private initializeServices() {
@@ -107,12 +108,12 @@ export class BaseProvider {
     this.reviewService = new ReviewService(
       this.context,
       this.webView,
-      this._sessionManager,
-      this._symmetryService,
       this._templateDir
     )
 
     new ProviderManager(this.context, this.webView)
+
+    logger.log("Provider services initialized successfully")
   }
 
   private registerEventListeners() {

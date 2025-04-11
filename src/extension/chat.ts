@@ -269,6 +269,22 @@ export class Chat extends Base {
 
       if (delta?.content) {
         this._completion += delta.content
+
+        const timestamp = Math.floor(Date.now() / 1000)
+        const chunkId = `chatcmpl-${timestamp}-${Math.random().toString(36).substring(2, 10)}`
+
+        logger.log(`Chat completion chunk: ${JSON.stringify({
+          id: chunkId,
+          object: "chat.completion.chunk",
+          created: timestamp,
+          model: response.model || "unknown",
+          choices: [{
+            index: 0,
+            delta: { content: delta.content },
+            finish_reason: null
+          }]
+        })}`)
+
         await this._webView?.postMessage({
           type: EVENT_NAME.twinnyOnCompletion,
           data: {
@@ -366,6 +382,14 @@ export class Chat extends Base {
     if (!this._tokenJs || this._isCancelled) return
 
     try {
+      logger.log(`Chat completion request: ${JSON.stringify({
+        model: requestBody.model,
+        messages: requestBody.messages,
+        stream: true,
+        temperature: requestBody.temperature,
+        max_tokens: requestBody.max_tokens
+      })}`)
+
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
       for await (const part of result) {
@@ -375,6 +399,24 @@ export class Chat extends Base {
 
         await this.onPart(part)
       }
+
+      const timestamp = Math.floor(Date.now() / 1000)
+      const responseId = `chatcmpl-${timestamp}-${Math.random().toString(36).substring(2, 10)}`
+
+      logger.log(`Chat completion response: ${JSON.stringify({
+        id: responseId,
+        object: "chat.completion",
+        created: timestamp,
+        model: requestBody.model || "unknown",
+        choices: [{
+          index: 0,
+          message: {
+            role: "assistant",
+            content: this._completion.trim()
+          },
+          finish_reason: "stop"
+        }]
+      })}`)
 
       await this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,

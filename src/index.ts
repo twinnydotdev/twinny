@@ -18,6 +18,7 @@ import {
   TWINNY_COMMAND_NAME,
   WEBUI_TABS
 } from "./common/constants"
+import { logger } from "./common/logger"
 import { ServerMessage } from "./common/types"
 import { setContext } from "./extension/context"
 import { EmbeddingDatabase } from "./extension/embeddings"
@@ -34,6 +35,8 @@ export async function activate(context: ExtensionContext) {
   setContext(context)
   const config = workspace.getConfiguration("twinny")
   const statusBarItem = window.createStatusBarItem(StatusBarAlignment.Right)
+
+  logger.log("Twinny extension starting")
   const templateDir = path.join(os.homedir(), ".twinny/templates") as string
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
@@ -306,4 +309,10 @@ export async function activate(context: ExtensionContext) {
   if (config.get("enabled")) statusBarItem.show()
 
   statusBarItem.text = "$(code)"
+
+  logger.log("Twinny extension activation complete")
+}
+
+export function deactivate() {
+  logger.log("Twinny extension deactivated")
 }

@@ -1,11 +1,18 @@
+import * as vscode from "vscode"
+
 export class Logger {
   private static instance: Logger
+  private outputChannel: vscode.OutputChannel
 
   private static colorCodes: Record<string, number> = {
     Default: 0,
     FetchError: 91,
     Abort: 90,
     Timeout: 33
+  }
+
+  private constructor() {
+    this.outputChannel = vscode.window.createOutputChannel("Twinny")
   }
 
   public static getInstance(): Logger {
@@ -17,11 +24,13 @@ export class Logger {
 
   public log = (message: string) => {
     console.log(`[twinny] ${message}`)
+    this.outputChannel.appendLine(`[INFO] ${message}`)
   }
 
   public error = (error: Error | string) => {
     const errorMessage = error instanceof Error ? error.message : error
     console.error(`[twinny:ERROR] ${errorMessage}`)
+    this.outputChannel.appendLine(`[ERROR] ${errorMessage}`)
   }
 
   public logError(errorType: string, message: string, error: Error | string) {
@@ -32,6 +41,12 @@ export class Logger {
       error
     )
     console.error(formattedErrorMessage)
+
+    const errorName = error instanceof Error ? error.name : "Unknown Error"
+    const errorMessage = error instanceof Error ? error.message : error
+    this.outputChannel.appendLine(`[ERROR_${errorType}] ${message}`)
+    this.outputChannel.appendLine(`  Error Type: ${errorName}`)
+    this.outputChannel.appendLine(`  Error Message: ${errorMessage}`)
   }
 
   private formatErrorMessage(

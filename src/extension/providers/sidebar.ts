@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 
+import { logger } from "../../common/logger"
 import { EmbeddingDatabase } from "../embeddings"
 import { SessionManager } from "../session-manager"
 import { getNonce } from "../utils"
@@ -27,6 +28,7 @@ export class SidebarProvider extends BaseProvider {
     }
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview)
+    logger.log("Sidebar webview view resolved")
 
     this.registerWebView(webviewView.webview)
   }
