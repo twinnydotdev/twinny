@@ -98,7 +98,7 @@ export class ProviderManager {
       apiProtocol: "https",
       id: "symmetry-default",
       label: "Twinny.dev (Symmetry)",
-      modelName: "",
+      modelName: "llama3.2:latest",
       provider: API_PROVIDERS.Twinny,
       type: "chat",
     } as TwinnyProvider
