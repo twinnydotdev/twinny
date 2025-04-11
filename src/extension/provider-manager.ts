@@ -91,17 +91,31 @@ export class ProviderManager {
     } as ServerMessage<string>)
   }
 
-  getDefaultChatProvider() {
+  getTwinnyProvider() {
     return {
       apiHostname: "twinny.dev",
       apiPath: "/v1",
       apiProtocol: "https",
       id: "symmetry-default",
       label: "Twinny.dev (Symmetry)",
-      modelName: "llama3.2:latest",
+      modelName: "",
       provider: API_PROVIDERS.Twinny,
       type: "chat",
     } as TwinnyProvider
+  }
+
+  getDefaultLocalProvider() {
+    return {
+        apiHostname: "localhost",
+        apiPath: "/v1",
+        apiPort: 11434,
+        apiProtocol: "http",
+        id: "openai-compatible-default",
+        label: "Ollama",
+        modelName: "codellama:7b-instruct",
+        provider: API_PROVIDERS.Ollama,
+        type: "chat",
+      }
   }
 
   getDefaultEmbeddingsProvider() {
@@ -137,10 +151,19 @@ export class ProviderManager {
     this.addDefaultChatProvider()
     this.addDefaultFimProvider()
     this.addDefaultEmbeddingsProvider()
+    this.addTwinnyProvider()
+  }
+
+  addDefaultLocalProvider(): TwinnyProvider {
+    const provider = this.getDefaultLocalProvider()
+    if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
+      this.addDefaultProvider(provider)
+    }
+    return provider
   }
 
   addDefaultChatProvider(): TwinnyProvider {
-    const provider = this.getDefaultChatProvider()
+    const provider = this.getDefaultLocalProvider()
     if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
       this.addDefaultProvider(provider)
     }
@@ -163,6 +186,15 @@ export class ProviderManager {
     ) {
       this.addDefaultProvider(provider)
     }
+    return provider
+  }
+
+  addTwinnyProvider(): TwinnyProvider | null {
+    const provider = this.getTwinnyProvider()
+    const providers = this.getProviders()
+    if (!providers) return this.addProvider(provider)
+    const twinnyProvider = Object.values(providers).find(p => p.apiHostname === "twinny.dev")
+    if (!twinnyProvider) this.addProvider(provider)
     return provider
   }
 
@@ -255,9 +287,9 @@ export class ProviderManager {
     return this.getActiveEmbeddingsProvider()
   }
 
-  addProvider(provider?: TwinnyProvider) {
+  addProvider(provider?: TwinnyProvider): TwinnyProvider | null {
     const providers = this.getProviders() || {}
-    if (!provider) return
+    if (!provider) return null
     provider.id = uuidv4()
     providers[provider.id] = provider
     this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
@@ -270,6 +302,7 @@ export class ProviderManager {
     }
 
     this.getAllProviders()
+    return provider
   }
 
   copyProvider(provider?: TwinnyProvider) {
@@ -318,6 +351,7 @@ export class ProviderManager {
     const chatProvider = this.addDefaultChatProvider()
     const fimProvider = this.addDefaultFimProvider()
     const embeddingsProvider = this.addDefaultEmbeddingsProvider()
+    this.addTwinnyProvider()
     this.focusProviderTab()
     this.setActiveChatProvider(chatProvider)
     this.setActiveFimProvider(fimProvider)

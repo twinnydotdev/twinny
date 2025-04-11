@@ -31,7 +31,7 @@ const providers: TwinnyProvider[] = [
     apiPath: "/v1",
     logo: <SvgTwinny />,
     apiProtocol: "https",
-    modelName: "llama3.2:latest",
+    modelName: "",
     id: "twinny",
     provider: API_PROVIDERS.Twinny,
     type: "chat",
