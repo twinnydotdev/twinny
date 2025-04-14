@@ -662,14 +662,20 @@ export class Chat extends Base {
     provider: TwinnyProvider,
     conversationId?: string
   ): CompletionStreamingWithId {
-    return {
+    const request = {
       messages: this._conversation,
       model: provider.modelName,
-      stream: true,
+      stream: true as const,
       id: conversationId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       provider: this.getProviderType(provider) as any
     }
+
+    if (provider.provider !== API_PROVIDERS.Twinny) {
+      delete request.id
+    }
+
+    return request
   }
 
   private getNoStreamOptions(
