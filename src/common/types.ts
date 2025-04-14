@@ -1,5 +1,5 @@
 import { ChatCompletionMessageParam } from "fluency.js"
-import { CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
+import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { serverMessageKeys } from "symmetry-core"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
@@ -108,11 +108,22 @@ export interface GithubPullRequestMessage {
   number: number
 }
 
-export type ChatCompletionMessage = ChatCompletionMessageParam & {
+export interface ImageAttachment {
+  data: string
+  type: string
   id?: string
 }
 
+export type ChatCompletionMessage = ChatCompletionMessageParam & {
+  id?: string
+  images?: ImageAttachment[] | string[]
+}
+
 export type CompletionStreamingWithId = CompletionStreaming<LLMProvider> & {
+  id?: string
+}
+
+export type CompletionNonStreamingWithId = CompletionNonStreaming<LLMProvider> & {
   id?: string
 }
 

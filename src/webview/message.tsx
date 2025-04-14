@@ -10,10 +10,11 @@ import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
-import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
+import { ChatCompletionMessage, ImageAttachment, MentionType, ThemeType } from "../common/types"
 
 import CodeBlock from "./code-block"
 import { useSuggestion } from "./hooks"
+import { createCustomImageExtension } from "./image-extension"
 import { MentionExtension } from "./mention-extention"
 import { useToast } from "./toast"
 import { getThinkingMessage } from "./utils"
@@ -34,10 +35,12 @@ interface MessageProps {
   onEdit?: (
     message: string,
     index: number,
-    mentions: MentionType[] | undefined
+    mentions: MentionType[] | undefined,
+    images?: ImageAttachment[]
   ) => void
   onHeightChange?: () => void
   theme: ThemeType | undefined
+  onDeleteImage?: (id: string) => void
 }
 
 const CustomKeyMap = Extension.create({
@@ -98,15 +101,13 @@ const ThinkingSection = React.memo(
         <div className={styles.thinkingHeader} onClick={handleToggle}>
           <span>{t("thinking")}</span>
           <span
-            className={`codicon ${
-              isCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"
-            }`}
+            className={`codicon ${isCollapsed ? "codicon-chevron-right" : "codicon-chevron-down"
+              }`}
           />
         </div>
         <div
-          className={`${styles.thinkingContent} ${
-            isCollapsed ? styles.collapsed : ""
-          }`}
+          className={`${styles.thinkingContent} ${isCollapsed ? styles.collapsed : ""
+            }`}
         >
           <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {thinking}
@@ -127,7 +128,8 @@ export const Message: React.FC<MessageProps> = ({
   onEdit,
   onHeightChange,
   theme,
-  messages
+  messages,
+  onDeleteImage
 }) => {
   const { t } = useTranslation()
   const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
@@ -198,6 +200,11 @@ export const Message: React.FC<MessageProps> = ({
       }
     )
 
+    const imageNodes = Array.from(doc.querySelectorAll("img"))
+    const imageIds = imageNodes.map(img => img.getAttribute("id")).filter((id): id is string => Boolean(id))
+    const allImages = (message?.images || []) as ImageAttachment[]
+    const filteredImages = allImages.filter(img => img.id && imageIds.includes(img.id))
+
     const finalContent = doc.body.innerHTML
     if (message?.content === finalContent) {
       return setEditing(false)
@@ -206,10 +213,11 @@ export const Message: React.FC<MessageProps> = ({
     onEdit?.(
       finalContent,
       index,
-      mentions.filter((m): m is MentionType => Boolean(m.name && m.path))
+      mentions.filter((m): m is MentionType => Boolean(m.name && m.path)),
+      filteredImages
     )
     setEditing(false)
-  }, [message?.content, onEdit, index])
+  }, [message?.content, onEdit, index, message?.images])
 
   const handleOpenFile = useCallback((filePath: string) => {
     global.vscode.postMessage({
@@ -227,9 +235,17 @@ export const Message: React.FC<MessageProps> = ({
 
   const editorRef = useRef<Editor | null>(null)
 
+  const CustomImageExtension = createCustomImageExtension(onDeleteImage)
+
   const editor = useEditor(
     {
       extensions: [
+        StarterKit,
+        TiptapMarkdown,
+        MentionExtension,
+        CustomImageExtension.configure({
+          allowBase64: true,
+        }),
         Mention.configure({
           HTMLAttributes: {
             class: "mention"
@@ -239,9 +255,6 @@ export const Message: React.FC<MessageProps> = ({
             return `@${node.attrs.label}`
           }
         }),
-        StarterKit,
-        TiptapMarkdown,
-        MentionExtension,
         CustomKeyMap.configure({
           handleToggleSave
         })
@@ -253,7 +266,27 @@ export const Message: React.FC<MessageProps> = ({
         },
         handleDOMEvents: {
           paste: (view, event) => {
-            event.preventDefault()
+            const items = Array.from(event.clipboardData?.items || [])
+            const imageItem = items.find(item => item.type.startsWith("image/"))
+
+            if (imageItem) {
+              const file = imageItem.getAsFile()
+              if (file) {
+                const reader = new FileReader()
+                reader.onload = (e) => {
+                  const base64 = e.target?.result as string
+                  const imageData = base64.includes("data:") ? base64 : `data:${file.type};base64,${base64.split(",")[1]}`
+                  view.dispatch(
+                    view.state.tr.replaceSelectionWith(
+                      view.state.schema.nodes.image.create({ src: imageData })
+                    )
+                  )
+                }
+                reader.readAsDataURL(file)
+                return true
+              }
+            }
+
             const text =
               event.clipboardData?.getData("text/html") ||
               event.clipboardData?.getData("text/plain")
@@ -289,27 +322,11 @@ export const Message: React.FC<MessageProps> = ({
   const renderContent = useCallback(
     (htmlContent: string) => {
       const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
-        ALLOWED_TAGS: [
-          "span",
-          "p",
-          "pre",
-          "code",
-          "strong",
-          "em",
-          "br",
-          "a",
-          "ul",
-          "ol",
-          "li"
-        ],
-        ALLOWED_ATTR: [
-          "class",
-          "data-type",
-          "data-id",
-          "data-label",
-          "language"
-        ]
-      })
+        ALLOWED_TAGS: ["span", "p", "br"],
+        ALLOWED_ATTR: ["class", "data-id", "data-label", "data-type"],
+        ALLOW_DATA_ATTR: true,
+        ALLOW_UNKNOWN_PROTOCOLS: true
+      });
 
       return (
         <div
@@ -331,6 +348,35 @@ export const Message: React.FC<MessageProps> = ({
     [handleOpenFile]
   )
 
+  const renderImageGallery = useCallback(() => {
+    const images = message?.images || [] as ImageAttachment[]
+    if (!images.length) return null;
+
+    const maxImages = 10
+    const limitedImages = images.slice(0, maxImages)
+
+    return (
+      <div className={styles.imageGallery}>
+        {limitedImages.map((img, index) => (
+          <div key={index} className={styles.imageContainer}>
+            <img
+              src={(img as ImageAttachment).data}
+              className={styles.chatImageSquare}
+              alt=""
+              loading="lazy"
+              style={{ maxWidth: "200px", maxHeight: "200px" }}
+            />
+          </div>
+        ))}
+        {images.length > maxImages && (
+          <div style={{ color: "#888", marginTop: 8 }}>
+            {`+${images.length - maxImages} more image(s) not shown for performance`}
+          </div>
+        )}
+      </div>
+    )
+  }, [message?.images])
+
   const renderCodeBlock = useCallback(
     ({
       children,
@@ -348,22 +394,22 @@ export const Message: React.FC<MessageProps> = ({
 
   const markdownComponents = useMemo(
     () =>
-      ({
-        pre: renderCodeBlock,
-        p: ({
-          children,
-          ...props
-        }: React.HTMLAttributes<HTMLParagraphElement>) => {
-          if (
-            typeof children === "string" &&
-            children.includes("class=\"mention\"")
-          ) {
-            return renderContent(children)
-          }
-          return <p {...props}>{children}</p>
+    ({
+      pre: renderCodeBlock,
+      p: ({
+        children,
+        ...props
+      }: React.HTMLAttributes<HTMLParagraphElement>) => {
+        if (
+          typeof children === "string" &&
+          (children.includes("class=\"mention\"") || children.includes("<img"))
+        ) {
+          return renderContent(children)
         }
-      } as Components),
-    [renderCodeBlock, renderContent]
+        return <p {...props}>{children}</p>
+      },
+    } as Components),
+    [renderCodeBlock, renderContent, message?.images]
   )
 
   if (!message?.content) return null
@@ -382,11 +428,10 @@ export const Message: React.FC<MessageProps> = ({
   return (
     <div
       ref={messageRef}
-      className={`${styles.message} ${
-        message.role === ASSISTANT
-          ? styles.assistantMessage
-          : styles.userMessage
-      }`}
+      className={`${styles.message} ${message.role === ASSISTANT
+        ? styles.assistantMessage
+        : styles.userMessage
+        }`}
     >
       {Toast}
       {thinking && (
@@ -463,11 +508,17 @@ export const Message: React.FC<MessageProps> = ({
       {editing ? (
         <EditorContent className={styles.tiptap} editor={editor} />
       ) : message.role === ASSISTANT ? (
-        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {messageContent.trimStart()}
-        </Markdown>
+        <>
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {messageContent.trimStart()}
+          </Markdown>
+          {renderImageGallery()}
+        </>
       ) : (
-        renderContent(messageContent.trimStart())
+        <>
+          {renderContent(messageContent.trimStart())}
+          {renderImageGallery()}
+        </>
       )}
     </div>
   )

@@ -289,13 +289,13 @@ code {
   border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
   font-size: var(--type-ramp-base-font-size);
   line-height: var(--type-ramp-base-line-height);
-  padding: 12px 40px 12px 16px;
+  padding: 7px;
+  min-height: 80px;
   width: 100%;
   min-width: var(--input-min-width);
   font-family: var(--vscode-font-family);
   resize: none;
   font-size: 14px;
-  overflow: hidden;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -305,22 +305,17 @@ code {
   box-shadow: 0 0 0 1px var(--vscode-focusBorder);
 }
 
-.chatSubmit {
+.chatButtons {
   position: absolute;
   bottom: 8px;
   right: 8px;
   cursor: pointer;
-  padding: 6px;
   background-color: transparent;
-  border-radius: 50%;
   transition: background-color 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.chatSubmit:hover {
-  background-color: var(--vscode-inputOption-hoverBackground);
+  gap: 5px;
 }
 
 .scrollToBottom {
@@ -482,6 +477,98 @@ code {
 
 .tiptap p {
   margin: 0;
+}
+
+:global(.imageContainer) {
+  position: relative;
+  display: inline-block;
+}
+
+:global(.imageDeleteButton) {
+  position: absolute;
+  top: 3px;
+  right: 7px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+:global(.imageDeleteButton:hover) {
+  background-color: rgba(255, 0, 0, 0.7);
+}
+
+:global(.chatImage) {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  margin: 0px 5px 10px 0px;
+  display: block;
+  object-fit: cover;
+}
+
+.messageContent img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 8px 0;
+  display: block;
+}
+
+.imageGallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.imageContainer {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chatImageSquare {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.imageDeleteButton {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.imageDeleteButton:hover {
+  background-color: rgba(255, 0, 0, 0.7);
+}
+
+:global(.chat-image) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 8px 0;
+  display: block;
 }
 
 :root {

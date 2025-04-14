@@ -213,7 +213,7 @@
         "command": "twinny.newConversation",
         "shortTitle": "New chat",
         "title": "Start a new chat",
-        "icon": "$(comment-discussion)"
+        "icon": "$(plus)"
       },
       {
         "command": "twinny.templates",
@@ -225,13 +225,13 @@
         "command": "twinny.manageTemplates",
         "shortTitle": "Manage twinny templates",
         "title": "Manage twinny templates",
-        "icon": "$(files)"
+        "icon": "$(book)"
       },
       {
         "command": "twinny.manageProviders",
         "shortTitle": "Manage twinny providers",
         "title": "Manage twinny providers",
-        "icon": "$(plug)"
+        "icon": "$(robot)"
       },
       {
         "command": "twinny.openChat",
@@ -498,6 +498,7 @@
   },
   "dependencies": {
     "@lancedb/lancedb": "^0.12.0",
+    "@tiptap/extension-image": "^2.11.7",
     "@tiptap/extension-mention": "^2.5.9",
     "@tiptap/extension-placeholder": "^2.5.9",
     "@tiptap/pm": "^2.5.9",

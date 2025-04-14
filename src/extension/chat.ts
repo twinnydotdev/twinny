@@ -1,3 +1,4 @@
+import * as cheerio from "cheerio"
 import { CompletionResponseChunk, TokenJS } from "fluency.js"
 import {
   CompletionNonStreaming,
@@ -38,9 +39,11 @@ import { logger } from "../common/logger"
 import { models } from "../common/models"
 import {
   ChatCompletionMessage,
+  CompletionNonStreamingWithId,
   CompletionStreamingWithId,
   ContextFile,
   FileContextItem,
+  ImageAttachment,
   ServerMessage,
   TemplateData
 } from "../common/types"
@@ -269,21 +272,6 @@ export class Chat extends Base {
 
       if (delta?.content) {
         this._completion += delta.content
-
-        const timestamp = Math.floor(Date.now() / 1000)
-        const chunkId = `chatcmpl-${timestamp}-${Math.random().toString(36).substring(2, 10)}`
-
-        logger.log(`Chat completion chunk: ${JSON.stringify({
-          id: chunkId,
-          object: "chat.completion.chunk",
-          created: timestamp,
-          model: response.model || "unknown",
-          choices: [{
-            index: 0,
-            delta: { content: delta.content },
-            finish_reason: null
-          }]
-        })}`)
 
         await this._webView?.postMessage({
           type: EVENT_NAME.twinnyOnCompletion,
@@ -599,19 +587,16 @@ export class Chat extends Base {
   private async buildConversation(
     messages: ChatCompletionMessage[],
     fileContexts: FileContextItem[] | undefined,
-    id?: string // Add parameter for conversation ID
+    id?: string
   ): Promise<ChatCompletionMessage[]> {
-
     const systemMessage: ChatCompletionMessage = {
       role: SYSTEM,
       content: await this.getSystemPrompt(),
-      id // Add conversation ID to system message
+      id
     }
 
     const lastMessage = messages[messages.length - 1]
-
     const messageContent = lastMessage.content?.toString() || ""
-
     const additionalContext = await this.buildAdditionalContext(
       messageContent,
       fileContexts
@@ -621,34 +606,52 @@ export class Chat extends Base {
 
     conversation.push({
       role: USER,
-      content: `${lastMessage.content}\n\n${additionalContext.trim()}`.trim() || " ",
-      id // Add conversation ID to user message
+      content: `${lastMessage.content}\n\n${additionalContext.trim()}`.trim(),
+      images: lastMessage.images,
     })
 
     return conversation.map((message) => {
-      const stringContent = message.content as string
+      const role = message.role;
+      const $ = cheerio.load(message.content as string)
+      $("img").remove()
 
-      if ([SYSTEM, ASSISTANT].includes(message.role)) {
-        // Preserve the conversationId if it exists
-        return {
-          ...message,
-          conversationId: id || message.id
-        }
-      }
-
-      return {
-        ...message,
-        conversationId: id || message.id, // Preserve the conversationId
-        content: stringContent.replace(/&lt;/g, "<")
+      const text = $.html("body").replace(/&lt;/g, "<")
+        .replace(/<body>|<\/body>/g, "")
         .replace(/@problems/g, "").trim()
         .replace(/@workspace/g, "").trim()
         .replace(/&amp;/g, "&")
         .replace(/&gt;/g, ">")
         .replace(/<span[^>]*data-type="mention"[^>]*>(.*?)<\/span>/g, "$1")
         .trimStart()
+
+      const images = message.images?.map((img) => ({
+        type: "image_url" as const,
+        image_url: { url: typeof img === "string" ? img : img.data }
+      })) || [];
+
+      const textPart = { type: "text" as const, text: images.length ? text : message.content };
+      const contentParts = images.length > 0
+        ? [textPart, ...images]
+        : [textPart];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: any = {
+        role,
+        content: contentParts,
+      };
+
+      if (role === "function" && message.name) {
+        result.name = message.name;
       }
-    })
+
+      if (message.id) {
+        result.id = message.id;
+      }
+
+      return result as ChatCompletionMessage;
+    });
   }
+
 
   private shouldUseStreaming(provider: TwinnyProvider): boolean {
     const supportsStreaming =
@@ -668,7 +671,7 @@ export class Chat extends Base {
       stream: true as const,
       id: conversationId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: this.getProviderType(provider) as any
+      provider: this.getProviderType(provider) as any,
     }
 
     if (provider.provider !== API_PROVIDERS.Twinny) {
@@ -680,12 +683,12 @@ export class Chat extends Base {
 
   private getNoStreamOptions(
     provider: TwinnyProvider
-  ): CompletionNonStreaming<LLMProvider> {
+  ): CompletionNonStreamingWithId {
     return {
       messages: this._conversation.filter((m) => m.role !== "system"),
       model: provider.modelName,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: this.getProviderType(provider) as any
+      provider: this.getProviderType(provider) as any,
     }
   }
 
