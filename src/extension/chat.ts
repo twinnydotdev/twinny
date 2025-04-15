@@ -43,7 +43,6 @@ import {
   CompletionStreamingWithId,
   ContextFile,
   FileContextItem,
-  ImageAttachment,
   ServerMessage,
   TemplateData
 } from "../common/types"
