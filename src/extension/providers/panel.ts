@@ -78,7 +78,7 @@ export class FullScreenProvider extends BaseProvider {
           <meta
             http-equiv="Content-Security-Policy"
             content="default-src 'self' http://localhost:11434;
-            img-src vscode-resource: https:;
+            img-src vscode-resource: https: data:;
             font-src vscode-webview-resource:;
             script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;"
           >

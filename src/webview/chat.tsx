@@ -18,6 +18,7 @@ import { EVENT_NAME, USER } from "../common/constants"
 import {
   ChatCompletionMessage,
   ClientMessage,
+  ImageAttachment,
   MentionType,
   ServerMessage
 } from "../common/types"
@@ -31,6 +32,7 @@ import {
   useSymmetryConnection,
   useTheme
 } from "./hooks"
+import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
@@ -49,11 +51,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const { fullScreen } = props
   const generatingRef = useRef(false)
   const editorRef = useRef<Editor | null>(null)
+  const imagesRef = useRef<ImageAttachment[]>([])
   const stopRef = useRef(false)
   const theme = useTheme()
   const selection = useSelection()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [messages, setMessages] = useState<ChatCompletionMessage[]>([])
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
@@ -180,7 +184,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         type: EVENT_NAME.twinnyChatMessage,
         data: updatedMessages,
         meta: mentions,
-        key: conversation?.id // Pass the conversation ID
+        key: conversation?.id
       } as ClientMessage)
 
       return updatedMessages
@@ -209,7 +213,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const handleEditMessage = (
     message: string,
     index: number,
-    mentions: MentionType[] | undefined
+    mentions: MentionType[] | undefined,
+    images?: ImageAttachment[]
   ): void => {
     generatingRef.current = true
     setIsLoading(true)
@@ -223,7 +228,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
           content: message
             .replace(/<p>/g, "")
             .replace(/<\/p>/g, "<br>")
-            .replace(/<br>$/, "")
+            .replace(/<br>$/, ""),
+          images: images && images.length > 0 ? images : undefined
         }
       ]
 
@@ -231,7 +237,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         type: EVENT_NAME.twinnyChatMessage,
         data: updatedMessages,
         meta: mentions,
-        key: conversation?.id // Pass the conversation ID
+        key: conversation?.id
       } as ClientMessage)
 
       return updatedMessages
@@ -287,8 +293,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setMessages((prevMessages) => {
       const updatedMessages: ChatCompletionMessage[] = [
         ...(prevMessages || []),
-        { role: USER, content: input }
+        {
+          role: USER,
+          content: input,
+          images: imagesRef.current.length > 0 ? imagesRef.current : undefined
+        }
       ]
+
       const currentConversation = {
         id: conversationId,
         messages: updatedMessages,
@@ -302,9 +313,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
         type: EVENT_NAME.twinnyChatMessage,
         data: updatedMessages,
         meta: mentions,
-        key: conversationId // Pass the conversation ID as the key
+        key: conversationId,
       }
 
+      imagesRef.current = []
       saveLastConversation(currentConversation)
       setActiveConversation(currentConversation)
 
@@ -313,7 +325,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       return updatedMessages
     })
   }, [
-    conversation?.id
+    conversation?.id,
   ])
 
   const handleNewConversation = useCallback(() => {
@@ -362,6 +374,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [JSON.stringify(filePaths)]
   )
 
+
+  const CustomImageExtension = createCustomImageExtension((id: string) => {
+    imagesRef.current = imagesRef.current.filter(img => img.id !== id)
+  })
+
   const editor = useEditor(
     {
       extensions: [
@@ -375,6 +392,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
             return node.attrs.label
           }
         }),
+        CustomImageExtension.configure({
+          allowBase64: true,
+        }),
         CustomKeyMap.configure({
           handleSubmitForm,
           clearEditor
@@ -384,8 +404,74 @@ export const Chat = (props: ChatProps): JSX.Element => {
         })
       ]
     },
-    [memoizedSuggestion, handleSubmitForm, clearEditor, t]
+    [memoizedSuggestion, handleSubmitForm, clearEditor, t, imagesRef]
   )
+
+  const handleImageUpload = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string
+      const imageData = base64.startsWith("data:") ? base64 : `data:${file.type};base64,${base64.split(",").pop()}`
+      const id = crypto.randomUUID()
+      const newImage = { id, data: imageData, type: file.type }
+
+      imagesRef.current = [...imagesRef.current, newImage]
+
+      const { state } = editor?.view || {}
+
+      if (state) {
+        if (state.selection.empty && state.selection.$head.pos === state.doc.content.size) {
+          editor?.chain().focus().createParagraphNear().run()
+        }
+
+        editor?.chain().focus().insertContent({
+          type: "image",
+          attrs: { src: imageData, id }
+        }).run()
+
+        editor?.chain().focus().createParagraphNear().run()
+      } else {
+        editor?.chain().focus().insertContent({
+          type: "image",
+          attrs: { src: imageData, id }
+        }).run()
+      }
+    }
+    reader.readAsDataURL(file)
+  }, [editor])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith("image/"))
+    files.forEach(handleImageUpload)
+  }, [handleImageUpload])
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLFormElement>) => {
+    const items = Array.from(e.clipboardData?.items || [])
+    const imageItem = items.find(item => item.type.startsWith("image/"))
+
+    if (imageItem) {
+      e.preventDefault()
+      const file = imageItem.getAsFile()
+      if (file) handleImageUpload(file)
+      return
+    }
+
+  }, [handleImageUpload])
+
+  const handleFileSelect = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(file => file.type.startsWith("image/"))
+    files.forEach(handleImageUpload)
+    e.target.value = ""
+  }, [handleImageUpload])
+
+  const handleDeleteImage = (id: string) => {
+    imagesRef.current = imagesRef.current.filter(img => img.id !== id)
+  }
 
   useAutosizeTextArea(chatRef, editorRef.current?.getText() || "")
 
@@ -437,16 +523,17 @@ export const Chat = (props: ChatProps): JSX.Element => {
     (index: number) => (
       <MessageItem
         key={`message-list-${index}`}
+        completion={completion}
+        generatingRef={generatingRef}
+        handleDeleteImage={handleDeleteImage}
         handleDeleteMessage={handleDeleteMessage}
         handleEditMessage={handleEditMessage}
         handleRegenerateMessage={handleRegenerateMessage}
+        index={index}
         isLoading={isLoading}
         message={messages[index]}
-        index={index}
-        completion={completion}
-        theme={theme}
-        generatingRef={generatingRef}
         messages={messages}
+        theme={theme}
       />
     ),
     [
@@ -538,18 +625,37 @@ export const Chat = (props: ChatProps): JSX.Element => {
             )}
           </div>
         </div>
-        <form>
+        <form onDrop={handleDrop} onPaste={handlePaste}>
           <div className={styles.chatBox}>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/*"
+              multiple
+              style={{ display: "none" }}
+            />
             <EditorContent
               className={styles.tiptap}
               editor={editorRef.current}
             />
-            <div
-              role="button"
-              onClick={handleSubmitForm}
-              className={styles.chatSubmit}
-            >
-              <span className="codicon codicon-send"></span>
+            <div className={styles.chatButtons}>
+              <VSCodeButton
+                appearance="icon"
+                role="button"
+                onClick={handleFileSelect}
+                title={t("upload-image")}
+              >
+                <span className="codicon codicon-device-camera" />
+              </VSCodeButton>
+              <VSCodeButton
+                appearance="icon"
+                role="button"
+                onClick={handleSubmitForm}
+                title={t("send")}
+              >
+                <span className="codicon codicon-send"></span>
+              </VSCodeButton>
             </div>
           </div>
         </form>
