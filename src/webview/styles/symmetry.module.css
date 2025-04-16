@@ -1,3 +1,11 @@
+:root {
+  --gap: 0.75rem;
+  --small: 0.9rem;
+  --radius: 4px;
+  --transition: all 0.2s ease;
+  --code-size: 0.85rem;
+}
+
 .symmetryContainer {
   max-width: 800px;
   margin: 0 auto;
@@ -6,33 +14,35 @@
 .statusSection {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.9rem;
+  gap: var(--gap);
+  font-size: var(--small);
   background: var(--vscode-editor-inactiveSelectionBackground);
-  padding: 0.75rem;
-  border-radius: 4px;
+  padding: var(--gap);
+  border-radius: var(--radius);
   margin-bottom: 1rem;
 }
 
-.connected, .disconnected {
+.status-badge {
   font-weight: 600;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-size: 0.85rem;
-  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   margin-left: 5px;
+  transition: var(--transition);
 }
 
 .connected {
+  composes: status-badge;
   color: var(--vscode-testing-iconPassed);
   background: color-mix(in srgb, var(--vscode-testing-iconPassed) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--vscode-testing-iconPassed) 30%, transparent);
 }
 
 .disconnected {
+  composes: status-badge;
   color: var(--vscode-testing-iconFailed);
   background: color-mix(in srgb, var(--vscode-testing-iconFailed) 15%, transparent);
   border: 1px solid color-mix(in srgb, var(--vscode-testing-iconFailed) 30%, transparent);
@@ -41,19 +51,19 @@
 .providerInfo {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-  font-size: 0.9rem;
+  gap: var(--gap);
+  font-size: var(--small);
   padding: 1rem;
   margin: 0.75rem 0;
   background: var(--vscode-textCodeBlock-background);
-  border-radius: 4px;
+  border-radius: var(--radius);
   border-left: 3px solid var(--vscode-activityBarBadge-background);
 }
 
 .providerInfo span {
   display: flex;
-  gap: 0.75rem;
   align-items: center;
+  gap: var(--gap);
 }
 
 .providerInfo b {
@@ -64,19 +74,19 @@
 
 .buttonContainer {
   display: flex;
-  gap: 0.75rem;
+  gap: var(--gap);
   margin: 0.75rem 0;
 }
 
 .buttonContainer vscode-button {
   min-width: 120px;
-  transition: all 0.2s ease;
+  transition: var(--transition);
 }
 
 .dropdownContainer label {
   display: block;
   margin-bottom: 0.5rem;
-  font-size: 0.9rem;
+  font-size: var(--small);
   font-weight: 500;
   color: var(--vscode-foreground);
 }
@@ -87,29 +97,34 @@
 }
 
 .checkboxContainer {
-  margin: 0.75rem 0;
-  padding: 0.5rem;
-  border-radius: 4px;
   display: flex;
   align-items: center;
+  gap: var(--gap);
+  margin: 0.75rem 0;
+  padding: 0.5rem;
+  border-radius: var(--radius);
 }
 
 .checkboxContainer vscode-checkbox {
-  font-size: 0.9rem;
+  font-size: var(--small);
 }
 
-.infoText {
-  font-size: 0.9rem;
+.infoText,
+.stepDescription {
+  font-size: var(--small);
   line-height: 1.5;
   color: var(--vscode-foreground);
   opacity: 0.9;
+}
+
+.infoText {
   margin-bottom: 0.5rem;
 }
 
 .header {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--gap);
   margin-top: 0.5rem;
   padding: 1rem;
   background: var(--vscode-editor-inactiveSelectionBackground);
@@ -120,17 +135,17 @@
 .stepContainer {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--gap);
   margin: 1rem 0;
 }
 
 .step {
   display: flex;
-  gap: 1rem;
   align-items: flex-start;
+  gap: 1rem;
   padding: 0.75rem;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius);
+  transition: var(--transition);
 }
 
 .stepNumber {
@@ -156,13 +171,6 @@
   color: var(--vscode-foreground);
 }
 
-.stepDescription {
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--vscode-foreground);
-  opacity: 0.9;
-}
-
 vscode-divider {
   margin: 0.75rem 0;
   opacity: 0.2;
@@ -171,7 +179,7 @@ vscode-divider {
 a {
   color: var(--vscode-textLink-foreground);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: var(--transition);
 }
 
 a:hover {
@@ -180,7 +188,7 @@ a:hover {
 }
 
 code {
-  font-size: 0.85rem;
+  font-size: var(--code-size);
   padding: 0.1rem 0.3rem;
   background: transparent;
   border-radius: 2px;
