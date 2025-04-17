@@ -338,7 +338,7 @@ pre code * {
 .tiptap {
   width: 100%;
   min-width: var(--input-min-width);
-  min-height: 80px;
+  min-height: 60px;
   padding: 7px;
   border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
   border-radius: 6px;
