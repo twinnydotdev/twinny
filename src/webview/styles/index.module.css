@@ -64,12 +64,21 @@ pre {
   overflow-x: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 code {
   font-family: inherit !important;
   font-size: 1rem !important;
   background: transparent !important;
+}
+
+pre code,
+pre code span,
+pre code * {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
 }
 
 .markdown::-webkit-scrollbar,
