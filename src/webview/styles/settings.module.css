@@ -1,4 +1,3 @@
-
 .settingsContainer p {
   font-size: 0.85rem;
   margin: 0.25rem 0 0.75rem;
@@ -10,7 +9,8 @@
   margin: 0.5rem 0 1.25rem;
 }
 
-.templateEditor vscode-button {
+.templateEditor vscode-button,
+.resetButton vscode-button {
   font-size: 0.85rem;
   height: 24px;
 }
@@ -43,9 +43,4 @@
 
 .resetButton {
   margin-top: 0.75rem;
-}
-
-.resetButton vscode-button {
-  font-size: 0.85rem;
-  height: 24px;
 }

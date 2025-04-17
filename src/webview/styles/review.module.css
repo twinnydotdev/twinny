@@ -1,25 +1,34 @@
-.reviewContainer h4 {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin: 0.75rem 0 0.5rem;
+:root {
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 0.75rem;
+  --font-size-base: 0.85rem;
+}
+
+.reviewContainer h4,
+.reviewContainer p {
+  font-size: var(--font-size-base);
   color: var(--vscode-foreground);
 }
 
+.reviewContainer h4 {
+  font-weight: 600;
+  margin: var(--spacing-md) 0 var(--spacing-sm);
+}
+
 .reviewContainer p {
-  font-size: 0.85rem;
-  margin: 0.25rem 0 0.75rem;
-  color: var(--vscode-foreground);
+  margin: var(--spacing-xs) 0 var(--spacing-md);
   opacity: 0.9;
 }
 
 .prInputContainer {
   display: flex;
-  gap: 0.5rem;
-  margin: 0.5rem 0;
   align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-sm) 0;
 }
 
-.prInputContainer vscode-text-field {
+.prInputContainer>vscode-text-field {
   width: 180px;
 }
 
@@ -27,34 +36,34 @@
   margin: 0;
 }
 
-.prButtonContainer vscode-button {
+.prButtonContainer>vscode-button {
   height: 24px;
   min-width: 90px;
 }
 
 .prListContainer {
-  margin-top: 0.75rem;
+  margin-top: var(--spacing-md);
 }
 
 .prList {
   list-style: none;
   padding: 0;
-  margin: 0.25rem 0;
+  margin: var(--spacing-xs) 0;
 }
 
 .prItem {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.35rem 0.5rem;
+  gap: var(--spacing-md);
+  padding: calc(var(--spacing-xs) + var(--spacing-sm)) var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
   border-radius: 3px;
-  margin-bottom: 0.35rem;
   transition: background 0.2s ease;
 }
 
 .prTitle {
   flex: 1;
-  font-size: 0.85rem;
+  font-size: var(--font-size-base);
   line-height: 1.4;
 }
 
@@ -69,11 +78,11 @@
   text-decoration: underline;
 }
 
-.prItem vscode-button {
+.prItem>vscode-button {
   padding: 3px;
   color: var(--vscode-icon-foreground);
 }
 
-.prItem vscode-button:hover {
+.prItem>vscode-button:hover {
   background: var(--vscode-toolbar-hoverBackground);
 }
