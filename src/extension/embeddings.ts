@@ -2,6 +2,7 @@ import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
 import ignore from "ignore"
+import PQueue from "p-queue"
 import path from "path"
 import * as vscode from "vscode"
 
@@ -27,6 +28,7 @@ export class EmbeddingDatabase extends Base {
   private _workspaceName = vscode.workspace.name || ""
   private _documentTableName = `${this._workspaceName}-documents`
   private _filePathTableName = `${this._workspaceName}-file-paths`
+  private _embeddingQueue = new PQueue({ concurrency: 5 })
 
   constructor(dbPath: string, context: vscode.ExtensionContext) {
     super(context)
@@ -42,46 +44,49 @@ export class EmbeddingDatabase extends Base {
   }
 
   public async fetchModelEmbedding(content: string) {
-    const provider = this.getEmbeddingProvider()
+    return this._embeddingQueue.add(async () => {
+      const provider = this.getEmbeddingProvider()
 
-    if (!provider) return
+      if (!provider) return
 
-    const requestBody: RequestOptionsOllama = {
-      model: provider.modelName,
-      input: content,
-      stream: false,
-      options: {}
-    }
-
-    const requestOptions: RequestOptions = {
-      hostname: provider.apiHostname || "localhost",
-      port: provider.apiPort,
-      path: provider.apiPath || "/api/embed",
-      protocol: provider.apiProtocol || "http",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
+      const requestBody: RequestOptionsOllama = {
+        model: provider.modelName,
+        input: content,
+        stream: false,
+        options: {}
       }
-    }
 
-    return new Promise<number[]>((resolve) => {
-      fetchEmbedding({
-        body: requestBody,
-        options: requestOptions,
-        onData: (response) => {
-          resolve(this.getEmbeddingFromResponse(provider, response))
+      const requestOptions: RequestOptions = {
+        hostname: provider.apiHostname || "localhost",
+        port: provider.apiPort,
+        path: provider.apiPath || "/api/embed",
+        protocol: provider.apiProtocol || "http",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${provider.apiKey}`
         }
+      }
+
+      return new Promise<number[]>((resolve) => {
+        fetchEmbedding({
+          body: requestBody,
+          options: requestOptions,
+          onData: (response) => {
+            resolve(this.getEmbeddingFromResponse(provider, response))
+          }
+        })
       })
     })
   }
 
-  private getAllFilePaths = async (dirPath: string): Promise<string[]> => {
+  private getAllFilePaths = async (
+    rootPath: string,
+    dirPath: string
+  ): Promise<string[]> => {
     let filePaths: string[] = []
     const dirents = await fs.promises.readdir(dirPath, { withFileTypes: true })
     const submodules = readGitSubmodulesFile()
-
-    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || ""
 
     const ig = ignore()
 
@@ -112,7 +117,9 @@ export class EmbeddingDatabase extends Base {
       }
 
       if (dirent.isDirectory()) {
-        filePaths = filePaths.concat(await this.getAllFilePaths(fullPath))
+        filePaths = filePaths.concat(
+          await this.getAllFilePaths(rootPath, fullPath)
+        )
       } else if (dirent.isFile()) {
         filePaths.push(fullPath)
       }
@@ -123,7 +130,7 @@ export class EmbeddingDatabase extends Base {
   public async injestDocuments(
     directoryPath: string
   ): Promise<EmbeddingDatabase> {
-    const filePaths = await this.getAllFilePaths(directoryPath)
+    const filePaths = await this.getAllFilePaths(directoryPath, directoryPath)
     const totalFiles = filePaths.length
     let processedFiles = 0
 
@@ -146,6 +153,8 @@ export class EmbeddingDatabase extends Base {
 
           const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
+          if (!filePathEmbedding) return
+
           this._filePaths.push({
             content: filePath,
             vector: filePathEmbedding,
@@ -154,6 +163,9 @@ export class EmbeddingDatabase extends Base {
 
           for (const chunk of chunks) {
             const chunkEmbedding = await this.fetchModelEmbedding(chunk)
+
+            if (!chunkEmbedding) continue
+
             if (this.getIsDuplicateItem(chunk, chunks)) return
             this._documents.push({
               content: chunk,
@@ -185,23 +197,15 @@ export class EmbeddingDatabase extends Base {
     try {
       const tableNames = await this._db?.tableNames()
       if (!tableNames?.includes(`${this._workspaceName}-documents`)) {
-        await this._db?.createTable(
-          this._documentTableName,
-          this._documents,
-          {
-            mode: "overwrite"
-          }
-        )
+        await this._db?.createTable(this._documentTableName, this._documents, {
+          mode: "overwrite"
+        })
       }
 
       if (!tableNames?.includes(`${this._workspaceName}-file-paths`)) {
-        await this._db?.createTable(
-          this._filePathTableName,
-          this._filePaths,
-          {
-            mode: "overwrite"
-          }
-        )
+        await this._db?.createTable(this._filePathTableName, this._filePaths, {
+          mode: "overwrite"
+        })
         return
       }
 
