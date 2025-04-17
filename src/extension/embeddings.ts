@@ -2,6 +2,7 @@ import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
 import ignore from "ignore"
+import PQueue from "p-queue"
 import path from "path"
 import * as vscode from "vscode"
 
@@ -16,7 +17,6 @@ import {
 
 import { Base } from "./base"
 import { fetchEmbedding } from "./llm"
-import PQueue from "p-queue"
 import { TwinnyProvider } from "./provider-manager"
 import { getDocumentSplitChunks, readGitSubmodulesFile } from "./utils"
 
@@ -153,6 +153,8 @@ export class EmbeddingDatabase extends Base {
 
           const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
+          if (!filePathEmbedding) return
+
           this._filePaths.push({
             content: filePath,
             vector: filePathEmbedding,
@@ -161,6 +163,9 @@ export class EmbeddingDatabase extends Base {
 
           for (const chunk of chunks) {
             const chunkEmbedding = await this.fetchModelEmbedding(chunk)
+
+            if (!chunkEmbedding) continue
+
             if (this.getIsDuplicateItem(chunk, chunks)) return
             this._documents.push({
               content: chunk,
