@@ -528,6 +528,7 @@
     "lucide-react": "^0.473.0",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
+    "p-queue": "^8.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-i18next": "^15.1.1",
