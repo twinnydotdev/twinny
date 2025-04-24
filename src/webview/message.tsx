@@ -507,16 +507,11 @@ export const Message: React.FC<MessageProps> = ({
       </div>
       {editing ? (
         <EditorContent className={styles.tiptap} editor={editor} />
-      ) : message.role === ASSISTANT ? (
+      ) : (
         <>
           <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {messageContent.trimStart()}
           </Markdown>
-          {renderImageGallery()}
-        </>
-      ) : (
-        <>
-          {renderContent(messageContent.trimStart())}
           {renderImageGallery()}
         </>
       )}

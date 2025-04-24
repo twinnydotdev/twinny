@@ -70,7 +70,7 @@ pre {
 
 code {
   font-family: inherit !important;
-  font-size: 1rem !important;
+  font-size: .85rem !important;
   background: transparent !important;
 }
 
@@ -123,7 +123,7 @@ pre code * {
   flex-grow: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  font-size: 14px;
+  font-size: .85rem;
   margin-top: 20px;
 }
 
@@ -139,7 +139,7 @@ pre code * {
   height: 30px;
   margin: 0 0 10px;
   display: block;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 30px;
   color: var(--vscode-textPreformat-foreground);
@@ -185,7 +185,7 @@ pre code * {
 }
 
 .message {
-  font-size: 1rem;
+  font-size: .85rem;
   line-height: 1.5;
   padding: 12px 8px;
   margin-right: 10px;
@@ -366,7 +366,7 @@ pre code * {
   background: var(--input-background);
   color: var(--input-foreground);
   font-family: var(--vscode-font-family);
-  font-size: 14px;
+  font-size: .85rem;
   line-height: var(--type-ramp-base-line-height);
   resize: none;
   outline: none;

@@ -246,12 +246,12 @@ export async function activate(context: ExtensionContext) {
       delayExecution(() => sidebarProvider.getGitCommitMessage(), 400)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
-      sidebarProvider.conversationHistory?.resetConversation()
-      sidebarProvider.chat?.resetConversation()
       sidebarProvider.newSymmetryConversation()
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnyNewConversation
       } as ServerMessage<string>)
+      sidebarProvider.conversationHistory?.resetConversation()
+      sidebarProvider.chat?.resetConversation()
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")
