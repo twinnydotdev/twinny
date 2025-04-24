@@ -283,6 +283,27 @@ pre code * {
   white-space: nowrap;
 }
 
+.fileItems {
+  display: flex;
+  margin-top: 20px;
+  padding-bottom: 5px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  background-color: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  margin: 2px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  max-width: fit-content;
+  cursor: pointer;
+  transition: all 0.3 ease-in-out;
+}
+
 .typingIndicator {
   display: flex;
   align-items: center;
