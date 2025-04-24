@@ -699,7 +699,6 @@ export class Chat extends Base {
 
   public resetConversation() {
     this._conversation = []
-    this.abort()
   }
 
   public async getTemplateMessages(

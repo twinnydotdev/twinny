@@ -354,6 +354,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   useEffect(() => {
+    if (editorRef.current) {
+      global.vscode.postMessage({ type: EVENT_NAME.twinnySidebarReady })
+    }
+  }, [editorRef.current])
+
+  useEffect(() => {
     window.addEventListener("message", messageEventHandler)
     editorRef.current?.commands.focus()
     return () => {

@@ -78,6 +78,7 @@ export const EVENT_NAME = {
   twinnySendTheme: "twinny-send-theme",
   twinnySessionContext: "twinny-session-context",
   twinnySetConfigValue: "twinny-set-config-value",
+  twinnySidebarReady: "twinny-sidebar-ready",
   twinnySetGlobalContext: "twinny-set-global-context",
   twinnySetLocale: "twinny-set-locale",
   twinnySetOllamaModel: "twinny-set-ollama-model",
