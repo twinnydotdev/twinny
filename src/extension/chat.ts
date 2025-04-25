@@ -722,11 +722,10 @@ export class Chat extends Base {
       type: EVENT_NAME.twinnyAddMessage,
       data: {
         role: USER,
-        content:
-          (kebabToSentence(template) + "\n\n" + "```\n" + selection + "\n```").trim() ||
-          " "
+        content: `${kebabToSentence(template)}\n\n\n<pre><code>${selection}</code></pre>`.trim() || " "
       }
-    } as ServerMessage<ChatCompletionMessage>)
+    } as ServerMessage<ChatCompletionMessage>);
+
 
     let ragContext = undefined
     if (["explain"].includes(template)) {

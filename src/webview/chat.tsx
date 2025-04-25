@@ -125,6 +125,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     const message: ServerMessage = event.data
     switch (message.type) {
       case EVENT_NAME.twinnyAddMessage: {
+        generatingRef.current = true
         handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
         break
       }
