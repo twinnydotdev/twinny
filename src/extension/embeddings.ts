@@ -159,7 +159,7 @@ export class EmbeddingDatabase extends Base {
               return
             }
 
-            const fileName = filePath.split("/").pop()
+            const fileName = filePath.split("/").pop() || ""
             currentlyProcessingFilePaths.add(fileName)
             progress.report({
               message: `${((processedFiles / totalFiles) * 100).toFixed(
@@ -175,7 +175,7 @@ export class EmbeddingDatabase extends Base {
               this.context
             )
 
-          const filePathEmbedding = await this.fetchModelEmbedding(filePath)
+            const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
             this._filePaths.push({
               content: filePath,
@@ -183,15 +183,15 @@ export class EmbeddingDatabase extends Base {
               file: filePath
             })
 
-          for (const chunk of chunks) {
-            const chunkEmbedding = await this.fetchModelEmbedding(chunk)
-            if (this.getIsDuplicateItem(chunk, chunks)) return
-            this._documents.push({
-              content: chunk,
-              vector: chunkEmbedding,
-              file: filePath
-            })
-          }
+            for (const chunk of chunks) {
+              const chunkEmbedding = await this.fetchModelEmbedding(chunk)
+              if (this.getIsDuplicateItem(chunk, chunks)) return
+              this._documents.push({
+                content: chunk,
+                vector: chunkEmbedding,
+                file: filePath
+              })
+            }
 
             currentlyProcessingFilePaths.delete(fileName)
             processedFiles++
