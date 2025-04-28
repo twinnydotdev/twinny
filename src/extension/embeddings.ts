@@ -137,6 +137,8 @@ export class EmbeddingDatabase extends Base {
     const filePaths = await this.getAllFilePaths(directoryPath, directoryPath)
     const totalFiles = filePaths.length
     let processedFiles = 0
+    const queue = new PQueue({ concurrency: 5 })
+    const currentlyProcessingFilePaths = new Set<string>()
 
     await vscode.window.withProgress(
       {
@@ -144,48 +146,65 @@ export class EmbeddingDatabase extends Base {
         title: "Embedding",
         cancellable: true
       },
-      async (progress) => {
+      async (progress, token) => {
         if (!this.context) return
-        const promises = filePaths.map(async (filePath) => {
-          const content = await fs.promises.readFile(filePath, "utf-8")
 
-          const chunks = await getDocumentSplitChunks(
-            content,
-            filePath,
-            this.context
-          )
+        const startTime = Date.now()
 
-          const filePathEmbedding = await this.fetchModelEmbedding(filePath)
+        const promises = filePaths.map(async (filePath) =>
+          queue.add(async () => {
+            if (token.isCancellationRequested) {
+              queue.clear()
+              return
+            }
 
-          this._filePaths.push({
-            content: filePath,
-            vector: filePathEmbedding,
-            file: filePath
-          })
+            const fileName = filePath.split("/").pop()
+            currentlyProcessingFilePaths.add(fileName)
+            progress.report({
+              message: `${((processedFiles / totalFiles) * 100).toFixed(
+                2
+              )}% (${Array.from(currentlyProcessingFilePaths).join(", ")})`
+            })
 
-          for (const chunk of chunks) {
-            const chunkEmbedding = await this.fetchModelEmbedding(chunk)
-              if (this.getIsDuplicateItem(chunk, chunks)) continue
+            const content = await fs.promises.readFile(filePath, "utf-8")
 
-            this._documents.push({
-              content: chunk,
-              vector: chunkEmbedding,
+            const chunks = await getDocumentSplitChunks(
+              content,
+              filePath,
+              this.context
+            )
+
+            const filePathEmbedding = await this.fetchModelEmbedding(filePath)
+
+            this._filePaths.push({
+              content: filePath,
+              vector: filePathEmbedding,
               file: filePath
             })
-          }
 
-          processedFiles++
-          progress.report({
-            message: `${((processedFiles / totalFiles) * 100).toFixed(
-              2
-            )}% (${filePath.split("/").pop()})`
+            for (const chunk of chunks) {
+              const chunkEmbedding = await this.fetchModelEmbedding(chunk)
+              if (this.getIsDuplicateItem(chunk, chunks)) continue
+
+              this._documents.push({
+                content: chunk,
+                vector: chunkEmbedding,
+                file: filePath
+              })
+            }
+
+            currentlyProcessingFilePaths.delete(fileName)
+            processedFiles++
           })
-        })
+        )
 
         await Promise.all(promises)
 
+        const endTime = Date.now()
+        const elapsedSeconds = ((endTime - startTime) / 1000).toFixed(2)
+
         vscode.window.showInformationMessage(
-          `Embedded successfully! Processed ${totalFiles} files.`
+          `Embedded successfully! Processed ${totalFiles} files and finished in ${elapsedSeconds} seconds.`
         )
       }
     )
