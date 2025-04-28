@@ -2,7 +2,6 @@ import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
 import ignore from "ignore"
-import PQueue from "p-queue"
 import path from "path"
 import * as vscode from "vscode"
 
