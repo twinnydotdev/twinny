@@ -1,20 +1,31 @@
 .providerHeader {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  display: flex;
+  flex-grow: 1;
   flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
 }
 
 .providerHeader h4 {
-  margin: 0;
   font-size: 13px;
   font-weight: 600;
+  margin: 0;
+}
+
+.providerHeader svg {
+  height: 16px;
+  width: 16px;
+}
+
+.providerHeader vscode-dropdown {
+  flex-grow: 1;
+  margin-right: 12px;
 }
 
 .fimSelector {
-  width: 100%;
   margin: 8px 0;
+  width: 100%;
 }
 
 .fimSelector vscode-dropdown {
@@ -22,17 +33,21 @@
 }
 
 .providerSelector {
-  width: 100%;
-  gap: 8px;
   display: flex;
+  gap: 8px;
   justify-content: space-between;
   margin-top: 8px;
+  width: 100%;
+}
+
+.providerSelector>div {
+  width: 48%;
 }
 
 .providerSelector vscode-dropdown {
-  width: 100%;
   background: transparent;
   border: none;
+  width: 100%;
 }
 
 .providerSelector vscode-dropdown::part(control),
@@ -41,22 +56,18 @@
   border: none;
 }
 
-.providerSelector > div {
-  width: 48%;
-}
-
 .providersButtons {
+  align-items: center;
   display: flex;
   gap: 8px;
-  align-items: center;
 }
 
 .provider {
-  padding: 5px;
   background: var(--vscode-inputOption-hoverBackground);
   border: 1px solid var(--vscode-editorWidget-border);
-  margin: 3px 0;
   border-radius: 4px;
+  margin: 3px 0;
+  padding: 5px;
   transition: background 0.2s ease;
 }
 
@@ -64,38 +75,33 @@
   background: var(--vscode-inputOption-activeBackground);
 }
 
-.providerHeader,
-.providerForm vscode-dropdown {
-  flex-grow: 1;
-}
-
 .providerDetails {
   display: grid;
+  gap: 8px;
   grid-template-columns: repeat(2, 1fr);
   grid-template-rows: repeat(2, auto);
-  gap: 8px;
-  overflow: hidden;
   margin-top: 8px;
+  overflow: hidden;
 }
 
-.providerDetails > div {
-  text-wrap: nowrap;
+.providerDetails>div {
   text-overflow: ellipsis;
+  text-wrap: nowrap;
 }
 
 .providerForm {
-  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 5px;
   padding: 8px 0;
+  width: 100%;
 }
 
 .providerForm div {
-  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin-bottom: 0;
 }
 
 .providerForm label {
@@ -105,70 +111,60 @@
 }
 
 .providerFormButtons {
-  display: flex;
-  flex-direction: row !important;
-  justify-content: flex-end;
   align-self: flex-end;
+  display: flex !important;
+  flex-direction: row !important;
   gap: 8px;
+  justify-content: flex-end;
   margin-top: 8px;
 }
 
-.providerHeader vscode-dropdown {
-  flex-grow: 1;
-  margin-right: 12px;
-}
-
-.providerHeader svg {
-  width: 16px;
-  height: 16px;
-}
-
 .providerActions {
+  align-items: center;
   display: flex;
   gap: 4px;
-  align-items: center;
 }
 
 .providerName {
-  font-weight: 500;
-  font-size: 13px;
-  margin: 0;
-  display: flex;
   align-items: center;
   color: var(--vscode-foreground);
+  display: flex;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
 }
 
 .providerName i {
-  margin-right: 8px;
   font-size: 14px;
+  margin-right: 8px;
   opacity: 0.8;
 }
 
 .defaultsHeader {
+  align-items: center;
   display: flex;
   gap: 8px;
-  align-items: center;
   margin-bottom: 16px;
 }
 
 .defaults {
-  margin-top: 16px;
-  padding: 16px;
   background-color: var(--vscode-editor-background);
   border: 1px solid var(--vscode-editor-lineHighlightBorder);
   border-radius: 4px;
+  margin-top: 16px;
+  padding: 16px;
 }
 
 .defaultsTitle {
-  margin: 0 0 12px 0;
   font-size: 13px;
   font-weight: 500;
+  margin: 0 0 12px 0;
 }
 
 .defaultsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   margin-bottom: 16px;
 }
 
@@ -179,8 +175,8 @@
 }
 
 .defaultLabel {
-  font-size: 12px;
   color: var(--vscode-descriptionForeground);
+  font-size: 12px;
 }
 
 .useDefaultsButton {
@@ -188,13 +184,13 @@
 }
 
 .divider {
-  margin: 16px 0;
   border-top: 1px solid var(--vscode-editorWidget-border);
+  margin: 16px 0;
 }
 
 .checkBox {
-  display: flex;
   align-items: center;
+  display: flex;
   gap: 8px;
 }
 
@@ -205,8 +201,8 @@
 .container {
   display: flex;
   flex-direction: column;
-  width: 100%;
   max-width: 800px;
+  width: 100%;
 }
 
 .title {
@@ -217,17 +213,17 @@
 
 .providersList {
   display: grid;
-  grid-template-columns: 1fr;
   gap: 8px;
+  grid-template-columns: 1fr;
 }
 
 .providerCard {
-  display: flex;
   align-items: flex-start;
-  padding: 16px;
   border: 1px solid var(--vscode-editor-lineHighlightBorder);
   border-radius: 4px;
   cursor: pointer;
+  display: flex;
+  padding: 16px;
   transition: all 0.2s ease-in-out;
 }
 
@@ -236,15 +232,15 @@
 }
 
 .logo {
-  width: 32px;
+  border-radius: 4px;
   height: 32px;
   margin-right: 12px;
-  border-radius: 4px;
+  width: 32px;
 }
 
 .logo svg {
-  width: 32px;
   height: 32px;
+  width: 32px;
 }
 
 .content {
@@ -252,9 +248,9 @@
 }
 
 .header {
+  align-items: center;
   display: flex;
   justify-content: space-between;
-  align-items: center;
 }
 
 .actions {
@@ -263,15 +259,15 @@
 }
 
 .modelLoader {
-  display: flex;
   align-items: center;
+  display: flex;
   gap: 8px;
-  padding: 4px 8px;
   height: 20px;
+  padding: 4px 8px;
 }
 
 .loaderText {
-  font-size: 13px;
   color: var(--vscode-foreground);
+  font-size: 13px;
   opacity: 0.8;
 }

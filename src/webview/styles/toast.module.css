@@ -1,23 +1,24 @@
 .toast {
   position: fixed;
-  top: 10px;
-  right: 10px;
-  transform: translateX(0);
+  top: 0.625rem;
+  right: 0.625rem;
+  padding: 0.5rem 1rem;
   background: var(--vscode-textCodeBlock-background);
   color: var(--vscode-button-foreground);
-  padding: 8px 16px;
-  border-radius: 4px;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.2);
   z-index: 20;
-  animation: slideDown 0.2s ease-in-out;
-  font-size: 12px;
+  animation: slideDown 0.2s ease-in-out both;
+  will-change: transform, opacity;
 }
 
 @keyframes slideDown {
-  from {
+  0% {
     transform: translateY(-100%);
     opacity: 0;
   }
-  to {
+  100% {
     transform: translateY(0);
     opacity: 1;
   }

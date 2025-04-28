@@ -1,76 +1,86 @@
+:root {
+  --mention-border-radius: 0.4rem;
+  --small-font-size: 0.9rem;
+  --smaller-font-size: 0.85em;
+  --dropdown-padding: 0.4rem;
+  --dropdown-gap: 0.1rem;
+}
+
 vscode-panel-view {
+  display: flex;
   flex-direction: column;
   padding: 0;
   line-height: 1.5em;
 }
 
-vscode-text-area {
-  width: 100%;
-}
-
+vscode-text-area,
 vscode-text-field {
   width: 100%;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-bottom: 0.5em;
   font-weight: 600;
   line-height: 1.5;
 }
 
 h1 {
   font-size: 1.75em;
-  margin-bottom: 0.5em;
   font-weight: 400;
   line-height: 1.3;
 }
 
 h2 {
   font-size: 1.25em;
-  margin-bottom: 0.5em;
   font-weight: 400;
 }
 
 h3 {
   font-size: 1.15em;
-  margin-bottom: 0.5em;
-  font-weight: 400;
 }
 
 h4 {
   font-size: 1em;
-  margin-bottom: 0.5em;
-  font-weight: 400;
 }
 
 h5 {
   font-size: 0.8em;
-  margin-bottom: 0.5em;
-  font-weight: 400;
 }
 
 h6 {
   font-size: 0.7em;
-  margin-bottom: 0.5em;
-  font-weight: 400;
 }
 
 pre {
-  background-color: var(--vscode-textCodeBlock-background);
+  background: var(--vscode-textCodeBlock-background);
   border-radius: 8px;
   padding: 12px;
-  overflow-x: auto;
   margin: 12px 0;
+  overflow-x: auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 code {
-  font-family: inherit;
-  font-size: 1rem !important;
-  background-color: transparent !important;
+  font-family: inherit !important;
+  font-size: .85rem !important;
+  background: transparent !important;
 }
 
-/* Scrollbar Styling */
+pre code,
+pre code span,
+pre code * {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+
 .markdown::-webkit-scrollbar,
 .markdownFullScreen::-webkit-scrollbar {
   width: 8px;
@@ -95,53 +105,48 @@ code {
 .container {
   display: flex;
   flex-direction: column;
-  height: 96vh;
   position: relative;
+  height: 96vh;
   margin-top: 10px;
 }
 
 .fullScreenActions {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
+  align-items: center;
   gap: 4px;
   margin-top: 20px;
 }
 
-.markdown {
-  flex-grow: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-top: 20px;
-  font-size: 14px;
-  margin-top: 20px;
-}
-
+.markdown,
 .markdownFullScreen {
   flex-grow: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  font-size: 14px;
+  font-size: .85rem;
   margin-top: 20px;
 }
 
+.markdown {
+  padding-top: 20px;
+}
+
 .title {
-  color: var(--vscode-textPreformat-foreground);
-  display: block;
-  font-weight: 600;
-  height: 30px;
-  left: 10px;
-  margin-bottom: 10px;
-  margin: 0;
-  overflow: hidden;
   position: absolute;
-  text-overflow: ellipsis;
   top: -27px;
-  white-space: nowrap;
+  left: 10px;
   width: calc(100% - 20px);
-  z-index: 2;
-  font-size: 16px;
+  height: 30px;
+  margin: 0 0 10px;
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 30px;
+  color: var(--vscode-textPreformat-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 2;
 }
 
 .title p {
@@ -152,15 +157,26 @@ code {
   margin-top: 10px;
 }
 
-.message {
-  font-size: 1rem;
-  line-height: 1.5;
-  padding: 12px 8px;
-  margin-right: 10px;
+.send,
+.settings {
+  display: flex;
+  justify-content: flex-end;
 }
 
-.userMessage {
-  border-bottom: 1px solid var(--vscode-editorWidget-border);
+.codeOptions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+  margin: 10px 0;
+}
+
+.scrollToBottom {
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.scrollToBottom:hover {
+  opacity: 1;
 }
 
 .message-container {
@@ -168,8 +184,19 @@ code {
   flex-direction: column;
 }
 
+.message {
+  font-size: .85rem;
+  line-height: 1.5;
+  padding: 12px 8px;
+  margin-right: 10px;
+}
+
 .message:first-child {
   border-top: none;
+}
+
+.userMessage {
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
 }
 
 .messageRole {
@@ -185,61 +212,105 @@ code {
 }
 
 .thinkingSection {
-  background-color: var(--vscode-editor-background);
+  background: var(--vscode-editor-background);
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--small-font-size);
   border-radius: 8px;
   padding: 8px;
   margin-bottom: 12px;
-  font-size: var(--small-font-size);
-  color: var(--vscode-descriptionForeground);
 }
 
 .thinkingHeader {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  cursor: pointer;
-  user-select: none;
+  align-items: center;
   padding: 4px;
   border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
   transition: background-color 0.2s ease;
 }
 
 .thinkingHeader:hover {
-  background-color: var(--vscode-inputOption-hoverBackground);
+  background: var(--vscode-inputOption-hoverBackground);
 }
 
 .thinkingContent {
   overflow: hidden;
   transition: all 0.3s ease-out;
   opacity: 1;
-  max-height: 1000px; /* Large enough to contain content */
+  max-height: 1000px;
   margin-top: 8px;
 }
 
 .thinkingContent.collapsed {
-  max-height: 0;
   opacity: 0;
+  max-height: 0;
   margin-top: 0;
 }
 
-.messageOptions {
+.messageOptions,
+.chatOptions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.messageOptions {
   justify-content: flex-end;
 }
 
-/* Typing Indicator */
+.chatOptions {
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.chatOptions > div {
+  gap: 6px;
+}
+
+.chatOptions svg {
+  width: 18px;
+  height: 18px;
+}
+
+.chatOptions vscode-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileItems {
+  display: flex;
+  margin-top: 20px;
+  padding-bottom: 5px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  background-color: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  margin: 2px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  max-width: fit-content;
+  cursor: pointer;
+  transition: all 0.3 ease-in-out;
+}
+
 .typingIndicator {
   display: flex;
   align-items: center;
   gap: 4px;
-  border-radius: 12px;
-  margin-bottom: 16px;
-  margin-top: 10px;
-  align-self: stretch;
-  margin-left: auto;
   width: 100%;
-  opacity: 1;
+  margin: 10px auto 16px;
+  border-radius: 12px;
   transition: opacity 0.15s ease-out;
   will-change: opacity;
 }
@@ -263,41 +334,46 @@ code {
 }
 
 @keyframes typingAnimation {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
     opacity: 0.6;
   }
+
   50% {
     transform: translateY(-3px);
     opacity: 0.8;
   }
 }
 
-/* Chat Input Area */
 .chatBox {
-  margin-top: 12px;
   position: relative;
+  margin-top: 12px;
   transition: transform 0.2s ease;
 }
 
+:global(.tiptap) {
+  outline: none;
+}
+
 .tiptap {
-  border-radius: 6px;
-  box-sizing: border-box;
-  position: relative;
-  color: var(--input-foreground);
-  background: var(--input-background);
-  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
-  font-size: var(--type-ramp-base-font-size);
-  line-height: var(--type-ramp-base-line-height);
-  padding: 7px;
-  min-height: 80px;
   width: 100%;
   min-width: var(--input-min-width);
+  min-height: 60px;
+  padding: 7px;
+  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  border-radius: 6px;
+  background: var(--input-background);
+  color: var(--input-foreground);
   font-family: var(--vscode-font-family);
+  font-size: .85rem;
+  line-height: var(--type-ramp-base-line-height);
   resize: none;
-  font-size: 14px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  box-sizing: border-box;
 }
 
 .tiptap:focus {
@@ -305,78 +381,24 @@ code {
   box-shadow: 0 0 0 1px var(--vscode-focusBorder);
 }
 
+.tiptap p {
+  margin: 0;
+}
+
+.tiptap:first-child {
+  margin-top: 0;
+}
+
 .chatButtons {
   position: absolute;
   bottom: 8px;
   right: 8px;
-  cursor: pointer;
-  background-color: transparent;
-  transition: background-color 0.2s ease;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 5px;
-}
-
-.scrollToBottom {
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
-}
-
-.scrollToBottom:hover {
-  opacity: 1;
-}
-
-.chatOptions {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-}
-
-.chatOptions > div {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.chatOptions vscode-badge {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.chatOptions svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* Additional Styles */
-.send {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 5px;
-}
-
-.codeOptions {
-  display: flex;
-  gap: 3px;
-  margin: 10px 0;
-  justify-content: flex-end;
-}
-
-.settings {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.selection {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  cursor: pointer;
+  background: transparent;
+  transition: background-color 0.2s ease;
 }
 
 .suggestions {
@@ -387,46 +409,35 @@ code {
 }
 
 .suggestion {
+  flex: 0 0 calc(50% - 5px);
   display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  min-height: 40px;
   border: 1px solid var(--vscode-editorWidget-border);
   border-radius: 2px;
-  justify-content: flex-start;
-  gap: 5px;
-  align-items: center;
-  flex: 0 0 calc(50% - 5px);
   box-sizing: border-box;
-  margin-bottom: 5px;
-  min-height: 40px;
-  padding: 0 7px;
-  font-size: 12px;
-}
-
-.suggestion svg {
-  width: 20px;
+  transition: background 0.2s;
+  cursor: pointer;
 }
 
 .suggestion:nth-child(odd) {
   margin-right: 10px;
 }
 
+.suggestion:hover {
+  background: var(--vscode-inputOption-hoverBackground);
+}
+
 .suggestion--disabled {
   opacity: 0.5;
 }
 
-.suggestion:hover {
-  background: var(--vscode-inputOption-hoverBackground);
-  cursor: pointer;
-}
-
-.vscodeCheckbox label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-}
-
-.resetTemplatesButton {
-  margin-top: 20px;
+.suggestion svg {
+  width: 20px;
 }
 
 .twinnyForm {
@@ -434,9 +445,9 @@ code {
 }
 
 .twinnyForm div {
-  margin-bottom: 10px;
   display: flex;
   flex-direction: column;
+  margin-bottom: 10px;
 }
 
 .textIcon {
@@ -445,8 +456,8 @@ code {
 }
 
 .embeddingOptions {
-  padding-bottom: 10px;
   width: 100%;
+  padding-bottom: 10px;
 }
 
 .embeddingOptions > div {
@@ -475,52 +486,6 @@ code {
   transform: translateY(-9px);
 }
 
-.tiptap p {
-  margin: 0;
-}
-
-:global(.imageContainer) {
-  position: relative;
-  display: inline-block;
-}
-
-:global(.imageDeleteButton) {
-  position: absolute;
-  top: 3px;
-  right: 7px;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: white;
-  border-radius: 50%;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 2;
-}
-
-:global(.imageDeleteButton:hover) {
-  background-color: rgba(255, 0, 0, 0.7);
-}
-
-:global(.chatImage) {
-  width: 40px;
-  height: 40px;
-  border-radius: 4px;
-  margin: 0px 5px 10px 0px;
-  display: block;
-  object-fit: cover;
-}
-
-.messageContent img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  margin: 8px 0;
-  display: block;
-}
-
 .imageGallery {
   display: flex;
   flex-wrap: wrap;
@@ -528,171 +493,140 @@ code {
   margin-top: 10px;
 }
 
-.imageContainer {
+.imageContainer,
+:global(.imageContainer) {
   position: relative;
+  display: inline-block;
   width: 150px;
   height: 150px;
   border-radius: 4px;
   overflow: hidden;
 }
 
-.chatImageSquare {
+.chatImageSquare,
+:global(.chatImage) {
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: 4px;
 }
 
-.imageDeleteButton {
+.imageDeleteButton,
+:global(.imageDeleteButton) {
   position: absolute;
   top: 5px;
   right: 5px;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: white;
-  border-radius: 50%;
   width: 20px;
   height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 2;
+  transition: background-color 0.2s;
 }
 
-.imageDeleteButton:hover {
-  background-color: rgba(255, 0, 0, 0.7);
+.imageDeleteButton:hover,
+:global(.imageDeleteButton:hover) {
+  background: rgba(255, 0, 0, 0.7);
 }
 
-:global(.chat-image) {
+.messageContent img {
+  display: block;
   max-width: 100%;
   height: auto;
-  border-radius: 4px;
   margin: 8px 0;
-  display: block;
-}
-
-:root {
-  --mention-border-radius: 0.4rem;
-  --small-font-size: 0.9rem;
-  --smaller-font-size: 0.85em;
-  --dropdown-padding: 0.4rem;
-  --dropdown-gap: 0.1rem;
-}
-
-:global(.tiptap .mention) {
-  background-color: var(--vscode-inputOption-activeBackground);
-  border-radius: var(--mention-border-radius);
-  box-decoration-break: clone;
-  color: var(--vscode-inputOption-activeForeground);
-  padding: 1px 2px 2px 2px;
-}
-
-:global(.tiptap) {
-  outline: none;
-}
-
-:global(.tiptap:first-child) {
-  margin-top: 0;
-}
-
-:global(.tiptap p.is-editor-empty:first-child::before) {
-  color: var(--vscode-disabledForeground);
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
+  border-radius: 4px;
 }
 
 .dropdownMenu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  min-width: 250px;
+  gap: var(--dropdown-gap);
+  padding: var(--dropdown-padding);
   background: var(--vscode-dropdown-background);
   border: 1px solid var(--vscode-inputOption-activeBorder);
   border-radius: 0.4rem;
   box-shadow: var(--vscode-widget-shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
   overflow-y: auto;
-  position: relative;
-  max-height: 300px;
-  min-width: 250px;
 }
 
-.dropdownItem {
-  border: none;
-  color: var(--vscode-foreground);
-  cursor: pointer;
-  background-color: transparent;
-  width: 100%;
-  padding: 0.4rem 0.5rem;
-  text-align: left;
+.dropdownItem,
+:global(.tiptap .item) {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
 }
 
-.itemPath {
+.dropdownItem i {
+  margin-right: 8px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.dropdownItem .itemPath {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.itemName {
+.dropdownItem .itemName {
   font-weight: 500;
 }
 
-.itemFullPath {
+.dropdownItem .itemFullPath {
   font-size: 0.85em;
   opacity: 0.7;
-  white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
-}
-
-:global(.tiptap .item) {
-  border: none;
-  color: var(--vscode-foreground);
-  cursor: pointer;
-  background-color: transparent;
-  width: 100%;
-  padding: 0.2rem 0.5rem;
-  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .dropdownMenu button.dropdownSelected {
-  background-color: var(--vscode-button-background);
+  background: var(--vscode-button-background);
   color: var(--vscode-inputValidation-infoForeground);
 }
 
 .menuContainer {
-  padding: 10px;
-  display: flex;
   position: absolute;
   left: 0;
+  top: 0;
   width: 100%;
   height: calc(100vh - 93px);
-  background-color: var(--vscode-editorWidget-background);
-  z-index: 10;
-  justify-content: flex-end;
+  display: flex;
   flex-direction: column;
-  animation-name: animateUpFadeIn;
-  animation-duration: 0.2s;
+  justify-content: flex-end;
+  padding: 10px;
+  background: var(--vscode-editorWidget-background);
+  z-index: 10;
+  animation: animateUpFadeIn 0.2s;
 }
 
 .menuContainer .active {
-  background-color: var(--vscode-inputOption-activeBackground);
+  background: var(--vscode-inputOption-activeBackground);
 }
 
 .prList {
   margin: 0;
   padding: 0;
+  list-style: none;
 }
 
 .prList li {
   margin-bottom: 10px;
-}
-
-.prButtonContainer {
-  margin-top: 7px;
 }
 
 .prItem {
@@ -711,67 +645,32 @@ code {
   color: var(--vscode-textLink-foreground);
 }
 
+.prButtonContainer {
+  margin-top: 7px;
+}
+
 :global(.mention) {
   display: inline-flex;
   align-items: center;
   padding: 1px 3px;
   border-radius: 4px;
   background: var(--vscode-editor-background);
-  cursor: pointer;
   border: 1px solid var(--vscode-editorWidget-border);
   color: var(--vscode-foreground);
   font-family: inherit;
   font-size: 13px;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 :global(.mention:hover) {
   background: var(--vscode-inputOption-hoverBackground);
 }
 
-:global(.mention > span) {
-  display: inline-block;
-  vertical-align: middle;
-}
-
-.dropdownItem i {
-  margin-right: 8px;
-  font-size: 14px;
-  opacity: 0.8;
-}
-
-/* File context */
-
-.fileItems {
-  display: flex;
-  margin-top: 20px;
-  padding-bottom: 5px;
-}
-
-.fileItem {
-  display: flex;
-  align-items: center;
-  padding: 4px 6px;
-  background-color: var(--vscode-editorWidget-background);
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 4px;
-  margin: 2px;
-  font-size: 12px;
-  flex-wrap: wrap;
-  max-width: fit-content;
-  cursor: pointer;
-  transition: all 0.3 ease-in-out;
-}
-
-.fileItem:hover {
-  background: var(--vscode-inputOption-hoverBackground);
-}
-
-.removeButton {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: var(--vscode-dangerForeground);
-  font-size: 12px;
-  padding: 0 4px;
+:global(.tiptap .mention) {
+  background: var(--vscode-inputOption-activeBackground);
+  color: var(--vscode-inputOption-activeForeground);
+  border-radius: var(--mention-border-radius);
+  box-decoration-break: clone;
+  padding: 1px 2px 2px;
 }

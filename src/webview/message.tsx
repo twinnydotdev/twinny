@@ -322,7 +322,7 @@ export const Message: React.FC<MessageProps> = ({
   const renderContent = useCallback(
     (htmlContent: string) => {
       const sanitizedHtml = DOMPurify.sanitize(htmlContent, {
-        ALLOWED_TAGS: ["span", "p", "br"],
+        ALLOWED_TAGS: ["span", "p", "br", "code", "pre"],
         ALLOWED_ATTR: ["class", "data-id", "data-label", "data-type"],
         ALLOW_DATA_ATTR: true,
         ALLOW_UNKNOWN_PROTOCOLS: true

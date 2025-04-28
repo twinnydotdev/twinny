@@ -289,7 +289,6 @@ export class Chat extends Base {
   }
 
   public abort = () => {
-    this._controller?.abort()
     this._isCancelled = true
     this._statusBar.text = "$(code)"
     commands.executeCommand(
@@ -297,6 +296,7 @@ export class Chat extends Base {
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
+    this._controller?.abort()
   }
 
   private buildTemplatePrompt = async (
@@ -718,8 +718,7 @@ export class Chat extends Base {
 
   public async getTemplateMessages(
     template: string,
-    context?: string,
-    skipMessage?: boolean
+    context?: string
   ): Promise<ChatCompletionMessage[]> {
     this._statusBar.text = "$(loading~spin)"
     const { language } = getLanguage()
@@ -732,20 +731,18 @@ export class Chat extends Base {
       context
     )
 
-    if (!skipMessage) {
-      this.focusChatTab()
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyOnLoading
-      })
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: {
-          content:
-            (kebabToSentence(template) + "\n\n" + "```\n" + selection).trim() ||
-            " "
-        }
-      } as ServerMessage<ChatCompletionMessage>)
-    }
+    this.focusChatTab()
+
+    this._webView?.postMessage({
+      type: EVENT_NAME.twinnyAddMessage,
+      data: {
+        role: USER,
+        content:
+          `${kebabToSentence(
+            template
+          )}\n\n\n<pre><code>${selection}</code></pre>`.trim() || " "
+      }
+    } as ServerMessage<ChatCompletionMessage>)
 
     let ragContext = undefined
     if (["explain"].includes(template)) {
@@ -770,17 +767,11 @@ export class Chat extends Base {
   public async completion(
     messages: ChatCompletionMessage[],
     fileContexts?: FileContextItem[],
-    conversationId?: string // Add parameter for conversation ID
+    conversationId?: string
   ) {
     this._completion = ""
     this._isCancelled = false
     this.sendEditorLanguage()
-
-    // Debug log to track the conversation ID being received
-    console.log(
-      "Received completion request with conversation ID:",
-      conversationId
-    )
 
     const provider = this.getProvider()
 
@@ -791,7 +782,7 @@ export class Chat extends Base {
     this._conversation = await this.buildConversation(
       messages,
       fileContexts,
-      conversationId // Pass the conversation ID to buildConversation
+      conversationId
     )
 
     const stream = this.shouldUseStreaming(provider)
@@ -801,16 +792,9 @@ export class Chat extends Base {
       : this.llmNoStream(this.getNoStreamOptions(provider))
   }
 
-  public async templateCompletion(
-    promptTemplate: string,
-    context?: string,
-    skipMessage?: boolean
-  ) {
-    this._conversation = await this.getTemplateMessages(
-      promptTemplate,
-      context,
-      skipMessage
-    )
+  public async templateCompletion(promptTemplate: string, context?: string) {
+    this._isCancelled = false
+    this._conversation = await this.getTemplateMessages(promptTemplate, context)
     const provider = this.getProvider()
     if (!provider) return []
 

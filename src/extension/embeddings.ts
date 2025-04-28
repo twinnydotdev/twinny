@@ -2,6 +2,7 @@ import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
 import ignore from "ignore"
+import PQueue from "p-queue"
 import path from "path"
 import * as vscode from "vscode"
 
@@ -174,7 +175,7 @@ export class EmbeddingDatabase extends Base {
               this.context
             )
 
-            const filePathEmbedding = await this.fetchModelEmbedding(filePath)
+          const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
             this._filePaths.push({
               content: filePath,
@@ -182,16 +183,15 @@ export class EmbeddingDatabase extends Base {
               file: filePath
             })
 
-            for (const chunk of chunks) {
-              const chunkEmbedding = await this.fetchModelEmbedding(chunk)
-              if (this.getIsDuplicateItem(chunk, chunks)) continue
-
-              this._documents.push({
-                content: chunk,
-                vector: chunkEmbedding,
-                file: filePath
-              })
-            }
+          for (const chunk of chunks) {
+            const chunkEmbedding = await this.fetchModelEmbedding(chunk)
+            if (this.getIsDuplicateItem(chunk, chunks)) return
+            this._documents.push({
+              content: chunk,
+              vector: chunkEmbedding,
+              file: filePath
+            })
+          }
 
             currentlyProcessingFilePaths.delete(fileName)
             processedFiles++
