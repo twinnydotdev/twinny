@@ -165,7 +165,8 @@ export class EmbeddingDatabase extends Base {
 
           for (const chunk of chunks) {
             const chunkEmbedding = await this.fetchModelEmbedding(chunk)
-            if (this.getIsDuplicateItem(chunk, chunks)) return
+              if (this.getIsDuplicateItem(chunk, chunks)) continue
+
             this._documents.push({
               content: chunk,
               vector: chunkEmbedding,
