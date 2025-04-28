@@ -158,9 +158,11 @@ export class EmbeddingDatabase extends Base {
             const fileName = filePath.split("/").pop() || ""
             currentlyProcessingFilePaths.add(fileName)
             progress.report({
-              message: `${((processedFiles / totalFiles) * 100).toFixed(
-                2
-              )}% (${Array.from(currentlyProcessingFilePaths).join(", ")})`
+              message: this.getProgressReportMessage(
+                processedFiles,
+                totalFiles,
+                currentlyProcessingFilePaths
+              )
             })
 
             const content = await fs.promises.readFile(filePath, "utf-8")
@@ -193,6 +195,14 @@ export class EmbeddingDatabase extends Base {
             )
             currentlyProcessingFilePaths.delete(fileName)
             processedFiles++
+            progress.report({
+              message: this.getProgressReportMessage(
+                processedFiles,
+                totalFiles,
+                currentlyProcessingFilePaths
+              ),
+              increment: 100 / totalFiles
+            })
           })
         )
 
@@ -208,6 +218,18 @@ export class EmbeddingDatabase extends Base {
     )
 
     return this
+  }
+
+  private getProgressReportMessage(
+    processedFiles: number,
+    totalFiles: number,
+    currentlyProcessingFilePaths: Set<string>
+  ) {
+    return `${((processedFiles / totalFiles) * 100).toFixed(2)}% (${Array.from(
+      currentlyProcessingFilePaths
+    )
+      .join(", ")
+      .slice(0, 100)}...)`
   }
 
   public async populateDatabase() {
