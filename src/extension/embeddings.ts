@@ -190,9 +190,7 @@ export class EmbeddingDatabase extends Base {
                 file: filePath
               })
             }
-            console.log(
-              `Processed ${fileName} (${processedFiles + 1}/${totalFiles})`
-            )
+
             currentlyProcessingFilePaths.delete(fileName)
             processedFiles++
             progress.report({
