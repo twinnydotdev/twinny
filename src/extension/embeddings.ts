@@ -33,7 +33,6 @@ export class EmbeddingDatabase extends Base {
   private _workspaceName = sanitizeWorkspaceName(vscode.workspace.name)
   private _documentTableName = `${this._workspaceName}-documents`
   private _filePathTableName = `${this._workspaceName}-file-paths`
-  private _embeddingQueue = new PQueue({ concurrency: 5 })
 
   constructor(dbPath: string, context: vscode.ExtensionContext) {
     super(context)
@@ -49,38 +48,41 @@ export class EmbeddingDatabase extends Base {
   }
 
   public async fetchModelEmbedding(content: string) {
-    return this._embeddingQueue.add(async () => {
-      const provider = this.getEmbeddingProvider()
+    const provider = this.getEmbeddingProvider()
 
-      if (!provider) return
+    if (!provider) return
 
-      const requestBody: RequestOptionsOllama = {
-        model: provider.modelName,
-        input: content,
-        stream: false,
-        options: {}
+    const requestBody: RequestOptionsOllama = {
+      model: provider.modelName,
+      input: content,
+      stream: false,
+      options: {}
+    }
+
+    const requestOptions: RequestOptions = {
+      hostname: provider.apiHostname || "localhost",
+      port: provider.apiPort,
+      path: provider.apiPath || "/api/embed",
+      protocol: provider.apiProtocol || "http",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`
       }
+    }
 
-      const requestOptions: RequestOptions = {
-        hostname: provider.apiHostname || "localhost",
-        port: provider.apiPort,
-        path: provider.apiPath || "/api/embed",
-        protocol: provider.apiProtocol || "http",
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${provider.apiKey}`
+    console.log("requestBody", requestBody)
+    console.log("requestOptions", requestOptions)
+    console.log("provider", provider)
+    console.log("fetching embedding...")
+
+    return new Promise<number[]>((resolve) => {
+      fetchEmbedding({
+        body: requestBody,
+        options: requestOptions,
+        onData: (response) => {
+          resolve(this.getEmbeddingFromResponse(provider, response))
         }
-      }
-
-      return new Promise<number[]>((resolve) => {
-        fetchEmbedding({
-          body: requestBody,
-          options: requestOptions,
-          onData: (response) => {
-            resolve(this.getEmbeddingFromResponse(provider, response))
-          }
-        })
       })
     })
   }
@@ -138,7 +140,7 @@ export class EmbeddingDatabase extends Base {
     const filePaths = await this.getAllFilePaths(directoryPath, directoryPath)
     const totalFiles = filePaths.length
     let processedFiles = 0
-    const queue = new PQueue({ concurrency: 5 })
+    const embeddingQueue = new PQueue({ concurrency: 30 })
     const currentlyProcessingFilePaths = new Set<string>()
 
     await vscode.window.withProgress(
@@ -153,9 +155,9 @@ export class EmbeddingDatabase extends Base {
         const startTime = Date.now()
 
         const promises = filePaths.map(async (filePath) =>
-          queue.add(async () => {
+          embeddingQueue.add(async () => {
             if (token.isCancellationRequested) {
-              queue.clear()
+              embeddingQueue.clear()
               return
             }
 
@@ -192,7 +194,9 @@ export class EmbeddingDatabase extends Base {
                 file: filePath
               })
             }
-
+            console.log(
+              `Processed ${fileName} (${processedFiles + 1}/${totalFiles})`
+            )
             currentlyProcessingFilePaths.delete(fileName)
             processedFiles++
           })
