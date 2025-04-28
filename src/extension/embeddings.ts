@@ -70,11 +70,6 @@ export class EmbeddingDatabase extends Base {
       }
     }
 
-    console.log("requestBody", requestBody)
-    console.log("requestOptions", requestOptions)
-    console.log("provider", provider)
-    console.log("fetching embedding...")
-
     return new Promise<number[]>((resolve) => {
       fetchEmbedding({
         body: requestBody,
