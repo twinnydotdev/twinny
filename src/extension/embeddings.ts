@@ -18,14 +18,18 @@ import { Base } from "./base"
 import { fetchEmbedding } from "./llm"
 import PQueue from "p-queue"
 import { TwinnyProvider } from "./provider-manager"
-import { getDocumentSplitChunks, readGitSubmodulesFile } from "./utils"
+import {
+  getDocumentSplitChunks,
+  readGitSubmodulesFile,
+  sanitizeWorkspaceName
+} from "./utils"
 
 export class EmbeddingDatabase extends Base {
   private _documents: EmbeddedDocument[] = []
   private _filePaths: EmbeddedDocument[] = []
   private _db: lancedb.Connection | null = null
   private _dbPath: string
-  private _workspaceName = vscode.workspace.name || ""
+  private _workspaceName = sanitizeWorkspaceName(vscode.workspace.name)
   private _documentTableName = `${this._workspaceName}-documents`
   private _filePathTableName = `${this._workspaceName}-file-paths`
   private _embeddingQueue = new PQueue({ concurrency: 5 })
