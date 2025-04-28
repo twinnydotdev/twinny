@@ -223,11 +223,11 @@ export class EmbeddingDatabase extends Base {
     totalFiles: number,
     currentlyProcessingFilePaths: Set<string>
   ) {
-    return `${((processedFiles / totalFiles) * 100).toFixed(2)}% (${Array.from(
+    return `${((processedFiles / totalFiles) * 100).toFixed(2)}%${Array.from(
       currentlyProcessingFilePaths
     )
-      .join(", ")
-      .slice(0, 100)}...)`
+      .join(",\u00A0")
+      .slice(0, 180)}...`
   }
 
   public async populateDatabase() {
