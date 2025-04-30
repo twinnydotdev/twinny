@@ -227,7 +227,7 @@ export class EmbeddingDatabase extends Base {
       currentlyProcessingFilePaths
     )
       .join(",\u00A0")
-      .slice(0, 180)}...`
+      .slice(0, 165)}...`
   }
 
   public async populateDatabase() {
