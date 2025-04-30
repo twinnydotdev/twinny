@@ -223,7 +223,7 @@ export class EmbeddingDatabase extends Base {
     totalFiles: number,
     currentlyProcessingFilePaths: Set<string>
   ) {
-    return `${((processedFiles / totalFiles) * 100).toFixed(2)}%${Array.from(
+    return `${((processedFiles / totalFiles) * 100).toFixed(2)}% ${Array.from(
       currentlyProcessingFilePaths
     )
       .join(",\u00A0")
