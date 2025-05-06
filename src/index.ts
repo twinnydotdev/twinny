@@ -87,41 +87,37 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.disable, () => {
       statusBarItem.hide()
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.explain, () => {
-      commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      delayExecution(() => sidebarProvider?.streamTemplateCompletion("explain"))
+    commands.registerCommand(TWINNY_COMMAND_NAME.explain, async () => {
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await sidebarProvider.waitForSidebarReady()
+      sidebarProvider?.streamTemplateCompletion("explain")
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.addTypes, () => {
-      commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion("add-types")
-      )
+    commands.registerCommand(TWINNY_COMMAND_NAME.addTypes, async () => {
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await sidebarProvider.waitForSidebarReady()
+      sidebarProvider?.streamTemplateCompletion("add-types")
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.refactor, () => {
-      commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion("refactor")
-      )
+    commands.registerCommand(TWINNY_COMMAND_NAME.refactor, async () => {
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await sidebarProvider.waitForSidebarReady()
+      sidebarProvider?.streamTemplateCompletion("refactor")
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.generateDocs, () => {
-      commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion("generate-docs")
-      )
+    commands.registerCommand(TWINNY_COMMAND_NAME.generateDocs, async () => {
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await sidebarProvider.waitForSidebarReady()
+      sidebarProvider?.streamTemplateCompletion("generate-docs")
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.addTests, () => {
-      commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      delayExecution(() =>
-        sidebarProvider?.streamTemplateCompletion("add-tests")
-      )
+    commands.registerCommand(TWINNY_COMMAND_NAME.addTests, async () => {
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await sidebarProvider.waitForSidebarReady()
+      sidebarProvider?.streamTemplateCompletion("add-tests")
     }),
     commands.registerCommand(
       TWINNY_COMMAND_NAME.templateCompletion,
-      (template: string) => {
-        commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-        delayExecution(() =>
-          sidebarProvider?.streamTemplateCompletion(template)
-        )
+      async (template: string) => {
+        await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+        await sidebarProvider.waitForSidebarReady()
+        sidebarProvider?.streamTemplateCompletion(template)
       }
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.stopGeneration, () => {
@@ -240,18 +236,19 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_NAME
       )
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.getGitCommitMessage, () => {
-      commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+    commands.registerCommand(TWINNY_COMMAND_NAME.getGitCommitMessage, async () => {
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
       sidebarProvider.conversationHistory?.resetConversation()
-      delayExecution(() => sidebarProvider.getGitCommitMessage(), 400)
+      await sidebarProvider.waitForSidebarReady()
+      sidebarProvider.getGitCommitMessage()
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
-      sidebarProvider.conversationHistory?.resetConversation()
-      sidebarProvider.chat?.resetConversation()
       sidebarProvider.newSymmetryConversation()
       sidebarProvider.webView?.postMessage({
         type: EVENT_NAME.twinnyNewConversation
       } as ServerMessage<string>)
+      sidebarProvider.conversationHistory?.resetConversation()
+      sidebarProvider.chat?.resetConversation()
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")

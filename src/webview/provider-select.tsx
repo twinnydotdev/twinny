@@ -137,7 +137,7 @@ export const ProviderSelect = () => {
         ) : (
           <VSCodeTextField
             value={selectedModel || effectiveProvider?.modelName || ""}
-            placeholder={t("Enter model name")}
+            placeholder={t("enter-model-name")}
             onChange={(e: unknown) => {
               const event = e as React.ChangeEvent<HTMLInputElement>
               const value = event.target.value.trim()

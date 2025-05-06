@@ -125,6 +125,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     const message: ServerMessage = event.data
     switch (message.type) {
       case EVENT_NAME.twinnyAddMessage: {
+        generatingRef.current = true
         handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
         break
       }
@@ -352,6 +353,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
       type: EVENT_NAME.twinnyHideBackButton
     })
   }, [])
+
+  useEffect(() => {
+    if (editorRef.current) {
+      global.vscode.postMessage({ type: EVENT_NAME.twinnySidebarReady })
+    }
+  }, [editorRef.current])
 
   useEffect(() => {
     window.addEventListener("message", messageEventHandler)

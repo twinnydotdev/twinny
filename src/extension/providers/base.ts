@@ -58,6 +58,12 @@ export class BaseProvider {
   public reviewService: ReviewService | undefined
   public webView?: vscode.Webview
 
+  private _sidebarReadyHandler?: () => void
+
+  public registerSidebarReadyHandler(handler: () => void) {
+    this._sidebarReadyHandler = handler
+  }
+
   constructor(
     context: vscode.ExtensionContext,
     templateDir: string,
@@ -151,6 +157,7 @@ export class BaseProvider {
       [EVENT_NAME.twinnyStopGeneration]: this.destroyStream,
       [EVENT_NAME.twinnyGetContextFiles]: this.getContextFiles,
       [EVENT_NAME.twinnyRemoveContextFile]: this.removeContextFile,
+      [EVENT_NAME.twinnySidebarReady]: this._sidebarReadyHandler,
       [TWINNY_COMMAND_NAME.settings]: this.openSettings
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

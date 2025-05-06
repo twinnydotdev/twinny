@@ -56,7 +56,7 @@ const execAsync = util.promisify(exec)
 
 export const delayExecution = <T extends () => void>(
   fn: T,
-  delay = 200
+  delay = 2000
 ): NodeJS.Timeout => {
   return setTimeout(() => {
     fn()

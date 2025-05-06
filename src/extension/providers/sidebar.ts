@@ -8,6 +8,9 @@ import { getNonce } from "../utils"
 import { BaseProvider } from "./base"
 
 export class SidebarProvider extends BaseProvider {
+  private _sidebarReadyResolver: (() => void) | null = null
+  private _sidebarReadyPromise: Promise<void> = Promise.resolve()
+
   constructor(
     statusBarItem: vscode.StatusBarItem,
     context: vscode.ExtensionContext,
@@ -17,10 +20,35 @@ export class SidebarProvider extends BaseProvider {
   ) {
     super(context, templateDir, statusBarItem, db, sessionManager)
     this.context = context
+    this.registerSidebarReadyHandler(this.handleSidebarReady)
+  }
+
+  private resetSidebarReadyPromise() {
+    this._sidebarReadyPromise = new Promise<void>((resolve) => {
+      this._sidebarReadyResolver = resolve
+    })
+  }
+
+  public handleSidebarReady = () => {
+    if (this._sidebarReadyResolver) {
+      this._sidebarReadyResolver()
+      this._sidebarReadyResolver = null
+    }
+  }
+
+  public waitForSidebarReady(): Promise<void> {
+    return this._sidebarReadyPromise
+  }
+
+  public override registerWebView(webView: vscode.Webview) {
+    this.resetSidebarReadyPromise()
+    super.registerWebView(webView)
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     if (!this.context) return
+
+    this.resetSidebarReadyPromise()
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -31,6 +59,13 @@ export class SidebarProvider extends BaseProvider {
     logger.log("Sidebar webview view resolved")
 
     this.registerWebView(webviewView.webview)
+
+    // Reset sidebar ready promise when the Twinny sidebar is hidden (user navigates away)
+    webviewView.onDidChangeVisibility(() => {
+      if (!webviewView.visible) {
+        this.resetSidebarReadyPromise()
+      }
+    })
   }
 
   private getHtmlForWebview(webview: vscode.Webview) {
