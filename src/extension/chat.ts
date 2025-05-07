@@ -60,6 +60,7 @@ import { FileTreeProvider } from "./tree"
 import {
   getIsOpenAICompatible,
   getLanguage,
+  sanitizeWorkspaceName,
   updateLoadingMessage
 } from "./utils"
 
@@ -84,6 +85,7 @@ export class Chat extends Base {
   private _webView?: Webview
   private _isCancelled = false
   private _fileHandler: FileHandler
+  private _workspaceName = sanitizeWorkspaceName(workspace.name)
 
   constructor(
     statusBar: StatusBarItem,
@@ -124,9 +126,9 @@ export class Chat extends Base {
   private async getRelevantFiles(
     text: string | undefined
   ): Promise<[string, number][]> {
-    if (!this._db || !text || !workspace.name) return []
+    if (!this._db || !text || !this._workspaceName) return []
 
-    const table = `${workspace.name}-file-paths`
+    const table = `${this._workspaceName}-file-paths`
     if (await this._db.hasEmbeddingTable(table)) {
       const embedding = await this._db.fetchModelEmbedding(text)
       if (!embedding) return []
@@ -164,7 +166,8 @@ export class Chat extends Base {
     text: string | undefined,
     filePaths: string[] | undefined
   ) {
-    if (!this._db || !text || !workspace.name || !filePaths?.length) return []
+    if (!this._db || !text || !this._workspaceName || !filePaths?.length)
+      return []
 
     const rerankThreshold = this.getRerankThreshold()
     logger.log(`Reranking threshold: ${rerankThreshold}`)
@@ -197,9 +200,9 @@ export class Chat extends Base {
     text: string | undefined,
     relevantFiles: [string, number][]
   ): Promise<string> {
-    if (!this._db || !text || !workspace.name) return ""
+    if (!this._db || !text || !this._workspaceName) return ""
 
-    const table = `${workspace.name}-documents`
+    const table = `${this._workspaceName}-documents`
     const rerankThreshold = this.getRerankThreshold()
 
     if (await this._db.hasEmbeddingTable(table)) {
@@ -213,7 +216,7 @@ export class Chat extends Base {
       if (!embedding) return ""
 
       const query = relevantFiles?.length
-        ? `file IN ("${relevantFiles.map((file) => file[0]).join("\",\"")}")`
+        ? `file IN ("${relevantFiles.map((file) => file[0]).join('","')}")`
         : ""
 
       const queryEmbeddedDocuments =
@@ -369,13 +372,15 @@ export class Chat extends Base {
     if (!this._tokenJs || this._isCancelled) return
 
     try {
-      logger.log(`Chat completion request: ${JSON.stringify({
-        model: requestBody.model,
-        messages: requestBody.messages,
-        stream: true,
-        temperature: requestBody.temperature,
-        max_tokens: requestBody.max_tokens
-      })}`)
+      logger.log(
+        `Chat completion request: ${JSON.stringify({
+          model: requestBody.model,
+          messages: requestBody.messages,
+          stream: true,
+          temperature: requestBody.temperature,
+          max_tokens: requestBody.max_tokens
+        })}`
+      )
 
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
@@ -388,22 +393,28 @@ export class Chat extends Base {
       }
 
       const timestamp = Math.floor(Date.now() / 1000)
-      const responseId = `chatcmpl-${timestamp}-${Math.random().toString(36).substring(2, 10)}`
+      const responseId = `chatcmpl-${timestamp}-${Math.random()
+        .toString(36)
+        .substring(2, 10)}`
 
-      logger.log(`Chat completion response: ${JSON.stringify({
-        id: responseId,
-        object: "chat.completion",
-        created: timestamp,
-        model: requestBody.model || "unknown",
-        choices: [{
-          index: 0,
-          message: {
-            role: "assistant",
-            content: this._completion.trim()
-          },
-          finish_reason: "stop"
-        }]
-      })}`)
+      logger.log(
+        `Chat completion response: ${JSON.stringify({
+          id: responseId,
+          object: "chat.completion",
+          created: timestamp,
+          model: requestBody.model || "unknown",
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: this._completion.trim()
+              },
+              finish_reason: "stop"
+            }
+          ]
+        })}`
+      )
 
       await this._webView?.postMessage({
         type: EVENT_NAME.twinnyAddMessage,
@@ -552,7 +563,6 @@ export class Chat extends Base {
     messageContent: string,
     filePaths?: FileContextItem[]
   ): Promise<string> {
-
     const editor = window.activeTextEditor
     const userSelection = editor?.document.getText(editor.selection)
 
@@ -606,51 +616,56 @@ export class Chat extends Base {
     conversation.push({
       role: USER,
       content: `${lastMessage.content}\n\n${additionalContext.trim()}`.trim(),
-      images: lastMessage.images,
+      images: lastMessage.images
     })
 
     return conversation.map((message) => {
-      const role = message.role;
+      const role = message.role
       const $ = cheerio.load(message.content as string)
       $("img").remove()
 
-      const text = $.html("body").replace(/&lt;/g, "<")
+      const text = $.html("body")
+        .replace(/&lt;/g, "<")
         .replace(/<body>|<\/body>/g, "")
-        .replace(/@problems/g, "").trim()
-        .replace(/@workspace/g, "").trim()
+        .replace(/@problems/g, "")
+        .trim()
+        .replace(/@workspace/g, "")
+        .trim()
         .replace(/&amp;/g, "&")
         .replace(/&gt;/g, ">")
         .replace(/<span[^>]*data-type="mention"[^>]*>(.*?)<\/span>/g, "$1")
         .trimStart()
 
-      const images = message.images?.map((img) => ({
-        type: "image_url" as const,
-        image_url: { url: typeof img === "string" ? img : img.data }
-      })) || [];
+      const images =
+        message.images?.map((img) => ({
+          type: "image_url" as const,
+          image_url: { url: typeof img === "string" ? img : img.data }
+        })) || []
 
-      const textPart = { type: "text" as const, text: images.length ? text : message.content };
-      const contentParts = images.length > 0
-        ? [textPart, ...images]
-        : [textPart];
+      const textPart = {
+        type: "text" as const,
+        text: images.length ? text : message.content
+      }
+      const contentParts =
+        images.length > 0 ? [textPart, ...images] : [textPart]
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result: any = {
         role,
-        content: contentParts,
-      };
+        content: contentParts
+      }
 
       if (role === "function" && message.name) {
-        result.name = message.name;
+        result.name = message.name
       }
 
       if (message.id) {
-        result.id = message.id;
+        result.id = message.id
       }
 
-      return result as ChatCompletionMessage;
-    });
+      return result as ChatCompletionMessage
+    })
   }
-
 
   private shouldUseStreaming(provider: TwinnyProvider): boolean {
     const supportsStreaming =
@@ -670,7 +685,7 @@ export class Chat extends Base {
       stream: true as const,
       id: conversationId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: this.getProviderType(provider) as any,
+      provider: this.getProviderType(provider) as any
     }
 
     if (provider.provider !== API_PROVIDERS.Twinny) {
@@ -687,7 +702,7 @@ export class Chat extends Base {
       messages: this._conversation.filter((m) => m.role !== "system"),
       model: provider.modelName,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: this.getProviderType(provider) as any,
+      provider: this.getProviderType(provider) as any
     }
   }
 
@@ -703,7 +718,7 @@ export class Chat extends Base {
 
   public async getTemplateMessages(
     template: string,
-    context?: string,
+    context?: string
   ): Promise<ChatCompletionMessage[]> {
     this._statusBar.text = "$(loading~spin)"
     const { language } = getLanguage()
@@ -722,10 +737,12 @@ export class Chat extends Base {
       type: EVENT_NAME.twinnyAddMessage,
       data: {
         role: USER,
-        content: `${kebabToSentence(template)}\n\n\n<pre><code>${selection}</code></pre>`.trim() || " "
+        content:
+          `${kebabToSentence(
+            template
+          )}\n\n\n<pre><code>${selection}</code></pre>`.trim() || " "
       }
-    } as ServerMessage<ChatCompletionMessage>);
-
+    } as ServerMessage<ChatCompletionMessage>)
 
     let ragContext = undefined
     if (["explain"].includes(template)) {
@@ -746,7 +763,6 @@ export class Chat extends Base {
 
     return this._conversation
   }
-
 
   public async completion(
     messages: ChatCompletionMessage[],
@@ -776,15 +792,9 @@ export class Chat extends Base {
       : this.llmNoStream(this.getNoStreamOptions(provider))
   }
 
-  public async templateCompletion(
-    promptTemplate: string,
-    context?: string,
-  ) {
+  public async templateCompletion(promptTemplate: string, context?: string) {
     this._isCancelled = false
-    this._conversation = await this.getTemplateMessages(
-      promptTemplate,
-      context,
-    )
+    this._conversation = await this.getTemplateMessages(promptTemplate, context)
     const provider = this.getProvider()
     if (!provider) return []
 

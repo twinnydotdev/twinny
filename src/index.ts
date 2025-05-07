@@ -28,7 +28,7 @@ import { FullScreenProvider } from "./extension/providers/panel"
 import { SidebarProvider } from "./extension/providers/sidebar"
 import { SessionManager } from "./extension/session-manager"
 import { TemplateProvider } from "./extension/template-provider"
-import { delayExecution } from "./extension/utils"
+import { delayExecution, sanitizeWorkspaceName } from "./extension/utils"
 import { getLineBreakCount } from "./webview/utils"
 
 export async function activate(context: ExtensionContext) {
@@ -50,9 +50,10 @@ export async function activate(context: ExtensionContext) {
   const homeDir = os.homedir()
   const dbDir = path.join(homeDir, ".twinny/embeddings")
   let db
+  const workspaceName = sanitizeWorkspaceName(workspace.name)
 
-  if (workspace.name) {
-    const dbPath = path.join(dbDir, workspace.name as string)
+  if (workspaceName) {
+    const dbPath = path.join(dbDir, workspaceName as string)
 
     if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
     db = new EmbeddingDatabase(dbPath, context)

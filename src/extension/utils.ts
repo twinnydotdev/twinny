@@ -376,17 +376,11 @@ export const getIsMultilineCompletion = ({
   }
 
   // Check if we're at the start of a new block
-  const isStartOfBlock =
-    isBlockStart ||
-    hasUnclosedBrackets ||
-    nextLineIndented
+  const isStartOfBlock = isBlockStart || hasUnclosedBrackets || nextLineIndented
 
   // Check if we're in a context where multiline completion makes sense
   const isMultilineContext =
-    isInCodeBlock ||
-    isDeclaration ||
-    isInMultilineContext ||
-    isStartOfBlock
+    isInCodeBlock || isDeclaration || isInMultilineContext || isStartOfBlock
 
   // Final decision based on all factors
   const isMultilineCompletion =
@@ -866,4 +860,13 @@ export function notifyKnownErrors(error: Error) {
         }
       })
   }
+}
+
+export function sanitizeWorkspaceName(
+  workspaceName: string | undefined
+): string {
+  const invalidChars = /[^a-zA-Z0-9_.-]+/g
+  const sanitizedName = (workspaceName || "").replace(invalidChars, "_")
+
+  return sanitizedName
 }

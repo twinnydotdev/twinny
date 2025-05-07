@@ -2,7 +2,6 @@ import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
 import ignore from "ignore"
-import PQueue from "p-queue"
 import path from "path"
 import * as vscode from "vscode"
 
@@ -17,18 +16,22 @@ import {
 
 import { Base } from "./base"
 import { fetchEmbedding } from "./llm"
+import PQueue from "p-queue"
 import { TwinnyProvider } from "./provider-manager"
-import { getDocumentSplitChunks, readGitSubmodulesFile } from "./utils"
+import {
+  getDocumentSplitChunks,
+  readGitSubmodulesFile,
+  sanitizeWorkspaceName
+} from "./utils"
 
 export class EmbeddingDatabase extends Base {
   private _documents: EmbeddedDocument[] = []
   private _filePaths: EmbeddedDocument[] = []
   private _db: lancedb.Connection | null = null
   private _dbPath: string
-  private _workspaceName = vscode.workspace.name || ""
+  private _workspaceName = sanitizeWorkspaceName(vscode.workspace.name)
   private _documentTableName = `${this._workspaceName}-documents`
   private _filePathTableName = `${this._workspaceName}-file-paths`
-  private _embeddingQueue = new PQueue({ concurrency: 5 })
 
   constructor(dbPath: string, context: vscode.ExtensionContext) {
     super(context)
@@ -44,38 +47,36 @@ export class EmbeddingDatabase extends Base {
   }
 
   public async fetchModelEmbedding(content: string) {
-    return this._embeddingQueue.add(async () => {
-      const provider = this.getEmbeddingProvider()
+    const provider = this.getEmbeddingProvider()
 
-      if (!provider) return
+    if (!provider) return
 
-      const requestBody: RequestOptionsOllama = {
-        model: provider.modelName,
-        input: content,
-        stream: false,
-        options: {}
+    const requestBody: RequestOptionsOllama = {
+      model: provider.modelName,
+      input: content,
+      stream: false,
+      options: {}
+    }
+
+    const requestOptions: RequestOptions = {
+      hostname: provider.apiHostname || "localhost",
+      port: provider.apiPort,
+      path: provider.apiPath || "/api/embed",
+      protocol: provider.apiProtocol || "http",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`
       }
+    }
 
-      const requestOptions: RequestOptions = {
-        hostname: provider.apiHostname || "localhost",
-        port: provider.apiPort,
-        path: provider.apiPath || "/api/embed",
-        protocol: provider.apiProtocol || "http",
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${provider.apiKey}`
+    return new Promise<number[]>((resolve) => {
+      fetchEmbedding({
+        body: requestBody,
+        options: requestOptions,
+        onData: (response) => {
+          resolve(this.getEmbeddingFromResponse(provider, response))
         }
-      }
-
-      return new Promise<number[]>((resolve) => {
-        fetchEmbedding({
-          body: requestBody,
-          options: requestOptions,
-          onData: (response) => {
-            resolve(this.getEmbeddingFromResponse(provider, response))
-          }
-        })
       })
     })
   }
@@ -133,6 +134,8 @@ export class EmbeddingDatabase extends Base {
     const filePaths = await this.getAllFilePaths(directoryPath, directoryPath)
     const totalFiles = filePaths.length
     let processedFiles = 0
+    const embeddingQueue = new PQueue({ concurrency: 30 })
+    const currentlyProcessingFilePaths = new Set<string>()
 
     await vscode.window.withProgress(
       {
@@ -140,57 +143,91 @@ export class EmbeddingDatabase extends Base {
         title: "Embedding",
         cancellable: true
       },
-      async (progress) => {
+      async (progress, token) => {
         if (!this.context) return
-        const promises = filePaths.map(async (filePath) => {
-          const content = await fs.promises.readFile(filePath, "utf-8")
 
-          const chunks = await getDocumentSplitChunks(
-            content,
-            filePath,
-            this.context
-          )
+        const startTime = Date.now()
 
-          const filePathEmbedding = await this.fetchModelEmbedding(filePath)
+        const promises = filePaths.map(async (filePath) =>
+          embeddingQueue.add(async () => {
+            if (token.isCancellationRequested) {
+              embeddingQueue.clear()
+              return
+            }
 
-          if (!filePathEmbedding) return
+            const fileName = filePath.split("/").pop() || ""
+            currentlyProcessingFilePaths.add(fileName)
+            progress.report({
+              message: this.getProgressReportMessage(
+                processedFiles,
+                totalFiles,
+                currentlyProcessingFilePaths
+              )
+            })
 
-          this._filePaths.push({
-            content: filePath,
-            vector: filePathEmbedding,
-            file: filePath
-          })
+            const content = await fs.promises.readFile(filePath, "utf-8")
 
-          for (const chunk of chunks) {
-            const chunkEmbedding = await this.fetchModelEmbedding(chunk)
+            const chunks = await getDocumentSplitChunks(
+              content,
+              filePath,
+              this.context
+            )
 
-            if (!chunkEmbedding) continue
+            const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
-            if (this.getIsDuplicateItem(chunk, chunks)) return
-            this._documents.push({
-              content: chunk,
-              vector: chunkEmbedding,
+            this._filePaths.push({
+              content: filePath,
+              vector: filePathEmbedding,
               file: filePath
             })
-          }
 
-          processedFiles++
-          progress.report({
-            message: `${((processedFiles / totalFiles) * 100).toFixed(
-              2
-            )}% (${filePath.split("/").pop()})`
+            for (const chunk of chunks) {
+              const chunkEmbedding = await this.fetchModelEmbedding(chunk)
+              if (this.getIsDuplicateItem(chunk, chunks)) break
+              this._documents.push({
+                content: chunk,
+                vector: chunkEmbedding,
+                file: filePath
+              })
+            }
+
+            currentlyProcessingFilePaths.delete(fileName)
+            processedFiles++
+            progress.report({
+              message: this.getProgressReportMessage(
+                processedFiles,
+                totalFiles,
+                currentlyProcessingFilePaths
+              ),
+              increment: 100 / totalFiles
+            })
           })
-        })
+        )
 
         await Promise.all(promises)
 
+        const endTime = Date.now()
+        const elapsedSeconds = ((endTime - startTime) / 1000).toFixed(2)
+
         vscode.window.showInformationMessage(
-          `Embedded successfully! Processed ${totalFiles} files.`
+          `Embedded successfully! Processed ${totalFiles} files and finished in ${elapsedSeconds} seconds.`
         )
       }
     )
 
     return this
+  }
+
+  private getProgressReportMessage(
+    processedFiles: number,
+    totalFiles: number,
+    currentlyProcessingFilePaths: Set<string>
+  ) {
+    return `${((processedFiles / totalFiles) * 100).toFixed(2)}% ${Array.from(
+      currentlyProcessingFilePaths
+    )
+      .join(",\u00A0")
+      .slice(0, 165)}...`
   }
 
   public async populateDatabase() {
