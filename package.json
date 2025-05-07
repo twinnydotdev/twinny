@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.23.8",
+  "version": "3.23.9",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -308,12 +308,20 @@
           "enum": [
             "en",
             "zh-CN",
-            "zh-HK"
+            "zh-HK",
+            "de",
+            "es",
+            "es-CL",
+            "ja"
           ],
           "enumDescriptions": [
             "English",
             "Chinese (Simplified)",
-            "Chinese (Hong Kong)"
+            "Chinese (Hong Kong)",
+            "German",
+            "Spanish",
+            "Spanish (Colombia)",
+            "Japanese"
           ],
           "default": "en",
           "markdownDescription": "Sets the locale for Twinny. The default is `en` (English)."
