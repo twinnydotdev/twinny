@@ -523,7 +523,7 @@
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",
-    "fluency.js": "^1.0.16",
+    "fluency.js": "^1.0.17",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
