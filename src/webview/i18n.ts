@@ -23,8 +23,7 @@ i18n.use(initReactI18next).init({
   detection: {
     order: ["localStorage"],
     availableLanguages: ["en", "zh-CN", "zh-HK", "ja", "es", "esCL", "de"]
-  },
-  debug: true
+  }
 })
 
 export default i18n
