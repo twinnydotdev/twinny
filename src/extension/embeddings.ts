@@ -137,6 +137,13 @@ export class EmbeddingDatabase extends Base {
     const embeddingQueue = new PQueue({ concurrency: 30 })
     const currentlyProcessingFilePaths = new Set<string>()
 
+    let docsBatch : EmbeddedDocument[] = []
+    let filePathsBatch : EmbeddedDocument[] = []
+    let currentBatchSize : number = 0
+    const maxBatchSize : number = 1000
+
+    await this.clearDatabase()
+
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -175,7 +182,7 @@ export class EmbeddingDatabase extends Base {
 
             const filePathEmbedding = await this.fetchModelEmbedding(filePath)
 
-            this._filePaths.push({
+            filePathsBatch.push({
               content: filePath,
               vector: filePathEmbedding,
               file: filePath
@@ -184,11 +191,20 @@ export class EmbeddingDatabase extends Base {
             for (const chunk of chunks) {
               const chunkEmbedding = await this.fetchModelEmbedding(chunk)
               if (this.getIsDuplicateItem(chunk, chunks)) break
-              this._documents.push({
+              docsBatch.push({
                 content: chunk,
                 vector: chunkEmbedding,
                 file: filePath
               })
+            }
+
+            currentBatchSize++
+
+            if (currentBatchSize >= maxBatchSize) {
+              this.populateDatabase(docsBatch, filePathsBatch)
+              docsBatch = []
+              filePathsBatch = []
+              currentBatchSize = 0
             }
 
             currentlyProcessingFilePaths.delete(fileName)
@@ -205,6 +221,10 @@ export class EmbeddingDatabase extends Base {
         )
 
         await Promise.all(promises)
+
+        if (currentBatchSize > 0) {
+          await this.populateDatabase(docsBatch, filePathsBatch)
+        }
 
         const endTime = Date.now()
         const elapsedSeconds = ((endTime - startTime) / 1000).toFixed(2)
@@ -230,28 +250,48 @@ export class EmbeddingDatabase extends Base {
       .slice(0, 165)}...`
   }
 
-  public async populateDatabase() {
+  public async clearDatabase() {
     try {
       const tableNames = await this._db?.tableNames()
-      if (!tableNames?.includes(`${this._workspaceName}-documents`)) {
-        await this._db?.createTable(this._documentTableName, this._documents, {
-          mode: "overwrite"
-        })
+      if (tableNames?.includes(`${this._workspaceName}-documents`)) {
+        await this._db?.dropTable(`${this._workspaceName}-documents`)
       }
 
-      if (!tableNames?.includes(`${this._workspaceName}-file-paths`)) {
-        await this._db?.createTable(this._filePathTableName, this._filePaths, {
-          mode: "overwrite"
-        })
-        return
+      if (tableNames?.includes(`${this._workspaceName}-file-paths`)) {
+        await this._db?.dropTable(`${this._workspaceName}-file-paths`)
       }
 
-      await this._db?.dropTable(`${this._workspaceName}-documents`)
-      await this._db?.dropTable(`${this._workspaceName}-file-paths`)
-      await this.populateDatabase()
+    } catch (e) {
+      console.log("Error clearing database", e)
+    }
+  }
 
-      this._documents.length = 0
-      this._filePaths.length = 0
+  public async populateDatabase(documents: EmbeddedDocument[], filePaths: EmbeddedDocument[]) {
+    try {
+      const tableNames = await this._db?.tableNames()
+
+      if (!tableNames?.includes(this._documentTableName)) {
+            await this._db?.createTable(this._documentTableName, documents, {
+        mode: "overwrite"
+        })
+      } else {
+        const table = await this._db?.openTable(this._documentTableName)
+        await table?.add(documents)
+      }
+
+      if (!tableNames?.includes(this._filePathTableName)) {
+        await this._db?.createTable(this._filePathTableName, filePaths, {
+          mode: "overwrite"
+        })
+      } else {
+        const table = await this._db?.openTable(this._filePathTableName)
+        await table?.add(documents)
+      }
+
+  
+    
+      
+
     } catch (e) {
       console.log("Error populating database", e)
     }

@@ -330,9 +330,7 @@ export class BaseProvider {
     }
     if (!this._embeddingDatabase) return
     for (const dir of dirs) {
-      (
         await this._embeddingDatabase.injestDocuments(dir.uri.fsPath)
-      ).populateDatabase()
     }
   }
 
