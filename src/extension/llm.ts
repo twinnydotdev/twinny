@@ -91,6 +91,10 @@ export async function llm(request: LlmRequest) {
       )
       .getReader()
 
+      signal.addEventListener("abort", () => {
+        reader.cancel();
+      });
+
     // eslint-disable-next-line no-constant-condition
     while (true) {
       if (signal.aborted) break
