@@ -216,7 +216,7 @@ export class Chat extends Base {
       if (!embedding) return ""
 
       const query = relevantFiles?.length
-        ? `file IN ("${relevantFiles.map((file) => file[0]).join('","')}")`
+        ? `file IN ("${relevantFiles.map((file) => file[0]).join("\",\"")}")`
         : ""
 
       const queryEmbeddedDocuments =

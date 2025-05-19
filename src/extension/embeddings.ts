@@ -2,6 +2,7 @@ import * as lancedb from "@lancedb/lancedb"
 import { IntoVector } from "@lancedb/lancedb/dist/arrow"
 import fs from "fs"
 import ignore from "ignore"
+import PQueue from "p-queue"
 import path from "path"
 import * as vscode from "vscode"
 
@@ -16,7 +17,6 @@ import {
 
 import { Base } from "./base"
 import { fetchEmbedding } from "./llm"
-import PQueue from "p-queue"
 import { TwinnyProvider } from "./provider-manager"
 import {
   getDocumentSplitChunks,
@@ -137,10 +137,10 @@ export class EmbeddingDatabase extends Base {
     const embeddingQueue = new PQueue({ concurrency: 30 })
     const currentlyProcessingFilePaths = new Set<string>()
 
-    let docsBatch : EmbeddedDocument[] = []
-    let filePathsBatch : EmbeddedDocument[] = []
-    let currentBatchSize : number = 0
-    const maxBatchSize : number = 1000
+    let docsBatch: EmbeddedDocument[] = []
+    let filePathsBatch: EmbeddedDocument[] = []
+    let currentBatchSize: number = 0
+    const maxBatchSize: number = 1000
 
     await this.clearDatabase()
 
@@ -260,19 +260,21 @@ export class EmbeddingDatabase extends Base {
       if (tableNames?.includes(`${this._workspaceName}-file-paths`)) {
         await this._db?.dropTable(`${this._workspaceName}-file-paths`)
       }
-
     } catch (e) {
       console.log("Error clearing database", e)
     }
   }
 
-  public async populateDatabase(documents: EmbeddedDocument[], filePaths: EmbeddedDocument[]) {
+  public async populateDatabase(
+    documents: EmbeddedDocument[],
+    filePaths: EmbeddedDocument[]
+  ) {
     try {
       const tableNames = await this._db?.tableNames()
 
       if (!tableNames?.includes(this._documentTableName)) {
-            await this._db?.createTable(this._documentTableName, documents, {
-        mode: "overwrite"
+        await this._db?.createTable(this._documentTableName, documents, {
+          mode: "overwrite"
         })
       } else {
         const table = await this._db?.openTable(this._documentTableName)
@@ -287,11 +289,6 @@ export class EmbeddingDatabase extends Base {
         const table = await this._db?.openTable(this._filePathTableName)
         await table?.add(documents)
       }
-
-  
-    
-      
-
     } catch (e) {
       console.log("Error populating database", e)
     }
