@@ -65,7 +65,8 @@ import {
   getIsMiddleOfString,
   getIsMultilineCompletion,
   getPrefixSuffix,
-  getShouldSkipCompletion
+  getShouldSkipCompletion,
+  sanitizeWorkspaceName
 } from "../utils"
 
 export class CompletionProvider
@@ -669,7 +670,7 @@ export class CompletionProvider
 
     if (this._provider.repositoryLevel) {
       const repositoryLevelData = await this.getRelevantDocuments()
-      const repoName = workspace.name
+      const repoName = sanitizeWorkspaceName(workspace.name)
       const currentFile = await this._document.uri.fsPath
       return getFimTemplateRepositoryLevel(
         repoName || "untitled",
