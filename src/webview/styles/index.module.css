@@ -239,7 +239,6 @@ pre code * {
   overflow: hidden;
   transition: all 0.3s ease-out;
   opacity: 1;
-  max-height: 1000px;
   margin-top: 8px;
 }
 
