@@ -1,0 +1,38 @@
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 5px;
+}
+
+.suggestion {
+  flex: 0 0 calc(50% - 5px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  min-height: 40px;
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 2px;
+  box-sizing: border-box;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.suggestion:nth-child(odd) {
+  margin-right: 10px;
+}
+
+.suggestion:hover {
+  background: var(--vscode-inputOption-hoverBackground);
+}
+
+.suggestion--disabled {
+  opacity: 0.5;
+}
+
+.suggestion svg {
+  width: 20px;
+}

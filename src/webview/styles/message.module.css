@@ -1,0 +1,163 @@
+.message-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.message {
+  font-size: .85rem;
+  line-height: 1.5;
+  padding: 12px 8px;
+  margin-right: 10px;
+}
+
+.message:first-child {
+  border-top: none;
+}
+
+.userMessage {
+  border-bottom: 1px solid var(--vscode-editorWidget-border);
+}
+
+.messageRole {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.userMessage .mention {
+  margin-left: 2px;
+}
+
+.thinkingSection {
+  background: var(--vscode-editor-background);
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--small-font-size);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+
+.thinkingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.thinkingHeader:hover {
+  background: var(--vscode-inputOption-hoverBackground);
+}
+
+.thinkingContent {
+  overflow: hidden;
+  transition: all 0.3s ease-out;
+  opacity: 1;
+  margin-top: 8px;
+}
+
+.thinkingContent.collapsed {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
+}
+
+.messageOptions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.messageContent img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+.imageGallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.imageContainer {
+  position: relative;
+  display: inline-block;
+  width: 150px;
+  height: 150px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chatImageSquare {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.imageDeleteButton {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: background-color 0.2s;
+}
+
+.imageDeleteButton:hover {
+  background: rgba(255, 0, 0, 0.7);
+}
+
+.tiptap {
+  width: 100%;
+  min-width: var(--input-min-width);
+  min-height: 60px;
+  padding: 7px;
+  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  border-radius: 6px;
+  background: var(--input-background);
+  color: var(--input-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: .85rem;
+  line-height: var(--type-ramp-base-line-height);
+  resize: none;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.tiptap:focus {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.tiptap p {
+  margin: 0;
+}
+
+.tiptap:first-child {
+  margin-top: 0;
+}
+
+.editor {
+  outline: none;
+}

@@ -6,7 +6,7 @@ import { EVENT_NAME,WORKSPACE_STORAGE_KEY } from "../common/constants"
 import { useTemplates, useWorkSpaceContext } from "./hooks"
 import { kebabToSentence } from "./utils"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/suggestions.module.css"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

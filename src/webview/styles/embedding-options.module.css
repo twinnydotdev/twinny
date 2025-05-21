@@ -1,0 +1,43 @@
+.embeddingOptions {
+  width: 100%;
+  padding-bottom: 10px;
+}
+
+.embeddingOptions > div {
+  width: 100%;
+}
+
+.embeddingOptions small {
+  display: block;
+}
+
+.embeddingOptions vscode-button {
+  margin-bottom: 5px;
+}
+
+.embeddingOptions vscode-dropdown {
+  width: 100%;
+  margin-bottom: 7px;
+}
+
+.embeddingOptions .slider {
+  width: 100%;
+  transform: translateX(-4px);
+}
+
+.embeddingOptions .sliderLabel {
+  transform: translateY(-9px);
+}
+
+.slider {
+  width: 100%;
+  transform: translateX(-4px);
+}
+
+.sliderLabel {
+  transform: translateY(-9px);
+}
+
+.embedDocumentsButton {
+  margin-top: 5px;
+}

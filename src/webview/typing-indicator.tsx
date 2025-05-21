@@ -1,6 +1,6 @@
 import React from "react"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/typing-indicator.module.css"
 
 const TypingIndicator = () => {
   return (

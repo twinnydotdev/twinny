@@ -11,7 +11,7 @@ import { useTheme } from "./hooks"
 import { useToast } from "./toast"
 import { getLanguageMatch } from "./utils"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/code-block.module.css"
 
 interface CodeBlockProps {
   className?: string

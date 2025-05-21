@@ -1,0 +1,139 @@
+:root {
+  --mention-border-radius: 0.4rem;
+  --small-font-size: 0.9rem;
+  --smaller-font-size: 0.85em;
+  --dropdown-padding: 0.4rem;
+  --dropdown-gap: 0.1rem;
+}
+
+vscode-panel-view {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  line-height: 1.5em;
+}
+
+vscode-text-area,
+vscode-text-field {
+  width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+h1 {
+  font-size: 1.75em;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+h2 {
+  font-size: 1.25em;
+  font-weight: 400;
+}
+
+h3 {
+  font-size: 1.15em;
+}
+
+h4 {
+  font-size: 1em;
+}
+
+h5 {
+  font-size: 0.8em;
+}
+
+h6 {
+  font-size: 0.7em;
+}
+
+.providerSelect {
+  margin-top: 10px;
+}
+
+.send,
+.settings {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.twinnyForm {
+  width: 100%;
+}
+
+.twinnyForm div {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.textIcon {
+  font-size: 1.15rem;
+  transform: translateY(-6px);
+}
+
+.dropdownMenu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  min-width: 250px;
+  gap: var(--dropdown-gap);
+  padding: var(--dropdown-padding);
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-inputOption-activeBorder);
+  border-radius: 0.4rem;
+  box-shadow: var(--vscode-widget-shadow);
+  overflow-y: auto;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  color: var(--vscode-foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.dropdownItem i {
+  margin-right: 8px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.dropdownItem .itemPath {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dropdownItem .itemName {
+  font-weight: 500;
+}
+
+.dropdownItem .itemFullPath {
+  font-size: 0.85em;
+  opacity: 0.7;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.dropdownMenu button.dropdownSelected {
+  background: var(--vscode-button-background);
+  color: var(--vscode-inputValidation-infoForeground);
+}
