@@ -1,0 +1,31 @@
+pre {
+  background: var(--vscode-textCodeBlock-background);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  overflow-x: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+code {
+  font-family: inherit !important;
+  font-size: .85rem !important;
+  background: transparent !important;
+}
+
+pre code,
+pre code span,
+pre code * {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+
+.codeOptions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+  margin: 10px 0;
+}

@@ -19,7 +19,7 @@ import { MentionExtension } from "./mention-extention"
 import { useToast } from "./toast"
 import { getThinkingMessage } from "./utils"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/message.module.css"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const global = globalThis as any

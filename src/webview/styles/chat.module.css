@@ -1,0 +1,226 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 95vh;
+  width: 100%;
+}
+
+.fullScreenActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  margin-top: 20px;
+}
+
+.markdown,
+.markdownFullScreen {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: .85rem;
+  margin-top: 20px;
+}
+
+.markdown {
+  padding-top: 20px;
+}
+
+.markdown::-webkit-scrollbar,
+.markdownFullScreen::-webkit-scrollbar {
+  width: 8px;
+}
+
+.markdown::-webkit-scrollbar-track,
+.markdownFullScreen::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown::-webkit-scrollbar-thumb,
+.markdownFullScreen::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background);
+  border-radius: 4px;
+}
+
+.markdown::-webkit-scrollbar-thumb:hover,
+.markdownFullScreen::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+.title {
+  position: absolute;
+  top: 0px;
+  left: 10px;
+  width: calc(100% - 20px);
+  height: 30px;
+  margin: 0 0 10px;
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 30px;
+  color: var(--vscode-textPreformat-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.title p {
+  margin: 0;
+}
+
+.chatOptions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.chatOptions > div {
+  gap: 6px;
+}
+
+.chatOptions svg {
+  width: 18px;
+  height: 18px;
+}
+
+.chatOptions vscode-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileItems {
+  display: flex;
+  margin-top: 20px;
+  padding-bottom: 5px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  background-color: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+  margin: 2px;
+  font-size: 12px;
+  flex-wrap: wrap;
+  max-width: fit-content;
+  cursor: pointer;
+  transition: all 0.3 ease-in-out;
+}
+
+.scrollToBottom {
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.scrollToBottom:hover {
+  opacity: 1;
+}
+
+.chatBox {
+  position: relative;
+  margin-top: 12px;
+  transition: transform 0.2s ease;
+}
+
+.chatButtons {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.menuContainer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: calc(100vh - 93px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px;
+  background: var(--vscode-editorWidget-background);
+  z-index: 10;
+  animation: animateUpFadeIn 0.2s;
+}
+
+.menuContainer .active {
+  background: var(--vscode-inputOption-activeBackground);
+}
+
+.prList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prList li {
+  margin-bottom: 10px;
+}
+
+.prItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.prTitle {
+  flex-grow: 1;
+  margin-right: 8px;
+}
+
+.prTitle a {
+  color: var(--vscode-textLink-foreground);
+}
+
+.prButtonContainer {
+  margin-top: 7px;
+}
+
+.tiptap {
+  width: 100%;
+  min-width: var(--input-min-width);
+  min-height: 60px;
+  padding: 7px;
+  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
+  border-radius: 6px;
+  background: var(--input-background);
+  color: var(--input-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: .85rem;
+  line-height: var(--type-ramp-base-line-height);
+  resize: none;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  box-sizing: border-box;
+  padding-bottom: 30px;
+}
+
+.tiptap:focus {
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.tiptap p {
+  margin: 0;
+}
+
+.tiptap:first-child {
+  margin-top: 0;
+}

@@ -11,7 +11,6 @@ import {
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import * as cheerio from "cheerio"
-import DOMPurify from "dompurify"
 import { v4 as uuidv4 } from "uuid"
 
 import { EVENT_NAME, USER } from "../common/constants"
@@ -38,7 +37,7 @@ import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
 import { CustomKeyMap } from "./utils"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/chat.module.css"
 
 interface ChatProps {
   fullScreen?: boolean
@@ -569,17 +568,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
             </VSCodeButton>
           </div>
         )}
-        <h4 className={styles.title}>
-          {conversation?.title ? (
-            <span
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(conversation?.title)
-              }}
-            />
-          ) : (
-            generatingRef.current && <span>New conversation</span>
-          )}
-        </h4>
         {!!files.length && (
           <div className={styles.fileItems}>{files.map(renderFileItem)}</div>
         )}
