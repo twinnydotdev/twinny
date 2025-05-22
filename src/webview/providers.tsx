@@ -527,7 +527,7 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
             onChange={handleChange}
             name="apiPort"
             value={formState.apiPort ? formState.apiPort.toString() : ""}
-            placeholder='Enter a port e.g "11434"'
+            placeholder={t("port-placeholder")}
           ></VSCodeTextField>
         </div>
 
