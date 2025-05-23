@@ -52,19 +52,19 @@ export const Review = () => {
         <VSCodeTextField
           value={owner ? owner : ""}
           onChange={handleOwnerChange}
-          placeholder={t('review-owner-placeholder')}
+          placeholder={t("review-owner-placeholder")}
         />
         <VSCodeTextField
           value={repo ? repo : ""}
           onChange={handleRepoChange}
-          placeholder={t('review-repository-placeholder')}
+          placeholder={t("review-repository-placeholder")}
         />
         <div className={styles.prButtonContainer}>
           <VSCodeButton
             onClick={handleFetchPRs}
             disabled={isLoading || !owner || !repo}
           >
-            {isLoading ? t('review-fetching-button') : t('review-fetch-prs-button')}
+            {isLoading ? t("review-fetching-button") : t("review-fetch-prs-button")}
           </VSCodeButton>
         </div>
       </div>
@@ -84,7 +84,7 @@ export const Review = () => {
                 </span>
                 <VSCodeButton
                   onClick={() => handleStartReview(pr.number, pr.title)}
-                  title={t('review-pr-title', { prNumber: pr.number })}
+                  title={t("review-pr-title", { prNumber: pr.number })}
                   appearance="icon"
                   disabled={isLoading}
                 >
