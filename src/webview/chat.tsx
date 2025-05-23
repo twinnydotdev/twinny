@@ -326,7 +326,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     })
   }, [
     conversation?.id,
-    t // Added t to dependency array
+    t
   ])
 
   const handleNewConversation = useCallback(() => {
@@ -339,7 +339,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyNewConversation
     })
-  }, [setActiveConversation, t]) // Added t to dependency array
+  }, [setActiveConversation, t])
 
   const handleOpenFile = useCallback((filePath: string) => {
     global.vscode.postMessage({
