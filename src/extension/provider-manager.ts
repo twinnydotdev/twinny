@@ -299,6 +299,17 @@ export class ProviderManager {
         `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.selectedModel}`,
         provider?.modelName
       )
+      if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
+        this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, provider)
+      }
+    } else if (provider.type === "fim") {
+      if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_STORAGE_KEY)) {
+        this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, provider)
+      }
+    } else if (provider.type === "embedding") {
+      if (!this._context.globalState.get(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY)) {
+        this._context.globalState.update(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY, provider)
+      }
     }
 
     this.getAllProviders()
@@ -315,6 +326,21 @@ export class ProviderManager {
   removeProvider(provider?: TwinnyProvider) {
     const providers = this.getProviders() || {}
     if (!provider) return
+
+    const activeFimProvider = this.getActiveFimProvider()
+    const activeChatProvider = this.getActiveChatProvider()
+    const activeEmbeddingsProvider = this.getActiveEmbeddingsProvider()
+
+    if (provider.id === activeFimProvider?.id) {
+      this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
+    }
+    if (provider.id === activeChatProvider?.id) {
+      this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, undefined)
+    }
+    if (provider.id === activeEmbeddingsProvider?.id) {
+      this._context.globalState.update(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY, undefined)
+    }
+
     delete providers[provider.id]
     this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
     this.getAllProviders()
