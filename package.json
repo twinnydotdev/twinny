@@ -312,7 +312,13 @@
             "de",
             "es",
             "es-CL",
-            "ja"
+            "ja",
+            "fr",
+            "it",
+            "pt",
+            "ru",
+            "ko",
+            "nl"
           ],
           "enumDescriptions": [
             "English",
@@ -321,7 +327,13 @@
             "German",
             "Spanish",
             "Spanish (Colombia)",
-            "Japanese"
+            "Japanese",
+            "French",
+            "Italian",
+            "Portuguese",
+            "Russian",
+            "Korean",
+            "Dutch"
           ],
           "default": "en",
           "markdownDescription": "Sets the locale for Twinny. The default is `en` (English)."
