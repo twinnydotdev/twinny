@@ -53,7 +53,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   const getTitle = (conversation: Conversation) => {
     return (
       DOMPurify.sanitize(stripHtml(conversation.title || "")) ||
-      "Random conversation"
+      t('conversation-history-random-title')
     )
   }
 

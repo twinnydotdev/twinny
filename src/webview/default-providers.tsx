@@ -26,7 +26,7 @@ interface ProviderSelectProps {
 }
 const providers: TwinnyProvider[] = [
   {
-    label: "Twinny.dev (Symmetry)",
+    label: "providers-twinny-name",
     apiHostname: "twinny.dev",
     apiPath: "/v1",
     logo: <SvgTwinny />,
@@ -37,7 +37,7 @@ const providers: TwinnyProvider[] = [
     type: "chat",
   },
   {
-    label: "Ollama",
+    label: "providers-ollama-name",
     logo: <SvgOllama />,
     apiHostname: "localhost",
     apiPort: 11434,
@@ -49,7 +49,7 @@ const providers: TwinnyProvider[] = [
     type: "chat",
   },
   {
-    label: "Localhost OpenAI Compatible Server",
+    label: "providers-openai-compatible-name",
     logo: <SvgOpenAI />,
     apiHostname: "localhost",
     apiPort: 11434,
@@ -61,7 +61,7 @@ const providers: TwinnyProvider[] = [
     type: "chat",
   },
   {
-    label: "OpenAI",
+    label: "providers-openai-name",
     logo: <SvgOpenAI />,
     id: "openai-default",
     modelName: "gpt-4o",
@@ -69,7 +69,7 @@ const providers: TwinnyProvider[] = [
     type: "chat"
   },
   {
-    label: "Anthropic",
+    label: "providers-anthropic-name",
     logo: <SvgAnthropic />,
     id: "anthropic-default",
     modelName: "claude-3-opus-20240229",
@@ -77,7 +77,7 @@ const providers: TwinnyProvider[] = [
     type: "chat"
   },
   {
-    label: "Deepseek",
+    label: "providers-deepseek-name",
     logo: <SvgDeepseek />,
     id: "openai-default",
     modelName: "deepseek-chat",
@@ -87,8 +87,8 @@ const providers: TwinnyProvider[] = [
     apiProtocol: "https"
   },
   {
-    label: "Groq",
-    features: ["Chat", "Streaming"],
+    label: "providers-groq-name",
+    features: ["providers-feature-chat", "providers-feature-streaming"],
     logo: <SvgGroq />,
     id: "groq-default",
     modelName: "llama2-70b-4096",
@@ -96,7 +96,7 @@ const providers: TwinnyProvider[] = [
     type: "chat"
   },
   {
-    label: "OpenRouter",
+    label: "providers-openrouter-name",
     logo: <SvgOpenRouter />,
     id: "openrouter-default",
     modelName: "openai/gpt-4",
@@ -104,7 +104,7 @@ const providers: TwinnyProvider[] = [
     type: "chat"
   },
   {
-    label: "Cohere",
+    label: "providers-cohere-name",
     logo: <SvgCohere />,
     id: "cohere",
     modelName: "command-r-plus",
@@ -112,7 +112,7 @@ const providers: TwinnyProvider[] = [
     type: "chat"
   },
   {
-    label: "Perplexity",
+    label: "providers-perplexity-name",
     logo: <SvgPerplexity />,
     id: "perplexity",
     modelName: "llama-3-sonar-small-32k-chat",
@@ -120,7 +120,7 @@ const providers: TwinnyProvider[] = [
     type: "chat"
   },
   {
-    label: "Gemini",
+    label: "providers-gemini-name",
     logo: <SvgGemini />,
     id: "gemini",
     modelName: "gemini-1.5-pro",
@@ -128,7 +128,7 @@ const providers: TwinnyProvider[] = [
     type: "chat"
   },
   {
-    label: "Mistral",
+    label: "providers-mistral-name",
     logo: <SvgMistral />,
     apiPath: "/v1",
     id: "mistral",
@@ -155,24 +155,24 @@ export const DefaultProviderSelect: React.FC<ProviderSelectProps> = ({
         <div className={styles.defaultsGrid}>
           <div className={styles.defaultItem}>
             <span className={styles.defaultLabel}>API Host:</span>
-            <span>{provider.apiHostname || "provider default"}</span>
+            <span>{provider.apiHostname || t("providers-default-detail")}</span>
           </div>
           <div className={styles.defaultItem}>
             <span className={styles.defaultLabel}>API Path:</span>
-            <span>{provider.apiPath || "provider default"}</span>
+            <span>{provider.apiPath || t("providers-default-detail")}</span>
           </div>
           <div className={styles.defaultItem}>
             <span className={styles.defaultLabel}>Protocol:</span>
-            <span>{provider.apiProtocol || "provider default"}</span>
+            <span>{provider.apiProtocol || t("providers-default-detail")}</span>
           </div>
           <div className={styles.defaultItem}>
             <span className={styles.defaultLabel}>Model:</span>
-            <span>{provider.modelName || "provider default"}</span>
+            <span>{provider.modelName || t("providers-default-detail")}</span>
           </div>
           {provider.apiPort && (
             <div className={styles.defaultItem}>
               <span className={styles.defaultLabel}>Port:</span>
-              <span>{provider.apiPort || "provider default"}</span>
+              <span>{provider.apiPort || t("providers-default-detail")}</span>
             </div>
           )}
         </div>
@@ -191,7 +191,7 @@ export const DefaultProviderSelect: React.FC<ProviderSelectProps> = ({
 
             <div className={styles.content}>
               <div className={styles.header}>
-                <h3 className={styles.providerName}>{provider.label}</h3>
+                <h3 className={styles.providerName}>{t(provider.label)}</h3>
                 <div className={styles.actions}>
                   <VSCodeButton
                     appearance="icon"
@@ -217,7 +217,15 @@ export const DefaultProviderSelect: React.FC<ProviderSelectProps> = ({
                   </VSCodeButton>
                 </div>
               </div>
-
+              {provider.features && (
+                <div className={styles.features}>
+                  {provider.features.map((feature) => (
+                    <span key={feature} className={styles.featureBadge}>
+                      {t(feature)}
+                    </span>
+                  ))}
+                </div>
+              )}
               {showDefaults && renderProviderDefaults(provider)}
             </div>
           </div>

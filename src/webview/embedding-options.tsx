@@ -103,10 +103,7 @@ export const EmbeddingOptions = () => {
   if (!embeddingProviders) {
     return (
       <div className={styles.embeddingOptions}>
-        <p>
-          No providers found for type: 'embedding', please add an embedding
-          provider...
-        </p>
+        <p>{t('embedding-options-no-providers-found')}</p>
       </div>
     )
   }
@@ -174,7 +171,7 @@ export const EmbeddingOptions = () => {
         <small>{t("number-code-snippets")}</small>
       </div>
       <div>
-        <div>Filepaths</div>
+        <div>{t('embedding-options-filepaths-label')}</div>
         <VSCodeTextField
           value={filePaths}
           name="provider"

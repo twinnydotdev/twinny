@@ -17,15 +17,18 @@ const ProviderConnectionStatus = ({
 }: {
   isProviderConnected: boolean;
   status: string | undefined;
-}) => (
-  <span className={isProviderConnected ? styles.connected : styles.disconnected}>
-    {status === "connecting"
-      ? "Connecting..."
-      : isProviderConnected
-        ? "Connected"
-        : "Not connected"}
-  </span>
-)
+}) => {
+  const { t } = useTranslation()
+  return (
+    <span className={isProviderConnected ? styles.connected : styles.disconnected}>
+      {status === "connecting"
+        ? t("symmetry-connection-status-connecting")
+        : isProviderConnected
+          ? t("symmetry-connection-status-connected")
+          : t("symmetry-connection-status-not-connected")}
+    </span>
+  )
+}
 
 const Step = ({ number, title, description }: { number: number; title: string; description: string | React.ReactNode }) => (
   <div className={styles.step}>
@@ -72,18 +75,18 @@ export const Symmetry = () => {
   return (
     <VSCodePanelView className={styles.symmetryContainer}>
       <div>
-        <h3>Become a Symmetry Provider</h3>
+        <h3>{t("symmetry-become-provider-title")}</h3>
 
         <div className={styles.stepContainer}>
           <Step
             number={1}
-            title="What is a Symmetry Provider?"
-            description="As a provider, you share your GPU resources with other users in the Symmetry network. All connections are peer-to-peer, encrypted end-to-end, and secure."
+            title={t("symmetry-what-is-provider-title")}
+            description={t("symmetry-what-is-provider-description")}
           />
 
           <Step
             number={2}
-            title="Check Your Connection Status"
+            title={t("symmetry-check-status-title")}
             description={
               <ProviderConnectionStatus
                 isProviderConnected={isProviderConnected}
@@ -94,11 +97,11 @@ export const Symmetry = () => {
 
           <Step
             number={3}
-            title="Connect to the Network"
+            title={t("symmetry-connect-network-title")}
             description={
               <>
                 <div className={styles.infoText}>
-                  Click the button below to connect to the Symmetry network as a provider.
+                  {t("symmetry-connect-network-description")}
                 </div>
                 <div className={styles.buttonContainer}>
                   <VSCodeButton
@@ -117,7 +120,7 @@ export const Symmetry = () => {
 
           <Step
             number={4}
-            title="Auto-Connect Settings"
+            title={t("symmetry-auto-connect-title")}
             description={
               <div className={styles.checkboxContainer}>
                 <VSCodeCheckbox
@@ -135,38 +138,44 @@ export const Symmetry = () => {
 
         {isProviderConnected ? (
           <section>
-            <h4>🎉 Successfully Connected!</h4>
+            <h4>{t("symmetry-connection-success-title")}</h4>
             <div className={styles.infoText}>
-              You are now visible on the <a href="https://twinny.dev/symmetry" target="_blank" rel="noopener noreferrer">Symmetry providers page</a>.
-              Other users can connect to your provider and use your GPU resources.
+              {t("symmetry-connection-success-message")}{" "}
+              <a href="https://twinny.dev/symmetry" target="_blank" rel="noopener noreferrer">
+                {t("symmetry-visit-providers-page-link")}
+              </a>.
             </div>
             <div className={styles.infoText}>
-              <b>For a more permanent connection:</b> Consider using the <code>symmetry-cli</code> package.
-              Visit the <a href="https://github.com/twinnydotdev/symmetry-cli" target="_blank" rel="noopener noreferrer">Symmetry CLI repository</a> to get started.
+              <b>{t("symmetry-permanent-connection-info")}</b>{" "}
+              <a href="https://github.com/twinnydotdev/symmetry-cli" target="_blank" rel="noopener noreferrer">
+                {t("symmetry-visit-cli-repo-link")}
+              </a>
             </div>
           </section>
         ) : (
           <section>
-            <h4>Benefits of Being a Provider</h4>
+            <h4>{t("symmetry-benefits-title")}</h4>
             <div className={styles.infoText}>
-              • Share your GPU resources with the community
+              {t("symmetry-benefit-item1")}
             </div>
             <div className={styles.infoText}>
-              • Help others access AI capabilities
+              {t("symmetry-benefit-item2")}
             </div>
             <div className={styles.infoText}>
-              • All connections are secure and encrypted
+              {t("symmetry-benefit-item3")}
             </div>
             <div className={styles.infoText}>
-              • Easy to set up and configure
+              {t("symmetry-benefit-item4")}
             </div>
           </section>
         )}
 
         <div className={styles.infoText}>
           <a href="https://twinny.dev/symmetry" target="_blank" rel="noopener noreferrer">
-            Visit the Symmetry providers page
-          </a> to see all available providers in the network.
+            {t("symmetry-visit-providers-page-link")}
+          </a>{" "}
+          {/* This part of the sentence might need adjustment based on full context */}
+          to see all available providers in the network.
         </div>
       </div>
     </VSCodePanelView>

@@ -141,9 +141,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
         setCompletion(null)
         setActiveConversation({
           id: uuidv4(),
-          title: "New conversation",
+          title: t("chat-new-conversation-title"),
           messages: []
-        });
+        })
         generatingRef.current = false
         setIsLoading(false)
         chatRef.current?.focus()
@@ -303,7 +303,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       const currentConversation = {
         id: conversationId,
         messages: updatedMessages,
-        title: conversation?.title || "New conversation"
+        title: conversation?.title || t("chat-new-conversation-title")
       };
 
       const clientMessage: ClientMessage<
@@ -326,19 +326,20 @@ export const Chat = (props: ChatProps): JSX.Element => {
     })
   }, [
     conversation?.id,
+    t
   ])
 
   const handleNewConversation = useCallback(() => {
     setActiveConversation({
       id: uuidv4(),
-      title: "New conversation",
+      title: t("chat-new-conversation-title"),
       messages: []
     });
 
     global.vscode.postMessage({
       type: EVENT_NAME.twinnyNewConversation
     })
-  }, [setActiveConversation])
+  }, [setActiveConversation, t])
 
   const handleOpenFile = useCallback((filePath: string) => {
     global.vscode.postMessage({
@@ -613,7 +614,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
             <VSCodeBadge>{selection?.length}</VSCodeBadge>
             {!!symmetryConnection && (
               <VSCodeBadge
-                title={`Connected to symmetry network provider ${symmetryConnection?.name}, model ${symmetryConnection?.modelName}, provider ${symmetryConnection?.provider}`}
+                title={t("chat-connected-to-provider", {
+                  providerName: symmetryConnection?.name,
+                  modelName: symmetryConnection?.modelName,
+                  providerId: symmetryConnection?.provider
+                })}
               >
                 ⚡️ {symmetryConnection?.name}
               </VSCodeBadge>
