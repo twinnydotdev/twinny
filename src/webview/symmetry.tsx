@@ -18,7 +18,7 @@ const ProviderConnectionStatus = ({
   isProviderConnected: boolean;
   status: string | undefined;
 }) => {
-  const { t } = useTranslation() // Added t hook
+  const { t } = useTranslation()
   return (
     <span className={isProviderConnected ? styles.connected : styles.disconnected}>
       {status === "connecting"
@@ -175,7 +175,7 @@ export const Symmetry = () => {
             {t("symmetry-visit-providers-page-link")}
           </a>{" "}
           {/* This part of the sentence might need adjustment based on full context */}
-          to see all available providers in the network. 
+          to see all available providers in the network.
         </div>
       </div>
     </VSCodePanelView>
