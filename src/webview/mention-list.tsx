@@ -14,7 +14,7 @@ import cx from "classnames"
 import { topLevelItems } from "../common/constants"
 import { CategoryType, FileContextItem } from "../common/types"
 
-import styles from "./styles/index.module.css"
+import styles from "./styles/common.module.css"
 
 const getCategoryIcon = (category: CategoryType): string => {
   switch (category) {
