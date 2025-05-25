@@ -13,7 +13,7 @@ import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { ChatCompletionMessage, ImageAttachment, MentionType, ThemeType } from "../common/types"
 
 import CodeBlock from "./code-block"
-import { useSuggestion } from "./hooks"
+import { useSuggestion } from "./hooks/useSuggestion"
 import { createCustomImageExtension } from "./image-extension"
 import { MentionExtension } from "./mention-extention"
 import { useToast } from "./toast"

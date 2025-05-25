@@ -15,7 +15,11 @@ import {
 } from "../common/constants"
 import { ClientMessage } from "../common/types"
 
-import { useGlobalContext, useProviders } from "./hooks"
+import { useProviders } from "./hooks/useProviders"
+import {
+  StorageType,
+  useStorageContext
+} from "./hooks/useStorageContext"
 
 import styles from "./styles/embedding-options.module.css"
 
@@ -31,22 +35,40 @@ export const EmbeddingOptions = () => {
   } = useProviders()
 
   const { context: rerankThreshold = 0.5, setContext: setRerankThreshold } =
-    useGlobalContext<number>(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)
+    useStorageContext<number>(
+      StorageType.Global,
+      EXTENSION_CONTEXT_NAME.twinnyRerankThreshold
+    )
 
   const { context: maxChunkSize = "500", setContext: setMaxChunkSize } =
-    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize)
+    useStorageContext<string>(
+      StorageType.Global,
+      EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize
+    )
 
   const { context: minChunkSize = "200", setContext: setMinChunkSize } =
-    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyMinChunkSize)
+    useStorageContext<string>(
+      StorageType.Global,
+      EXTENSION_CONTEXT_NAME.twinnyMinChunkSize
+    )
 
   const { context: overlap = "20", setContext: setOverlap } =
-    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyOverlapSize)
+    useStorageContext<string>(
+      StorageType.Global,
+      EXTENSION_CONTEXT_NAME.twinnyOverlapSize
+    )
 
   const { context: codeSnippets = "5", setContext: setRelevantCodeSnippets } =
-    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets)
+    useStorageContext<string>(
+      StorageType.Global,
+      EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets
+    )
 
   const { context: filePaths = "10", setContext: setRelevantFilePaths } =
-    useGlobalContext<string>(EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths)
+    useStorageContext<string>(
+      StorageType.Global,
+      EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths
+    )
 
   const embeddingProviders = Object.values(getProvidersByType("embedding"))
 

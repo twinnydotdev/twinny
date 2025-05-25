@@ -4,18 +4,24 @@ import { VSCodeButton, VSCodeTextField } from "@vscode/webview-ui-toolkit/react"
 
 import { WORKSPACE_STORAGE_KEY } from "../common/constants"
 
-import { useGithubPRs, useGlobalContext } from "./hooks"
+import { useGithubPRs } from "./hooks/useGithubPRs"
+import {
+  StorageType,
+  useStorageContext
+} from "./hooks/useStorageContext"
 
 import styles from "./styles/review.module.css"
 
 export const Review = () => {
   const { t } = useTranslation()
   const { prs, getPrs, startReview, isLoading } = useGithubPRs()
-  const { context: owner, setContext: setOwner } = useGlobalContext<string>(
+  const { context: owner, setContext: setOwner } = useStorageContext<string>(
+    StorageType.Workspace,
     WORKSPACE_STORAGE_KEY.reviewOwner
   )
 
-  const { context: repo, setContext: setRepo } = useGlobalContext<string>(
+  const { context: repo, setContext: setRepo } = useStorageContext<string>(
+    StorageType.Workspace,
     WORKSPACE_STORAGE_KEY.reviewRepo
   )
 

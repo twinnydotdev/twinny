@@ -5,7 +5,7 @@ import DOMPurify from "dompurify"
 import { EVENT_NAME } from "../common/constants"
 import { Conversation } from "../common/types"
 
-import { useConversationHistory } from "./hooks"
+import { useConversationHistory } from "./hooks/useConversationHistory"
 
 import styles from "./styles/conversation-history.module.css"
 

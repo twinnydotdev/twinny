@@ -18,7 +18,8 @@ import {
 import { TwinnyProvider } from "../extension/provider-manager"
 
 import { DefaultProviderSelect } from "./default-providers"
-import { useOllamaModels, useProviders } from "./hooks"
+import { useOllamaModels } from "./hooks/useOllamaModels"
+import { useProviders } from "./hooks/useProviders"
 import { ModelSelect } from "./model-select"
 
 import indexStyles from "./styles/index.module.css"

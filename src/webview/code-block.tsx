@@ -7,7 +7,7 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 import { ASSISTANT, EVENT_NAME } from "../common/constants"
 import { LanguageType, Theme, ThemeType } from "../common/types"
 
-import { useTheme } from "./hooks"
+import { useTheme } from "./hooks/useTheme"
 import { useToast } from "./toast"
 import { getLanguageMatch } from "./utils"
 

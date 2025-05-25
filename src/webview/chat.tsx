@@ -22,15 +22,13 @@ import {
   ServerMessage
 } from "../common/types"
 
-import {
-  useAutosizeTextArea,
-  useConversationHistory,
-  useFileContext,
-  useSelection,
-  useSuggestion,
-  useSymmetryConnection,
-  useTheme
-} from "./hooks"
+import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
+import { useConversationHistory } from "./hooks/useConversationHistory"
+import { useFileContext } from "./hooks/useFileContext"
+import { useSelection } from "./hooks/useSelection"
+import { useSuggestion } from "./hooks/useSuggestion"
+import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
+import { useTheme } from "./hooks/useTheme"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { ProviderSelect } from "./provider-select"

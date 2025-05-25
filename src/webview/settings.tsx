@@ -6,7 +6,11 @@ import {
   WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 
-import { useTemplates, useWorkSpaceContext } from "./hooks"
+import { useTemplates } from "./hooks/useTemplates"
+import {
+  StorageType,
+  useStorageContext
+} from "./hooks/useStorageContext"
 import { kebabToSentence } from "./utils"
 
 import styles from "./styles/settings.module.css"
@@ -18,7 +22,10 @@ export const Settings = () => {
     context: selectedTemplatesContext,
     setContext: setSelectedTemplatesContext
   } =
-    useWorkSpaceContext<string[]>(WORKSPACE_STORAGE_KEY.selectedTemplates) || []
+    useStorageContext<string[]>(
+      StorageType.Workspace,
+      WORKSPACE_STORAGE_KEY.selectedTemplates
+    ) || []
 
   const handleTemplateClick = (
     e: React.MouseEvent<HTMLInputElement, MouseEvent>
