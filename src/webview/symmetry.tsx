@@ -7,7 +7,7 @@ import {
   VSCodePanelView,
 } from "@vscode/webview-ui-toolkit/react"
 
-import { useSymmetryConnection } from "./hooks"
+import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
 
 import styles from "./styles/symmetry.module.css"
 
