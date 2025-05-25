@@ -806,4 +806,42 @@ export class Chat extends Base {
       ? this.llmStream(this.getStreamOptions(provider))
       : this.llmNoStream(this.getNoStreamOptions(provider))
   }
+
+  public async generateSimpleCompletion(prompt: string): Promise<string | undefined> {
+    const provider = this.getProvider()
+    if (!provider) {
+      logger.error("No provider configured for simple completion.")
+      return undefined
+    }
+
+    this.instantiateTokenJS(provider)
+
+    if (!this._tokenJs) {
+      logger.error("TokenJS not initialized for simple completion.")
+      return undefined
+    }
+
+    const messages: ChatCompletionMessage[] = [{ role: USER, content: prompt }]
+
+    const completionParams: CompletionNonStreaming<LLMProvider> = {
+      messages: messages,
+      model: provider.modelName,
+      provider: this.getProviderType(provider) as any,
+      temperature: 0.7, // Sensible default for creative title
+      max_tokens: 60 // Enough for a title (approx 10-15 words)
+    }
+
+    try {
+      const result = await this._tokenJs.chat.completions.create(completionParams)
+
+      if (result.choices && result.choices.length > 0 && result.choices[0].message) {
+        return result.choices[0].message.content?.trim()
+      }
+      logger.warn("LLM response for simple completion was empty or malformed.")
+      return undefined
+    } catch (error) {
+      logger.error("Error during simple LLM completion:", error)
+      return undefined
+    }
+  }
 }
