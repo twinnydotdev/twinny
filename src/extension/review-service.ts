@@ -12,6 +12,7 @@ import {
 } from "../common/constants"
 import { ClientMessage, ServerMessage, TemplateData } from "../common/types"
 
+import { Chat } from "./chat"
 import { ConversationHistory } from "./conversation-history"
 import { TemplateProvider } from "./template-provider"
 import { getIsOpenAICompatible, updateLoadingMessage } from "./utils"
@@ -25,9 +26,10 @@ export class GithubService extends ConversationHistory {
   constructor(
     context: ExtensionContext,
     webView: Webview,
-    templateDir: string | undefined
+    templateDir: string | undefined,
+    chat: Chat
   ) {
-    super(context, webView)
+    super(context, webView, chat)
     this._templateProvider = new TemplateProvider(templateDir)
     const provider = this.getProvider()
     if (!provider) return
@@ -181,7 +183,7 @@ export class GithubService extends ConversationHistory {
     this.setActiveConversation({
       messages,
       id: crypto.randomUUID(),
-      title: "Code Review",
+      title: "Code Review"
     })
 
     const result = await this._tokenJs?.chat.completions.create({
@@ -190,8 +192,8 @@ export class GithubService extends ConversationHistory {
       stream: true,
       provider: getIsOpenAICompatible(provider)
         ? API_PROVIDERS.OpenAICompatible
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        : (provider.provider as any),
+        : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (provider.provider as any)
     })
 
     if (!result) return
@@ -219,11 +221,11 @@ export class GithubService extends ConversationHistory {
         ...messages,
         {
           role: ASSISTANT,
-          content: this._completion,
+          content: this._completion
         }
       ],
       id: crypto.randomUUID(),
-      title: "Code Review",
+      title: "Code Review"
     })
 
     this._completion = ""

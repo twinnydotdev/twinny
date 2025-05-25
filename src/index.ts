@@ -250,6 +250,10 @@ export async function activate(context: ExtensionContext) {
       } as ServerMessage<string>)
       sidebarProvider.conversationHistory?.resetConversation()
       sidebarProvider.chat?.resetConversation()
+      sidebarProvider.webView?.postMessage({
+        type: EVENT_NAME.twinnySetTab,
+        data: WEBUI_TABS.chat
+      } as ServerMessage<string>)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")

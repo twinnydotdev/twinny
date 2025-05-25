@@ -17,8 +17,9 @@ import {
 } from "../common/constants"
 import { TwinnyProvider } from "../extension/provider-manager"
 
+import { useOllamaModels } from "./hooks/useOllamaModels"
+import { useProviders } from "./hooks/useProviders"
 import { DefaultProviderSelect } from "./default-providers"
-import { useOllamaModels, useProviders } from "./hooks"
 import { ModelSelect } from "./model-select"
 
 import indexStyles from "./styles/index.module.css"
@@ -179,7 +180,7 @@ export const Providers = () => {
                         title="chat"
                         className="codicon codicon-comment-discussion"
                       />
-                      {provider.label}
+                      {t(provider.label)}
                     </h3>
                     <div className={styles.providerActions}>
                       <VSCodeButton

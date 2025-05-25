@@ -8,11 +8,14 @@ import {
 import { API_PROVIDERS, GLOBAL_STORAGE_KEY } from "../common/constants"
 import { SymmetryModelProvider } from "../common/types"
 
-import { useGlobalContext, useModels, useOllamaModels, useProviders, useSymmetryConnection } from "./hooks"
+import { useModels } from "./hooks/useModels"
+import { useOllamaModels } from "./hooks/useOllamaModels"
+import { useProviders } from "./hooks/useProviders"
+import { StorageType, useStorageContext } from "./hooks/useStorageContext"
+import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
 
 import styles from "./styles/providers.module.css"
 
-// Simple loader component for model loading
 const ModelLoader = () => {
   const { t } = useTranslation()
   const [dots, setDots] = useState("")
@@ -78,7 +81,7 @@ export const ProviderSelect = () => {
   const {
     context: selectedModel,
     setContext: setSelectedModel
-  } = useGlobalContext<string>(GLOBAL_STORAGE_KEY.selectedModel)
+  } = useStorageContext<string>(StorageType.Global, GLOBAL_STORAGE_KEY.selectedModel)
 
   const handleChangeChatProvider = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
@@ -102,7 +105,7 @@ export const ProviderSelect = () => {
         >
           {chatProviders.map((provider, index) => (
             <VSCodeOption key={index} value={provider.id}>
-              {provider.label}
+              {t(provider.label)}
             </VSCodeOption>
           ))}
         </VSCodeDropdown>

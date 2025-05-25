@@ -6,7 +6,11 @@ import {
   WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 
-import { useTemplates, useWorkSpaceContext } from "./hooks"
+import {
+  StorageType,
+  useStorageContext
+} from "./hooks/useStorageContext"
+import { useTemplates } from "./hooks/useTemplates"
 import { kebabToSentence } from "./utils"
 
 import styles from "./styles/settings.module.css"
@@ -18,7 +22,10 @@ export const Settings = () => {
     context: selectedTemplatesContext,
     setContext: setSelectedTemplatesContext
   } =
-    useWorkSpaceContext<string[]>(WORKSPACE_STORAGE_KEY.selectedTemplates) || []
+    useStorageContext<string[] | undefined>(
+      StorageType.Workspace,
+      WORKSPACE_STORAGE_KEY.selectedTemplates
+    ) || []
 
   const handleTemplateClick = (
     e: React.MouseEvent<HTMLInputElement, MouseEvent>
@@ -29,25 +36,21 @@ export const Settings = () => {
 
     if (selectedTemplatesContext?.includes(template)) {
       if (selectedTemplatesContext.length === 1) {
-        saveTemplates([])
-        setSelectedTemplatesContext([])
-        return
+      saveTemplates([])
+      setSelectedTemplatesContext([])
+      return
       }
 
-      return setSelectedTemplatesContext((prev) => {
-        const newValue = prev?.filter((item) => item !== template)
-        if (!newValue) return
-        saveTemplates(newValue)
-        return newValue
-      })
+      const newValue = selectedTemplatesContext.filter((item) => item !== template)
+      saveTemplates(newValue)
+      setSelectedTemplatesContext(newValue)
+      return
     }
 
-    setSelectedTemplatesContext((prev) => {
-      if (!prev) return
-      const newValue = [...prev, template]
-      saveTemplates(newValue)
-      return newValue
-    })
+    const currentValue = selectedTemplatesContext || []
+    const newValue = [...currentValue, template]
+    saveTemplates(newValue)
+    setSelectedTemplatesContext(newValue)
   }
 
   const handleClearSelection = () => {

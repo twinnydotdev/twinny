@@ -109,12 +109,14 @@ export class BaseProvider {
     this.conversationHistory = new ConversationHistory(
       this.context,
       this.webView,
+      this.chat,
     )
 
     this.reviewService = new ReviewService(
       this.context,
       this.webView,
-      this._templateDir
+      this._templateDir,
+      this.chat,
     )
 
     new ProviderManager(this.context, this.webView)
