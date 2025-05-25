@@ -1,32 +1,29 @@
 import { ChatCompletionMessageParam } from "fluency.js"
 import { ExtensionContext, Webview } from "vscode"
-import { Chat } from "./chat" // Added import
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_CONVERSATION_STORAGE_KEY,
   CONVERSATION_EVENT_NAME,
   CONVERSATION_STORAGE_KEY,
+  TITLE_GENERATION_PROMPT_MESAGE
 } from "../common/constants"
 import { ClientMessage, Conversation, ServerMessage } from "../common/types"
 
 import { Base } from "./base"
+import { Chat } from "./chat" // Added import
 import { TwinnyProvider } from "./provider-manager"
 
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory extends Base {
   public webView: Webview
-  private _chatService: Chat // New private member
+  private _chatService: Chat
 
-  constructor(
-    context: ExtensionContext,
-    webView: Webview,
-    chatService: Chat // New parameter
-  ) {
+  constructor(context: ExtensionContext, webView: Webview, chatService: Chat) {
     super(context)
     this.webView = webView
-    this._chatService = chatService // Assign to the new member
+    this._chatService = chatService
     this.setUpEventListeners()
   }
 
@@ -65,29 +62,19 @@ export class ConversationHistory extends Base {
     )
   }
 
-  private getRequestOptions(provider: TwinnyProvider) {
-    return {
-      hostname: provider.apiHostname,
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
-      }
+  getConversationTitle(messages: ChatCompletionMessageParam[]): string {
+    if (
+      messages &&
+      messages.length > 0 &&
+      messages[0].content &&
+      typeof messages[0].content === "string" &&
+      (messages[0].content as string).trim() !== ""
+    ) {
+      const content = messages[0].content as string
+      return content.length > 50 ? `${content.substring(0, 50)}...` : content
     }
+    return "Untitled Conversation"
   }
-
-getConversationTitle(
-  messages: ChatCompletionMessageParam[]
-): string { // Return string, not undefined
-  if (messages && messages.length > 0 && messages[0].content && typeof messages[0].content === 'string' && (messages[0].content as string).trim() !== "") {
-    const content = messages[0].content as string;
-    return content.length > 50 ? `${content.substring(0, 50)}...` : content;
-  }
-  return "Untitled Conversation"; // Default title if no suitable message content
-}
 
   getAllConversations() {
     const conversations = this.getConversations() || {}
@@ -196,22 +183,21 @@ getConversationTitle(
         ? (messages[1].content as string)
         : ""
 
-    const prompt = `Generate a short, concise title (under 10 words) for a conversation that starts with the following messages:
+    const prompt = `${TITLE_GENERATION_PROMPT_MESAGE}:
 
-Message 1: "${message1Text}"
-${message2Text ? `Message 2: "${message2Text}"` : ""}
+      Message 1: "${message1Text}"
+      ${message2Text ? `Message 2: "${message2Text}"` : ""}
 
-Title:`
+      Title:`.trim()
 
     console.log("LLM Title Generation Prompt:", prompt)
 
     try {
-      // Replace the hardcoded return with a call to the chat service
       const title = await this._chatService.generateSimpleCompletion(prompt)
-      return title?.trim() // Trim whitespace from the LLM response
+      return title?.trim()
     } catch (error) {
       console.error("Error calling LLM for title generation:", error)
-      return undefined // Fallback in case of error
+      return undefined
     }
   }
 }

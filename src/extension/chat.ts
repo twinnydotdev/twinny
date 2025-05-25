@@ -826,9 +826,8 @@ export class Chat extends Base {
     const completionParams: CompletionNonStreaming<LLMProvider> = {
       messages: messages,
       model: provider.modelName,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       provider: this.getProviderType(provider) as any,
-      temperature: 0.7, // Sensible default for creative title
-      max_tokens: 60 // Enough for a title (approx 10-15 words)
     }
 
     try {
@@ -837,10 +836,10 @@ export class Chat extends Base {
       if (result.choices && result.choices.length > 0 && result.choices[0].message) {
         return result.choices[0].message.content?.trim()
       }
-      logger.warn("LLM response for simple completion was empty or malformed.")
+      logger.log("LLM response for simple completion was empty or malformed.")
       return undefined
-    } catch (error) {
-      logger.error("Error during simple LLM completion:", error)
+    } catch {
+      logger.error("Error during simple LLM completion")
       return undefined
     }
   }
