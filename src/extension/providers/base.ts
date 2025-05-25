@@ -115,7 +115,8 @@ export class BaseProvider {
     this.reviewService = new ReviewService(
       this.context,
       this.webView,
-      this._templateDir
+      this._templateDir,
+      this.chat,
     )
 
     new ProviderManager(this.context, this.webView)
