@@ -12,63 +12,57 @@ export enum StorageType {
   Workspace = "workspace"
 }
 
+interface StorageEventNames {
+  listen: string
+  fetch: string
+  store: string
+}
+
 export const useStorageContext = <T>(storageType: StorageType, key: string) => {
   const [context, setContextState] = useState<T | undefined>()
 
-  const getEventName = (baseEvent: string) => `${baseEvent}-${key}`
-
-  const listenEventName = useMemo(() => {
-    switch (storageType) {
-      case StorageType.Global:
-        return getEventName(EVENT_NAME.twinnyGlobalContext)
-      case StorageType.Session:
-        return getEventName(EVENT_NAME.twinnySessionContext)
-      case StorageType.Workspace:
-        return getEventName(EVENT_NAME.twinnyGetWorkspaceContext)
+  const eventNames = useMemo((): StorageEventNames => {
+    const eventMap = {
+      [StorageType.Global]: {
+        listen: `${EVENT_NAME.twinnyGlobalContext}-${key}`,
+        fetch: EVENT_NAME.twinnyGlobalContext,
+        store: EVENT_NAME.twinnySetGlobalContext
+      },
+      [StorageType.Session]: {
+        listen: `${EVENT_NAME.twinnySessionContext}-${key}`,
+        fetch: EVENT_NAME.twinnySessionContext,
+        store: EVENT_NAME.twinnySetSessionContext
+      },
+      [StorageType.Workspace]: {
+        listen: `${EVENT_NAME.twinnyGetWorkspaceContext}-${key}`,
+        fetch: EVENT_NAME.twinnyGetWorkspaceContext,
+        store: EVENT_NAME.twinnySetWorkspaceContext
+      }
     }
+    return eventMap[storageType]
   }, [storageType, key])
-
-  const fetchEventName = useMemo(() => {
-    switch (storageType) {
-      case StorageType.Global:
-        return EVENT_NAME.twinnyGlobalContext
-      case StorageType.Session:
-        return EVENT_NAME.twinnySessionContext
-      case StorageType.Workspace:
-        return EVENT_NAME.twinnyGetWorkspaceContext
-    }
-  }, [storageType])
-
-  const storeEventName = useMemo(() => {
-    switch (storageType) {
-      case StorageType.Global:
-        return EVENT_NAME.twinnySetGlobalContext
-      case StorageType.Session:
-        return EVENT_NAME.twinnySetSessionContext
-      case StorageType.Workspace:
-        return EVENT_NAME.twinnySetWorkspaceContext
-    }
-  }, [storageType])
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const message: ServerMessage = event.data
-      if (message?.type === listenEventName) {
+      if (message?.type === eventNames.listen) {
         setContextState(event.data.data)
       }
     }
+
     window.addEventListener("message", handler)
     global.vscode.postMessage({
-      type: fetchEventName,
+      type: eventNames.fetch,
       key
     })
+
     return () => window.removeEventListener("message", handler)
-  }, [listenEventName, fetchEventName, key])
+  }, [eventNames.listen, eventNames.fetch, key])
 
   const setContext = (value: T) => {
     setContextState(value)
     global.vscode.postMessage({
-      type: storeEventName,
+      type: eventNames.store,
       key,
       data: value
     })
