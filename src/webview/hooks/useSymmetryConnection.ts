@@ -111,7 +111,7 @@ export const useSymmetryConnection = () => {
     }
     window.addEventListener("message", handler)
     return () => window.removeEventListener("message", handler)
-  }, [symmetryConnectionSession, setSymmetryConnectionSession, setSymmetryProviderStatus]) // Removed connectAsProvider from dependencies
+  }, [symmetryConnectionSession, setSymmetryConnectionSession, setSymmetryProviderStatus])
 
   useEffect(() => {
     if (
@@ -120,7 +120,7 @@ export const useSymmetryConnection = () => {
     ) {
       connectAsProvider()
     }
-  }, [autoConnectProviderContext, symmetryProviderStatus, connectAsProvider]) // connectAsProvider can stay here as it's defined in the hook's scope
+  }, [autoConnectProviderContext, symmetryProviderStatus, connectAsProvider])
 
   return {
     autoConnectProviderContext,
