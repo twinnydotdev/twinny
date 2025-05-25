@@ -6,23 +6,24 @@ import {
   ACTIVE_CONVERSATION_STORAGE_KEY,
   CONVERSATION_EVENT_NAME,
   CONVERSATION_STORAGE_KEY,
+  TITLE_GENERATION_PROMPT_MESAGE
 } from "../common/constants"
 import { ClientMessage, Conversation, ServerMessage } from "../common/types"
 
 import { Base } from "./base"
+import { Chat } from "./chat" // Added import
 import { TwinnyProvider } from "./provider-manager"
 
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory extends Base {
   public webView: Webview
+  private _chatService: Chat
 
-  constructor(
-    context: ExtensionContext,
-    webView: Webview,
-  ) {
+  constructor(context: ExtensionContext, webView: Webview, chatService: Chat) {
     super(context)
     this.webView = webView
+    this._chatService = chatService
     this.setUpEventListeners()
   }
 
@@ -61,25 +62,18 @@ export class ConversationHistory extends Base {
     )
   }
 
-  private getRequestOptions(provider: TwinnyProvider) {
-    return {
-      hostname: provider.apiHostname,
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath,
-      protocol: provider.apiProtocol,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.apiKey}`
-      }
+  getConversationTitle(messages: ChatCompletionMessageParam[]): string {
+    if (
+      messages &&
+      messages.length > 0 &&
+      messages[0].content &&
+      typeof messages[0].content === "string" &&
+      (messages[0].content as string).trim() !== ""
+    ) {
+      const content = messages[0].content as string
+      return content.length > 50 ? `${content.substring(0, 50)}...` : content
     }
-  }
-
-  getConversationTitle(
-    messages: ChatCompletionMessageParam[]
-  ):string | undefined {
-    const message = messages[0].content as string
-    return `${message?.substring(0, 50)}...`
+    return "Untitled Conversation"
   }
 
   getAllConversations() {
@@ -157,11 +151,54 @@ export class ConversationHistory extends Base {
     const activeConversation = this.getActiveConversation()
 
     if (activeConversation) {
+      let title = await this._generateTitleWithLlm(
+        conversation.messages.slice(0, 2)
+      )
+      if (!title) {
+        title = this.getConversationTitle(conversation.messages)
+      }
       return this.updateConversation({
         ...activeConversation,
         messages: conversation.messages,
-        title: this.getConversationTitle(conversation.messages)
+        title
       })
+    }
+  }
+
+  private async _generateTitleWithLlm(
+    messages: ChatCompletionMessageParam[]
+  ): Promise<string | undefined> {
+    if (!messages?.length) {
+      return undefined
+    }
+
+    const firstMessage = messages[0].content
+    if (typeof firstMessage !== "string" || !firstMessage.trim()) {
+      return undefined
+    }
+
+    const secondMessage =
+      messages.length > 1 && typeof messages[1].content === "string"
+        ? messages[1].content
+        : ""
+
+    const prompt = `${TITLE_GENERATION_PROMPT_MESAGE}:
+
+    Message 1: "${firstMessage.trim()}"
+    ${secondMessage ? `Message 2: "${secondMessage}"` : ""}
+
+    Title:`.trim()
+
+    console.log("LLM Title Generation Prompt:", prompt)
+
+    try {
+      const generatedTitle = await this._chatService.generateSimpleCompletion(
+        prompt
+      )
+      return generatedTitle?.trim()
+    } catch (error) {
+      console.error("Error calling LLM for title generation:", error)
+      return undefined
     }
   }
 }

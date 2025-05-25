@@ -109,6 +109,7 @@ export class BaseProvider {
     this.conversationHistory = new ConversationHistory(
       this.context,
       this.webView,
+      this.chat,
     )
 
     this.reviewService = new ReviewService(
