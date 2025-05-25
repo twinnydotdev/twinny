@@ -28,7 +28,7 @@ export const useSymmetryConnection = () => {
   const {
     context: symmetryConnectionSession,
     setContext: setSymmetryConnectionSession
-  } = useStorageContext<SymmetryConnection>(
+  } = useStorageContext<SymmetryConnection | undefined>(
     StorageType.Session,
     EXTENSION_SESSION_NAME.twinnySymmetryConnection
   )

@@ -88,7 +88,6 @@ const providers: TwinnyProvider[] = [
   },
   {
     label: "providers-groq-name",
-    features: ["providers-feature-chat", "providers-feature-streaming"],
     logo: <SvgGroq />,
     id: "groq-default",
     modelName: "llama2-70b-4096",

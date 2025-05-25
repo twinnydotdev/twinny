@@ -7,6 +7,7 @@ import { ApiModel, ServerMessage } from "../../common/types"
 const global = globalThis as any
 
 export const useModels = () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [models, setModels] = useState<Record<string, any>>({})
 
   const handler = (event: MessageEvent) => {

@@ -16,7 +16,6 @@ import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
 
 import styles from "./styles/providers.module.css"
 
-// Simple loader component for model loading
 const ModelLoader = () => {
   const { t } = useTranslation()
   const [dots, setDots] = useState("")
@@ -106,7 +105,7 @@ export const ProviderSelect = () => {
         >
           {chatProviders.map((provider, index) => (
             <VSCodeOption key={index} value={provider.id}>
-              {provider.label}
+              {t(provider.label)}
             </VSCodeOption>
           ))}
         </VSCodeDropdown>

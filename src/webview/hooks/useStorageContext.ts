@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { EVENT_NAME } from "../../common/constants"
 import { ServerMessage } from "../../common/types"
@@ -12,10 +12,7 @@ export enum StorageType {
   Workspace = "workspace"
 }
 
-export const useStorageContext = <T>(
-  storageType: StorageType,
-  key: string
-) => {
+export const useStorageContext = <T>(storageType: StorageType, key: string) => {
   const [context, setContextState] = useState<T | undefined>()
 
   const getEventName = (baseEvent: string) => `${baseEvent}-${key}`
@@ -47,8 +44,7 @@ export const useStorageContext = <T>(
       case StorageType.Global:
         return EVENT_NAME.twinnySetGlobalContext
       case StorageType.Session:
-        // Assuming a naming convention, if not, this needs to be distinct
-        return EVENT_NAME.twinnySetSessionContext 
+        return EVENT_NAME.twinnySetSessionContext
       case StorageType.Workspace:
         return EVENT_NAME.twinnySetWorkspaceContext
     }

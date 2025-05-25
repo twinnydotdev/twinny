@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react"
 import cn from "classnames"
 
-import { EVENT_NAME,WORKSPACE_STORAGE_KEY } from "../common/constants"
+import { EVENT_NAME, WORKSPACE_STORAGE_KEY } from "../common/constants"
 
-import { useTemplates } from "./hooks/useTemplates"
 import {
   StorageType,
   useStorageContext
 } from "./hooks/useStorageContext"
+import { useTemplates } from "./hooks/useTemplates"
 import { kebabToSentence } from "./utils"
 
 import styles from "./styles/suggestions.module.css"

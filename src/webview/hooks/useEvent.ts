@@ -2,7 +2,7 @@ import { useEffect } from "react"
 
 export const useEvent = (
   eventName: string,
-  handler: ((event: any) => void) | null,
+  handler: ((event: Event) => void) | null,
   target: Window | HTMLElement = window
 ) => {
   useEffect(() => {
