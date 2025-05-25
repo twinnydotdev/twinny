@@ -517,7 +517,7 @@
     "web-tree-sitter": "^0.22.1"
   },
   "dependencies": {
-    "@lancedb/lancedb": "^0.12.0",
+    "@lancedb/lancedb": "^0.19.1",
     "@tiptap/extension-image": "^2.11.7",
     "@tiptap/extension-mention": "^2.5.9",
     "@tiptap/extension-placeholder": "^2.5.9",
