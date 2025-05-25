@@ -168,33 +168,34 @@ export class ConversationHistory extends Base {
   private async _generateTitleWithLlm(
     messages: ChatCompletionMessageParam[]
   ): Promise<string | undefined> {
-    if (!messages || messages.length === 0) {
+    if (!messages?.length) {
       return undefined
     }
 
-    const message1Content = messages[0].content
-    if (typeof message1Content !== "string" || message1Content.trim() === "") {
+    const firstMessage = messages[0].content
+    if (typeof firstMessage !== "string" || !firstMessage.trim()) {
       return undefined
     }
 
-    const message1Text = message1Content
-    const message2Text =
+    const secondMessage =
       messages.length > 1 && typeof messages[1].content === "string"
-        ? (messages[1].content as string)
+        ? messages[1].content
         : ""
 
     const prompt = `${TITLE_GENERATION_PROMPT_MESAGE}:
 
-      Message 1: "${message1Text}"
-      ${message2Text ? `Message 2: "${message2Text}"` : ""}
+    Message 1: "${firstMessage.trim()}"
+    ${secondMessage ? `Message 2: "${secondMessage}"` : ""}
 
-      Title:`.trim()
+    Title:`.trim()
 
     console.log("LLM Title Generation Prompt:", prompt)
 
     try {
-      const title = await this._chatService.generateSimpleCompletion(prompt)
-      return title?.trim()
+      const generatedTitle = await this._chatService.generateSimpleCompletion(
+        prompt
+      )
+      return generatedTitle?.trim()
     } catch (error) {
       console.error("Error calling LLM for title generation:", error)
       return undefined
