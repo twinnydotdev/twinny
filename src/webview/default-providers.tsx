@@ -64,7 +64,7 @@ const providers: TwinnyProvider[] = [
     label: "providers-openai-name",
     logo: <SvgOpenAI />,
     id: "openai-default",
-    modelName: "gpt-4o",
+    modelName: "gpt-4.1",
     provider: API_PROVIDERS.OpenAI,
     type: "chat"
   },
@@ -90,7 +90,7 @@ const providers: TwinnyProvider[] = [
     label: "providers-groq-name",
     logo: <SvgGroq />,
     id: "groq-default",
-    modelName: "llama2-70b-4096",
+    modelName: "llama-3.3-70b-versatile",
     provider: API_PROVIDERS.Groq,
     type: "chat"
   },
