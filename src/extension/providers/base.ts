@@ -260,9 +260,9 @@ export class BaseProvider {
     let updatedItems
     if (itemIndex > -1) {
       updatedItems = [...items]
-      updatedItems[itemIndex] = item // Replace if ID exists
+      updatedItems[itemIndex] = item
     } else {
-      updatedItems = [...items, item] // Add if new
+      updatedItems = [...items, item]
     }
     this.saveContextItems(updatedItems)
     this.notifyContextUpdate(updatedItems)
@@ -436,8 +436,8 @@ export class BaseProvider {
 
     this.chat?.completion(
       data.data || [],
-      data.meta as AnyContextItem[], // Updated to AnyContextItem[]
-      data.key // Pass the conversation ID
+      data.meta as AnyContextItem[],
+      data.key
     )
   }
 

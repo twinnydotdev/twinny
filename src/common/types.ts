@@ -321,23 +321,20 @@ export type EmbeddedDocument = {
 
 export type CategoryType = "files" | "workspace" | "problems"
 
-// Base interface for context items
 export interface ContextItem {
   id: string;
-  category: "file" | "selection"; // Use "category" for consistency
+  category: "file" | "selection";
   name: string;
-  path: string; // File path, relative to workspace root
+  path: string;
 }
 
-// Interface for file context items
 export interface FileContextItem extends ContextItem {
   category: "file";
 }
 
-// Interface for selection context items
 export interface SelectionContextItem extends ContextItem {
   category: "selection";
-  content: string; // The actual selected code
+  content: string;
   selectionRange: {
     startLine: number;
     startCharacter: number;
@@ -346,7 +343,6 @@ export interface SelectionContextItem extends ContextItem {
   };
 }
 
-// Discriminated union type for any context item
 export type AnyContextItem = FileContextItem | SelectionContextItem;
 
 export interface MentionType {
