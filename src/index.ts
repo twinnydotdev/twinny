@@ -1,6 +1,7 @@
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
+import { v4 as uuidv4 } from "uuid"
 import {
   commands,
   ExtensionContext,
@@ -19,7 +20,10 @@ import {
   WEBUI_TABS
 } from "./common/constants"
 import { logger } from "./common/logger"
-import { ServerMessage } from "./common/types"
+import {
+  FileContextItem,
+  SelectionContextItem,
+  ServerMessage} from "./common/types"
 import { setContext } from "./extension/context"
 import { EmbeddingDatabase } from "./extension/embeddings"
 import { FileInteractionCache } from "./extension/file-interaction"
@@ -237,12 +241,15 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_NAME
       )
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.getGitCommitMessage, async () => {
-      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      sidebarProvider.conversationHistory?.resetConversation()
-      await sidebarProvider.waitForSidebarReady()
-      sidebarProvider.getGitCommitMessage()
-    }),
+    commands.registerCommand(
+      TWINNY_COMMAND_NAME.getGitCommitMessage,
+      async () => {
+        await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+        sidebarProvider.conversationHistory?.resetConversation()
+        await sidebarProvider.waitForSidebarReady()
+        sidebarProvider.getGitCommitMessage()
+      }
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
       sidebarProvider.newSymmetryConversation()
       sidebarProvider.webView?.postMessage({
@@ -262,14 +269,49 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.addFileToContext, () => {
       const editor = window.activeTextEditor
       if (editor) {
-        const currentFile = {
+        const filePath = workspace.asRelativePath(editor.document.uri.fsPath)
+        const fileContextItem: FileContextItem = {
+          id: filePath, // Use filePath as the ID for files
+          category: "file",
           name: path.basename(editor.document.uri.fsPath),
-          path: workspace.asRelativePath(editor.document.uri.fsPath),
-          category: "files" as const
+          path: filePath
         }
-        sidebarProvider.addFileToContext(currentFile)
+        if (sidebarProvider.addContextItem) {
+          sidebarProvider.addContextItem(fileContextItem)
+        }
       }
     }),
+    commands.registerCommand(
+      TWINNY_COMMAND_NAME.addSelectionToContext,
+      async () => {
+        const editor = window.activeTextEditor
+        if (editor && !editor.selection.isEmpty) {
+          const selection = editor.selection
+          const selectedText = editor.document.getText(selection)
+          const filePath = workspace.asRelativePath(editor.document.uri.fsPath)
+          const selectionContextItem: SelectionContextItem = {
+            id: uuidv4(),
+            category: "selection",
+            name: `Selection from ${path.basename(filePath)} (L${
+              selection.start.line + 1
+            }-L${selection.end.line + 1})`,
+            path: filePath,
+            content: selectedText,
+            selectionRange: {
+              startLine: selection.start.line,
+              startCharacter: selection.start.character,
+              endLine: selection.end.line,
+              endCharacter: selection.end.character
+            }
+          }
+          if (sidebarProvider.addContextItem) {
+            sidebarProvider.addContextItem(selectionContextItem)
+          }
+        } else {
+          window.showInformationMessage("No text selected to add to context.")
+        }
+      }
+    ),
     workspace.onDidCloseTextDocument((document) => {
       const filePath = document.uri.fsPath
       fileInteractionCache.endSession()

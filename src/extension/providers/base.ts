@@ -13,11 +13,10 @@ import {
 } from "../../common/constants"
 import { logger } from "../../common/logger"
 import {
+  AnyContextItem,
   ApiModel,
   ChatCompletionMessage,
   ClientMessage,
-  ContextFile,
-  FileContextItem,
   InferenceRequest,
   LanguageType,
   ServerMessage,
@@ -109,14 +108,14 @@ export class BaseProvider {
     this.conversationHistory = new ConversationHistory(
       this.context,
       this.webView,
-      this.chat,
+      this.chat
     )
 
     this.reviewService = new ReviewService(
       this.context,
       this.webView,
       this._templateDir,
-      this.chat,
+      this.chat
     )
 
     new ProviderManager(this.context, this.webView)
@@ -157,8 +156,8 @@ export class BaseProvider {
       [EVENT_NAME.twinntGetLocale]: this.sendLocaleToWebView,
       [EVENT_NAME.twinnyGetModels]: this.sendModelsToWebView,
       [EVENT_NAME.twinnyStopGeneration]: this.destroyStream,
-      [EVENT_NAME.twinnyGetContextFiles]: this.getContextFiles,
-      [EVENT_NAME.twinnyRemoveContextFile]: this.removeContextFile,
+      [EVENT_NAME.twinnyGetContextItems]: this.getContextItems,
+      [EVENT_NAME.twinnyRemoveContextItem]: this.removeContextItem,
       [EVENT_NAME.twinnySidebarReady]: this._sidebarReadyHandler,
       [TWINNY_COMMAND_NAME.settings]: this.openSettings
     }
@@ -250,48 +249,55 @@ export class BaseProvider {
     this.chat?.templateCompletion(template)
   }
 
-  addFileToContext = (file: ContextFile) => {
-    const files =
-      this.context?.workspaceState.get<ContextFile[]>(
-        WORKSPACE_STORAGE_KEY.contextFiles
+  addContextItem = (item: AnyContextItem) => {
+    const items =
+      this.context?.workspaceState.get<AnyContextItem[]>(
+        WORKSPACE_STORAGE_KEY.contextItems
       ) || []
-    const isUnique = !files.some(
-      (existingFile) => existingFile.path === file.path
+    const itemIndex = items.findIndex(
+      (existingItem) => existingItem.id === item.id
     )
-    if (isUnique) {
-      const updatedFiles = [...files, file]
-      this.saveContextFiles(updatedFiles)
-      this.notifyWebView(updatedFiles)
+    let updatedItems
+    if (itemIndex > -1) {
+      updatedItems = [...items]
+      updatedItems[itemIndex] = item
+    } else {
+      updatedItems = [...items, item]
     }
+    this.saveContextItems(updatedItems)
+    this.notifyContextUpdate(updatedItems)
   }
 
-  getContextFiles = () => {
-    const files =
-      this.context?.workspaceState.get<ContextFile[]>(
-        WORKSPACE_STORAGE_KEY.contextFiles
+  getContextItems = () => {
+    const items =
+      this.context?.workspaceState.get<AnyContextItem[]>(
+        WORKSPACE_STORAGE_KEY.contextItems
       ) || []
-    this.notifyWebView(files)
+    this.notifyContextUpdate(items)
   }
 
-  removeContextFile = (data: { data: string }) => {
-    const files =
-      this.context?.workspaceState.get<ContextFile[]>(
-        WORKSPACE_STORAGE_KEY.contextFiles
+  removeContextItem = (message: { data: string }) => {
+    const items =
+      this.context?.workspaceState.get<AnyContextItem[]>(
+        WORKSPACE_STORAGE_KEY.contextItems
       ) || []
-    const updatedFiles = files.filter((file) => file.path !== data.data)
-    this.saveContextFiles(updatedFiles)
-    this.notifyWebView(updatedFiles)
+    const updatedItems = items.filter((item) => item.id !== message.data)
+    this.saveContextItems(updatedItems)
+    this.notifyContextUpdate(updatedItems)
   }
 
-  private saveContextFiles = (files: ContextFile[]) => {
-    this.context?.workspaceState.update(WORKSPACE_STORAGE_KEY.contextFiles, files)
+  private saveContextItems = (items: AnyContextItem[]) => {
+    this.context?.workspaceState.update(
+      WORKSPACE_STORAGE_KEY.contextItems,
+      items
+    )
   }
 
-  private notifyWebView = (files: ContextFile[]) => {
+  private notifyContextUpdate = (items: AnyContextItem[]) => {
     this.webView?.postMessage({
-      type: EVENT_NAME.twinnyAddOpenFilesToContext,
-      data: files
-    } as ServerMessage<ContextFile[]>)
+      type: EVENT_NAME.twinnyUpdateContextItems,
+      data: items
+    } as ServerMessage<AnyContextItem[]>)
   }
 
   public getGitCommitMessage = async () => {
@@ -332,7 +338,7 @@ export class BaseProvider {
     }
     if (!this._embeddingDatabase) return
     for (const dir of dirs) {
-        await this._embeddingDatabase.injestDocuments(dir.uri.fsPath)
+      await this._embeddingDatabase.injestDocuments(dir.uri.fsPath)
     }
   }
 
@@ -410,7 +416,7 @@ export class BaseProvider {
       const messages = [
         systemMessage,
         ...(data.data as ChatCompletionMessage[])
-      ].map(m => ({
+      ].map((m) => ({
         ...m,
         content: m.content
       }))
@@ -430,8 +436,8 @@ export class BaseProvider {
 
     this.chat?.completion(
       data.data || [],
-      data.meta as FileContextItem[],
-      data.key // Pass the conversation ID
+      data.meta as AnyContextItem[],
+      data.key
     )
   }
 

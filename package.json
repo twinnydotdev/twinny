@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.23.19",
+  "version": "3.23.20",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -83,6 +83,10 @@
         {
           "when": "editorTextFocus",
           "command": "twinny.addFileToContext"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "twinny.addSelectionToContext"
         }
       ],
       "view/title": [
@@ -248,6 +252,10 @@
       {
         "command": "twinny.addFileToContext",
         "title": "Twinny - Add file to context"
+      },
+      {
+        "command": "twinny.addSelectionToContext",
+        "title": "Twinny: Add Selection to Context"
       }
     ],
     "keybindings": [
