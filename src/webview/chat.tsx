@@ -16,15 +16,17 @@ import { v4 as uuidv4 } from "uuid"
 import { EVENT_NAME, USER } from "../common/constants"
 import {
   ChatCompletionMessage,
+  ChatCompletionMessage,
   ClientMessage,
   ImageAttachment,
   MentionType,
-  ServerMessage
+  ServerMessage,
+  AnyContextItem
 } from "../common/types"
 
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useConversationHistory } from "./hooks/useConversationHistory"
-import { useFileContext } from "./hooks/useFileContext"
+import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
 import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
@@ -59,7 +61,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { symmetryConnection } = useSymmetryConnection()
-  const { files, removeFile } = useFileContext()
+  const { contextItems, removeContextItem } = useWorkspaceContext()
   const [isBottom, setIsBottom] = useState(false)
 
   const { conversation, saveLastConversation, setActiveConversation } =
@@ -502,26 +504,40 @@ export const Chat = (props: ChatProps): JSX.Element => {
     })
   }, [])
 
-  const renderFileItem = useCallback(
-    (file: { path: string; name: string }) => (
-      <div
-        key={file.path}
-        title={file.path}
-        className={styles.fileItem}
-        onClick={() => handleOpenFile(file.path)}
-      >
-        {file.name}
-        <span
-          onClick={(e) => {
-            e.stopPropagation()
-            removeFile(file.path)
-          }}
-          data-id={file.path}
-          className="codicon codicon-close"
-        />
-      </div>
-    ),
-    [handleOpenFile, removeFile]
+  const renderContextItem = useCallback(
+    (item: AnyContextItem) => {
+      let codicon = ""
+      let displayName = item.name
+
+      if (item.category === "file") {
+        codicon = "codicon codicon-file-code"
+        // displayName is already item.name (basename)
+      } else if (item.category === "selection") {
+        codicon = "codicon codicon-symbol-snippet"
+        // displayName for selection is already formatted in item.name
+      }
+
+      return (
+        <div
+          key={item.id}
+          title={item.path}
+          className={styles.fileItem} // Existing style, can be adapted if needed
+          onClick={() => handleOpenFile(item.path)} // Opens the file for both types
+        >
+          <span className={`${codicon} ${styles.contextItemIcon}`}></span> {/* Display the codicon */}
+          {displayName} {/* Display the name */}
+          <span
+            onClick={(e) => {
+              e.stopPropagation()
+              removeContextItem(item.id)
+            }}
+            data-id={item.id}
+            className="codicon codicon-close"
+          />
+        </div>
+      )
+    },
+    [handleOpenFile, removeContextItem]
   )
 
   const itemContent = useCallback(
@@ -567,8 +583,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
             </VSCodeButton>
           </div>
         )}
-        {!!files.length && (
-          <div className={styles.fileItems}>{files.map(renderFileItem)}</div>
+        {!!contextItems.length && (
+          <div className={styles.fileItems}>{contextItems.map(renderContextItem)}</div>
         )}
         <Virtuoso
           followOutput

@@ -92,9 +92,9 @@ export const EVENT_NAME = {
   twinnyGetSymmetryModels: "twinny-get-symmetry-models",
   twinnyTextSelection: "twinny-text-selection",
   twinnyGetModels: "twinny-get-models",
-  twinnyAddOpenFilesToContext: "twinny-add-open-file-to-context",
-  twinnyGetContextFiles: "twinny-get-context-files",
-  twinnyRemoveContextFile: "twinny-remove-context-file"
+  twinnyUpdateContextItems: "twinny-update-context-items",
+  twinnyGetContextItems: "twinny-get-context-items",
+  twinnyRemoveContextItem: "twinny-remove-context-item"
 }
 
 export const TWINNY_COMMAND_NAME = {
@@ -122,7 +122,8 @@ export const TWINNY_COMMAND_NAME = {
   templates: "twinny.templates",
   twinnySymmetryTab: "twinny.symmetry",
   addFileToContext: "twinny.addFileToContext",
-  getContextFiles: "twinny.getContextFiles"
+  getContextFiles: "twinny.getContextFiles",
+  addSelectionToContext: "twinny.addSelectionToContext"
 }
 
 export const OPEN_AI_COMPATIBLE_PROVIDERS = {
@@ -191,7 +192,7 @@ export const GLOBAL_STORAGE_KEY = {
 export const WORKSPACE_STORAGE_KEY = {
   autoScroll: "autoScroll",
   chatMessage: "chatMessage",
-  contextFiles: "contextFiles",
+  contextItems: "contextItems", // Renamed from contextFiles
   downloadCancelled: "downloadCancelled",
   selectedTemplates: "selectedTemplates",
   selection: "selection",

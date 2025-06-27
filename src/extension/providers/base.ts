@@ -16,8 +16,10 @@ import {
   ApiModel,
   ChatCompletionMessage,
   ClientMessage,
-  ContextFile,
+  ContextFile, // Will be replaced by AnyContextItem for actual storage
+  AnyContextItem,
   FileContextItem,
+  SelectionContextItem,
   InferenceRequest,
   LanguageType,
   ServerMessage,
@@ -157,8 +159,8 @@ export class BaseProvider {
       [EVENT_NAME.twinntGetLocale]: this.sendLocaleToWebView,
       [EVENT_NAME.twinnyGetModels]: this.sendModelsToWebView,
       [EVENT_NAME.twinnyStopGeneration]: this.destroyStream,
-      [EVENT_NAME.twinnyGetContextFiles]: this.getContextFiles,
-      [EVENT_NAME.twinnyRemoveContextFile]: this.removeContextFile,
+      [EVENT_NAME.twinnyGetContextItems]: this.getContextItems,
+      [EVENT_NAME.twinnyRemoveContextItem]: this.removeContextItem,
       [EVENT_NAME.twinnySidebarReady]: this._sidebarReadyHandler,
       [TWINNY_COMMAND_NAME.settings]: this.openSettings
     }
@@ -250,48 +252,52 @@ export class BaseProvider {
     this.chat?.templateCompletion(template)
   }
 
-  addFileToContext = (file: ContextFile) => {
-    const files =
-      this.context?.workspaceState.get<ContextFile[]>(
-        WORKSPACE_STORAGE_KEY.contextFiles
-      ) || []
-    const isUnique = !files.some(
-      (existingFile) => existingFile.path === file.path
+addContextItem = (item: AnyContextItem) => {
+  const items =
+    this.context?.workspaceState.get<AnyContextItem[]>(
+      WORKSPACE_STORAGE_KEY.contextItems
+    ) || []
+  const itemIndex = items.findIndex(
+    (existingItem) => existingItem.id === item.id
     )
-    if (isUnique) {
-      const updatedFiles = [...files, file]
-      this.saveContextFiles(updatedFiles)
-      this.notifyWebView(updatedFiles)
+  let updatedItems
+  if (itemIndex > -1) {
+    updatedItems = [...items]
+    updatedItems[itemIndex] = item // Replace if ID exists
+  } else {
+    updatedItems = [...items, item] // Add if new
     }
+  this.saveContextItems(updatedItems)
+  this.notifyContextUpdate(updatedItems)
   }
 
-  getContextFiles = () => {
-    const files =
-      this.context?.workspaceState.get<ContextFile[]>(
-        WORKSPACE_STORAGE_KEY.contextFiles
-      ) || []
-    this.notifyWebView(files)
+getContextItems = () => {
+  const items =
+    this.context?.workspaceState.get<AnyContextItem[]>(
+      WORKSPACE_STORAGE_KEY.contextItems
+    ) || []
+  this.notifyContextUpdate(items)
   }
 
-  removeContextFile = (data: { data: string }) => {
-    const files =
-      this.context?.workspaceState.get<ContextFile[]>(
-        WORKSPACE_STORAGE_KEY.contextFiles
-      ) || []
-    const updatedFiles = files.filter((file) => file.path !== data.data)
-    this.saveContextFiles(updatedFiles)
-    this.notifyWebView(updatedFiles)
+removeContextItem = (message: { data: string }) => { // data is the id of the item to remove
+  const items =
+    this.context?.workspaceState.get<AnyContextItem[]>(
+      WORKSPACE_STORAGE_KEY.contextItems
+    ) || []
+  const updatedItems = items.filter((item) => item.id !== message.data)
+  this.saveContextItems(updatedItems)
+  this.notifyContextUpdate(updatedItems)
   }
 
-  private saveContextFiles = (files: ContextFile[]) => {
-    this.context?.workspaceState.update(WORKSPACE_STORAGE_KEY.contextFiles, files)
+private saveContextItems = (items: AnyContextItem[]) => {
+  this.context?.workspaceState.update(WORKSPACE_STORAGE_KEY.contextItems, items)
   }
 
-  private notifyWebView = (files: ContextFile[]) => {
+private notifyContextUpdate = (items: AnyContextItem[]) => {
     this.webView?.postMessage({
-      type: EVENT_NAME.twinnyAddOpenFilesToContext,
-      data: files
-    } as ServerMessage<ContextFile[]>)
+    type: EVENT_NAME.twinnyUpdateContextItems, // Use the new event name
+    data: items
+  } as ServerMessage<AnyContextItem[]>)
   }
 
   public getGitCommitMessage = async () => {
@@ -430,7 +436,7 @@ export class BaseProvider {
 
     this.chat?.completion(
       data.data || [],
-      data.meta as FileContextItem[],
+      data.meta as AnyContextItem[], // Updated to AnyContextItem[]
       data.key // Pass the conversation ID
     )
   }

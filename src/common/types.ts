@@ -321,11 +321,33 @@ export type EmbeddedDocument = {
 
 export type CategoryType = "files" | "workspace" | "problems"
 
-export interface FileContextItem {
-  name: string
-  path: string
-  category: CategoryType
+// Base interface for context items
+export interface ContextItem {
+  id: string;
+  category: "file" | "selection"; // Use "category" for consistency
+  name: string;
+  path: string; // File path, relative to workspace root
 }
+
+// Interface for file context items
+export interface FileContextItem extends ContextItem {
+  category: "file";
+}
+
+// Interface for selection context items
+export interface SelectionContextItem extends ContextItem {
+  category: "selection";
+  content: string; // The actual selected code
+  selectionRange: {
+    startLine: number;
+    startCharacter: number;
+    endLine: number;
+    endCharacter: number;
+  };
+}
+
+// Discriminated union type for any context item
+export type AnyContextItem = FileContextItem | SelectionContextItem;
 
 export interface MentionType {
   name: string
@@ -359,5 +381,4 @@ export interface LMStudioEmbedding {
 export interface ContextFile {
   name: string;
   path: string;
-  category: "files";
 }

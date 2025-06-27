@@ -19,9 +19,10 @@ import {
   WEBUI_TABS
 } from "./common/constants"
 import { logger } from "./common/logger"
-import { ServerMessage } from "./common/types"
+import { ServerMessage, SelectionContextItem, FileContextItem } from "./common/types"
 import { setContext } from "./extension/context"
 import { EmbeddingDatabase } from "./extension/embeddings"
+import { v4 as uuidv4 } from "uuid";
 import { FileInteractionCache } from "./extension/file-interaction"
 import { CompletionProvider } from "./extension/providers/completion"
 import { FullScreenProvider } from "./extension/providers/panel"
@@ -260,14 +261,71 @@ export async function activate(context: ExtensionContext) {
       fullScreenProvider.createOrShowPanel()
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.addFileToContext, () => {
-      const editor = window.activeTextEditor
+      const editor = window.activeTextEditor;
       if (editor) {
-        const currentFile = {
+        const filePath = workspace.asRelativePath(editor.document.uri.fsPath);
+        const fileContextItem: FileContextItem = {
+          id: filePath, // Use filePath as the ID for files
+          category: "file",
           name: path.basename(editor.document.uri.fsPath),
-          path: workspace.asRelativePath(editor.document.uri.fsPath),
-          category: "files" as const
+          path: filePath,
+        };
+        // Ensure addContextItem is used, which should exist from previous subtask
+        if (sidebarProvider.addContextItem) {
+          sidebarProvider.addContextItem(fileContextItem);
+        } else {
+          // Fallback for robustness, similar to addSelectionToContext
+          // @ts-expect-error addFileToContext might not exist
+          if (sidebarProvider.addFileToContext) {
+             // @ts-expect-error addFileToContext might expect a different structure now
+            sidebarProvider.addFileToContext(fileContextItem);
+            window.showWarningMessage("Using fallback file context method. Please ensure `addContextItem` is available.");
+          } else {
+            window.showErrorMessage("Could not add file to context. Provider method not found.");
+          }
         }
-        sidebarProvider.addFileToContext(currentFile)
+      }
+    }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.addSelectionToContext, async () => {
+      const editor = window.activeTextEditor;
+      if (editor && !editor.selection.isEmpty) {
+        const selection = editor.selection;
+        const selectedText = editor.document.getText(selection);
+        const filePath = workspace.asRelativePath(editor.document.uri.fsPath);
+        const selectionContextItem: SelectionContextItem = {
+          id: uuidv4(),
+          category: "selection",
+          name: `Selection from ${path.basename(filePath)} (L${selection.start.line + 1}-L${selection.end.line + 1})`,
+          path: filePath,
+          content: selectedText,
+          selectionRange: {
+            startLine: selection.start.line,
+            startCharacter: selection.start.character,
+            endLine: selection.end.line,
+            endCharacter: selection.end.character,
+          },
+        };
+        // The addContextItem method should exist on BaseProvider, and thus on sidebarProvider
+        // It was renamed from addFileToContext in a previous step.
+        if (sidebarProvider.addContextItem) {
+          sidebarProvider.addContextItem(selectionContextItem);
+        } else {
+          // Fallback or error if the method somehow doesn't exist (e.g. if previous step was skipped)
+          // This else block is more for robustness during development.
+          // In a sequential execution of subtasks, addFileToContext would have been renamed to addContextItem.
+          // For now, let's try to call the old name if new one is not present.
+          // This indicates a potential issue if addContextItem is not found.
+          // @ts-expect-error addFileToContext might not exist
+          if (sidebarProvider.addFileToContext) {
+            // @ts-expect-error addFileToContext expects a FileContextItem
+            sidebarProvider.addFileToContext(selectionContextItem);
+            window.showWarningMessage("Using fallback context method. Please ensure `addContextItem` is available.");
+          } else {
+            window.showErrorMessage("Could not add selection to context. Provider method not found.");
+          }
+        }
+      } else {
+        window.showInformationMessage("No text selected to add to context.");
       }
     }),
     workspace.onDidCloseTextDocument((document) => {

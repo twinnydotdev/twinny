@@ -83,6 +83,10 @@
         {
           "when": "editorTextFocus",
           "command": "twinny.addFileToContext"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "twinny.addSelectionToContext"
         }
       ],
       "view/title": [
@@ -248,6 +252,10 @@
       {
         "command": "twinny.addFileToContext",
         "title": "Twinny - Add file to context"
+      },
+      {
+        "command": "twinny.addSelectionToContext",
+        "title": "Twinny: Add Selection to Context"
       }
     ],
     "keybindings": [
