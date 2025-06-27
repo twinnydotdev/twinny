@@ -95,25 +95,51 @@
   white-space: nowrap;
 }
 
-.fileItems {
+.contextItems {
   display: flex;
   margin-top: 20px;
   padding-bottom: 5px;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.fileItem {
+.contextItem {
   display: flex;
   align-items: center;
   padding: 4px 6px;
   background-color: var(--vscode-editorWidget-background);
   border: 1px solid var(--vscode-editorWidget-border);
   border-radius: 4px;
-  margin: 2px;
   font-size: 12px;
-  flex-wrap: wrap;
-  max-width: fit-content;
   cursor: pointer;
-  transition: all 0.3 ease-in-out;
+  transition: all 0.3s ease-in-out;
+  min-width: 0;
+  max-width: 200px;
+}
+
+.contextItemIcon {
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.contextItemName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.contextItemClose {
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.contextItemClose:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
 }
 
 .scrollToBottom {

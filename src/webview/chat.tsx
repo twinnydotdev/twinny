@@ -11,26 +11,26 @@ import {
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
 import * as cheerio from "cheerio"
+import cx from "classnames"
 import { v4 as uuidv4 } from "uuid"
 
 import { EVENT_NAME, USER } from "../common/constants"
 import {
-  ChatCompletionMessage,
+  AnyContextItem,
   ChatCompletionMessage,
   ClientMessage,
   ImageAttachment,
   MentionType,
-  ServerMessage,
-  AnyContextItem
+  ServerMessage
 } from "../common/types"
 
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useConversationHistory } from "./hooks/useConversationHistory"
-import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
 import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
 import { useTheme } from "./hooks/useTheme"
+import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { ProviderSelect } from "./provider-select"
@@ -507,38 +507,37 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const renderContextItem = useCallback(
     (item: AnyContextItem) => {
       let codicon = ""
-      let displayName = item.name
+      const displayName = item.name
 
       if (item.category === "file") {
         codicon = "codicon codicon-file-code"
-        // displayName is already item.name (basename)
       } else if (item.category === "selection") {
         codicon = "codicon codicon-symbol-snippet"
-        // displayName for selection is already formatted in item.name
       }
 
       return (
         <div
           key={item.id}
           title={item.path}
-          className={styles.fileItem} // Existing style, can be adapted if needed
-          onClick={() => handleOpenFile(item.path)} // Opens the file for both types
+          className={styles.contextItem}
+          onClick={() => handleOpenFile(item.path)}
         >
-          <span className={`${codicon} ${styles.contextItemIcon}`}></span> {/* Display the codicon */}
-          {displayName} {/* Display the name */}
+          <span className={`${codicon} ${styles.contextItemIcon}`}></span>
+          <span className={styles.contextItemName}>{displayName}</span>
           <span
             onClick={(e) => {
               e.stopPropagation()
               removeContextItem(item.id)
             }}
             data-id={item.id}
-            className="codicon codicon-close"
+            className={cx("codicon codicon-close", styles.contextItemClose)}
           />
         </div>
       )
     },
     [handleOpenFile, removeContextItem]
   )
+
 
   const itemContent = useCallback(
     (index: number) => (
@@ -584,7 +583,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           </div>
         )}
         {!!contextItems.length && (
-          <div className={styles.fileItems}>{contextItems.map(renderContextItem)}</div>
+          <div className={styles.contextItems}>{contextItems.map(renderContextItem)}</div>
         )}
         <Virtuoso
           followOutput

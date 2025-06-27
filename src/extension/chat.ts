@@ -38,11 +38,10 @@ import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import { models } from "../common/models"
 import {
+  AnyContextItem,
   ChatCompletionMessage,
   CompletionNonStreamingWithId,
   CompletionStreamingWithId,
-  ContextFile,
-  FileContextItem,
   ServerMessage,
   TemplateData
 } from "../common/types"
@@ -528,7 +527,7 @@ export class Chat extends Base {
     return combinedContext.trim() || null
   }
 
-  private async loadFileContents(files?: FileContextItem[]): Promise<string> {
+  private async loadFileContents(files?: AnyContextItem[]): Promise<string> {
     if (!files?.length) return ""
     let fileContents = ""
 
@@ -561,7 +560,7 @@ export class Chat extends Base {
 
   private async buildAdditionalContext(
     messageContent: string,
-    filePaths?: FileContextItem[]
+    filePaths?: AnyContextItem[]
   ): Promise<string> {
     const editor = window.activeTextEditor
     const userSelection = editor?.document.getText(editor.selection)
@@ -571,8 +570,8 @@ export class Chat extends Base {
     if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
 
     const workspaceFiles =
-      this.context?.workspaceState.get<ContextFile[]>(
-        WORKSPACE_STORAGE_KEY.contextFiles
+      this.context?.workspaceState.get<AnyContextItem[]>(
+        WORKSPACE_STORAGE_KEY.contextItems
       ) || []
     const allFilePaths = [...(filePaths || []), ...workspaceFiles]
 
@@ -595,7 +594,7 @@ export class Chat extends Base {
 
   private async buildConversation(
     messages: ChatCompletionMessage[],
-    fileContexts: FileContextItem[] | undefined,
+    fileContexts: AnyContextItem[] | undefined,
     id?: string
   ): Promise<ChatCompletionMessage[]> {
     const systemMessage: ChatCompletionMessage = {
@@ -766,7 +765,7 @@ export class Chat extends Base {
 
   public async completion(
     messages: ChatCompletionMessage[],
-    fileContexts?: FileContextItem[],
+    fileContexts?: AnyContextItem[],
     conversationId?: string
   ) {
     this._completion = ""

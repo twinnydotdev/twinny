@@ -13,13 +13,10 @@ import {
 } from "../../common/constants"
 import { logger } from "../../common/logger"
 import {
+  AnyContextItem,
   ApiModel,
   ChatCompletionMessage,
   ClientMessage,
-  ContextFile, // Will be replaced by AnyContextItem for actual storage
-  AnyContextItem,
-  FileContextItem,
-  SelectionContextItem,
   InferenceRequest,
   LanguageType,
   ServerMessage,
@@ -111,14 +108,14 @@ export class BaseProvider {
     this.conversationHistory = new ConversationHistory(
       this.context,
       this.webView,
-      this.chat,
+      this.chat
     )
 
     this.reviewService = new ReviewService(
       this.context,
       this.webView,
       this._templateDir,
-      this.chat,
+      this.chat
     )
 
     new ProviderManager(this.context, this.webView)
@@ -252,52 +249,55 @@ export class BaseProvider {
     this.chat?.templateCompletion(template)
   }
 
-addContextItem = (item: AnyContextItem) => {
-  const items =
-    this.context?.workspaceState.get<AnyContextItem[]>(
-      WORKSPACE_STORAGE_KEY.contextItems
-    ) || []
-  const itemIndex = items.findIndex(
-    (existingItem) => existingItem.id === item.id
+  addContextItem = (item: AnyContextItem) => {
+    const items =
+      this.context?.workspaceState.get<AnyContextItem[]>(
+        WORKSPACE_STORAGE_KEY.contextItems
+      ) || []
+    const itemIndex = items.findIndex(
+      (existingItem) => existingItem.id === item.id
     )
-  let updatedItems
-  if (itemIndex > -1) {
-    updatedItems = [...items]
-    updatedItems[itemIndex] = item // Replace if ID exists
-  } else {
-    updatedItems = [...items, item] // Add if new
+    let updatedItems
+    if (itemIndex > -1) {
+      updatedItems = [...items]
+      updatedItems[itemIndex] = item // Replace if ID exists
+    } else {
+      updatedItems = [...items, item] // Add if new
     }
-  this.saveContextItems(updatedItems)
-  this.notifyContextUpdate(updatedItems)
+    this.saveContextItems(updatedItems)
+    this.notifyContextUpdate(updatedItems)
   }
 
-getContextItems = () => {
-  const items =
-    this.context?.workspaceState.get<AnyContextItem[]>(
-      WORKSPACE_STORAGE_KEY.contextItems
-    ) || []
-  this.notifyContextUpdate(items)
+  getContextItems = () => {
+    const items =
+      this.context?.workspaceState.get<AnyContextItem[]>(
+        WORKSPACE_STORAGE_KEY.contextItems
+      ) || []
+    this.notifyContextUpdate(items)
   }
 
-removeContextItem = (message: { data: string }) => { // data is the id of the item to remove
-  const items =
-    this.context?.workspaceState.get<AnyContextItem[]>(
-      WORKSPACE_STORAGE_KEY.contextItems
-    ) || []
-  const updatedItems = items.filter((item) => item.id !== message.data)
-  this.saveContextItems(updatedItems)
-  this.notifyContextUpdate(updatedItems)
+  removeContextItem = (message: { data: string }) => {
+    const items =
+      this.context?.workspaceState.get<AnyContextItem[]>(
+        WORKSPACE_STORAGE_KEY.contextItems
+      ) || []
+    const updatedItems = items.filter((item) => item.id !== message.data)
+    this.saveContextItems(updatedItems)
+    this.notifyContextUpdate(updatedItems)
   }
 
-private saveContextItems = (items: AnyContextItem[]) => {
-  this.context?.workspaceState.update(WORKSPACE_STORAGE_KEY.contextItems, items)
+  private saveContextItems = (items: AnyContextItem[]) => {
+    this.context?.workspaceState.update(
+      WORKSPACE_STORAGE_KEY.contextItems,
+      items
+    )
   }
 
-private notifyContextUpdate = (items: AnyContextItem[]) => {
+  private notifyContextUpdate = (items: AnyContextItem[]) => {
     this.webView?.postMessage({
-    type: EVENT_NAME.twinnyUpdateContextItems, // Use the new event name
-    data: items
-  } as ServerMessage<AnyContextItem[]>)
+      type: EVENT_NAME.twinnyUpdateContextItems,
+      data: items
+    } as ServerMessage<AnyContextItem[]>)
   }
 
   public getGitCommitMessage = async () => {
@@ -338,7 +338,7 @@ private notifyContextUpdate = (items: AnyContextItem[]) => {
     }
     if (!this._embeddingDatabase) return
     for (const dir of dirs) {
-        await this._embeddingDatabase.injestDocuments(dir.uri.fsPath)
+      await this._embeddingDatabase.injestDocuments(dir.uri.fsPath)
     }
   }
 
@@ -416,7 +416,7 @@ private notifyContextUpdate = (items: AnyContextItem[]) => {
       const messages = [
         systemMessage,
         ...(data.data as ChatCompletionMessage[])
-      ].map(m => ({
+      ].map((m) => ({
         ...m,
         content: m.content
       }))

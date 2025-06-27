@@ -415,6 +415,6 @@ export const knownErrorMessages = [
 ]
 
 export const topLevelItems: FileContextItem[] = [
-  { name: "workspace", path: "", category: "workspace" },
-  { name: "problems", path: "", category: "problems" }
+  { name: "workspace", path: "", category: "file", id: "workspace" },
+  { name: "problems", path: "", category: "file", id: "problems" }
 ]
