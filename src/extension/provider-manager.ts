@@ -1,6 +1,7 @@
 import { ReactNode } from "react"
+import { TextEncoder } from "util"
 import { v4 as uuidv4 } from "uuid"
-import { ExtensionContext, Webview } from "vscode"
+import { ExtensionContext, Uri, Webview, window, workspace } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -12,6 +13,7 @@ import {
   GLOBAL_STORAGE_KEY,
   INFERENCE_PROVIDERS_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
+  TWINNY_PROVIDERS_FILENAME,
   WEBUI_TABS
 } from "../common/constants"
 import { ClientMessage, ServerMessage } from "../common/types"
@@ -38,31 +40,62 @@ type Providers = Record<string, TwinnyProvider> | undefined
 export class ProviderManager {
   _context: ExtensionContext
   _webView: Webview
+  _storageLocation: string
 
   constructor(context: ExtensionContext, webviewView: Webview) {
     this._context = context
     this._webView = webviewView
+    this._storageLocation =
+      workspace
+        .getConfiguration("twinny")
+        .get("providerStorageLocation") || "globalState"
+    this._initializeProviders()
     this.setUpEventListeners()
-    this.addDefaultProviders()
+  }
+
+  private async _initializeProviders(): Promise<void> {
+    if (this._storageLocation === "file") {
+      const fileProviders = await this._getProvidersFromFile()
+      if (!fileProviders || Object.keys(fileProviders).length === 0) {
+        const globalStateProviders = this._context.globalState.get<Providers>(
+          INFERENCE_PROVIDERS_STORAGE_KEY
+        )
+        if (globalStateProviders && Object.keys(globalStateProviders).length > 0) {
+          await this._saveProvidersToFile(globalStateProviders)
+          // Optional: Consider clearing globalStateProviders here
+          // await this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, undefined);
+        } else {
+          await this.addDefaultProviders()
+        }
+      }
+    } else {
+      const globalStateProviders = this._context.globalState.get<Providers>(
+        INFERENCE_PROVIDERS_STORAGE_KEY
+      )
+      if (!globalStateProviders || Object.keys(globalStateProviders).length === 0) {
+        await this.addDefaultProviders()
+      }
+    }
+    await this.getAllProviders()
   }
 
   setUpEventListeners() {
     this._webView?.onDidReceiveMessage(
-      (message: ClientMessage<TwinnyProvider>) => {
-        this.handleMessage(message)
+      async (message: ClientMessage<TwinnyProvider>) => {
+        await this.handleMessage(message)
       }
     )
   }
 
-  handleMessage(message: ClientMessage<TwinnyProvider>) {
+  async handleMessage(message: ClientMessage<TwinnyProvider>) {
     const { data: provider } = message
     switch (message.type) {
       case PROVIDER_EVENT_NAME.addProvider:
-        return this.addProvider(provider)
+        return await this.addProvider(provider)
       case PROVIDER_EVENT_NAME.removeProvider:
-        return this.removeProvider(provider)
+        return await this.removeProvider(provider)
       case PROVIDER_EVENT_NAME.updateProvider:
-        return this.updateProvider(provider)
+        return await this.updateProvider(provider)
       case PROVIDER_EVENT_NAME.getActiveChatProvider:
         return this.getActiveChatProvider()
       case PROVIDER_EVENT_NAME.getActiveFimProvider:
@@ -78,9 +111,101 @@ export class ProviderManager {
       case PROVIDER_EVENT_NAME.copyProvider:
         return this.copyProvider(provider)
       case PROVIDER_EVENT_NAME.getAllProviders:
-        return this.getAllProviders()
+        return await this.getAllProviders()
       case PROVIDER_EVENT_NAME.resetProvidersToDefaults:
-        return this.resetProvidersToDefaults()
+        return await this.resetProvidersToDefaults()
+      case PROVIDER_EVENT_NAME.exportProviders:
+        return await this.exportProviders()
+      case PROVIDER_EVENT_NAME.importProviders:
+        return await this.importProviders()
+    }
+  }
+
+  public async importProviders(): Promise<void> {
+    try {
+      const fileUris = await window.showOpenDialog({
+        canSelectMany: false,
+        filters: { JSON: ["json"] }
+      })
+
+      if (!fileUris || fileUris.length === 0) {
+        return
+      }
+
+      const fileUri = fileUris[0]
+      const readData = await workspace.fs.readFile(fileUri)
+      const jsonString = new TextDecoder().decode(readData)
+
+      let importedProvidersData
+      try {
+        importedProvidersData = JSON.parse(jsonString)
+      } catch  {
+        window.showErrorMessage("Error parsing provider file")
+        console.error("Error parsing provider file:")
+        return
+      }
+
+      if (
+        typeof importedProvidersData !== "object" ||
+        importedProvidersData === null ||
+        Array.isArray(importedProvidersData)
+      ) {
+        window.showErrorMessage("Invalid provider file format or content: Expected a JSON object of providers.")
+        console.error("Import validation failed: Data is not an object or is null/array.")
+        return
+      }
+
+      for (const id in importedProvidersData) {
+        // eslint-disable-next-line no-prototype-builtins
+        if (importedProvidersData.hasOwnProperty(id)) {
+          const provider = importedProvidersData[id];
+          if (
+            typeof provider !== "object" || provider === null ||
+            typeof provider?.id !== "string" ||
+            typeof provider?.label !== "string" ||
+            typeof provider?.modelName !== "string" ||
+            typeof provider?.provider !== "string"
+          ) {
+            window.showErrorMessage(`Invalid provider file format or content: Provider with id '${id}' is invalid or missing essential properties.`)
+            console.error(`Import validation failed: Provider '${id}' is invalid.`, provider)
+            return
+          }
+        }
+      }
+
+      const validatedProviders = importedProvidersData as Providers
+
+      await this._saveProviders(validatedProviders)
+      await this.getAllProviders()
+      window.showInformationMessage("Providers imported successfully.")
+
+    } catch {
+      window.showErrorMessage("Error importing providers")
+      console.error("Error importing providers")
+    }
+  }
+
+  public async exportProviders(): Promise<void> {
+    const providers = await this.getProviders()
+    if (!providers || Object.keys(providers).length === 0) {
+      window.showInformationMessage("No providers to export.")
+      return
+    }
+    try {
+      const fileUri = await window.showSaveDialog({
+        defaultUri: Uri.file("twinny-providers.json"),
+        filters: { JSON: ["json"] }
+      })
+      if (!fileUri) {
+        return
+      }
+      const jsonString = JSON.stringify(providers, null, 2)
+      const writeData = new TextEncoder().encode(jsonString)
+      await workspace.fs.writeFile(fileUri, writeData)
+      window.showInformationMessage("Providers exported successfully.")
+    } catch  {
+      window.showErrorMessage("Error exporting providers")
+      console.error("Error exporting providers")
     }
   }
 
@@ -147,58 +272,58 @@ export class ProviderManager {
     } as TwinnyProvider
   }
 
-  addDefaultProviders() {
-    this.addDefaultChatProvider()
-    this.addDefaultFimProvider()
-    this.addDefaultEmbeddingsProvider()
-    this.addTwinnyProvider()
+  async addDefaultProviders() {
+    await this.addDefaultChatProvider()
+    await this.addDefaultFimProvider()
+    await this.addDefaultEmbeddingsProvider()
+    await this.addTwinnyProvider()
   }
 
-  addDefaultLocalProvider(): TwinnyProvider {
+  async addDefaultLocalProvider(): Promise<TwinnyProvider> {
     const provider = this.getDefaultLocalProvider()
     if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
-      this.addDefaultProvider(provider)
+      await this.addDefaultProvider(provider)
     }
     return provider
   }
 
-  addDefaultChatProvider(): TwinnyProvider {
+  async addDefaultChatProvider(): Promise<TwinnyProvider> {
     const provider = this.getDefaultLocalProvider()
     if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
-      this.addDefaultProvider(provider)
+      await this.addDefaultProvider(provider)
     }
     return provider
   }
 
-  addDefaultFimProvider(): TwinnyProvider {
+  async addDefaultFimProvider(): Promise<TwinnyProvider> {
     const provider = this.getDefaultFimProvider()
     if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_STORAGE_KEY)) {
-      this.addDefaultProvider(provider)
+      await this.addDefaultProvider(provider)
     }
     return provider
   }
 
-  addDefaultEmbeddingsProvider(): TwinnyProvider {
+  async addDefaultEmbeddingsProvider(): Promise<TwinnyProvider> {
     const provider = this.getDefaultEmbeddingsProvider()
 
     if (
       !this._context.globalState.get(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY)
     ) {
-      this.addDefaultProvider(provider)
+      await this.addDefaultProvider(provider)
     }
     return provider
   }
 
-  addTwinnyProvider(): TwinnyProvider | null {
+  async addTwinnyProvider(): Promise<TwinnyProvider | null> {
     const provider = this.getTwinnyProvider()
-    const providers = this.getProviders()
-    if (!providers) return this.addProvider(provider)
+    const providers = await this.getProviders()
+    if (!providers) return await this.addProvider(provider)
     const twinnyProvider = Object.values(providers).find(p => p.apiHostname === "twinny.dev")
-    if (!twinnyProvider) this.addProvider(provider)
+    if (!twinnyProvider) await this.addProvider(provider)
     return provider
   }
 
-  addDefaultProvider(provider: TwinnyProvider): void {
+  async addDefaultProvider(provider: TwinnyProvider): Promise<void> {
     if (provider.type === "chat") {
       this._context.globalState.update(
         ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -215,18 +340,32 @@ export class ProviderManager {
         provider
       )
     }
-    this.addProvider(provider)
+    await this.addProvider(provider)
   }
 
-  getProviders(): Providers {
-    const providers = this._context.globalState.get<
-      Record<string, TwinnyProvider>
-    >(INFERENCE_PROVIDERS_STORAGE_KEY)
-    return providers
+  private async _saveProviders(providers: Providers): Promise<void> {
+    if (this._storageLocation === "file") {
+      await this._saveProvidersToFile(providers)
+    } else {
+      await this._context.globalState.update(
+        INFERENCE_PROVIDERS_STORAGE_KEY,
+        providers
+      )
+    }
   }
 
-  getAllProviders() {
-    const providers = this.getProviders() || {}
+  async getProviders(): Promise<Providers> {
+    if (this._storageLocation === "file") {
+      return await this._getProvidersFromFile()
+    } else {
+      return this._context.globalState.get<Providers>(
+        INFERENCE_PROVIDERS_STORAGE_KEY
+      )
+    }
+  }
+
+  async getAllProviders() {
+    const providers = (await this.getProviders()) || {}
     this._webView?.postMessage({
       type: PROVIDER_EVENT_NAME.getAllProviders,
       data: providers
@@ -287,12 +426,12 @@ export class ProviderManager {
     return this.getActiveEmbeddingsProvider()
   }
 
-  addProvider(provider?: TwinnyProvider): TwinnyProvider | null {
-    const providers = this.getProviders() || {}
+  async addProvider(provider?: TwinnyProvider): Promise<TwinnyProvider | null> {
+    const providers = (await this.getProviders()) || {}
     if (!provider) return null
     provider.id = uuidv4()
     providers[provider.id] = provider
-    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
+    await this._saveProviders(providers)
 
     if (provider.type === "chat") {
       this._context.globalState.update(
@@ -312,19 +451,19 @@ export class ProviderManager {
       }
     }
 
-    this.getAllProviders()
+    await this.getAllProviders()
     return provider
   }
 
-  copyProvider(provider?: TwinnyProvider) {
+  async copyProvider(provider?: TwinnyProvider) {
     if (!provider) return
     provider.id = uuidv4()
     provider.label = `${provider.label}-copy`
-    this.addProvider(provider)
+    await this.addProvider(provider)
   }
 
-  removeProvider(provider?: TwinnyProvider) {
-    const providers = this.getProviders() || {}
+  async removeProvider(provider?: TwinnyProvider) {
+    const providers = (await this.getProviders()) || {}
     if (!provider) return
 
     const activeFimProvider = this.getActiveFimProvider()
@@ -342,46 +481,77 @@ export class ProviderManager {
     }
 
     delete providers[provider.id]
-    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
-    this.getAllProviders()
+    await this._saveProviders(providers)
+    await this.getAllProviders()
   }
 
-  updateProvider(provider?: TwinnyProvider) {
-    const providers = this.getProviders() || {}
+  async updateProvider(provider?: TwinnyProvider) {
+    const providers = (await this.getProviders()) || {}
     const activeFimProvider = this.getActiveFimProvider()
     const activeChatProvider = this.getActiveChatProvider()
     const activeEmbeddingsProvider = this.getActiveEmbeddingsProvider()
     if (!provider) return
     providers[provider.id] = provider
-    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, providers)
+    await this._saveProviders(providers)
     if (provider.id === activeFimProvider?.id)
       this.setActiveFimProvider(provider)
     if (provider.id === activeChatProvider?.id)
       this.setActiveChatProvider(provider)
     if (provider.id === activeEmbeddingsProvider?.id)
       this.setActiveEmbeddingsProvider(provider)
-    this.getAllProviders()
+    await this.getAllProviders()
   }
 
-  resetProvidersToDefaults(): void {
-    this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, undefined)
-    this._context.globalState.update(
-      ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
-      undefined
-    )
-    this._context.globalState.update(
-      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
-      undefined
-    )
-    this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
-    const chatProvider = this.addDefaultChatProvider()
-    const fimProvider = this.addDefaultFimProvider()
-    const embeddingsProvider = this.addDefaultEmbeddingsProvider()
-    this.addProvider(this.getTwinnyProvider())
+  async resetProvidersToDefaults(): Promise<void> {
+    await this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, undefined)
+    await this._context.globalState.update(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY, undefined)
+    await this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
+
+    if (this._storageLocation === "file") {
+      await this._saveProvidersToFile({})
+    } else {
+      await this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, undefined)
+    }
+
+    const chatProvider = await this.addDefaultChatProvider()
+    const fimProvider = await this.addDefaultFimProvider()
+    const embeddingsProvider = await this.addDefaultEmbeddingsProvider()
+    await this.addProvider(this.getTwinnyProvider())
+
     this.focusProviderTab()
+
     this.setActiveChatProvider(chatProvider)
     this.setActiveFimProvider(fimProvider)
     this.setActiveEmbeddingsProvider(embeddingsProvider)
-    this.getAllProviders()
+    await this.getAllProviders()
+  }
+
+  private async _getProvidersFromFile(): Promise<Providers | undefined> {
+    const fileUri = Uri.joinPath(
+      this._context.globalStorageUri,
+      TWINNY_PROVIDERS_FILENAME
+    )
+    try {
+      const content = await workspace.fs.readFile(fileUri)
+      const providers = JSON.parse(content.toString()) as Providers
+      return providers
+    } catch {
+      // Silently ignore and return undefined if file doesn't exist or is invalid JSON
+      return undefined
+    }
+  }
+
+  private async _saveProvidersToFile(providers: Providers): Promise<void> {
+    const fileUri = Uri.joinPath(
+      this._context.globalStorageUri,
+      TWINNY_PROVIDERS_FILENAME
+    )
+    try {
+      const content = JSON.stringify(providers, null, 2)
+      await workspace.fs.writeFile(fileUri, Buffer.from(content))
+    } catch (e) {
+      console.error(e)
+      // Handle error appropriately, e.g. show error message to user
+    }
   }
 }

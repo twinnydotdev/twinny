@@ -11,7 +11,7 @@ import {
 import { ClientMessage, Conversation, ServerMessage } from "../common/types"
 
 import { Base } from "./base"
-import { Chat } from "./chat" // Added import
+import { Chat } from "./chat"
 import { TwinnyProvider } from "./provider-manager"
 
 type Conversations = Record<string, Conversation> | undefined

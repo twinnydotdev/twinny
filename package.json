@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.23.20",
+  "version": "3.23.21",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -472,6 +472,16 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Your personal GitHub access token. This is used for fetching data from GitHub repositories. Keep this token secure and do not share it."
+        },
+        "twinny.providerStorageLocation": {
+          "order": 22,
+          "type": "string",
+          "enum": [
+            "globalState",
+            "file"
+          ],
+          "default": "globalState",
+          "markdownDescription": "Specifies where to store Twinny provider configurations. 'globalState' uses VS Code's global state (persists per domain, may be lost if domain changes frequently). 'file' stores configurations in a file within the extension's global storage directory (more resilient to domain changes)."
         }
       }
     }

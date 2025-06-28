@@ -131,6 +131,20 @@ export const useProviders = () => {
     setActiveChatProvider,
     setActiveEmbeddingsProvider,
     setActiveFimProvider,
-    updateProvider
+    updateProvider,
+    triggerExportProviders,
+    triggerImportProviders
   }
+}
+
+const triggerExportProviders = () => {
+  global.vscode.postMessage({
+    type: PROVIDER_EVENT_NAME.exportProviders
+  } as ClientMessage<unknown>)
+}
+
+const triggerImportProviders = () => {
+  global.vscode.postMessage({
+    type: PROVIDER_EVENT_NAME.importProviders
+  } as ClientMessage<unknown>)
 }

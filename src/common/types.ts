@@ -323,17 +323,12 @@ export type CategoryType = "files" | "workspace" | "problems"
 
 export interface ContextItem {
   id: string;
-  category: "file" | "selection";
+  category: CategoryType;
   name: string;
   path: string;
 }
 
-export interface FileContextItem extends ContextItem {
-  category: "file";
-}
-
 export interface SelectionContextItem extends ContextItem {
-  category: "selection";
   content: string;
   selectionRange: {
     startLine: number;
@@ -343,7 +338,7 @@ export interface SelectionContextItem extends ContextItem {
   };
 }
 
-export type AnyContextItem = FileContextItem | SelectionContextItem;
+export type AnyContextItem = SelectionContextItem;
 
 export interface MentionType {
   name: string
