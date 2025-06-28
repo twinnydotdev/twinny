@@ -483,7 +483,7 @@ suite("ProviderManager Test Suite", () => {
 
         await providerManager.importProviders()
 
-        assert.ok(showErrorMessageStub.calledWith("Invalid provider file format: Not an object."))
+        assert.ok(showErrorMessageStub.calledWith("Invalid provider file format or content: Expected a JSON object of providers.")) // Updated expected message
         assert.ok(saveProvidersStubManager.notCalled)
       })
 

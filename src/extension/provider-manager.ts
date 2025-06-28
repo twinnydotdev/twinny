@@ -114,8 +114,75 @@ export class ProviderManager {
         return await this.getAllProviders()
       case PROVIDER_EVENT_NAME.resetProvidersToDefaults:
         return await this.resetProvidersToDefaults()
-      case PROVIDER_EVENT_NAME.exportProviders: // Added new case
+      case PROVIDER_EVENT_NAME.exportProviders:
         return await this.exportProviders()
+      case PROVIDER_EVENT_NAME.importProviders:
+        return await this.importProviders()
+    }
+  }
+
+  public async importProviders(): Promise<void> {
+    try {
+      const fileUris = await window.showOpenDialog({
+        canSelectMany: false,
+        filters: { JSON: ["json"] }
+      })
+
+      if (!fileUris || fileUris.length === 0) {
+        return // User cancelled or no file selected
+      }
+
+      const fileUri = fileUris[0]
+      const readData = await workspace.fs.readFile(fileUri)
+      const jsonString = new TextDecoder().decode(readData)
+
+      let importedProvidersData: any
+      try {
+        importedProvidersData = JSON.parse(jsonString)
+      } catch (e: any) {
+        window.showErrorMessage(`Error parsing provider file: ${e.message}`)
+        console.error("Error parsing provider file:", e)
+        return
+      }
+
+      // Validation
+      if (
+        typeof importedProvidersData !== "object" ||
+        importedProvidersData === null ||
+        Array.isArray(importedProvidersData) // Explicitly check for array
+      ) {
+        window.showErrorMessage("Invalid provider file format or content: Expected a JSON object of providers.")
+        console.error("Import validation failed: Data is not an object or is null/array.")
+        return
+      }
+
+      for (const id in importedProvidersData) {
+        // eslint-disable-next-line no-prototype-builtins
+        if (importedProvidersData.hasOwnProperty(id)) {
+          const provider = importedProvidersData[id];
+          if (
+            typeof provider !== "object" || provider === null || // Ensure provider itself is an object
+            typeof provider?.id !== "string" ||
+            typeof provider?.label !== "string" ||
+            typeof provider?.modelName !== "string" ||
+            typeof provider?.provider !== "string"
+          ) {
+            window.showErrorMessage(`Invalid provider file format or content: Provider with id '${id}' is invalid or missing essential properties.`)
+            console.error(`Import validation failed: Provider '${id}' is invalid.`, provider)
+            return
+          }
+        }
+      }
+
+      const validatedProviders = importedProvidersData as Providers
+
+      await this._saveProviders(validatedProviders)
+      await this.getAllProviders()
+      window.showInformationMessage("Providers imported successfully.")
+
+    } catch (error: any) {
+      window.showErrorMessage(`Error importing providers: ${error.message}`)
+      console.error("Error importing providers:", error)
     }
   }
 
