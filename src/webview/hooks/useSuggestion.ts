@@ -6,7 +6,7 @@ import Fuse from "fuse.js"
 import tippy, { Instance as TippyInstance } from "tippy.js"
 
 import { topLevelItems } from "../../common/constants"
-import { CategoryType, FileContextItem } from "../../common/types"
+import { CategoryType, ContextItem } from "../../common/types"
 import { MentionList, MentionListProps, MentionListRef } from "../mention-list"
 
 import { useFilePaths } from "./useFilePaths" // Adjusted import path
@@ -40,26 +40,27 @@ export const useSuggestion = () => {
     [getFilePaths]
   )
 
-  const createFileItems = (filePaths: string[]): FileContextItem[] =>
+  const createFileItems = (filePaths: string[]): ContextItem[] =>
     filePaths.map((path) => ({
       name: path.split("/").pop() || "",
       path,
-      category: "files"
+      category: "files",
+      id: path,
     }))
 
   const groupItemsByCategory = (
-    items: FileContextItem[]
-  ): Record<string, FileContextItem[]> =>
+    items: ContextItem[]
+  ): Record<string, ContextItem[]> =>
     items.reduce((acc, item) => {
       acc[item.category] = [...(acc[item.category] || []), item]
       return acc
-    }, {} as Record<string, FileContextItem[]>)
+    }, {} as Record<string, ContextItem[]>)
 
   const orderedCategories: CategoryType[] = ["workspace", "problems", "files"]
 
   const sortItemsByCategory = (
-    groupedItems: Record<string, FileContextItem[]>
-  ): FileContextItem[] =>
+    groupedItems: Record<string, ContextItem[]>
+  ): ContextItem[] =>
     orderedCategories.flatMap((category) => groupedItems[category] || [])
 
   const render = useCallback(() => {

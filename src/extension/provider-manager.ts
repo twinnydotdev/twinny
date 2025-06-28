@@ -503,19 +503,16 @@ export class ProviderManager {
   }
 
   async resetProvidersToDefaults(): Promise<void> {
-    // Clear global state active providers
     await this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, undefined)
     await this._context.globalState.update(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY, undefined)
     await this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
 
-    // Clear based on storage type
     if (this._storageLocation === "file") {
-      await this._saveProvidersToFile({}) // Save an empty object to the file
+      await this._saveProvidersToFile({})
     } else {
       await this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, undefined)
     }
 
-    // Add default providers (this will save them to the configured storage)
     const chatProvider = await this.addDefaultChatProvider()
     const fimProvider = await this.addDefaultFimProvider()
     const embeddingsProvider = await this.addDefaultEmbeddingsProvider()
@@ -523,7 +520,6 @@ export class ProviderManager {
 
     this.focusProviderTab()
 
-    // Set active providers (these are still stored in globalState)
     this.setActiveChatProvider(chatProvider)
     this.setActiveFimProvider(fimProvider)
     this.setActiveEmbeddingsProvider(embeddingsProvider)

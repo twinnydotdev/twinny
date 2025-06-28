@@ -137,7 +137,6 @@ export const useProviders = () => {
   }
 }
 
-// New functions to trigger export/import
 const triggerExportProviders = () => {
   global.vscode.postMessage({
     type: PROVIDER_EVENT_NAME.exportProviders
