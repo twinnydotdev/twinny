@@ -132,8 +132,8 @@ export const useProviders = () => {
     setActiveEmbeddingsProvider,
     setActiveFimProvider,
     updateProvider,
-    triggerExportProviders, // Added
-    triggerImportProviders  // Added
+    triggerExportProviders,
+    triggerImportProviders
   }
 }
 
@@ -141,11 +141,11 @@ export const useProviders = () => {
 const triggerExportProviders = () => {
   global.vscode.postMessage({
     type: PROVIDER_EVENT_NAME.exportProviders
-  } as ClientMessage<unknown>) // data can be unknown or undefined if not sending payload
+  } as ClientMessage<unknown>)
 }
 
 const triggerImportProviders = () => {
   global.vscode.postMessage({
     type: PROVIDER_EVENT_NAME.importProviders
-  } as ClientMessage<unknown>) // data can be unknown or undefined if not sending payload
+  } as ClientMessage<unknown>)
 }
