@@ -40,8 +40,8 @@ export const Providers = () => {
     getProvidersByType,
     setActiveFimProvider,
     fimProvider,
-    triggerExportProviders, // Added
-    triggerImportProviders  // Added
+    triggerExportProviders,
+    triggerImportProviders
   } = useProviders()
 
   const fimProviders = Object.values(getProvidersByType("fim")) || []

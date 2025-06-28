@@ -1,7 +1,7 @@
 import { ReactNode } from "react"
-import { TextEncoder } from "util" // Added TextEncoder
+import { TextEncoder } from "util"
 import { v4 as uuidv4 } from "uuid"
-import { ExtensionContext, Uri, Webview, window, workspace } from "vscode" // Added window
+import { ExtensionContext, Uri, Webview, window, workspace } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
