@@ -55,7 +55,7 @@ export class ProviderManager {
 
   private async _initializeProviders(): Promise<void> {
     if (this._storageLocation === "file") {
-      let fileProviders = await this._getProvidersFromFile()
+      const fileProviders = await this._getProvidersFromFile()
       if (!fileProviders || Object.keys(fileProviders).length === 0) {
         const globalStateProviders = this._context.globalState.get<Providers>(
           INFERENCE_PROVIDERS_STORAGE_KEY
@@ -129,27 +129,26 @@ export class ProviderManager {
       })
 
       if (!fileUris || fileUris.length === 0) {
-        return // User cancelled or no file selected
+        return
       }
 
       const fileUri = fileUris[0]
       const readData = await workspace.fs.readFile(fileUri)
       const jsonString = new TextDecoder().decode(readData)
 
-      let importedProvidersData: any
+      let importedProvidersData
       try {
         importedProvidersData = JSON.parse(jsonString)
-      } catch (e: any) {
-        window.showErrorMessage(`Error parsing provider file: ${e.message}`)
-        console.error("Error parsing provider file:", e)
+      } catch  {
+        window.showErrorMessage("Error parsing provider file")
+        console.error("Error parsing provider file:")
         return
       }
 
-      // Validation
       if (
         typeof importedProvidersData !== "object" ||
         importedProvidersData === null ||
-        Array.isArray(importedProvidersData) // Explicitly check for array
+        Array.isArray(importedProvidersData)
       ) {
         window.showErrorMessage("Invalid provider file format or content: Expected a JSON object of providers.")
         console.error("Import validation failed: Data is not an object or is null/array.")
@@ -161,7 +160,7 @@ export class ProviderManager {
         if (importedProvidersData.hasOwnProperty(id)) {
           const provider = importedProvidersData[id];
           if (
-            typeof provider !== "object" || provider === null || // Ensure provider itself is an object
+            typeof provider !== "object" || provider === null ||
             typeof provider?.id !== "string" ||
             typeof provider?.label !== "string" ||
             typeof provider?.modelName !== "string" ||
@@ -180,9 +179,9 @@ export class ProviderManager {
       await this.getAllProviders()
       window.showInformationMessage("Providers imported successfully.")
 
-    } catch (error: any) {
-      window.showErrorMessage(`Error importing providers: ${error.message}`)
-      console.error("Error importing providers:", error)
+    } catch {
+      window.showErrorMessage("Error importing providers")
+      console.error("Error importing providers")
     }
   }
 
@@ -194,19 +193,19 @@ export class ProviderManager {
     }
     try {
       const fileUri = await window.showSaveDialog({
-        defaultUri: Uri.file("twinny-providers.json"), // Default file name
-        filters: { JSON: ["json"] } // Filter for JSON files
+        defaultUri: Uri.file("twinny-providers.json"),
+        filters: { JSON: ["json"] }
       })
       if (!fileUri) {
-        return // User cancelled the dialog
+        return
       }
       const jsonString = JSON.stringify(providers, null, 2)
       const writeData = new TextEncoder().encode(jsonString)
       await workspace.fs.writeFile(fileUri, writeData)
       window.showInformationMessage("Providers exported successfully.")
-    } catch (error: any) {
-      window.showErrorMessage(`Error exporting providers: ${error.message}`)
-      console.error("Error exporting providers:", error) // Log error for debugging
+    } catch  {
+      window.showErrorMessage("Error exporting providers")
+      console.error("Error exporting providers")
     }
   }
 
@@ -428,7 +427,7 @@ export class ProviderManager {
   }
 
   async addProvider(provider?: TwinnyProvider): Promise<TwinnyProvider | null> {
-    let providers = (await this.getProviders()) || {}
+    const providers = (await this.getProviders()) || {}
     if (!provider) return null
     provider.id = uuidv4()
     providers[provider.id] = provider
@@ -464,7 +463,7 @@ export class ProviderManager {
   }
 
   async removeProvider(provider?: TwinnyProvider) {
-    let providers = (await this.getProviders()) || {}
+    const providers = (await this.getProviders()) || {}
     if (!provider) return
 
     const activeFimProvider = this.getActiveFimProvider()
@@ -487,7 +486,7 @@ export class ProviderManager {
   }
 
   async updateProvider(provider?: TwinnyProvider) {
-    let providers = (await this.getProviders()) || {}
+    const providers = (await this.getProviders()) || {}
     const activeFimProvider = this.getActiveFimProvider()
     const activeChatProvider = this.getActiveChatProvider()
     const activeEmbeddingsProvider = this.getActiveEmbeddingsProvider()
@@ -540,7 +539,7 @@ export class ProviderManager {
       const content = await workspace.fs.readFile(fileUri)
       const providers = JSON.parse(content.toString()) as Providers
       return providers
-    } catch (e) {
+    } catch {
       // Silently ignore and return undefined if file doesn't exist or is invalid JSON
       return undefined
     }
