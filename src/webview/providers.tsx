@@ -39,7 +39,9 @@ export const Providers = () => {
     saveProvider,
     getProvidersByType,
     setActiveFimProvider,
-    fimProvider
+    fimProvider,
+    triggerExportProviders, // Added
+    triggerImportProviders  // Added
   } = useProviders()
 
   const fimProviders = Object.values(getProvidersByType("fim")) || []
@@ -92,6 +94,9 @@ export const Providers = () => {
   const handleReset = () => {
     resetProviders()
   }
+
+  // Removed placeholder handleImportProviders
+  // Removed placeholder handleExportProviders
 
   const handleProviderSelect = (selectedProvider: TwinnyProvider) => {
     const tempProvider = { ...selectedProvider }
@@ -161,10 +166,18 @@ export const Providers = () => {
             <div className={styles.providerHeader}>
               <h4>{t("chat-provider")}</h4>
               <div className={styles.providersButtons}>
-                <VSCodeButton appearance="icon" onClick={handleAdd}>
+                <VSCodeButton appearance="icon" onClick={handleAdd} title={t("add-provider")}>
                   <i className="codicon codicon-add" />
                 </VSCodeButton>
-                <VSCodeButton appearance="secondary" onClick={handleReset}>
+                <VSCodeButton appearance="secondary" onClick={triggerImportProviders} title={t("import-providers")}>
+                  <i className="codicon codicon-cloud-upload" />
+                  {t("import")}
+                </VSCodeButton>
+                <VSCodeButton appearance="secondary" onClick={triggerExportProviders} title={t("export-providers")}>
+                  <i className="codicon codicon-cloud-download" />
+                  {t("export")}
+                </VSCodeButton>
+                <VSCodeButton appearance="secondary" onClick={handleReset} title={t("reset-providers")}>
                   <i className="codicon codicon-refresh" />
                   {t("reset-providers")}
                 </VSCodeButton>

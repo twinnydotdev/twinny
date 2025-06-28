@@ -173,7 +173,9 @@ export const PROVIDER_EVENT_NAME = {
   setActiveChatProvider: "twinny.set-active-chat-provider",
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
-  updateProvider: "twinny.update-provider"
+  updateProvider: "twinny.update-provider",
+  exportProviders: "twinny.exportProviders",
+  importProviders: "twinny.importProviders"
 }
 
 export const ACTIVE_CONVERSATION_STORAGE_KEY = "twinny.active-conversation"

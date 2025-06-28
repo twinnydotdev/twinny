@@ -131,6 +131,21 @@ export const useProviders = () => {
     setActiveChatProvider,
     setActiveEmbeddingsProvider,
     setActiveFimProvider,
-    updateProvider
+    updateProvider,
+    triggerExportProviders, // Added
+    triggerImportProviders  // Added
   }
+}
+
+// New functions to trigger export/import
+const triggerExportProviders = () => {
+  global.vscode.postMessage({
+    type: PROVIDER_EVENT_NAME.exportProviders
+  } as ClientMessage<unknown>) // data can be unknown or undefined if not sending payload
+}
+
+const triggerImportProviders = () => {
+  global.vscode.postMessage({
+    type: PROVIDER_EVENT_NAME.importProviders
+  } as ClientMessage<unknown>) // data can be unknown or undefined if not sending payload
 }
