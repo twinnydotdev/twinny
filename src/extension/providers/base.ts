@@ -10,7 +10,7 @@ import {
   SYSTEM,
   TWINNY_COMMAND_NAME,
   WORKSPACE_STORAGE_KEY
-} from "../../common/constants" // Updated to point to the new barrel file
+} from "../../common/constants"
 import { logger } from "../../common/logger"
 import {
   AnyContextItem,
