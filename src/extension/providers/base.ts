@@ -7,10 +7,14 @@ import {
   EVENT_NAME,
   EXTENSION_SESSION_NAME,
   SYMMETRY_EMITTER_KEY,
+  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+  EVENT_NAME,
+  EXTENSION_SESSION_NAME,
+  SYMMETRY_EMITTER_KEY,
   SYSTEM,
   TWINNY_COMMAND_NAME,
   WORKSPACE_STORAGE_KEY
-} from "../../common/constants"
+} from "../../common/constants" // Updated to point to the new barrel file
 import { logger } from "../../common/logger"
 import {
   AnyContextItem,

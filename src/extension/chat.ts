@@ -28,12 +28,20 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_SESSION_NAME,
+  API_PROVIDERS,
+  ASSISTANT,
+  DEFAULT_RELEVANT_CODE_COUNT,
+  DEFAULT_RELEVANT_FILE_COUNT,
+  DEFAULT_RERANK_THRESHOLD,
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME,
+  EXTENSION_SESSION_NAME,
   SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
   WEBUI_TABS,
   WORKSPACE_STORAGE_KEY
-} from "../common/constants"
+} from "../common/constants" // Updated to point to the new barrel file
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import { models } from "../common/models"

@@ -4,7 +4,7 @@ import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   ACTIVE_FIM_PROVIDER_STORAGE_KEY
-} from "../common/constants"
+} from "../common/constants" // Updated to point to the new barrel file
 
 import { TwinnyProvider } from "./provider-manager"
 import { getIsOpenAICompatible } from "./utils"
