@@ -78,6 +78,8 @@ export const PROVIDER_EVENT_NAME = {
   getAllProviders: "twinny.get-providers",
   removeProvider: "twinny.remove-provider",
   resetProvidersToDefaults: "twinny.reset-providers-to-defaults",
+  exportProviders: "twinny.export-providers",
+  importProviders: "twinny.import-providers",
   setActiveChatProvider: "twinny.set-active-chat-provider",
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
