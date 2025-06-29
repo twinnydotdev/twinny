@@ -33,7 +33,7 @@ import {
   USER,
   WEBUI_TABS,
   WORKSPACE_STORAGE_KEY
-} from "../common/constants"
+} from "../common/constants/"
 import { CodeLanguageDetails } from "../common/languages"
 import { logger } from "../common/logger"
 import { models } from "../common/models"
@@ -806,7 +806,9 @@ export class Chat extends Base {
       : this.llmNoStream(this.getNoStreamOptions(provider))
   }
 
-  public async generateSimpleCompletion(prompt: string): Promise<string | undefined> {
+  public async generateSimpleCompletion(
+    prompt: string
+  ): Promise<string | undefined> {
     const provider = this.getProvider()
     if (!provider) {
       logger.error("No provider configured for simple completion.")
@@ -826,13 +828,19 @@ export class Chat extends Base {
       messages: messages,
       model: provider.modelName,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      provider: this.getProviderType(provider) as any,
+      provider: this.getProviderType(provider) as any
     }
 
     try {
-      const result = await this._tokenJs.chat.completions.create(completionParams)
+      const result = await this._tokenJs.chat.completions.create(
+        completionParams
+      )
 
-      if (result.choices && result.choices.length > 0 && result.choices[0].message) {
+      if (
+        result.choices &&
+        result.choices.length > 0 &&
+        result.choices[0].message
+      ) {
         return result.choices[0].message.content?.trim()
       }
       logger.log("LLM response for simple completion was empty or malformed.")
