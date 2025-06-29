@@ -16,9 +16,9 @@ import { v4 as uuidv4 } from "uuid"
 
 import { EVENT_NAME, USER } from "../common/constants"
 import {
-  AnyContextItem,
   ChatCompletionMessage,
   ClientMessage,
+  ContextItem,
   ImageAttachment,
   MentionType,
   ServerMessage
@@ -505,11 +505,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   const renderContextItem = useCallback(
-    (item: AnyContextItem) => {
+    (item: ContextItem) => {
       let codicon = ""
       const displayName = item.name
 
-      if (item.category === "file") {
+      if (item.category === "files") {
         codicon = "codicon codicon-file-code"
       } else if (item.category === "selection") {
         codicon = "codicon codicon-symbol-snippet"

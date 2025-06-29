@@ -24,6 +24,8 @@ const getCategoryIcon = (category: CategoryType): string => {
       return "root-folder"
     case "problems":
       return "warning"
+    default:
+      return ""
   }
 }
 
