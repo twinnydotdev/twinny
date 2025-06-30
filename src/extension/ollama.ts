@@ -22,17 +22,4 @@ export class OllamaService {
       return []
     }
   }
-
-  public testConnection = async () => {
-    try {
-      const response = await fetch(`${this._baseUrl}/api/tags`) // Using /api/tags as a simple test endpoint
-      if (response.ok) {
-        return { success: true }
-      } else {
-        return { success: false, error: `Server responded with status: ${response.status}` }
-      }
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) }
-    }
-  }
 }

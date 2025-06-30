@@ -84,9 +84,7 @@ export const PROVIDER_EVENT_NAME = {
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
   updateProvider: "twinny.update-provider",
-  testOllamaConnection: "twinny.test-ollama-connection",
   testProvider: "twinny.test-provider",
-  testOllamaConnectionResult: "twinny.test-ollama-connection-result",
   testProviderResult: "twinny.test-provider-result"
 }
 

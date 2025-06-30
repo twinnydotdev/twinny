@@ -21,7 +21,6 @@ import {
 } from "../common/constants"
 import { ClientMessage, ServerMessage } from "../common/types"
 
-import { OllamaService } from "./ollama"
 import { getIsOpenAICompatible } from "./utils" // Added getIsOpenAICompatible
 
 export interface TwinnyProvider {
@@ -129,8 +128,6 @@ export class ProviderManager {
         return await this.exportProviders()
       case PROVIDER_EVENT_NAME.importProviders:
         return await this.importProviders()
-      case PROVIDER_EVENT_NAME.testOllamaConnection:
-        return this.testOllamaConnection()
       case PROVIDER_EVENT_NAME.testProvider:
         return this.testProvider(provider)
     }
@@ -612,15 +609,6 @@ export class ProviderManager {
       console.error(e)
       // Handle error appropriately, e.g. show error message to user
     }
-  }
-
-  async testOllamaConnection() {
-    const ollamaService = new OllamaService()
-    const result = await ollamaService.testConnection()
-    this._webView?.postMessage({
-      type: PROVIDER_EVENT_NAME.testOllamaConnectionResult,
-      data: result
-    } as ServerMessage<{ success: boolean; error?: string }>)
   }
 
   private _buildProviderBaseUrl(provider: TwinnyProvider): string {
