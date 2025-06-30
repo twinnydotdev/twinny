@@ -13,7 +13,8 @@ import {
 import {
   API_PROVIDERS,
   DEFAULT_PROVIDER_FORM_VALUES,
-  FIM_TEMPLATE_FORMAT
+  FIM_TEMPLATE_FORMAT,
+  PROVIDER_EVENT_NAME
 } from "../common/constants"
 import { TwinnyProvider } from "../extension/provider-manager"
 
@@ -27,6 +28,8 @@ import styles from "./styles/providers.module.css"
 
 type ViewState = "providers" | "defaults" | "custom-form" | "fim-form"
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 export const Providers = () => {
   const { t } = useTranslation()
   const [view, setView] = React.useState<ViewState>("providers")
@@ -351,6 +354,32 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
       type
     }
   )
+  const [testStatus, setTestStatus] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const listener = (event: MessageEvent) => {
+      const message = event.data
+      if (message.type === PROVIDER_EVENT_NAME.testProviderResult) {
+        if (message.data.success) {
+          setTestStatus(t("provider-test-successful"))
+        } else {
+          setTestStatus(`${t("provider-test-failed")}: ${message.data.error || t("unknown-error")}`)
+        }
+      }
+    }
+    window.addEventListener("message", listener)
+    return () => {
+      window.removeEventListener("message", listener)
+    }
+  }, [t])
+
+  const handleTestProvider = () => {
+    setTestStatus("Testing...")
+    global.vscode.postMessage({
+      type: PROVIDER_EVENT_NAME.testProvider,
+      data: formState
+    })
+  }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -587,7 +616,15 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
           <VSCodeButton appearance="secondary" onClick={handleCancel}>
             {t("cancel")}
           </VSCodeButton>
+          {
+            formState.type === "chat" && (
+              <VSCodeButton appearance="secondary" onClick={handleTestProvider}>
+                {t("test-provider")}
+              </VSCodeButton>
+            )
+          }
         </div>
+        {testStatus && <p className={styles.testStatus}>{testStatus}</p>}
       </form>
     </>
   )

@@ -83,7 +83,9 @@ export const PROVIDER_EVENT_NAME = {
   setActiveChatProvider: "twinny.set-active-chat-provider",
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
-  updateProvider: "twinny.update-provider"
+  updateProvider: "twinny.update-provider",
+  testProvider: "twinny.test-provider",
+  testProviderResult: "twinny.test-provider-result"
 }
 
 export const GITHUB_EVENT_NAME = {

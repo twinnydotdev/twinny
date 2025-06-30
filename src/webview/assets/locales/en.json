@@ -166,5 +166,12 @@
   "toggle-provider-selection": "Toggle provider selection",
   "tools": "Tools",
   "type": "Type",
-  "upload-image": "Upload image"
+  "unknown-error": "Unknown error",
+  "upload-image": "Upload image",
+  "onboarding": "Onboarding",
+  "onboarding-description": "Welcome to Twinny! Let's get you set up.",
+  "ollama-connection-failed": "Ollama connection failed",
+  "test-provider": "Test Provider",
+  "provider-test-successful": "Provider test successful!",
+  "provider-test-failed": "Provider test failed"
 }

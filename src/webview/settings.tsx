@@ -36,9 +36,9 @@ export const Settings = () => {
 
     if (selectedTemplatesContext?.includes(template)) {
       if (selectedTemplatesContext.length === 1) {
-      saveTemplates([])
-      setSelectedTemplatesContext([])
-      return
+        saveTemplates([])
+        setSelectedTemplatesContext([])
+        return
       }
 
       const newValue = selectedTemplatesContext.filter((item) => item !== template)

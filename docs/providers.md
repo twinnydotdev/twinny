@@ -2,8 +2,6 @@
 
 These example configurations serve as a starting point. Individual adjustments may be required depending on your specific hardware and software environments.
 
-### Ollama Configuration
-
 #### FIM (Auto-complete)
 
 - **Hostname:** `localhost`
