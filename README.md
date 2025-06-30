@@ -43,8 +43,6 @@ Use the sidebar to discuss your code with AI, getting explanations, tests, refac
 - Code solution block copying
 - Workspace embeddings for context-aware assistance
 - Symmetry network integration for P2P AI inference
-- **Easy Onboarding**: A new setup guide in the settings to test your Ollama connection.
-- **Provider Testing**: Test your configured AI providers directly from the provider settings page.
 
 ### Workspace Embeddings
 Twinny uses workspace embeddings to provide context-aware AI assistance, improving the relevance of suggestions.
