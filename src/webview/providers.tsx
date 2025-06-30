@@ -17,7 +17,6 @@ import {
   PROVIDER_EVENT_NAME // Added PROVIDER_EVENT_NAME
 } from "../common/constants"
 import { TwinnyProvider } from "../extension/provider-manager"
-import { vscode } from "./utils" // Added vscode for messaging
 
 import { useOllamaModels } from "./hooks/useOllamaModels"
 import { useProviders } from "./hooks/useProviders"
@@ -29,6 +28,8 @@ import styles from "./styles/providers.module.css"
 
 type ViewState = "providers" | "defaults" | "custom-form" | "fim-form"
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 export const Providers = () => {
   const { t } = useTranslation()
   const [view, setView] = React.useState<ViewState>("providers")
@@ -374,7 +375,7 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
 
   const handleTestProvider = () => {
     setTestStatus("Testing...")
-    vscode.postMessage({
+    global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.testProvider,
       data: formState
     })

@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { VSCodeButton, VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 
 import {
   DEFAULT_ACTION_TEMPLATES,
+  PROVIDER_EVENT_NAME,
   WORKSPACE_STORAGE_KEY
 } from "../common/constants"
 
@@ -15,12 +17,11 @@ import { kebabToSentence } from "./utils"
 
 import styles from "./styles/settings.module.css"
 
-import { WEBUI_TABS, PROVIDER_EVENT_NAME } from "../common/constants" // Added PROVIDER_EVENT_NAME
-import { vscode } from "./utils" // Added vscode for messaging
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const global = globalThis as any
 export const Settings = () => {
   const { t } = useTranslation()
-  const [ollamaStatus, setOllamaStatus] = React.useState<string | null>(null) // Added state for Ollama status
+  const [ollamaStatus, setOllamaStatus] = useState<string | null>(null)
   const { templates, saveTemplates, editDefaultTemplates } = useTemplates()
   const {
     context: selectedTemplatesContext,
@@ -40,9 +41,9 @@ export const Settings = () => {
 
     if (selectedTemplatesContext?.includes(template)) {
       if (selectedTemplatesContext.length === 1) {
-      saveTemplates([])
-      setSelectedTemplatesContext([])
-      return
+        saveTemplates([])
+        setSelectedTemplatesContext([])
+        return
       }
 
       const newValue = selectedTemplatesContext.filter((item) => item !== template)
@@ -68,13 +69,13 @@ export const Settings = () => {
 
   const handleTestOllamaConnection = () => {
     setOllamaStatus("Testing...")
-    vscode.postMessage({
+    global.vscode.postMessage({
       type: PROVIDER_EVENT_NAME.testOllamaConnection,
       data: null
     })
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     const listener = (event: MessageEvent) => {
       const message = event.data
       if (message.type === PROVIDER_EVENT_NAME.testOllamaConnectionResult) {
