@@ -617,7 +617,7 @@ export class ProviderManager {
     if (apiPort) {
       baseUrl += `:${apiPort}`
     }
-    baseUrl += apiPath // apiPath from provider is usually the base path like /v1 or empty
+    baseUrl += apiPath
     return baseUrl
   }
 
