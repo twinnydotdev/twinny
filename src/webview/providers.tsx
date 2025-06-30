@@ -14,7 +14,7 @@ import {
   API_PROVIDERS,
   DEFAULT_PROVIDER_FORM_VALUES,
   FIM_TEMPLATE_FORMAT,
-  PROVIDER_EVENT_NAME // Added PROVIDER_EVENT_NAME
+  PROVIDER_EVENT_NAME
 } from "../common/constants"
 import { TwinnyProvider } from "../extension/provider-manager"
 
