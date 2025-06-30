@@ -1,4 +1,6 @@
 import { ReactNode } from "react"
+import { TokenJS } from "fluency.js" // Added fluency.js
+import { CompletionNonStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { TextEncoder } from "util"
 import { v4 as uuidv4 } from "uuid"
 import { ExtensionContext, Uri, Webview, window, workspace } from "vscode"
@@ -12,11 +14,15 @@ import {
   FIM_TEMPLATE_FORMAT,
   GLOBAL_STORAGE_KEY,
   INFERENCE_PROVIDERS_STORAGE_KEY,
+  OPEN_AI_COMPATIBLE_PROVIDERS,
   PROVIDER_EVENT_NAME,
   TWINNY_PROVIDERS_FILENAME,
   WEBUI_TABS
 } from "../common/constants"
 import { ClientMessage, ServerMessage } from "../common/types"
+
+import { OllamaService } from "./ollama"
+import { getIsOpenAICompatible } from "./utils" // Added getIsOpenAICompatible
 
 export interface TwinnyProvider {
   apiHostname?: string
@@ -46,9 +52,8 @@ export class ProviderManager {
     this._context = context
     this._webView = webviewView
     this._storageLocation =
-      workspace
-        .getConfiguration("twinny")
-        .get("providerStorageLocation") || "globalState"
+      workspace.getConfiguration("twinny").get("providerStorageLocation") ||
+      "globalState"
     this._initializeProviders()
     this.setUpEventListeners()
   }
@@ -60,7 +65,10 @@ export class ProviderManager {
         const globalStateProviders = this._context.globalState.get<Providers>(
           INFERENCE_PROVIDERS_STORAGE_KEY
         )
-        if (globalStateProviders && Object.keys(globalStateProviders).length > 0) {
+        if (
+          globalStateProviders &&
+          Object.keys(globalStateProviders).length > 0
+        ) {
           await this._saveProvidersToFile(globalStateProviders)
           // Optional: Consider clearing globalStateProviders here
           // await this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, undefined);
@@ -72,7 +80,10 @@ export class ProviderManager {
       const globalStateProviders = this._context.globalState.get<Providers>(
         INFERENCE_PROVIDERS_STORAGE_KEY
       )
-      if (!globalStateProviders || Object.keys(globalStateProviders).length === 0) {
+      if (
+        !globalStateProviders ||
+        Object.keys(globalStateProviders).length === 0
+      ) {
         await this.addDefaultProviders()
       }
     }
@@ -118,6 +129,10 @@ export class ProviderManager {
         return await this.exportProviders()
       case PROVIDER_EVENT_NAME.importProviders:
         return await this.importProviders()
+      case PROVIDER_EVENT_NAME.testOllamaConnection:
+        return this.testOllamaConnection()
+      case PROVIDER_EVENT_NAME.testProvider:
+        return this.testProvider(provider)
     }
   }
 
@@ -139,7 +154,7 @@ export class ProviderManager {
       let importedProvidersData
       try {
         importedProvidersData = JSON.parse(jsonString)
-      } catch  {
+      } catch {
         window.showErrorMessage("Error parsing provider file")
         console.error("Error parsing provider file:")
         return
@@ -150,24 +165,34 @@ export class ProviderManager {
         importedProvidersData === null ||
         Array.isArray(importedProvidersData)
       ) {
-        window.showErrorMessage("Invalid provider file format or content: Expected a JSON object of providers.")
-        console.error("Import validation failed: Data is not an object or is null/array.")
+        window.showErrorMessage(
+          "Invalid provider file format or content: Expected a JSON object of providers."
+        )
+        console.error(
+          "Import validation failed: Data is not an object or is null/array."
+        )
         return
       }
 
       for (const id in importedProvidersData) {
         // eslint-disable-next-line no-prototype-builtins
         if (importedProvidersData.hasOwnProperty(id)) {
-          const provider = importedProvidersData[id];
+          const provider = importedProvidersData[id]
           if (
-            typeof provider !== "object" || provider === null ||
+            typeof provider !== "object" ||
+            provider === null ||
             typeof provider?.id !== "string" ||
             typeof provider?.label !== "string" ||
             typeof provider?.modelName !== "string" ||
             typeof provider?.provider !== "string"
           ) {
-            window.showErrorMessage(`Invalid provider file format or content: Provider with id '${id}' is invalid or missing essential properties.`)
-            console.error(`Import validation failed: Provider '${id}' is invalid.`, provider)
+            window.showErrorMessage(
+              `Invalid provider file format or content: Provider with id '${id}' is invalid or missing essential properties.`
+            )
+            console.error(
+              `Import validation failed: Provider '${id}' is invalid.`,
+              provider
+            )
             return
           }
         }
@@ -178,7 +203,6 @@ export class ProviderManager {
       await this._saveProviders(validatedProviders)
       await this.getAllProviders()
       window.showInformationMessage("Providers imported successfully.")
-
     } catch {
       window.showErrorMessage("Error importing providers")
       console.error("Error importing providers")
@@ -203,9 +227,10 @@ export class ProviderManager {
       const writeData = new TextEncoder().encode(jsonString)
       await workspace.fs.writeFile(fileUri, writeData)
       window.showInformationMessage("Providers exported successfully.")
-    } catch  {
+    } catch {
       window.showErrorMessage("Error exporting providers")
       console.error("Error exporting providers")
+      return this.resetProvidersToDefaults()
     }
   }
 
@@ -225,22 +250,22 @@ export class ProviderManager {
       label: "Twinny.dev (Symmetry)",
       modelName: "llama3.2:latest",
       provider: API_PROVIDERS.Twinny,
-      type: "chat",
+      type: "chat"
     } as TwinnyProvider
   }
 
   getDefaultLocalProvider() {
     return {
-        apiHostname: "localhost",
-        apiPath: "/v1",
-        apiPort: 11434,
-        apiProtocol: "http",
-        id: "openai-compatible-default",
-        label: "Ollama",
-        modelName: "codellama:7b-instruct",
-        provider: API_PROVIDERS.Ollama,
-        type: "chat",
-      }
+      apiHostname: "localhost",
+      apiPath: "/v1",
+      apiPort: 11434,
+      apiProtocol: "http",
+      id: "openai-compatible-default",
+      label: "Ollama",
+      modelName: "codellama:7b-instruct",
+      provider: API_PROVIDERS.Ollama,
+      type: "chat"
+    }
   }
 
   getDefaultEmbeddingsProvider() {
@@ -318,7 +343,9 @@ export class ProviderManager {
     const provider = this.getTwinnyProvider()
     const providers = await this.getProviders()
     if (!providers) return await this.addProvider(provider)
-    const twinnyProvider = Object.values(providers).find(p => p.apiHostname === "twinny.dev")
+    const twinnyProvider = Object.values(providers).find(
+      (p) => p.apiHostname === "twinny.dev"
+    )
     if (!twinnyProvider) await this.addProvider(provider)
     return provider
   }
@@ -439,15 +466,26 @@ export class ProviderManager {
         provider?.modelName
       )
       if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
-        this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, provider)
+        this._context.globalState.update(
+          ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+          provider
+        )
       }
     } else if (provider.type === "fim") {
       if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_STORAGE_KEY)) {
-        this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, provider)
+        this._context.globalState.update(
+          ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+          provider
+        )
       }
     } else if (provider.type === "embedding") {
-      if (!this._context.globalState.get(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY)) {
-        this._context.globalState.update(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY, provider)
+      if (
+        !this._context.globalState.get(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY)
+      ) {
+        this._context.globalState.update(
+          ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+          provider
+        )
       }
     }
 
@@ -471,13 +509,22 @@ export class ProviderManager {
     const activeEmbeddingsProvider = this.getActiveEmbeddingsProvider()
 
     if (provider.id === activeFimProvider?.id) {
-      this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
+      this._context.globalState.update(
+        ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+        undefined
+      )
     }
     if (provider.id === activeChatProvider?.id) {
-      this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, undefined)
+      this._context.globalState.update(
+        ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+        undefined
+      )
     }
     if (provider.id === activeEmbeddingsProvider?.id) {
-      this._context.globalState.update(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY, undefined)
+      this._context.globalState.update(
+        ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+        undefined
+      )
     }
 
     delete providers[provider.id]
@@ -503,14 +550,26 @@ export class ProviderManager {
   }
 
   async resetProvidersToDefaults(): Promise<void> {
-    await this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, undefined)
-    await this._context.globalState.update(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY, undefined)
-    await this._context.globalState.update(ACTIVE_FIM_PROVIDER_STORAGE_KEY, undefined)
+    await this._context.globalState.update(
+      ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+      undefined
+    )
+    await this._context.globalState.update(
+      ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+      undefined
+    )
+    await this._context.globalState.update(
+      ACTIVE_FIM_PROVIDER_STORAGE_KEY,
+      undefined
+    )
 
     if (this._storageLocation === "file") {
       await this._saveProvidersToFile({})
     } else {
-      await this._context.globalState.update(INFERENCE_PROVIDERS_STORAGE_KEY, undefined)
+      await this._context.globalState.update(
+        INFERENCE_PROVIDERS_STORAGE_KEY,
+        undefined
+      )
     }
 
     const chatProvider = await this.addDefaultChatProvider()
@@ -552,6 +611,80 @@ export class ProviderManager {
     } catch (e) {
       console.error(e)
       // Handle error appropriately, e.g. show error message to user
+    }
+  }
+
+  async testOllamaConnection() {
+    const ollamaService = new OllamaService()
+    const result = await ollamaService.testConnection()
+    this._webView?.postMessage({
+      type: PROVIDER_EVENT_NAME.testOllamaConnectionResult,
+      data: result
+    } as ServerMessage<{ success: boolean; error?: string }>)
+  }
+
+  private _buildProviderBaseUrl(provider: TwinnyProvider): string {
+    const { apiProtocol, apiHostname, apiPort, apiPath = "" } = provider
+    let baseUrl = `${apiProtocol || "http"}://${apiHostname}`
+    if (apiPort) {
+      baseUrl += `:${apiPort}`
+    }
+    baseUrl += apiPath // apiPath from provider is usually the base path like /v1 or empty
+    return baseUrl
+  }
+
+  private _getProviderTypeForFluency(provider: TwinnyProvider): LLMProvider {
+    if (getIsOpenAICompatible(provider)) {
+      return OPEN_AI_COMPATIBLE_PROVIDERS.OpenAICompatible as LLMProvider
+    }
+    return provider.provider as LLMProvider // ollama, anthropic etc.
+  }
+
+  async testProvider(provider?: TwinnyProvider) {
+    if (!provider) {
+      this._webView?.postMessage({
+        type: PROVIDER_EVENT_NAME.testProviderResult,
+        data: { success: false, error: "Provider details not provided." }
+      } as ServerMessage<{ success: boolean; error?: string }>)
+      return
+    }
+
+    const { apiKey, modelName } = provider
+
+    const tokenJs = new TokenJS({
+      baseURL: this._buildProviderBaseUrl(provider),
+      apiKey: apiKey
+    })
+
+    const requestBody: CompletionNonStreaming<LLMProvider> = {
+      messages: [{ role: "user", content: "hi" }],
+      model: modelName || "test-model", // fluency.js requires a model
+      provider: this._getProviderTypeForFluency(provider),
+      max_tokens: 5
+    }
+
+    try {
+      await tokenJs.chat.completions.create(requestBody)
+      this._webView?.postMessage({
+        type: PROVIDER_EVENT_NAME.testProviderResult,
+        data: { success: true }
+      } as ServerMessage<{ success: boolean; error?: string }>)
+    } catch (error) {
+      let errorMessage = "An unknown error occurred."
+      if (error instanceof Error) {
+        errorMessage = error.message
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((error as any).response?.data?.error?.message) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          errorMessage = (error as any).response.data.error.message
+        }
+      } else if (typeof error === "string") {
+        errorMessage = error
+      }
+      this._webView?.postMessage({
+        type: PROVIDER_EVENT_NAME.testProviderResult,
+        data: { success: false, error: errorMessage }
+      } as ServerMessage<{ success: boolean; error?: string }>)
     }
   }
 }

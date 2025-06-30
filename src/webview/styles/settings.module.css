@@ -44,3 +44,22 @@
 .resetButton {
   margin-top: 0.75rem;
 }
+
+.onboardingSection {
+  margin-bottom: calc(var(--container-padding) * 2);
+  padding: var(--container-padding);
+  border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
+  border-radius: var(--input-radius);
+}
+
+.onboardingSection h4 {
+  margin-top: 0;
+}
+
+.ollamaStatus {
+  margin-top: var(--container-padding);
+  padding: var(--container-padding);
+  border-radius: var(--input-radius);
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
+}

@@ -13,9 +13,11 @@ import {
 import {
   API_PROVIDERS,
   DEFAULT_PROVIDER_FORM_VALUES,
-  FIM_TEMPLATE_FORMAT
+  FIM_TEMPLATE_FORMAT,
+  PROVIDER_EVENT_NAME // Added PROVIDER_EVENT_NAME
 } from "../common/constants"
 import { TwinnyProvider } from "../extension/provider-manager"
+import { vscode } from "./utils" // Added vscode for messaging
 
 import { useOllamaModels } from "./hooks/useOllamaModels"
 import { useProviders } from "./hooks/useProviders"
@@ -351,6 +353,32 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
       type
     }
   )
+  const [testStatus, setTestStatus] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const listener = (event: MessageEvent) => {
+      const message = event.data
+      if (message.type === PROVIDER_EVENT_NAME.testProviderResult) {
+        if (message.data.success) {
+          setTestStatus(t("provider-test-successful"))
+        } else {
+          setTestStatus(`${t("provider-test-failed")}: ${message.data.error || t("unknown-error")}`)
+        }
+      }
+    }
+    window.addEventListener("message", listener)
+    return () => {
+      window.removeEventListener("message", listener)
+    }
+  }, [t])
+
+  const handleTestProvider = () => {
+    setTestStatus("Testing...")
+    vscode.postMessage({
+      type: PROVIDER_EVENT_NAME.testProvider,
+      data: formState
+    })
+  }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -587,7 +615,11 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
           <VSCodeButton appearance="secondary" onClick={handleCancel}>
             {t("cancel")}
           </VSCodeButton>
+          <VSCodeButton appearance="secondary" onClick={handleTestProvider}>
+            {t("test-provider")}
+          </VSCodeButton>
         </div>
+        {testStatus && <p className={styles.testStatus}>{testStatus}</p>}
       </form>
     </>
   )

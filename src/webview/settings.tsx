@@ -15,8 +15,12 @@ import { kebabToSentence } from "./utils"
 
 import styles from "./styles/settings.module.css"
 
+import { WEBUI_TABS, PROVIDER_EVENT_NAME } from "../common/constants" // Added PROVIDER_EVENT_NAME
+import { vscode } from "./utils" // Added vscode for messaging
+
 export const Settings = () => {
   const { t } = useTranslation()
+  const [ollamaStatus, setOllamaStatus] = React.useState<string | null>(null) // Added state for Ollama status
   const { templates, saveTemplates, editDefaultTemplates } = useTemplates()
   const {
     context: selectedTemplatesContext,
@@ -62,8 +66,43 @@ export const Settings = () => {
     editDefaultTemplates()
   }
 
+  const handleTestOllamaConnection = () => {
+    setOllamaStatus("Testing...")
+    vscode.postMessage({
+      type: PROVIDER_EVENT_NAME.testOllamaConnection,
+      data: null
+    })
+  }
+
+  React.useEffect(() => {
+    const listener = (event: MessageEvent) => {
+      const message = event.data
+      if (message.type === PROVIDER_EVENT_NAME.testOllamaConnectionResult) {
+        if (message.data.success) {
+          setOllamaStatus(t("ollama-connection-successful"))
+        } else {
+          setOllamaStatus(`${t("ollama-connection-failed")}: ${message.data.error || t("unknown-error")}`)
+        }
+      }
+    }
+    window.addEventListener("message", listener)
+    return () => {
+      window.removeEventListener("message", listener)
+    }
+  }, [t])
+
   return (
     <div className={styles.settingsContainer}>
+      <h3>{t("onboarding")}</h3>
+      <p>{t("onboarding-description")}</p>
+      <div className={styles.onboardingSection}>
+        <h4>{t("ollama-connection-test")}</h4>
+        <VSCodeButton onClick={handleTestOllamaConnection}>
+          {t("test-ollama-connection")}
+        </VSCodeButton>
+        {ollamaStatus && <p className={styles.ollamaStatus}>{ollamaStatus}</p>}
+      </div>
+
       <h3>{t("edit-default-templates")}</h3>
       <p>{t("edit-default-templates-description")}</p>
       <div className={styles.templateEditor}>
