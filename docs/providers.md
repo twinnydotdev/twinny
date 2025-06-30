@@ -2,13 +2,6 @@
 
 These example configurations serve as a starting point. Individual adjustments may be required depending on your specific hardware and software environments.
 
-### Testing Your Provider Configuration
-Before diving into specific provider setups, it's important to know that Twinny now offers a way to test your provider configurations. When adding or editing a provider in the Twinny settings (accessible via the activity bar icon, then navigating to the "Providers" tab), you'll find a "Test Provider" button. Clicking this will attempt to make a basic API call to your provider using the entered details. This can help you quickly verify if the hostname, port, API path, and API key (if applicable) are correctly configured and if the provider is reachable from your system.
-
-For users utilizing Ollama, there's an additional convenience: a dedicated "Test Ollama Connection" button is available in the main settings page (accessible via the activity bar icon, then navigating to "Templates & Onboarding"). This allows for a quick check of your local Ollama server's availability.
-
-### Ollama Configuration
-
 #### FIM (Auto-complete)
 
 - **Hostname:** `localhost`
