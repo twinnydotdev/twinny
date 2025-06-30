@@ -21,7 +21,7 @@ import {
 } from "../common/constants"
 import { ClientMessage, ServerMessage } from "../common/types"
 
-import { getIsOpenAICompatible } from "./utils" // Added getIsOpenAICompatible
+import { getIsOpenAICompatible } from "./utils"
 
 export interface TwinnyProvider {
   apiHostname?: string
@@ -646,7 +646,7 @@ export class ProviderManager {
 
     const requestBody: CompletionNonStreaming<LLMProvider> = {
       messages: [{ role: "user", content: "hi" }],
-      model: modelName || "test-model", // fluency.js requires a model
+      model: modelName,
       provider: this._getProviderTypeForFluency(provider),
       max_tokens: 5
     }

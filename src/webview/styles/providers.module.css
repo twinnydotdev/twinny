@@ -144,7 +144,6 @@
   margin-top: var(--container-padding);
   padding: var(--container-padding);
   border-radius: var(--input-radius);
-  background-color: var(--vscode-input-background);
   border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
 }
 

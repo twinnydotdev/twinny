@@ -616,9 +616,13 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
           <VSCodeButton appearance="secondary" onClick={handleCancel}>
             {t("cancel")}
           </VSCodeButton>
-          <VSCodeButton appearance="secondary" onClick={handleTestProvider}>
-            {t("test-provider")}
-          </VSCodeButton>
+          {
+            formState.type === "chat" && (
+              <VSCodeButton appearance="secondary" onClick={handleTestProvider}>
+                {t("test-provider")}
+              </VSCodeButton>
+            )
+          }
         </div>
         {testStatus && <p className={styles.testStatus}>{testStatus}</p>}
       </form>
