@@ -592,7 +592,6 @@ export class ProviderManager {
       const providers = JSON.parse(content.toString()) as Providers
       return providers
     } catch {
-      // Silently ignore and return undefined if file doesn't exist or is invalid JSON
       return undefined
     }
   }
@@ -607,7 +606,6 @@ export class ProviderManager {
       await workspace.fs.writeFile(fileUri, Buffer.from(content))
     } catch (e) {
       console.error(e)
-      // Handle error appropriately, e.g. show error message to user
     }
   }
 
@@ -625,7 +623,7 @@ export class ProviderManager {
     if (getIsOpenAICompatible(provider)) {
       return OPEN_AI_COMPATIBLE_PROVIDERS.OpenAICompatible as LLMProvider
     }
-    return provider.provider as LLMProvider // ollama, anthropic etc.
+    return provider.provider as LLMProvider
   }
 
   async testProvider(provider?: TwinnyProvider) {
