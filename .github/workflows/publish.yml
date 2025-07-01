@@ -58,11 +58,11 @@ jobs:
             echo "Publishing $file"
             npx vsce publish --pat "$VSCE_PAT" --packagePath "$file"
           done
-      # - name: Publish to Open VSX Registry
-      #   env:
-      #     OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
-      #   run: |
-      #     for file in ./vsix/**/*.vsix; do
-      #       echo "Publishing $file to Open VSX Registry"
-      #       npx ovsx publish -p "$OVSX_PAT" --packagePath "$file"
-      #     done
+      - name: Publish to Open VSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+        run: |
+          for file in ./vsix/**/*.vsix; do
+            echo "Publishing $file to Open VSX Registry"
+            npx ovsx publish -p "$OVSX_PAT" --packagePath "$file"
+          done
