@@ -15,6 +15,9 @@ jobs:
           - os: macOS-13
             target: darwin-x64
             npm_config_arch: x64
+          - os: ubuntu-latest
+            target: linux-arm64
+            npm_config_arch: arm64
           - os: macos-latest
             target: darwin-arm64
             npm_config_arch: arm64
