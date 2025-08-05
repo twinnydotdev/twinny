@@ -338,7 +338,7 @@ export interface SelectionContextItem extends ContextItem {
   };
 }
 
-export type AnyContextItem = SelectionContextItem;
+export type AnyContextItem = SelectionContextItem | ContextItem;
 
 export interface MentionType {
   name: string

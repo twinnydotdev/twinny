@@ -21,7 +21,7 @@ import {
 } from "./common/constants"
 import { logger } from "./common/logger"
 import {
-  FileContextItem,
+  ContextItem,
   SelectionContextItem,
   ServerMessage} from "./common/types"
 import { setContext } from "./extension/context"
@@ -270,9 +270,9 @@ export async function activate(context: ExtensionContext) {
       const editor = window.activeTextEditor
       if (editor) {
         const filePath = workspace.asRelativePath(editor.document.uri.fsPath)
-        const fileContextItem: FileContextItem = {
+        const fileContextItem: ContextItem = {
           id: filePath, // Use filePath as the ID for files
-          category: "file",
+          category: "files",
           name: path.basename(editor.document.uri.fsPath),
           path: filePath
         }

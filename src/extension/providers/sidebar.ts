@@ -52,13 +52,13 @@ export class SidebarProvider extends BaseProvider {
 
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [this.context?.extensionUri],
+      localResourceRoots: [this.context?.extensionUri]
     }
+
+    this.registerWebView(webviewView.webview)
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview)
     logger.log("Sidebar webview view resolved")
-
-    this.registerWebView(webviewView.webview)
 
     // Reset sidebar ready promise when the Twinny sidebar is hidden (user navigates away)
     webviewView.onDidChangeVisibility(() => {
