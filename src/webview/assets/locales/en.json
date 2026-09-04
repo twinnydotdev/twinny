@@ -94,6 +94,7 @@
   "providers-feature-streaming": "Streaming",
   "providers-gemini-name": "Gemini",
   "providers-groq-name": "Groq",
+  "providers-llmman-name": "llmman",
   "providers-mistral-name": "Mistral",
   "providers-ollama-name": "Ollama",
   "providers-openai-compatible-name": "Localhost OpenAI Compatible Server",

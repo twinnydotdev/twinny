@@ -5,6 +5,8 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
   Ollama: "ollama",
+  // https://github.com/llmmanorg/llmman serves the Ollama API on port 17434
+  Llmman: "llmman",
   Twinny: "twinny",
   OpenAICompatible: "openai-compatible"
 }

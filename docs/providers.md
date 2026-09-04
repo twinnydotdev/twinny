@@ -17,6 +17,25 @@ These example configurations serve as a starting point. Individual adjustments m
 - **Path:** `/v1/chat/completions`
 - **Model Name:** `codellama:7b-instruct` or any effective instruct model
 
+### llmman
+
+[llmman](https://github.com/llmmanorg/llmman) is a local model runner that serves the Ollama API (alongside OpenAI- and Anthropic-compatible ones) on port `17434`. Configure it like Ollama, changing only the port. Start it with `llmman serve` and pull a model with `llmman pull gemma4`.
+
+#### FIM (Auto-complete)
+
+- **Hostname:** `localhost`
+- **Port:** `17434`
+- **Path:** `/api/generate`
+- **Model Name:** `qwen3.8` or any base/code model (e.g. `hf.co/unsloth/Qwen3.5-0.8B-GGUF`)
+- **FIM Template:** Select the appropriate template based on the model.
+
+#### Chat Configuration
+
+- **Hostname:** `localhost`
+- **Port:** `17434`
+- **Path:** `/v1/chat/completions`
+- **Model Name:** `gemma4` or any effective instruct model
+
 ### Open WebUI
 
 Open WebUI can be used a proxy API for twinny, simply configure the endpoint to match what is served by OpenWeb UI.

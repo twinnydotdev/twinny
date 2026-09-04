@@ -49,6 +49,19 @@ const providers: TwinnyProvider[] = [
     type: "chat",
   },
   {
+    // https://github.com/llmmanorg/llmman - Ollama-compatible API on 17434
+    label: "providers-llmman-name",
+    logo: <i className="codicon codicon-server" />,
+    apiHostname: "localhost",
+    apiPort: 17434,
+    apiPath: "/v1",
+    apiProtocol: "http",
+    id: "llmman-default",
+    modelName: "gemma4",
+    provider: API_PROVIDERS.Llmman,
+    type: "chat",
+  },
+  {
     label: "providers-openai-compatible-name",
     logo: <SvgOpenAI />,
     apiHostname: "localhost",

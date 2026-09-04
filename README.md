@@ -5,6 +5,7 @@ Twinny is a free AI extension for Visual Studio Code, offering powerful AI-assis
 ## Supported Providers
 
 - localhost OpenAI/Ollama Compatible API (default)
+- [llmman](https://github.com/llmmanorg/llmman)
 - [OpenAI](https://openai.com)
 - [Anthropic](https://www.anthropic.com)
 - [OpenRouter](https://openrouter.ai)
