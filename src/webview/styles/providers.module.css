@@ -265,16 +265,3 @@
   gap: 4px;
 }
 
-.modelLoader {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  height: 20px;
-  padding: 4px 8px;
-}
-
-.loaderText {
-  color: var(--vscode-foreground);
-  font-size: 13px;
-  opacity: 0.8;
-}

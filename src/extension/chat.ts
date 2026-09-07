@@ -27,8 +27,6 @@ import {
   DEFAULT_RERANK_THRESHOLD,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
-  EXTENSION_SESSION_NAME,
-  SYMMETRY_EMITTER_KEY,
   SYSTEM,
   USER,
   WEBUI_TABS,
@@ -52,8 +50,6 @@ import { EmbeddingDatabase } from "./embeddings"
 import { FileHandler } from "./file-handler"
 import { TwinnyProvider } from "./provider-manager"
 import { Reranker } from "./reranker"
-import { SessionManager } from "./session-manager"
-import { SymmetryService } from "./symmetry-service"
 import { TemplateProvider } from "./template-provider"
 import { FileTreeProvider } from "./tree"
 import {
@@ -76,9 +72,7 @@ export class Chat extends Base {
   private _lastStreamingRequest?: CompletionStreaming<LLMProvider>
   private _lastRequest?: CompletionNonStreaming<LLMProvider>
   private _reranker: Reranker
-  private _sessionManager: SessionManager | undefined
   private _statusBar: StatusBarItem
-  private _symmetryService?: SymmetryService
   private _templateProvider?: TemplateProvider
   private _tokenJs: TokenJS | undefined
   private _webView?: Webview
@@ -91,9 +85,7 @@ export class Chat extends Base {
     templateDir: string | undefined,
     extensionContext: ExtensionContext,
     webView: Webview,
-    db: EmbeddingDatabase | undefined,
-    sessionManager: SessionManager | undefined,
-    symmetryService: SymmetryService
+    db: EmbeddingDatabase | undefined
   ) {
     super(extensionContext)
     this._webView = webView
@@ -101,25 +93,7 @@ export class Chat extends Base {
     this._templateProvider = new TemplateProvider(templateDir)
     this._reranker = new Reranker()
     this._db = db
-    this._sessionManager = sessionManager
-    this._symmetryService = symmetryService
     this._fileHandler = new FileHandler(webView)
-    this.setupSymmetryListeners()
-  }
-
-  private setupSymmetryListeners() {
-    this._symmetryService?.on(
-      SYMMETRY_EMITTER_KEY.inference,
-      (completion: string) => {
-        this._webView?.postMessage({
-          type: EVENT_NAME.twinnyOnCompletion,
-          data: {
-            content: completion.trimStart(),
-            role: ASSISTANT
-          }
-        } as ServerMessage<ChatCompletionMessage>)
-      }
-    )
   }
 
   private async getRelevantFiles(
@@ -479,16 +453,10 @@ export class Chat extends Base {
   }
 
   public async getRagContext(text?: string): Promise<string | null> {
-    const symmetryConnected = this._sessionManager?.get(
-      EXTENSION_SESSION_NAME.twinnySymmetryConnection
-    )
-
     let combinedContext = ""
 
     const workspaceMentioned = text?.includes("@workspace")
     const problemsMentioned = text?.includes("@problems")
-
-    if (symmetryConnected) return null
 
     let problemsContext = ""
     if (problemsMentioned) {

@@ -243,8 +243,8 @@ export class ProviderManager {
       apiHostname: "twinny.dev",
       apiPath: "/v1",
       apiProtocol: "https",
-      id: "symmetry-default",
-      label: "Twinny.dev (Symmetry)",
+      id: "twinny-default",
+      label: "Twinny.dev",
       modelName: "llama3.2:latest",
       provider: API_PROVIDERS.Twinny,
       type: "chat"
@@ -603,7 +603,7 @@ export class ProviderManager {
     )
     try {
       const content = JSON.stringify(providers, null, 2)
-      await workspace.fs.writeFile(fileUri, Buffer.from(content))
+      await workspace.fs.writeFile(fileUri, Buffer.from(content) as Uint8Array)
     } catch (e) {
       console.error(e)
     }

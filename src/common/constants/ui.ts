@@ -4,6 +4,5 @@ export const WEBUI_TABS = {
   providers: "providers",
   review: "review",
   settings: "templates",
-  symmetry: "symmetry",
   embeddings: "embeddings"
 }

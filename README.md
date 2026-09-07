@@ -42,13 +42,10 @@ Use the sidebar to discuss your code with AI, getting explanations, tests, refac
 - Full-screen chat mode
 - Code solution block copying
 - Workspace embeddings for context-aware assistance
-- Symmetry network integration for P2P AI inference
 
 ### Workspace Embeddings
 Twinny uses workspace embeddings to provide context-aware AI assistance, improving the relevance of suggestions.
 
-### Symmetry Network
-A decentralized P2P network for sharing AI inference resources, enhancing the capabilities of Twinny.
 
 ## Known Issues
 

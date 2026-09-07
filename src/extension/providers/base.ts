@@ -1,13 +1,9 @@
 import { ChatCompletionMessageParam, models } from "fluency.js"
-import { serverMessageKeys } from "symmetry-core"
 import * as vscode from "vscode"
 
 import {
   ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   EVENT_NAME,
-  EXTENSION_SESSION_NAME,
-  SYMMETRY_EMITTER_KEY,
-  SYSTEM,
   TWINNY_COMMAND_NAME,
   WORKSPACE_STORAGE_KEY
 } from "../../common/constants"
@@ -15,9 +11,7 @@ import { logger } from "../../common/logger"
 import {
   AnyContextItem,
   ApiModel,
-  ChatCompletionMessage,
   ClientMessage,
-  InferenceRequest,
   LanguageType,
   ServerMessage,
   ThemeType
@@ -30,11 +24,9 @@ import { OllamaService } from "../ollama"
 import { ProviderManager, TwinnyProvider } from "../provider-manager"
 import { GithubService as ReviewService } from "../review-service"
 import { SessionManager } from "../session-manager"
-import { SymmetryService } from "../symmetry-service"
 import { TemplateProvider } from "../template-provider"
 import { FileTreeProvider } from "../tree"
 import {
-  createSymmetryMessage,
   getGitChanges,
   getLanguage,
   getTextSelection,
@@ -48,7 +40,6 @@ export class BaseProvider {
   private _ollamaService: OllamaService | undefined
   private _sessionManager: SessionManager | undefined
   private _statusBarItem: vscode.StatusBarItem
-  private _symmetryService?: SymmetryService
   private _templateDir: string | undefined
   private _templateProvider: TemplateProvider
   public chat: Chat | undefined
@@ -89,20 +80,13 @@ export class BaseProvider {
 
   private initializeServices() {
     if (!this.webView) return
-    this._symmetryService = new SymmetryService(
-      this.webView,
-      this._sessionManager,
-      this.context
-    )
 
     this.chat = new Chat(
       this._statusBarItem,
       this._templateDir,
       this.context,
       this.webView,
-      this._embeddingDatabase,
-      this._sessionManager,
-      this._symmetryService
+      this._embeddingDatabase
     )
 
     this.conversationHistory = new ConversationHistory(
@@ -206,12 +190,6 @@ export class BaseProvider {
     this.sendTextSelectionToWebView(text)
   }
 
-  public newSymmetryConversation() {
-    this._symmetryService?.write(
-      createSymmetryMessage(serverMessageKeys.newConversation)
-    )
-  }
-
   public editDefaultTemplates = async () => {
     if (!this._templateDir) return
     await vscode.commands.executeCommand(
@@ -230,22 +208,6 @@ export class BaseProvider {
   }
 
   public async streamTemplateCompletion(template: string) {
-    const symmetryConnected = this._sessionManager?.get(
-      EXTENSION_SESSION_NAME.twinnySymmetryConnection
-    )
-    if (symmetryConnected && this.chat) {
-      const messages = await this.chat.getTemplateMessages(template)
-      logger.log(`
-        Using symmetry for inference
-        Messages: ${JSON.stringify(messages)}
-      `)
-      return this._symmetryService?.write(
-        createSymmetryMessage<InferenceRequest>(serverMessageKeys.inference, {
-          messages,
-          key: SYMMETRY_EMITTER_KEY.inference
-        })
-      )
-    }
     this.chat?.templateCompletion(template)
   }
 
@@ -313,7 +275,6 @@ export class BaseProvider {
 
   private twinnyNewConversation = () => {
     this.conversationHistory?.resetConversation()
-    this.newSymmetryConversation()
     this.webView?.postMessage({
       type: EVENT_NAME.twinnyNewConversation
     } as ServerMessage<string>)
@@ -404,36 +365,6 @@ export class BaseProvider {
   private streamChatCompletion = async (
     data: ClientMessage<ChatCompletionMessageParam[]>
   ) => {
-    const symmetryConnected = this._sessionManager?.get(
-      EXTENSION_SESSION_NAME.twinnySymmetryConnection
-    )
-    if (symmetryConnected) {
-      const systemMessage = {
-        role: SYSTEM,
-        content: await this._templateProvider?.readSystemMessageTemplate()
-      }
-
-      const messages = [
-        systemMessage,
-        ...(data.data as ChatCompletionMessage[])
-      ].map((m) => ({
-        ...m,
-        content: m.content
-      }))
-
-      logger.log(`
-        Using symmetry for inference
-        Messages: ${JSON.stringify(messages)}
-      `)
-
-      return this._symmetryService?.write(
-        createSymmetryMessage(serverMessageKeys.inference, {
-          messages,
-          key: SYMMETRY_EMITTER_KEY.inference
-        })
-      )
-    }
-
     this.chat?.completion(
       data.data || [],
       data.meta as AnyContextItem[],

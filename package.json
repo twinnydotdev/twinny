@@ -93,16 +93,11 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab || view == twinny.sidebar && twinnySymmetryTab"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab"
         },
         {
           "command": "twinny.review",
           "group": "navigation@1",
-          "when": "view == twinny.sidebar"
-        },
-        {
-          "command": "twinny.symmetry",
-          "group": "navigation@2",
           "when": "view == twinny.sidebar"
         },
         {
@@ -194,12 +189,6 @@
         "shortTitle": "twinny code reviewer",
         "title": "Code reviewer",
         "icon": "$(git-pull-request)"
-      },
-      {
-        "command": "twinny.symmetry",
-        "shortTitle": "twinny symmetry network",
-        "title": "Symmetry network settings",
-        "icon": "$(mirror-public)"
       },
       {
         "command": "twinny.conversationHistory",
@@ -461,12 +450,6 @@
           "default": true,
           "markdownDescription": "Activates debug logging for Twinny. When `true`, Twinny will output detailed logs, which can be helpful for troubleshooting."
         },
-        "twinny.symmetryServerKey": {
-          "order": 20,
-          "type": "string",
-          "markdownDescription": "Sets the symmetry master server key. Default value is provided for twinny's Symmetry server.",
-          "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
-        },
         "twinny.githubToken": {
           "order": 21,
           "type": "string",
@@ -504,7 +487,6 @@
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
     "@types/async-lock": "^1.4.2",
     "@types/cheerio": "^0.22.35",
-    "@types/js-yaml": "^4.0.9",
     "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
@@ -513,7 +495,6 @@
     "@types/string_score": "^0.1.31",
     "@types/uuid": "^9.0.8",
     "@types/vscode": "^1.70.0",
-    "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
     "@vscode/test-cli": "^0.0.6",
@@ -548,7 +529,6 @@
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
     "async-lock": "^1.4.1",
-    "b4a": "^1.6.6",
     "cheerio": "^1.0.0",
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
@@ -557,12 +537,10 @@
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
-    "hypercore-crypto": "^3.4.2",
     "hyperswarm": "^4.7.15",
     "i18next": "^23.16.5",
     "i18next-http-backend": "^2.6.2",
     "ignore": "^6.0.2",
-    "js-yaml": "^4.1.0",
     "lucide-react": "^0.473.0",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
@@ -576,12 +554,10 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "string_score": "^0.1.22",
-    "symmetry-core": "^1.0.45",
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.8.10",
     "toxe": "^1.1.0",
-    "uuid": "^9.0.1",
-    "ws": "^8.18.0"
+    "uuid": "^9.0.1"
   },
   "os": [
     "darwin",

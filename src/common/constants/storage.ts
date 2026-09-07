@@ -7,7 +7,6 @@ export const CONVERSATION_STORAGE_KEY = "twinny.conversations"
 export const INFERENCE_PROVIDERS_STORAGE_KEY = "twinny.inference-providers"
 
 export const GLOBAL_STORAGE_KEY = {
-  autoConnectSymmetryProvider: "twinny.autoConnectSymmetryProvider",
   selectedModel: "twinny.selectedModel"
 }
 

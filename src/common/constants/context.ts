@@ -11,11 +11,5 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyRelevantFilePaths: "twinnyRelevantFilePaths",
   twinnyRerankThreshold: "twinnyRerankThreshold",
   twinnyReviewTab: "twinnyReviewTab",
-  twinnySymmetryTab: "twinnySymmetryTab",
   twinnyEmbeddingsTab: "twinnyEmbeddingsTab"
-}
-
-export const EXTENSION_SESSION_NAME = {
-  twinnySymmetryConnection: "twinnySymmetryConnection",
-  twinnySymmetryConnectionProvider: "twinnySymmetryConnectionProvider"
 }

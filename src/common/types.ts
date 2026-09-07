@@ -1,6 +1,5 @@
 import { ChatCompletionMessageParam } from "fluency.js"
 import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
-import { serverMessageKeys } from "symmetry-core"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
 
 import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
@@ -257,50 +256,6 @@ export interface InferenceProvider {
   modelName?: string
   name: string
   type: (typeof API_PROVIDERS)[keyof typeof API_PROVIDERS]
-}
-
-export interface Peer {
-  publicKey: Buffer
-  write: (value: string) => boolean
-  on: (key: string, cb: (data: Buffer) => void) => void
-  once: (key: string, cb: (data: Buffer) => void) => void
-  writable: boolean
-  key: string
-  discovery_key: string
-}
-
-export interface SymmetryMessage<T> {
-  key: string
-  data: T
-}
-
-export type ServerMessageKey = keyof typeof serverMessageKeys
-
-export interface SymmetryConnection {
-  sessionToken?: string
-  discoveryKey?: string
-  modelName?: string
-  name: string
-  provider: string
-  id: string
-}
-
-export interface SymmetryModelProvider {
-  connections: number | null
-  data_collection_enabled: number
-  id: number
-  last_seen: string
-  max_connections: number
-  model_name: string
-  name: string
-  online: number
-  provider: string
-  public: number
-}
-
-export interface InferenceRequest {
-  key: string
-  messages: ChatCompletionMessage[]
 }
 
 export interface ChunkOptions {

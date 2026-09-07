@@ -5,10 +5,6 @@ export const EVENT_NAME = {
   twinnyChat: "twinny-chat",
   twinnyChatMessage: "twinny-chat-message",
   twinnyClickSuggestion: "twinny-click-suggestion",
-  twinnyConnectedToSymmetry: "twinny-connected-to-symmetry",
-  twinnyConnectSymmetry: "twinny-connect-symmetry",
-  twinnyDisconnectedFromSymmetry: "twinny-disconnected-from-symmetry",
-  twinnyDisconnectSymmetry: "twinny-disconnect-symmetry",
   twinnyEditDefaultTemplates: "twinny-edit-default-templates",
   twinnyEmbedDocuments: "twinny-embed-documents",
   twinnyEnableModelDownload: "twinny-enable-model-download",
@@ -34,7 +30,6 @@ export const EVENT_NAME = {
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
   twinnySendRequestBody: "twinny-send-request-body",
-  twinnySendSymmetryMessage: "twinny-send-symmetry-message",
   twinnySendSystemMessage: "twinny-send-system-message",
   twinnySendTheme: "twinny-send-theme",
   twinnySessionContext: "twinny-session-context",
@@ -46,11 +41,7 @@ export const EVENT_NAME = {
   twinnySetSessionContext: "twinny-set-session-context",
   twinnySetTab: "twinny-set-tab",
   twinnySetWorkspaceContext: "twinny-set-workspace-context",
-  twinnyStartSymmetryProvider: "twinny-start-symmetry-provider",
   twinnyStopGeneration: "twinny-stop-generation",
-  twinnyStopSymmetryProvider: "twinny-stop-symmetry-provider",
-  twinnySymmetryModels: "twinny-symmetry-models",
-  twinnyGetSymmetryModels: "twinny-get-symmetry-models",
   twinnyTextSelection: "twinny-text-selection",
   twinnyGetModels: "twinny-get-models",
   twinnyUpdateContextItems: "twinny-update-context-items",
@@ -93,6 +84,3 @@ export const GITHUB_EVENT_NAME = {
   getPullRequestReview: "github.getPullRequestReview"
 }
 
-export const SYMMETRY_EMITTER_KEY = {
-  inference: "inference"
-}

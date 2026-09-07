@@ -44,7 +44,6 @@ import {
   LanguageType,
   PrefixSuffix,
   ServerMessage,
-  ServerMessageKey,
   StreamResponse,
   Theme
 } from "../common/types"
@@ -533,13 +532,6 @@ export const getTerminalExists = (): boolean => {
   return true
 }
 
-export function createSymmetryMessage<T>(
-  key: ServerMessageKey,
-  data?: T
-): string {
-  return JSON.stringify({ key, data })
-}
-
 export const getNormalisedText = (text: string) =>
   text.replace(NORMALIZE_REGEX, " ")
 
@@ -677,16 +669,6 @@ export const updateLoadingMessage = (
 ) => {
   webView?.postMessage({
     type: EVENT_NAME.twinnySendLoader,
-    data: message
-  } as ServerMessage<string>)
-}
-
-export const updateSymmetryStatus = (
-  webView: Webview | undefined,
-  message: string
-) => {
-  webView?.postMessage({
-    type: EVENT_NAME.twinnySendSymmetryMessage,
     data: message
   } as ServerMessage<string>)
 }

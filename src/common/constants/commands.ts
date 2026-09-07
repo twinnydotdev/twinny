@@ -21,7 +21,6 @@ export const TWINNY_COMMAND_NAME = {
   stopGeneration: "twinny.stopGeneration",
   templateCompletion: "twinny.templateCompletion",
   templates: "twinny.templates",
-  twinnySymmetryTab: "twinny.symmetry",
   addFileToContext: "twinny.addFileToContext",
   getContextFiles: "twinny.getContextFiles",
   addSelectionToContext: "twinny.addSelectionToContext"
