@@ -1,7 +1,7 @@
 import { ReactNode } from "react"
 import { ChatCompletionMessageParam } from "fluency.js"
 import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
-import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
+import { InlineCompletionItem, InlineCompletionList } from "vscode"
 
 import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
@@ -11,6 +11,7 @@ export interface RequestBodyBase {
   n_predict?: number
   temperature?: number
   messages?: ChatCompletionMessageParam[]
+  stop?: string[]
 }
 
 export interface RequestOptionsOllama extends RequestBodyBase {
@@ -22,20 +23,12 @@ export interface RequestOptionsOllama extends RequestBodyBase {
 }
 
 export interface StreamBodyOpenAI extends RequestBodyBase {
-  max_tokens: number
+  max_tokens?: number
 }
 
 export interface PrefixSuffix {
   prefix: string
   suffix: string
-}
-
-export interface RepositoryLevelData {
-  uri: Uri
-  text: string
-  name: string
-  isOpen: boolean
-  relevanceScore: number
 }
 
 export interface StreamResponse {
@@ -172,12 +165,24 @@ export interface ChatTemplateData {
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
 
+/** A neighbouring file (or a window of one) included in a FIM prompt. */
+export interface FimContextFile {
+  /** Workspace-relative path, used as the label in the prompt. */
+  name: string
+  text: string
+}
+
 export interface FimPromptTemplate {
-  context: string
+  /** Other files to show the model before the current one. */
+  contextFiles: FimContextFile[]
+  /** Comment line(s) naming the language and file, placed just before the prefix. */
   header: string
   prefixSuffix: PrefixSuffix
-  fileContextEnabled: boolean
   language?: string
+  /** Workspace-relative path of the file being completed. */
+  fileName: string
+  /** Workspace name, used by repository-level templates. */
+  repoName: string
 }
 
 export interface ApiProviders {

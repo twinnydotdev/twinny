@@ -6,30 +6,39 @@ import { supportedLanguages } from "../common/languages"
 import { Bracket } from "../common/types"
 import { getLineBreakCount } from "../webview/utils"
 
-import { getLanguage } from "./utils"
+const BRACKET_PAIRS: Record<string, string> = {
+  "(": ")",
+  "[": "]",
+  "{": "}"
+}
 
+/**
+ * Post-processes a raw model completion against the text around the cursor:
+ * drops closers/quotes the editor already has, refuses completions that
+ * duplicate nearby lines, and trims whitespace the editor will add itself.
+ */
 export class CompletionFormatter {
   protected editor: TextEditor
   public cursorPosition: Position
   private lineText: string
+  private textBeforeCursor: string
   public textAfterCursor: string
   private charAfterCursor: string
   private charBeforeCursor: string
   protected completion = ""
-  private normalizedCompletion = ""
   private originalCompletion = ""
   public languageId: string | undefined
-  private isDebugEnabled = false
 
-  constructor(editor: TextEditor) {
+  constructor(editor: TextEditor, position?: Position) {
     this.editor = editor
-    this.cursorPosition = editor.selection.active
+    this.cursorPosition = position ?? editor.selection.active
     const document = editor.document
     this.languageId = document.languageId
     const currentLine = document.lineAt(this.cursorPosition.line)
     this.lineText = currentLine.text
     const textAfterRange = new Range(this.cursorPosition, currentLine.range.end)
     this.textAfterCursor = document.getText(textAfterRange) || ""
+    this.textBeforeCursor = this.lineText.slice(0, this.cursorPosition.character)
     this.charAfterCursor = this.textAfterCursor.charAt(0)
     this.charBeforeCursor =
       this.cursorPosition.character > 0
@@ -37,20 +46,11 @@ export class CompletionFormatter {
         : ""
   }
 
-  public setDebug(enabled: boolean): this {
-    this.isDebugEnabled = enabled
-    return this
-  }
-
   private isMatchingPair(open?: Bracket, close?: string): boolean {
-    const BRACKET_PAIRS: { [key: string]: string } = {
-      "(": ")",
-      "[": "]",
-      "{": "}"
-    }
     return BRACKET_PAIRS[open || ""] === close
   }
 
+  /** Cut the completion at the first closing bracket that has no opener in it. */
   protected matchCompletionBrackets(): this {
     let accumulatedCompletion = ""
     const openBrackets: Bracket[] = []
@@ -87,10 +87,6 @@ export class CompletionFormatter {
     this.completion =
       accumulatedCompletion.trimEnd() || this.originalCompletion.trimEnd()
 
-    if (this.isDebugEnabled) {
-      console.log(`After matchCompletionBrackets: ${this.completion}`)
-    }
-
     return this
   }
 
@@ -101,92 +97,52 @@ export class CompletionFormatter {
     ) {
       this.completion = this.completion.trim()
     }
-
-    if (this.isDebugEnabled) {
-      console.log(`After ignoreBlankLines: ${this.completion}`)
-    }
-
     return this
   }
 
   protected normalize(text: string): string {
-    let normalized = text.trim()
-
-    const language = getLanguage()
-    const languageDetails =
-      supportedLanguages[language.languageId as keyof typeof supportedLanguages]
-
-    if (languageDetails) {
-      if (languageDetails.syntaxComments && languageDetails.syntaxComments.start) {
-        const commentStart = languageDetails.syntaxComments.start
-        if (normalized.startsWith(commentStart)) {
-          normalized = normalized.substring(commentStart.length).trim()
-        }
-      }
-    }
-
-    return normalized
+    return text.trim()
   }
 
   protected calculateStringSimilarity(str1: string, str2: string): number {
-    if (str1 === str2) return 1.0;
-    if (str1.length === 0 || str2.length === 0) return 0.0;
+    if (str1 === str2) return 1.0
+    if (str1.length === 0 || str2.length === 0) return 0.0
 
-    const maxLen = Math.max(str1.length, str2.length);
-    const levenshteinDistance = distance(str1, str2);
-
-    return 1 - (levenshteinDistance / maxLen);
+    const maxLen = Math.max(str1.length, str2.length)
+    return 1 - distance(str1, str2) / maxLen
   }
 
+  /**
+   * Models sometimes restart the current line instead of continuing it, e.g.
+   * `const x = foo(` completed with `const x = foo(a, b)`. Keep only the part
+   * after the echoed text.
+   */
+  protected stripEchoedPrefix(completion: string): string {
+    const before = this.textBeforeCursor.trimStart()
+    if (before.trim().length < 3) return completion
+    const trimmed = completion.trimStart()
+    return trimmed.startsWith(before) ? trimmed.slice(before.length) : completion
+  }
+
+  /** Drop the part of the completion that repeats what follows the cursor. */
   protected removeDuplicateText(): this {
     const after = this.normalize(this.textAfterCursor)
     if (!after || !this.completion) return this
 
     const maxLength = Math.min(this.completion.length, after.length)
-    let overlapLength = 0
 
     for (let length = maxLength; length > 0; length--) {
-      const endOfCompletion = this.completion.slice(-length)
-      const startOfAfter = after.slice(0, length)
-      if (endOfCompletion === startOfAfter) {
-        overlapLength = length
+      if (this.completion.slice(-length) === after.slice(0, length)) {
+        this.completion = this.completion.slice(0, -length)
         break
       }
-    }
-
-    if (overlapLength > 0) {
-      this.completion = this.completion.slice(0, -overlapLength)
-    }
-
-    if (this.isDebugEnabled) {
-      console.log(`After removeDuplicateText: ${this.completion}`)
     }
 
     return this
   }
 
   protected isCursorAtMiddleOfWord(): boolean {
-    const isAfterWord = /\w/.test(this.charAfterCursor)
-    const isBeforeWord = /\w/.test(this.charBeforeCursor)
-
-    if (!isAfterWord || !isBeforeWord) return false
-
-    const language = getLanguage()
-    const languageId = language.languageId
-
-    if (languageId) {
-      if (["javascript", "typescript", "php"].includes(languageId)) {
-        if (this.charBeforeCursor === "$" || this.charAfterCursor === "$") {
-          return true
-        }
-      }
-
-      if (this.charBeforeCursor === "_" || this.charAfterCursor === "_") {
-        return true
-      }
-    }
-
-    return true
+    return /\w/.test(this.charAfterCursor) && /\w/.test(this.charBeforeCursor)
   }
 
   protected removeUnnecessaryMiddleQuotes(): this {
@@ -199,11 +155,6 @@ export class CompletionFormatter {
         this.completion = this.completion.slice(0, -1)
       }
     }
-
-    if (this.isDebugEnabled) {
-      console.log(`After removeUnnecessaryMiddleQuotes: ${this.completion}`)
-    }
-
     return this
   }
 
@@ -218,58 +169,49 @@ export class CompletionFormatter {
       trimmedCharAfterCursor &&
       (normalizedCompletion.endsWith("',") ||
         normalizedCompletion.endsWith("\",") ||
-        normalizedCompletion.endsWith("`,")||
+        normalizedCompletion.endsWith("`,") ||
         (normalizedCompletion.endsWith(",") &&
           QUOTES.includes(trimmedCharAfterCursor)))
     ) {
       this.completion = this.completion.slice(0, -2)
-    }
-    else if (
+    } else if (
       (normalizedCompletion.endsWith("'") ||
         normalizedCompletion.endsWith("\"") ||
         normalizedCompletion.endsWith("`")) &&
       QUOTES.includes(trimmedCharAfterCursor)
     ) {
       this.completion = this.completion.slice(0, -1)
-    }
-    else if (
+    } else if (
       QUOTES.includes(lastCharOfCompletion) &&
       trimmedCharAfterCursor === lastCharOfCompletion
     ) {
       this.completion = this.completion.slice(0, -1)
     }
 
-    if (this.isDebugEnabled) {
-      console.log(`After removeDuplicateQuotes: ${this.completion}`)
-    }
-
     return this
   }
 
+  /**
+   * Refuse a completion that repeats one of the next few lines verbatim.
+   * Only exact matches count: repetitive code (test files, data tables)
+   * legitimately produces lines that closely resemble their neighbours.
+   */
   protected preventDuplicateLine(): this {
     const lineCount = this.editor.document.lineCount
     const originalNormalized = this.normalize(this.originalCompletion)
+    if (!originalNormalized) return this
 
     for (let i = 1; i <= 3; i++) {
       const nextLineIndex = this.cursorPosition.line + i
       if (nextLineIndex >= lineCount) break
 
-      const nextLine = this.editor.document.lineAt(nextLineIndex).text
-      const nextLineNormalized = this.normalize(nextLine)
-
-      if (nextLineNormalized === originalNormalized) {
+      const nextLineNormalized = this.normalize(
+        this.editor.document.lineAt(nextLineIndex).text
+      )
+      if (nextLineNormalized && nextLineNormalized === originalNormalized) {
         this.completion = ""
         break
       }
-
-      if (this.calculateStringSimilarity(nextLineNormalized, originalNormalized) > 0.8) {
-        this.completion = ""
-        break
-      }
-    }
-
-    if (this.isDebugEnabled) {
-      console.log(`After preventDuplicateLine: ${this.completion}`)
     }
 
     return this
@@ -279,11 +221,6 @@ export class CompletionFormatter {
     if (this.textAfterCursor) {
       this.completion = this.completion.trimEnd()
     }
-
-    if (this.isDebugEnabled) {
-      console.log(`After removeInvalidLineBreaks: ${this.completion}`)
-    }
-
     return this
   }
 
@@ -291,31 +228,16 @@ export class CompletionFormatter {
     if (this.isCursorAtMiddleOfWord()) {
       this.completion = ""
     }
-
-    if (this.isDebugEnabled) {
-      console.log(`After skipMiddleOfWord: ${this.completion}`)
-    }
-
     return this
   }
 
   protected skipSimilarCompletions(): this {
-    const { document } = this.editor
-    const textAfter = document.getText(
-      new Range(
-        this.cursorPosition,
-        document.lineAt(this.cursorPosition.line).range.end
-      )
-    )
-
-    if (this.calculateStringSimilarity(textAfter, this.completion) > 0.6) {
+    if (
+      this.calculateStringSimilarity(this.textAfterCursor, this.completion) >
+      0.6
+    ) {
       this.completion = ""
     }
-
-    if (this.isDebugEnabled) {
-      console.log(`After skipSimilarCompletions: ${this.completion}`)
-    }
-
     return this
   }
 
@@ -326,6 +248,7 @@ export class CompletionFormatter {
     return this.completion
   }
 
+  /** The editor already indented the line; don't indent it twice. */
   protected trimStart(): this {
     const firstNonSpaceIndex = this.completion.search(/\S/)
     if (
@@ -334,18 +257,13 @@ export class CompletionFormatter {
     ) {
       this.completion = this.completion.trimStart()
     }
-
-    if (this.isDebugEnabled) {
-      console.log(`After trimStart: ${this.completion}`)
-    }
-
     return this
   }
 
+  /** Strip the "// File:" style header lines the prompt itself introduces. */
   public preventQuotationCompletions(): this {
-    const language = getLanguage()
-    const languageId =
-      supportedLanguages[language.languageId as keyof typeof supportedLanguages]
+    const languageDetails =
+      supportedLanguages[this.languageId as keyof typeof supportedLanguages]
 
     const normalizedCompletion = this.normalize(this.completion)
 
@@ -357,22 +275,16 @@ export class CompletionFormatter {
       return this
     }
 
-    if (
-      !languageId ||
-      !languageId.syntaxComments ||
-      !languageId.syntaxComments.start
-    ) {
-      return this
-    }
+    const commentStart = languageDetails?.syntaxComments?.start
+    if (!commentStart) return this
 
-    const lineBreakCount = getLineBreakCount(this.completion)
-    if (lineBreakCount > 1) return this
+    if (getLineBreakCount(this.completion) > 1) return this
 
-    const commentStart = languageId.syntaxComments.start
     const completionLines = this.completion.split("\n").filter((line) => {
       const startsWithComment = line.startsWith(commentStart)
-      const includesCommentReference = /\b(Language|File|End):\s*(.*)\b/.test(line)
-
+      const includesCommentReference = /\b(Language|File|End):\s*(.*)\b/.test(
+        line
+      )
       return !(startsWithComment && includesCommentReference)
     })
 
@@ -380,27 +292,12 @@ export class CompletionFormatter {
       this.completion = completionLines.join("\n")
     }
 
-    if (this.isDebugEnabled) {
-      console.log(`After preventQuotationCompletions: ${this.completion}`)
-    }
-
     return this
-  }
-
-  public debug(): void {
-    console.log(`Text after cursor: ${this.textAfterCursor}`)
-    console.log(`Original completion: ${this.originalCompletion}`)
-    console.log(`Normalized completion: ${this.normalizedCompletion}`)
-    console.log(`Character after cursor: ${this.charAfterCursor}`)
-    console.log(`Character before cursor: ${this.charBeforeCursor}`)
-    console.log(`Language ID: ${this.languageId}`)
-    console.log(`Final completion: ${this.completion}`)
   }
 
   public format(completion: string): string {
     this.completion = ""
-    this.normalizedCompletion = this.normalize(completion)
-    this.originalCompletion = completion
+    this.originalCompletion = this.stripEchoedPrefix(completion)
 
     return this.matchCompletionBrackets()
       .preventQuotationCompletions()

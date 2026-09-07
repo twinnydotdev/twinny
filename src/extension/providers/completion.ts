@@ -1,13 +1,9 @@
-import AsyncLock from "async-lock"
-import fs from "fs"
-import ignore from "ignore"
-import path from "path"
 import {
+  CancellationToken,
   ExtensionContext,
   InlineCompletionContext,
   InlineCompletionItem,
   InlineCompletionItemProvider,
-  InlineCompletionList,
   InlineCompletionTriggerKind,
   Position,
   Range,
@@ -17,81 +13,71 @@ import {
   window,
   workspace
 } from "vscode"
-import Parser, { SyntaxNode } from "web-tree-sitter"
-
-import "string_score"
+import { SyntaxNode } from "web-tree-sitter"
 
 import {
-  CLOSING_BRACKETS,
-  FIM_TEMPLATE_FORMAT,
-  LINE_BREAK_REGEX,
-  MAX_CONTEXT_LINE_COUNT,
-  MAX_EMPTY_COMPLETION_CHARS,
-  MIN_COMPLETION_CHUNKS,
-  MULTI_LINE_DELIMITERS,
-  MULTILINE_INSIDE,
-  MULTILINE_OUTSIDE,
-  OPENING_BRACKETS
+  FIM_CONTEXT_WINDOW_LINES,
+  FIM_MAX_CONTEXT_CHARS,
+  FIM_MAX_CONTEXT_FILES,
+  FIM_STREAM_TIMEOUT_MS,
+  FIM_TEMPLATE_FORMAT
 } from "../../common/constants"
 import { supportedLanguages } from "../../common/languages"
 import { logger } from "../../common/logger"
 import {
-  Bracket,
+  FimContextFile,
   FimTemplateData,
   PrefixSuffix,
-  RepositoryLevelData as RepositoryDocment,
-  ResolvedInlineCompletion,
-  StreamRequestOptions,
-  StreamResponse
+  StreamRequestOptions
 } from "../../common/types"
-import { getLineBreakCount } from "../../webview/utils"
 import { Base } from "../base"
-import { cache } from "../cache"
+import { cache, getSuggestionContinuation, LastSuggestion } from "../cache"
 import { CompletionFormatter } from "../completion-formatter"
+import { CompletionStream } from "../completion-stream"
 import { FileInteractionCache } from "../file-interaction"
 import {
   getFimPrompt,
   getFimTemplateRepositoryLevel,
   getStopWords
 } from "../fim-templates"
+import { getImportedFiles } from "../imports"
 import { llm } from "../llm"
 import { getNodeAtPosition, getParser } from "../parser"
 import { TwinnyProvider } from "../provider-manager"
 import { createStreamRequestBodyFim } from "../provider-options"
 import { TemplateProvider } from "../template-provider"
 import {
-  getCurrentLineText,
   getFimDataFromProvider,
-  getIsMiddleOfString,
-  getIsMultilineCompletion,
+  getIsMiddleOfWord,
   getPrefixSuffix,
-  getShouldSkipCompletion,
+  getShouldUseMultiline,
   sanitizeWorkspaceName
 } from "../utils"
+
+/** Everything one inline-completion request needs, kept off the instance. */
+interface CompletionRequest {
+  id: number
+  document: TextDocument
+  position: Position
+  prefixSuffix: PrefixSuffix
+  provider: TwinnyProvider
+  token: CancellationToken
+}
+
+const STATUS_IDLE = "$(code)"
+const STATUS_BUSY = "$(loading~spin)"
 
 export class CompletionProvider
   extends Base
   implements InlineCompletionItemProvider
 {
-  private _abortController: AbortController | null
+  private _abortController: AbortController | null = null
   private _acceptedLastCompletion = false
-  private _chunkCount = 0
-  private _completion = ""
-  private _debouncer: NodeJS.Timeout | undefined
-  private _document: TextDocument | null
   private _fileInteractionCache: FileInteractionCache
-  private _isMultilineCompletion = false
-  private _lastCompletionMultiline = false
-  private _lock: AsyncLock
-  private _nodeAtPosition: SyntaxNode | null = null
-  private _nonce = 0
-  private _parser: Parser | undefined
-  private _position: Position | null
-  private _prefixSuffix: PrefixSuffix = { prefix: "", suffix: "" }
-  private _provider: TwinnyProvider | undefined
+  private _lastSuggestion: LastSuggestion | undefined
+  private _requestId = 0
   private _statusBar: StatusBarItem
   private _templateProvider: TemplateProvider
-  private _usingFimTemplate = false
   public lastCompletionText = ""
 
   constructor(
@@ -101,21 +87,257 @@ export class CompletionProvider
     context: ExtensionContext
   ) {
     super(context)
-    this._abortController = null
-    this._document = null
-    this._lock = new AsyncLock()
-    this._position = null
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
     this._templateProvider = templateProvider
   }
 
-  private buildFimRequest(prompt: string, provider: TwinnyProvider) {
+  public async provideInlineCompletionItems(
+    document: TextDocument,
+    position: Position,
+    context: InlineCompletionContext,
+    token: CancellationToken
+  ): Promise<InlineCompletionItem[] | undefined> {
+    const provider = this.getFimProvider()
+    if (!this.config.get<boolean>("enabled", true) || !provider) return
+
+    if (!this.isLanguageEnabled(document.languageId)) return
+
+    const isManualTrigger =
+      context.triggerKind === InlineCompletionTriggerKind.Invoke
+    if (!isManualTrigger && !this.config.get<boolean>("autoSuggestEnabled")) {
+      return
+    }
+
+    // Any request still running is for an older cursor position.
+    this.abortCompletion()
+
+    const prefixSuffix = getPrefixSuffix(
+      this.config.get<number>("contextLength", 100),
+      document,
+      position
+    )
+
+    const continuation = getSuggestionContinuation(
+      this._lastSuggestion,
+      prefixSuffix
+    )
+    if (continuation) {
+      return this.toInlineCompletion(continuation, position)
+    }
+
+    if (this.config.get<boolean>("completionCacheEnabled")) {
+      const cached = cache.getCache(prefixSuffix)
+      if (cached) return this.toInlineCompletion(cached, position)
+    }
+
+    if (
+      this._acceptedLastCompletion &&
+      !this.config.get<boolean>("enableSubsequentCompletions", true)
+    ) {
+      return
+    }
+
+    if (getIsMiddleOfWord(document, position)) return
+
+    const request: CompletionRequest = {
+      id: ++this._requestId,
+      document,
+      position,
+      prefixSuffix,
+      provider,
+      token
+    }
+
+    if (!isManualTrigger) {
+      await this.debounce(this.config.get<number>("debounceWait", 300))
+      if (this.isStale(request)) return
+    }
+
+    return this.complete(request)
+  }
+
+  private isLanguageEnabled(languageId: string) {
+    const enabledLanguages = this.config.get<Record<string, boolean>>(
+      "enabledLanguages",
+      {}
+    )
+    return enabledLanguages[languageId] ?? enabledLanguages["*"] ?? true
+  }
+
+  private debounce(ms: number) {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms))
+  }
+
+  private isStale(request: CompletionRequest) {
+    return request.id !== this._requestId || request.token.isCancellationRequested
+  }
+
+  private async complete(
+    request: CompletionRequest
+  ): Promise<InlineCompletionItem[] | undefined> {
+    const { document, position, prefixSuffix, provider, token } = request
+
+    this._statusBar.text = STATUS_BUSY
+    this._statusBar.command = "twinny.stopGeneration"
+
+    const node = await this.getNodeAtCursor(document, position)
+    const prompt = await this.getPrompt(request)
+    if (!prompt || this.isStale(request)) {
+      this.setIdle()
+      return
+    }
+
+    const stopWords = getStopWords(provider.modelName, provider.fimTemplate)
+    const lineText = document.lineAt(position.line).text
+    const multiline = getShouldUseMultiline({
+      document,
+      position,
+      node,
+      multilineEnabled: this.config.get<boolean>(
+        "multilineCompletionsEnabled",
+        true
+      )
+    })
+    const stream = new CompletionStream({
+      stopWords,
+      multiline,
+      maxLines: this.config.get<number>("maxLines", 40),
+      textBeforeCursor: lineText.slice(0, position.character),
+      suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix)
+    })
+
+    const { body, options } = this.buildFimRequest(prompt, provider, stopWords)
+
+    const completion = await new Promise<string>((resolve) => {
+      let controller: AbortController | null = null
+      let settled = false
+      const settle = (text: string) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        cancellation.dispose()
+        resolve(text)
+      }
+      const timeout = setTimeout(() => {
+        logger.log(`FIM request ${request.id} timed out`)
+        controller?.abort()
+        settle(stream.finish())
+      }, FIM_STREAM_TIMEOUT_MS)
+      const cancellation = token.onCancellationRequested(() => {
+        controller?.abort()
+        settle("")
+      })
+
+      llm({
+        body,
+        options,
+        onStart: (abortController) => {
+          controller = abortController
+          this._abortController = abortController
+        },
+        onData: (data) => {
+          const text = getFimDataFromProvider(provider.provider, data)
+          if (text === undefined) return
+          const { done } = stream.push(text)
+          if (done) {
+            controller?.abort()
+            settle(stream.value)
+          }
+        },
+        onEnd: () => settle(stream.finish()),
+        onError: (error) => {
+          logger.error(error)
+          settle("")
+        }
+      }).catch((error) => {
+        logger.error(error)
+        settle("")
+      })
+    })
+
+    if (this._abortController && request.id === this._requestId) {
+      this._abortController = null
+    }
+
+    if (this.isStale(request) || !completion) {
+      this.setIdle()
+      return
+    }
+
+    const editor = window.activeTextEditor
+    if (!editor || editor.document !== document) {
+      this.setIdle()
+      return
+    }
+
+    const formatted = new CompletionFormatter(editor, position).format(
+      completion
+    )
+
+    logger.log(
+      `FIM request ${request.id} (${document.uri.fsPath})\n` +
+        `  multiline: ${multiline}\n` +
+        `  raw: ${JSON.stringify(completion)}\n` +
+        `  formatted: ${JSON.stringify(formatted)}`
+    )
+
+    if (!formatted) {
+      this.setIdle()
+      return
+    }
+
+    if (this.config.get<boolean>("completionCacheEnabled")) {
+      cache.setCache(prefixSuffix, formatted)
+    }
+
+    this._lastSuggestion = { ...prefixSuffix, completion: formatted }
+    return this.toInlineCompletion(formatted, position)
+  }
+
+  private toInlineCompletion(text: string, position: Position) {
+    this.setIdle()
+    this.lastCompletionText = text
+    return [new InlineCompletionItem(text, new Range(position, position))]
+  }
+
+  private setIdle() {
+    this._statusBar.text = STATUS_IDLE
+  }
+
+  private getFirstNonBlankLine(text: string) {
+    return (
+      text
+        .split("\n")
+        .map((line) => line.trim())
+        .find((line) => line.length > 0) || ""
+    )
+  }
+
+  private async getNodeAtCursor(
+    document: TextDocument,
+    position: Position
+  ): Promise<SyntaxNode | null> {
+    try {
+      const parser = await getParser(document.uri.fsPath)
+      if (!parser) return null
+      return getNodeAtPosition(parser.parse(document.getText()), position)
+    } catch {
+      return null
+    }
+  }
+
+  private buildFimRequest(
+    prompt: string,
+    provider: TwinnyProvider,
+    stopWords: string[]
+  ) {
     const body = createStreamRequestBodyFim(provider.provider, prompt, {
       model: provider.modelName,
-      numPredictFim: this.config.numPredictFim,
-      temperature: this.config.temperature,
-      keepAlive: this.config.keepAlive
+      numPredictFim: this.config.get<number>("numPredictFim", 512),
+      temperature: this.config.get<number>("temperature", 0.2),
+      keepAlive: this.config.get<string>("keepAlive"),
+      stop: stopWords
     })
 
     const options: StreamRequestOptions = {
@@ -133,614 +355,131 @@ export class CompletionProvider
     return { options, body }
   }
 
-  public async provideInlineCompletionItems(
-    document: TextDocument,
-    position: Position,
-    context: InlineCompletionContext
-  ): Promise<InlineCompletionItem[] | InlineCompletionList | null | undefined> {
-    const editor = window.activeTextEditor
-    this._provider = this.getFimProvider()
-    const isLastCompletionAccepted =
-      this._acceptedLastCompletion && !this.config.enableSubsequentCompletions
+  private getPromptHeader(languageId: string, uri: Uri) {
+    const lang = supportedLanguages[languageId as keyof typeof supportedLanguages]
+    if (!lang) return ""
 
-    this._prefixSuffix = getPrefixSuffix(
-      this.config.contextLength,
-      document,
-      position
-    )
-
-    const languageEnabled =
-      this.config.enabledLanguages[document.languageId] ??
-      this.config.enabledLanguages["*"] ??
-      true
-
-    if (!languageEnabled) return
-
-    const cachedCompletion = cache.getCache(this._prefixSuffix)
-    if (cachedCompletion && this.config.completionCacheEnabled) {
-      this._completion = cachedCompletion
-      return this.provideInlineCompletion()
-    }
-
-    if (
-      context.triggerKind === InlineCompletionTriggerKind.Invoke &&
-      this.config.autoSuggestEnabled
-    ) {
-      this._completion = this.lastCompletionText
-      return this.provideInlineCompletion()
-    }
-
-    if (
-      !this.config.enabled ||
-      !editor ||
-      isLastCompletionAccepted ||
-      this._lastCompletionMultiline ||
-      getShouldSkipCompletion(context, this.config.autoSuggestEnabled) ||
-      getIsMiddleOfString()
-    ) {
-      this._statusBar.text = "$(code)"
-      return
-    }
-
-    this._chunkCount = 0
-    this._document = document
-    this._position = position
-    this._nonce = this._nonce + 1
-    this._statusBar.text = "$(loading~spin)"
-    this._statusBar.command = "twinny.stopGeneration"
-    await this.tryParseDocument(document)
-
-    this._isMultilineCompletion = getIsMultilineCompletion({
-      node: this._nodeAtPosition,
-      prefixSuffix: this._prefixSuffix
-    })
-
-    if (this._debouncer) clearTimeout(this._debouncer)
-
-    const prompt = await this.getPrompt(this._prefixSuffix)
-
-    if (!prompt) return
-
-    return new Promise<ResolvedInlineCompletion>((resolve, reject) => {
-      this._debouncer = setTimeout(() => {
-        this._lock.acquire("twinny.completion", async () => {
-          const provider = this.getFimProvider()
-          if (!provider) return
-          const request = this.buildFimRequest(prompt, provider)
-
-          if (!request) return
-
-          try {
-            await llm({
-              body: request.body,
-              options: request.options,
-              onStart: (controller) => (this._abortController = controller),
-              onEnd: () => this.onEnd(resolve),
-              onError: this.onError,
-              onData: (data) => {
-                const completion = this.onData(data as StreamResponse)
-                if (completion) {
-                  this._abortController?.abort()
-                }
-              }
-            })
-          } catch {
-            this.onError()
-            reject([])
-          }
-        })
-      }, this.config.debounceWait)
-    })
+    const start = lang.syntaxComments?.start || ""
+    const end = lang.syntaxComments?.end || ""
+    return `${start} Path: ${workspace.asRelativePath(uri)} ${end}\n`
   }
 
-  private async tryParseDocument(document: TextDocument) {
-    try {
-      if (!this._position || !this._document) return
-      const parser = await getParser(document.uri.fsPath)
-
-      if (!parser || !parser.parse) return
-
-      this._parser = parser
-
-      this._nodeAtPosition = getNodeAtPosition(
-        this._parser?.parse(this._document.getText()),
-        this._position
-      )
-    } catch {
-      return
-    }
-  }
-
-  private onData(data: StreamResponse | undefined): string {
-    if (!this._provider) return ""
-
-    const stopWords = getStopWords(
-      this._provider.modelName,
-      this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
-    )
-
-    try {
-      const providerFimData = getFimDataFromProvider(
-        this._provider.provider,
-        data
-      )
-      if (providerFimData === undefined) return ""
-
-      this._completion = this._completion + providerFimData
-      this._chunkCount = this._chunkCount + 1
-
-      if (
-        this._completion.length > MAX_EMPTY_COMPLETION_CHARS &&
-        this._completion.trim().length === 0
-      ) {
-        this.abortCompletion()
-        logger.log(
-          `Streaming response end as llm in empty completion loop:  ${this._nonce}`
-        )
-      }
-
-      if (stopWords.some((stopWord) => this._completion.includes(stopWord))) {
-        return this._completion
-      }
-
-      if (
-        !this.config.multilineCompletionsEnabled &&
-        this._chunkCount >= MIN_COMPLETION_CHUNKS &&
-        LINE_BREAK_REGEX.test(this._completion.trimStart())
-      ) {
-        logger.log(
-          `Streaming response end due to single line completion:  ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        return this._completion
-      }
-
-
-      const isMultilineCompletionRequired =
-        !this._isMultilineCompletion &&
-        this.config.multilineCompletionsEnabled &&
-        this._chunkCount >= MIN_COMPLETION_CHUNKS &&
-        LINE_BREAK_REGEX.test(this._completion.trimStart())
-      if (isMultilineCompletionRequired) {
-        logger.log(
-          `Streaming response end due to multiline not required  ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        return this._completion
-      }
-
-      try {
-        if (this._nodeAtPosition) {
-          const takeFirst =
-            MULTILINE_OUTSIDE.includes(this._nodeAtPosition?.type) ||
-            (MULTILINE_INSIDE.includes(this._nodeAtPosition?.type) &&
-              this._nodeAtPosition?.childCount > 2)
-
-
-          const lineText = getCurrentLineText(this._position) || ""
-          const contextBeforeCompletion = this._prefixSuffix?.prefix || ""
-
-
-          const isInsideFunction =
-            contextBeforeCompletion.includes("=>") ||
-            contextBeforeCompletion.includes("function") ||
-            this._nodeAtPosition?.type.includes("function") ||
-            this._nodeAtPosition?.type.includes("method") ||
-            this._nodeAtPosition?.parent?.type.includes("function") ||
-            this._nodeAtPosition?.parent?.type.includes("method");
-
-          if (!this._parser) return ""
-
-          if (providerFimData.includes("\n")) {
-            const { rootNode } = this._parser.parse(
-              `${lineText}${this._completion}`
-            )
-
-            const { hasError } = rootNode
-
-            const openBrackets: string[] = [];
-            let isBalanced = true;
-
-            for (const char of this._completion) {
-              if (OPENING_BRACKETS.includes(char as Bracket)) {
-                openBrackets.push(char);
-              } else if (CLOSING_BRACKETS.includes(char as Bracket)) {
-                const lastOpen = openBrackets.pop();
-
-                if (!lastOpen || !this.isMatchingBracket(lastOpen as Bracket, char)) {
-                  isBalanced = false;
-                  break;
-                }
-              }
-            }
-
-            const hasSubstantialContent = this._completion.trim().length > 20;
-            const hasCompleteSyntax = openBrackets.length === 0 && isBalanced;
-
-            const hasEndPattern = /\}\s*$|\)\s*$|\]\s*$|;\s*$/.test(this._completion);
-
-            const endsWithEmptyLine = /\n\s*\n\s*$/.test(this._completion);
-
-            const lines = this._completion.split("\n");
-            const lastLineIndent = lines.length > 1 ?
-              lines[lines.length - 1].length - lines[lines.length - 1].trimStart().length : 0;
-            const firstLineIndent = lines.length > 0 ?
-              lines[0].length - lines[0].trimStart().length : 0;
-            const indentationReturned = lines.length > 2 && lastLineIndent <= firstLineIndent;
-
-            const structuralBoundaryPattern = /\}\s*\n(\s*)\S+/m.test(this._completion);
-
-            if (isInsideFunction && this._completion.includes("}")) {
-              const lastClosingBraceIndex = this._completion.lastIndexOf("}");
-
-              if (hasCompleteSyntax) {
-                const contentAfterBrace = this._completion.substring(lastClosingBraceIndex + 1).trim();
-
-                if (!contentAfterBrace || /^\s*\n\s*\S+/.test(contentAfterBrace)) {
-                  this._completion = this._completion.substring(0, lastClosingBraceIndex + 1);
-                  logger.log(
-                    `Trimmed completion at function end: ${this._nonce} \nCompletion: ${this._completion}`
-                  )
-                  return this._completion;
-                }
-              }
-            }
-
-            if (structuralBoundaryPattern && hasCompleteSyntax) {
-              const match = this._completion.match(/\}\s*\n(\s*)\S+/m);
-              if (match && match.index !== undefined) {
-                const closingBracePos = match.index + 1;
-
-                const indentAfterBrace = match[1].length;
-                if (indentAfterBrace <= firstLineIndent) {
-                  this._completion = this._completion.substring(0, closingBracePos);
-                  logger.log(
-                    `Trimmed completion at structural boundary: ${this._nonce} \nCompletion: ${this._completion}`
-                  )
-                  return this._completion;
-                }
-              }
-            }
-
-            if (
-              this._parser &&
-              this._nodeAtPosition &&
-              this._isMultilineCompletion &&
-              this._chunkCount >= 2 &&
-              (takeFirst || hasCompleteSyntax) &&
-              !hasError &&
-              (hasEndPattern || endsWithEmptyLine || indentationReturned ||
-               (hasSubstantialContent && hasCompleteSyntax))
-            ) {
-              if (
-                MULTI_LINE_DELIMITERS.some((delimiter) =>
-                  this._completion.endsWith(delimiter)
-                ) ||
-                endsWithEmptyLine ||
-                (hasEndPattern && hasCompleteSyntax) ||
-                (structuralBoundaryPattern && hasCompleteSyntax)
-              ) {
-                logger.log(
-                  `Streaming response end due to completion detection ${this._nonce} \nCompletion: ${this._completion}`
-                )
-                return this._completion
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error(e)
-        this.abortCompletion()
-      }
-
-      if (getLineBreakCount(this._completion) >= this.config.maxLines) {
-        logger.log(
-          `Streaming response end due to max line count ${this._nonce} \nCompletion: ${this._completion}`
-        )
-        return this._completion
-      }
-
-      return ""
-    } catch (e) {
-      console.error(e)
-      return ""
-    }
-  }
-
-  private isMatchingBracket(open: Bracket, close: string): boolean {
-    const pairs: Record<Bracket, string> = {
-      "(": ")",
-      "[": "]",
-      "{": "}"
-    };
-    return pairs[open] === close;
-  }
-
-  private onEnd(resolve: (completion: ResolvedInlineCompletion) => void) {
-    return resolve(this.provideInlineCompletion())
-  }
-
-  public onError = () => {
-    this._abortController?.abort()
-  }
-
-  private getPromptHeader(languageId: string | undefined, uri: Uri) {
-    const lang =
-      supportedLanguages[languageId as keyof typeof supportedLanguages]
-
-    if (!lang) {
-      return ""
-    }
-
-    const language = `${lang.syntaxComments?.start || ""} Language: ${
-      lang?.langName
-    } (${languageId}) ${lang.syntaxComments?.end || ""}`
-
-    const path = `${
-      lang.syntaxComments?.start || ""
-    } File uri: ${uri.toString()} (${languageId}) ${
-      lang.syntaxComments?.end || ""
-    }`
-
-    return `\n${language}\n${path}\n`
-  }
-
-  private async getRelevantDocuments(): Promise<RepositoryDocment[]> {
-    const interactions = this._fileInteractionCache.getAll()
-    const currentFileName = this._document?.fileName || ""
-    const openTextDocuments = workspace.textDocuments
-    const rootPath = workspace.workspaceFolders?.[0]?.uri.fsPath || ""
-    const ig = ignore({ allowRelativePaths: true })
-
-    const embeddingIgnoredGlobs = this.config.get(
-      "embeddingIgnoredGlobs",
-      [] as string[]
-    )
-
-    ig.add(embeddingIgnoredGlobs)
-
-    const gitIgnoreFilePath = path.join(rootPath, ".gitignore")
-
-    if (fs.existsSync(gitIgnoreFilePath)) {
-      ig.add(fs.readFileSync(gitIgnoreFilePath).toString())
-    }
-
-    const openDocumentsData: RepositoryDocment[] = openTextDocuments
-      .filter((doc) => {
-        const isCurrentFile = doc.fileName === currentFileName
-        const isGitFile =
-          doc.fileName.includes(".git") || doc.fileName.includes("git/")
-
-        const projectRoot = workspace.workspaceFolders?.[0].uri.fsPath || ""
-        const relativePath = path.relative(projectRoot, doc.fileName)
-
-        if (isGitFile) return false
-
-        const normalizedPath = relativePath.split(path.sep).join("/")
-        const isIgnored = ig.ignores(normalizedPath)
-
-        return !isCurrentFile && !isIgnored
-      })
-      .map((doc) => {
-        const interaction = interactions.find((i) => i.name === doc.fileName)
-        return {
-          uri: doc.uri,
-          text: doc.getText(),
-          name: doc.fileName,
-          isOpen: true,
-          relevanceScore: interaction?.relevanceScore || 0
-        }
-      })
-
-    const otherDocumentsData: RepositoryDocment[] = (
-      await Promise.all(
-        interactions
-          .filter(
-            (interaction) =>
-              !openTextDocuments.some(
-                (doc) => doc.fileName === interaction.name
-              )
-          )
-          .filter((interaction) => !ig.ignores(interaction.name || ""))
-          .map(async (interaction) => {
-            const filePath = interaction.name
-            if (!filePath) return null
-            if (
-              filePath.toString().match(".git") ||
-              currentFileName === filePath
-            )
-              return null
-            const uri = Uri.file(filePath)
-            try {
-              const document = await workspace.openTextDocument(uri)
-              return {
-                uri,
-                text: document.getText(),
-                name: filePath,
-                isOpen: false,
-                relevanceScore: interaction.relevanceScore
-              }
-            } catch (error) {
-              console.error(`Error opening document ${filePath}:`, error)
-              return null
-            }
-          })
-      )
-    ).filter((doc): doc is RepositoryDocment => doc !== null)
-
-    const allDocuments = [...openDocumentsData, ...otherDocumentsData].sort(
-      (a, b) => b.relevanceScore - a.relevanceScore
-    )
-
-    return allDocuments.slice(0, 3)
-  }
-
-  private async getFileInteractionContext() {
+  /**
+   * Files worth showing the model before the current one: what this file
+   * imports first (that is where the symbols being used are declared), then
+   * the most relevant recently-used files, windowed around the lines the user
+   * touched. Capped by a character budget so the prompt stays small.
+   */
+  private async getContextFiles(
+    currentDocument: TextDocument
+  ): Promise<FimContextFile[]> {
     this._fileInteractionCache.addOpenFilesWithPriority()
-    const interactions = this._fileInteractionCache.getAll()
-    const currentFileName = this._document?.fileName || ""
+    const halfWindow = Math.floor(FIM_CONTEXT_WINDOW_LINES / 2)
 
-    const fileChunks: string[] = []
-    for (const interaction of interactions) {
+    const candidates: { path: string; focusLine: number }[] = getImportedFiles(
+      currentDocument
+    ).map((path) => ({ path, focusLine: halfWindow }))
+
+    for (const interaction of this._fileInteractionCache.getAll()) {
       const filePath = interaction.name
-
-      if (!filePath) continue
-      if (filePath.toString().match(".git")) continue
-      if (currentFileName === filePath) continue
-
-      const uri = Uri.file(filePath)
+      if (!filePath || candidates.some((c) => c.path === filePath)) continue
       const activeLines = interaction.activeLines
+      const focusLine = activeLines.length
+        ? Math.round(
+            activeLines.reduce((sum, { line }) => sum + line, 0) /
+              activeLines.length
+          )
+        : 0
+      candidates.push({ path: filePath, focusLine })
+    }
 
-      let document;
+    const files: FimContextFile[] = []
+    let budget = FIM_MAX_CONTEXT_CHARS
+
+    for (const candidate of candidates) {
+      if (files.length >= FIM_MAX_CONTEXT_FILES || budget <= 0) break
+      if (candidate.path === currentDocument.fileName) continue
+
+      let document: TextDocument
       try {
-        document = await workspace.openTextDocument(uri)
+        document = await workspace.openTextDocument(Uri.file(candidate.path))
       } catch {
         continue
       }
 
-      const lineCount = document.lineCount
-      if (lineCount > MAX_CONTEXT_LINE_COUNT) {
-        const averageLine =
-          activeLines.reduce((acc, curr) => acc + curr.line, 0) /
-          activeLines.length
-        const start = new Position(
-          Math.max(0, Math.ceil(averageLine || 0) - 100),
-          0
-        )
-        const end = new Position(
-          Math.min(lineCount, Math.ceil(averageLine || 0) + 100),
-          0
-        )
-        fileChunks.push(
-          `
-          // File: ${filePath}
-          // Content: \n ${document.getText(new Range(start, end))}
-        `.trim()
-        )
-      } else {
-        fileChunks.push(
-          `
-          // File: ${filePath}
-          // Content: \n ${document.getText()}
-        `.trim()
-        )
-      }
+      const start = new Position(Math.max(0, candidate.focusLine - halfWindow), 0)
+      const end = new Position(
+        Math.min(document.lineCount, candidate.focusLine + halfWindow),
+        0
+      )
+      const text = document.getText(new Range(start, end)).slice(0, budget)
+      if (!text.trim()) continue
+
+      budget -= text.length
+      files.push({ name: workspace.asRelativePath(document.uri), text })
     }
 
-    return fileChunks.join("\n")
+    return files
   }
 
-  private removeStopWords(completion: string) {
-    if (!this._provider) return completion
-    let filteredCompletion = completion
-    const stopWords = getStopWords(
-      this._provider.modelName,
-      this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic
-    )
-    stopWords.forEach((stopWord) => {
-      filteredCompletion = filteredCompletion.split(stopWord).join("")
-    })
-    return filteredCompletion
-  }
+  private async getPrompt(request: CompletionRequest) {
+    const { document, prefixSuffix, provider } = request
+    const languageId = document.languageId
+    const fileName = workspace.asRelativePath(document.uri)
 
-  private async getPrompt(prefixSuffix: PrefixSuffix) {
-    if (!this._provider) return ""
-    if (!this._document || !this._position || !this._provider) return ""
+    const wantsContext =
+      this.config.get<boolean>("fileContextEnabled") || provider.repositoryLevel
+    const contextFiles = wantsContext ? await this.getContextFiles(document) : []
 
-    const documentLanguage = this._document.languageId
-    const fileInteractionContext = await this.getFileInteractionContext()
-
-    if (this._provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
+    if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
       const systemMessage =
-        await this._templateProvider.readSystemMessageTemplate("fim-system.hbs")
-
-      const fimTemplate =
-        await this._templateProvider.readTemplate<FimTemplateData>("fim", {
+        await this._templateProvider.readSystemMessageTemplate("fim")
+      const context = contextFiles
+        .map((file) => `// File: ${file.name}\n${file.text}`)
+        .join("\n\n")
+      const template = await this._templateProvider.readTemplate<FimTemplateData>(
+        "fim",
+        {
           prefix: prefixSuffix.prefix,
           suffix: prefixSuffix.suffix,
           systemMessage,
-          context: fileInteractionContext || "",
-          fileName: this._document.uri.fsPath,
-          language: documentLanguage
-        })
-
-      if (fimTemplate) {
-        this._usingFimTemplate = true
-        return fimTemplate
-      }
-    }
-
-    if (this._provider.repositoryLevel) {
-      const repositoryLevelData = await this.getRelevantDocuments()
-      const repoName = sanitizeWorkspaceName(workspace.name)
-      const currentFile = await this._document.uri.fsPath
-      return getFimTemplateRepositoryLevel(
-        repoName || "untitled",
-        repositoryLevelData,
-        prefixSuffix,
-        currentFile
+          context,
+          fileName: document.uri.fsPath,
+          language: languageId
+        }
       )
+      if (template) return template
     }
 
-    return getFimPrompt(
-      this._provider.modelName,
-      this._provider.fimTemplate || FIM_TEMPLATE_FORMAT.automatic,
-      {
-        context: fileInteractionContext || "",
-        prefixSuffix,
-        header: this.getPromptHeader(documentLanguage, this._document.uri),
-        fileContextEnabled: this.config.fileContextEnabled,
-        language: documentLanguage
-      }
-    )
+    const templateArgs = {
+      contextFiles,
+      prefixSuffix,
+      header: this.getPromptHeader(languageId, document.uri),
+      language: languageId,
+      fileName,
+      repoName: sanitizeWorkspaceName(workspace.name) || "untitled"
+    }
+
+    if (provider.repositoryLevel) {
+      return getFimTemplateRepositoryLevel(templateArgs)
+    }
+
+    return getFimPrompt(provider.modelName, provider.fimTemplate, templateArgs)
   }
 
+  /** Called by the activation code once the editor has inserted a suggestion. */
   public setAcceptedLastCompletion(value: boolean) {
     this._acceptedLastCompletion = value
-    this._lastCompletionMultiline = getLineBreakCount(this._completion) > 1
+    if (value) this._lastSuggestion = undefined
+  }
+
+  public onError = () => {
+    this.abortCompletion()
   }
 
   public abortCompletion() {
     this._abortController?.abort()
-    this._statusBar.text = "$(code)"
-  }
-
-  private logCompletion(formattedCompletion: string) {
-    logger.log(
-      `
-      *** Twinny completion triggered for file: ${this._document?.uri} ***
-      Original completion: ${this._completion}
-      Formatted completion: ${formattedCompletion}
-      Max Lines: ${this.config.maxLines}
-      Use file context: ${this.config.fileContextEnabled}
-      Completed lines count ${getLineBreakCount(formattedCompletion)}
-      Using custom FIM template fim.bhs?: ${this._usingFimTemplate}
-    `.trim()
-    )
-  }
-
-  private provideInlineCompletion(): InlineCompletionItem[] {
-    const editor = window.activeTextEditor
-
-    if (!editor || !this._position) return []
-
-    const formattedCompletion = new CompletionFormatter(editor).format(
-      this.removeStopWords(this._completion)
-    )
-
-    this.logCompletion(formattedCompletion)
-
-    if (this.config.completionCacheEnabled)
-      cache.setCache(this._prefixSuffix, formattedCompletion)
-
-    this._completion = ""
-    this._statusBar.text = "$(code)"
-    this.lastCompletionText = formattedCompletion
-    this._lastCompletionMultiline = getLineBreakCount(this._completion) > 1
-
-    return [
-      new InlineCompletionItem(
-        formattedCompletion,
-        new Range(this._position, this._position)
-      )
-    ]
+    this._abortController = null
+    this.setIdle()
   }
 }

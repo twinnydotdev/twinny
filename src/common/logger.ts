@@ -22,7 +22,12 @@ export class Logger {
     return Logger.instance
   }
 
+  private isEnabled() {
+    return vscode.workspace.getConfiguration("twinny").get<boolean>("enableLogging", true)
+  }
+
   public log = (message: string) => {
+    if (!this.isEnabled()) return
     console.log(`[twinny] ${message}`)
     this.outputChannel.appendLine(`[INFO] ${message}`)
   }
