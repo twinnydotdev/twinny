@@ -419,6 +419,12 @@
           "default": false,
           "markdownDescription": "When `true`, Twinny will scan neighboring documents to provide more context for completions. This is an experimental feature and may impact performance."
         },
+        "twinny.lspContextEnabled": {
+          "order": 9,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Includes matching IntelliSense symbols and available type signatures in FIM context. Uses installed completion providers, with up to 20 suggestions, 2,000 characters and a 150 ms wait limit. Works independently of file context."
+        },
         "twinny.completionCacheEnabled": {
           "order": 10,
           "type": "boolean",

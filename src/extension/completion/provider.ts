@@ -51,6 +51,7 @@ import {
 } from "./fim-templates"
 import { CompletionFormatter } from "./formatter"
 import { getImportedFiles } from "./imports"
+import { LspContext } from "./lsp-context"
 import { getNodeAtPosition, getParser } from "./parser"
 import { createStreamRequestBodyFim } from "./request-body"
 import { CompletionStream } from "./stream"
@@ -58,6 +59,7 @@ import { CompletionStream } from "./stream"
 /** Everything one inline-completion request needs, kept off the instance. */
 interface CompletionRequest {
   id: number
+  version: number
   document: TextDocument
   position: Position
   prefixSuffix: PrefixSuffix
@@ -81,6 +83,7 @@ export class CompletionProvider
   private _acceptedLastCompletion = false
   private _fileInteractionCache: FileInteractionCache
   private _lastSuggestion: LastSuggestion | undefined
+  private _lspContext = new LspContext()
   private _requestId = 0
   private _statusBar: TwinnyStatusBar
   private _templateProvider: TemplateProvider
@@ -149,6 +152,7 @@ export class CompletionProvider
 
     const request: CompletionRequest = {
       id: ++this._requestId,
+      version: document.version,
       document,
       position,
       prefixSuffix,
@@ -177,7 +181,8 @@ export class CompletionProvider
   }
 
   private isStale(request: CompletionRequest) {
-    return request.id !== this._requestId || request.token.isCancellationRequested
+    return request.id !== this._requestId || request.token.isCancellationRequested ||
+      request.document.version !== request.version
   }
 
   private async complete(
@@ -438,7 +443,15 @@ export class CompletionProvider
 
     const wantsContext =
       this.config.get<boolean>("fileContextEnabled") || provider.repositoryLevel
-    const contextFiles = wantsContext ? await this.getContextFiles(document) : []
+    const [contextFiles, lspContext] = await Promise.all([
+      wantsContext ? this.getContextFiles(document) : Promise.resolve([]),
+      this.config.get<boolean>("lspContextEnabled", true)
+        ? this._lspContext.get(document, request.position, request.token)
+        : Promise.resolve("")
+    ])
+    if (lspContext) {
+      contextFiles.unshift({ name: "IntelliSense context", text: lspContext })
+    }
 
     if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
       const systemMessage =
