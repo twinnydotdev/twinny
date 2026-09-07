@@ -1,5 +1,3 @@
-import { exec } from "child_process"
-import * as util from "util"
 import {
   commands,
   env,
@@ -14,9 +12,8 @@ import { logger } from "../common/logger"
 import { TemplateData } from "../common/types"
 
 import { Chat } from "./chat"
+import { runGit } from "./git"
 import { TemplateProvider } from "./template-provider"
-
-const execAsync = util.promisify(exec)
 
 /** Roughly what a small local model can take alongside the instructions. */
 export const COMMIT_DIFF_MAX_CHARS = 24000
@@ -76,16 +73,9 @@ export const cleanCommitMessage = (text: string): string => {
 export const getCommitDiff = async (
   cwd: string
 ): Promise<{ diff: string; staged: boolean }> => {
-  const run = async (args: string) => {
-    const { stdout } = await execAsync(`git diff ${args}`, {
-      cwd,
-      maxBuffer: 20 * 1024 * 1024
-    })
-    return stdout
-  }
-  const staged = await run("--cached")
+  const staged = await runGit(cwd, "diff --cached")
   if (staged.trim()) return { diff: staged, staged: true }
-  return { diff: await run(""), staged: false }
+  return { diff: await runGit(cwd, "diff"), staged: false }
 }
 
 const findRepository = (cwd: string): GitRepository | undefined => {

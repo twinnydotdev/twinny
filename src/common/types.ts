@@ -124,6 +124,8 @@ export interface Conversation {
   id?: string
   title?: string
   messages: ChatCompletionMessage[]
+  /** Set by features that name the conversation themselves (reviews). */
+  pinnedTitle?: boolean
 }
 
 export const Theme = {
@@ -340,6 +342,10 @@ export interface GitHubPr {
   number: number
   title: string
   html_url: string
+  draft?: boolean
+  updated_at?: string
+  user?: { login: string }
+  head?: { ref: string }
 }
 
 export interface LMSEmbeddingItem {

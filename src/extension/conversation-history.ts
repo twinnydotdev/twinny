@@ -150,7 +150,7 @@ export class ConversationHistory extends Base {
     const isFirstExchange = conversation.messages.length === 2
     let title = activeConversation.title
 
-    if (isFirstExchange) {
+    if (isFirstExchange && !activeConversation.pinnedTitle) {
       title =
         (await this._generateTitleWithLlm(conversation.messages)) || title
     }

@@ -2,20 +2,26 @@ import { useState } from "react"
 
 import { GITHUB_EVENT_NAME } from "../../common/constants"
 import { GitHubPr } from "../../common/types"
-import { emit, useServerEvent } from "../messaging"
+import { bridge, emit } from "../messaging"
 
 export const useGithubPRs = () => {
   const [prs, setPRs] = useState<GitHubPr[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  useServerEvent(GITHUB_EVENT_NAME.getPullRequests, (pullRequests) => {
-    setPRs(pullRequests)
-    setIsLoading(false)
-  })
-
-  const getPrs = (owner: string | undefined, repo: string | undefined) => {
+  const getPrs = async (owner: string | undefined, repo: string | undefined) => {
+    if (!owner || !repo) return
     setIsLoading(true)
-    emit(GITHUB_EVENT_NAME.getPullRequests, { owner, repo })
+    try {
+      const pullRequests = await bridge.request(
+        GITHUB_EVENT_NAME.getPullRequests,
+        { owner, repo }
+      )
+      setPRs(Array.isArray(pullRequests) ? pullRequests : [])
+    } catch {
+      setPRs([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const startReview = (

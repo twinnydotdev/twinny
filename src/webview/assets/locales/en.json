@@ -143,5 +143,21 @@
   "ollama-connection-failed": "Ollama connection failed",
   "test-provider": "Test Provider",
   "provider-test-successful": "Provider test successful!",
-  "provider-test-failed": "Provider test failed"
+  "provider-test-failed": "Provider test failed",
+  "review-local-title": "Local changes",
+  "review-on-branch": "On branch {{branch}}",
+  "review-working-tree": "Review working tree",
+  "review-working-tree-detail": "{{count}} changed files, staged and unstaged",
+  "review-branch": "Review branch",
+  "review-branch-detail": "{{count}} files changed against {{base}}",
+  "review-base-placeholder": "Base branch, e.g. main",
+  "review-no-repository": "Open a git repository to review local changes.",
+  "review-no-changes": "No changes",
+  "review-github-title": "GitHub pull requests",
+  "review-github-intro": "Pull requests for the repository below. Detected from the git remote; edit the owner and repository to review another project. Set a GitHub token in the settings for private repositories.",
+  "review-draft": "draft",
+  "review-how-it-works": "Twinny sends the diff to your chat provider in parts sized for its context window; lockfiles, binaries and build output are skipped.",
+  "review-github-detected": "Detected from the git remote",
+  "review-github-use-detected": "Use {{owner}}/{{repo}}",
+  "review-current-branch": "this branch"
 }

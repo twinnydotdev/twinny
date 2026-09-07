@@ -15,8 +15,8 @@ import { v4 as uuidv4 } from "uuid"
 
 import { EVENT_NAME, USER } from "../common/constants"
 import {
+  AnyContextItem,
   ChatCompletionMessage,
-  ContextItem,
   ImageAttachment,
   MentionType
 } from "../common/types"
@@ -326,10 +326,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
     editorRef.current?.commands.focus()
   }, [])
 
+  // Switching conversation shows its messages, including none for a new one.
   useEffect(() => {
-    if (conversation?.messages?.length) {
-      setMessages(conversation.messages)
-    }
+    if (conversation?.id) setMessages(conversation.messages || [])
   }, [conversation?.id])
 
   const { suggestion, filePaths } = useSuggestion()
@@ -517,9 +516,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   const renderContextItem = useCallback(
-    (item: ContextItem) => {
+    (item: AnyContextItem) => {
       let codicon = ""
       const displayName = item.name
+      const title =
+        "selectionRange" in item
+          ? `${item.path} (lines ${item.selectionRange.startLine + 1}-${
+              item.selectionRange.endLine + 1
+            })`
+          : item.path
 
       if (item.category === "files") {
         codicon = "codicon codicon-file-code"
@@ -530,7 +535,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       return (
         <div
           key={item.id}
-          title={item.path}
+          title={title}
           className={styles.contextItem}
           onClick={() => handleOpenFile(item.path)}
         >

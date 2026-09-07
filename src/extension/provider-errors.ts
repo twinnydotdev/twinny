@@ -115,3 +115,20 @@ export const describeProviderError = (
 
   return `${summary}\n\n\`${raw}\``
 }
+
+/** The same explanation without markdown, for plain-text surfaces. */
+export const describeProviderErrorPlain = (
+  error: unknown,
+  provider: ProviderSummary
+): string =>
+  describeProviderError(error, provider)
+    .replace(/\*\*/g, "")
+    .replace(/`/g, "")
+    .replace(/\n\n/g, " — ")
+
+/** Reasoning models wrap their thinking in tags; only the answer is wanted. */
+export const stripThinking = (text: string): string =>
+  text
+    .replace(/<(think|thinking)>[\s\S]*?<\/\1>/gi, "")
+    .replace(/^<(think|thinking)>[\s\S]*$/i, "")
+    .trim()

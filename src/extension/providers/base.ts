@@ -22,7 +22,7 @@ import { FileHandler } from "../file-handler"
 import { ExtensionBridge } from "../messaging/bridge"
 import { OllamaService } from "../ollama"
 import { ProviderManager } from "../provider-manager"
-import { GithubService as ReviewService } from "../review-service"
+import { ReviewService } from "../review-service"
 import { SessionManager } from "../session-manager"
 import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../template-provider"
@@ -87,7 +87,6 @@ export class BaseProvider {
     this.bridge = undefined
     this.chat?.dispose()
     this.conversationHistory?.dispose()
-    this.reviewService?.dispose()
     this._disposables.forEach((disposable) => disposable.dispose())
     this._disposables = []
   }
@@ -111,7 +110,8 @@ export class BaseProvider {
       this.context,
       bridge,
       this._templateDir,
-      this.chat
+      this.chat,
+      this.conversationHistory
     )
 
     new ProviderManager(this.context, bridge)
@@ -133,7 +133,7 @@ export class BaseProvider {
       [EVENT_NAME.twinnyAcceptSolution]: (code) =>
         this._diffManager.acceptSolution(code),
       [EVENT_NAME.twinnyChatMessage]: ({ messages, mentions, conversationId }) =>
-        this.chat?.completion(messages, mentions, conversationId),
+        void this.chat?.completion(messages, mentions, conversationId),
       [EVENT_NAME.twinnyClickSuggestion]: (template) =>
         void vscode.commands.executeCommand(
           TWINNY_COMMAND_NAME.templateCompletion,
@@ -229,7 +229,6 @@ export class BaseProvider {
 
   public destroyStream = () => {
     this.chat?.abort()
-    this.reviewService?.abort()
     this.bridge?.emit(EVENT_NAME.twinnyStopGeneration)
   }
 

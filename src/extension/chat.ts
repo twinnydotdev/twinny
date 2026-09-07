@@ -38,6 +38,7 @@ import {
   CompletionNonStreamingWithId,
   CompletionStreamingWithId,
   MentionType,
+  SelectionContextItem,
   TemplateData,
   TwinnyProvider
 } from "../common/types"
@@ -45,8 +46,13 @@ import { kebabToSentence } from "../webview/utils"
 
 import { ExtensionBridge } from "./messaging/bridge"
 import { Base } from "./base"
+import { ContextEntry, formatContextEntries } from "./context-files"
 import { EmbeddingDatabase } from "./embeddings"
-import { describeProviderError, isAbortError } from "./provider-errors"
+import {
+  describeProviderError,
+  isAbortError,
+  stripThinking
+} from "./provider-errors"
 import { Reranker } from "./reranker"
 import { TwinnyStatusBar } from "./status-bar"
 import { TemplateProvider } from "./template-provider"
@@ -56,6 +62,9 @@ import {
   sanitizeWorkspaceName,
   updateLoadingMessage
 } from "./utils"
+
+/** Diagnostics beyond this add noise, not signal, to an @problems prompt. */
+const MAX_PROBLEMS = 50
 
 export class Chat extends Base {
   private _completion = ""
@@ -308,23 +317,31 @@ export class Chat extends Base {
     return { prompt: prompt || "", selection: selectionContext }
   }
 
+  /**
+   * `prefix` is text shown (and saved) ahead of the model's reply, e.g. a
+   * part heading in a multi-part review. Resolves with the final text.
+   */
   private async llmNoStream(
     requestBody: CompletionNonStreaming<LLMProvider>,
-    provider: TwinnyProvider
-  ) {
-    if (!this._tokenJs || this._isCancelled) return
+    provider: TwinnyProvider,
+    prefix = ""
+  ): Promise<string> {
+    if (!this._tokenJs || this._isCancelled) return ""
     this.beginGeneration()
 
     try {
       const result = await this._tokenJs.chat.completions.create(requestBody)
+      const content = `${prefix}${result.choices[0].message.content || ""}`
 
       this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
-        content: result.choices[0].message.content,
+        content,
         role: ASSISTANT
       })
+      return content
     } catch (error) {
       this._controller?.abort()
       this.reportError(error, provider)
+      return ""
     } finally {
       this.endGeneration()
     }
@@ -332,10 +349,12 @@ export class Chat extends Base {
 
   private async llmStream(
     requestBody: CompletionStreamingWithId,
-    provider: TwinnyProvider
-  ) {
-    if (!this._tokenJs || this._isCancelled) return
+    provider: TwinnyProvider,
+    prefix = ""
+  ): Promise<string> {
+    if (!this._tokenJs || this._isCancelled) return ""
     this.beginGeneration()
+    this._completion = prefix
 
     try {
       logger.log(
@@ -382,27 +401,61 @@ export class Chat extends Base {
         })}`
       )
 
-      if (this._completion.trim()) {
+      const text = this._completion.trim()
+      if (text) {
         this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
-          content: this._completion.trim(),
+          content: text,
           role: ASSISTANT
         })
       }
 
       this._completion = ""
+      return text
     } catch (error) {
       this._controller?.abort()
       // Keep whatever streamed before the failure; it is still useful.
-      if (this._completion.trim()) {
+      // A bare heading is not.
+      const partial =
+        this._completion.trim() === prefix.trim() ? "" : this._completion.trim()
+      if (partial) {
         this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
-          content: this._completion.trim(),
+          content: partial,
           role: ASSISTANT
         })
       }
       this.reportError(error, provider)
+      return partial
     } finally {
       this.endGeneration()
     }
+  }
+
+  /** True once the user has stopped generation, until the next request. */
+  public get cancelled(): boolean {
+    return this._isCancelled
+  }
+
+  /**
+   * Stream a reply to exactly these messages, skipping the chat's own prompt
+   * building (system prompt, editor selection, workspace context). The reply
+   * is shown in the chat as it arrives and returned when complete.
+   */
+  public async streamMessages(
+    messages: ChatCompletionMessage[],
+    prefix = ""
+  ): Promise<string> {
+    this._isCancelled = false
+    this.sendEditorLanguage()
+
+    const provider = this.getProvider()
+    if (!provider) return ""
+
+    this.instantiateTokenJS(provider)
+    this._conversation = messages
+
+    return this.shouldUseStreaming(provider)
+      ? this.llmStream(this.getStreamOptions(provider), provider, prefix)
+      : this.llmNoStream(this.getNoStreamOptions(provider), provider, prefix)
   }
 
   private sendEditorLanguage = () => {
@@ -413,11 +466,14 @@ export class Chat extends Base {
     this._bridge.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
   }
 
+  /** Errors first, then warnings, capped so one noisy file cannot flood the prompt. */
   getProblemsContext(): string {
     const problems = workspace.textDocuments
       .flatMap((document) =>
         languages.getDiagnostics(document.uri).map((diagnostic) => ({
           severity: DiagnosticSeverity[diagnostic.severity],
+          severityRank: diagnostic.severity,
+          file: workspace.asRelativePath(document.uri),
           message: diagnostic.message,
           code: document.getText(diagnostic.range),
           line: document.lineAt(diagnostic.range.start.line).text,
@@ -427,10 +483,19 @@ export class Chat extends Base {
           diagnosticCode: diagnostic.code
         }))
       )
-      .map((problem) => JSON.stringify(problem))
-      .join("\n")
+      .sort((a, b) => a.severityRank - b.severityRank)
 
-    return problems
+    const shown = problems.slice(0, MAX_PROBLEMS).map((problem) => {
+      const { severityRank, ...rest } = problem
+      void severityRank
+      return JSON.stringify(rest)
+    })
+
+    if (problems.length > MAX_PROBLEMS) {
+      shown.push(`... and ${problems.length - MAX_PROBLEMS} more problems`)
+    }
+
+    return shown.join("\n")
   }
 
   public async getRagContext(text?: string): Promise<string | null> {
@@ -476,24 +541,80 @@ export class Chat extends Base {
     return combinedContext.trim() || null
   }
 
-  private async loadFileContents(files?: MentionType[]): Promise<string> {
-    if (!files?.length) return ""
-    let fileContents = ""
+  /**
+   * Current text of a workspace file: the editor buffer when it is open (so
+   * unsaved edits count), otherwise the file on disk.
+   */
+  private async readWorkspaceFile(
+    relativePath: string
+  ): Promise<string | undefined> {
+    const root = workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!root) return undefined
+    const fullPath = path.isAbsolute(relativePath)
+      ? relativePath
+      : path.join(root, relativePath)
 
-    for (const file of files) {
-      try {
-        const workspaceFolders = workspace.workspaceFolders
-        if (!workspaceFolders) continue
+    const open = workspace.textDocuments.find(
+      (document) => document.uri.fsPath === fullPath
+    )
+    if (open) return open.getText()
 
-        const filePath = path.join(workspaceFolders[0].uri.fsPath, file.path)
+    try {
+      return await fs.readFile(fullPath, "utf-8")
+    } catch (error) {
+      logger.error(`Could not read context file ${relativePath}: ${error}`)
+      return undefined
+    }
+  }
 
-        const content = await fs.readFile(filePath, "utf-8")
-        fileContents += `File: ${file.name}\n\n${content}\n\n`
-      } catch (error) {
-        console.error(`Error reading file ${file.path}:`, error)
+  /**
+   * A pinned selection follows the file: re-read the lines it covers so the
+   * model sees what is there now, and fall back to the snapshot taken when
+   * it was pinned if the file has gone.
+   */
+  private async loadSelectionEntry(
+    item: SelectionContextItem
+  ): Promise<ContextEntry> {
+    const { startLine, endLine } = item.selectionRange
+    const range = { startLine, endLine }
+    const text = await this.readWorkspaceFile(item.path)
+    if (text === undefined) {
+      return { path: item.path, content: item.content, range }
+    }
+    const lines = text.split("\n")
+    if (endLine >= lines.length) {
+      return { path: item.path, content: item.content, range }
+    }
+    return {
+      path: item.path,
+      content: lines.slice(startLine, endLine + 1).join("\n"),
+      range
+    }
+  }
+
+  /** Everything the user attached: @mentions in the message, then pinned items. */
+  private async loadContextEntries(
+    mentions: MentionType[],
+    items: AnyContextItem[]
+  ): Promise<ContextEntry[]> {
+    const entries: ContextEntry[] = []
+
+    for (const mention of mentions) {
+      if (!mention.path) continue
+      const content = await this.readWorkspaceFile(mention.path)
+      if (content !== undefined) entries.push({ path: mention.path, content })
+    }
+
+    for (const item of items) {
+      if (item.category === "selection" && "selectionRange" in item) {
+        entries.push(await this.loadSelectionEntry(item))
+      } else if (item.category === "files" && item.path) {
+        const content = await this.readWorkspaceFile(item.path)
+        if (content !== undefined) entries.push({ path: item.path, content })
       }
     }
-    return fileContents.trim()
+
+    return entries
   }
 
   private async getSystemPrompt(): Promise<string> {
@@ -518,21 +639,14 @@ export class Chat extends Base {
     const ragContext = await this.getRagContext(messageContent)
     if (ragContext) context += `Additional Context:\n${ragContext}\n\n`
 
-    const workspaceFiles =
+    const pinnedItems =
       this.context?.workspaceState.get<AnyContextItem[]>(
         WORKSPACE_STORAGE_KEY.contextItems
       ) || []
-    const allFilePaths: MentionType[] = [
-      ...(mentions || []),
-      ...workspaceFiles
-    ]
 
-    const fileContents = await this.loadFileContents(
-      allFilePaths.filter(
-        (filepath) => !["workspace", "problems"].includes(filepath.name)
-      )
-    )
-    if (fileContents) context += `File Contents:\n${fileContents}\n\n`
+    const entries = await this.loadContextEntries(mentions || [], pinnedItems)
+    const attached = formatContextEntries(entries)
+    if (attached) context += `Attached code:\n\n${attached}\n\n`
 
     return context
   }
@@ -780,12 +894,9 @@ export class Chat extends Base {
         completionParams
       )
 
-      if (
-        result.choices &&
-        result.choices.length > 0 &&
-        result.choices[0].message
-      ) {
-        return result.choices[0].message.content?.trim()
+      const content = result.choices?.[0]?.message?.content
+      if (typeof content === "string") {
+        return stripThinking(content) || undefined
       }
       logger.log("LLM response for simple completion was empty or malformed.")
       return undefined

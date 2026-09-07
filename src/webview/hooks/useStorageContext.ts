@@ -39,6 +39,8 @@ const CHANNELS: Record<
 
 export const useStorageContext = <T>(storageType: StorageType, key: string) => {
   const [context, setContextState] = useState<T | undefined>()
+  /** False until the first read answers; an unset key still reads as undefined. */
+  const [loaded, setLoaded] = useState(false)
   const { read, write } = CHANNELS[storageType]
 
   useEffect(() => {
@@ -46,7 +48,9 @@ export const useStorageContext = <T>(storageType: StorageType, key: string) => {
     bridge
       .request(read as typeof EVENT_NAME.twinnyGlobalContext, { key })
       .then(({ value }) => {
-        if (!cancelled) setContextState(value as T)
+        if (cancelled) return
+        setContextState(value as T)
+        setLoaded(true)
       })
     return () => {
       cancelled = true
@@ -74,5 +78,5 @@ export const useStorageContext = <T>(storageType: StorageType, key: string) => {
     [write, key]
   )
 
-  return { context, setContext }
+  return { context, setContext, loaded }
 }

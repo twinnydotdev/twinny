@@ -295,21 +295,48 @@ export async function activate(context: ExtensionContext) {
       commands.executeCommand("workbench.action.closeSidebar")
       fullScreenProvider.createOrShowPanel()
     }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.addFileToContext, () => {
-      const editor = window.activeTextEditor
-      if (editor) {
-        const filePath = workspace.asRelativePath(editor.document.uri.fsPath)
-        const fileContextItem: ContextItem = {
-          id: filePath, // Use filePath as the ID for files
-          category: "files",
-          name: path.basename(editor.document.uri.fsPath),
-          path: filePath
-        }
-        if (sidebarProvider.addContextItem) {
+    // From the editor (no arguments), or the explorer (clicked uri plus the
+    // whole multi-selection as the second argument).
+    commands.registerCommand(
+      TWINNY_COMMAND_NAME.addFileToContext,
+      async (clicked?: vscode.Uri, selected?: vscode.Uri[]) => {
+        const uris = selected?.length
+          ? selected
+          : clicked
+            ? [clicked]
+            : window.activeTextEditor
+              ? [window.activeTextEditor.document.uri]
+              : []
+
+        let added = 0
+        for (const uri of uris) {
+          if (uri.scheme !== "file") continue
+          const stat = await workspace.fs.stat(uri).then(
+            (s) => s,
+            () => undefined
+          )
+          if (!stat || stat.type !== vscode.FileType.File) continue
+          const filePath = workspace.asRelativePath(uri)
+          const fileContextItem: ContextItem = {
+            id: filePath,
+            category: "files",
+            name: path.basename(uri.fsPath),
+            path: filePath
+          }
           sidebarProvider.addContextItem(fileContextItem)
+          added++
+        }
+
+        if (added === 0) {
+          window.showInformationMessage("No file to add to the chat context.")
+        } else if (uris.length > 1) {
+          window.setStatusBarMessage(
+            `Twinny: added ${added} files to the chat context`,
+            4000
+          )
         }
       }
-    }),
+    ),
     commands.registerCommand(
       TWINNY_COMMAND_NAME.addSelectionToContext,
       async () => {

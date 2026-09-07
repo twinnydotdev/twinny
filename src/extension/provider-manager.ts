@@ -22,6 +22,7 @@ import { ApiModel, TwinnyProvider } from "../common/types"
 
 import { ExtensionBridge } from "./messaging/bridge"
 import { OllamaService } from "./ollama"
+import { describeProviderErrorPlain } from "./provider-errors"
 import { getIsOpenAICompatible } from "./utils"
 
 export type { TwinnyProvider }
@@ -638,20 +639,14 @@ export class ProviderManager {
         success: true
       })
     } catch (error) {
-      let errorMessage = "An unknown error occurred."
-      if (error instanceof Error) {
-        errorMessage = error.message
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((error as any).response?.data?.error?.message) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          errorMessage = (error as any).response.data.error.message
-        }
-      } else if (typeof error === "string") {
-        errorMessage = error
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const serverMessage = (error as any)?.response?.data?.error?.message
       this._bridge.emit(PROVIDER_EVENT_NAME.testProviderResult, {
         success: false,
-        error: errorMessage
+        error: describeProviderErrorPlain(
+          typeof serverMessage === "string" ? new Error(serverMessage) : error,
+          provider
+        )
       })
     }
   }

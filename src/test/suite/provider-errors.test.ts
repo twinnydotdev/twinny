@@ -2,7 +2,9 @@ import * as assert from "assert"
 
 import {
   describeProviderError,
-  isAbortError
+  describeProviderErrorPlain,
+  isAbortError,
+  stripThinking
 } from "../../extension/provider-errors"
 
 const provider = {
@@ -60,5 +62,20 @@ suite("Provider errors", () => {
     assert.strictEqual(isAbortError({ cause: abort }), true)
     assert.strictEqual(isAbortError(new Error("boom")), false)
     assert.strictEqual(isAbortError(undefined), false)
+  })
+
+  test("plain variant has no markdown", () => {
+    const text = describeProviderErrorPlain(new Error("fetch failed"), provider)
+    assert.ok(!text.includes("**") && !text.includes("`"))
+    assert.ok(text.includes("Local Ollama"))
+  })
+
+  test("strips reasoning blocks, closed or not", () => {
+    assert.strictEqual(
+      stripThinking("<think>\nhmm\n</think>\nFix the bug"),
+      "Fix the bug"
+    )
+    assert.strictEqual(stripThinking("<think>never closed"), "")
+    assert.strictEqual(stripThinking("plain"), "plain")
   })
 })

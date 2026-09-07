@@ -149,6 +149,13 @@
           "command": "twinny.statusBarMenu",
           "when": "false"
         }
+      ],
+      "explorer/context": [
+        {
+          "command": "twinny.addFileToContext",
+          "group": "twinny@1",
+          "when": "!explorerResourceIsFolder"
+        }
       ]
     },
     "commands": [
@@ -487,6 +494,13 @@
           ],
           "default": "globalState",
           "markdownDescription": "Specifies where to store Twinny provider configurations. 'globalState' uses VS Code's global state (persists per domain, may be lost if domain changes frequently). 'file' stores configurations in a file within the extension's global storage directory (more resilient to domain changes)."
+        },
+        "twinny.reviewMaxDiffChars": {
+          "order": 30,
+          "type": "number",
+          "default": 16000,
+          "minimum": 2000,
+          "description": "Characters of diff sent to the model per code-review request. Larger reviews are split into parts. Lower this for models with small context windows; raise it for large-context models to get fewer parts."
         }
       }
     }

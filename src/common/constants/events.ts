@@ -80,3 +80,8 @@ export const GITHUB_EVENT_NAME = {
   getPullRequests: "github.getPullRequests",
   getPullRequestReview: "github.getPullRequestReview"
 } as const
+
+export const REVIEW_EVENT_NAME = {
+  getLocalStatus: "review.getLocalStatus",
+  reviewLocal: "review.reviewLocal"
+} as const

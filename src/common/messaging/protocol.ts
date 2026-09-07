@@ -2,7 +2,8 @@ import {
   CONVERSATION_EVENT_NAME,
   EVENT_NAME,
   GITHUB_EVENT_NAME,
-  PROVIDER_EVENT_NAME
+  PROVIDER_EVENT_NAME,
+  REVIEW_EVENT_NAME
 } from "../constants"
 import type {
   AnyContextItem,
@@ -60,6 +61,24 @@ export interface PullRequestQuery {
 export interface PullRequestReviewRequest extends PullRequestQuery {
   number: number
   title: string
+}
+
+/** What the review tab shows about the open folder's git state. */
+export interface LocalReviewStatus {
+  isRepository: boolean
+  branch: string
+  /** Detected merge target, e.g. `origin/main`; absent when none was found. */
+  base?: string
+  workingTreeFiles: number
+  branchFiles: number
+  /** Owner and repo parsed from the git remote when it points at GitHub. */
+  github?: { owner: string; repo: string }
+}
+
+export interface LocalReviewRequest {
+  mode: "working-tree" | "branch"
+  /** Overrides the detected base for `branch` mode. */
+  base?: string
 }
 
 /* -------------------------------------------------------------------------- */
@@ -125,8 +144,11 @@ export interface ClientEvents {
   [PROVIDER_EVENT_NAME.testProvider]: Channel<TwinnyProvider>
   [PROVIDER_EVENT_NAME.updateProvider]: Channel<TwinnyProvider>
 
-  [GITHUB_EVENT_NAME.getPullRequests]: Channel<PullRequestQuery>
+  [GITHUB_EVENT_NAME.getPullRequests]: Channel<PullRequestQuery, GitHubPr[]>
   [GITHUB_EVENT_NAME.getPullRequestReview]: Channel<PullRequestReviewRequest>
+
+  [REVIEW_EVENT_NAME.getLocalStatus]: Channel<void, LocalReviewStatus>
+  [REVIEW_EVENT_NAME.reviewLocal]: Channel<LocalReviewRequest>
 }
 
 /* -------------------------------------------------------------------------- */
@@ -197,6 +219,7 @@ type EveryName =
   | (typeof CONVERSATION_EVENT_NAME)[keyof typeof CONVERSATION_EVENT_NAME]
   | (typeof PROVIDER_EVENT_NAME)[keyof typeof PROVIDER_EVENT_NAME]
   | (typeof GITHUB_EVENT_NAME)[keyof typeof GITHUB_EVENT_NAME]
+  | (typeof REVIEW_EVENT_NAME)[keyof typeof REVIEW_EVENT_NAME]
 
 /**
  * Every declared name must be used by at least one direction, and no channel
