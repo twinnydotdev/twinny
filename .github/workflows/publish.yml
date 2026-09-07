@@ -12,7 +12,7 @@ jobs:
           - os: ubuntu-latest
             target: linux-x64
             npm_config_arch: x64
-          - os: macOS-13
+          - os: macos-15-intel
             target: darwin-x64
             npm_config_arch: x64
           - os: ubuntu-latest
