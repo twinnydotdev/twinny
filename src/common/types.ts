@@ -271,6 +271,8 @@ export interface TwinnyProvider {
   apiPath?: string
   apiPort?: number
   apiProtocol?: string
+  /** For `twinny-p2p` providers: the public key of the paired device. */
+  deviceId?: string
   features?: string[]
   fimTemplate?: string
   id: string

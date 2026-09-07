@@ -19,6 +19,9 @@ import { ConversationHistory } from "../chat/conversation-history"
 import { EmbeddingDatabase } from "../embeddings/database"
 import { EmbeddingService } from "../embeddings/service"
 import { ExtensionBridge } from "../messaging/bridge"
+import { P2pBridge } from "../p2p/bridge"
+import { resolveProviderEndpoint } from "../p2p/endpoint"
+import { P2pRuntime } from "../p2p/runtime"
 import { ProviderManager } from "../providers/manager"
 import { OllamaService } from "../providers/ollama"
 import { ReviewService } from "../review/service"
@@ -39,6 +42,8 @@ export class BaseProvider {
   private _embeddingDatabase: EmbeddingDatabase | undefined
   private _fileTreeProvider: FileTreeProvider
   private _ollamaService: OllamaService | undefined
+  private _p2p: P2pRuntime | undefined
+  private _p2pBridge: P2pBridge | undefined
   private _sessionManager: SessionManager | undefined
   private _statusBarItem: TwinnyStatusBar
   private _templateDir: string | undefined
@@ -62,12 +67,14 @@ export class BaseProvider {
     templateDir: string,
     statusBar: TwinnyStatusBar,
     db?: EmbeddingDatabase,
-    sessionManager?: SessionManager
+    sessionManager?: SessionManager,
+    p2p?: P2pRuntime
   ) {
     this.context = context
     this._fileTreeProvider = new FileTreeProvider()
     this._embeddingDatabase = db
     this._ollamaService = new OllamaService()
+    this._p2p = p2p
     this._sessionManager = sessionManager
     this._statusBarItem = statusBar
     this._templateDir = templateDir
@@ -87,6 +94,8 @@ export class BaseProvider {
   public dispose() {
     this.bridge?.dispose()
     this.bridge = undefined
+    this._p2pBridge?.dispose()
+    this._p2pBridge = undefined
     this.chat?.dispose()
     this.conversationHistory?.dispose()
     this._disposables.forEach((disposable) => disposable.dispose())
@@ -116,7 +125,10 @@ export class BaseProvider {
       this.conversationHistory
     )
 
-    new ProviderManager(this.context, bridge)
+    const providerManager = new ProviderManager(this.context, bridge)
+    if (this._p2p) {
+      this._p2pBridge = new P2pBridge(this._p2p, bridge, providerManager)
+    }
     new EmbeddingService(this.context, bridge, this._embeddingDatabase)
     new FileHandler(bridge)
 
@@ -217,8 +229,8 @@ export class BaseProvider {
   }
 
   public getFimProvider = () => {
-    return this.context.globalState.get<TwinnyProvider>(
-      ACTIVE_FIM_PROVIDER_STORAGE_KEY
+    return resolveProviderEndpoint(
+      this.context.globalState.get<TwinnyProvider>(ACTIVE_FIM_PROVIDER_STORAGE_KEY)
     )
   }
 

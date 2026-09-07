@@ -44,6 +44,18 @@ import { copy } from "esbuild-plugin-copy";
     ]
   }
 
+  // The headless node: `node out/node/cli.js` on the machine with the GPU.
+  const nodeConfig = {
+    bundle: true,
+    entryPoints: ["src/node/cli.ts"],
+    external: ["sodium-native", "udx-native", "b4a"],
+    format: "cjs",
+    outfile: "out/node/cli.js",
+    platform: "node",
+    target: "node18",
+    sourcemap: true,
+  }
+
   const webConfig = {
     bundle: true,
     external: ["vscode"],
@@ -58,10 +70,13 @@ import { copy } from "esbuild-plugin-copy";
   if (flags.includes("--watch")) {
     const ctx = await esbuild.context(webConfig);
     const ectx = await esbuild.context(extensionConfig);
+    const nctx = await esbuild.context(nodeConfig);
     await ctx.watch();
     await ectx.watch();
+    await nctx.watch();
   } else {
     await esbuild.build(webConfig);
     await esbuild.build(extensionConfig);
+    await esbuild.build(nodeConfig);
   }
 })()

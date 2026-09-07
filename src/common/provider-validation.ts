@@ -54,12 +54,24 @@ export const isOpenAICompatibleProvider = (provider: string) =>
   (Object.values(OPEN_AI_COMPATIBLE_PROVIDERS) as string[]).includes(provider)
 
 /**
+ * A paired device. Requests still go to an address (the extension's local
+ * gateway), but the person never types one: the address is decided at
+ * request time from the device id, so the endpoint fields do not apply.
+ */
+export const isP2pProvider = (provider: string) =>
+  provider === API_PROVIDERS.TwinnyP2P
+
+/**
  * Whether the hostname / port / path fields matter for this provider + type.
  * Chat with a hosted API goes through fluency.js and ignores them; everything
  * else is a raw HTTP request to the address the user gives.
  */
 export const usesEndpoint = (provider: string, type: string) =>
   type !== "chat" || !isHostedProvider(provider)
+
+/** Whether the person configures the hostname / port / path themselves. */
+export const hasConfigurableEndpoint = (provider: string, type: string) =>
+  usesEndpoint(provider, type) && !isP2pProvider(provider)
 
 export const expectsApiKey = (provider: string) =>
   KEY_REQUIRED_PROVIDERS.includes(provider)
@@ -222,6 +234,16 @@ export const normalizeProvider = (input: TwinnyProvider): TwinnyProvider => {
     if (input.repositoryLevel) normalized.repositoryLevel = true
   }
 
+  if (isP2pProvider(providerName)) {
+    normalized.deviceId = trim(input.deviceId).toLowerCase()
+    // The gateway address is filled in per request; nothing typed here
+    // should survive, or it would be shown as if it mattered.
+    normalized.apiHostname = ""
+    normalized.apiPort = undefined
+    normalized.apiPath = ""
+    normalized.apiKey = ""
+  }
+
   return normalized
 }
 
@@ -278,7 +300,11 @@ export const validateProvider = (
     errors.fimTemplate = `Unknown FIM template "${provider.fimTemplate}".`
   }
 
-  if (usesEndpoint(providerName, type)) {
+  if (isP2pProvider(providerName) && !/^[0-9a-f]{64}$/.test(provider.deviceId || "")) {
+    errors.deviceId = "Pair a device first, then create the provider from its card."
+  }
+
+  if (hasConfigurableEndpoint(providerName, type)) {
     const hostname = provider.apiHostname || ""
     if (!hostname) {
       errors.apiHostname = "Enter the hostname of the server."
@@ -371,7 +397,7 @@ export const getProviderOrigin = (provider: TwinnyProvider) => {
  * hosted chat provider, which has no configurable address.
  */
 export const describeProviderEndpoint = (provider: TwinnyProvider) => {
-  if (!usesEndpoint(provider.provider, provider.type)) return ""
+  if (!hasConfigurableEndpoint(provider.provider, provider.type)) return ""
   const origin = getProviderOrigin(provider)
   if (!origin) return ""
   const path = provider.apiPath || ""
@@ -384,9 +410,11 @@ export const describeProviderEndpoint = (provider: TwinnyProvider) => {
 
 /** A one-line human summary: `codellama:7b-code · localhost:11434`. */
 export const summarizeProvider = (provider: TwinnyProvider) => {
-  const where = usesEndpoint(provider.provider, provider.type)
-    ? `${provider.apiHostname || "?"}${provider.apiPort ? `:${provider.apiPort}` : ""}`
-    : provider.provider
+  const where = isP2pProvider(provider.provider)
+    ? "P2P device"
+    : usesEndpoint(provider.provider, provider.type)
+      ? `${provider.apiHostname || "?"}${provider.apiPort ? `:${provider.apiPort}` : ""}`
+      : provider.provider
   return [provider.modelName || "no model", where].join(" · ")
 }
 

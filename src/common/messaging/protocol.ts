@@ -3,6 +3,7 @@ import {
   EMBEDDING_EVENT_NAME,
   EVENT_NAME,
   GITHUB_EVENT_NAME,
+  P2P_EVENT_NAME,
   PROVIDER_EVENT_NAME,
   REVIEW_EVENT_NAME
 } from "../constants"
@@ -97,6 +98,69 @@ export interface EmbeddingProgress {
   error?: string
   /** Set when the run was cancelled by the user. */
   cancelled?: boolean
+}
+
+/** A paired peer-to-peer device as the devices panel shows it. */
+export interface P2pDeviceStatus {
+  /** The device's public key in hex; also the provider's `deviceId`. */
+  id: string
+  name: string
+  state: "online" | "connecting" | "offline"
+  /** Round trip of the last ping while online. */
+  latencyMs?: number
+  /** Whether the node could reach its Ollama on the last ping. */
+  ollamaOk?: boolean
+  /** Model names the node reported, most recent first known. */
+  models: string[]
+  pairedAt: number
+  lastSeenAt?: number
+  /** Why the device is offline, when known. */
+  error?: string
+}
+
+/** A device allowed to use this machine's Ollama. */
+export interface P2pTrustedPeer {
+  id: string
+  name: string
+  pairedAt: number
+  lastSeenAt?: number
+  connected: boolean
+}
+
+/** This machine as a node: sharing its own Ollama with paired devices. */
+export interface P2pHostStatus {
+  /** Sharing is switched on and comes back after a restart. */
+  enabled: boolean
+  running: boolean
+  /**
+   * Sharing is on but another VS Code window on this machine is the one
+   * running the node. Only one window may, or paired devices would reach a
+   * random one of them.
+   */
+  runningElsewhere: boolean
+  /** What paired devices see this machine as. */
+  name: string
+  peerId?: string
+  ollamaUrl: string
+  ollamaOk?: boolean
+  /** The code to paste on another device, while a pairing window is open. */
+  pairingCode?: string
+  pairingExpiresAt?: number
+  trustedPeers: P2pTrustedPeer[]
+  error?: string
+}
+
+export interface P2pPairRequest {
+  /** The pairing code shown by the node. */
+  code: string
+  /** What to call this device locally; defaults to the node's own name. */
+  name?: string
+}
+
+export interface P2pPairResult {
+  success: boolean
+  device?: P2pDeviceStatus
+  error?: string
 }
 
 export interface ConversationRename {
@@ -210,6 +274,16 @@ export interface ClientEvents {
   [GITHUB_EVENT_NAME.getPullRequests]: Channel<PullRequestQuery, GitHubPr[]>
   [GITHUB_EVENT_NAME.getPullRequestReview]: Channel<PullRequestReviewRequest>
 
+  [P2P_EVENT_NAME.getDevices]: Channel<void, P2pDeviceStatus[]>
+  [P2P_EVENT_NAME.pairDevice]: Channel<P2pPairRequest, P2pPairResult>
+  [P2P_EVENT_NAME.refreshDevice]: Channel<string, P2pDeviceStatus | undefined>
+  [P2P_EVENT_NAME.removeDevice]: Channel<string>
+  [P2P_EVENT_NAME.getHost]: Channel<void, P2pHostStatus>
+  [P2P_EVENT_NAME.startHost]: Channel<void, P2pHostStatus>
+  [P2P_EVENT_NAME.stopHost]: Channel<void, P2pHostStatus>
+  [P2P_EVENT_NAME.newPairingCode]: Channel<void, P2pHostStatus>
+  [P2P_EVENT_NAME.removeTrustedPeer]: Channel<string, P2pHostStatus>
+
   [REVIEW_EVENT_NAME.getLocalStatus]: Channel<void, LocalReviewStatus>
   [REVIEW_EVENT_NAME.reviewLocal]: Channel<LocalReviewRequest>
 }
@@ -252,6 +326,9 @@ export interface ServerEvents {
   [PROVIDER_EVENT_NAME.getAllProviders]: Record<string, TwinnyProvider>
 
   [GITHUB_EVENT_NAME.getPullRequests]: GitHubPr[]
+
+  [P2P_EVENT_NAME.getDevices]: P2pDeviceStatus[]
+  [P2P_EVENT_NAME.getHost]: P2pHostStatus
 }
 
 /* -------------------------------------------------------------------------- */
@@ -285,6 +362,7 @@ type EveryName =
   | (typeof EMBEDDING_EVENT_NAME)[keyof typeof EMBEDDING_EVENT_NAME]
   | (typeof PROVIDER_EVENT_NAME)[keyof typeof PROVIDER_EVENT_NAME]
   | (typeof GITHUB_EVENT_NAME)[keyof typeof GITHUB_EVENT_NAME]
+  | (typeof P2P_EVENT_NAME)[keyof typeof P2P_EVENT_NAME]
   | (typeof REVIEW_EVENT_NAME)[keyof typeof REVIEW_EVENT_NAME]
 
 /**

@@ -2,19 +2,28 @@ import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
-import { DEFAULT_PROVIDER_FORM_VALUES, FIM_TEMPLATE_FORMAT } from "../../common/constants"
-import { ProviderTestResult } from "../../common/messaging/protocol"
+import {
+  API_PROVIDERS,
+  DEFAULT_PROVIDER_FORM_VALUES,
+  FIM_TEMPLATE_FORMAT
+} from "../../common/constants"
+import {
+  P2pDeviceStatus,
+  ProviderTestResult
+} from "../../common/messaging/protocol"
 import {
   getEndpointDefaults,
+  isP2pProvider,
   PROVIDER_TYPES,
   ProviderType
 } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
 import { useProviders } from "../hooks/useProviders"
 
+import { DeviceJobs, DevicesSection } from "./devices"
 import { PresetGallery } from "./presets"
 import { ProviderCard } from "./provider-card"
-import { ProviderForm } from "./provider-form"
+import { pickModel, ProviderForm } from "./provider-form"
 import { SetupCheck } from "./setup-check"
 
 import styles from "../styles/providers.module.css"
@@ -41,6 +50,24 @@ const blankProvider = (type: ProviderType): TwinnyProvider => {
   }
 }
 
+/** A draft provider that runs a job on a paired device. */
+const deviceProvider = (
+  device: P2pDeviceStatus,
+  type: ProviderType
+): TwinnyProvider => ({
+  id: "",
+  label: type === "chat" ? device.name : `${device.name} ${type.toUpperCase()}`,
+  modelName: "",
+  provider: API_PROVIDERS.TwinnyP2P,
+  type,
+  deviceId: device.id,
+  apiHostname: "",
+  apiPath: "",
+  apiProtocol: "http",
+  apiKey: "",
+  ...(type === "fim" ? { fimTemplate: FIM_TEMPLATE_FORMAT.automatic } : {})
+})
+
 export const Providers = () => {
   const { t } = useTranslation()
   const [view, setView] = useState<View>({ name: "list" })
@@ -48,12 +75,14 @@ export const Providers = () => {
   const [results, setResults] = useState<Record<string, ProviderTestResult>>({})
   const [testing, setTesting] = useState<Set<string>>(new Set())
   const [checkingSetup, setCheckingSetup] = useState(false)
+  const [collapsed, setCollapsed] = useState<Partial<Record<ProviderType, boolean>>>({})
 
   const {
     activeProviders,
     providers,
     getProvidersByType,
     setActiveProvider,
+    saveProvider,
     removeProvider,
     copyProvider,
     resetProviders,
@@ -61,6 +90,56 @@ export const Providers = () => {
     triggerExportProviders,
     triggerImportProviders
   } = useProviders()
+
+  /* ---------------------------------------------------------------------- */
+  /*  Devices: one provider per job, made and switched from the device card  */
+  /* ---------------------------------------------------------------------- */
+
+  const deviceProviderFor = (device: P2pDeviceStatus, type: ProviderType) =>
+    Object.values(providers).find(
+      (p) => isP2pProvider(p.provider) && p.deviceId === device.id && p.type === type
+    )
+
+  const jobsFor = (device: P2pDeviceStatus): DeviceJobs => {
+    const jobs = {} as DeviceJobs
+    for (const type of PROVIDER_TYPES) {
+      const existing = deviceProviderFor(device, type)
+      jobs[type] = existing
+        ? {
+            state: activeProviders[type]?.id === existing.id ? "active" : "set",
+            modelName: existing.modelName
+          }
+        : { state: "unset" }
+    }
+    return jobs
+  }
+
+  /**
+   * First click sets the device up for the job with a sensible model and
+   * makes it active; a later click switches back to it; on the active job
+   * it opens the form so the model can be changed. The form only appears
+   * up front when the device lists nothing to pick from.
+   */
+  const assignDevice = async (device: P2pDeviceStatus, type: ProviderType) => {
+    const existing = deviceProviderFor(device, type)
+    if (existing) {
+      if (activeProviders[type]?.id === existing.id) openForm(existing)
+      else setActiveProvider(type, existing)
+      return
+    }
+    const draft = deviceProvider(device, type)
+    const model = pickModel(device.models, type)
+    if (!model) {
+      openForm(draft)
+      return
+    }
+    const result = await saveProvider({ ...draft, modelName: model })
+    if (result.success && result.provider) {
+      setActiveProvider(type, result.provider)
+    } else {
+      openForm(draft)
+    }
+  }
 
   const runTest = async (provider: TwinnyProvider) => {
     setTesting((current) => new Set(current).add(provider.id))
@@ -126,18 +205,26 @@ export const Providers = () => {
   }
 
   const renderSection = (type: ProviderType) => {
-    const list = getProvidersByType(type).sort((a, b) =>
-      a.label.localeCompare(b.label)
-    )
+    // Device-backed providers live on their device card, not here.
+    const list = getProvidersByType(type)
+      .filter((p) => !isP2pProvider(p.provider))
+      .sort((a, b) => a.label.localeCompare(b.label))
     const active = activeProviders[type]
+    const open = !collapsed[type]
     return (
       <section key={type} className={styles.section}>
         <div className={styles.sectionHeader}>
-          <h4>
+          <button
+            type="button"
+            className={styles.sectionToggle}
+            aria-expanded={open}
+            onClick={() => setCollapsed((c) => ({ ...c, [type]: open }))}
+          >
+            <i className={`codicon codicon-chevron-${open ? "down" : "right"}`} />
             <i className={`codicon codicon-${SECTION_ICONS[type]}`} />
             {t(`type-${type}`)}
             <span className={styles.sectionCount}>{list.length}</span>
-          </h4>
+          </button>
           <VSCodeButton
             appearance="icon"
             title={t(`add-${type}-provider`)}
@@ -147,33 +234,36 @@ export const Providers = () => {
             <i className="codicon codicon-add" />
           </VSCodeButton>
         </div>
-        <p className={styles.sectionBlurb}>{t(`type-${type}-blurb`)}</p>
 
-        {list.length === 0 ? (
-          <button
-            type="button"
-            className={styles.emptySection}
-            onClick={() => openGallery(type)}
-          >
-            <i className="codicon codicon-add" />
-            {t(`add-${type}-provider`)}
-          </button>
-        ) : (
-          list.map((provider) => (
-            <ProviderCard
-              key={provider.id}
-              provider={provider}
-              active={active?.id === provider.id}
-              testResult={results[provider.id]}
-              testing={testing.has(provider.id)}
-              onActivate={() => setActiveProvider(type, provider)}
-              onTest={() => runTest(provider)}
-              onEdit={() => openForm(provider)}
-              onCopy={() => copyProvider(provider)}
-              onDelete={() => removeProvider(provider)}
-            />
-          ))
-        )}
+        {open &&
+          (list.length === 0 ? (
+            <button
+              type="button"
+              className={styles.emptySection}
+              onClick={() => openGallery(type)}
+            >
+              <i className="codicon codicon-add" />
+              <span className={styles.emptySectionText}>
+                <span>{t(`add-${type}-provider`)}</span>
+                <span className={styles.emptySectionBlurb}>{t(`type-${type}-blurb`)}</span>
+              </span>
+            </button>
+          ) : (
+            list.map((provider) => (
+              <ProviderCard
+                key={provider.id}
+                provider={provider}
+                active={active?.id === provider.id}
+                testResult={results[provider.id]}
+                testing={testing.has(provider.id)}
+                onActivate={() => setActiveProvider(type, provider)}
+                onTest={() => runTest(provider)}
+                onEdit={() => openForm(provider)}
+                onCopy={() => copyProvider(provider)}
+                onDelete={() => removeProvider(provider)}
+              />
+            ))
+          ))}
       </section>
     )
   }
@@ -248,9 +338,7 @@ export const Providers = () => {
         onFix={openForm}
       />
 
-      {Object.keys(providers).length === 0 && (
-        <p className={styles.emptyAll}>{t("no-providers-yet")}</p>
-      )}
+      <DevicesSection onUse={assignDevice} jobsFor={jobsFor} />
 
       {PROVIDER_TYPES.map(renderSection)}
     </div>

@@ -1,4 +1,3 @@
-declare module "hyperswarm"
 declare module "@tiptap/extension-placeholder"
 
 declare module "*.css"
@@ -28,3 +27,5 @@ declare function acquireVsCodeApi<State = unknown>(): VsCodeApi<State>
 interface Window {
   acquireVsCodeApi: typeof acquireVsCodeApi
 }
+declare module "hyperdht"
+declare module "hyperdht/testnet"

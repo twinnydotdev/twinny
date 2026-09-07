@@ -24,6 +24,7 @@ import {
 } from "../../common/provider-validation"
 import { ApiModel, TwinnyProvider } from "../../common/types"
 import { ExtensionBridge } from "../messaging/bridge"
+import { resolveProviderEndpoint } from "../p2p/endpoint"
 
 import { OllamaService } from "./ollama"
 import { listProviderModels, testProvider } from "./probe"
@@ -107,7 +108,7 @@ export class ProviderManager {
       [PROVIDER_EVENT_NAME.getAllProviders]: () => this.broadcastProviders(),
       [PROVIDER_EVENT_NAME.importProviders]: () => this.importProviders(),
       [PROVIDER_EVENT_NAME.listProviderModels]: (p) =>
-        listProviderModels(normalizeProvider(p)),
+        listProviderModels(resolveProviderEndpoint(normalizeProvider(p))),
       [PROVIDER_EVENT_NAME.removeProvider]: (p) => this.removeProvider(p),
       [PROVIDER_EVENT_NAME.resetProvidersToDefaults]: () =>
         this.resetProvidersToDefaults(),
@@ -118,7 +119,7 @@ export class ProviderManager {
       [PROVIDER_EVENT_NAME.setActiveFimProvider]: (p) =>
         this.setActiveProvider("fim", p),
       [PROVIDER_EVENT_NAME.testProvider]: (p) =>
-        testProvider(normalizeProvider(p)),
+        testProvider(resolveProviderEndpoint(normalizeProvider(p))),
       [PROVIDER_EVENT_NAME.updateProvider]: (p) => this.updateProvider(p)
     })
   }
@@ -313,9 +314,26 @@ export class ProviderManager {
     this._bridge.emit(ACTIVE_EVENTS[type], this.getActiveProvider(type))
   }
 
+  /**
+   * Makes a provider the one used for a job. A model picked along the way
+   * (the chat header's dropdown) becomes the provider's model: there is one
+   * entry and one model, whichever picker last changed it.
+   */
   public async setActiveProvider(type: ProviderType, provider?: TwinnyProvider) {
     if (!provider) return
-    await this._storeActive(type, provider)
+    const providers = await this.getProviders()
+    const stored = providers[provider.id]
+    let active = provider
+    if (stored) {
+      const modelName = provider.modelName || stored.modelName
+      active = { ...stored, modelName }
+      if (modelName !== stored.modelName) {
+        providers[provider.id] = active
+        await this._saveProviders(providers)
+        await this.broadcastProviders()
+      }
+    }
+    await this._storeActive(type, active)
     this.broadcastActive(type)
   }
 
@@ -435,6 +453,15 @@ export class ProviderManager {
       this.broadcastActive(type)
     }
     await this.broadcastProviders()
+  }
+
+  /** A device that was unpaired takes its providers with it. */
+  public async removeProvidersForDevice(deviceId: string): Promise<void> {
+    const providers = await this.getProviders()
+    const doomed = Object.values(providers).filter(
+      (p) => p.provider === API_PROVIDERS.TwinnyP2P && p.deviceId === deviceId
+    )
+    for (const provider of doomed) await this.removeProvider(provider)
   }
 
   public async resetProvidersToDefaults(): Promise<void> {

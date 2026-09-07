@@ -26,6 +26,7 @@ import { FileInteractionCache } from "./extension/completion/file-interaction"
 import { CompletionProvider } from "./extension/completion/provider"
 import { setContext } from "./extension/context"
 import { EmbeddingDatabase } from "./extension/embeddings/database"
+import { P2pRuntime } from "./extension/p2p/runtime"
 import { generateCommitMessage } from "./extension/review/commit-message"
 import { SessionManager } from "./extension/session-manager"
 import { TwinnyStatusBar } from "./extension/status-bar"
@@ -137,10 +138,17 @@ export async function activate(context: ExtensionContext) {
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
   const sessionManager = new SessionManager()
+
+  // Paired GPU machines. The gateway must be up before any provider is read,
+  // since a P2P provider's address is the gateway's.
+  const p2p = new P2pRuntime(context)
+  await p2p.start()
+
   const fullScreenProvider = new FullScreenProvider(
     context,
     templateDir,
-    statusBar
+    statusBar,
+    p2p
   )
 
   const db = await openEmbeddingDatabase(context)
@@ -150,7 +158,8 @@ export async function activate(context: ExtensionContext) {
     context,
     templateDir,
     db,
-    sessionManager
+    sessionManager,
+    p2p
   )
 
   const completionProvider = new CompletionProvider(
@@ -175,6 +184,7 @@ export async function activate(context: ExtensionContext) {
 
   context.subscriptions.push(
     statusBar,
+    p2p,
     fileInteractionCache,
     languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
@@ -285,6 +295,30 @@ export async function activate(context: ExtensionContext) {
         await generateCommitMessage(sidebarProvider.chat, templateProvider)
       }
     ),
+    // Turn this machine into a node and put a pairing code on the clipboard.
+    commands.registerCommand(TWINNY_COMMAND_NAME.shareOllama, async () => {
+      try {
+        const status = await p2p.host.newPairingCode()
+        if (status.pairingCode) {
+          await vscode.env.clipboard.writeText(status.pairingCode)
+        }
+        const choice = await window.showInformationMessage(
+          `Twinny is sharing this computer's Ollama as "${status.name}". ` +
+            "A pairing code is on the clipboard; paste it into Twinny on your other device within ten minutes.",
+          "Open providers"
+        )
+        if (choice) {
+          await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+          await commands.executeCommand(TWINNY_COMMAND_NAME.manageProviders)
+        }
+      } catch (error) {
+        window.showErrorMessage(
+          `Twinny could not start sharing: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        )
+      }
+    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnyNewConversation)
       sidebarProvider.conversationHistory?.resetConversation()

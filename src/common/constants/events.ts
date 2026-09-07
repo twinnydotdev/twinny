@@ -84,6 +84,18 @@ export const PROVIDER_EVENT_NAME = {
   updateProvider: "twinny.update-provider"
 } as const
 
+export const P2P_EVENT_NAME = {
+  getDevices: "p2p.getDevices",
+  pairDevice: "p2p.pairDevice",
+  refreshDevice: "p2p.refreshDevice",
+  removeDevice: "p2p.removeDevice",
+  getHost: "p2p.getHost",
+  startHost: "p2p.startHost",
+  stopHost: "p2p.stopHost",
+  newPairingCode: "p2p.newPairingCode",
+  removeTrustedPeer: "p2p.removeTrustedPeer"
+} as const
+
 export const GITHUB_EVENT_NAME = {
   getPullRequests: "github.getPullRequests",
   getPullRequestReview: "github.getPullRequestReview"

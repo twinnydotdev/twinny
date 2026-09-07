@@ -24,5 +24,6 @@ export const TWINNY_COMMAND_NAME = {
   templates: "twinny.templates",
   addFileToContext: "twinny.addFileToContext",
   getContextFiles: "twinny.getContextFiles",
-  addSelectionToContext: "twinny.addSelectionToContext"
+  addSelectionToContext: "twinny.addSelectionToContext",
+  shareOllama: "twinny.shareOllama"
 }

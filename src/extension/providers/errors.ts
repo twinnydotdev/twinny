@@ -6,6 +6,7 @@
 export interface ProviderSummary {
   label: string
   modelName: string
+  provider?: string
   apiHostname?: string
   apiPort?: number
   apiProtocol?: string
@@ -85,7 +86,12 @@ export const describeProviderError = (
 
   let summary: string
 
-  if (CONNECTION_HINTS.some((hint) => lower.includes(hint))) {
+  if (provider.provider === "twinny-p2p" && /\b(50[234])\b|twinny node|device/i.test(raw)) {
+    // The local gateway already wrote a sentence about the device; the
+    // usual "check the hostname" advice would point at the wrong thing.
+    summary = `${name}: ${raw.replace(/^\d{3}\s*/, "").replace(/^status code \d+:?\s*/i, "")}`
+    return summary
+  } else if (CONNECTION_HINTS.some((hint) => lower.includes(hint))) {
     summary =
       `Could not connect to ${name}${where}. ` +
       "Check that the server is running and that the hostname, port and " +

@@ -67,13 +67,17 @@
   background: var(--tw-surface);
 }
 
+.setup .setupHeader vscode-button .codicon {
+  margin-right: 6px;
+}
+
 .roles {
   list-style: none;
   margin: 10px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 
 .role {
@@ -82,65 +86,80 @@
   gap: 4px;
 }
 
+/*
+ * A row is a button so the whole line takes you to the provider. Two lines:
+ * the job and its state on the first, which provider answers it on the
+ * second, so nothing has to be squeezed to fit a narrow sidebar.
+ */
 .roleLine {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 8px;
+  row-gap: 1px;
   align-items: center;
-  gap: 8px;
+  width: 100%;
   min-width: 0;
+  margin: 0;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.roleLine:hover,
+.roleLine:focus-visible {
+  border-color: var(--tw-rule);
+  outline: none;
 }
 
 .roleLine > .codicon:first-child {
-  flex-shrink: 0;
+  grid-row: 1 / span 2;
   opacity: 0.6;
 }
 
 .roleName {
-  flex-shrink: 0;
-  min-width: 72px;
+  grid-column: 2;
+  grid-row: 1;
   font-weight: 600;
 }
 
 .roleProvider {
-  flex: 1;
+  grid-column: 2 / span 2;
+  grid-row: 2;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--tw-fg-dim);
-  font-size: var(--tw-fs-sm);
 }
 
 .roleState {
+  grid-column: 3;
+  grid-row: 1;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  flex-shrink: 0;
-  font-size: var(--tw-fs-sm);
+  font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
   text-transform: uppercase;
-}
-
-.roleLatency {
   color: var(--tw-fg-faint);
-  letter-spacing: 0;
-  text-transform: none;
 }
 
-.roleOk {
-  color: var(--vscode-testing-iconPassed, var(--vscode-terminal-ansiGreen));
+.role-ok .roleState {
+  color: var(--vscode-testing-iconPassed, var(--tw-accent));
 }
 
-.roleFailed {
-  color: var(--vscode-testing-iconFailed, var(--vscode-errorForeground));
+.role-failed .roleState {
+  color: var(--vscode-editorError-foreground);
 }
 
-.roleMissing {
-  color: var(--vscode-editorWarning-foreground, var(--vscode-terminal-ansiYellow));
-}
-
-.rolePending,
-.roleUnknown {
-  color: var(--tw-fg-faint);
+.role-missing .roleState {
+  color: var(--vscode-editorWarning-foreground, var(--tw-fg-dim));
 }
 
 .roleDetail {
@@ -154,15 +173,6 @@
   color: var(--tw-fg-dim);
   font-size: var(--tw-fs-sm);
   line-height: 1.5;
-}
-
-.setupAllGood {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 10px 0 0;
-  color: var(--vscode-testing-iconPassed, var(--vscode-terminal-ansiGreen));
-  font-size: var(--tw-fs-sm);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -187,11 +197,6 @@
   margin: -2px 0 4px;
   color: var(--tw-fg-dim);
   font-size: var(--tw-fs-sm);
-}
-
-.emptyAll {
-  margin: 0;
-  color: var(--tw-fg-dim);
 }
 
 .emptySection,
@@ -676,4 +681,232 @@
 .noProviderNotice .linkButton {
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Devices                                                                  */
+/* ------------------------------------------------------------------------ */
+
+.deviceState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--tw-fg-faint);
+}
+
+.deviceState-online {
+  color: var(--vscode-testing-iconPassed, var(--tw-accent));
+}
+
+.deviceState-connecting {
+  color: var(--tw-fg-dim);
+}
+
+.pairForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--tw-rule);
+  background: var(--tw-surface);
+}
+
+.pairForm .sectionBlurb {
+  margin: 0;
+}
+
+.staticValue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 0 2px;
+}
+
+.staticValue .codicon {
+  color: var(--tw-fg-faint);
+}
+
+.pairingCode {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--tw-rule);
+}
+
+.pairingCodeHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--tw-fs-sm);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.pairingCodeHead > span:first-child {
+  font-weight: 600;
+}
+
+.pairingCodeHead > .fieldHint {
+  flex: 1;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pairingCode code {
+  display: block;
+  padding: 6px 8px;
+  border: 1px dashed var(--tw-rule);
+  background: var(--tw-surface);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  color: var(--tw-code);
+  word-break: break-all;
+  user-select: all;
+}
+
+.pairingCode p {
+  margin: 0;
+}
+
+.peerList {
+  list-style: none;
+  margin: 0;
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--tw-rule);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.peerList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.peerList li > .codicon {
+  color: var(--tw-fg-faint);
+}
+
+.peerName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Compact list: collapsible sections, two-line empty states               */
+/* ---------------------------------------------------------------------- */
+
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sectionToggle .codicon {
+  opacity: 0.7;
+}
+
+.sectionToggle .codicon:first-child {
+  opacity: 0.5;
+}
+
+.sectionToggle:hover .codicon,
+.sectionToggle:focus-visible .codicon {
+  opacity: 1;
+}
+
+.emptySectionText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.emptySectionBlurb {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-sm);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.emptySection {
+  justify-content: flex-start;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Device job chips                                                        */
+/* ---------------------------------------------------------------------- */
+
+.jobChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 6px 6px 28px;
+}
+
+.jobChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 8px;
+  border: 1px dashed var(--tw-rule);
+  background: transparent;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-sm);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.jobChip:hover,
+.jobChip:focus-visible {
+  color: var(--tw-fg);
+  border-color: var(--tw-fg-faint);
+}
+
+.jobChip-set {
+  border-style: solid;
+  color: var(--tw-fg);
+}
+
+.jobChip-active {
+  border-style: solid;
+  border-color: var(--tw-accent-soft, var(--tw-accent));
+  color: var(--tw-accent);
+}
+
+.jobChipModel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+}
+
+.jobChip-active .jobChipModel {
+  color: inherit;
+  opacity: 0.8;
 }

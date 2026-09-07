@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 
+import { P2pRuntime } from "../p2p/runtime"
 import { TwinnyStatusBar } from "../status-bar"
 import { getNonce } from "../utils"
 
@@ -11,9 +12,10 @@ export class FullScreenProvider extends BaseProvider {
   constructor(
     context: vscode.ExtensionContext,
     templateDir: string,
-    statusBarItem: TwinnyStatusBar
+    statusBarItem: TwinnyStatusBar,
+    p2p?: P2pRuntime
   ) {
-    super(context, templateDir, statusBarItem)
+    super(context, templateDir, statusBarItem, undefined, undefined, p2p)
     this.context = context
   }
 

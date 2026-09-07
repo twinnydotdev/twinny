@@ -23,3 +23,9 @@ target
 !node_modules/queue-tick/**
 !node_modules/text-decoder/**
 !node_modules/fast-fifo/**
+!node_modules/require-addon/**
+!node_modules/bare-addon-resolve/**
+!node_modules/bare-module-resolve/**
+!node_modules/bare-semver/**
+!node_modules/bare-events/**
+!node_modules/events-universal/**

@@ -6,7 +6,9 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   OpenWebUI: "openwebui",
   Ollama: "ollama",
   LlamaCpp: "llamacpp",
-  OpenAICompatible: "openai-compatible"
+  OpenAICompatible: "openai-compatible",
+  /** Another machine's Ollama, reached over an encrypted peer-to-peer link. */
+  TwinnyP2P: "twinny-p2p"
 }
 
 export const API_PROVIDERS = {

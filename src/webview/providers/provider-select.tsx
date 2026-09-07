@@ -5,11 +5,10 @@ import {
   VSCodeOption,
   VSCodeTextField} from "@vscode/webview-ui-toolkit/react"
 
-import { API_PROVIDERS, EVENT_NAME, GLOBAL_STORAGE_KEY } from "../../common/constants"
+import { API_PROVIDERS, EVENT_NAME } from "../../common/constants"
 import { useModels } from "../hooks/useModels"
 import { useOllamaModels } from "../hooks/useOllamaModels"
 import { useProviders } from "../hooks/useProviders"
-import { StorageType, useStorageContext } from "../hooks/useStorageContext"
 import { emit } from "../messaging"
 
 import styles from "../styles/providers.module.css"
@@ -18,8 +17,13 @@ export const ProviderSelect = () => {
   const { t } = useTranslation()
   const ollamaModels = useOllamaModels()
   const { models } = useModels()
-  const { getProvidersByType, setActiveChatProvider, providers, chatProvider } =
-    useProviders()
+  const {
+    getProvidersByType,
+    setActiveChatProvider,
+    providers,
+    chatProvider,
+    listModels
+  } = useProviders()
 
   const chatProviders = Object.values(getProvidersByType("chat"))
     .sort((a, b) => a.modelName.localeCompare(b.modelName))
@@ -27,36 +31,57 @@ export const ProviderSelect = () => {
   const isActiveProviderInList = chatProvider && chatProviders.some(p => p.id === chatProvider.id)
   const effectiveProvider = isActiveProviderInList ? chatProvider : (chatProviders[0] || null)
 
+  // A provider's own model comes first; the catalogue only fills a blank.
+  const modelFor = (provider: { provider: string; modelName: string }) =>
+    provider.modelName ||
+    models[provider.provider as keyof typeof models]?.models?.[0] ||
+    ""
+
   React.useEffect(() => {
     if (chatProvider && !isActiveProviderInList && chatProviders.length > 0) {
       const firstProvider = chatProviders[0]
-      const defaultModel = models[firstProvider.provider as keyof typeof models]?.models?.[0] || firstProvider.modelName
       setActiveChatProvider({
         ...firstProvider,
-        modelName: defaultModel
+        modelName: modelFor(firstProvider)
       })
     }
   }, [chatProvider, chatProviders, isActiveProviderInList])
 
-  const providerModels =
-    effectiveProvider?.provider === API_PROVIDERS.Ollama
-      ? ollamaModels.models?.map(({ name }) => name) || []
-      : models[effectiveProvider?.provider as keyof typeof models]?.models || []
+  // A paired device's models come from the device itself.
+  const [remoteModels, setRemoteModels] = React.useState<string[]>([])
+  const remoteKey = `${effectiveProvider?.id}|${effectiveProvider?.deviceId}`
+  React.useEffect(() => {
+    if (effectiveProvider?.provider !== API_PROVIDERS.TwinnyP2P) {
+      setRemoteModels([])
+      return
+    }
+    let cancelled = false
+    listModels(effectiveProvider).then((result) => {
+      if (!cancelled) setRemoteModels(result.models)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [remoteKey])
 
-  const {
-    context: selectedModel,
-    setContext: setSelectedModel
-  } = useStorageContext<string>(StorageType.Global, GLOBAL_STORAGE_KEY.selectedModel)
+  const providerModels =
+    effectiveProvider?.provider === API_PROVIDERS.TwinnyP2P
+      ? remoteModels
+      : effectiveProvider?.provider === API_PROVIDERS.Ollama
+        ? ollamaModels.models?.map(({ name }) => name) || []
+        : models[effectiveProvider?.provider as keyof typeof models]?.models || []
+
+  // The active provider is the one source of truth for the model, so this
+  // dropdown, the providers tab and a device's chips always agree.
+  const selectedModel = effectiveProvider?.modelName || ""
 
   const handleChangeChatProvider = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
     const value = event.target.value
     const provider = providers[value]
-    const defaultModel = models[provider.provider as keyof typeof models]?.models?.[0] || provider.modelName
-    setSelectedModel(defaultModel)
     setActiveChatProvider({
       ...provider,
-      modelName: defaultModel
+      modelName: modelFor(provider)
     })
   }
 
@@ -98,8 +123,7 @@ export const ProviderSelect = () => {
             name="model"
             onChange={(e: unknown) => {
               const event = e as React.ChangeEvent<HTMLSelectElement>
-              setSelectedModel(event.target.value)
-              if (effectiveProvider) {
+              if (effectiveProvider && event.target.value !== selectedModel) {
                 setActiveChatProvider({
                   ...effectiveProvider,
                   modelName: event.target.value
@@ -118,13 +142,12 @@ export const ProviderSelect = () => {
           </VSCodeDropdown>
         ) : (
           <VSCodeTextField
-            value={selectedModel || effectiveProvider?.modelName || ""}
+            value={selectedModel}
             placeholder={t("enter-model-name")}
             onChange={(e: unknown) => {
               const event = e as React.ChangeEvent<HTMLInputElement>
               const value = event.target.value.trim()
-              if (!value) return
-              setSelectedModel(value)
+              if (!value || value === selectedModel) return
               if (effectiveProvider) {
                 setActiveChatProvider({
                   ...effectiveProvider,

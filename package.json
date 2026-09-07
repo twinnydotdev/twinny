@@ -57,6 +57,9 @@
   },
   "main": "./out/index.js",
   "browser": "./out/index.js",
+  "bin": {
+    "twinny-node": "./out/node/cli.js"
+  },
   "contributes": {
     "menus": {
       "editor/context": [
@@ -274,6 +277,10 @@
       {
         "command": "twinny.statusBarMenu",
         "title": "Twinny - Status bar options"
+      },
+      {
+        "command": "twinny.shareOllama",
+        "title": "Twinny - Share this computer's Ollama with my other devices (P2P)"
       }
     ],
     "keybindings": [
@@ -511,6 +518,7 @@
     "clean": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\"",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
+    "node": "node ./out/node/cli.js",
     "package": "node scripts/build.mjs",
     "pretest": "npm run clean && npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",
@@ -571,7 +579,7 @@
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
-    "hyperswarm": "^4.7.15",
+    "hyperdht": "^6.34.0",
     "i18next": "^23.16.5",
     "i18next-http-backend": "^2.6.2",
     "ignore": "^6.0.2",

@@ -4,6 +4,7 @@ import { API_PROVIDERS, FIM_TEMPLATE_FORMAT } from "../../common/constants"
 import {
   describeProviderEndpoint,
   getEndpointDefaults,
+  hasConfigurableEndpoint,
   isProviderLike,
   normalizeProvider,
   summarizeProvider,
@@ -259,6 +260,47 @@ suite("Provider validation", () => {
         }),
         "gpt-4.1 · openai"
       )
+    })
+  })
+
+  suite("P2P device providers", () => {
+    const device = "ab".repeat(32)
+    const p2p = {
+      id: "",
+      label: "Home RTX",
+      modelName: "qwen3:30b",
+      provider: API_PROVIDERS.TwinnyP2P,
+      type: "chat",
+      deviceId: device.toUpperCase()
+    }
+
+    test("normalises to a device id and no address", () => {
+      const normalized = normalizeProvider({
+        ...p2p,
+        apiHostname: "https://should-not-stay:1234/v1",
+        apiKey: "secret"
+      })
+      assert.strictEqual(normalized.deviceId, device)
+      assert.strictEqual(normalized.apiHostname, "")
+      assert.strictEqual(normalized.apiPort, undefined)
+      assert.strictEqual(normalized.apiPath, "")
+      assert.strictEqual(normalized.apiKey, "")
+    })
+
+    test("is valid without an endpoint and invalid without a device", () => {
+      assert.ok(validateProvider(normalizeProvider(p2p)).valid)
+      const { valid, errors } = validateProvider(
+        normalizeProvider({ ...p2p, deviceId: "nope" })
+      )
+      assert.strictEqual(valid, false)
+      assert.match(errors.deviceId || "", /Pair a device/)
+    })
+
+    test("has no configurable endpoint but does use one", () => {
+      assert.strictEqual(hasConfigurableEndpoint(API_PROVIDERS.TwinnyP2P, "chat"), false)
+      assert.strictEqual(usesEndpoint(API_PROVIDERS.TwinnyP2P, "chat"), true)
+      assert.strictEqual(describeProviderEndpoint(normalizeProvider(p2p)), "")
+      assert.strictEqual(summarizeProvider(normalizeProvider(p2p)), "qwen3:30b · P2P device")
     })
   })
 

@@ -19,14 +19,16 @@ import {
   describeProviderEndpoint,
   expectsApiKey,
   getEndpointDefaults,
+  hasConfigurableEndpoint,
+  isP2pProvider,
   normalizeProvider,
   PROVIDER_TYPES,
   ProviderField,
   supportsType,
-  usesEndpoint,
   validateProvider
 } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
+import { useDevices } from "../hooks/useDevices"
 import { useProviders } from "../hooks/useProviders"
 
 import { ProviderTestBadge } from "./provider-test-badge"
@@ -49,7 +51,8 @@ const PROVIDER_NAMES: Record<string, string> = {
   [API_PROVIDERS.OpenAICompatible]: "OpenAI-compatible server",
   [API_PROVIDERS.OpenRouter]: "OpenRouter",
   [API_PROVIDERS.OpenWebUI]: "Open WebUI",
-  [API_PROVIDERS.Perplexity]: "Perplexity"
+  [API_PROVIDERS.Perplexity]: "Perplexity",
+  [API_PROVIDERS.TwinnyP2P]: "Twinny device (P2P)"
 }
 
 const EMBEDDING_MODEL_PATTERN = /embed|minilm|bge|e5|nomic/i
@@ -57,7 +60,7 @@ const FIM_MODEL_PATTERN =
   /code|coder|fim|starcoder|codestral|codegemma|stable-code/i
 
 /** When the server lists models, the first one that fits the job. */
-const pickModel = (models: string[], type: string) => {
+export const pickModel = (models: string[], type: string) => {
   if (type === "embedding") {
     return models.find((m) => EMBEDDING_MODEL_PATTERN.test(m)) || models[0]
   }
@@ -84,6 +87,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const { t } = useTranslation()
   const { saveProvider, updateProvider, testProvider, listModels } =
     useProviders()
+  const { devices } = useDevices()
   const isEditing = !!initial.id
 
   const [draft, setDraft] = useState<TwinnyProvider>({
@@ -109,7 +113,9 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const normalized = useMemo(() => normalizeProvider(draft), [draft])
   const validation = useMemo(() => validateProvider(normalized), [normalized])
   const endpoint = describeProviderEndpoint(normalized)
-  const showEndpointFields = usesEndpoint(draft.provider, draft.type)
+  const isP2p = isP2pProvider(draft.provider)
+  const showEndpointFields = hasConfigurableEndpoint(draft.provider, draft.type)
+  const device = isP2p ? devices.find((d) => d.id === draft.deviceId) : undefined
 
   const errorFor = (field: ProviderField) =>
     serverErrors[field] ||
@@ -161,6 +167,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const listKey = [
     draft.provider,
     draft.type,
+    draft.deviceId,
     draft.apiHostname,
     draft.apiPort,
     draft.apiProtocol,
@@ -169,7 +176,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   useEffect(() => {
     let cancelled = false
     const probe = normalizeProvider(draft)
-    if (showEndpointFields && !probe.apiHostname) {
+    if ((showEndpointFields && !probe.apiHostname) || (isP2p && !probe.deviceId)) {
       setModels([])
       return
     }
@@ -245,8 +252,14 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
     )
   }
 
+  // A device provider is made from the device's card, where the id comes
+  // from; it is not something to pick from a list.
   const providerOptions = Object.values(API_PROVIDERS)
-    .filter((name) => supportsType(name, draft.type) || name === draft.provider)
+    .filter(
+      (name) =>
+        (supportsType(name, draft.type) && !isP2pProvider(name)) ||
+        name === draft.provider
+    )
     .sort((a, b) => PROVIDER_NAMES[a].localeCompare(PROVIDER_NAMES[b]))
 
   return (
@@ -302,6 +315,24 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
           </VSCodeDropdown>
         )}
       </div>
+
+      {isP2p &&
+        field(
+          "deviceId",
+          t("device"),
+          <div className={styles.staticValue}>
+            <i
+              className={`codicon codicon-${
+                device?.state === "online" ? "circle-filled" : "circle-outline"
+              }`}
+            />
+            <span>{device?.name || draft.deviceId?.slice(0, 12) || "—"}</span>
+            {device && (
+              <span className={styles.fieldHint}>{t(`device-${device.state}`)}</span>
+            )}
+          </div>,
+          !device ? t("device-not-paired") : undefined
+        )}
 
       {showEndpointFields && (
         <>
@@ -375,7 +406,8 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         </>
       )}
 
-      {field(
+      {!isP2p &&
+        field(
         "apiKey",
         t("api-key"),
         <div className={styles.inlineControl}>

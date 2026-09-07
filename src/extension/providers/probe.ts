@@ -24,6 +24,7 @@ import {
 } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
 import { createStreamRequestBodyFim } from "../completion/request-body"
+import { p2pListingBase } from "../p2p/endpoint"
 import { getFimDataFromProvider } from "../utils"
 
 import { describeProviderErrorPlain } from "./errors"
@@ -262,6 +263,7 @@ const OPENWEBUI_MODELS: ListRoute = {
 const listRoutesFor = (provider: string): ListRoute[] => {
   switch (provider) {
     case API_PROVIDERS.Ollama:
+    case API_PROVIDERS.TwinnyP2P:
       return [OLLAMA_TAGS, OPENAI_MODELS]
     case API_PROVIDERS.OpenWebUI:
       return [OPENWEBUI_MODELS, OPENWEBUI_OLLAMA_TAGS, OPENAI_MODELS]
@@ -276,10 +278,13 @@ const fetchList = async (
 ): Promise<string[]> => {
   const { signal, done } = withTimeout(LIST_TIMEOUT_MS)
   try {
-    const response = await fetch(`${getProviderOrigin(provider)}${route.path}`, {
-      headers: authHeaders(provider),
-      signal
-    })
+    const response = await fetch(
+      `${getProviderOrigin(provider)}${p2pListingBase(provider)}${route.path}`,
+      {
+        headers: authHeaders(provider),
+        signal
+      }
+    )
     if (!response.ok) throw await httpError(response)
     return route.parse(await response.json())
   } finally {

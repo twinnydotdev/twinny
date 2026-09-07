@@ -221,6 +221,7 @@ export const getFimDataFromProvider = (
     case API_PROVIDERS.OpenAICompatible:
     case API_PROVIDERS.Ollama:
     case API_PROVIDERS.OpenWebUI:
+    case API_PROVIDERS.TwinnyP2P:
       if (typeof data.response === "string") return data.response
       break
     case API_PROVIDERS.LlamaCpp:

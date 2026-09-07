@@ -5,6 +5,7 @@ import {
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   ACTIVE_FIM_PROVIDER_STORAGE_KEY
 } from "../../common/constants"
+import { resolveProviderEndpoint } from "../p2p/endpoint"
 import { getIsOpenAICompatible } from "../utils"
 
 import { TwinnyProvider } from "./manager"
@@ -34,7 +35,7 @@ export class Base {
     const provider = this.context?.globalState.get<TwinnyProvider>(
       ACTIVE_FIM_PROVIDER_STORAGE_KEY
     )
-    return provider
+    return resolveProviderEndpoint(provider)
   }
 
   public getProviderBaseUrl = (provider: TwinnyProvider) => {
@@ -47,18 +48,22 @@ export class Base {
     }
   }
 
+  /**
+   * The active provider for each job, with a P2P device already pointed at
+   * its local gateway. Callers never see a provider without an address.
+   */
   public getProvider = () => {
     const provider = this.context?.globalState.get<TwinnyProvider>(
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
-    return provider
+    return resolveProviderEndpoint(provider)
   }
 
   public getEmbeddingProvider = () => {
     const provider = this.context?.globalState.get<TwinnyProvider>(
       ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
     )
-    return provider
+    return resolveProviderEndpoint(provider)
   }
 
   public updateConfig() {
