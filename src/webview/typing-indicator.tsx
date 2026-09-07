@@ -1,16 +1,14 @@
 import React from "react"
 
+import { TWINNY } from "../common/constants"
+
 import styles from "./styles/typing-indicator.module.css"
 
 const TypingIndicator = () => {
   return (
-    <div className={styles.message}>
-      <span className={styles.messageRole}>twinny</span>
-      <div className={styles.typingIndicator}>
-        <div className={styles.typingDot}></div>
-        <div className={styles.typingDot}></div>
-        <div className={styles.typingDot}></div>
-      </div>
+    <div className={styles.pending}>
+      <span>{TWINNY}</span>
+      <span className={styles.cursor} aria-hidden="true" />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { ChatCompletionMessageParam } from "fluency.js"
-import { ExtensionContext, Webview } from "vscode"
+import { ExtensionContext } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -8,52 +8,44 @@ import {
   CONVERSATION_STORAGE_KEY,
   TITLE_GENERATION_PROMPT_MESAGE
 } from "../common/constants"
-import { ClientMessage, Conversation, ServerMessage } from "../common/types"
+import { Conversation, TwinnyProvider } from "../common/types"
 
+import { ExtensionBridge } from "./messaging/bridge"
 import { Base } from "./base"
 import { Chat } from "./chat"
-import { TwinnyProvider } from "./provider-manager"
 
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory extends Base {
-  public webView: Webview
+  public bridge: ExtensionBridge
   private _chatService: Chat
 
-  constructor(context: ExtensionContext, webView: Webview, chatService: Chat) {
+  constructor(
+    context: ExtensionContext,
+    bridge: ExtensionBridge,
+    chatService: Chat
+  ) {
     super(context)
-    this.webView = webView
+    this.bridge = bridge
     this._chatService = chatService
-    this.setUpEventListeners()
+    this.registerHandlers()
   }
 
-  setUpEventListeners() {
-    this.webView?.onDidReceiveMessage(
-      (message: ClientMessage<Conversation>) => {
-        this.handleMessage(message)
-      }
-    )
-  }
-
-  handleMessage(message: ClientMessage<Conversation>) {
-    const { type } = message
-    switch (type) {
-      case CONVERSATION_EVENT_NAME.getConversations:
-        return this.getAllConversations()
-      case CONVERSATION_EVENT_NAME.getActiveConversation:
-        return this.getActiveConversation()
-      case CONVERSATION_EVENT_NAME.setActiveConversation:
-        return this.setActiveConversation(message.data)
-      case CONVERSATION_EVENT_NAME.removeConversation:
-        return this.removeConversation(message.data)
-      case CONVERSATION_EVENT_NAME.saveConversation:
-        if (!message.data) return
-        return this.saveConversation(message.data)
-      case CONVERSATION_EVENT_NAME.clearAllConversations:
-        return this.clearAllConversations()
-      default:
-      // do nothing
-    }
+  protected registerHandlers() {
+    this.bridge.handleAll({
+      [CONVERSATION_EVENT_NAME.getConversations]: () =>
+        this.getAllConversations(),
+      [CONVERSATION_EVENT_NAME.getActiveConversation]: () =>
+        void this.getActiveConversation(),
+      [CONVERSATION_EVENT_NAME.setActiveConversation]: (conversation) =>
+        this.setActiveConversation(conversation),
+      [CONVERSATION_EVENT_NAME.removeConversation]: (conversation) =>
+        this.removeConversation(conversation),
+      [CONVERSATION_EVENT_NAME.saveConversation]: (conversation) =>
+        conversation && void this.saveConversation(conversation),
+      [CONVERSATION_EVENT_NAME.clearAllConversations]: () =>
+        this.clearAllConversations()
+    })
   }
 
   public getProvider = () => {
@@ -77,11 +69,10 @@ export class ConversationHistory extends Base {
   }
 
   getAllConversations() {
-    const conversations = this.getConversations() || {}
-    this.webView?.postMessage({
-      type: CONVERSATION_EVENT_NAME.getConversations,
-      data: conversations
-    })
+    this.bridge.emit(
+      CONVERSATION_EVENT_NAME.getConversations,
+      this.getConversations() || {}
+    )
   }
 
   getConversations(): Conversations {
@@ -115,10 +106,10 @@ export class ConversationHistory extends Base {
       conversation
     )
 
-    this.webView?.postMessage({
-      type: CONVERSATION_EVENT_NAME.setActiveConversation,
-      data: conversation
-    } as ServerMessage<Conversation>)
+    this.bridge.emit(
+      CONVERSATION_EVENT_NAME.setActiveConversation,
+      conversation
+    )
 
     this.getAllConversations()
   }
@@ -147,22 +138,31 @@ export class ConversationHistory extends Base {
     this.setActiveConversation(undefined)
   }
 
+  /**
+   * The model names the conversation once, after the first reply, when the
+   * two messages say what it is about. Later saves keep that title rather
+   * than paying for another request every time a message lands.
+   */
   async saveConversation(conversation: Conversation) {
     const activeConversation = this.getActiveConversation()
+    if (!activeConversation) return
 
-    if (activeConversation) {
-      let title = await this._generateTitleWithLlm(
-        conversation.messages.slice(0, 2)
-      )
-      if (!title) {
-        title = this.getConversationTitle(conversation.messages)
-      }
-      return this.updateConversation({
-        ...activeConversation,
-        messages: conversation.messages,
-        title
-      })
+    const isFirstExchange = conversation.messages.length === 2
+    let title = activeConversation.title
+
+    if (isFirstExchange && !activeConversation.pinnedTitle) {
+      title =
+        (await this._generateTitleWithLlm(conversation.messages)) || title
     }
+    if (!title) {
+      title = this.getConversationTitle(conversation.messages)
+    }
+
+    return this.updateConversation({
+      ...activeConversation,
+      messages: conversation.messages,
+      title
+    })
   }
 
   private async _generateTitleWithLlm(
@@ -189,16 +189,31 @@ export class ConversationHistory extends Base {
 
     Title:`.trim()
 
-    console.log("LLM Title Generation Prompt:", prompt)
-
     try {
       const generatedTitle = await this._chatService.generateSimpleCompletion(
         prompt
       )
-      return generatedTitle?.trim()
+      return this.cleanTitle(generatedTitle)
     } catch (error) {
       console.error("Error calling LLM for title generation:", error)
       return undefined
     }
+  }
+
+  /** Models like to quote or prefix titles; a title is one short line. */
+  private cleanTitle(text: string | undefined): string | undefined {
+    if (!text) return undefined
+    const firstLine = text
+      .trim()
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0)
+    if (!firstLine) return undefined
+    const cleaned = firstLine
+      .replace(/^(title:?)\s*/i, "")
+      .replace(/^["'`*#\s]+|["'`*\s]+$/g, "")
+      .trim()
+    if (!cleaned) return undefined
+    return cleaned.length > 60 ? `${cleaned.slice(0, 57)}...` : cleaned
   }
 }

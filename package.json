@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.23.31",
+  "version": "4.0.0",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -93,16 +93,11 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab || view == twinny.sidebar && twinnySymmetryTab"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab"
         },
         {
           "command": "twinny.review",
           "group": "navigation@1",
-          "when": "view == twinny.sidebar"
-        },
-        {
-          "command": "twinny.symmetry",
-          "group": "navigation@2",
           "when": "view == twinny.sidebar"
         },
         {
@@ -140,6 +135,26 @@
           "command": "twinny.settings",
           "when": "view == twinny.sidebar",
           "group": "navigation@9"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "twinny.generateCommitMessage",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "twinny.statusBarMenu",
+          "when": "false"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "twinny.addFileToContext",
+          "group": "twinny@1",
+          "when": "!explorerResourceIsFolder"
         }
       ]
     },
@@ -196,12 +211,6 @@
         "icon": "$(git-pull-request)"
       },
       {
-        "command": "twinny.symmetry",
-        "shortTitle": "twinny symmetry network",
-        "title": "Symmetry network settings",
-        "icon": "$(mirror-public)"
-      },
-      {
         "command": "twinny.conversationHistory",
         "shortTitle": "twinny conversation history",
         "title": "Open twinny conversation history",
@@ -256,6 +265,15 @@
       {
         "command": "twinny.addSelectionToContext",
         "title": "Twinny: Add Selection to Context"
+      },
+      {
+        "command": "twinny.generateCommitMessage",
+        "title": "Twinny - Generate commit message",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "twinny.statusBarMenu",
+        "title": "Twinny - Status bar options"
       }
     ],
     "keybindings": [
@@ -461,12 +479,6 @@
           "default": true,
           "markdownDescription": "Activates debug logging for Twinny. When `true`, Twinny will output detailed logs, which can be helpful for troubleshooting."
         },
-        "twinny.symmetryServerKey": {
-          "order": 20,
-          "type": "string",
-          "markdownDescription": "Sets the symmetry master server key. Default value is provided for twinny's Symmetry server.",
-          "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
-        },
         "twinny.githubToken": {
           "order": 21,
           "type": "string",
@@ -482,6 +494,13 @@
           ],
           "default": "globalState",
           "markdownDescription": "Specifies where to store Twinny provider configurations. 'globalState' uses VS Code's global state (persists per domain, may be lost if domain changes frequently). 'file' stores configurations in a file within the extension's global storage directory (more resilient to domain changes)."
+        },
+        "twinny.reviewMaxDiffChars": {
+          "order": 30,
+          "type": "number",
+          "default": 16000,
+          "minimum": 2000,
+          "description": "Characters of diff sent to the model per code-review request. Larger reviews are split into parts. Lower this for models with small context windows; raise it for large-context models to get fewer parts."
         }
       }
     }
@@ -489,10 +508,11 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build-tests": "tsc -p . --outDir out",
+    "clean": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\"",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "package": "node scripts/build.mjs",
-    "pretest": "npm run build-tests && npm run build && npm run lint",
+    "pretest": "npm run clean && npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",
     "vscode:package": "npm exec vsce package",
     "vscode:prepublish": "npm run package",
@@ -502,18 +522,14 @@
   },
   "devDependencies": {
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
-    "@types/async-lock": "^1.4.2",
     "@types/cheerio": "^0.22.35",
-    "@types/js-yaml": "^4.0.9",
     "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
     "@types/react-syntax-highlighter": "^15.5.11",
-    "@types/string_score": "^0.1.31",
     "@types/uuid": "^9.0.8",
     "@types/vscode": "^1.70.0",
-    "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
     "@vscode/test-cli": "^0.0.6",
@@ -547,8 +563,6 @@
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
-    "async-lock": "^1.4.1",
-    "b4a": "^1.6.6",
     "cheerio": "^1.0.0",
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
@@ -557,12 +571,10 @@
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
-    "hypercore-crypto": "^3.4.2",
     "hyperswarm": "^4.7.15",
     "i18next": "^23.16.5",
     "i18next-http-backend": "^2.6.2",
     "ignore": "^6.0.2",
-    "js-yaml": "^4.1.0",
     "lucide-react": "^0.473.0",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
@@ -575,13 +587,10 @@
     "react-virtuoso": "^4.12.3",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
-    "string_score": "^0.1.22",
-    "symmetry-core": "^1.0.45",
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.8.10",
     "toxe": "^1.1.0",
-    "uuid": "^9.0.1",
-    "ws": "^8.18.0"
+    "uuid": "^9.0.1"
   },
   "os": [
     "darwin",

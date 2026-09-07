@@ -1,0 +1,277 @@
+/*
+ * twinny — terminal
+ *
+ * One token layer for the whole webview. Everything else consumes these; if a
+ * colour or a size needs tuning it should only need tuning here.
+ *
+ * The palette is derived from the user's VS Code theme rather than hard-coded,
+ * so a light theme stays readable. The look comes from the shape of things —
+ * monospace, hairlines, square corners, no shadows — not from a fixed colour.
+ */
+
+:root {
+  --tw-font: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
+
+  --tw-fs: 12px;
+  --tw-fs-sm: 11px;
+  --tw-fs-xs: 10px;
+  --tw-lh: 1.65;
+  --tw-track: 0.08em;
+
+  --tw-pad: 12px;
+  --tw-gutter: 14px;
+
+  --tw-bg: var(--vscode-editor-background);
+  --tw-fg: var(--vscode-foreground);
+
+  /* Plain fallbacks; the @supports block below refines them. */
+  --tw-fg-dim: var(--vscode-descriptionForeground);
+  --tw-fg-faint: var(--vscode-disabledForeground);
+  --tw-rule: var(--vscode-editorWidget-border);
+  --tw-rule-soft: var(--vscode-editorWidget-border);
+  --tw-surface: var(--vscode-editorWidget-background);
+  /*
+   * No invented palette. Each of these is the token VS Code itself uses for
+   * that exact job, so every colour in the UI is one the active theme already
+   * chose — a link is the theme's link colour, the caret is the theme's caret,
+   * the selection is the theme's selection.
+   */
+  /*
+   * focusBorder and editorCursor.foreground are the two accent tokens themes
+   * reliably override (verified against the built-in themes); textLink is a
+   * VS Code constant, so it is used only for real hyperlinks.
+   */
+  --tw-accent: var(--vscode-focusBorder);
+  --tw-link: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+  --tw-code: var(--vscode-textPreformat-foreground, var(--vscode-foreground));
+  --tw-cursor: var(--vscode-editorCursor-foreground, var(--vscode-foreground));
+  --tw-selection: var(--vscode-editor-selectionBackground);
+}
+
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    --tw-fg-dim: color-mix(in srgb, var(--vscode-foreground) 60%, transparent);
+    --tw-fg-faint: color-mix(in srgb, var(--vscode-foreground) 34%, transparent);
+    --tw-rule: color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
+    --tw-rule-soft: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
+    --tw-surface: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
+    --tw-accent-soft: color-mix(in srgb, var(--tw-accent) 45%, transparent);
+    --tw-link-soft: color-mix(in srgb, var(--tw-link) 40%, transparent);
+  }
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--tw-bg);
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  line-height: var(--tw-lh);
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--tw-selection);
+  color: var(--tw-fg);
+}
+
+/* Thin, square, unobtrusive. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--tw-rule);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--tw-fg-faint);
+}
+
+a {
+  color: var(--tw-fg);
+  text-decoration: none;
+  border-bottom: 1px solid var(--tw-rule);
+}
+
+a:hover {
+  color: var(--tw-link);
+  border-bottom-color: var(--tw-link-soft, var(--tw-link));
+}
+
+/*
+ * The toolkit web components render their own rounded chrome. Square the
+ * corners and put them on the same font as everything else; their colours and
+ * weights are VS Code's own and are left alone.
+ */
+vscode-button::part(control),
+vscode-dropdown::part(control),
+vscode-text-field::part(root),
+vscode-text-field::part(control),
+vscode-text-area::part(control),
+vscode-badge::part(control),
+vscode-checkbox::part(control) {
+  border-radius: 0;
+  font-family: var(--tw-font);
+}
+
+vscode-button[appearance="icon"]::part(control) {
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+}
+
+vscode-button[appearance="icon"]:hover::part(control),
+vscode-button[appearance="icon"]:focus-visible::part(control) {
+  opacity: 1;
+}
+
+/*
+ * The toolkit's panel view is a flex ROW by default, which lays a whole tab
+ * out sideways. Every tab that uses it expects a column.
+ */
+vscode-panel-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+}
+
+vscode-dropdown,
+vscode-text-field,
+vscode-text-area {
+  font-family: var(--tw-font);
+}
+
+/* A button's icon and its label share one slot and would otherwise touch. */
+vscode-button::part(content) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.codicon {
+  font-size: 14px !important;
+}
+
+/* Mentions read as a path token, not a chip. */
+.mention {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--tw-accent-soft);
+  border-radius: 0;
+  background: transparent;
+  color: var(--tw-accent);
+  font-family: var(--tw-font);
+  font-size: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mention:hover {
+  background: var(--tw-surface);
+}
+
+.tiptap {
+  outline: none;
+  caret-color: var(--tw-cursor);
+}
+
+/* Tiptap's Placeholder extension had no styling at all, so it never showed. */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--tw-fg-faint);
+  pointer-events: none;
+}
+
+.imageContainer {
+  position: relative;
+  display: inline-block;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--tw-rule);
+  overflow: hidden;
+}
+
+.chatImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imageDeleteButton {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: var(--tw-bg);
+  border: 1px solid var(--tw-rule);
+  color: var(--tw-fg-dim);
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.imageDeleteButton:hover {
+  color: var(--vscode-errorForeground);
+  border-color: var(--vscode-errorForeground);
+}
+
+/* Global typography for the non-chat tabs (settings, providers, review). */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 1.4em 0 0.6em;
+  color: var(--tw-fg);
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  line-height: 1.4;
+  text-transform: lowercase;
+}
+
+h1 {
+  font-size: 14px;
+}
+
+h1:first-child,
+h2:first-child,
+h3:first-child {
+  margin-top: 0;
+}
+
+label {
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  letter-spacing: var(--tw-track);
+}
+
+hr {
+  height: 0;
+  border: 0;
+  border-top: 1px solid var(--tw-rule-soft);
+}

@@ -3,6 +3,7 @@ import * as vscode from "vscode"
 import { logger } from "../../common/logger"
 import { EmbeddingDatabase } from "../embeddings"
 import { SessionManager } from "../session-manager"
+import { TwinnyStatusBar } from "../status-bar"
 import { getNonce } from "../utils"
 
 import { BaseProvider } from "./base"
@@ -12,7 +13,7 @@ export class SidebarProvider extends BaseProvider {
   private _sidebarReadyPromise: Promise<void> = Promise.resolve()
 
   constructor(
-    statusBarItem: vscode.StatusBarItem,
+    statusBarItem: TwinnyStatusBar,
     context: vscode.ExtensionContext,
     templateDir: string,
     db: EmbeddingDatabase | undefined,
@@ -103,7 +104,7 @@ export class SidebarProvider extends BaseProvider {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>twinny</title>
           <style>
-            body { padding: 10px }
+            body { padding: 0 }
           </style>
       </head>
       <body>

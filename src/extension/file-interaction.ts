@@ -12,7 +12,11 @@ export class FileInteractionCache {
   private _sessionStartTime: Date | null = null
   private readonly _disposables: vscode.Disposable[] = []
   private readonly _inactivityThreshold = 5 * 60 * 1000
-  private readonly FILTER_REGEX = /\.git|git|package.json|.hg/
+  /** VCS internals and lockfiles are never useful completion context. */
+  private readonly FILTER_REGEX =
+    /(^|[\\/])(\.git|\.hg|\.svn)([\\/]|$)|package(-lock)?\.json$|yarn\.lock$|pnpm-lock\.yaml$/
+  /** Only the most recent edits say where the user is working. */
+  private static readonly MAX_ACTIVE_LINES = 200
   private static readonly KEY_STROKE_WEIGHT = 2
   private static readonly OPEN_FILE_WEIGHT = 10
   private static readonly RECENCY_WEIGHT = 2.1
@@ -135,7 +139,9 @@ export class FileInteractionCache {
       ...item,
       keyStrokes: (item.keyStrokes || 0) + 1,
       activeLines: [
-        ...item.activeLines,
+        ...item.activeLines.slice(
+          -(FileInteractionCache.MAX_ACTIVE_LINES - 1)
+        ),
         { line: currentLine, character: currentCharacter }
       ],
       lastVisited: Date.now()

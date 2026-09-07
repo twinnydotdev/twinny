@@ -51,6 +51,16 @@ Use the standard documentation format for {{language}}. If unsure, use a widely 
 Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.`.trim()
   },
   {
+    name: "commit-message",
+    template: `
+Write a git commit message for the following diff.
+Use the imperative mood ("Add", "Fix", "Refactor"), keep the subject line under 72 characters,
+and add a short body only when it explains something the subject cannot.
+Reply with the commit message only: no code fences, no quotes, no explanation.
+
+{{{code}}}`.trim()
+  },
+  {
     name: "system",
     template: `You are a helpful, respectful and honest coding assistant.
 Always reply using markdown.
@@ -84,19 +94,37 @@ Consider these in your response if pertinent. Disregard if not relevant.`.trim()
   {
     name: "review",
     template: `
-You are a highly skilled software engineer specializing in code reviews.
-Your task is to review code changes in a unidiff format.
-Ensure your feedback is constructive and professional.
+You are a senior engineer reviewing a change titled "{{title}}".
+{{#if part}}This is part {{part}} of a larger review; comment only on the files shown here.{{/if}}
 
-Review the following diff:
+Review the unified diff below and answer in markdown with these sections:
 
-\`\`\`
+## Summary
+Two or three sentences: what the change does and how sound it looks.
+
+## Issues
+The most important problems first, at most eight. For each, one bullet with a severity marker (🔴 bug, 🟠 risk, 🟡 nit), the file and approximate line from the hunk header, what is wrong, and a concrete fix. Omit this section if there are none.
+
+## Suggestions
+Optional improvements worth making, if any.
+
+## Verdict
+One line: ready to merge, merge after fixes, or needs rework.
+
+Be specific and quote the relevant code. Do not restate the diff, do not ask for comments or documentation, and do not mention dependencies or other pull requests.
+
+\`\`\`diff
 {{{code}}}
-\`\`\`
+\`\`\``.trim()
+  },
+  {
+    name: "review-summary",
+    template: `
+Below are the parts of a code review of "{{title}}", each covering different files.
+Combine them into one short overall assessment in markdown: the most important issues across all parts (at most five, most severe first, each naming its file), then one line on merge readiness.
+Do not repeat the parts and do not add new findings.
 
-Present it in markdown format, and refrain from mentioning:
-- Adding comments or documentation
-- Adding dependencies or related pull requests`.trim()
+{{{code}}}`.trim()
   },
   {
     name: "fim-system",

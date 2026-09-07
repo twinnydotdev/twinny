@@ -16,11 +16,12 @@ import {
   FIM_TEMPLATE_FORMAT,
   PROVIDER_EVENT_NAME
 } from "../common/constants"
-import { TwinnyProvider } from "../extension/provider-manager"
+import { TwinnyProvider } from "../common/types"
 
 import { useOllamaModels } from "./hooks/useOllamaModels"
 import { useProviders } from "./hooks/useProviders"
 import { DefaultProviderSelect } from "./default-providers"
+import { emit, useServerEvent } from "./messaging"
 import { ModelSelect } from "./model-select"
 
 import indexStyles from "./styles/index.module.css"
@@ -28,8 +29,6 @@ import styles from "./styles/providers.module.css"
 
 type ViewState = "providers" | "defaults" | "custom-form" | "fim-form"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 export const Providers = () => {
   const { t } = useTranslation()
   const [view, setView] = React.useState<ViewState>("providers")
@@ -177,9 +176,9 @@ export const Providers = () => {
                   <i className="codicon codicon-cloud-download" />
                   {t("export")}
                 </VSCodeButton>
-                <VSCodeButton appearance="secondary" onClick={handleReset} title={t("reset-providers")}>
+                <VSCodeButton appearance="secondary" onClick={handleReset} title={t("reset")}>
                   <i className="codicon codicon-refresh" />
-                  {t("reset-providers")}
+                  {t("reset")}
                 </VSCodeButton>
               </div>
             </div>
@@ -356,29 +355,19 @@ function ProviderForm({ onClose, provider, type }: ProviderFormProps) {
   )
   const [testStatus, setTestStatus] = React.useState<string | null>(null)
 
-  React.useEffect(() => {
-    const listener = (event: MessageEvent) => {
-      const message = event.data
-      if (message.type === PROVIDER_EVENT_NAME.testProviderResult) {
-        if (message.data.success) {
-          setTestStatus(t("provider-test-successful"))
-        } else {
-          setTestStatus(`${t("provider-test-failed")}: ${message.data.error || t("unknown-error")}`)
-        }
-      }
-    }
-    window.addEventListener("message", listener)
-    return () => {
-      window.removeEventListener("message", listener)
-    }
-  }, [t])
+  useServerEvent(PROVIDER_EVENT_NAME.testProviderResult, (result) => {
+    setTestStatus(
+      result.success
+        ? t("provider-test-successful")
+        : `${t("provider-test-failed")}: ${
+            result.error || t("unknown-error")
+          }`
+    )
+  })
 
   const handleTestProvider = () => {
     setTestStatus("Testing...")
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.testProvider,
-      data: formState
-    })
+    emit(PROVIDER_EVENT_NAME.testProvider, formState)
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {

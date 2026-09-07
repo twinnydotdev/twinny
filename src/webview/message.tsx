@@ -16,13 +16,11 @@ import { useSuggestion } from "./hooks/useSuggestion"
 import CodeBlock from "./code-block"
 import { createCustomImageExtension } from "./image-extension"
 import { MentionExtension } from "./mention-extention"
+import { emit } from "./messaging"
 import { useToast } from "./toast"
 import { getThinkingMessage } from "./utils"
 
 import styles from "./styles/message.module.css"
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 
 interface MessageProps {
   index?: number
@@ -220,10 +218,7 @@ export const Message: React.FC<MessageProps> = ({
   }, [message?.content, onEdit, index, message?.images])
 
   const handleOpenFile = useCallback((filePath: string) => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyOpenFile,
-      data: filePath
-    })
+    emit(EVENT_NAME.twinnyOpenFile, filePath)
   }, [])
 
   const { suggestion, filePaths } = useSuggestion()
@@ -443,7 +438,14 @@ export const Message: React.FC<MessageProps> = ({
         />
       )}
       <div className={styles.messageRole}>
-        <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
+        <span className={styles.roleLabel}>
+          {message.role !== ASSISTANT && (
+            <span className={styles.rolePrompt} aria-hidden="true">
+              &#10095;
+            </span>
+          )}
+          {message.role === ASSISTANT ? TWINNY : YOU}
+        </span>
         <div className={styles.messageOptions}>
           <VSCodeButton
             title={t("copy-code")}

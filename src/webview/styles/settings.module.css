@@ -1,8 +1,7 @@
 .settingsContainer p {
-  font-size: 0.85rem;
+  font-size: var(--tw-fs);
   margin: 0.25rem 0 0.75rem;
-  color: var(--vscode-foreground);
-  opacity: 0.9;
+  color: var(--tw-fg-dim);
 }
 
 .templateEditor {
@@ -11,7 +10,7 @@
 
 .templateEditor vscode-button,
 .resetButton vscode-button {
-  font-size: 0.85rem;
+  font-size: var(--tw-fs);
   height: 24px;
 }
 
@@ -20,23 +19,21 @@
   flex-direction: column;
   gap: 0.4rem;
   margin: 0.2rem 0;
-  padding: 0.5rem;
-  border-radius: 3px;
+  padding: 0.5rem 0;
 }
 
 .checkboxItem {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem;
-  border-radius: 2px;
+  padding: 0.25rem 0;
 }
 
 .checkboxItem label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.85rem;
+  font-size: var(--tw-fs);
   color: var(--vscode-foreground);
   cursor: pointer;
 }

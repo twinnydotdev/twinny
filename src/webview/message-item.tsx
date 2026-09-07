@@ -1,5 +1,4 @@
 import React, { memo } from "react"
-import cn from "classnames"
 
 import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
 
@@ -91,11 +90,7 @@ const MessageItem = memo(
             onDeleteImage={handleDeleteImage}
           />
         )}
-        {isLoading && !completion && isLastMessage && (
-          <div className={cn("message", "assistantMessage")}>
-            <TypingIndicator />
-          </div>
-        )}
+        {isLoading && !completion && isLastMessage && <TypingIndicator />}
       </>
     )
   }

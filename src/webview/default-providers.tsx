@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
 import { API_PROVIDERS } from "../common/constants"
-import { TwinnyProvider } from "../extension/provider-manager"
+import { TwinnyProvider } from "../common/types"
 
 import {
   SvgAnthropic,
@@ -16,7 +16,6 @@ import {
   SvgOpenAI,
   SvgOpenRouter,
   SvgPerplexity,
-  SvgTwinny,
 } from "./icons"
 
 import styles from "./styles/providers.module.css"
@@ -25,17 +24,6 @@ interface ProviderSelectProps {
   onSelect: (provider: TwinnyProvider) => void
 }
 const providers: TwinnyProvider[] = [
-  {
-    label: "providers-twinny-name",
-    apiHostname: "twinny.dev",
-    apiPath: "/v1",
-    logo: <SvgTwinny />,
-    apiProtocol: "https",
-    modelName: "",
-    id: "twinny",
-    provider: API_PROVIDERS.Twinny,
-    type: "chat",
-  },
   {
     label: "providers-ollama-name",
     logo: <SvgOllama />,

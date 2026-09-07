@@ -1,0 +1,4 @@
+/* The chat tab lays out its own edges; every other tab gets page padding. */
+.page {
+  padding: var(--tw-pad);
+}

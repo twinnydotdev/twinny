@@ -30,6 +30,10 @@ export async function llm(request: LlmRequest) {
       signal: controller.signal
     }
 
+    // Hand the controller out before connecting so callers can abort a
+    // request that is still waiting on the server.
+    onStart?.(controller)
+
     const response = await fetch(url, fetchOptions)
     clearTimeout(timeOut)
 
@@ -42,8 +46,6 @@ export async function llm(request: LlmRequest) {
     }
 
     let buffer = ""
-
-    onStart?.(controller)
 
     if (body.stream === false) {
       const text = await response.text()

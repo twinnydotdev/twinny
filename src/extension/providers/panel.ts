@@ -1,5 +1,6 @@
 import * as vscode from "vscode"
 
+import { TwinnyStatusBar } from "../status-bar"
 import { getNonce } from "../utils"
 
 import { BaseProvider } from "./base"
@@ -10,7 +11,7 @@ export class FullScreenProvider extends BaseProvider {
   constructor(
     context: vscode.ExtensionContext,
     templateDir: string,
-    statusBarItem: vscode.StatusBarItem
+    statusBarItem: TwinnyStatusBar
   ) {
     super(context, templateDir, statusBarItem)
     this.context = context
@@ -85,7 +86,7 @@ export class FullScreenProvider extends BaseProvider {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>twinny</title>
           <style>
-            body { padding: 10px }
+            body { padding: 0 }
           </style>
       </head>
       <body>

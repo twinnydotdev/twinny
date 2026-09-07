@@ -6,7 +6,6 @@ import Placeholder from "@tiptap/extension-placeholder"
 import { Editor, EditorContent, JSONContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import {
-  VSCodeBadge,
   VSCodeButton,
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
@@ -16,35 +15,33 @@ import { v4 as uuidv4 } from "uuid"
 
 import { EVENT_NAME, USER } from "../common/constants"
 import {
+  AnyContextItem,
   ChatCompletionMessage,
-  ClientMessage,
-  ContextItem,
   ImageAttachment,
-  MentionType,
-  ServerMessage
+  MentionType
 } from "../common/types"
 
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useConversationHistory } from "./hooks/useConversationHistory"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
-import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
 import { useTheme } from "./hooks/useTheme"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
+import { emit, useServerEvent } from "./messaging"
 import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
 import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/chat.module.css"
 
+const COMPOSER_MIN_HEIGHT = 44
+const COMPOSER_HEIGHT_KEY = "twinny.composerHeight"
+
 interface ChatProps {
   fullScreen?: boolean
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 
 export const Chat = (props: ChatProps): JSX.Element => {
   const { fullScreen } = props
@@ -60,7 +57,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const [messages, setMessages] = useState<ChatCompletionMessage[]>([])
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const { symmetryConnection } = useSymmetryConnection()
   const { contextItems, removeContextItem } = useWorkspaceContext()
   const [isBottom, setIsBottom] = useState(false)
 
@@ -68,9 +64,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
     useConversationHistory()
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
+  const editorWrapRef = useRef<HTMLDivElement>(null)
+  const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  const [composerHeight, setComposerHeight] = useState<number | null>(() => {
+    const stored = Number(localStorage.getItem(COMPOSER_HEIGHT_KEY))
+    return stored > 0 ? stored : null
+  })
 
-  const handleAddMessage = (message: ServerMessage<ChatCompletionMessage>) => {
-    if (!message.data) {
+  const handleAddMessage = (incoming: ChatCompletionMessage | undefined) => {
+    if (!incoming) {
       setCompletion(null)
       setIsLoading(false)
       generatingRef.current = false
@@ -78,12 +80,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
 
     setMessages((prev) => {
-      if (message.data.id) {
-        const existingIndex = prev?.findIndex((m) => m.id === message.data.id)
+      if (incoming.id) {
+        const existingIndex = prev?.findIndex((m) => m.id === incoming.id)
 
         if (existingIndex !== -1) {
           const updatedMessages = [...(prev || [])]
-          updatedMessages[existingIndex || 0] = message.data
+          updatedMessages[existingIndex || 0] = incoming
 
           saveLastConversation({
             ...conversation,
@@ -93,7 +95,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         }
       }
 
-      const messages = [...(prev || []), message.data]
+      const messages = [...(prev || []), incoming]
       saveLastConversation({
         ...conversation,
         messages: messages
@@ -110,64 +112,43 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(false)
   }
 
-  const handleCompletionMessage = (
-    message: ServerMessage<ChatCompletionMessage>
-  ) => {
-    setCompletion(message.data)
-  }
+  useServerEvent(EVENT_NAME.twinnyAddMessage, (incoming) => {
+    generatingRef.current = true
+    handleAddMessage(incoming)
+  })
 
-  const handleLoadingMessage = () => {
-    setIsLoading(true)
-  }
+  useServerEvent(EVENT_NAME.twinnyOnCompletion, setCompletion)
 
-  const messageEventHandler = (event: MessageEvent) => {
-    const message: ServerMessage = event.data
-    switch (message.type) {
-      case EVENT_NAME.twinnyAddMessage: {
-        generatingRef.current = true
-        handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
-        break
-      }
-      case EVENT_NAME.twinnyOnCompletion: {
-        handleCompletionMessage(message as ServerMessage<ChatCompletionMessage>)
-        break
-      }
-      case EVENT_NAME.twinnyOnLoading: {
-        handleLoadingMessage()
-        break
-      }
-      case EVENT_NAME.twinnyNewConversation: {
-        setMessages([])
-        setCompletion(null)
-        setActiveConversation({
-          id: uuidv4(),
-          title: t("chat-new-conversation-title"),
-          messages: []
-        })
-        generatingRef.current = false
-        setIsLoading(false)
-        chatRef.current?.focus()
-        setTimeout(() => {
-          stopRef.current = false
-        }, 1000)
-        break
-      }
-      case EVENT_NAME.twinnyStopGeneration: {
-        setIsLoading(false)
-        setCompletion(null)
-        stopRef.current = false
-        generatingRef.current = false
-        setTimeout(() => {
-          chatRef.current?.focus()
-        }, 200)
-      }
-    }
-  }
+  useServerEvent(EVENT_NAME.twinnyOnLoading, () => setIsLoading(true))
+
+  useServerEvent(EVENT_NAME.twinnyNewConversation, () => {
+    setMessages([])
+    setCompletion(null)
+    setActiveConversation({
+      id: uuidv4(),
+      title: t("chat-new-conversation-title"),
+      messages: []
+    })
+    generatingRef.current = false
+    setIsLoading(false)
+    chatRef.current?.focus()
+    setTimeout(() => {
+      stopRef.current = false
+    }, 1000)
+  })
+
+  useServerEvent(EVENT_NAME.twinnyStopGeneration, () => {
+    setIsLoading(false)
+    setCompletion(null)
+    stopRef.current = false
+    generatingRef.current = false
+    setTimeout(() => {
+      chatRef.current?.focus()
+    }, 200)
+  })
 
   const handleStopGeneration = useCallback(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration
-    } as ClientMessage)
+    emit(EVENT_NAME.twinnyStopGeneration)
   }, [])
 
   const handleRegenerateMessage = (
@@ -180,12 +161,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
       if (!prev) return prev
       const updatedMessages = prev.slice(0, index)
 
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversation?.id
-      } as ClientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: mentions || [],
+        conversationId: conversation?.id
+      })
 
       return updatedMessages
     })
@@ -233,12 +213,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
         }
       ]
 
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversation?.id
-      } as ClientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: mentions || [],
+        conversationId: conversation?.id
+      })
 
       return updatedMessages
     })
@@ -306,21 +285,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
         title: conversation?.title || t("chat-new-conversation-title")
       };
 
-      const clientMessage: ClientMessage<
-        ChatCompletionMessage[],
-        MentionType[]
-      > = {
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversationId,
-      }
-
       imagesRef.current = []
       saveLastConversation(currentConversation)
       setActiveConversation(currentConversation)
 
-      global.vscode.postMessage(clientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions,
+        conversationId
+      })
 
       return updatedMessages
     })
@@ -336,42 +309,26 @@ export const Chat = (props: ChatProps): JSX.Element => {
       messages: []
     });
 
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyNewConversation
-    })
+    emit(EVENT_NAME.twinnyNewConversation)
   }, [setActiveConversation, t])
 
   const handleOpenFile = useCallback((filePath: string) => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyOpenFile,
-      data: filePath
-    })
+    emit(EVENT_NAME.twinnyOpenFile, filePath)
   }, [])
 
-  useEffect(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyHideBackButton
-    })
-  }, [])
+  useEffect(() => emit(EVENT_NAME.twinnyHideBackButton), [])
 
   useEffect(() => {
-    if (editorRef.current) {
-      global.vscode.postMessage({ type: EVENT_NAME.twinnySidebarReady })
-    }
+    if (editorRef.current) emit(EVENT_NAME.twinnySidebarReady)
   }, [editorRef.current])
 
   useEffect(() => {
-    window.addEventListener("message", messageEventHandler)
     editorRef.current?.commands.focus()
-    return () => {
-      window.removeEventListener("message", messageEventHandler)
-    }
   }, [])
 
+  // Switching conversation shows its messages, including none for a new one.
   useEffect(() => {
-    if (conversation?.messages?.length) {
-      setMessages(conversation.messages)
-    }
+    if (conversation?.id) setMessages(conversation.messages || [])
   }, [conversation?.id])
 
   const { suggestion, filePaths } = useSuggestion()
@@ -497,6 +454,60 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
   }, [memoizedSuggestion])
 
+  useEffect(() => {
+    if (composerHeight === null) {
+      localStorage.removeItem(COMPOSER_HEIGHT_KEY)
+      return
+    }
+    localStorage.setItem(COMPOSER_HEIGHT_KEY, String(composerHeight))
+  }, [composerHeight])
+
+  /*
+   * Dragging the strip above the composer grows the typing area upwards,
+   * so a long prompt can be written without the transcript being in the way.
+   */
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const wrap = editorWrapRef.current
+      if (!wrap) return
+      e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      resizeRef.current = {
+        startY: e.clientY,
+        startHeight: wrap.getBoundingClientRect().height
+      }
+    },
+    []
+  )
+
+  const handleResizeMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const resize = resizeRef.current
+      if (!resize) return
+      const max = Math.max(COMPOSER_MIN_HEIGHT, window.innerHeight - 140)
+      const height = resize.startHeight + (resize.startY - e.clientY)
+      setComposerHeight(Math.min(max, Math.max(COMPOSER_MIN_HEIGHT, height)))
+    },
+    []
+  )
+
+  /* Anywhere in the box is fair game for a click: focus the editor at the end. */
+  const handleComposerMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+      if (target.closest("button, input, a, .ProseMirror")) return
+      e.preventDefault()
+      editorRef.current?.commands.focus("end")
+    },
+    []
+  )
+
+  const handleResizeEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeRef.current) return
+    resizeRef.current = null
+    e.currentTarget.releasePointerCapture(e.pointerId)
+  }, [])
+
   const scrollToBottom = useCallback(() => {
     virtuosoRef.current?.scrollTo({
       top: Infinity,
@@ -505,9 +516,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   const renderContextItem = useCallback(
-    (item: ContextItem) => {
+    (item: AnyContextItem) => {
       let codicon = ""
       const displayName = item.name
+      const title =
+        "selectionRange" in item
+          ? `${item.path} (lines ${item.selectionRange.startLine + 1}-${
+              item.selectionRange.endLine + 1
+            })`
+          : item.path
 
       if (item.category === "files") {
         codicon = "codicon codicon-file-code"
@@ -518,7 +535,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       return (
         <div
           key={item.id}
-          title={item.path}
+          title={title}
           className={styles.contextItem}
           onClick={() => handleOpenFile(item.path)}
         >
@@ -585,34 +602,35 @@ export const Chat = (props: ChatProps): JSX.Element => {
         {!!contextItems.length && (
           <div className={styles.contextItems}>{contextItems.map(renderContextItem)}</div>
         )}
-        <Virtuoso
-          followOutput
-          ref={virtuosoRef}
-          data={messages}
-          initialTopMostItemIndex={messages?.length}
-          defaultItemHeight={800}
-          itemContent={itemContent}
-          atBottomThreshold={20}
-          atBottomStateChange={(bottom) => setIsBottom(bottom)}
-          alignToBottom
-        />
+        <div className={styles.transcript}>
+          <Virtuoso
+            followOutput
+            style={{ height: "100%" }}
+            ref={virtuosoRef}
+            data={messages}
+            initialTopMostItemIndex={messages?.length}
+            defaultItemHeight={800}
+            itemContent={itemContent}
+            atBottomThreshold={20}
+            atBottomStateChange={(bottom) => setIsBottom(bottom)}
+            alignToBottom
+          />
+        </div>
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
         <div className={styles.chatOptions}>
           <div>
             {!isBottom && (
-              <div className={styles.scrollToBottom}>
-                <VSCodeButton
-                  appearance="icon"
-                  onClick={scrollToBottom}
-                  title={t("scroll-to-bottom")}
-                >
-                  <i className="codicon codicon-arrow-down" />
-                </VSCodeButton>
-              </div>
+              <VSCodeButton
+                appearance="icon"
+                onClick={scrollToBottom}
+                title={t("scroll-to-bottom")}
+              >
+                <i className="codicon codicon-arrow-down" />
+              </VSCodeButton>
             )}
-            {generatingRef.current && !symmetryConnection && (
+            {generatingRef.current && (
               <VSCodeButton
                 type="button"
                 appearance="icon"
@@ -623,56 +641,80 @@ export const Chat = (props: ChatProps): JSX.Element => {
               </VSCodeButton>
             )}
           </div>
-          <div>
-            <VSCodeBadge>{selection?.length}</VSCodeBadge>
-            {!!symmetryConnection && (
-              <VSCodeBadge
-                title={t("chat-connected-to-provider", {
-                  providerName: symmetryConnection?.name,
-                  modelName: symmetryConnection?.modelName,
-                  providerId: symmetryConnection?.provider
-                })}
+          {!!selection.length && (
+            <span className={styles.selectionCount}>
+              {t("selection-chars", { chars: selection.length })}
+            </span>
+          )}
+        </div>
+        <div className={styles.composer}>
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            title={t("resize-composer")}
+            className={styles.resizeHandle}
+            onPointerDown={handleResizeStart}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+            onPointerCancel={handleResizeEnd}
+            onDoubleClick={() => setComposerHeight(null)}
+          >
+            <span className={styles.resizeGrip} />
+          </div>
+          <form onDrop={handleDrop} onPaste={handlePaste}>
+            <div
+              className={styles.chatBox}
+              onMouseDown={handleComposerMouseDown}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                multiple
+                style={{ display: "none" }}
+              />
+              <span className={styles.prompt} aria-hidden="true">
+                &#10095;
+              </span>
+              <div
+                ref={editorWrapRef}
+                className={styles.editorWrap}
+                style={
+                  composerHeight === null
+                    ? undefined
+                    : { height: composerHeight, maxHeight: composerHeight }
+                }
               >
-                ⚡️ {symmetryConnection?.name}
-              </VSCodeBadge>
-            )}
+                <EditorContent
+                  className={styles.tiptap}
+                  editor={editorRef.current}
+                />
+              </div>
+              <div className={styles.chatButtons}>
+                <VSCodeButton
+                  appearance="icon"
+                  role="button"
+                  onClick={handleFileSelect}
+                  title={t("upload-image")}
+                >
+                  <span className="codicon codicon-device-camera" />
+                </VSCodeButton>
+                <VSCodeButton
+                  appearance="icon"
+                  role="button"
+                  onClick={handleSubmitForm}
+                  title={t("send")}
+                >
+                  <span className="codicon codicon-send"></span>
+                </VSCodeButton>
+              </div>
+            </div>
+          </form>
+          <div className={styles.footer}>
+            <ProviderSelect />
           </div>
         </div>
-        <form onDrop={handleDrop} onPaste={handlePaste}>
-          <div className={styles.chatBox}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*"
-              multiple
-              style={{ display: "none" }}
-            />
-            <EditorContent
-              className={styles.tiptap}
-              editor={editorRef.current}
-            />
-            <div className={styles.chatButtons}>
-              <VSCodeButton
-                appearance="icon"
-                role="button"
-                onClick={handleFileSelect}
-                title={t("upload-image")}
-              >
-                <span className="codicon codicon-device-camera" />
-              </VSCodeButton>
-              <VSCodeButton
-                appearance="icon"
-                role="button"
-                onClick={handleSubmitForm}
-                title={t("send")}
-              >
-                <span className="codicon codicon-send"></span>
-              </VSCodeButton>
-            </div>
-          </div>
-        </form>
-        {!symmetryConnection && <ProviderSelect />}
       </div>
     </VSCodePanelView>
   )

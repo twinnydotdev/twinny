@@ -12,16 +12,22 @@ import { getIsOpenAICompatible } from "./utils"
 export class Base {
   public config = vscode.workspace.getConfiguration("twinny")
   public context?: vscode.ExtensionContext
+  private _configListener: vscode.Disposable
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context
 
-    vscode.workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration("twinny")) {
-        return
+    this._configListener = vscode.workspace.onDidChangeConfiguration(
+      (event) => {
+        if (!event.affectsConfiguration("twinny")) return
+        this.updateConfig()
       }
-      this.updateConfig()
-    })
+    )
+  }
+
+  /** Services are rebuilt whenever a webview is (re)registered; drop the old listener. */
+  public dispose() {
+    this._configListener.dispose()
   }
 
   public getFimProvider = () => {

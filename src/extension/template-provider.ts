@@ -104,8 +104,21 @@ export class TemplateProvider {
     }
   }
 
+  /** Templates that need input the chat's selection buttons cannot supply. */
+  private static readonly NON_INTERACTIVE_TEMPLATES = [
+    "chat",
+    "commit-message",
+    "fim",
+    "relevant-code",
+    "relevant-files",
+    "review"
+  ]
+
   private filterSystemTemplates = (filterName: string) => {
-    return filterName !== "chat" && filterName.includes(SYSTEM) === false
+    return (
+      !TemplateProvider.NON_INTERACTIVE_TEMPLATES.includes(filterName) &&
+      filterName.includes(SYSTEM) === false
+    )
   }
 
   public listTemplates(): string[] {

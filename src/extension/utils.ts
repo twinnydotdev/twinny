@@ -1,58 +1,45 @@
-import { exec } from "child_process"
 import fs from "fs"
 import ignore from "ignore"
 import path from "path"
-import * as util from "util"
 import * as vscode from "vscode"
 import {
   ColorThemeKind,
   ExtensionContext,
-  InlineCompletionContext,
-  InlineCompletionTriggerKind,
   Position,
   Range,
   Terminal,
   TextDocument,
-  Webview,
   window,
   workspace
 } from "vscode"
 import { SyntaxNode } from "web-tree-sitter"
 
 import {
-  ALL_BRACKETS,
   API_PROVIDERS,
-  CLOSING_BRACKETS,
   defaultChunkOptions,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
+  FIM_MAX_PREFIX_CHARS,
+  FIM_MAX_SUFFIX_CHARS,
   knownErrorMessages,
-  MULTILINE_TYPES,
   NORMALIZE_REGEX,
   OPEN_AI_COMPATIBLE_PROVIDERS,
-  OPENING_BRACKETS,
-  QUOTES,
-  SKIP_DECLARATION_SYMBOLS,
   TWINNY
 } from "../common/constants"
 import { supportedLanguages } from "../common/languages"
 import { logger } from "../common/logger"
 import {
-  Bracket,
   ChatCompletionMessage,
   ChunkOptions,
   LanguageType,
   PrefixSuffix,
-  ServerMessage,
-  ServerMessageKey,
   StreamResponse,
   Theme
 } from "../common/types"
 
+import { ExtensionBridge } from "./messaging/bridge"
 import { getParser } from "./parser"
 import { TwinnyProvider } from "./provider-manager"
-
-const execAsync = util.promisify(exec)
 
 export const delayExecution = <T extends () => void>(
   fn: T,
@@ -81,92 +68,15 @@ export const getLanguage = (): LanguageType => {
   }
 }
 
-export const getIsBracket = (char: string): char is Bracket => {
-  return ALL_BRACKETS.includes(char as Bracket)
-}
-
-export const getIsClosingBracket = (char: string): char is Bracket => {
-  return CLOSING_BRACKETS.includes(char as Bracket)
-}
-
-export const getIsOpeningBracket = (char: string): char is Bracket => {
-  return OPENING_BRACKETS.includes(char as Bracket)
-}
-
-export const getIsSingleBracket = (chars: string) =>
-  chars?.length === 1 && getIsBracket(chars)
-
-export const getIsOnlyOpeningBrackets = (chars: string) => {
-  if (!chars || !chars.length) return false
-
-  for (const char of chars) {
-    if (!getIsOpeningBracket(char)) {
-      return false
-    }
-  }
-  return true
-}
-
-export const getIsOnlyClosingBrackets = (chars: string) => {
-  if (!chars || !chars.length) return false
-
-  for (const char of chars) {
-    if (!getIsClosingBracket(char)) {
-      return false
-    }
-  }
-  return true
-}
-
-export const getIsOnlyBrackets = (chars: string) => {
-  if (!chars || !chars.length) return false
-
-  for (const char of chars) {
-    if (!getIsBracket(char)) {
-      return false
-    }
-  }
-  return true
-}
-
-export const getSkipVariableDeclataion = (
-  characterBefore: string,
-  textAfter: string
-) => {
-  if (
-    characterBefore &&
-    SKIP_DECLARATION_SYMBOLS.includes(characterBefore.trim()) &&
-    textAfter.length &&
-    (!textAfter.at(0) as unknown as string) === "?" &&
-    !getIsOnlyBrackets(textAfter)
-  ) {
-    return true
-  }
-
-  return false
-}
-
-export const getShouldSkipCompletion = (
-  context: InlineCompletionContext,
-  autoSuggestEnabled: boolean
-) => {
-  const editor = window.activeTextEditor
-  if (!editor) return true
-  const document = editor.document
-  const cursorPosition = editor.selection.active
-  const lineEndPosition = document.lineAt(cursorPosition.line).range.end
-  const textAfterRange = new Range(cursorPosition, lineEndPosition)
-  const textAfter = document.getText(textAfterRange)
-  const { charBefore } = getBeforeAndAfter()
-
-  if (getSkipVariableDeclataion(charBefore, textAfter)) {
-    return true
-  }
-
-  return (
-    context.triggerKind === InlineCompletionTriggerKind.Automatic &&
-    !autoSuggestEnabled
-  )
+/** True when the cursor sits between two word characters, e.g. `fo|o`. */
+export const getIsMiddleOfWord = (
+  document: TextDocument,
+  position: Position
+): boolean => {
+  const lineText = document.lineAt(position.line).text
+  const charBefore = lineText.charAt(position.character - 1)
+  const charAfter = lineText.charAt(position.character)
+  return /\w/.test(charBefore) && /\w/.test(charAfter)
 }
 
 export const getPrefixSuffix = (
@@ -204,196 +114,70 @@ export const getPrefixSuffix = (
   )
 
   return {
-    prefix: document.getText(prefixRange),
-    suffix: document.getText(suffixRange)
+    prefix: trimToLineBoundary(document.getText(prefixRange), FIM_MAX_PREFIX_CHARS, "start"),
+    suffix: trimToLineBoundary(document.getText(suffixRange), FIM_MAX_SUFFIX_CHARS, "end")
   }
-}
-
-export const getBeforeAndAfter = () => {
-  const editor = window.activeTextEditor
-  if (!editor)
-    return {
-      charBefore: "",
-      charAfter: ""
-    }
-
-  const position = editor.selection.active
-  const lineText = editor.document.lineAt(position.line).text
-
-  const charBefore = lineText
-    .substring(0, position.character)
-    .trim()
-    .split("")
-    .reverse()[0]
-
-  const charAfter = lineText.substring(position.character).trim().split("")[0]
-
-  return {
-    charBefore,
-    charAfter
-  }
-}
-
-export const getIsMiddleOfString = () => {
-  const { charBefore, charAfter } = getBeforeAndAfter()
-
-  return (
-    charBefore && charAfter && /\w/.test(charBefore) && /\w/.test(charAfter)
-  )
-}
-
-export const getCurrentLineText = (position: Position | null) => {
-  const editor = window.activeTextEditor
-  if (!editor || !position) return ""
-
-  const lineText = editor.document.lineAt(position.line).text
-
-  return lineText
-}
-
-export const getHasLineTextBeforeAndAfter = () => {
-  const { charBefore, charAfter } = getBeforeAndAfter()
-
-  return charBefore && charAfter
-}
-
-export const isCursorInEmptyString = () => {
-  const { charBefore, charAfter } = getBeforeAndAfter()
-
-  return QUOTES.includes(charBefore) && QUOTES.includes(charAfter)
-}
-
-export const getNextLineIsClosingBracket = () => {
-  const editor = window.activeTextEditor
-  if (!editor) return false
-  const position = editor.selection.active
-  const nextLineText = editor.document
-    .lineAt(Math.min(position.line + 1, editor.document.lineCount - 1))
-    .text.trim()
-  return getIsOnlyClosingBrackets(nextLineText)
-}
-
-export const getPreviousLineIsOpeningBracket = () => {
-  const editor = window.activeTextEditor
-  if (!editor) return false
-  const position = editor.selection.active
-  const previousLineCharacter = editor.document
-    .lineAt(Math.max(position.line - 1, 0))
-    .text.trim()
-    .split("")
-    .reverse()[0]
-  return getIsOnlyOpeningBrackets(previousLineCharacter)
 }
 
 /**
- * Determines if a completion should be multiline based on syntax structure and context.
+ * Line counts alone don't bound the prompt: a hundred lines of minified or
+ * generated code can exceed a small model's context. Cut at a line boundary
+ * so the model never sees half a line.
  */
-export const getIsMultilineCompletion = ({
+export const trimToLineBoundary = (
+  text: string,
+  maxChars: number,
+  side: "start" | "end"
+): string => {
+  if (text.length <= maxChars) return text
+  if (side === "start") {
+    const cut = text.length - maxChars
+    const newline = text.indexOf("\n", cut)
+    return newline === -1 ? text.slice(cut) : text.slice(newline + 1)
+  }
+  const newline = text.lastIndexOf("\n", maxChars - 1)
+  return newline === -1 ? text.slice(0, maxChars) : text.slice(0, newline + 1)
+}
+
+const BLOCK_OPENERS = ["{", "(", "[", ":", "=>", "=", ","]
+
+/**
+ * Decides whether to let a completion run over several lines. Multiline is
+ * used on a blank line (the model is filling in a block), or after a token
+ * that opens one; otherwise, and inside strings or comments, the completion
+ * is kept to the rest of the current line.
+ */
+export const getShouldUseMultiline = ({
+  document,
+  position,
   node,
-  prefixSuffix
+  multilineEnabled
 }: {
+  document: TextDocument
+  position: Position
   node: SyntaxNode | null
-  prefixSuffix: PrefixSuffix | null
-}) => {
-  if (!node) return false
+  multilineEnabled: boolean
+}): boolean => {
+  if (!multilineEnabled) return false
 
-  const editor = window.activeTextEditor
-  if (!editor) return false
-
-  const position = editor.selection.active
-  const document = editor.document
   const lineText = document.lineAt(position.line).text
-  const trimmedLineText = lineText.trim()
+  const before = lineText.slice(0, position.character).trimEnd()
+  const after = lineText.slice(position.character).trim()
 
-  // Get the raw line text and its indentation
-  const currentIndent = lineText.length - lineText.trimStart().length
+  if (after.length > 0) return false
 
-  // Check if we're in a string or comment
-  const isInStringOrComment =
-    node.type.includes("string") ||
-    node.type.includes("comment") ||
-    node.type.includes("template")
-
-  // Check for block start indicators (expanded list)
-  const isBlockStart =
-    trimmedLineText.endsWith("{") ||
-    trimmedLineText.endsWith("=>") ||
-    trimmedLineText.endsWith("(") ||
-    trimmedLineText.endsWith("[") ||
-    trimmedLineText.endsWith(":")
-
-  // Check if we're in a multiline context based on node types
-  const isInMultilineContext =
-    (node.parent && MULTILINE_TYPES.includes(node.parent.type)) ||
-    MULTILINE_TYPES.includes(node.type)
-
-  // Check if we're in a declaration or definition (expanded)
-  const isDeclaration =
-    node.type.includes("declaration") ||
-    node.type.includes("definition") ||
-    node.type === "class" ||
-    node.type === "interface" ||
-    node.type.includes("function") ||
-    node.type.includes("method")
-
-  // Check for proper indentation
-  const hasProperIndentation = currentIndent > 0
-
-  // Check if the node is complex (has multiple children)
-  const isComplexNode =
-    node.childCount > 2 || (node.parent && node.parent.childCount > 2)
-
-  // Check if we're in a code block
-  const isInCodeBlock =
-    MULTILINE_TYPES.includes(node.type) || isInMultilineContext
-
-  // Check if the line ends with specific characters (expanded)
-  const isLineEnd =
-    trimmedLineText.endsWith(";") ||
-    trimmedLineText.endsWith("{") ||
-    trimmedLineText.endsWith("=>") ||
-    trimmedLineText.endsWith("(") ||
-    trimmedLineText.endsWith("[") ||
-    trimmedLineText.endsWith(":")
-
-  // Check if there's an unclosed bracket/parenthesis
-  let unclosedBrackets = 0
-  for (const char of trimmedLineText) {
-    if (OPENING_BRACKETS.includes(char as Bracket)) {
-      unclosedBrackets++
-    } else if (CLOSING_BRACKETS.includes(char as Bracket)) {
-      unclosedBrackets--
-    }
-  }
-  const hasUnclosedBrackets = unclosedBrackets > 0
-
-  // Check if the next line is indented (suggesting a block)
-  let nextLineIndented = false
-  if (position.line + 1 < document.lineCount) {
-    const nextLine = document.lineAt(position.line + 1).text
-    const nextLineIndent = nextLine.length - nextLine.trimStart().length
-    nextLineIndented = nextLineIndent > currentIndent
+  const nodeType = node?.type || ""
+  if (
+    nodeType.includes("string") ||
+    nodeType.includes("comment") ||
+    nodeType.includes("template")
+  ) {
+    return false
   }
 
-  // Check if we're at the start of a new block
-  const isStartOfBlock = isBlockStart || hasUnclosedBrackets || nextLineIndented
+  if (before.trim().length === 0) return true
 
-  // Check if we're in a context where multiline completion makes sense
-  const isMultilineContext =
-    isInCodeBlock || isDeclaration || isInMultilineContext || isStartOfBlock
-
-  // Final decision based on all factors
-  const isMultilineCompletion =
-    !getHasLineTextBeforeAndAfter() &&
-    !isCursorInEmptyString() &&
-    (isMultilineContext || isInStringOrComment) &&
-    (isStartOfBlock ||
-      hasProperIndentation ||
-      isComplexNode ||
-      isLineEnd ||
-      !prefixSuffix?.suffix.trim())
-
-  return !!(isMultilineCompletion || !prefixSuffix?.suffix.trim())
+  return BLOCK_OPENERS.some((opener) => before.endsWith(opener))
 }
 
 export const getTheme = () => {
@@ -422,55 +206,52 @@ export const getIsOpenAICompatible = (provider: TwinnyProvider) => {
   return providers.includes(provider.provider)
 }
 
+/**
+ * Pulls the streamed text out of a chunk. Providers are checked for their
+ * native shape first, then every known shape is tried so a misconfigured
+ * provider type still works as long as the server speaks a common dialect.
+ */
 export const getFimDataFromProvider = (
   provider: string,
   data: StreamResponse | undefined
-) => {
+): string | undefined => {
+  if (!data) return undefined
+
   switch (provider) {
     case API_PROVIDERS.OpenAICompatible:
     case API_PROVIDERS.Ollama:
     case API_PROVIDERS.OpenWebUI:
-      return data?.response
+      if (typeof data.response === "string") return data.response
+      break
     case API_PROVIDERS.LlamaCpp:
-      return data?.content
-    case API_PROVIDERS.LiteLLM:
-      return data?.choices[0].delta.content
-    default:
-      if (!data?.choices.length) return
-      if (data?.choices[0].text === "undefined") {
-        return ""
-      }
-      return data?.choices[0].text ? data?.choices[0].text : ""
+      if (typeof data.content === "string") return data.content
+      break
   }
+
+  const choice = data.choices?.[0]
+  if (typeof choice?.text === "string") return choice.text
+  if (typeof choice?.delta?.content === "string") return choice.delta.content
+  if (typeof choice?.message?.content === "string") return choice.message.content
+  if (typeof data.response === "string") return data.response
+  if (typeof data.content === "string") return data.content
+  return undefined
 }
 
 export function isStreamWithDataPrefix(stringBuffer: string) {
   return stringBuffer.startsWith("data:")
 }
 
-export const getNoTextBeforeOrAfter = () => {
-  const editor = window.activeTextEditor
-  const cursorPosition = editor?.selection.active
-  if (!cursorPosition) return
-  const lastLinePosition = new Position(
-    cursorPosition.line,
-    editor.document.lineCount
-  )
-  const textAfterRange = new Range(cursorPosition, lastLinePosition)
-  const textAfter = editor?.document.getText(textAfterRange)
-  const textBeforeRange = new Range(new Position(0, 0), cursorPosition)
-  const textBefore = editor?.document.getText(textBeforeRange)
-  return !textAfter || !textBefore
-}
-
 export function safeParseJsonResponse(
   stringBuffer: string
 ): StreamResponse | undefined {
   try {
-    if (isStreamWithDataPrefix(stringBuffer)) {
-      return JSON.parse(stringBuffer.split("data:")[1])
-    }
-    return JSON.parse(stringBuffer)
+    const line = stringBuffer.trim()
+    if (!line) return undefined
+    const payload = isStreamWithDataPrefix(line)
+      ? line.slice("data:".length).trim()
+      : line
+    if (!payload || payload === "[DONE]") return undefined
+    return JSON.parse(payload)
   } catch {
     return undefined
   }
@@ -504,19 +285,6 @@ export const getCurrentWorkspacePath = (): string | undefined => {
   }
 }
 
-export const getGitChanges = async (): Promise<string> => {
-  try {
-    const path = getCurrentWorkspacePath()
-    const { stdout } = await execAsync("git diff", {
-      cwd: path
-    })
-    return stdout
-  } catch (error) {
-    console.error("Error executing git command:", error)
-    return ""
-  }
-}
-
 export const getTerminal = async (): Promise<Terminal | undefined> => {
   const twinnyTerminal = window.terminals.find((t) => t.name === TWINNY)
   if (twinnyTerminal) return twinnyTerminal
@@ -531,13 +299,6 @@ export const getTerminalExists = (): boolean => {
     return false
   }
   return true
-}
-
-export function createSymmetryMessage<T>(
-  key: ServerMessageKey,
-  data?: T
-): string {
-  return JSON.stringify({ key, data })
 }
 
 export const getNormalisedText = (text: string) =>
@@ -672,23 +433,10 @@ function simpleChunk(content: string, options: ChunkOptions): string[] {
 }
 
 export const updateLoadingMessage = (
-  webView: Webview | undefined,
+  bridge: ExtensionBridge | undefined,
   message: string
 ) => {
-  webView?.postMessage({
-    type: EVENT_NAME.twinnySendLoader,
-    data: message
-  } as ServerMessage<string>)
-}
-
-export const updateSymmetryStatus = (
-  webView: Webview | undefined,
-  message: string
-) => {
-  webView?.postMessage({
-    type: EVENT_NAME.twinnySendSymmetryMessage,
-    data: message
-  } as ServerMessage<string>)
+  bridge?.emit(EVENT_NAME.twinnySendLoader, message)
 }
 
 export function getNonce() {

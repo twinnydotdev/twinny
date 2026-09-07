@@ -94,6 +94,34 @@ suite("Completion formatter", () => {
     assert.strictEqual(completionFormatter.format("line2"), "")
   })
 
+  test("strips an echoed copy of the text before the cursor", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "const x = foo(",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, document.lineAt(0).text.length)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor)
+    // The unmatched `)` is cut either way, as the editor auto-closes it.
+    assert.strictEqual(completionFormatter.format("const x = foo(a, b)"), "a, b")
+    assert.strictEqual(completionFormatter.format("a, b)"), "a, b")
+  })
+
+  test("keeps completions that merely resemble the next line", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "\nassert.equal(add(2, 2), 4)\nassert.equal(add(3, 3), 6)",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, 0)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor)
+    assert.strictEqual(
+      completionFormatter.format("assert.equal(add(1, 2), 3)"),
+      "assert.equal(add(1, 2), 3)"
+    )
+    assert.strictEqual(completionFormatter.format("assert.equal(add(2, 2), 4)"), "")
+  })
+
   test("calculates string similarity correctly", async () => {
     const document = await vscode.workspace.openTextDocument()
     editor = await vscode.window.showTextDocument(document)
@@ -141,7 +169,8 @@ suite("Completion formatter", () => {
 
     // Test with text after cursor
     testFormatter.textAfterCursor = "}"
-    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("\n  return true;\n  \n"), "\n  return true;")
+    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("\n  return true;\n  \n"), "")
+    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("return true;\n  \n"), "return true;")
 
     // Test with no text after cursor
     testFormatter.textAfterCursor = ""

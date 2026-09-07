@@ -1,7 +1,7 @@
+import { ReactNode } from "react"
 import { ChatCompletionMessageParam } from "fluency.js"
 import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
-import { serverMessageKeys } from "symmetry-core"
-import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
+import { InlineCompletionItem, InlineCompletionList } from "vscode"
 
 import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
@@ -11,6 +11,7 @@ export interface RequestBodyBase {
   n_predict?: number
   temperature?: number
   messages?: ChatCompletionMessageParam[]
+  stop?: string[]
 }
 
 export interface RequestOptionsOllama extends RequestBodyBase {
@@ -22,20 +23,12 @@ export interface RequestOptionsOllama extends RequestBodyBase {
 }
 
 export interface StreamBodyOpenAI extends RequestBodyBase {
-  max_tokens: number
+  max_tokens?: number
 }
 
 export interface PrefixSuffix {
   prefix: string
   suffix: string
-}
-
-export interface RepositoryLevelData {
-  uri: Uri
-  text: string
-  name: string
-  isOpen: boolean
-  relevanceScore: number
 }
 
 export interface StreamResponse {
@@ -131,6 +124,8 @@ export interface Conversation {
   id?: string
   title?: string
   messages: ChatCompletionMessage[]
+  /** Set by features that name the conversation themselves (reviews). */
+  pinnedTitle?: boolean
 }
 
 export const Theme = {
@@ -172,12 +167,24 @@ export interface ChatTemplateData {
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
 
+/** A neighbouring file (or a window of one) included in a FIM prompt. */
+export interface FimContextFile {
+  /** Workspace-relative path, used as the label in the prompt. */
+  name: string
+  text: string
+}
+
 export interface FimPromptTemplate {
-  context: string
+  /** Other files to show the model before the current one. */
+  contextFiles: FimContextFile[]
+  /** Comment line(s) naming the language and file, placed just before the prefix. */
   header: string
   prefixSuffix: PrefixSuffix
-  fileContextEnabled: boolean
   language?: string
+  /** Workspace-relative path of the file being completed. */
+  fileName: string
+  /** Workspace name, used by repository-level templates. */
+  repoName: string
 }
 
 export interface ApiProviders {
@@ -224,6 +231,15 @@ export interface ApiModels {
   models: ApiModel[]
 }
 
+/** What one provider in the bundled model catalogue advertises. */
+export interface ModelCatalogueEntry {
+  models: string[]
+  supportsStreaming?: boolean | string[]
+}
+
+/** The bundled catalogue, keyed by provider id. */
+export type ModelCatalogue = Record<string, ModelCatalogueEntry>
+
 export type ResolvedInlineCompletion =
   | InlineCompletionItem[]
   | InlineCompletionList
@@ -247,6 +263,23 @@ export interface InteractionItem {
   }[]
 }
 
+export interface TwinnyProvider {
+  apiHostname?: string
+  apiKey?: string
+  apiPath?: string
+  apiPort?: number
+  apiProtocol?: string
+  features?: string[]
+  fimTemplate?: string
+  id: string
+  label: string
+  logo?: ReactNode
+  modelName: string
+  provider: string
+  repositoryLevel?: boolean
+  type: string
+}
+
 export interface InferenceProvider {
   apiBaseUrl?: string
   apiHostname?: string
@@ -257,50 +290,6 @@ export interface InferenceProvider {
   modelName?: string
   name: string
   type: (typeof API_PROVIDERS)[keyof typeof API_PROVIDERS]
-}
-
-export interface Peer {
-  publicKey: Buffer
-  write: (value: string) => boolean
-  on: (key: string, cb: (data: Buffer) => void) => void
-  once: (key: string, cb: (data: Buffer) => void) => void
-  writable: boolean
-  key: string
-  discovery_key: string
-}
-
-export interface SymmetryMessage<T> {
-  key: string
-  data: T
-}
-
-export type ServerMessageKey = keyof typeof serverMessageKeys
-
-export interface SymmetryConnection {
-  sessionToken?: string
-  discoveryKey?: string
-  modelName?: string
-  name: string
-  provider: string
-  id: string
-}
-
-export interface SymmetryModelProvider {
-  connections: number | null
-  data_collection_enabled: number
-  id: number
-  last_seen: string
-  max_connections: number
-  model_name: string
-  name: string
-  online: number
-  provider: string
-  public: number
-}
-
-export interface InferenceRequest {
-  key: string
-  messages: ChatCompletionMessage[]
 }
 
 export interface ChunkOptions {
@@ -338,7 +327,11 @@ export interface SelectionContextItem extends ContextItem {
   };
 }
 
-export type AnyContextItem = SelectionContextItem;
+/**
+ * Anything that can sit in the workspace context list: a whole file, or a
+ * selected range within one.
+ */
+export type AnyContextItem = ContextItem | SelectionContextItem;
 
 export interface MentionType {
   name: string
@@ -349,6 +342,10 @@ export interface GitHubPr {
   number: number
   title: string
   html_url: string
+  draft?: boolean
+  updated_at?: string
+  user?: { login: string }
+  head?: { ref: string }
 }
 
 export interface LMSEmbeddingItem {

@@ -8,8 +8,8 @@ export function run(): Promise<void> {
       const mocha = new Mocha({ ui: "tdd" })
       const testsRoot = path.resolve(__dirname, "..")
 
-      // Look for TypeScript test files instead of JavaScript
-      const files = globSync("**/**.test.ts", { cwd: testsRoot })
+      // Mocha runs the compiled tests
+      const files = globSync("**/*.test.js", { cwd: testsRoot })
 
       files.forEach((file) => mocha.addFile(path.resolve(testsRoot, file)))
 

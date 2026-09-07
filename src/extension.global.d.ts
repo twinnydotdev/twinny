@@ -1,17 +1,5 @@
 declare module "hyperswarm"
-declare module "b4a"
 declare module "@tiptap/extension-placeholder"
-
-declare module "hypercore-crypto" {
-  const hyperCoreCrypto: {
-    keyPair: () => { publicKey: Buffer; secretKey: Buffer }
-    discoveryKey: (publicKey: Buffer) => Buffer
-    randomBytes: (n?: number) => Buffer
-    verify: (challenge: Buffer, signature: Buffer, publicKey: Buffer) => boolean
-  }
-
-  export default hyperCoreCrypto
-}
 
 declare module "*.css"
 
@@ -25,11 +13,18 @@ declare module "*.svg" {
   export default content
 }
 
+interface VsCodeApi<State = unknown> {
+  getState: () => State
+  setState: (data: State) => void
+  postMessage: (message: unknown) => void
+}
+
+/**
+ * Injected by the VS Code webview host. May only be called once per document,
+ * which is why `src/webview/messaging/bridge.ts` owns the single call.
+ */
+declare function acquireVsCodeApi<State = unknown>(): VsCodeApi<State>
 
 interface Window {
-  acquireVsCodeApi: <T = unknown>() => {
-    getState: () => T
-    setState: (data: T) => void
-    postMessage: (msg: unknown) => void
-  }
+  acquireVsCodeApi: typeof acquireVsCodeApi
 }
