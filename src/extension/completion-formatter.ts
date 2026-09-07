@@ -217,7 +217,11 @@ export class CompletionFormatter {
     return this
   }
 
+  /** Mid-line, a completion can neither start on the next line nor end with one. */
   public removeInvalidLineBreaks(): this {
+    if (this.textAfterCursor.trim() && /^\s*\n/.test(this.completion)) {
+      this.completion = ""
+    }
     if (this.textAfterCursor) {
       this.completion = this.completion.trimEnd()
     }

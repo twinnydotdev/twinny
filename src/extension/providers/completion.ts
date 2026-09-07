@@ -204,6 +204,7 @@ export class CompletionProvider
       multiline,
       maxLines: this.config.get<number>("maxLines", 40),
       textBeforeCursor: lineText.slice(0, position.character),
+      textAfterCursor: lineText.slice(position.character),
       suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix)
     })
 
@@ -361,7 +362,9 @@ export class CompletionProvider
 
     const start = lang.syntaxComments?.start || ""
     const end = lang.syntaxComments?.end || ""
-    return `${start} Path: ${workspace.asRelativePath(uri)} ${end}\n`
+    const language = `${start} Language: ${lang.langName} (${languageId}) ${end}`
+    const filePath = `${start} Path: ${workspace.asRelativePath(uri)} ${end}`
+    return `${language}\n${filePath}\n`
   }
 
   /**

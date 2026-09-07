@@ -169,7 +169,8 @@ suite("Completion formatter", () => {
 
     // Test with text after cursor
     testFormatter.textAfterCursor = "}"
-    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("\n  return true;\n  \n"), "\n  return true;")
+    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("\n  return true;\n  \n"), "")
+    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("return true;\n  \n"), "return true;")
 
     // Test with no text after cursor
     testFormatter.textAfterCursor = ""

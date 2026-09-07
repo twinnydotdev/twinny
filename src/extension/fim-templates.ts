@@ -104,10 +104,15 @@ const renderSeparatedContext = (
   return `${context}${separator}${fileName}\n`
 }
 
+/**
+ * Meta's reference format is `<SUF>{suffix}`, but with a space CodeLlama is
+ * far more robust when the cursor sits between quotes: without it the model
+ * ignores the hole and re-emits the file from the top.
+ */
 const codellama = (args: FimPromptTemplate) => {
   const { prefix, suffix } = args.prefixSuffix
   const body = `${renderCommentedContext(args.contextFiles, args.language)}${args.header}${prefix}`
-  return hasSuffix(args) ? `<PRE> ${body} <SUF>${suffix} <MID>` : body
+  return hasSuffix(args) ? `<PRE> ${body} <SUF> ${suffix} <MID>` : body
 }
 
 const deepseek = (args: FimPromptTemplate) => {
