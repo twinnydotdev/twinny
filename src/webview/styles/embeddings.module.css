@@ -1,0 +1,205 @@
+/* Embeddings tab: index status card, then three groups of settings. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.pageHeader h3 {
+  margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.intro {
+  margin: -8px 0 0;
+  color: var(--tw-fg-dim);
+}
+
+.intro code,
+.groupBlurb code {
+  color: var(--tw-code);
+}
+
+.card {
+  padding: 10px 12px 12px;
+  border: 1px solid var(--tw-rule);
+  background: var(--tw-surface);
+}
+
+.cardHeader,
+.progressLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.cardHeader h4,
+.group h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.cardHeader h4 .codicon {
+  opacity: 0.7;
+}
+
+.workspaceName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tw-fg-dim);
+  font-weight: 400;
+}
+
+.stateLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
+}
+
+.stateLine .codicon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.stateOk {
+  color: var(--vscode-testing-iconPassed, var(--vscode-terminal-ansiGreen));
+}
+
+.stateError {
+  color: var(--vscode-testing-iconFailed, var(--vscode-errorForeground));
+}
+
+.stateEmpty {
+  color: var(--tw-fg-dim);
+}
+
+.progressLine {
+  margin-top: 10px;
+  font-size: var(--tw-fs-sm);
+}
+
+.progressPercent {
+  color: var(--tw-fg-dim);
+}
+
+.progressBar {
+  height: 3px;
+  margin-top: 6px;
+  background: var(--tw-rule);
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--tw-accent);
+  transition: width 0.2s ease;
+}
+
+.progressFiles {
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.groupBlurb,
+.groupNote {
+  margin: 0;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}
+
+.groupNote {
+  color: var(--tw-fg-faint);
+}
+
+.emptyProvider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--tw-rule);
+  color: var(--tw-fg-dim);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.field vscode-text-field,
+.field vscode-dropdown {
+  width: 100%;
+}
+
+.fieldInvalid vscode-text-field::part(root) {
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.fieldHint,
+.fieldError {
+  font-size: var(--tw-fs-sm);
+  line-height: 1.45;
+}
+
+.fieldHint {
+  color: var(--tw-fg-faint);
+}
+
+.fieldError {
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground));
+}
+
+.thresholdValue {
+  color: var(--tw-fg);
+  letter-spacing: 0;
+}
+
+.slider {
+  width: 100%;
+  margin: 4px 0;
+  accent-color: var(--tw-accent);
+}

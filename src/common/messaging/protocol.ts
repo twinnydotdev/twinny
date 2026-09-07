@@ -1,5 +1,6 @@
 import {
   CONVERSATION_EVENT_NAME,
+  EMBEDDING_EVENT_NAME,
   EVENT_NAME,
   GITHUB_EVENT_NAME,
   PROVIDER_EVENT_NAME,
@@ -48,9 +49,59 @@ export interface ConfigValue<T = unknown> {
   value: T
 }
 
+/** The outcome of one live request against a provider. */
 export interface ProviderTestResult {
   success: boolean
+  /** A readable explanation of the failure, from `describeProviderError`. */
   error?: string
+  /** Round-trip time of the probe when it succeeded. */
+  latencyMs?: number
+  /** What came back, e.g. the first few tokens, to show the model is alive. */
+  sample?: string
+}
+
+/** Models a provider's endpoint says it serves. */
+export interface ProviderModelList {
+  models: string[]
+  /** Set when the endpoint could not be listed; `models` is then empty. */
+  error?: string
+}
+
+/** Reply to add/update: either the stored provider or the field errors. */
+export interface ProviderSaveResult {
+  success: boolean
+  provider?: TwinnyProvider
+  errors?: Partial<Record<keyof TwinnyProvider, string>>
+}
+
+/** What the embeddings tab shows about the workspace index. */
+export interface EmbeddingStatus {
+  indexed: boolean
+  files: number
+  chunks: number
+  /** Unix ms of the last completed index run. */
+  updatedAt?: number
+  running: boolean
+  workspace?: string
+}
+
+/** Live progress of an index run, pushed as files are processed. */
+export interface EmbeddingProgress {
+  running: boolean
+  processed: number
+  total: number
+  /** Files in flight right now, for the status line. */
+  currentFiles: string[]
+  startedAt?: number
+  /** Set when the run stopped because of a failure. */
+  error?: string
+  /** Set when the run was cancelled by the user. */
+  cancelled?: boolean
+}
+
+export interface ConversationRename {
+  id: string
+  title: string
 }
 
 export interface PullRequestQuery {
@@ -91,7 +142,6 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyChatMessage]: Channel<ChatRequest>
   [EVENT_NAME.twinnyClickSuggestion]: Channel<string>
   [EVENT_NAME.twinnyEditDefaultTemplates]: Channel
-  [EVENT_NAME.twinnyEmbedDocuments]: Channel
   [EVENT_NAME.twinnyFetchOllamaModels]: Channel<void, ApiModel[]>
   [EVENT_NAME.twinnyFileListRequest]: Channel<void, string[]>
   [EVENT_NAME.twinnyGetConfigValue]: Channel<{ key: string }, ConfigValue>
@@ -107,6 +157,7 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyNotification]: Channel<string>
   [EVENT_NAME.twinnyOpenDiff]: Channel<string>
   [EVENT_NAME.twinnyOpenFile]: Channel<string>
+  [EVENT_NAME.twinnyOpenProviders]: Channel
   [EVENT_NAME.twinnyRemoveContextItem]: Channel<string>
   [EVENT_NAME.twinnySendLanguage]: Channel<void, LanguageType>
   [EVENT_NAME.twinnySendTheme]: Channel<void, ThemeType>
@@ -123,12 +174,17 @@ export interface ClientEvents {
   [CONVERSATION_EVENT_NAME.getActiveConversation]: Channel
   [CONVERSATION_EVENT_NAME.getConversations]: Channel
   [CONVERSATION_EVENT_NAME.removeConversation]: Channel<Conversation>
+  [CONVERSATION_EVENT_NAME.renameConversation]: Channel<ConversationRename>
   [CONVERSATION_EVENT_NAME.saveConversation]: Channel<Conversation | undefined>
   [CONVERSATION_EVENT_NAME.setActiveConversation]: Channel<
     Conversation | undefined
   >
 
-  [PROVIDER_EVENT_NAME.addProvider]: Channel<TwinnyProvider>
+  [EMBEDDING_EVENT_NAME.cancel]: Channel
+  [EMBEDDING_EVENT_NAME.embed]: Channel
+  [EMBEDDING_EVENT_NAME.getStatus]: Channel<void, EmbeddingStatus>
+
+  [PROVIDER_EVENT_NAME.addProvider]: Channel<TwinnyProvider, ProviderSaveResult>
   [PROVIDER_EVENT_NAME.copyProvider]: Channel<TwinnyProvider>
   [PROVIDER_EVENT_NAME.exportProviders]: Channel
   [PROVIDER_EVENT_NAME.getActiveChatProvider]: Channel
@@ -136,13 +192,20 @@ export interface ClientEvents {
   [PROVIDER_EVENT_NAME.getActiveFimProvider]: Channel
   [PROVIDER_EVENT_NAME.getAllProviders]: Channel
   [PROVIDER_EVENT_NAME.importProviders]: Channel
+  [PROVIDER_EVENT_NAME.listProviderModels]: Channel<
+    TwinnyProvider,
+    ProviderModelList
+  >
   [PROVIDER_EVENT_NAME.removeProvider]: Channel<TwinnyProvider>
   [PROVIDER_EVENT_NAME.resetProvidersToDefaults]: Channel
   [PROVIDER_EVENT_NAME.setActiveChatProvider]: Channel<TwinnyProvider>
   [PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider]: Channel<TwinnyProvider>
   [PROVIDER_EVENT_NAME.setActiveFimProvider]: Channel<TwinnyProvider>
-  [PROVIDER_EVENT_NAME.testProvider]: Channel<TwinnyProvider>
-  [PROVIDER_EVENT_NAME.updateProvider]: Channel<TwinnyProvider>
+  [PROVIDER_EVENT_NAME.testProvider]: Channel<TwinnyProvider, ProviderTestResult>
+  [PROVIDER_EVENT_NAME.updateProvider]: Channel<
+    TwinnyProvider,
+    ProviderSaveResult
+  >
 
   [GITHUB_EVENT_NAME.getPullRequests]: Channel<PullRequestQuery, GitHubPr[]>
   [GITHUB_EVENT_NAME.getPullRequestReview]: Channel<PullRequestReviewRequest>
@@ -179,12 +242,14 @@ export interface ServerEvents {
   [CONVERSATION_EVENT_NAME.getConversations]: Record<string, Conversation>
   [CONVERSATION_EVENT_NAME.setActiveConversation]: Conversation | undefined
 
+  [EMBEDDING_EVENT_NAME.getStatus]: EmbeddingStatus
+  [EMBEDDING_EVENT_NAME.progress]: EmbeddingProgress
+
   [PROVIDER_EVENT_NAME.focusProviderTab]: string
   [PROVIDER_EVENT_NAME.getActiveChatProvider]: TwinnyProvider | undefined
   [PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider]: TwinnyProvider | undefined
   [PROVIDER_EVENT_NAME.getActiveFimProvider]: TwinnyProvider | undefined
   [PROVIDER_EVENT_NAME.getAllProviders]: Record<string, TwinnyProvider>
-  [PROVIDER_EVENT_NAME.testProviderResult]: ProviderTestResult
 
   [GITHUB_EVENT_NAME.getPullRequests]: GitHubPr[]
 }
@@ -217,6 +282,7 @@ export type VoidPayloadEvent = {
 type EveryName =
   | (typeof EVENT_NAME)[keyof typeof EVENT_NAME]
   | (typeof CONVERSATION_EVENT_NAME)[keyof typeof CONVERSATION_EVENT_NAME]
+  | (typeof EMBEDDING_EVENT_NAME)[keyof typeof EMBEDDING_EVENT_NAME]
   | (typeof PROVIDER_EVENT_NAME)[keyof typeof PROVIDER_EVENT_NAME]
   | (typeof GITHUB_EVENT_NAME)[keyof typeof GITHUB_EVENT_NAME]
   | (typeof REVIEW_EVENT_NAME)[keyof typeof REVIEW_EVENT_NAME]

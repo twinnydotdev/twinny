@@ -6,10 +6,10 @@ import * as assert from "assert"
 import * as vscode from "vscode"
 
 import { ACTIVE_FIM_PROVIDER_STORAGE_KEY } from "../../common/constants"
-import { FileInteractionCache } from "../../extension/file-interaction"
-import { CompletionProvider } from "../../extension/providers/completion"
+import { FileInteractionCache } from "../../extension/completion/file-interaction"
+import { CompletionProvider } from "../../extension/completion/provider"
 import { TwinnyStatusBar } from "../../extension/status-bar"
-import { TemplateProvider } from "../../extension/template-provider"
+import { TemplateProvider } from "../../extension/templates/provider"
 
 const LIVE = process.env.TWINNY_LIVE === "1"
 

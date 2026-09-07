@@ -5,7 +5,7 @@ import {
   describeProviderErrorPlain,
   isAbortError,
   stripThinking
-} from "../../extension/provider-errors"
+} from "../../extension/providers/errors"
 
 const provider = {
   label: "Local Ollama",

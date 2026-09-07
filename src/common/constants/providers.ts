@@ -5,6 +5,7 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
   Ollama: "ollama",
+  LlamaCpp: "llamacpp",
   OpenAICompatible: "openai-compatible"
 }
 
@@ -12,7 +13,6 @@ export const API_PROVIDERS = {
   Anthropic: "anthropic",
   OpenAI: "openai",
   Mistral: "mistral",
-  LlamaCpp: "llamacpp",
   Groq: "groq",
   OpenRouter: "openrouter",
   Cohere: "cohere",
@@ -22,15 +22,14 @@ export const API_PROVIDERS = {
 }
 
 export const DEFAULT_PROVIDER_FORM_VALUES = {
-  apiHostname: "0.0.0.0",
+  apiHostname: "localhost",
   apiKey: "",
-  apiPath: "",
+  apiPath: "/v1",
   apiPort: 11434,
   apiProtocol: "http",
   id: "",
   label: "",
   modelName: "",
-  name: "",
   provider: "ollama",
   type: "chat"
 }

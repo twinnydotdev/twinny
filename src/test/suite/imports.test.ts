@@ -8,7 +8,7 @@ import {
   getImportedFiles,
   getRelativeImportSpecifiers,
   resolveImport
-} from "../../extension/imports"
+} from "../../extension/completion/imports"
 
 suite("Import-aware context", () => {
   let root: string

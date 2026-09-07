@@ -4,7 +4,7 @@ import {
   bracketDelta,
   CompletionStream,
   CompletionStreamOptions
-} from "../../extension/completion-stream"
+} from "../../extension/completion/stream"
 
 const makeStream = (overrides: Partial<CompletionStreamOptions> = {}) =>
   new CompletionStream({

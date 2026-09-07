@@ -12,7 +12,6 @@ export const EVENT_NAME = {
   twinnyChatMessage: "twinny-chat-message",
   twinnyClickSuggestion: "twinny-click-suggestion",
   twinnyEditDefaultTemplates: "twinny-edit-default-templates",
-  twinnyEmbedDocuments: "twinny-embed-documents",
   twinnyFetchOllamaModels: "twinny-fetch-ollama-models",
   twinnyFileListRequest: "twinny-file-list-request",
   twinnyGetConfigValue: "twinny-get-config-value",
@@ -30,6 +29,7 @@ export const EVENT_NAME = {
   twinnyOnLoading: "twinny-on-loading",
   twinnyOpenDiff: "twinny-open-diff",
   twinnyOpenFile: "twinny-open-file",
+  twinnyOpenProviders: "twinny-open-providers",
   twinnyRemoveContextItem: "twinny-remove-context-item",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
@@ -52,8 +52,16 @@ export const CONVERSATION_EVENT_NAME = {
   getActiveConversation: "twinny.get-active-conversation",
   getConversations: "twinny.get-conversations",
   removeConversation: "twinny.remove-conversation",
+  renameConversation: "twinny.rename-conversation",
   saveConversation: "twinny.save-conversation",
   setActiveConversation: "twinny.set-active-conversation"
+} as const
+
+export const EMBEDDING_EVENT_NAME = {
+  cancel: "embeddings.cancel",
+  embed: "embeddings.embed",
+  getStatus: "embeddings.getStatus",
+  progress: "embeddings.progress"
 } as const
 
 export const PROVIDER_EVENT_NAME = {
@@ -66,13 +74,13 @@ export const PROVIDER_EVENT_NAME = {
   getActiveFimProvider: "twinny.get-active-fim-provider",
   getAllProviders: "twinny.get-providers",
   importProviders: "twinny.import-providers",
+  listProviderModels: "twinny.list-provider-models",
   removeProvider: "twinny.remove-provider",
   resetProvidersToDefaults: "twinny.reset-providers-to-defaults",
   setActiveChatProvider: "twinny.set-active-chat-provider",
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
   testProvider: "twinny.test-provider",
-  testProviderResult: "twinny.test-provider-result",
   updateProvider: "twinny.update-provider"
 } as const
 

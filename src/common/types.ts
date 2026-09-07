@@ -126,6 +126,8 @@ export interface Conversation {
   messages: ChatCompletionMessage[]
   /** Set by features that name the conversation themselves (reviews). */
   pinnedTitle?: boolean
+  /** Unix ms of the last save; absent on conversations from older builds. */
+  updatedAt?: number
 }
 
 export const Theme = {

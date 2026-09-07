@@ -20,7 +20,8 @@ export const WORKSPACE_STORAGE_KEY = {
   showEmbeddingOptions: "showEmbeddingOptions",
   showProviders: "showProviders",
   reviewOwner: "reviewOwner",
-  reviewRepo: "reviewRepo"
+  reviewRepo: "reviewRepo",
+  embeddingsUpdatedAt: "embeddingsUpdatedAt"
 }
 
 export const EXTENSION_SETTING_KEY = {

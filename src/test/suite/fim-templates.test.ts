@@ -7,7 +7,7 @@ import {
   getFimTemplateRepositoryLevel,
   getStopWords,
   resolveFimFormat
-} from "../../extension/fim-templates"
+} from "../../extension/completion/fim-templates"
 
 const args = (overrides: Partial<FimPromptTemplate> = {}): FimPromptTemplate => ({
   contextFiles: [],

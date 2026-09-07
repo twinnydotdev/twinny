@@ -2,12 +2,12 @@ import { useState } from "react"
 
 import "./i18n"
 
-import { EVENT_NAME, WEBUI_TABS } from "../common/constants"
+import { EVENT_NAME, PROVIDER_EVENT_NAME, WEBUI_TABS } from "../common/constants"
 
 import { useLocale } from "./hooks/useLocale"
 import { Chat } from "./chat"
-import { ConversationHistory } from "./conversation-history"
-import { EmbeddingOptions } from "./embedding-options"
+import { EmbeddingOptions } from "./embeddings"
+import { ConversationHistory } from "./history"
 import { useServerEvent } from "./messaging"
 import { Providers } from "./providers"
 import { Review } from "./review"
@@ -34,6 +34,7 @@ export const Main = ({ fullScreen }: MainProps) => {
   }
 
   useServerEvent(EVENT_NAME.twinnySetTab, setTab)
+  useServerEvent(PROVIDER_EVENT_NAME.focusProviderTab, setTab)
 
   if (!tab) {
     return null

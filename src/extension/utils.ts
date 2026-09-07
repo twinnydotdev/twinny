@@ -37,9 +37,9 @@ import {
   Theme
 } from "../common/types"
 
+import { getParser } from "./completion/parser"
 import { ExtensionBridge } from "./messaging/bridge"
-import { getParser } from "./parser"
-import { TwinnyProvider } from "./provider-manager"
+import { TwinnyProvider } from "./providers/manager"
 
 export const delayExecution = <T extends () => void>(
   fn: T,

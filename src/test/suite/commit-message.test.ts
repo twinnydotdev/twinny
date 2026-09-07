@@ -3,7 +3,7 @@ import * as assert from "assert"
 import {
   cleanCommitMessage,
   truncateDiff
-} from "../../extension/commit-message"
+} from "../../extension/review/commit-message"
 
 suite("Commit message", () => {
   suite("truncateDiff", () => {

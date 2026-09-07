@@ -3,7 +3,7 @@ import * as vscode from "vscode"
 
 import { API_PROVIDERS } from "../../common/constants"
 import { RequestOptionsOllama, StreamResponse } from "../../common/types"
-import { createStreamRequestBodyFim } from "../../extension/provider-options"
+import { createStreamRequestBodyFim } from "../../extension/completion/request-body"
 import {
   getFimDataFromProvider,
   getIsMiddleOfWord,

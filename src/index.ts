@@ -20,19 +20,19 @@ import {
   WEBUI_TABS
 } from "./common/constants"
 import { logger } from "./common/logger"
+import { getLineBreakCount } from "./common/text"
 import { ContextItem, SelectionContextItem } from "./common/types"
-import { generateCommitMessage } from "./extension/commit-message"
+import { FileInteractionCache } from "./extension/completion/file-interaction"
+import { CompletionProvider } from "./extension/completion/provider"
 import { setContext } from "./extension/context"
-import { EmbeddingDatabase } from "./extension/embeddings"
-import { FileInteractionCache } from "./extension/file-interaction"
-import { CompletionProvider } from "./extension/providers/completion"
-import { FullScreenProvider } from "./extension/providers/panel"
-import { SidebarProvider } from "./extension/providers/sidebar"
+import { EmbeddingDatabase } from "./extension/embeddings/database"
+import { generateCommitMessage } from "./extension/review/commit-message"
 import { SessionManager } from "./extension/session-manager"
 import { TwinnyStatusBar } from "./extension/status-bar"
-import { TemplateProvider } from "./extension/template-provider"
+import { TemplateProvider } from "./extension/templates/provider"
 import { delayExecution, sanitizeWorkspaceName } from "./extension/utils"
-import { getLineBreakCount } from "./webview/utils"
+import { FullScreenProvider } from "./extension/webview/panel"
+import { SidebarProvider } from "./extension/webview/sidebar"
 
 /** The editor commands that hand a selection to a chat template. */
 const TEMPLATE_COMMANDS: Record<string, string> = {

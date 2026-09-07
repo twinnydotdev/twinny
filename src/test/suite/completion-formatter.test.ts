@@ -2,7 +2,7 @@
 import * as assert from "assert"
 import * as vscode from "vscode"
 
-import { CompletionFormatter } from "../../extension/completion-formatter"
+import { CompletionFormatter } from "../../extension/completion/formatter"
 
 suite("Completion formatter", () => {
   let editor: vscode.TextEditor

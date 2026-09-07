@@ -1,36 +1,622 @@
-.providerHeader {
-  align-items: center;
+/*
+ * Providers tab.
+ *
+ * Three views share this sheet: the list (setup check + one section per job),
+ * the preset gallery, and the form. Everything sits on the theme tokens from
+ * theme.css — hairlines, square corners, the editor's monospace.
+ */
+
+.page {
   display: flex;
-  flex-grow: 1;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
 }
 
-.providerHeader h4 {
-  font-size: 13px;
-  font-weight: 600;
+.page h3 {
   margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
 }
 
-.providerHeader svg {
-  height: 16px;
-  width: 16px;
+.pageHeader,
+.viewHeader,
+.sectionHeader,
+.setupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
 }
 
-.providerHeader vscode-dropdown {
-  flex-grow: 1;
-  margin-right: 12px;
+.viewHeader {
+  justify-content: flex-start;
 }
 
-.fimSelector {
-  margin: 8px 0;
+.viewHeader h4,
+.sectionHeader h4,
+.setupHeader h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+}
+
+.sectionHeader h4 .codicon {
+  opacity: 0.7;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Setup check                                                              */
+/* ------------------------------------------------------------------------ */
+
+.setup {
+  padding: 10px 12px 12px;
+  border: 1px solid var(--tw-rule);
+  background: var(--tw-surface);
+}
+
+.roles {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.roleLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.roleLine > .codicon:first-child {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.roleName {
+  flex-shrink: 0;
+  min-width: 72px;
+  font-weight: 600;
+}
+
+.roleProvider {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}
+
+.roleState {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: var(--tw-fs-sm);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.roleLatency {
+  color: var(--tw-fg-faint);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.roleOk {
+  color: var(--vscode-testing-iconPassed, var(--vscode-terminal-ansiGreen));
+}
+
+.roleFailed {
+  color: var(--vscode-testing-iconFailed, var(--vscode-errorForeground));
+}
+
+.roleMissing {
+  color: var(--vscode-editorWarning-foreground, var(--vscode-terminal-ansiYellow));
+}
+
+.rolePending,
+.roleUnknown {
+  color: var(--tw-fg-faint);
+}
+
+.roleDetail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-left: 22px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--tw-rule);
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
+}
+
+.setupAllGood {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--vscode-testing-iconPassed, var(--vscode-terminal-ansiGreen));
+  font-size: var(--tw-fs-sm);
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Sections and cards                                                       */
+/* ------------------------------------------------------------------------ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionCount {
+  padding: 0 6px;
+  border: 1px solid var(--tw-rule);
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  font-weight: 400;
+}
+
+.sectionBlurb {
+  margin: -2px 0 4px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}
+
+.emptyAll {
+  margin: 0;
+  color: var(--tw-fg-dim);
+}
+
+.emptySection,
+.presetCard,
+.linkButton {
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  color: var(--tw-fg);
+  background: transparent;
+  cursor: pointer;
+}
+
+.emptySection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--tw-rule);
+  color: var(--tw-fg-dim);
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.emptySection:hover,
+.emptySection:focus-visible {
+  color: var(--tw-fg);
+  border-color: var(--tw-fg-faint);
+  outline: none;
+}
+
+.card {
+  border: 1px solid var(--tw-rule);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.card:hover {
+  background: var(--tw-surface);
+}
+
+.cardActive {
+  border-color: var(--tw-accent-soft, var(--tw-accent));
+}
+
+.cardMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 4px;
+  min-width: 0;
+}
+
+.cardSelect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg-faint);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.cardSelect:hover,
+.cardSelect:focus-visible {
+  color: var(--tw-fg);
+  outline: none;
+}
+
+.cardSelect[aria-pressed="true"] {
+  color: var(--tw-accent);
+}
+
+.cardText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cardLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  /* A provider label is a proper noun — "OpenAI", not "openai". */
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.cardBadge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 1px solid var(--tw-accent-soft, var(--tw-accent));
+  color: var(--tw-accent);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.cardSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.confirmRow,
+.confirmBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--tw-rule);
+  font-size: var(--tw-fs-sm);
+}
+
+.confirmRow > span,
+.confirmBanner > span {
+  flex: 1;
+  min-width: 140px;
+}
+
+.confirmBanner {
+  border: 1px solid var(--vscode-editorWarning-foreground, var(--tw-rule));
+}
+
+/* Test outcome, under a card or the form. */
+.testResult {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--tw-rule);
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.testResult .codicon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.testOk {
+  color: var(--vscode-testing-iconPassed, var(--vscode-terminal-ansiGreen));
+}
+
+.testFailed {
+  color: var(--vscode-testing-iconFailed, var(--vscode-errorForeground));
+}
+
+.testPending {
+  color: var(--tw-fg-dim);
+}
+
+.providerForm .testResult {
+  border: 1px solid currentColor;
+  border-top-width: 1px;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Preset gallery                                                           */
+/* ------------------------------------------------------------------------ */
+
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.galleryIntro {
+  margin: 0 0 4px;
+  color: var(--tw-fg-dim);
+}
+
+.galleryGroup {
+  margin: 8px 0 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.presetList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.presetCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--tw-rule);
+  text-align: left;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.presetCard:hover,
+.presetCard:focus-visible {
+  background: var(--tw-surface);
+  border-color: var(--tw-fg-faint);
+  outline: none;
+}
+
+.presetLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  opacity: 0.85;
+}
+
+.presetLogo svg {
+  width: 20px;
+  height: 20px;
+}
+
+.presetLogo .codicon {
+  font-size: 18px !important;
+}
+
+.presetBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.presetName {
+  font-weight: 600;
+}
+
+.presetDescription {
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  line-height: 1.45;
+}
+
+.presetChevron {
+  flex-shrink: 0;
+  opacity: 0.4;
+}
+
+.galleryFooter {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tw-rule-soft);
+}
+
+.linkButton {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--tw-rule);
+  color: var(--tw-fg);
+  font-size: var(--tw-fs-sm);
+}
+
+.linkButton:hover,
+.linkButton:focus-visible {
+  color: var(--tw-link);
+  border-bottom-color: var(--tw-link-soft, var(--tw-link));
+  outline: none;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Form                                                                     */
+/* ------------------------------------------------------------------------ */
+
+.providerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   width: 100%;
 }
 
-.fimSelector vscode-dropdown {
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field label {
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.field vscode-text-field,
+.field vscode-dropdown {
   width: 100%;
 }
+
+.fieldInvalid vscode-text-field::part(root),
+.fieldInvalid vscode-dropdown::part(control) {
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fieldHint,
+.fieldError {
+  font-size: var(--tw-fs-sm);
+  line-height: 1.45;
+}
+
+.fieldHint {
+  color: var(--tw-fg-faint);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground));
+}
+
+.inlineControl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inlineControl > vscode-text-field,
+.inlineControl > vscode-dropdown {
+  flex: 1;
+  min-width: 0;
+}
+
+.checkbox {
+  margin-top: -4px;
+}
+
+.endpointPreview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--tw-rule);
+  background: var(--tw-surface);
+  font-size: var(--tw-fs-sm);
+}
+
+.endpointLabel {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.endpointPreview code {
+  color: var(--tw-code);
+  word-break: break-all;
+}
+
+.warnings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.warnings li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--vscode-editorWarning-foreground, var(--tw-fg-dim));
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
+}
+
+.warnings .codicon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.formActionsSpacer {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Composer footer selector (chat tab)                                      */
+/* ------------------------------------------------------------------------ */
 
 /* Sits under the composer as a status line: two quiet, borderless selects. */
 .providerSelector {
@@ -75,215 +661,19 @@
   color: var(--tw-fg-dim);
 }
 
-.providersButtons {
+/* A nudge in the composer footer when nothing is configured for chat. */
+.noProviderNotice {
+  display: flex;
   align-items: center;
-  display: flex;
   gap: 8px;
-}
-
-.provider {
-  background: var(--vscode-inputOption-hoverBackground);
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 0;
-  margin: 3px 0;
-  padding: 5px;
-  transition: background 0.2s ease;
-}
-
-.provider:hover {
-  background: var(--vscode-inputOption-activeBackground);
-}
-
-.providerDetails {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, auto);
-  margin-top: 8px;
-  overflow: hidden;
-}
-
-.providerDetails>div {
-  text-overflow: ellipsis;
-  text-wrap: nowrap;
-}
-
-.providerForm {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 8px 0;
   width: 100%;
+  padding: 0 10px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
 }
 
-.providerForm div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 0;
+.noProviderNotice .linkButton {
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
 }
-
-.providerForm label {
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.providerFormButtons {
-  align-self: flex-end;
-  display: flex !important;
-  flex-direction: row !important;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 8px;
-}
-
-.providerActions {
-  align-items: center;
-  display: flex;
-  gap: 4px;
-}
-
-.providerName {
-  align-items: center;
-  color: var(--vscode-foreground);
-  display: flex;
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0;
-  /* A provider label is a proper noun — "OpenAI", not "openai". */
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.providerName i {
-  font-size: 14px;
-  margin-right: 8px;
-  opacity: 0.8;
-}
-
-.testStatus {
-  margin-top: var(--container-padding);
-  padding: var(--container-padding);
-  border-radius: 0;
-  border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
-}
-
-.defaultsHeader {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.defaults {
-  background-color: var(--vscode-editor-background);
-  border: 1px solid var(--vscode-editor-lineHighlightBorder);
-  border-radius: 0;
-  margin-top: 16px;
-  padding: 16px;
-}
-
-.defaultsTitle {
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0 0 12px 0;
-}
-
-.defaultsGrid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  margin-bottom: 16px;
-}
-
-.defaultItem {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.defaultLabel {
-  color: var(--vscode-descriptionForeground);
-  font-size: 12px;
-}
-
-.useDefaultsButton {
-  width: 100%;
-}
-
-.divider {
-  border-top: 1px solid var(--vscode-editorWidget-border);
-  margin: 16px 0;
-}
-
-.checkBox {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.enableTools {
-  margin-top: 8px;
-}
-
-.container {
-  display: flex;
-  flex-direction: column;
-  max-width: 800px;
-  width: 100%;
-}
-
-.title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 16px;
-}
-
-.providersList {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr;
-}
-
-.providerCard {
-  align-items: flex-start;
-  border: 1px solid var(--vscode-editor-lineHighlightBorder);
-  border-radius: 0;
-  cursor: pointer;
-  display: flex;
-  padding: 16px;
-  transition: all 0.2s ease-in-out;
-}
-
-.providerCard:hover {
-  border-color: var(--vscode-button-background);
-}
-
-.logo {
-  border-radius: 0;
-  height: 32px;
-  margin-right: 12px;
-  width: 32px;
-}
-
-.logo svg {
-  height: 32px;
-  width: 32px;
-}
-
-.content {
-  flex-grow: 1;
-}
-
-.header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-
-.actions {
-  display: flex;
-  gap: 4px;
-}
-

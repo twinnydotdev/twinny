@@ -4,7 +4,7 @@ import {
   getSuggestionContinuation,
   LastSuggestion,
   LRUCache
-} from "../../extension/cache"
+} from "../../extension/completion/cache"
 
 suite("Completion cache", () => {
   test("evicts the least recently used entry", () => {

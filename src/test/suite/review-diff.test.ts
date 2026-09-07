@@ -8,7 +8,7 @@ import {
   planReview,
   summarizeReview,
   truncateFileDiff
-} from "../../extension/review-diff"
+} from "../../extension/review/diff"
 
 const file = (path: string, hunks: string[]): string =>
   [

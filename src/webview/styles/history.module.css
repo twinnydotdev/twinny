@@ -1,0 +1,208 @@
+/* Conversation history: a searchable, date-grouped list. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.pageHeader h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.count {
+  padding: 0 6px;
+  border: 1px solid var(--tw-rule);
+  color: var(--tw-fg-dim);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.search {
+  width: 100%;
+}
+
+.confirmBanner,
+.confirmRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: var(--tw-fs-sm);
+}
+
+.confirmBanner {
+  border: 1px solid var(--vscode-editorWarning-foreground, var(--tw-rule));
+}
+
+.confirmRow {
+  border-top: 1px solid var(--tw-rule-soft);
+}
+
+.confirmBanner > span,
+.confirmRow > span {
+  flex: 1;
+  min-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.groupTitle {
+  margin: 4px 0 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  border-bottom: 1px solid var(--tw-rule-soft);
+}
+
+.row:hover {
+  background: var(--tw-surface);
+}
+
+.rowActive {
+  border-left: 2px solid var(--tw-accent);
+  margin-left: -8px;
+  padding-left: 6px;
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rowBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowBody:focus-visible {
+  outline: 1px solid var(--tw-accent);
+  outline-offset: -1px;
+}
+
+.rowTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowTitle .codicon {
+  flex-shrink: 0;
+  font-size: 8px !important;
+  color: var(--tw-accent);
+}
+
+.rowMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-sm);
+}
+
+.rowActions {
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.row:hover .rowActions,
+.row:focus-within .rowActions {
+  opacity: 1;
+}
+
+.renameRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.renameRow vscode-text-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 12px;
+  border: 1px dashed var(--tw-rule);
+  background: transparent;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  cursor: pointer;
+}
+
+.empty:hover {
+  color: var(--tw-fg);
+  border-color: var(--tw-fg-faint);
+}
+
+.noMatch {
+  margin: 0;
+  color: var(--tw-fg-dim);
+}

@@ -1,4 +1,4 @@
-import { defaultTemplates } from "../../extension/templates"
+import { defaultTemplates } from "../../extension/templates/defaults"
 
 export const FIM_TEMPLATE_FORMAT = {
   automatic: "automatic",

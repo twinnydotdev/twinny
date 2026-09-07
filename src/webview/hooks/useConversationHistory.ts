@@ -38,6 +38,8 @@ export const useConversationHistory = () => {
       emit(CONVERSATION_EVENT_NAME.clearAllConversations),
     removeConversation: (target: Conversation) =>
       emit(CONVERSATION_EVENT_NAME.removeConversation, target),
+    renameConversation: (id: string, title: string) =>
+      emit(CONVERSATION_EVENT_NAME.renameConversation, { id, title }),
     saveLastConversation: (target: Conversation | undefined) =>
       emit(CONVERSATION_EVENT_NAME.saveConversation, target)
   }

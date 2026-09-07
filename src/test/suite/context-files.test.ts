@@ -3,10 +3,20 @@ import * as assert from "assert"
 import {
   dedupeContextEntries,
   formatContextEntries,
-  languageForPath
-} from "../../extension/context-files"
+  languageForPath,
+  normalizeWorkspacePath
+} from "../../extension/chat/context-files"
 
 suite("Attached context", () => {
+  test("treats @mention and pinned paths as the same workspace file", () => {
+    assert.strictEqual(normalizeWorkspacePath("/package.json"), "package.json")
+    assert.strictEqual(normalizeWorkspacePath("/src/a.ts"), "src/a.ts")
+    assert.strictEqual(normalizeWorkspacePath("src/a.ts"), "src/a.ts")
+    assert.strictEqual(normalizeWorkspacePath("\\src\\a.ts"), "src\\a.ts")
+    assert.strictEqual(normalizeWorkspacePath("C:\\repo\\a.ts"), "C:\\repo\\a.ts")
+    assert.strictEqual(normalizeWorkspacePath(""), "")
+  })
+
   test("maps file extensions to fence languages", () => {
     assert.strictEqual(languageForPath("src/a.ts"), "typescript")
     assert.strictEqual(languageForPath("src/A.PY"), "python")

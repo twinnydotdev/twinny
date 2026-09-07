@@ -1,6 +1,6 @@
 import * as assert from "assert"
 
-import { parseGitHubRemote } from "../../extension/git"
+import { parseGitHubRemote } from "../../extension/review/git"
 
 suite("Git remotes", () => {
   test("parses the URL forms git accepts", () => {
