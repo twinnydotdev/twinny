@@ -57,7 +57,8 @@ interface LiveStatus {
 }
 
 const HEALTH_INTERVAL_MS = 30_000
-const PAIR_CONNECT_TIMEOUT_MS = 20_000
+// A hole punch that fails takes ~10s; leave room for a retry before giving up.
+const PAIR_CONNECT_TIMEOUT_MS = 40_000
 
 const hostName = () => {
   try {
@@ -261,6 +262,14 @@ export class P2pRuntime implements Disposable {
   }
 
   private watch(client: P2pClient) {
+    client.on(CLIENT_EVENT.dialFailed, (error: Error) => {
+      const code = (error as { code?: unknown }).code
+      logger.log(
+        `p2p dial to ${client.remotePublicKeyHex.slice(0, 8)} failed: ${
+          typeof code === "string" && !error.message.startsWith(code) ? `${code}: ` : ""
+        }${error.message}`
+      )
+    })
     client.on(CLIENT_EVENT.state, (state: ClientState) => {
       const id = client.remotePublicKeyHex
       const previous = this._live.get(id)

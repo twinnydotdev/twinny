@@ -185,6 +185,7 @@ export class TwinnyNode extends EventEmitter {
     // The firewall already said no to anyone else, but the window may have
     // closed between the handshake starting and finishing.
     if (!trusted && !this.pairingOpen) {
+      this.log(`turned away ${hex.slice(0, 8)}: not paired and no pairing code is open`)
       session.close(new Error("Not paired"))
       return
     }

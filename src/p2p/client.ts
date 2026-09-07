@@ -68,7 +68,9 @@ export interface P2pClientOptions {
 }
 
 export const CLIENT_EVENT = {
-  state: "state"
+  state: "state",
+  /** One dial attempt failed; the payload is the transport's error. */
+  dialFailed: "dial-failed"
 } as const
 
 interface Pending {
@@ -94,6 +96,14 @@ const REDIAL_MS = 1_500
 
 const noop = () => undefined
 
+/** "HOLEPUNCH_ABORTED: Holepunch aborted" rather than the code twice. */
+const describe = (error: Error): string => {
+  const code = (error as { code?: unknown }).code
+  return typeof code === "string" && !error.message.startsWith(code)
+    ? `${code}: ${error.message}`
+    : error.message
+}
+
 export class P2pClient extends EventEmitter {
   public readonly remotePublicKeyHex: string
   private readonly _options: Required<P2pClientOptions>
@@ -106,6 +116,7 @@ export class P2pClient extends EventEmitter {
   private _connectTimer?: ReturnType<typeof setTimeout>
   private _redialTimer?: ReturnType<typeof setTimeout>
   private _dialing?: PeerStream
+  private _lastDialError?: Error
   private readonly _pending = new Map<string, Pending>()
   private readonly _streams = new Map<string, OpenStream>()
   private _destroyed = false
@@ -193,7 +204,9 @@ export class P2pClient extends EventEmitter {
         this._connectWaiters = []
         const error = new P2pRequestError(
           "timeout",
-          "Could not reach the device. Check that the Twinny node is running and online."
+          `Could not reach the device. Check that the Twinny node is running and online.${
+            this._lastDialError ? ` Last attempt: ${describe(this._lastDialError)}.` : ""
+          }`
         )
         for (const waiter of waiters) waiter.reject(error)
       }, timeoutMs)
@@ -233,17 +246,22 @@ export class P2pClient extends EventEmitter {
         return
       }
       this._dialing = undefined
+      this._lastDialError = undefined
       this.attach(stream)
     }
-    const onFail = () => {
+    const onFail = (error?: Error) => {
       settle()
       if (this._dialing !== stream) return
       this._dialing = undefined
+      // A close without an error is the transport giving up quietly.
+      const reason = error instanceof Error ? error : new Error("Connection closed before it opened")
+      this._lastDialError = reason
+      this.emit(CLIENT_EVENT.dialFailed, reason)
       this.redialLater()
     }
     stream.on("open", onOpen)
     stream.on("error", onFail)
-    stream.on("close", onFail)
+    stream.on("close", () => onFail())
   }
 
   private redialLater() {

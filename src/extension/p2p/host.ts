@@ -325,17 +325,33 @@ export class P2pHost implements Disposable {
   }
 
   private listen(node: TwinnyNode) {
+    const log = (message: string) => logger.log(`p2p host: ${message}`)
     const refresh = () => this.changed()
-    node.on(NODE_EVENT.peerConnected, refresh)
-    node.on(NODE_EVENT.peerDisconnected, refresh)
-    node.on(NODE_EVENT.paired, refresh)
+    const short = (key: string) => key.slice(0, 8)
+    node.on(NODE_EVENT.peerConnected, ({ publicKey, trusted }) => {
+      log(`${trusted ? "paired device" : "unpaired device"} ${short(publicKey)} connected`)
+      refresh()
+    })
+    node.on(NODE_EVENT.peerDisconnected, ({ publicKey }) => {
+      log(`device ${short(publicKey)} disconnected`)
+      refresh()
+    })
+    node.on(NODE_EVENT.paired, ({ publicKey, name }) => {
+      log(`paired with ${name} (${short(publicKey)})`)
+      refresh()
+    })
+    node.on(NODE_EVENT.pairingOpened, () => log("pairing code shown; waiting for a device"))
     node.on(NODE_EVENT.pairingClosed, () => {
       this._pairingCode = undefined
       this._pairingExpiresAt = undefined
+      log("pairing window closed")
       refresh()
     })
-    node.on(NODE_EVENT.pairingFailed, refresh)
-    node.on(NODE_EVENT.log, (message: string) => logger.log(`p2p host: ${message}`))
+    node.on(NODE_EVENT.pairingFailed, ({ publicKey }) => {
+      log(`device ${short(publicKey)} offered a wrong pairing code`)
+      refresh()
+    })
+    node.on(NODE_EVENT.log, log)
   }
 
   private async loadSeed(): Promise<Buffer> {
