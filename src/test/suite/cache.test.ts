@@ -18,13 +18,32 @@ suite("Completion cache", () => {
     assert.strictEqual(lru.get("c"), "3")
   })
 
-  test("keys ignore whitespace differences but not token boundaries", () => {
+  test("keys preserve whitespace and token boundaries", () => {
     const lru = new LRUCache<string>(5)
     lru.setCache({ prefix: "foo  bar\n", suffix: "\n baz" }, "x")
-    assert.strictEqual(lru.getCache({ prefix: "foo bar", suffix: "baz" }), "x")
+    assert.strictEqual(lru.getCache({ prefix: "foo  bar\n", suffix: "\n baz" }), "x")
+    assert.strictEqual(lru.getCache({ prefix: "foo bar", suffix: "baz" }), undefined)
     assert.strictEqual(
       lru.getCache({ prefix: "foobar", suffix: "baz" }),
       undefined
+    )
+  })
+
+  test("separates documents, providers and document versions", () => {
+    const lru = new LRUCache<string>(5)
+    const context = { prefix: "const value = ", suffix: "\n" }
+    lru.setCache(context, "one", "file-a/model-a/v1")
+    assert.strictEqual(lru.getCache(context, "file-a/model-a/v1"), "one")
+    for (const scope of ["file-b/model-a/v1", "file-a/model-b/v1", "file-a/model-a/v2"]) {
+      assert.strictEqual(lru.getCache(context, scope), undefined)
+    }
+  })
+
+  test("prefix/suffix delimiter text cannot collide", () => {
+    const lru = new LRUCache<string>(5)
+    assert.notStrictEqual(
+      lru.getKey({ prefix: "a #### b", suffix: "c" }),
+      lru.getKey({ prefix: "a", suffix: "b #### c" })
     )
   })
 
@@ -34,6 +53,13 @@ suite("Completion cache", () => {
       suffix: "\nexport {}",
       completion: "items.reduce((a, b) => a + b, 0)"
     }
+
+    test("never continues a suggestion from another file or provider", () => {
+      const scoped = { ...last, scope: "file-a/model-a" }
+      assert.strictEqual(getSuggestionContinuation(scoped, last, scoped.scope), last.completion)
+      assert.strictEqual(getSuggestionContinuation(scoped, last, "file-b/model-a"), undefined)
+      assert.strictEqual(getSuggestionContinuation(scoped, last, "file-a/model-b"), undefined)
+    })
 
     test("serves the remainder after the user types part of it", () => {
       assert.strictEqual(

@@ -38,22 +38,19 @@ export class LRUCache<T = string> {
     this._cache.set(key, value)
   }
 
-  normalize(src: string): string {
-    return src.replace(/\s+/g, " ").trim()
-  }
-
-  getKey(prefixSuffix: PrefixSuffix): string {
+  getKey(prefixSuffix: PrefixSuffix, scope = ""): string {
     const { prefix, suffix } = prefixSuffix
-    return this.normalize(prefix) + " #### " + this.normalize(suffix)
+    // Whitespace matters in strings and indentation-sensitive languages.
+    return JSON.stringify([scope, prefix, suffix])
   }
 
-  getCache(prefixSuffix: PrefixSuffix): T | undefined | null {
-    const key = this.getKey(prefixSuffix)
+  getCache(prefixSuffix: PrefixSuffix, scope = ""): T | undefined | null {
+    const key = this.getKey(prefixSuffix, scope)
     return this.get(key)
   }
 
-  setCache(prefixSuffix: PrefixSuffix, completion: T): void {
-    const key = this.getKey(prefixSuffix)
+  setCache(prefixSuffix: PrefixSuffix, completion: T, scope = ""): void {
+    const key = this.getKey(prefixSuffix, scope)
     this.set(key, completion)
   }
 }
@@ -63,6 +60,7 @@ export const cache = new LRUCache(50)
 /** The most recent suggestion shown, plus the context it was generated for. */
 export interface LastSuggestion extends PrefixSuffix {
   completion: string
+  scope?: string
 }
 
 /** How much of the old prefix/suffix must still match to count as the same spot. */
@@ -94,9 +92,10 @@ const endsWithAnchor = (head: string, anchor: string): boolean => {
  */
 export const getSuggestionContinuation = (
   last: LastSuggestion | undefined,
-  current: PrefixSuffix
+  current: PrefixSuffix,
+  scope?: string
 ): string | undefined => {
-  if (!last?.completion) return undefined
+  if (!last?.completion || last.scope !== scope) return undefined
 
   const suffixAnchor = last.suffix.slice(0, ANCHOR_LENGTH)
   if (!current.suffix.startsWith(suffixAnchor)) return undefined

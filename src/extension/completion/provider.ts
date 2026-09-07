@@ -60,6 +60,8 @@ import { CompletionStream } from "./stream"
 interface CompletionRequest {
   id: number
   version: number
+  scope: string
+  cacheScope: string
   document: TextDocument
   position: Position
   prefixSuffix: PrefixSuffix
@@ -107,6 +109,9 @@ export class CompletionProvider
     context: InlineCompletionContext,
     token: CancellationToken
   ): Promise<InlineCompletionItem[] | undefined> {
+    // Invalidate even when this invocation returns early or uses the cache.
+    this.abortCompletion()
+    if (token.isCancellationRequested) return
     const provider = this.getFimProvider()
     if (!this.config.get<boolean>("enabled", true) || !provider) return
 
@@ -119,25 +124,36 @@ export class CompletionProvider
       return
     }
 
-    // Any request still running is for an older cursor position.
-    this.abortCompletion()
-
     const prefixSuffix = getPrefixSuffix(
       this.config.get<number>("contextLength", 100),
       document,
       position
     )
 
+    const scope = JSON.stringify([
+      document.uri.toString(), document.languageId,
+      provider.id, provider.modelName, provider.provider,
+      provider.apiProtocol, provider.apiHostname, provider.apiPort, provider.apiPath,
+      provider.fimTemplate, provider.repositoryLevel,
+      this.config.get("lspContextEnabled", true),
+      this.config.get("fileContextEnabled", false),
+      this.config.get("multilineCompletionsEnabled", true),
+      this.config.get("maxLines", 40),
+      this.config.get("numPredictFim", 512),
+      this.config.get("temperature", 0.2)
+    ])
+    const cacheScope = JSON.stringify([scope, document.version])
     const continuation = getSuggestionContinuation(
       this._lastSuggestion,
-      prefixSuffix
+      prefixSuffix,
+      scope
     )
     if (continuation) {
       return this.toInlineCompletion(continuation, position)
     }
 
     if (this.config.get<boolean>("completionCacheEnabled")) {
-      const cached = cache.getCache(prefixSuffix)
+      const cached = cache.getCache(prefixSuffix, cacheScope)
       if (cached) return this.toInlineCompletion(cached, position)
     }
 
@@ -151,8 +167,10 @@ export class CompletionProvider
     if (getIsMiddleOfWord(document, position)) return
 
     const request: CompletionRequest = {
-      id: ++this._requestId,
+      id: this._requestId,
       version: document.version,
+      scope,
+      cacheScope,
       document,
       position,
       prefixSuffix,
@@ -192,8 +210,11 @@ export class CompletionProvider
 
     this._statusBar.busy()
 
-    const node = await this.getNodeAtCursor(document, position)
-    const prompt = await this.getPrompt(request)
+    if (this.isStale(request)) return
+    const [node, prompt] = await Promise.all([
+      this.getNodeAtCursor(document, position),
+      this.getPrompt(request)
+    ])
     if (!prompt || this.isStale(request)) {
       this.setIdle()
       return
@@ -300,10 +321,10 @@ export class CompletionProvider
     }
 
     if (this.config.get<boolean>("completionCacheEnabled")) {
-      cache.setCache(prefixSuffix, formatted)
+      cache.setCache(prefixSuffix, formatted, request.cacheScope)
     }
 
-    this._lastSuggestion = { ...prefixSuffix, completion: formatted }
+    this._lastSuggestion = { ...prefixSuffix, completion: formatted, scope: request.scope }
     return this.toInlineCompletion(formatted, position)
   }
 
@@ -500,6 +521,7 @@ export class CompletionProvider
   }
 
   public abortCompletion() {
+    this._requestId++
     this._abortController?.abort()
     this._abortController = null
     this.setIdle()
