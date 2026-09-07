@@ -248,7 +248,11 @@ export class P2pRuntime implements Disposable {
 
   private network(): Promise<PeerNetwork> {
     if (!this._network) {
-      this._network = this.loadSeed().then((seed) => new PeerNetwork({ seed }))
+      // Any free port: this side only dials out, and it must not take the
+      // fixed port the host shares on when it happens to start first.
+      this._network = this.loadSeed().then(
+        (seed) => new PeerNetwork({ seed, port: [0, 0] })
+      )
     }
     return this._network
   }

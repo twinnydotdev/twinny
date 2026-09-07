@@ -32,6 +32,7 @@ import {
 } from "../../common/constants"
 import { logger } from "../../common/logger"
 import { P2pHostStatus } from "../../common/messaging/protocol"
+import { DEFAULT_NODE_PORT } from "../../node/config"
 import { TrustStorage, TrustStore } from "../../node/peers"
 import { NODE_EVENT, TwinnyNode } from "../../node/server"
 import { createSeed, keyPairFromSeed, toHex } from "../../p2p"
@@ -54,6 +55,12 @@ const localOllamaUrl = (): string => {
   // 0.0.0.0 is where Ollama *listens*; it is not an address to call.
   const host = hostname === "0.0.0.0" ? "127.0.0.1" : hostname
   return `${protocol}://${host}:${port}`
+}
+
+/** The UDP port to share on. Fixed so a firewall rule for it stays valid. */
+const configuredPort = (): number => {
+  const port = workspace.getConfiguration("twinny").get<number>("p2pPort")
+  return Number.isInteger(port) && port! > 0 && port! < 65536 ? port! : DEFAULT_NODE_PORT
 }
 
 export class P2pHost implements Disposable {
@@ -113,6 +120,7 @@ export class P2pHost implements Disposable {
       runningElsewhere: this.enabled && !this.running && this._runningElsewhere,
       name: this.name,
       peerId: this._peerId,
+      port: this._node?.port ?? configuredPort(),
       ollamaUrl: localOllamaUrl(),
       ollamaOk: this._ollamaOk,
       pairingCode: pairingOpen ? this._pairingCode : undefined,
@@ -160,6 +168,7 @@ export class P2pHost implements Disposable {
         seed,
         name: this.name,
         ollamaUrl: localOllamaUrl(),
+        port: configuredPort(),
         trust: this._trust
       })
       this._peerId = node.publicKeyHex

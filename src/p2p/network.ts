@@ -24,7 +24,8 @@ export class PeerNetwork {
   ) {
     this._dht = new DHT({
       seed: options.seed,
-      bootstrap: options.bootstrap
+      bootstrap: options.bootstrap,
+      port: options.port
     }) as PeerDht
   }
 

@@ -13,6 +13,12 @@ import { createSeed, SEED_BYTES } from "../p2p/identity"
 
 export const DEFAULT_NODE_DIR = path.join(os.homedir(), ".twinny", "node")
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434"
+/**
+ * The UDP port a node listens on. Fixed rather than random so a firewall
+ * rule for it can be permanent; hyperdht's own default, so a node started
+ * by an older build sits on the same port.
+ */
+export const DEFAULT_NODE_PORT = 49737
 
 export const IDENTITY_FILE = "identity.json"
 export const TRUSTED_PEERS_FILE = "trusted-peers.json"
@@ -21,6 +27,8 @@ export interface NodeConfig {
   dir: string
   name: string
   ollamaUrl: string
+  /** UDP port to listen on. */
+  port: number
   /** Open a pairing window as soon as the node starts. */
   pairOnStart: boolean
 }
@@ -55,6 +63,7 @@ export const parseArgs = (argv: string[], env = process.env): NodeConfig | "help
     ollamaUrl: env.OLLAMA_HOST
       ? normaliseOllamaUrl(env.OLLAMA_HOST)
       : DEFAULT_OLLAMA_URL,
+    port: parsePort(env.TWINNY_NODE_PORT) ?? DEFAULT_NODE_PORT,
     pairOnStart: true
   }
 
@@ -80,6 +89,14 @@ export const parseArgs = (argv: string[], env = process.env): NodeConfig | "help
       case "-d":
         config.dir = next()
         break
+      case "--port":
+      case "-p": {
+        const raw = next()
+        const port = parsePort(raw)
+        if (port === undefined) throw new Error(`${arg} needs a port between 1 and 65535, not "${raw}"`)
+        config.port = port
+        break
+      }
       case "--no-pair":
         config.pairOnStart = false
         break
@@ -91,6 +108,12 @@ export const parseArgs = (argv: string[], env = process.env): NodeConfig | "help
     }
   }
   return config
+}
+
+const parsePort = (value: string | undefined): number | undefined => {
+  if (!value) return undefined
+  const port = Number(value)
+  return Number.isInteger(port) && port > 0 && port < 65536 ? port : undefined
 }
 
 /** `OLLAMA_HOST` may be `host:port` or a full URL; a node wants a URL. */
@@ -105,6 +128,9 @@ Usage: twinny-node [options]
   -o, --ollama <url>    Ollama address (default: ${DEFAULT_OLLAMA_URL}, or $OLLAMA_HOST)
   -d, --dir <path>      Where to keep the node identity and trusted devices
                         (default: ${DEFAULT_NODE_DIR})
+  -p, --port <port>     UDP port to listen on (default: ${DEFAULT_NODE_PORT}, or $TWINNY_NODE_PORT).
+                        Devices on your network reach the node on this port, so a
+                        firewall must allow it, e.g. \`sudo ufw allow ${DEFAULT_NODE_PORT}/udp\`.
       --no-pair         Start without opening a pairing window
   -h, --help            Show this help
 

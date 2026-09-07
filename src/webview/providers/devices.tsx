@@ -294,6 +294,7 @@ const HostCard = () => {
   const summary = host.running
     ? [
         host.ollamaOk === false ? t("host-ollama-down") : host.ollamaUrl,
+        t("host-port", { port: host.port }),
         t("host-paired-count", { count: host.trustedPeers.length })
       ].join(" · ")
     : host.runningElsewhere
@@ -397,6 +398,7 @@ const HostCard = () => {
           </div>
           <code>{host.pairingCode}</code>
           <p className={styles.fieldHint}>{t("pairing-code-share-hint")}</p>
+          <p className={styles.fieldHint}>{t("host-port-hint", { port: host.port })}</p>
         </div>
       )}
 

@@ -32,6 +32,8 @@ export interface TwinnyNodeOptions {
   name: string
   ollamaUrl: string
   trust: TrustStore
+  /** UDP port to listen on; hyperdht picks 49737 or the next free one above it when unset. */
+  port?: number
   /** Local DHT bootstrap nodes; only tests set this. */
   bootstrap?: unknown[]
   /** Streaming requests one device may have open at once. */
@@ -90,6 +92,11 @@ export class TwinnyNode extends EventEmitter {
     return this._options.trust
   }
 
+  /** The UDP port paired devices reach this node on, once started. */
+  public get port(): number | undefined {
+    return this._dht?.io.serverSocket.address().port
+  }
+
   public get pairingOpen(): boolean {
     return !!this._pairing?.isOpen()
   }
@@ -109,7 +116,8 @@ export class TwinnyNode extends EventEmitter {
     if (this._dht) return
     const dht = new DHT({
       seed: this._options.seed,
-      bootstrap: this._options.bootstrap
+      bootstrap: this._options.bootstrap,
+      port: this._options.port
     }) as PeerDht
     this._dht = dht
     // The firewall runs during the Noise handshake, so a stranger never
@@ -121,7 +129,7 @@ export class TwinnyNode extends EventEmitter {
       this.onConnection
     )
     await this._server.listen()
-    this.log(`listening as ${this.publicKeyHex}`)
+    this.log(`listening as ${this.publicKeyHex} on UDP port ${this.port}`)
   }
 
   public async stop(): Promise<void> {

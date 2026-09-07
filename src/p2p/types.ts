@@ -36,6 +36,8 @@ export interface PeerServer {
  */
 export interface PeerDht {
   defaultKeyPair: PeerKeyPair
+  /** The UDP socket other peers reach this node on. */
+  io: { serverSocket: { address: () => { port: number } } }
   connect: (remotePublicKey: Buffer) => PeerStream
   createServer: (
     options: {
@@ -49,6 +51,11 @@ export interface PeerDht {
 
 export interface NetworkOptions {
   seed: Buffer
+  /**
+   * UDP port (or [from, to] range) to bind. hyperdht defaults to 49737 and
+   * the five ports above it; `[0, 0]` asks for any free port.
+   */
+  port?: number | [number, number]
   /** Local DHT bootstrap nodes; only tests set this. */
   bootstrap?: unknown[]
 }

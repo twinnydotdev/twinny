@@ -141,6 +141,8 @@ export interface P2pHostStatus {
   /** What paired devices see this machine as. */
   name: string
   peerId?: string
+  /** UDP port devices reach this computer on; what a firewall rule must allow. */
+  port: number
   ollamaUrl: string
   ollamaOk?: boolean
   /** The code to paste on another device, while a pairing window is open. */

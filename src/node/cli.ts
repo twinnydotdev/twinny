@@ -41,6 +41,7 @@ async function main() {
     seed,
     name: config.name,
     ollamaUrl: config.ollamaUrl,
+    port: config.port,
     trust
   })
 
@@ -121,6 +122,9 @@ async function main() {
   }
 
   await node.start()
+  out(`Port:    UDP ${node.port}  (devices connect here; allow it through any firewall,`)
+  out(`         e.g. sudo ufw allow ${node.port}/udp)`)
+  out()
   out("Waiting for connections...  (p pair, l list, r remove, q quit)")
   out()
 

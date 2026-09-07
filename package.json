@@ -468,6 +468,14 @@
           "markdownDescription": "Sets the port number for the Ollama API. The default is `11434`, but you can change it if your Ollama instance uses a different port.",
           "required": false
         },
+        "twinny.p2pPort": {
+          "order": 16,
+          "type": "number",
+          "default": 49737,
+          "minimum": 1,
+          "maximum": 65535,
+          "markdownDescription": "UDP port this computer listens on when sharing its Ollama with paired devices (Providers → Devices → Share). Devices on your network connect to this port, so a firewall on this computer must allow it, e.g. `sudo ufw allow 49737/udp`. Takes effect the next time sharing starts."
+        },
         "twinny.keepAlive": {
           "order": 17,
           "type": "string",
