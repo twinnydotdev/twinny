@@ -2,26 +2,25 @@ import { useEffect, useState } from "react"
 import i18next from "i18next"
 
 import { EVENT_NAME } from "../../common/constants"
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
+import { bridge, useServerEvent } from "../messaging"
 
 export const useLocale = () => {
   const [locale, setLocale] = useState<string>("en")
   const [renderKey, setRenderKey] = useState<number>(0)
+
+  const applyLocale = (next: string) => {
+    i18next.changeLanguage(next)
+    setLocale(next)
+    // Remounting the tree is how translated strings baked into component
+    // state get refreshed.
+    setRenderKey((key) => key + 1)
+  }
+
   useEffect(() => {
-    const messageHandler = (event: MessageEvent) => {
-      if (event.data.type === EVENT_NAME.twinnySetLocale) {
-        i18next.changeLanguage(event.data.data)
-        setLocale(event.data.data)
-        setRenderKey((prev: number) => prev + 1)
-      }
-    }
+    bridge.request(EVENT_NAME.twinntGetLocale).then(applyLocale)
+  }, [])
 
-    global.vscode.postMessage({ type: EVENT_NAME.twinntGetLocale })
+  useServerEvent(EVENT_NAME.twinnySetLocale, applyLocale)
 
-    window.addEventListener("message", messageHandler)
-    return () => window.removeEventListener("message", messageHandler)
-  }, [i18next])
   return { locale, renderKey }
 }

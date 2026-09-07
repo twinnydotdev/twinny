@@ -1,5 +1,5 @@
 import { ChatCompletionMessageParam, TokenJS } from "fluency.js"
-import { commands, ExtensionContext, Webview } from "vscode"
+import { commands, ExtensionContext } from "vscode"
 
 import {
   API_PROVIDERS,
@@ -10,8 +10,10 @@ import {
   USER,
   WEBUI_TABS
 } from "../common/constants"
-import { ClientMessage, ServerMessage, TemplateData } from "../common/types"
+import { PullRequestReviewRequest } from "../common/messaging/protocol"
+import { GitHubPr, TemplateData } from "../common/types"
 
+import { ExtensionBridge } from "./messaging/bridge"
 import { Chat } from "./chat"
 import { ConversationHistory } from "./conversation-history"
 import { TemplateProvider } from "./template-provider"
@@ -25,11 +27,11 @@ export class GithubService extends ConversationHistory {
 
   constructor(
     context: ExtensionContext,
-    webView: Webview,
+    bridge: ExtensionBridge,
     templateDir: string | undefined,
     chat: Chat
   ) {
-    super(context, webView, chat)
+    super(context, bridge, chat)
     this._templateProvider = new TemplateProvider(templateDir)
     const provider = this.getProvider()
     if (!provider) return
@@ -40,20 +42,19 @@ export class GithubService extends ConversationHistory {
     })
   }
 
-  setUpEventListeners() {
-    this.webView.onDidReceiveMessage(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      async (message: ClientMessage<any>) => {
-        switch (message.type) {
-          case GITHUB_EVENT_NAME.getPullRequests:
-            this.handleGetPullRequests(message.data)
-            break
-          case GITHUB_EVENT_NAME.getPullRequestReview:
-            this.handleGetPullRequestReview(message.data)
-            break
-        }
-      }
-    )
+  /**
+   * Deliberately replaces — not extends — the conversation-history table.
+   * `BaseProvider` builds a plain `ConversationHistory` alongside this
+   * subclass, and that instance already owns the conversation channels; the
+   * bridge would reject a second claim on them.
+   */
+  protected override registerHandlers() {
+    this.bridge.handleAll({
+      [GITHUB_EVENT_NAME.getPullRequests]: ({ owner, repo }) =>
+        this.handleGetPullRequests(owner, repo),
+      [GITHUB_EVENT_NAME.getPullRequestReview]: (request) =>
+        this.getPullRequestReview(request)
+    })
   }
 
   private async loadReviewTemplate(diff: string): Promise<string> {
@@ -63,38 +64,14 @@ export class GithubService extends ConversationHistory {
   }
 
   private async handleGetPullRequests(
-    data: { owner: string; repo: string } | undefined
+    owner: string | undefined,
+    repo: string | undefined
   ) {
-    if (!data) return
-    const prs = await this.getPullRequests(data.owner, data.repo)
-    this.webView.postMessage({
-      type: GITHUB_EVENT_NAME.getPullRequests,
-      data: prs
-    })
-  }
-
-  private async handleGetPullRequestReview(
-    data:
-      | {
-          owner: string
-          repo: string
-          number: number
-          title: string
-        }
-      | undefined
-  ) {
-    if (!data) return
-
-    const review = await this.getPullRequestReview(
-      data.owner,
-      data.repo,
-      data.number,
-      data.title
+    if (!owner || !repo) return
+    this.bridge.emit(
+      GITHUB_EVENT_NAME.getPullRequests,
+      await this.getPullRequests(owner, repo)
     )
-    this.webView.postMessage({
-      type: GITHUB_EVENT_NAME.getPullRequestReview,
-      data: review
-    })
   }
 
   getHeaders() {
@@ -105,26 +82,23 @@ export class GithubService extends ConversationHistory {
   }
 
   private focusChatTab = () => {
-    this.webView.postMessage({
-      type: EVENT_NAME.twinnySetTab,
-      data: WEBUI_TABS.chat
-    } as ServerMessage<string>)
+    this.bridge.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
   }
 
-  async getPullRequests(owner: string, repo: string) {
+  async getPullRequests(owner: string, repo: string): Promise<GitHubPr[]> {
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls`
     const response = await fetch(url, {
       headers: this.getHeaders()
     })
-    return response.json()
+    return response.json() as Promise<GitHubPr[]>
   }
 
-  async getPullRequestReview(
-    owner: string,
-    repo: string,
-    number: number,
-    title: string
-  ) {
+  async getPullRequestReview({
+    owner,
+    repo,
+    number,
+    title
+  }: PullRequestReviewRequest) {
     const headers = this.getHeaders()
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`
     const response = await fetch(url, {
@@ -145,14 +119,12 @@ export class GithubService extends ConversationHistory {
     this.resetConversation()
 
     setTimeout(async () => {
-      this.webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: prompt
+      this.bridge.emit(EVENT_NAME.twinnyAddMessage, {
+        role: USER,
+        content: prompt
       })
 
-      this.webView?.postMessage({
-        type: EVENT_NAME.twinnyOnLoading
-      })
+      this.bridge.emit(EVENT_NAME.twinnyOnLoading)
 
       commands.executeCommand(
         "setContext",
@@ -160,7 +132,7 @@ export class GithubService extends ConversationHistory {
         false
       )
 
-      updateLoadingMessage(this.webView, "Reviewing")
+      updateLoadingMessage(this.bridge, "Reviewing")
 
       await this.streamCodeReview(messages)
     }, 500)
@@ -207,12 +179,9 @@ export class GithubService extends ConversationHistory {
         this._completion += part.choices[0].delta.content
       }
 
-      this.webView.postMessage({
-        type: EVENT_NAME.twinnyOnCompletion,
-        data: {
-          role: ASSISTANT,
-          content: this._completion
-        }
+      this.bridge.emit(EVENT_NAME.twinnyOnCompletion, {
+        role: ASSISTANT,
+        content: this._completion
       })
     }
 

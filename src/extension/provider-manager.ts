@@ -1,9 +1,8 @@
-import { ReactNode } from "react"
 import { TokenJS } from "fluency.js"
 import { CompletionNonStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { TextEncoder } from "util"
 import { v4 as uuidv4 } from "uuid"
-import { ExtensionContext, Uri, Webview, window, workspace } from "vscode"
+import { ExtensionContext, Uri, window, workspace } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -19,27 +18,13 @@ import {
   TWINNY_PROVIDERS_FILENAME,
   WEBUI_TABS
 } from "../common/constants"
-import { ApiModel, ClientMessage, ServerMessage } from "../common/types"
+import { ApiModel, TwinnyProvider } from "../common/types"
 
+import { ExtensionBridge } from "./messaging/bridge"
 import { OllamaService } from "./ollama"
 import { getIsOpenAICompatible } from "./utils"
 
-export interface TwinnyProvider {
-  apiHostname?: string
-  apiKey?: string
-  apiPath?: string
-  apiPort?: number
-  apiProtocol?: string
-  features?: string[]
-  fimTemplate?: string
-  id: string
-  label: string
-  logo?: ReactNode
-  modelName: string
-  provider: string
-  repositoryLevel?: boolean
-  type: string
-}
+export type { TwinnyProvider }
 
 type Providers = Record<string, TwinnyProvider> | undefined
 
@@ -53,17 +38,17 @@ const FALLBACK_EMBEDDINGS_MODEL = "all-minilm:latest"
 
 export class ProviderManager {
   _context: ExtensionContext
-  _webView: Webview
+  _bridge: ExtensionBridge
   _storageLocation: string
 
-  constructor(context: ExtensionContext, webviewView: Webview) {
+  constructor(context: ExtensionContext, bridge: ExtensionBridge) {
     this._context = context
-    this._webView = webviewView
+    this._bridge = bridge
     this._storageLocation =
       workspace.getConfiguration("twinny").get("providerStorageLocation") ||
       "globalState"
     this._initializeProviders()
-    this.setUpEventListeners()
+    this.registerHandlers()
   }
 
   private async _initializeProviders(): Promise<void> {
@@ -98,48 +83,31 @@ export class ProviderManager {
     await this.getAllProviders()
   }
 
-  setUpEventListeners() {
-    this._webView?.onDidReceiveMessage(
-      async (message: ClientMessage<TwinnyProvider>) => {
-        await this.handleMessage(message)
-      }
-    )
-  }
-
-  async handleMessage(message: ClientMessage<TwinnyProvider>) {
-    const { data: provider } = message
-    switch (message.type) {
-      case PROVIDER_EVENT_NAME.addProvider:
-        return await this.addProvider(provider)
-      case PROVIDER_EVENT_NAME.removeProvider:
-        return await this.removeProvider(provider)
-      case PROVIDER_EVENT_NAME.updateProvider:
-        return await this.updateProvider(provider)
-      case PROVIDER_EVENT_NAME.getActiveChatProvider:
-        return this.getActiveChatProvider()
-      case PROVIDER_EVENT_NAME.getActiveFimProvider:
-        return this.getActiveFimProvider()
-      case PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider:
-        return this.getActiveEmbeddingsProvider()
-      case PROVIDER_EVENT_NAME.setActiveChatProvider:
-        return this.setActiveChatProvider(provider)
-      case PROVIDER_EVENT_NAME.setActiveFimProvider:
-        return this.setActiveFimProvider(provider)
-      case PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider:
-        return this.setActiveEmbeddingsProvider(provider)
-      case PROVIDER_EVENT_NAME.copyProvider:
-        return this.copyProvider(provider)
-      case PROVIDER_EVENT_NAME.getAllProviders:
-        return await this.getAllProviders()
-      case PROVIDER_EVENT_NAME.resetProvidersToDefaults:
-        return await this.resetProvidersToDefaults()
-      case PROVIDER_EVENT_NAME.exportProviders:
-        return await this.exportProviders()
-      case PROVIDER_EVENT_NAME.importProviders:
-        return await this.importProviders()
-      case PROVIDER_EVENT_NAME.testProvider:
-        return this.testProvider(provider)
-    }
+  private registerHandlers() {
+    this._bridge.handleAll({
+      [PROVIDER_EVENT_NAME.addProvider]: (p) => void this.addProvider(p),
+      [PROVIDER_EVENT_NAME.copyProvider]: (p) => this.copyProvider(p),
+      [PROVIDER_EVENT_NAME.exportProviders]: () => this.exportProviders(),
+      [PROVIDER_EVENT_NAME.getActiveChatProvider]: () =>
+        void this.getActiveChatProvider(),
+      [PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider]: () =>
+        void this.getActiveEmbeddingsProvider(),
+      [PROVIDER_EVENT_NAME.getActiveFimProvider]: () =>
+        void this.getActiveFimProvider(),
+      [PROVIDER_EVENT_NAME.getAllProviders]: () => this.getAllProviders(),
+      [PROVIDER_EVENT_NAME.importProviders]: () => this.importProviders(),
+      [PROVIDER_EVENT_NAME.removeProvider]: (p) => this.removeProvider(p),
+      [PROVIDER_EVENT_NAME.resetProvidersToDefaults]: () =>
+        this.resetProvidersToDefaults(),
+      [PROVIDER_EVENT_NAME.setActiveChatProvider]: (p) =>
+        void this.setActiveChatProvider(p),
+      [PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider]: (p) =>
+        void this.setActiveEmbeddingsProvider(p),
+      [PROVIDER_EVENT_NAME.setActiveFimProvider]: (p) =>
+        void this.setActiveFimProvider(p),
+      [PROVIDER_EVENT_NAME.testProvider]: (p) => this.testProvider(p),
+      [PROVIDER_EVENT_NAME.updateProvider]: (p) => this.updateProvider(p)
+    })
   }
 
   public async importProviders(): Promise<void> {
@@ -241,10 +209,7 @@ export class ProviderManager {
   }
 
   public focusProviderTab = () => {
-    this._webView.postMessage({
-      type: PROVIDER_EVENT_NAME.focusProviderTab,
-      data: WEBUI_TABS.providers
-    } as ServerMessage<string>)
+    this._bridge.emit(PROVIDER_EVENT_NAME.focusProviderTab, WEBUI_TABS.providers)
   }
 
   getTwinnyProvider() {
@@ -434,21 +399,17 @@ export class ProviderManager {
   }
 
   async getAllProviders() {
-    const providers = (await this.getProviders()) || {}
-    this._webView?.postMessage({
-      type: PROVIDER_EVENT_NAME.getAllProviders,
-      data: providers
-    })
+    this._bridge.emit(
+      PROVIDER_EVENT_NAME.getAllProviders,
+      (await this.getProviders()) || {}
+    )
   }
 
   getActiveChatProvider() {
     const provider = this._context.globalState.get<TwinnyProvider>(
       ACTIVE_CHAT_PROVIDER_STORAGE_KEY
     )
-    this._webView?.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveChatProvider,
-      data: provider
-    })
+    this._bridge.emit(PROVIDER_EVENT_NAME.getActiveChatProvider, provider)
     return provider
   }
 
@@ -456,10 +417,7 @@ export class ProviderManager {
     const provider = this._context.globalState.get<TwinnyProvider>(
       ACTIVE_FIM_PROVIDER_STORAGE_KEY
     )
-    this._webView?.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveFimProvider,
-      data: provider
-    })
+    this._bridge.emit(PROVIDER_EVENT_NAME.getActiveFimProvider, provider)
     return provider
   }
 
@@ -467,10 +425,7 @@ export class ProviderManager {
     const provider = this._context.globalState.get<TwinnyProvider>(
       ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
     )
-    this._webView?.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider,
-      data: provider
-    })
+    this._bridge.emit(PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider, provider)
     return provider
   }
 
@@ -681,10 +636,10 @@ export class ProviderManager {
 
   async testProvider(provider?: TwinnyProvider) {
     if (!provider) {
-      this._webView?.postMessage({
-        type: PROVIDER_EVENT_NAME.testProviderResult,
-        data: { success: false, error: "Provider details not provided." }
-      } as ServerMessage<{ success: boolean; error?: string }>)
+      this._bridge.emit(PROVIDER_EVENT_NAME.testProviderResult, {
+        success: false,
+        error: "Provider details not provided."
+      })
       return
     }
 
@@ -704,10 +659,9 @@ export class ProviderManager {
 
     try {
       await tokenJs.chat.completions.create(requestBody)
-      this._webView?.postMessage({
-        type: PROVIDER_EVENT_NAME.testProviderResult,
-        data: { success: true }
-      } as ServerMessage<{ success: boolean; error?: string }>)
+      this._bridge.emit(PROVIDER_EVENT_NAME.testProviderResult, {
+        success: true
+      })
     } catch (error) {
       let errorMessage = "An unknown error occurred."
       if (error instanceof Error) {
@@ -720,10 +674,10 @@ export class ProviderManager {
       } else if (typeof error === "string") {
         errorMessage = error
       }
-      this._webView?.postMessage({
-        type: PROVIDER_EVENT_NAME.testProviderResult,
-        data: { success: false, error: errorMessage }
-      } as ServerMessage<{ success: boolean; error?: string }>)
+      this._bridge.emit(PROVIDER_EVENT_NAME.testProviderResult, {
+        success: false,
+        error: errorMessage
+      })
     }
   }
 }

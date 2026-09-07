@@ -13,7 +13,6 @@ import {
   Range,
   Terminal,
   TextDocument,
-  Webview,
   window,
   workspace
 } from "vscode"
@@ -43,11 +42,11 @@ import {
   ChunkOptions,
   LanguageType,
   PrefixSuffix,
-  ServerMessage,
   StreamResponse,
   Theme
 } from "../common/types"
 
+import { ExtensionBridge } from "./messaging/bridge"
 import { getParser } from "./parser"
 import { TwinnyProvider } from "./provider-manager"
 
@@ -664,13 +663,10 @@ function simpleChunk(content: string, options: ChunkOptions): string[] {
 }
 
 export const updateLoadingMessage = (
-  webView: Webview | undefined,
+  bridge: ExtensionBridge | undefined,
   message: string
 ) => {
-  webView?.postMessage({
-    type: EVENT_NAME.twinnySendLoader,
-    data: message
-  } as ServerMessage<string>)
+  bridge?.emit(EVENT_NAME.twinnySendLoader, message)
 }
 
 export function getNonce() {

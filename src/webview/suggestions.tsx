@@ -8,12 +8,11 @@ import {
   useStorageContext
 } from "./hooks/useStorageContext"
 import { useTemplates } from "./hooks/useTemplates"
+import { emit } from "./messaging"
 import { kebabToSentence } from "./utils"
 
 import styles from "./styles/suggestions.module.css"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
   const templateContext = useStorageContext<string[]>(
     StorageType.Workspace,
@@ -25,10 +24,7 @@ export const Suggestions = ({ isDisabled }: { isDisabled?: boolean }) => {
   const handleOnClickSuggestion = (message: string) => {
     if (isDisabled) return
 
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyClickSuggestion,
-      data: message,
-    })
+    emit(EVENT_NAME.twinnyClickSuggestion, message)
   }
 
   const fixDeletedTemplates = (savedTemplates: string[]) => {

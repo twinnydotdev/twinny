@@ -1,8 +1,6 @@
 import * as path from "path"
 import * as vscode from "vscode"
 
-import { ClientMessage } from "../common/types"
-
 export class DiffManager {
   private _originalUri: vscode.Uri | undefined
   private _modifiedUri: vscode.Uri | undefined
@@ -27,7 +25,7 @@ export class DiffManager {
     }
   }
 
-  public async openDiff(message: ClientMessage) {
+  public async openDiff(proposed: string) {
     const editor = vscode.window.activeTextEditor
     if (!editor) return
 
@@ -59,7 +57,7 @@ export class DiffManager {
     )
     await vscode.workspace.fs.writeFile(
       this._modifiedUri,
-      Buffer.from(message.data as string, "utf8")
+      Buffer.from(proposed, "utf8")
     )
 
     const title = `Original ↔ Modified (${fileExtension})`
@@ -86,7 +84,7 @@ export class DiffManager {
     })
   }
 
-  public async acceptSolution(message: ClientMessage) {
+  public async acceptSolution(solution: string) {
     if (this._originalEditor) {
       const diffEditor = vscode.window.activeTextEditor
       if (diffEditor && diffEditor.document.uri.scheme === "diff") {
@@ -97,7 +95,7 @@ export class DiffManager {
       await this._originalEditor.edit((editBuilder: vscode.TextEditorEdit) => {
         const selection = this._originalEditor?.selection
         if (!selection) return
-        editBuilder.replace(selection, message.data as string)
+        editBuilder.replace(selection, solution)
       })
       await this.cleanupTempFiles()
     } else {
@@ -105,7 +103,7 @@ export class DiffManager {
       await editor?.edit((editBuilder: vscode.TextEditorEdit) => {
         const selection = editor?.selection
         if (!selection) return
-        editBuilder.replace(selection, message.data as string)
+        editBuilder.replace(selection, solution)
       })
     }
   }

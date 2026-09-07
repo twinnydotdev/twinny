@@ -2,7 +2,6 @@ import * as cheerio from "cheerio"
 import { CompletionResponseChunk, TokenJS } from "fluency.js"
 import {
   CompletionNonStreaming,
-  CompletionStreaming,
   LLMProvider
 } from "fluency.js/dist/chat"
 import * as fs from "fs/promises"
@@ -14,7 +13,6 @@ import {
   ExtensionContext,
   languages,
   StatusBarItem,
-  Webview,
   window,
   workspace
 } from "vscode"
@@ -40,18 +38,17 @@ import {
   ChatCompletionMessage,
   CompletionNonStreamingWithId,
   CompletionStreamingWithId,
-  ServerMessage,
-  TemplateData
+  MentionType,
+  TemplateData,
+  TwinnyProvider
 } from "../common/types"
 import { kebabToSentence } from "../webview/utils"
 
+import { ExtensionBridge } from "./messaging/bridge"
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
-import { FileHandler } from "./file-handler"
-import { TwinnyProvider } from "./provider-manager"
 import { Reranker } from "./reranker"
 import { TemplateProvider } from "./template-provider"
-import { FileTreeProvider } from "./tree"
 import {
   getIsOpenAICompatible,
   getLanguage,
@@ -64,36 +61,27 @@ export class Chat extends Base {
   private _controller?: AbortController
   private _conversation: ChatCompletionMessage[] = []
   private _db?: EmbeddingDatabase
-  private _fileTreeProvider = new FileTreeProvider()
-  private _functionArguments = ""
-  private _functionId = ""
-  private _functionName = ""
-  private _isCollectingFunctionArgs = false
-  private _lastStreamingRequest?: CompletionStreaming<LLMProvider>
-  private _lastRequest?: CompletionNonStreaming<LLMProvider>
   private _reranker: Reranker
   private _statusBar: StatusBarItem
   private _templateProvider?: TemplateProvider
   private _tokenJs: TokenJS | undefined
-  private _webView?: Webview
+  private _bridge: ExtensionBridge
   private _isCancelled = false
-  private _fileHandler: FileHandler
   private _workspaceName = sanitizeWorkspaceName(workspace.name)
 
   constructor(
     statusBar: StatusBarItem,
     templateDir: string | undefined,
     extensionContext: ExtensionContext,
-    webView: Webview,
+    bridge: ExtensionBridge,
     db: EmbeddingDatabase | undefined
   ) {
     super(extensionContext)
-    this._webView = webView
+    this._bridge = bridge
     this._statusBar = statusBar
     this._templateProvider = new TemplateProvider(templateDir)
     this._reranker = new Reranker()
     this._db = db
-    this._fileHandler = new FileHandler(webView)
   }
 
   private async getRelevantFiles(
@@ -248,13 +236,10 @@ export class Chat extends Base {
       if (delta?.content) {
         this._completion += delta.content
 
-        await this._webView?.postMessage({
-          type: EVENT_NAME.twinnyOnCompletion,
-          data: {
-            content: this._completion.trimStart() || " ",
-            role: ASSISTANT
-          }
-        } as ServerMessage<ChatCompletionMessage>)
+        this._bridge.emit(EVENT_NAME.twinnyOnCompletion, {
+          content: this._completion.trimStart() || " ",
+          role: ASSISTANT
+        })
       }
     } catch (error) {
       console.error("Error processing stream part:", error)
@@ -294,53 +279,33 @@ export class Chat extends Base {
 
   private async llmNoStream(requestBody: CompletionNonStreaming<LLMProvider>) {
     this._controller = new AbortController()
-
-    this._lastRequest = requestBody
     this._completion = ""
-    this._functionArguments = ""
-    this._functionName = ""
-    this._isCollectingFunctionArgs = false
 
     if (!this._tokenJs || this._isCancelled) return
 
     try {
       const result = await this._tokenJs.chat.completions.create(requestBody)
 
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
 
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: {
-          content: result.choices[0].message.content,
-          role: ASSISTANT
-        }
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+        content: result.choices[0].message.content,
+        role: ASSISTANT
+      })
     } catch (error) {
       this._controller?.abort()
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
 
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: {
-          content: error instanceof Error ? error.message : String(error),
-          role: ASSISTANT
-        }
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+        content: error instanceof Error ? error.message : String(error),
+        role: ASSISTANT
+      })
     }
   }
 
   private async llmStream(requestBody: CompletionStreamingWithId) {
     this._controller = new AbortController()
-
-    this._lastStreamingRequest = requestBody
     this._completion = ""
-    this._functionArguments = ""
-    this._functionName = ""
-    this._isCollectingFunctionArgs = false
 
     if (!this._tokenJs || this._isCancelled) return
 
@@ -389,47 +354,31 @@ export class Chat extends Base {
         })}`
       )
 
-      await this._webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: {
-          content: this._completion.trim(),
-          role: ASSISTANT
-        }
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+        content: this._completion.trim(),
+        role: ASSISTANT
+      })
 
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
 
       this._completion = ""
     } catch (error) {
       this._controller?.abort()
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyStopGeneration
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
 
-      this._webView?.postMessage({
-        type: EVENT_NAME.twinnyAddMessage,
-        data: {
-          content: error instanceof Error ? error.message : String(error),
-          role: ASSISTANT
-        }
-      } as ServerMessage<ChatCompletionMessage>)
+      this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+        content: error instanceof Error ? error.message : String(error),
+        role: ASSISTANT
+      })
     }
   }
 
   private sendEditorLanguage = () => {
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnySendLanguage,
-      data: getLanguage()
-    } as ServerMessage)
+    this._bridge.emit(EVENT_NAME.twinnySendLanguage, getLanguage())
   }
 
   private focusChatTab = () => {
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnySetTab,
-      data: WEBUI_TABS.chat
-    } as ServerMessage<string>)
+    this._bridge.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
   }
 
   getProblemsContext(): string {
@@ -469,7 +418,7 @@ export class Chat extends Base {
     let relevantCode: string | null = ""
 
     if (workspaceMentioned) {
-      updateLoadingMessage(this._webView, "Exploring knowledge base")
+      updateLoadingMessage(this._bridge, "Exploring knowledge base")
       relevantFiles = await this.getRelevantFiles(prompt)
       relevantCode = await this.getRelevantCode(prompt, relevantFiles)
     }
@@ -495,7 +444,7 @@ export class Chat extends Base {
     return combinedContext.trim() || null
   }
 
-  private async loadFileContents(files?: AnyContextItem[]): Promise<string> {
+  private async loadFileContents(files?: MentionType[]): Promise<string> {
     if (!files?.length) return ""
     let fileContents = ""
 
@@ -528,7 +477,7 @@ export class Chat extends Base {
 
   private async buildAdditionalContext(
     messageContent: string,
-    filePaths?: AnyContextItem[]
+    mentions?: MentionType[]
   ): Promise<string> {
     const editor = window.activeTextEditor
     const userSelection = editor?.document.getText(editor.selection)
@@ -541,7 +490,10 @@ export class Chat extends Base {
       this.context?.workspaceState.get<AnyContextItem[]>(
         WORKSPACE_STORAGE_KEY.contextItems
       ) || []
-    const allFilePaths = [...(filePaths || []), ...workspaceFiles]
+    const allFilePaths: MentionType[] = [
+      ...(mentions || []),
+      ...workspaceFiles
+    ]
 
     const fileContents = await this.loadFileContents(
       allFilePaths.filter(
@@ -562,7 +514,7 @@ export class Chat extends Base {
 
   private async buildConversation(
     messages: ChatCompletionMessage[],
-    fileContexts: AnyContextItem[] | undefined,
+    mentions: MentionType[] | undefined,
     id?: string
   ): Promise<ChatCompletionMessage[]> {
     const systemMessage: ChatCompletionMessage = {
@@ -575,7 +527,7 @@ export class Chat extends Base {
     const messageContent = lastMessage.content?.toString() || ""
     const additionalContext = await this.buildAdditionalContext(
       messageContent,
-      fileContexts
+      mentions
     )
 
     const conversation = [systemMessage, ...messages.slice(0, -1)]
@@ -700,16 +652,13 @@ export class Chat extends Base {
 
     this.focusChatTab()
 
-    this._webView?.postMessage({
-      type: EVENT_NAME.twinnyAddMessage,
-      data: {
-        role: USER,
-        content:
-          `${kebabToSentence(
-            template
-          )}\n\n\n<pre><code>${selection}</code></pre>`.trim() || " "
-      }
-    } as ServerMessage<ChatCompletionMessage>)
+    this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+      role: USER,
+      content:
+        `${kebabToSentence(
+          template
+        )}\n\n\n<pre><code>${selection}</code></pre>`.trim() || " "
+    })
 
     let ragContext = undefined
     if (["explain"].includes(template)) {
@@ -733,7 +682,7 @@ export class Chat extends Base {
 
   public async completion(
     messages: ChatCompletionMessage[],
-    fileContexts?: AnyContextItem[],
+    mentions?: MentionType[],
     conversationId?: string
   ) {
     this._completion = ""
@@ -748,7 +697,7 @@ export class Chat extends Base {
 
     this._conversation = await this.buildConversation(
       messages,
-      fileContexts,
+      mentions,
       conversationId
     )
 

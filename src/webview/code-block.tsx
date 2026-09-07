@@ -8,6 +8,7 @@ import { ASSISTANT, EVENT_NAME } from "../common/constants"
 import { LanguageType, Theme, ThemeType } from "../common/types"
 
 import { useTheme } from "./hooks/useTheme"
+import { emit } from "./messaging"
 import { useToast } from "./toast"
 import { getLanguageMatch } from "./utils"
 
@@ -20,9 +21,6 @@ interface CodeBlockProps {
   theme: ThemeType
   role: string | undefined
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 
 export const CodeBlock = (props: CodeBlockProps) => {
   const { t } = useTranslation()
@@ -37,26 +35,13 @@ export const CodeBlock = (props: CodeBlockProps) => {
     showToast(t("copied-to-clipboard"))
   }
 
-  const handleNewDocument = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyNewDocument,
-      data: String(children).replace(/^\n/, ""),
-    })
-  }
+  const code = () => String(children).replace(/^\n/, "")
 
-  const handleAccept = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyAcceptSolution,
-      data: String(children).replace(/^\n/, ""),
-    })
-  }
+  const handleNewDocument = () => emit(EVENT_NAME.twinnyNewDocument, code())
 
-  const handleOpenDiff = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyOpenDiff,
-      data: String(children).replace(/^\n/, ""),
-    })
-  }
+  const handleAccept = () => emit(EVENT_NAME.twinnyAcceptSolution, code())
+
+  const handleOpenDiff = () => emit(EVENT_NAME.twinnyOpenDiff, code())
 
   return (
     <>

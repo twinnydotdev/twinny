@@ -1,3 +1,4 @@
+import { ReactNode } from "react"
 import { ChatCompletionMessageParam } from "fluency.js"
 import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
@@ -223,6 +224,15 @@ export interface ApiModels {
   models: ApiModel[]
 }
 
+/** What one provider in the bundled model catalogue advertises. */
+export interface ModelCatalogueEntry {
+  models: string[]
+  supportsStreaming?: boolean | string[]
+}
+
+/** The bundled catalogue, keyed by provider id. */
+export type ModelCatalogue = Record<string, ModelCatalogueEntry>
+
 export type ResolvedInlineCompletion =
   | InlineCompletionItem[]
   | InlineCompletionList
@@ -244,6 +254,23 @@ export interface InteractionItem {
     line: number
     character: number
   }[]
+}
+
+export interface TwinnyProvider {
+  apiHostname?: string
+  apiKey?: string
+  apiPath?: string
+  apiPort?: number
+  apiProtocol?: string
+  features?: string[]
+  fimTemplate?: string
+  id: string
+  label: string
+  logo?: ReactNode
+  modelName: string
+  provider: string
+  repositoryLevel?: boolean
+  type: string
 }
 
 export interface InferenceProvider {
@@ -293,7 +320,11 @@ export interface SelectionContextItem extends ContextItem {
   };
 }
 
-export type AnyContextItem = SelectionContextItem;
+/**
+ * Anything that can sit in the workspace context list: a whole file, or a
+ * selected range within one.
+ */
+export type AnyContextItem = ContextItem | SelectionContextItem;
 
 export interface MentionType {
   name: string

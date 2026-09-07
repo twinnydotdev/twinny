@@ -20,10 +20,7 @@ import {
   WEBUI_TABS
 } from "./common/constants"
 import { logger } from "./common/logger"
-import {
-  FileContextItem,
-  SelectionContextItem,
-  ServerMessage} from "./common/types"
+import { ContextItem, SelectionContextItem } from "./common/types"
 import { setContext } from "./extension/context"
 import { EmbeddingDatabase } from "./extension/embeddings"
 import { FileInteractionCache } from "./extension/file-interaction"
@@ -135,10 +132,7 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_CONTEXT_NAME.twinnyManageProviders,
         true
       )
-      sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        data: WEBUI_TABS.providers
-      } as ServerMessage<string>)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.providers)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.embeddings, async () => {
       commands.executeCommand(
@@ -146,10 +140,7 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_CONTEXT_NAME.twinnyEmbeddingsTab,
         true
       )
-      sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        data: WEBUI_TABS.embeddings
-      } as ServerMessage<string>)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.embeddings)
     }),
     commands.registerCommand(
       TWINNY_COMMAND_NAME.conversationHistory,
@@ -159,10 +150,7 @@ export async function activate(context: ExtensionContext) {
           EXTENSION_CONTEXT_NAME.twinnyConversationHistory,
           true
         )
-        sidebarProvider.webView?.postMessage({
-          type: EVENT_NAME.twinnySetTab,
-          data: WEBUI_TABS.history
-        } as ServerMessage<string>)
+        sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.history)
       }
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.review, async () => {
@@ -171,10 +159,7 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_CONTEXT_NAME.twinnyReviewTab,
         true
       )
-      sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        data: WEBUI_TABS.review
-      } as ServerMessage<string>)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.review)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageTemplates, async () => {
       commands.executeCommand(
@@ -182,10 +167,7 @@ export async function activate(context: ExtensionContext) {
         EXTENSION_CONTEXT_NAME.twinnyManageTemplates,
         true
       )
-      sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        data: WEBUI_TABS.settings
-      } as ServerMessage<string>)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.settings)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.hideBackButton, () => {
       commands.executeCommand(
@@ -211,10 +193,7 @@ export async function activate(context: ExtensionContext) {
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openChat, () => {
       commands.executeCommand(TWINNY_COMMAND_NAME.hideBackButton)
-      sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        data: WEBUI_TABS.chat
-      } as ServerMessage<string>)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.settings, () => {
       vscode.commands.executeCommand(
@@ -232,15 +211,10 @@ export async function activate(context: ExtensionContext) {
       }
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
-      sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnyNewConversation
-      } as ServerMessage<string>)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnyNewConversation)
       sidebarProvider.conversationHistory?.resetConversation()
       sidebarProvider.chat?.resetConversation()
-      sidebarProvider.webView?.postMessage({
-        type: EVENT_NAME.twinnySetTab,
-        data: WEBUI_TABS.chat
-      } as ServerMessage<string>)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")
@@ -250,9 +224,9 @@ export async function activate(context: ExtensionContext) {
       const editor = window.activeTextEditor
       if (editor) {
         const filePath = workspace.asRelativePath(editor.document.uri.fsPath)
-        const fileContextItem: FileContextItem = {
+        const fileContextItem: ContextItem = {
           id: filePath, // Use filePath as the ID for files
-          category: "file",
+          category: "files",
           name: path.basename(editor.document.uri.fsPath),
           path: filePath
         }

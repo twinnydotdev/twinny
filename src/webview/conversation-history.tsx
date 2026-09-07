@@ -6,6 +6,7 @@ import { EVENT_NAME } from "../common/constants"
 import { Conversation } from "../common/types"
 
 import { useConversationHistory } from "./hooks/useConversationHistory"
+import { emit } from "./messaging"
 
 import styles from "./styles/conversation-history.module.css"
 
@@ -13,8 +14,6 @@ interface ConversationHistoryProps {
   onSelect: () => void
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   const { t } = useTranslation()
   const {
@@ -27,9 +26,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   const handleSetConversation = (conversation: Conversation) => {
     setActiveConversation(conversation)
     onSelect()
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyHideBackButton
-    })
+    emit(EVENT_NAME.twinnyHideBackButton)
   }
 
   const handleRemoveConversation = (

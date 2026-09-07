@@ -17,11 +17,9 @@ import { v4 as uuidv4 } from "uuid"
 import { EVENT_NAME, USER } from "../common/constants"
 import {
   ChatCompletionMessage,
-  ClientMessage,
   ContextItem,
   ImageAttachment,
-  MentionType,
-  ServerMessage
+  MentionType
 } from "../common/types"
 
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
@@ -32,6 +30,7 @@ import { useTheme } from "./hooks/useTheme"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
+import { emit, useServerEvent } from "./messaging"
 import { ProviderSelect } from "./provider-select"
 import { Suggestions } from "./suggestions"
 import { CustomKeyMap } from "./utils"
@@ -41,9 +40,6 @@ import styles from "./styles/chat.module.css"
 interface ChatProps {
   fullScreen?: boolean
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 
 export const Chat = (props: ChatProps): JSX.Element => {
   const { fullScreen } = props
@@ -67,8 +63,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
 
-  const handleAddMessage = (message: ServerMessage<ChatCompletionMessage>) => {
-    if (!message.data) {
+  const handleAddMessage = (incoming: ChatCompletionMessage | undefined) => {
+    if (!incoming) {
       setCompletion(null)
       setIsLoading(false)
       generatingRef.current = false
@@ -76,12 +72,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
 
     setMessages((prev) => {
-      if (message.data.id) {
-        const existingIndex = prev?.findIndex((m) => m.id === message.data.id)
+      if (incoming.id) {
+        const existingIndex = prev?.findIndex((m) => m.id === incoming.id)
 
         if (existingIndex !== -1) {
           const updatedMessages = [...(prev || [])]
-          updatedMessages[existingIndex || 0] = message.data
+          updatedMessages[existingIndex || 0] = incoming
 
           saveLastConversation({
             ...conversation,
@@ -91,7 +87,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         }
       }
 
-      const messages = [...(prev || []), message.data]
+      const messages = [...(prev || []), incoming]
       saveLastConversation({
         ...conversation,
         messages: messages
@@ -108,64 +104,43 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(false)
   }
 
-  const handleCompletionMessage = (
-    message: ServerMessage<ChatCompletionMessage>
-  ) => {
-    setCompletion(message.data)
-  }
+  useServerEvent(EVENT_NAME.twinnyAddMessage, (incoming) => {
+    generatingRef.current = true
+    handleAddMessage(incoming)
+  })
 
-  const handleLoadingMessage = () => {
-    setIsLoading(true)
-  }
+  useServerEvent(EVENT_NAME.twinnyOnCompletion, setCompletion)
 
-  const messageEventHandler = (event: MessageEvent) => {
-    const message: ServerMessage = event.data
-    switch (message.type) {
-      case EVENT_NAME.twinnyAddMessage: {
-        generatingRef.current = true
-        handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
-        break
-      }
-      case EVENT_NAME.twinnyOnCompletion: {
-        handleCompletionMessage(message as ServerMessage<ChatCompletionMessage>)
-        break
-      }
-      case EVENT_NAME.twinnyOnLoading: {
-        handleLoadingMessage()
-        break
-      }
-      case EVENT_NAME.twinnyNewConversation: {
-        setMessages([])
-        setCompletion(null)
-        setActiveConversation({
-          id: uuidv4(),
-          title: t("chat-new-conversation-title"),
-          messages: []
-        })
-        generatingRef.current = false
-        setIsLoading(false)
-        chatRef.current?.focus()
-        setTimeout(() => {
-          stopRef.current = false
-        }, 1000)
-        break
-      }
-      case EVENT_NAME.twinnyStopGeneration: {
-        setIsLoading(false)
-        setCompletion(null)
-        stopRef.current = false
-        generatingRef.current = false
-        setTimeout(() => {
-          chatRef.current?.focus()
-        }, 200)
-      }
-    }
-  }
+  useServerEvent(EVENT_NAME.twinnyOnLoading, () => setIsLoading(true))
+
+  useServerEvent(EVENT_NAME.twinnyNewConversation, () => {
+    setMessages([])
+    setCompletion(null)
+    setActiveConversation({
+      id: uuidv4(),
+      title: t("chat-new-conversation-title"),
+      messages: []
+    })
+    generatingRef.current = false
+    setIsLoading(false)
+    chatRef.current?.focus()
+    setTimeout(() => {
+      stopRef.current = false
+    }, 1000)
+  })
+
+  useServerEvent(EVENT_NAME.twinnyStopGeneration, () => {
+    setIsLoading(false)
+    setCompletion(null)
+    stopRef.current = false
+    generatingRef.current = false
+    setTimeout(() => {
+      chatRef.current?.focus()
+    }, 200)
+  })
 
   const handleStopGeneration = useCallback(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration
-    } as ClientMessage)
+    emit(EVENT_NAME.twinnyStopGeneration)
   }, [])
 
   const handleRegenerateMessage = (
@@ -178,12 +153,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
       if (!prev) return prev
       const updatedMessages = prev.slice(0, index)
 
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversation?.id
-      } as ClientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: mentions || [],
+        conversationId: conversation?.id
+      })
 
       return updatedMessages
     })
@@ -231,12 +205,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
         }
       ]
 
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversation?.id
-      } as ClientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: mentions || [],
+        conversationId: conversation?.id
+      })
 
       return updatedMessages
     })
@@ -304,21 +277,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
         title: conversation?.title || t("chat-new-conversation-title")
       };
 
-      const clientMessage: ClientMessage<
-        ChatCompletionMessage[],
-        MentionType[]
-      > = {
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversationId,
-      }
-
       imagesRef.current = []
       saveLastConversation(currentConversation)
       setActiveConversation(currentConversation)
 
-      global.vscode.postMessage(clientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions,
+        conversationId
+      })
 
       return updatedMessages
     })
@@ -334,36 +301,21 @@ export const Chat = (props: ChatProps): JSX.Element => {
       messages: []
     });
 
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyNewConversation
-    })
+    emit(EVENT_NAME.twinnyNewConversation)
   }, [setActiveConversation, t])
 
   const handleOpenFile = useCallback((filePath: string) => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyOpenFile,
-      data: filePath
-    })
+    emit(EVENT_NAME.twinnyOpenFile, filePath)
   }, [])
 
-  useEffect(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyHideBackButton
-    })
-  }, [])
+  useEffect(() => emit(EVENT_NAME.twinnyHideBackButton), [])
 
   useEffect(() => {
-    if (editorRef.current) {
-      global.vscode.postMessage({ type: EVENT_NAME.twinnySidebarReady })
-    }
+    if (editorRef.current) emit(EVENT_NAME.twinnySidebarReady)
   }, [editorRef.current])
 
   useEffect(() => {
-    window.addEventListener("message", messageEventHandler)
     editorRef.current?.commands.focus()
-    return () => {
-      window.removeEventListener("message", messageEventHandler)
-    }
   }, [])
 
   useEffect(() => {

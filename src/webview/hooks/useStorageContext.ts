@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import { EVENT_NAME } from "../../common/constants"
-import { ServerMessage } from "../../common/types"
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
+import { ClientEventName } from "../../common/messaging/protocol"
+import { bridge, useServerEvent } from "../messaging"
 
 export enum StorageType {
   Global = "global",
@@ -12,61 +10,69 @@ export enum StorageType {
   Workspace = "workspace"
 }
 
-interface StorageEventNames {
-  listen: string
-  fetch: string
-  store: string
+/**
+ * Each scope is one read channel and one write channel. The read channel
+ * doubles as the change broadcast, so a value written by one component
+ * reaches every other component watching the same key.
+ *
+ * This used to be three channels per *key* — `twinny-global-context-<key>` —
+ * because the transport had no way to say which request a reply belonged to.
+ * The bridge correlates replies by id now, so the key is payload, not name.
+ */
+const CHANNELS: Record<
+  StorageType,
+  { read: ClientEventName; write: ClientEventName }
+> = {
+  [StorageType.Global]: {
+    read: EVENT_NAME.twinnyGlobalContext,
+    write: EVENT_NAME.twinnySetGlobalContext
+  },
+  [StorageType.Session]: {
+    read: EVENT_NAME.twinnySessionContext,
+    write: EVENT_NAME.twinnySetSessionContext
+  },
+  [StorageType.Workspace]: {
+    read: EVENT_NAME.twinnyGetWorkspaceContext,
+    write: EVENT_NAME.twinnySetWorkspaceContext
+  }
 }
 
 export const useStorageContext = <T>(storageType: StorageType, key: string) => {
   const [context, setContextState] = useState<T | undefined>()
-
-  const eventNames = useMemo((): StorageEventNames => {
-    const eventMap = {
-      [StorageType.Global]: {
-        listen: `${EVENT_NAME.twinnyGlobalContext}-${key}`,
-        fetch: EVENT_NAME.twinnyGlobalContext,
-        store: EVENT_NAME.twinnySetGlobalContext
-      },
-      [StorageType.Session]: {
-        listen: `${EVENT_NAME.twinnySessionContext}-${key}`,
-        fetch: EVENT_NAME.twinnySessionContext,
-        store: EVENT_NAME.twinnySetSessionContext
-      },
-      [StorageType.Workspace]: {
-        listen: `${EVENT_NAME.twinnyGetWorkspaceContext}-${key}`,
-        fetch: EVENT_NAME.twinnyGetWorkspaceContext,
-        store: EVENT_NAME.twinnySetWorkspaceContext
-      }
-    }
-    return eventMap[storageType]
-  }, [storageType, key])
+  const { read, write } = CHANNELS[storageType]
 
   useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const message: ServerMessage = event.data
-      if (message?.type === eventNames.listen) {
-        setContextState(event.data.data)
-      }
+    let cancelled = false
+    bridge
+      .request(read as typeof EVENT_NAME.twinnyGlobalContext, { key })
+      .then(({ value }) => {
+        if (!cancelled) setContextState(value as T)
+      })
+    return () => {
+      cancelled = true
     }
+  }, [read, key])
 
-    window.addEventListener("message", handler)
-    global.vscode.postMessage({
-      type: eventNames.fetch,
-      key
-    })
+  useServerEvent(
+    read as typeof EVENT_NAME.twinnyGlobalContext,
+    useCallback(
+      (update) => {
+        if (update.key === key) setContextState(update.value as T)
+      },
+      [key]
+    )
+  )
 
-    return () => window.removeEventListener("message", handler)
-  }, [eventNames.listen, eventNames.fetch, key])
-
-  const setContext = (value: T) => {
-    setContextState(value)
-    global.vscode.postMessage({
-      type: eventNames.store,
-      key,
-      data: value
-    })
-  }
+  const setContext = useCallback(
+    (value: T) => {
+      setContextState(value)
+      bridge.emit(write as typeof EVENT_NAME.twinnySetGlobalContext, {
+        key,
+        value
+      })
+    },
+    [write, key]
+  )
 
   return { context, setContext }
 }

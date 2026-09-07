@@ -9,22 +9,14 @@ import {
   VSCodeTextField
 } from "@vscode/webview-ui-toolkit/react"
 
-import {
-  EVENT_NAME,
-  EXTENSION_CONTEXT_NAME,
-} from "../common/constants"
-import { ClientMessage } from "../common/types"
+import { EVENT_NAME, EXTENSION_CONTEXT_NAME } from "../common/constants"
 
 import { useProviders } from "./hooks/useProviders"
-import {
-  StorageType,
-  useStorageContext
-} from "./hooks/useStorageContext"
+import { StorageType, useStorageContext } from "./hooks/useStorageContext"
+import { emit } from "./messaging"
 
 import styles from "./styles/embedding-options.module.css"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 export const EmbeddingOptions = () => {
   const { t } = useTranslation()
   const {
@@ -73,9 +65,7 @@ export const EmbeddingOptions = () => {
   const embeddingProviders = Object.values(getProvidersByType("embedding"))
 
   const handleEmbedDocuments = () => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyEmbedDocuments
-    } as ClientMessage<string[]>)
+    emit(EVENT_NAME.twinnyEmbedDocuments)
   }
 
   const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {

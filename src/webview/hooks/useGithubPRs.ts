@@ -1,34 +1,21 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { GITHUB_EVENT_NAME } from "../../common/constants"
 import { GitHubPr } from "../../common/types"
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
+import { emit, useServerEvent } from "../messaging"
 
 export const useGithubPRs = () => {
-  const [prs, setPRs] = useState<Array<GitHubPr>>([])
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [prs, setPRs] = useState<GitHubPr[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const message = event.data
-      if (message.type === GITHUB_EVENT_NAME.getPullRequests) {
-        setPRs(message.data)
-        setIsLoading(false)
-      }
-    }
-
-    window.addEventListener("message", handler)
-    return () => window.removeEventListener("message", handler)
-  }, [])
+  useServerEvent(GITHUB_EVENT_NAME.getPullRequests, (pullRequests) => {
+    setPRs(pullRequests)
+    setIsLoading(false)
+  })
 
   const getPrs = (owner: string | undefined, repo: string | undefined) => {
     setIsLoading(true)
-    global.vscode.postMessage({
-      type: GITHUB_EVENT_NAME.getPullRequests,
-      data: { owner, repo }
-    })
+    emit(GITHUB_EVENT_NAME.getPullRequests, { owner, repo })
   }
 
   const startReview = (
@@ -38,17 +25,13 @@ export const useGithubPRs = () => {
     title: string
   ) => {
     if (selectedPR === null) return
-
-    global.vscode.postMessage({
-      type: GITHUB_EVENT_NAME.getPullRequestReview,
-      data: { owner, repo, number: selectedPR, title }
+    emit(GITHUB_EVENT_NAME.getPullRequestReview, {
+      owner,
+      repo,
+      number: selectedPR,
+      title
     })
   }
 
-  return {
-    prs,
-    isLoading,
-    getPrs,
-    startReview
-  }
+  return { prs, isLoading, getPrs, startReview }
 }

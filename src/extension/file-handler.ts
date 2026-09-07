@@ -4,10 +4,11 @@ import * as path from "path"
 import * as vscode from "vscode"
 
 import { EVENT_NAME } from "../common/constants"
-import { ServerMessage } from "../common/types"
+
+import { ExtensionBridge } from "./messaging/bridge"
 
 export class FileHandler {
-  constructor(private readonly _webview: vscode.Webview) {
+  constructor(private readonly _bridge: ExtensionBridge) {
     this.registerHandlers()
   }
 
@@ -72,8 +73,7 @@ export class FileHandler {
     return dirMatch
   }
 
-  public async handleOpenFile(message: ServerMessage<string>) {
-    const filePath = message.data
+  public async handleOpenFile(filePath: string) {
     if (filePath && vscode.workspace.workspaceFolders) {
       const fullPath = path.join(
         vscode.workspace.workspaceFolders[0].uri.fsPath,
@@ -115,12 +115,8 @@ export class FileHandler {
   }
 
   public registerHandlers() {
-    this._webview.onDidReceiveMessage(
-      async (message: ServerMessage<string>) => {
-        if (message.type === EVENT_NAME.twinnyOpenFile) {
-          await this.handleOpenFile(message as ServerMessage<string>)
-        }
-      }
+    this._bridge.handle(EVENT_NAME.twinnyOpenFile, (filePath) =>
+      this.handleOpenFile(filePath)
     )
   }
 }

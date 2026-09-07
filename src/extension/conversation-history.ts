@@ -1,5 +1,5 @@
 import { ChatCompletionMessageParam } from "fluency.js"
-import { ExtensionContext, Webview } from "vscode"
+import { ExtensionContext } from "vscode"
 
 import {
   ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
@@ -8,52 +8,44 @@ import {
   CONVERSATION_STORAGE_KEY,
   TITLE_GENERATION_PROMPT_MESAGE
 } from "../common/constants"
-import { ClientMessage, Conversation, ServerMessage } from "../common/types"
+import { Conversation, TwinnyProvider } from "../common/types"
 
+import { ExtensionBridge } from "./messaging/bridge"
 import { Base } from "./base"
 import { Chat } from "./chat"
-import { TwinnyProvider } from "./provider-manager"
 
 type Conversations = Record<string, Conversation> | undefined
 
 export class ConversationHistory extends Base {
-  public webView: Webview
+  public bridge: ExtensionBridge
   private _chatService: Chat
 
-  constructor(context: ExtensionContext, webView: Webview, chatService: Chat) {
+  constructor(
+    context: ExtensionContext,
+    bridge: ExtensionBridge,
+    chatService: Chat
+  ) {
     super(context)
-    this.webView = webView
+    this.bridge = bridge
     this._chatService = chatService
-    this.setUpEventListeners()
+    this.registerHandlers()
   }
 
-  setUpEventListeners() {
-    this.webView?.onDidReceiveMessage(
-      (message: ClientMessage<Conversation>) => {
-        this.handleMessage(message)
-      }
-    )
-  }
-
-  handleMessage(message: ClientMessage<Conversation>) {
-    const { type } = message
-    switch (type) {
-      case CONVERSATION_EVENT_NAME.getConversations:
-        return this.getAllConversations()
-      case CONVERSATION_EVENT_NAME.getActiveConversation:
-        return this.getActiveConversation()
-      case CONVERSATION_EVENT_NAME.setActiveConversation:
-        return this.setActiveConversation(message.data)
-      case CONVERSATION_EVENT_NAME.removeConversation:
-        return this.removeConversation(message.data)
-      case CONVERSATION_EVENT_NAME.saveConversation:
-        if (!message.data) return
-        return this.saveConversation(message.data)
-      case CONVERSATION_EVENT_NAME.clearAllConversations:
-        return this.clearAllConversations()
-      default:
-      // do nothing
-    }
+  protected registerHandlers() {
+    this.bridge.handleAll({
+      [CONVERSATION_EVENT_NAME.getConversations]: () =>
+        this.getAllConversations(),
+      [CONVERSATION_EVENT_NAME.getActiveConversation]: () =>
+        void this.getActiveConversation(),
+      [CONVERSATION_EVENT_NAME.setActiveConversation]: (conversation) =>
+        this.setActiveConversation(conversation),
+      [CONVERSATION_EVENT_NAME.removeConversation]: (conversation) =>
+        this.removeConversation(conversation),
+      [CONVERSATION_EVENT_NAME.saveConversation]: (conversation) =>
+        conversation && void this.saveConversation(conversation),
+      [CONVERSATION_EVENT_NAME.clearAllConversations]: () =>
+        this.clearAllConversations()
+    })
   }
 
   public getProvider = () => {
@@ -77,11 +69,10 @@ export class ConversationHistory extends Base {
   }
 
   getAllConversations() {
-    const conversations = this.getConversations() || {}
-    this.webView?.postMessage({
-      type: CONVERSATION_EVENT_NAME.getConversations,
-      data: conversations
-    })
+    this.bridge.emit(
+      CONVERSATION_EVENT_NAME.getConversations,
+      this.getConversations() || {}
+    )
   }
 
   getConversations(): Conversations {
@@ -115,10 +106,10 @@ export class ConversationHistory extends Base {
       conversation
     )
 
-    this.webView?.postMessage({
-      type: CONVERSATION_EVENT_NAME.setActiveConversation,
-      data: conversation
-    } as ServerMessage<Conversation>)
+    this.bridge.emit(
+      CONVERSATION_EVENT_NAME.setActiveConversation,
+      conversation
+    )
 
     this.getAllConversations()
   }
