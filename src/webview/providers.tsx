@@ -176,9 +176,9 @@ export const Providers = () => {
                   <i className="codicon codicon-cloud-download" />
                   {t("export")}
                 </VSCodeButton>
-                <VSCodeButton appearance="secondary" onClick={handleReset} title={t("reset-providers")}>
+                <VSCodeButton appearance="secondary" onClick={handleReset} title={t("reset")}>
                   <i className="codicon codicon-refresh" />
-                  {t("reset-providers")}
+                  {t("reset")}
                 </VSCodeButton>
               </div>
             </div>

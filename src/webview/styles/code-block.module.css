@@ -1,31 +1,66 @@
+/*
+ * Code blocks are the one place the transcript is allowed extra weight: a
+ * hairline frame and a slightly lifted ground, no radius, no shadow.
+ */
 pre {
-  background: var(--vscode-textCodeBlock-background);
-  border-radius: 8px;
-  padding: 12px;
   margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--tw-rule);
+  background: var(--tw-surface) !important;
   overflow-x: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  font-family: inherit;
+  font-family: var(--tw-font) !important;
+  font-size: var(--tw-fs-sm) !important;
+  line-height: 1.55 !important;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-code {
-  font-family: inherit !important;
-  font-size: .85rem !important;
-  background: transparent !important;
 }
 
 pre code,
 pre code span,
 pre code * {
+  font-family: var(--tw-font) !important;
+  font-size: var(--tw-fs-sm) !important;
+  background: transparent !important;
   white-space: pre-wrap !important;
   word-break: break-word !important;
 }
 
+.codeBlock {
+  position: relative;
+  margin: 12px 0;
+}
+
+.codeBlock pre {
+  margin: 0;
+}
+
+/* Language tag + actions share one strip that only lights up on hover. */
+.codeBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 3px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}
+
+.codeLang {
+  text-transform: lowercase;
+  user-select: none;
+}
+
 .codeOptions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 3px;
-  margin: 10px 0;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.codeBlock:hover .codeOptions,
+.codeBlock:focus-within .codeOptions {
+  opacity: 1;
 }

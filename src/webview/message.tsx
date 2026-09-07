@@ -438,7 +438,14 @@ export const Message: React.FC<MessageProps> = ({
         />
       )}
       <div className={styles.messageRole}>
-        <span>{message.role === ASSISTANT ? TWINNY : YOU}</span>
+        <span className={styles.roleLabel}>
+          {message.role !== ASSISTANT && (
+            <span className={styles.rolePrompt} aria-hidden="true">
+              &#10095;
+            </span>
+          )}
+          {message.role === ASSISTANT ? TWINNY : YOU}
+        </span>
         <div className={styles.messageOptions}>
           <VSCodeButton
             title={t("copy-code")}

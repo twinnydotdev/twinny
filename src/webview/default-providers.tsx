@@ -16,7 +16,6 @@ import {
   SvgOpenAI,
   SvgOpenRouter,
   SvgPerplexity,
-  SvgTwinny,
 } from "./icons"
 
 import styles from "./styles/providers.module.css"
@@ -25,17 +24,6 @@ interface ProviderSelectProps {
   onSelect: (provider: TwinnyProvider) => void
 }
 const providers: TwinnyProvider[] = [
-  {
-    label: "providers-twinny-name",
-    apiHostname: "twinny.dev",
-    apiPath: "/v1",
-    logo: <SvgTwinny />,
-    apiProtocol: "https",
-    modelName: "",
-    id: "twinny",
-    provider: API_PROVIDERS.Twinny,
-    type: "chat",
-  },
   {
     label: "providers-ollama-name",
     logo: <SvgOllama />,

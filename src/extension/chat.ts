@@ -607,10 +607,6 @@ export class Chat extends Base {
       provider: this.getProviderType(provider) as any
     }
 
-    if (provider.provider !== API_PROVIDERS.Twinny) {
-      delete request.id
-    }
-
     return request
   }
 

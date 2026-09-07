@@ -212,18 +212,6 @@ export class ProviderManager {
     this._bridge.emit(PROVIDER_EVENT_NAME.focusProviderTab, WEBUI_TABS.providers)
   }
 
-  getTwinnyProvider() {
-    return {
-      apiHostname: "twinny.dev",
-      apiPath: "/v1",
-      apiProtocol: "https",
-      id: "twinny-default",
-      label: "Twinny.dev",
-      modelName: "llama3.2:latest",
-      provider: API_PROVIDERS.Twinny,
-      type: "chat"
-    } as TwinnyProvider
-  }
 
   getOllamaConnection() {
     const config = workspace.getConfiguration("twinny")
@@ -300,7 +288,6 @@ export class ProviderManager {
     await this.addDefaultChatProvider(installedModels)
     await this.addDefaultFimProvider(installedModels)
     await this.addDefaultEmbeddingsProvider(installedModels)
-    await this.addTwinnyProvider()
   }
 
   async addDefaultLocalProvider(
@@ -343,17 +330,6 @@ export class ProviderManager {
     ) {
       await this.addDefaultProvider(provider)
     }
-    return provider
-  }
-
-  async addTwinnyProvider(): Promise<TwinnyProvider | null> {
-    const provider = this.getTwinnyProvider()
-    const providers = await this.getProviders()
-    if (!providers) return await this.addProvider(provider)
-    const twinnyProvider = Object.values(providers).find(
-      (p) => p.apiHostname === "twinny.dev"
-    )
-    if (!twinnyProvider) await this.addProvider(provider)
     return provider
   }
 
@@ -580,7 +556,6 @@ export class ProviderManager {
     const embeddingsProvider = await this.addDefaultEmbeddingsProvider(
       installedModels
     )
-    await this.addProvider(this.getTwinnyProvider())
 
     this.focusProviderTab()
 

@@ -2,6 +2,8 @@ import { createRoot } from "react-dom/client"
 
 import { Main } from "./main"
 
+import "./styles/theme.css"
+
 const container = document.querySelector("#root")
 const panelContainer = document.querySelector("#root-panel")
 

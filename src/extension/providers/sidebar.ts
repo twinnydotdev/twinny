@@ -103,7 +103,7 @@ export class SidebarProvider extends BaseProvider {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>twinny</title>
           <style>
-            body { padding: 10px }
+            body { padding: 0 }
           </style>
       </head>
       <body>

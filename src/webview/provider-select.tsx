@@ -48,24 +48,6 @@ export const ProviderSelect = () => {
     setContext: setSelectedModel
   } = useStorageContext<string>(StorageType.Global, GLOBAL_STORAGE_KEY.selectedModel)
 
-  const isOllamaProvider = effectiveProvider?.provider === API_PROVIDERS.Ollama
-  const currentModel = selectedModel || effectiveProvider?.modelName
-
-  // Ollama reports the models which are actually installed, so a provider
-  // pointing at a model which is not in that list (the first run defaults, for
-  // example) can only ever 404. Fall back to an installed model instead.
-  React.useEffect(() => {
-    if (!effectiveProvider || !isOllamaProvider) return
-    if (!providerModels.length) return
-    if (currentModel && providerModels.includes(currentModel)) return
-    const installedModel = providerModels[0]
-    setSelectedModel(installedModel)
-    setActiveChatProvider({
-      ...effectiveProvider,
-      modelName: installedModel
-    })
-  }, [effectiveProvider?.id, isOllamaProvider, currentModel, providerModels.join(",")])
-
   const handleChangeChatProvider = (e: unknown): void => {
     const event = e as React.ChangeEvent<HTMLSelectElement>
     const value = event.target.value

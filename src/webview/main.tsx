@@ -13,6 +13,8 @@ import { Providers } from "./providers"
 import { Review } from "./review"
 import { Settings } from "./settings"
 
+import styles from "./styles/main.module.css"
+
 const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.settings]: <Settings />,
   [WEBUI_TABS.providers]: <Providers />,
@@ -38,7 +40,11 @@ export const Main = ({ fullScreen }: MainProps) => {
   }
 
   if (tab === WEBUI_TABS.history) {
-    return <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
+    return (
+      <div className={styles.page}>
+        <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
+      </div>
+    )
   }
 
   const allTabs = { ...tabs, ...tabsWithProps }
@@ -46,7 +52,11 @@ export const Main = ({ fullScreen }: MainProps) => {
   const element: JSX.Element = allTabs[tab]
 
   return (
-    <div key={renderKey} data-locale={locale}>
+    <div
+      key={renderKey}
+      data-locale={locale}
+      className={tab === WEBUI_TABS.chat ? undefined : styles.page}
+    >
       {element}
     </div>
   )

@@ -1,76 +1,194 @@
-.message-container {
-  display: flex;
-  flex-direction: column;
-}
-
+/*
+ * A message is a block in a transcript, not a bubble. User turns carry a left
+ * rule and a prompt glyph (input); assistant turns are flush (output).
+ */
 .message {
-  font-size: .85rem;
-  line-height: 1.5;
-  padding: 12px 8px;
-  margin-right: 10px;
+  position: relative;
+  padding: 12px var(--tw-pad) 14px calc(var(--tw-pad) + var(--tw-gutter));
+  font-size: var(--tw-fs);
+  line-height: var(--tw-lh);
+  border-bottom: 1px solid var(--tw-rule-soft);
+  overflow-wrap: anywhere;
 }
 
-.message:first-child {
-  border-top: none;
-}
-
-.userMessage {
-  border-bottom: 1px solid var(--vscode-editorWidget-border);
+.userMessage::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: var(--tw-pad);
+  width: 1px;
+  background: var(--tw-rule);
 }
 
 .messageRole {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
-  font-weight: 600;
+  gap: 8px;
+  min-height: 18px;
+  margin-bottom: 8px;
 }
 
-.userMessage .mention {
-  margin-left: 2px;
+.roleLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  font-weight: 400;
+  letter-spacing: var(--tw-track);
+  text-transform: lowercase;
+  user-select: none;
+}
+
+.rolePrompt {
+  color: var(--tw-cursor);
+}
+
+/* Row actions stay out of the way until the message is under the cursor. */
+.messageOptions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.message:hover .messageOptions,
+.message:focus-within .messageOptions {
+  opacity: 1;
 }
 
 .thinkingSection {
-  background: var(--vscode-editor-background);
-  color: var(--vscode-descriptionForeground);
-  font-size: var(--small-font-size);
-  border-radius: 8px;
-  padding: 8px;
   margin-bottom: 12px;
+  padding-left: 10px;
+  border-left: 1px solid var(--tw-rule);
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-sm);
 }
 
 .thinkingHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px;
-  border-radius: 4px;
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: lowercase;
   cursor: pointer;
   user-select: none;
-  transition: background-color 0.2s ease;
+  transition: color 0.12s ease;
 }
 
 .thinkingHeader:hover {
-  background: var(--vscode-inputOption-hoverBackground);
+  color: var(--tw-fg-dim);
 }
 
 .thinkingContent {
   overflow: hidden;
-  transition: all 0.3s ease-out;
-  opacity: 1;
   margin-top: 8px;
+  opacity: 1;
+  transition: opacity 0.2s ease-out, max-height 0.2s ease-out;
 }
 
 .thinkingContent.collapsed {
-  opacity: 0;
   max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+}
+
+/* Markdown rendered inside a message. */
+.message p {
+  margin: 0 0 0.9em;
+}
+
+.message p:last-child {
+  margin-bottom: 0;
+}
+
+.message h1,
+.message h2,
+.message h3,
+.message h4,
+.message h5,
+.message h6 {
+  margin: 1.4em 0 0.6em;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: lowercase;
+  color: var(--tw-fg);
+}
+
+.message h1:first-child,
+.message h2:first-child,
+.message h3:first-child {
   margin-top: 0;
 }
 
-.messageOptions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+.message ul,
+.message ol {
+  margin: 0 0 0.9em;
+  padding-left: 1.4em;
+}
+
+.message li {
+  position: relative;
+  margin: 0.2em 0;
+}
+
+.message ul {
+  list-style: none;
+}
+
+.message ul > li::before {
+  content: "–";
+  position: absolute;
+  margin-left: -1.4em;
+  color: var(--tw-fg-faint);
+}
+
+.message blockquote {
+  margin: 0 0 0.9em;
+  padding-left: 10px;
+  border-left: 1px solid var(--tw-rule);
+  color: var(--tw-fg-dim);
+}
+
+.message hr {
+  height: 0;
+  margin: 1.2em 0;
+  border: 0;
+  border-top: 1px solid var(--tw-rule-soft);
+}
+
+.message table {
+  width: 100%;
+  margin: 0 0 0.9em;
+  border-collapse: collapse;
+  font-size: var(--tw-fs-sm);
+}
+
+.message th,
+.message td {
+  padding: 4px 8px;
+  border: 1px solid var(--tw-rule-soft);
+  text-align: left;
+}
+
+.message th {
+  color: var(--tw-fg-dim);
+  font-weight: 400;
+  letter-spacing: var(--tw-track);
+}
+
+/* Inline code — distinguished by colour, not by a box. */
+.message :not(pre) > code {
+  padding: 0;
+  background: transparent !important;
+  color: var(--tw-code);
+  font-family: var(--tw-font);
+  font-size: inherit !important;
 }
 
 .messageContent img {
@@ -78,84 +196,48 @@
   max-width: 100%;
   height: auto;
   margin: 8px 0;
-  border-radius: 4px;
+  border: 1px solid var(--tw-rule);
 }
 
 .imageGallery {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
   margin-top: 10px;
 }
 
 .imageContainer {
   position: relative;
   display: inline-block;
-  width: 150px;
-  height: 150px;
-  border-radius: 4px;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--tw-rule);
   overflow: hidden;
 }
 
 .chatImageSquare {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 4px;
 }
 
-.imageDeleteButton {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 20px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 2;
-  transition: background-color 0.2s;
-}
-
-.imageDeleteButton:hover {
-  background: rgba(255, 0, 0, 0.7);
-}
-
+/* Inline editor shown when a user message is being edited. */
 .tiptap {
   width: 100%;
-  min-width: var(--input-min-width);
-  min-height: 60px;
-  padding: 7px;
-  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
-  border-radius: 6px;
-  background: var(--input-background);
-  color: var(--input-foreground);
-  font-family: var(--vscode-font-family);
-  font-size: .85rem;
-  line-height: var(--type-ramp-base-line-height);
-  resize: none;
+  padding: 8px;
+  border: 1px solid var(--tw-accent-soft);
+  background: var(--tw-surface);
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  line-height: var(--tw-lh);
   outline: none;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
   box-sizing: border-box;
-}
-
-.tiptap:focus {
-  border-color: var(--vscode-focusBorder);
-  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
 }
 
 .tiptap p {
   margin: 0;
-}
-
-.tiptap:first-child {
-  margin-top: 0;
 }
 
 .editor {

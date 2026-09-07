@@ -2,124 +2,51 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  height: 95vh;
+  height: 100vh;
   width: 100%;
+  overflow: hidden;
 }
 
 .fullScreenActions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
-  margin-top: 20px;
+  gap: 2px;
+  padding: 4px var(--tw-pad);
+  border-bottom: 1px solid var(--tw-rule-soft);
 }
 
-.markdown,
-.markdownFullScreen {
-  flex-grow: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  font-size: .85rem;
-  margin-top: 20px;
-}
-
-.markdown {
-  padding-top: 20px;
-}
-
-.markdown::-webkit-scrollbar,
-.markdownFullScreen::-webkit-scrollbar {
-  width: 8px;
-}
-
-.markdown::-webkit-scrollbar-track,
-.markdownFullScreen::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.markdown::-webkit-scrollbar-thumb,
-.markdownFullScreen::-webkit-scrollbar-thumb {
-  background: var(--vscode-scrollbarSlider-background);
-  border-radius: 4px;
-}
-
-.markdown::-webkit-scrollbar-thumb:hover,
-.markdownFullScreen::-webkit-scrollbar-thumb:hover {
-  background: var(--vscode-scrollbarSlider-hoverBackground);
-}
-
-.title {
-  position: absolute;
-  top: 0px;
-  left: 10px;
-  width: calc(100% - 20px);
-  height: 30px;
-  margin: 0 0 10px;
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 30px;
-  color: var(--vscode-textPreformat-foreground);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  z-index: 2;
-}
-
-.title p {
-  margin: 0;
-}
-
-.chatOptions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-}
-
-.chatOptions > div {
-  gap: 6px;
-}
-
-.chatOptions svg {
-  width: 18px;
-  height: 18px;
-}
-
-.chatOptions vscode-badge {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/*
+ * Context chips: a wrapping row of paths, sitting above the transcript.
+ * Underlined rather than boxed, so a long list reads as a list of files.
+ */
 .contextItems {
   display: flex;
-  margin-top: 20px;
-  padding-bottom: 5px;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px 14px;
+  padding: 8px var(--tw-pad);
+  border-bottom: 1px solid var(--tw-rule-soft);
 }
 
 .contextItem {
   display: flex;
   align-items: center;
-  padding: 4px 6px;
-  background-color: var(--vscode-editorWidget-background);
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease-in-out;
   min-width: 0;
-  max-width: 200px;
+  max-width: 220px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.contextItem:hover {
+  color: var(--tw-fg);
 }
 
 .contextItemIcon {
   flex-shrink: 0;
-  margin-right: 4px;
+  margin-right: 6px;
+  opacity: 0.55;
 }
 
 .contextItemName {
@@ -128,125 +55,156 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-right: 4px;
 }
 
 .contextItemClose {
   flex-shrink: 0;
-  padding: 2px;
-  border-radius: 2px;
-  transition: background-color 0.2s ease;
+  margin-left: 6px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.contextItem:hover .contextItemClose {
+  opacity: 0.6;
 }
 
 .contextItemClose:hover {
-  background-color: var(--vscode-toolbar-hoverBackground);
+  opacity: 1 !important;
+  color: var(--vscode-errorForeground);
 }
 
-.scrollToBottom {
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
+.transcript {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.scrollToBottom:hover {
-  opacity: 1;
+/*
+ * Status strip between the transcript and the composer. Empty most of the
+ * time, so it collapses to a hairline rather than reserving a bar of space.
+ */
+.chatOptions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+  padding: 0 var(--tw-pad);
+}
+
+.chatOptions > div {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.selectionCount {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  white-space: nowrap;
+}
+
+.composer {
+  border-top: 1px solid var(--tw-rule);
+}
+
+/*
+ * Grab strip sitting on the composer's top rule. Invisible until hovered,
+ * so it reads as an edge rather than a control.
+ */
+.resizeHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8px;
+  margin-top: -1px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.resizeGrip {
+  width: 28px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--tw-fg-faint);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.resizeHandle:hover .resizeGrip {
+  opacity: 0.7;
 }
 
 .chatBox {
   position: relative;
-  margin-top: 12px;
-  transition: transform 0.2s ease;
-}
-
-.chatButtons {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
   display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
+  align-items: stretch;
+  cursor: text;
+  background: var(--tw-bg);
+  transition: background 0.12s ease;
 }
 
-.menuContainer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: calc(100vh - 93px);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 10px;
-  background: var(--vscode-editorWidget-background);
-  z-index: 10;
-  animation: animateUpFadeIn 0.2s;
+.chatBox:focus-within {
+  background: var(--tw-surface);
 }
 
-.menuContainer .active {
-  background: var(--vscode-inputOption-activeBackground);
+/* The prompt glyph is the one place colour is spent. */
+.prompt {
+  flex: 0 0 auto;
+  padding: 6px 0 0 var(--tw-pad);
+  color: var(--tw-fg-faint);
+  user-select: none;
+  transition: color 0.12s ease;
 }
 
-.prList {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.chatBox:focus-within .prompt {
+  color: var(--tw-cursor);
 }
 
-.prList li {
-  margin-bottom: 10px;
-}
-
-.prItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.prTitle {
-  flex-grow: 1;
-  margin-right: 8px;
-}
-
-.prTitle a {
-  color: var(--vscode-textLink-foreground);
-}
-
-.prButtonContainer {
-  margin-top: 7px;
+.editorWrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .tiptap {
-  width: 100%;
-  min-width: var(--input-min-width);
-  min-height: 60px;
-  padding: 7px;
-  border: calc(var(--border-width) * 1px) solid var(--dropdown-border);
-  border-radius: 6px;
-  background: var(--input-background);
-  color: var(--input-foreground);
-  font-family: var(--vscode-font-family);
-  font-size: .85rem;
-  line-height: var(--type-ramp-base-line-height);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px 28px;
+  border: none;
+  background: transparent;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  line-height: var(--tw-lh);
   resize: none;
   outline: none;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
   box-sizing: border-box;
-  padding-bottom: 30px;
 }
 
-.tiptap:focus {
-  border-color: var(--vscode-focusBorder);
-  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+.tiptap :global(.ProseMirror) {
+  flex: 1 1 auto;
+  outline: none;
 }
 
 .tiptap p {
   margin: 0;
 }
 
-.tiptap:first-child {
-  margin-top: 0;
+.chatButtons {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--tw-rule-soft);
 }

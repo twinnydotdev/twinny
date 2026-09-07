@@ -69,7 +69,9 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
             className={styles.conversation}
             key={conversation.id}
           >
-            <div>{getTitle(conversation)}</div>
+            <div className={styles.conversationTitle}>
+              {getTitle(conversation)}
+            </div>
             <VSCodeButton
               appearance="icon"
               onClick={(e) => handleRemoveConversation(e, conversation)}

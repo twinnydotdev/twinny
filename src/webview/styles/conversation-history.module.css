@@ -2,10 +2,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
-  border-radius: 5px;
-  background: var(--vscode-inputOption-hoverBackground);
-  border: 1px solid var(--vscode-editorWidget-border);
-  margin: 5px 0;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tw-rule-soft);
+  color: var(--tw-fg-dim);
   cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.conversation:hover {
+  color: var(--tw-fg);
+}
+
+.conversationTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

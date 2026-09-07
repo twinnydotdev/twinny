@@ -6,7 +6,6 @@ import Placeholder from "@tiptap/extension-placeholder"
 import { Editor, EditorContent, JSONContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import {
-  VSCodeBadge,
   VSCodeButton,
   VSCodePanelView
 } from "@vscode/webview-ui-toolkit/react"
@@ -37,6 +36,9 @@ import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/chat.module.css"
 
+const COMPOSER_MIN_HEIGHT = 44
+const COMPOSER_HEIGHT_KEY = "twinny.composerHeight"
+
 interface ChatProps {
   fullScreen?: boolean
 }
@@ -62,6 +64,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
     useConversationHistory()
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
+  const editorWrapRef = useRef<HTMLDivElement>(null)
+  const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  const [composerHeight, setComposerHeight] = useState<number | null>(() => {
+    const stored = Number(localStorage.getItem(COMPOSER_HEIGHT_KEY))
+    return stored > 0 ? stored : null
+  })
 
   const handleAddMessage = (incoming: ChatCompletionMessage | undefined) => {
     if (!incoming) {
@@ -447,6 +455,60 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
   }, [memoizedSuggestion])
 
+  useEffect(() => {
+    if (composerHeight === null) {
+      localStorage.removeItem(COMPOSER_HEIGHT_KEY)
+      return
+    }
+    localStorage.setItem(COMPOSER_HEIGHT_KEY, String(composerHeight))
+  }, [composerHeight])
+
+  /*
+   * Dragging the strip above the composer grows the typing area upwards,
+   * so a long prompt can be written without the transcript being in the way.
+   */
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const wrap = editorWrapRef.current
+      if (!wrap) return
+      e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      resizeRef.current = {
+        startY: e.clientY,
+        startHeight: wrap.getBoundingClientRect().height
+      }
+    },
+    []
+  )
+
+  const handleResizeMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const resize = resizeRef.current
+      if (!resize) return
+      const max = Math.max(COMPOSER_MIN_HEIGHT, window.innerHeight - 140)
+      const height = resize.startHeight + (resize.startY - e.clientY)
+      setComposerHeight(Math.min(max, Math.max(COMPOSER_MIN_HEIGHT, height)))
+    },
+    []
+  )
+
+  /* Anywhere in the box is fair game for a click: focus the editor at the end. */
+  const handleComposerMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+      if (target.closest("button, input, a, .ProseMirror")) return
+      e.preventDefault()
+      editorRef.current?.commands.focus("end")
+    },
+    []
+  )
+
+  const handleResizeEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeRef.current) return
+    resizeRef.current = null
+    e.currentTarget.releasePointerCapture(e.pointerId)
+  }, [])
+
   const scrollToBottom = useCallback(() => {
     virtuosoRef.current?.scrollTo({
       top: Infinity,
@@ -535,32 +597,33 @@ export const Chat = (props: ChatProps): JSX.Element => {
         {!!contextItems.length && (
           <div className={styles.contextItems}>{contextItems.map(renderContextItem)}</div>
         )}
-        <Virtuoso
-          followOutput
-          ref={virtuosoRef}
-          data={messages}
-          initialTopMostItemIndex={messages?.length}
-          defaultItemHeight={800}
-          itemContent={itemContent}
-          atBottomThreshold={20}
-          atBottomStateChange={(bottom) => setIsBottom(bottom)}
-          alignToBottom
-        />
+        <div className={styles.transcript}>
+          <Virtuoso
+            followOutput
+            style={{ height: "100%" }}
+            ref={virtuosoRef}
+            data={messages}
+            initialTopMostItemIndex={messages?.length}
+            defaultItemHeight={800}
+            itemContent={itemContent}
+            atBottomThreshold={20}
+            atBottomStateChange={(bottom) => setIsBottom(bottom)}
+            alignToBottom
+          />
+        </div>
         {!!selection.length && (
           <Suggestions isDisabled={!!generatingRef.current} />
         )}
         <div className={styles.chatOptions}>
           <div>
             {!isBottom && (
-              <div className={styles.scrollToBottom}>
-                <VSCodeButton
-                  appearance="icon"
-                  onClick={scrollToBottom}
-                  title={t("scroll-to-bottom")}
-                >
-                  <i className="codicon codicon-arrow-down" />
-                </VSCodeButton>
-              </div>
+              <VSCodeButton
+                appearance="icon"
+                onClick={scrollToBottom}
+                title={t("scroll-to-bottom")}
+              >
+                <i className="codicon codicon-arrow-down" />
+              </VSCodeButton>
             )}
             {generatingRef.current && (
               <VSCodeButton
@@ -573,45 +636,80 @@ export const Chat = (props: ChatProps): JSX.Element => {
               </VSCodeButton>
             )}
           </div>
-          <div>
-            <VSCodeBadge>{selection?.length}</VSCodeBadge>
+          {!!selection.length && (
+            <span className={styles.selectionCount}>
+              {t("selection-chars", { chars: selection.length })}
+            </span>
+          )}
+        </div>
+        <div className={styles.composer}>
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            title={t("resize-composer")}
+            className={styles.resizeHandle}
+            onPointerDown={handleResizeStart}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+            onPointerCancel={handleResizeEnd}
+            onDoubleClick={() => setComposerHeight(null)}
+          >
+            <span className={styles.resizeGrip} />
+          </div>
+          <form onDrop={handleDrop} onPaste={handlePaste}>
+            <div
+              className={styles.chatBox}
+              onMouseDown={handleComposerMouseDown}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                multiple
+                style={{ display: "none" }}
+              />
+              <span className={styles.prompt} aria-hidden="true">
+                &#10095;
+              </span>
+              <div
+                ref={editorWrapRef}
+                className={styles.editorWrap}
+                style={
+                  composerHeight === null
+                    ? undefined
+                    : { height: composerHeight, maxHeight: composerHeight }
+                }
+              >
+                <EditorContent
+                  className={styles.tiptap}
+                  editor={editorRef.current}
+                />
+              </div>
+              <div className={styles.chatButtons}>
+                <VSCodeButton
+                  appearance="icon"
+                  role="button"
+                  onClick={handleFileSelect}
+                  title={t("upload-image")}
+                >
+                  <span className="codicon codicon-device-camera" />
+                </VSCodeButton>
+                <VSCodeButton
+                  appearance="icon"
+                  role="button"
+                  onClick={handleSubmitForm}
+                  title={t("send")}
+                >
+                  <span className="codicon codicon-send"></span>
+                </VSCodeButton>
+              </div>
+            </div>
+          </form>
+          <div className={styles.footer}>
+            <ProviderSelect />
           </div>
         </div>
-        <form onDrop={handleDrop} onPaste={handlePaste}>
-          <div className={styles.chatBox}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*"
-              multiple
-              style={{ display: "none" }}
-            />
-            <EditorContent
-              className={styles.tiptap}
-              editor={editorRef.current}
-            />
-            <div className={styles.chatButtons}>
-              <VSCodeButton
-                appearance="icon"
-                role="button"
-                onClick={handleFileSelect}
-                title={t("upload-image")}
-              >
-                <span className="codicon codicon-device-camera" />
-              </VSCodeButton>
-              <VSCodeButton
-                appearance="icon"
-                role="button"
-                onClick={handleSubmitForm}
-                title={t("send")}
-              >
-                <span className="codicon codicon-send"></span>
-              </VSCodeButton>
-            </div>
-          </div>
-        </form>
-        <ProviderSelect />
       </div>
     </VSCodePanelView>
   )

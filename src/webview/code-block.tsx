@@ -44,15 +44,11 @@ export const CodeBlock = (props: CodeBlockProps) => {
   const handleOpenDiff = () => emit(EVENT_NAME.twinnyOpenDiff, code())
 
   return (
-    <>
+    <div className={styles.codeBlock}>
       {Toast}
-      <SyntaxHighlighter
-        children={String(children).trimStart().replace(/\n$/, "")}
-        style={theme === Theme.Dark ? vscDarkPlus : vs}
-        language={lang || "auto"}
-      />
-      {role === ASSISTANT && (
-        <>
+      <div className={styles.codeBar}>
+        <span className={styles.codeLang}>{lang || ""}</span>
+        {role === ASSISTANT && (
           <div className={styles.codeOptions}>
             <VSCodeButton
               title={t("accept-solution")}
@@ -83,9 +79,14 @@ export const CodeBlock = (props: CodeBlockProps) => {
               <span className="codicon codicon-diff"></span>
             </VSCodeButton>
           </div>
-        </>
-      )}
-    </>
+        )}
+      </div>
+      <SyntaxHighlighter
+        children={String(children).trimStart().replace(/\n$/, "")}
+        style={theme === Theme.Dark ? vscDarkPlus : vs}
+        language={lang || "auto"}
+      />
+    </div>
   )
 }
 
