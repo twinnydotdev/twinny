@@ -19,8 +19,9 @@ import {
   TWINNY_PROVIDERS_FILENAME,
   WEBUI_TABS
 } from "../common/constants"
-import { ClientMessage, ServerMessage } from "../common/types"
+import { ApiModel, ClientMessage, ServerMessage } from "../common/types"
 
+import { OllamaService } from "./ollama"
 import { getIsOpenAICompatible } from "./utils"
 
 export interface TwinnyProvider {
@@ -41,6 +42,14 @@ export interface TwinnyProvider {
 }
 
 type Providers = Record<string, TwinnyProvider> | undefined
+
+const EMBEDDING_MODEL_PATTERN = /embed|minilm|bge|e5|nomic/i
+const FIM_MODEL_PATTERN =
+  /code|coder|fim|starcoder|codestral|codegemma|stable-code/i
+
+const FALLBACK_CHAT_MODEL = "codellama:7b-instruct"
+const FALLBACK_FIM_MODEL = "codellama:7b-code"
+const FALLBACK_EMBEDDINGS_MODEL = "all-minilm:latest"
 
 export class ProviderManager {
   _context: ExtensionContext
@@ -251,82 +260,118 @@ export class ProviderManager {
     } as TwinnyProvider
   }
 
-  getDefaultLocalProvider() {
+  getOllamaConnection() {
+    const config = workspace.getConfiguration("twinny")
     return {
-      apiHostname: "localhost",
-      apiPath: "/v1",
-      apiPort: 11434,
-      apiProtocol: "http",
-      id: "openai-compatible-default",
-      label: "Ollama",
-      modelName: "codellama:7b-instruct",
-      provider: API_PROVIDERS.Ollama,
-      type: "chat"
+      apiHostname: config.get<string>("ollamaHostname") || "0.0.0.0",
+      apiPort: config.get<number>("ollamaApiPort") || 11434,
+      apiProtocol: config.get<boolean>("ollamaUseTls") ? "https" : "http"
     }
   }
 
-  getDefaultEmbeddingsProvider() {
+  /**
+   * The models installed locally, so the default providers point at something
+   * which actually exists instead of a hardcoded name which 404s on first run.
+   */
+  private async _getInstalledOllamaModels(): Promise<string[]> {
+    try {
+      const models = (await new OllamaService().fetchModels()) as ApiModel[]
+      return models.map((model) => model?.name).filter(Boolean)
+    } catch {
+      return []
+    }
+  }
+
+  getDefaultLocalProvider(installedModels: string[] = []) {
     return {
-      apiHostname: "0.0.0.0",
+      ...this.getOllamaConnection(),
+      apiPath: "/v1",
+      id: "openai-compatible-default",
+      label: "Ollama",
+      modelName:
+        installedModels.find(
+          (model) => !EMBEDDING_MODEL_PATTERN.test(model)
+        ) || FALLBACK_CHAT_MODEL,
+      provider: API_PROVIDERS.Ollama,
+      type: "chat"
+    } as TwinnyProvider
+  }
+
+  getDefaultEmbeddingsProvider(installedModels: string[] = []) {
+    return {
+      ...this.getOllamaConnection(),
       apiPath: "/api/embed",
-      apiPort: 11434,
-      apiProtocol: "http",
       id: uuidv4(),
       label: "Ollama Embedding",
-      modelName: "all-minilm:latest",
+      modelName:
+        installedModels.find((model) => EMBEDDING_MODEL_PATTERN.test(model)) ||
+        FALLBACK_EMBEDDINGS_MODEL,
       provider: API_PROVIDERS.Ollama,
       type: "embedding"
     } as TwinnyProvider
   }
 
-  getDefaultFimProvider() {
+  getDefaultFimProvider(installedModels: string[] = []) {
+    const fimModel = installedModels.find(
+      (model) =>
+        FIM_MODEL_PATTERN.test(model) && !EMBEDDING_MODEL_PATTERN.test(model)
+    )
     return {
-      apiHostname: "0.0.0.0",
+      ...this.getOllamaConnection(),
       apiPath: "/api/generate",
-      apiPort: 11434,
-      apiProtocol: "http",
-      fimTemplate: FIM_TEMPLATE_FORMAT.codellama,
+      fimTemplate: fimModel
+        ? FIM_TEMPLATE_FORMAT.automatic
+        : FIM_TEMPLATE_FORMAT.codellama,
       label: "Ollama FIM",
       id: uuidv4(),
-      modelName: "codellama:7b-code",
+      modelName: fimModel || FALLBACK_FIM_MODEL,
       provider: API_PROVIDERS.Ollama,
       type: "fim"
     } as TwinnyProvider
   }
 
   async addDefaultProviders() {
-    await this.addDefaultChatProvider()
-    await this.addDefaultFimProvider()
-    await this.addDefaultEmbeddingsProvider()
+    const installedModels = await this._getInstalledOllamaModels()
+    await this.addDefaultChatProvider(installedModels)
+    await this.addDefaultFimProvider(installedModels)
+    await this.addDefaultEmbeddingsProvider(installedModels)
     await this.addTwinnyProvider()
   }
 
-  async addDefaultLocalProvider(): Promise<TwinnyProvider> {
-    const provider = this.getDefaultLocalProvider()
+  async addDefaultLocalProvider(
+    installedModels: string[] = []
+  ): Promise<TwinnyProvider> {
+    const provider = this.getDefaultLocalProvider(installedModels)
     if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
       await this.addDefaultProvider(provider)
     }
     return provider
   }
 
-  async addDefaultChatProvider(): Promise<TwinnyProvider> {
-    const provider = this.getDefaultLocalProvider()
+  async addDefaultChatProvider(
+    installedModels: string[] = []
+  ): Promise<TwinnyProvider> {
+    const provider = this.getDefaultLocalProvider(installedModels)
     if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
       await this.addDefaultProvider(provider)
     }
     return provider
   }
 
-  async addDefaultFimProvider(): Promise<TwinnyProvider> {
-    const provider = this.getDefaultFimProvider()
+  async addDefaultFimProvider(
+    installedModels: string[] = []
+  ): Promise<TwinnyProvider> {
+    const provider = this.getDefaultFimProvider(installedModels)
     if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_STORAGE_KEY)) {
       await this.addDefaultProvider(provider)
     }
     return provider
   }
 
-  async addDefaultEmbeddingsProvider(): Promise<TwinnyProvider> {
-    const provider = this.getDefaultEmbeddingsProvider()
+  async addDefaultEmbeddingsProvider(
+    installedModels: string[] = []
+  ): Promise<TwinnyProvider> {
+    const provider = this.getDefaultEmbeddingsProvider(installedModels)
 
     if (
       !this._context.globalState.get(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY)
@@ -432,7 +477,15 @@ export class ProviderManager {
   setActiveChatProvider(provider?: TwinnyProvider) {
     if (!provider) return
     this._context.globalState.update(ACTIVE_CHAT_PROVIDER_STORAGE_KEY, provider)
+    this._setSelectedModel(provider.modelName)
     return this.getActiveChatProvider()
+  }
+
+  private _setSelectedModel(modelName?: string) {
+    this._context.globalState.update(
+      `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.selectedModel}`,
+      modelName
+    )
   }
 
   setActiveFimProvider(provider?: TwinnyProvider) {
@@ -458,15 +511,12 @@ export class ProviderManager {
     await this._saveProviders(providers)
 
     if (provider.type === "chat") {
-      this._context.globalState.update(
-        `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.selectedModel}`,
-        provider?.modelName
-      )
       if (!this._context.globalState.get(ACTIVE_CHAT_PROVIDER_STORAGE_KEY)) {
         this._context.globalState.update(
           ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
           provider
         )
+        this._setSelectedModel(provider.modelName)
       }
     } else if (provider.type === "fim") {
       if (!this._context.globalState.get(ACTIVE_FIM_PROVIDER_STORAGE_KEY)) {
@@ -569,9 +619,12 @@ export class ProviderManager {
       )
     }
 
-    const chatProvider = await this.addDefaultChatProvider()
-    const fimProvider = await this.addDefaultFimProvider()
-    const embeddingsProvider = await this.addDefaultEmbeddingsProvider()
+    const installedModels = await this._getInstalledOllamaModels()
+    const chatProvider = await this.addDefaultChatProvider(installedModels)
+    const fimProvider = await this.addDefaultFimProvider(installedModels)
+    const embeddingsProvider = await this.addDefaultEmbeddingsProvider(
+      installedModels
+    )
     await this.addProvider(this.getTwinnyProvider())
 
     this.focusProviderTab()
