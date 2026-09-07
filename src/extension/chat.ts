@@ -12,7 +12,6 @@ import {
   DiagnosticSeverity,
   ExtensionContext,
   languages,
-  StatusBarItem,
   window,
   workspace
 } from "vscode"
@@ -47,7 +46,9 @@ import { kebabToSentence } from "../webview/utils"
 import { ExtensionBridge } from "./messaging/bridge"
 import { Base } from "./base"
 import { EmbeddingDatabase } from "./embeddings"
+import { describeProviderError, isAbortError } from "./provider-errors"
 import { Reranker } from "./reranker"
+import { TwinnyStatusBar } from "./status-bar"
 import { TemplateProvider } from "./template-provider"
 import {
   getIsOpenAICompatible,
@@ -62,7 +63,7 @@ export class Chat extends Base {
   private _conversation: ChatCompletionMessage[] = []
   private _db?: EmbeddingDatabase
   private _reranker: Reranker
-  private _statusBar: StatusBarItem
+  private _statusBar: TwinnyStatusBar
   private _templateProvider?: TemplateProvider
   private _tokenJs: TokenJS | undefined
   private _bridge: ExtensionBridge
@@ -70,7 +71,7 @@ export class Chat extends Base {
   private _workspaceName = sanitizeWorkspaceName(workspace.name)
 
   constructor(
-    statusBar: StatusBarItem,
+    statusBar: TwinnyStatusBar,
     templateDir: string | undefined,
     extensionContext: ExtensionContext,
     bridge: ExtensionBridge,
@@ -248,13 +249,43 @@ export class Chat extends Base {
 
   public abort = () => {
     this._isCancelled = true
-    this._statusBar.text = "$(code)"
+    this._controller?.abort()
+    this.endGeneration()
+  }
+
+  /**
+   * Spinner on, and the `twinnyGeneratingText` context set so the
+   * stop-generation keybinding is live for as long as the request runs.
+   */
+  private beginGeneration() {
+    this._controller = new AbortController()
+    this._completion = ""
+    this._statusBar.busy()
+    commands.executeCommand(
+      "setContext",
+      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
+      true
+    )
+  }
+
+  private endGeneration() {
+    this._statusBar.idle()
     commands.executeCommand(
       "setContext",
       EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
       false
     )
-    this._controller?.abort()
+    this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
+  }
+
+  /** A stopped request is not an error; anything else gets explained. */
+  private reportError(error: unknown, provider: TwinnyProvider) {
+    if (isAbortError(error) || this._isCancelled) return
+    logger.error(error instanceof Error ? error : String(error))
+    this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+      content: describeProviderError(error, provider),
+      role: ASSISTANT
+    })
   }
 
   private buildTemplatePrompt = async (
@@ -277,16 +308,15 @@ export class Chat extends Base {
     return { prompt: prompt || "", selection: selectionContext }
   }
 
-  private async llmNoStream(requestBody: CompletionNonStreaming<LLMProvider>) {
-    this._controller = new AbortController()
-    this._completion = ""
-
+  private async llmNoStream(
+    requestBody: CompletionNonStreaming<LLMProvider>,
+    provider: TwinnyProvider
+  ) {
     if (!this._tokenJs || this._isCancelled) return
+    this.beginGeneration()
 
     try {
       const result = await this._tokenJs.chat.completions.create(requestBody)
-
-      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
 
       this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
         content: result.choices[0].message.content,
@@ -294,20 +324,18 @@ export class Chat extends Base {
       })
     } catch (error) {
       this._controller?.abort()
-      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
-
-      this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
-        content: error instanceof Error ? error.message : String(error),
-        role: ASSISTANT
-      })
+      this.reportError(error, provider)
+    } finally {
+      this.endGeneration()
     }
   }
 
-  private async llmStream(requestBody: CompletionStreamingWithId) {
-    this._controller = new AbortController()
-    this._completion = ""
-
+  private async llmStream(
+    requestBody: CompletionStreamingWithId,
+    provider: TwinnyProvider
+  ) {
     if (!this._tokenJs || this._isCancelled) return
+    this.beginGeneration()
 
     try {
       logger.log(
@@ -354,22 +382,26 @@ export class Chat extends Base {
         })}`
       )
 
-      this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
-        content: this._completion.trim(),
-        role: ASSISTANT
-      })
-
-      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
+      if (this._completion.trim()) {
+        this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+          content: this._completion.trim(),
+          role: ASSISTANT
+        })
+      }
 
       this._completion = ""
     } catch (error) {
       this._controller?.abort()
-      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
-
-      this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
-        content: error instanceof Error ? error.message : String(error),
-        role: ASSISTANT
-      })
+      // Keep whatever streamed before the failure; it is still useful.
+      if (this._completion.trim()) {
+        this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+          content: this._completion.trim(),
+          role: ASSISTANT
+        })
+      }
+      this.reportError(error, provider)
+    } finally {
+      this.endGeneration()
     }
   }
 
@@ -635,7 +667,6 @@ export class Chat extends Base {
     template: string,
     context?: string
   ): Promise<ChatCompletionMessage[]> {
-    this._statusBar.text = "$(loading~spin)"
     const { language } = getLanguage()
     this._completion = ""
     this.sendEditorLanguage()
@@ -700,8 +731,8 @@ export class Chat extends Base {
     const stream = this.shouldUseStreaming(provider)
 
     return stream
-      ? this.llmStream(this.getStreamOptions(provider, conversationId))
-      : this.llmNoStream(this.getNoStreamOptions(provider))
+      ? this.llmStream(this.getStreamOptions(provider, conversationId), provider)
+      : this.llmNoStream(this.getNoStreamOptions(provider), provider)
   }
 
   public async templateCompletion(promptTemplate: string, context?: string) {
@@ -715,8 +746,8 @@ export class Chat extends Base {
     const stream = this.shouldUseStreaming(provider)
 
     return stream
-      ? this.llmStream(this.getStreamOptions(provider))
-      : this.llmNoStream(this.getNoStreamOptions(provider))
+      ? this.llmStream(this.getStreamOptions(provider), provider)
+      : this.llmNoStream(this.getNoStreamOptions(provider), provider)
   }
 
   public async generateSimpleCompletion(
@@ -758,8 +789,10 @@ export class Chat extends Base {
       }
       logger.log("LLM response for simple completion was empty or malformed.")
       return undefined
-    } catch {
-      logger.error("Error during simple LLM completion")
+    } catch (error) {
+      logger.error(
+        `Simple completion failed: ${describeProviderError(error, provider)}`
+      )
       return undefined
     }
   }

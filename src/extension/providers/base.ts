@@ -24,14 +24,10 @@ import { OllamaService } from "../ollama"
 import { ProviderManager } from "../provider-manager"
 import { GithubService as ReviewService } from "../review-service"
 import { SessionManager } from "../session-manager"
+import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../template-provider"
 import { FileTreeProvider } from "../tree"
-import {
-  getGitChanges,
-  getLanguage,
-  getTextSelection,
-  getTheme
-} from "../utils"
+import { getLanguage, getTextSelection, getTheme } from "../utils"
 
 /** Prefix under which a scoped context value lives in extension storage. */
 const storageKeyFor = (scope: string, key: string) => `${scope}-${key}`
@@ -42,7 +38,7 @@ export class BaseProvider {
   private _fileTreeProvider: FileTreeProvider
   private _ollamaService: OllamaService | undefined
   private _sessionManager: SessionManager | undefined
-  private _statusBarItem: vscode.StatusBarItem
+  private _statusBarItem: TwinnyStatusBar
   private _templateDir: string | undefined
   private _templateProvider: TemplateProvider
   private _disposables: vscode.Disposable[] = []
@@ -62,7 +58,7 @@ export class BaseProvider {
   constructor(
     context: vscode.ExtensionContext,
     templateDir: string,
-    statusBar: vscode.StatusBarItem,
+    statusBar: TwinnyStatusBar,
     db?: EmbeddingDatabase,
     sessionManager?: SessionManager
   ) {
@@ -89,6 +85,9 @@ export class BaseProvider {
   public dispose() {
     this.bridge?.dispose()
     this.bridge = undefined
+    this.chat?.dispose()
+    this.conversationHistory?.dispose()
+    this.reviewService?.dispose()
     this._disposables.forEach((disposable) => disposable.dispose())
     this._disposables = []
   }
@@ -151,7 +150,10 @@ export class BaseProvider {
       }),
       [EVENT_NAME.twinnyGetContextItems]: () =>
         this.broadcastContextItems(this.readContextItems()),
-      [EVENT_NAME.twinnyGetGitChanges]: () => this.getGitCommitMessage(),
+      [EVENT_NAME.twinnyGetGitChanges]: () =>
+        void vscode.commands.executeCommand(
+          TWINNY_COMMAND_NAME.generateCommitMessage
+        ),
       [EVENT_NAME.twinnyGetModels]: () => models as unknown as ModelCatalogue,
       [EVENT_NAME.twinnyGlobalContext]: ({ key }) =>
         this.readGlobalContext(key),
@@ -314,17 +316,6 @@ export class BaseProvider {
   }
 
   /* ---------------------------------------------------------------------- */
-
-  public getGitCommitMessage = async () => {
-    const diff = await getGitChanges()
-    if (!diff.length) {
-      vscode.window.showInformationMessage(
-        "No changes found in the current workspace."
-      )
-      return
-    }
-    this.conversationHistory?.resetConversation()
-  }
 
   private newConversation = () => {
     this.conversationHistory?.resetConversation()

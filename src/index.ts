@@ -21,6 +21,7 @@ import {
 } from "./common/constants"
 import { logger } from "./common/logger"
 import { ContextItem, SelectionContextItem } from "./common/types"
+import { generateCommitMessage } from "./extension/commit-message"
 import { setContext } from "./extension/context"
 import { EmbeddingDatabase } from "./extension/embeddings"
 import { FileInteractionCache } from "./extension/file-interaction"
@@ -28,14 +29,108 @@ import { CompletionProvider } from "./extension/providers/completion"
 import { FullScreenProvider } from "./extension/providers/panel"
 import { SidebarProvider } from "./extension/providers/sidebar"
 import { SessionManager } from "./extension/session-manager"
+import { TwinnyStatusBar } from "./extension/status-bar"
 import { TemplateProvider } from "./extension/template-provider"
 import { delayExecution, sanitizeWorkspaceName } from "./extension/utils"
 import { getLineBreakCount } from "./webview/utils"
 
+/** The editor commands that hand a selection to a chat template. */
+const TEMPLATE_COMMANDS: Record<string, string> = {
+  [TWINNY_COMMAND_NAME.explain]: "explain",
+  [TWINNY_COMMAND_NAME.addTypes]: "add-types",
+  [TWINNY_COMMAND_NAME.refactor]: "refactor",
+  [TWINNY_COMMAND_NAME.generateDocs]: "generate-docs",
+  [TWINNY_COMMAND_NAME.addTests]: "add-tests"
+}
+
+/** Clicking the idle status bar item: the most-used toggles, one click away. */
+async function showStatusBarMenu(statusBar: TwinnyStatusBar) {
+  const config = workspace.getConfiguration("twinny")
+  const autoSuggest = config.get<boolean>("autoSuggestEnabled", true)
+
+  const picked = await window.showQuickPick(
+    [
+      {
+        label: autoSuggest
+          ? "$(circle-slash) Pause auto-suggest"
+          : "$(play) Resume auto-suggest",
+        description: autoSuggest
+          ? "Completions only when triggered with Alt+\\"
+          : "Suggest completions as you type",
+        action: "toggle"
+      },
+      {
+        label: "$(comment-discussion) Open chat",
+        action: "chat"
+      },
+      {
+        label: "$(robot) Manage providers",
+        action: "providers"
+      },
+      {
+        label: "$(gear) Settings",
+        action: "settings"
+      }
+    ],
+    { title: "Twinny", placeHolder: "What would you like to do?" }
+  )
+
+  switch (picked?.action) {
+    case "toggle":
+      await config.update(
+        "autoSuggestEnabled",
+        !autoSuggest,
+        vscode.ConfigurationTarget.Global
+      )
+      statusBar.refresh()
+      break
+    case "chat":
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await commands.executeCommand(TWINNY_COMMAND_NAME.openChat)
+      break
+    case "providers":
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await commands.executeCommand(TWINNY_COMMAND_NAME.manageProviders)
+      break
+    case "settings":
+      await commands.executeCommand(TWINNY_COMMAND_NAME.settings)
+      break
+  }
+}
+
+/**
+ * Embeddings live in a per-workspace LanceDB under ~/.twinny. If that fails
+ * to open (unsupported platform, corrupt directory) the rest of the
+ * extension must still come up; only the embeddings tab goes without.
+ */
+async function openEmbeddingDatabase(
+  context: ExtensionContext
+): Promise<EmbeddingDatabase | undefined> {
+  const workspaceName = sanitizeWorkspaceName(workspace.name)
+  if (!workspaceName) return undefined
+
+  try {
+    const dbDir = path.join(os.homedir(), ".twinny/embeddings")
+    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
+    const db = new EmbeddingDatabase(path.join(dbDir, workspaceName), context)
+    await db.connect()
+    return db
+  } catch (error) {
+    logger.error(
+      `Embedding database unavailable: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    )
+    return undefined
+  }
+}
+
 export async function activate(context: ExtensionContext) {
   setContext(context)
-  const config = workspace.getConfiguration("twinny")
-  const statusBarItem = window.createStatusBarItem(StatusBarAlignment.Right)
+  const statusBar = new TwinnyStatusBar(
+    window.createStatusBarItem(StatusBarAlignment.Right),
+    context
+  )
 
   logger.log("Twinny extension starting")
   const templateDir = path.join(os.homedir(), ".twinny/templates") as string
@@ -45,24 +140,13 @@ export async function activate(context: ExtensionContext) {
   const fullScreenProvider = new FullScreenProvider(
     context,
     templateDir,
-    statusBarItem
+    statusBar
   )
 
-  const homeDir = os.homedir()
-  const dbDir = path.join(homeDir, ".twinny/embeddings")
-  let db
-  const workspaceName = sanitizeWorkspaceName(workspace.name)
-
-  if (workspaceName) {
-    const dbPath = path.join(dbDir, workspaceName as string)
-
-    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
-    db = new EmbeddingDatabase(dbPath, context)
-    await db.connect()
-  }
+  const db = await openEmbeddingDatabase(context)
 
   const sidebarProvider = new SidebarProvider(
-    statusBarItem,
+    statusBar,
     context,
     templateDir,
     db,
@@ -70,7 +154,7 @@ export async function activate(context: ExtensionContext) {
   )
 
   const completionProvider = new CompletionProvider(
-    statusBarItem,
+    statusBar,
     fileInteractionCache,
     templateProvider,
     context
@@ -78,49 +162,37 @@ export async function activate(context: ExtensionContext) {
 
   templateProvider.init()
 
+  const runTemplate = async (template: string) => {
+    await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+    await sidebarProvider.waitForSidebarReady()
+    sidebarProvider.streamTemplateCompletion(template)
+  }
+
+  const setEnabled = (enabled: boolean) =>
+    workspace
+      .getConfiguration("twinny")
+      .update("enabled", enabled, vscode.ConfigurationTarget.Global)
+
   context.subscriptions.push(
+    statusBar,
+    fileInteractionCache,
     languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
       completionProvider
     ),
-    commands.registerCommand(TWINNY_COMMAND_NAME.enable, () => {
-      statusBarItem.show()
-    }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.disable, () => {
-      statusBarItem.hide()
-    }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.explain, async () => {
-      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      await sidebarProvider.waitForSidebarReady()
-      sidebarProvider?.streamTemplateCompletion("explain")
-    }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.addTypes, async () => {
-      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      await sidebarProvider.waitForSidebarReady()
-      sidebarProvider?.streamTemplateCompletion("add-types")
-    }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.refactor, async () => {
-      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      await sidebarProvider.waitForSidebarReady()
-      sidebarProvider?.streamTemplateCompletion("refactor")
-    }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.generateDocs, async () => {
-      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      await sidebarProvider.waitForSidebarReady()
-      sidebarProvider?.streamTemplateCompletion("generate-docs")
-    }),
-    commands.registerCommand(TWINNY_COMMAND_NAME.addTests, async () => {
-      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-      await sidebarProvider.waitForSidebarReady()
-      sidebarProvider?.streamTemplateCompletion("add-tests")
-    }),
+    ...Object.entries(TEMPLATE_COMMANDS).map(([command, template]) =>
+      commands.registerCommand(command, () => runTemplate(template))
+    ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.enable, () => setEnabled(true)),
+    commands.registerCommand(TWINNY_COMMAND_NAME.disable, () =>
+      setEnabled(false)
+    ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.statusBarMenu, () =>
+      showStatusBarMenu(statusBar)
+    ),
     commands.registerCommand(
       TWINNY_COMMAND_NAME.templateCompletion,
-      async (template: string) => {
-        await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-        await sidebarProvider.waitForSidebarReady()
-        sidebarProvider?.streamTemplateCompletion(template)
-      }
+      (template: string) => runTemplate(template)
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.stopGeneration, () => {
       completionProvider.onError()
@@ -202,12 +274,15 @@ export async function activate(context: ExtensionContext) {
       )
     }),
     commands.registerCommand(
-      TWINNY_COMMAND_NAME.getGitCommitMessage,
+      TWINNY_COMMAND_NAME.generateCommitMessage,
       async () => {
-        await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-        sidebarProvider.conversationHistory?.resetConversation()
-        await sidebarProvider.waitForSidebarReady()
-        sidebarProvider.getGitCommitMessage()
+        // The chat service only exists once the sidebar has been shown.
+        if (!sidebarProvider.chat) {
+          await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+          await sidebarProvider.waitForSidebarReady()
+        }
+        if (!sidebarProvider.chat) return
+        await generateCommitMessage(sidebarProvider.chat, templateProvider)
       }
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
@@ -294,19 +369,18 @@ export async function activate(context: ExtensionContext) {
       fileInteractionCache.incrementStrokes(currentLine, currentCharacter)
     }),
     window.registerWebviewViewProvider("twinny.sidebar", sidebarProvider),
-    statusBarItem
+    window.onDidChangeTextEditorSelection(() => {
+      completionProvider.abortCompletion()
+      delayExecution(() => {
+        completionProvider.setAcceptedLastCompletion(false)
+      }, 200)
+    }),
+    workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration("twinny")) statusBar.refresh()
+    })
   )
 
-  window.onDidChangeTextEditorSelection(() => {
-    completionProvider.abortCompletion()
-    delayExecution(() => {
-      completionProvider.setAcceptedLastCompletion(false)
-    }, 200)
-  })
-
-  if (config.get("enabled")) statusBarItem.show()
-
-  statusBarItem.text = "$(code)"
+  statusBar.refresh()
 
   logger.log("Twinny extension activation complete")
 }

@@ -7,7 +7,6 @@ import {
   InlineCompletionTriggerKind,
   Position,
   Range,
-  StatusBarItem,
   TextDocument,
   Uri,
   window,
@@ -45,6 +44,7 @@ import { llm } from "../llm"
 import { getNodeAtPosition, getParser } from "../parser"
 import { TwinnyProvider } from "../provider-manager"
 import { createStreamRequestBodyFim } from "../provider-options"
+import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../template-provider"
 import {
   getFimDataFromProvider,
@@ -64,8 +64,13 @@ interface CompletionRequest {
   token: CancellationToken
 }
 
-const STATUS_IDLE = "$(code)"
-const STATUS_BUSY = "$(loading~spin)"
+/** Editors that are not code: output panes, search results, terminals. */
+const IGNORED_SCHEMES = new Set([
+  "output",
+  "search-editor",
+  "vscode-terminal",
+  "comment"
+])
 
 export class CompletionProvider
   extends Base
@@ -76,12 +81,12 @@ export class CompletionProvider
   private _fileInteractionCache: FileInteractionCache
   private _lastSuggestion: LastSuggestion | undefined
   private _requestId = 0
-  private _statusBar: StatusBarItem
+  private _statusBar: TwinnyStatusBar
   private _templateProvider: TemplateProvider
   public lastCompletionText = ""
 
   constructor(
-    statusBar: StatusBarItem,
+    statusBar: TwinnyStatusBar,
     fileInteractionCache: FileInteractionCache,
     templateProvider: TemplateProvider,
     context: ExtensionContext
@@ -101,6 +106,7 @@ export class CompletionProvider
     const provider = this.getFimProvider()
     if (!this.config.get<boolean>("enabled", true) || !provider) return
 
+    if (IGNORED_SCHEMES.has(document.uri.scheme)) return
     if (!this.isLanguageEnabled(document.languageId)) return
 
     const isManualTrigger =
@@ -178,8 +184,7 @@ export class CompletionProvider
   ): Promise<InlineCompletionItem[] | undefined> {
     const { document, position, prefixSuffix, provider, token } = request
 
-    this._statusBar.text = STATUS_BUSY
-    this._statusBar.command = "twinny.stopGeneration"
+    this._statusBar.busy()
 
     const node = await this.getNodeAtCursor(document, position)
     const prompt = await this.getPrompt(request)
@@ -303,7 +308,7 @@ export class CompletionProvider
   }
 
   private setIdle() {
-    this._statusBar.text = STATUS_IDLE
+    this._statusBar.idle()
   }
 
   private getFirstNonBlankLine(text: string) {

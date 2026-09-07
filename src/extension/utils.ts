@@ -1,8 +1,6 @@
-import { exec } from "child_process"
 import fs from "fs"
 import ignore from "ignore"
 import path from "path"
-import * as util from "util"
 import * as vscode from "vscode"
 import {
   ColorThemeKind,
@@ -42,8 +40,6 @@ import {
 import { ExtensionBridge } from "./messaging/bridge"
 import { getParser } from "./parser"
 import { TwinnyProvider } from "./provider-manager"
-
-const execAsync = util.promisify(exec)
 
 export const delayExecution = <T extends () => void>(
   fn: T,
@@ -286,19 +282,6 @@ export const getCurrentWorkspacePath = (): string | undefined => {
   } else {
     window.showInformationMessage("No workspace is open.")
     return undefined
-  }
-}
-
-export const getGitChanges = async (): Promise<string> => {
-  try {
-    const path = getCurrentWorkspacePath()
-    const { stdout } = await execAsync("git diff", {
-      cwd: path
-    })
-    return stdout
-  } catch (error) {
-    console.error("Error executing git command:", error)
-    return ""
   }
 }
 

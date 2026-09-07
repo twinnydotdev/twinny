@@ -136,6 +136,19 @@
           "when": "view == twinny.sidebar",
           "group": "navigation@9"
         }
+      ],
+      "scm/title": [
+        {
+          "command": "twinny.generateCommitMessage",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "twinny.statusBarMenu",
+          "when": "false"
+        }
       ]
     },
     "commands": [
@@ -245,6 +258,15 @@
       {
         "command": "twinny.addSelectionToContext",
         "title": "Twinny: Add Selection to Context"
+      },
+      {
+        "command": "twinny.generateCommitMessage",
+        "title": "Twinny - Generate commit message",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "twinny.statusBarMenu",
+        "title": "Twinny - Status bar options"
       }
     ],
     "keybindings": [

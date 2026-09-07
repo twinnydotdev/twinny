@@ -31,10 +31,9 @@ export class LRUCache<T = string> {
   set(key: string, value: T | null): void {
     if (this._cache.has(key)) {
       this._cache.delete(key)
-    } else if (this._cache.size === this._capacity) {
+    } else if (this._cache.size >= this._capacity) {
       const firstKey = this._cache.keys().next().value
-      if (!firstKey) return
-      this._cache.delete(firstKey)
+      if (firstKey !== undefined) this._cache.delete(firstKey)
     }
     this._cache.set(key, value)
   }

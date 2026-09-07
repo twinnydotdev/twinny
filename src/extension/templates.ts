@@ -51,6 +51,16 @@ Use the standard documentation format for {{language}}. If unsure, use a widely 
 Always format responses with Markdown for code blocks with the language prefix e.g \`\`\`{{language}}.`.trim()
   },
   {
+    name: "commit-message",
+    template: `
+Write a git commit message for the following diff.
+Use the imperative mood ("Add", "Fix", "Refactor"), keep the subject line under 72 characters,
+and add a short body only when it explains something the subject cannot.
+Reply with the commit message only: no code fences, no quotes, no explanation.
+
+{{{code}}}`.trim()
+  },
+  {
     name: "system",
     template: `You are a helpful, respectful and honest coding assistant.
 Always reply using markdown.

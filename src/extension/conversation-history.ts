@@ -138,22 +138,31 @@ export class ConversationHistory extends Base {
     this.setActiveConversation(undefined)
   }
 
+  /**
+   * The model names the conversation once, after the first reply, when the
+   * two messages say what it is about. Later saves keep that title rather
+   * than paying for another request every time a message lands.
+   */
   async saveConversation(conversation: Conversation) {
     const activeConversation = this.getActiveConversation()
+    if (!activeConversation) return
 
-    if (activeConversation) {
-      let title = await this._generateTitleWithLlm(
-        conversation.messages.slice(0, 2)
-      )
-      if (!title) {
-        title = this.getConversationTitle(conversation.messages)
-      }
-      return this.updateConversation({
-        ...activeConversation,
-        messages: conversation.messages,
-        title
-      })
+    const isFirstExchange = conversation.messages.length === 2
+    let title = activeConversation.title
+
+    if (isFirstExchange) {
+      title =
+        (await this._generateTitleWithLlm(conversation.messages)) || title
     }
+    if (!title) {
+      title = this.getConversationTitle(conversation.messages)
+    }
+
+    return this.updateConversation({
+      ...activeConversation,
+      messages: conversation.messages,
+      title
+    })
   }
 
   private async _generateTitleWithLlm(
@@ -180,16 +189,31 @@ export class ConversationHistory extends Base {
 
     Title:`.trim()
 
-    console.log("LLM Title Generation Prompt:", prompt)
-
     try {
       const generatedTitle = await this._chatService.generateSimpleCompletion(
         prompt
       )
-      return generatedTitle?.trim()
+      return this.cleanTitle(generatedTitle)
     } catch (error) {
       console.error("Error calling LLM for title generation:", error)
       return undefined
     }
+  }
+
+  /** Models like to quote or prefix titles; a title is one short line. */
+  private cleanTitle(text: string | undefined): string | undefined {
+    if (!text) return undefined
+    const firstLine = text
+      .trim()
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0)
+    if (!firstLine) return undefined
+    const cleaned = firstLine
+      .replace(/^(title:?)\s*/i, "")
+      .replace(/^["'`*#\s]+|["'`*\s]+$/g, "")
+      .trim()
+    if (!cleaned) return undefined
+    return cleaned.length > 60 ? `${cleaned.slice(0, 57)}...` : cleaned
   }
 }
