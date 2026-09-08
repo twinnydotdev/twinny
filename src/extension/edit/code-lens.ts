@@ -37,17 +37,50 @@ export class InlineEditCodeLensProvider implements vscode.CodeLensProvider {
         )
       ]
     }
-    return [
+    if (pending.hunks.length <= 1) {
+      return [
+        lens(
+          `$(check) Accept (${ACCEPT_KEY})`,
+          TWINNY_COMMAND_NAME.acceptEdit,
+          "Keep the new lines and delete the old ones"
+        ),
+        lens(
+          `$(close) Reject (${REJECT_KEY})`,
+          TWINNY_COMMAND_NAME.rejectEdit,
+          "Delete the new lines and keep the old ones"
+        )
+      ]
+    }
+
+    const lenses = [
       lens(
-        `$(check) Accept (${ACCEPT_KEY})`,
+        `$(check-all) Accept all (${ACCEPT_KEY})`,
         TWINNY_COMMAND_NAME.acceptEdit,
-        "Keep the new lines and delete the old ones"
+        "Keep every new line and delete every old one"
       ),
       lens(
-        `$(close) Reject (${REJECT_KEY})`,
+        `$(close-all) Reject all (${REJECT_KEY})`,
         TWINNY_COMMAND_NAME.rejectEdit,
-        "Delete the new lines and keep the old ones"
+        "Delete every new line and keep every old one"
       )
     ]
+    pending.hunks.forEach((line, index) => {
+      const at = new vscode.Range(line, 0, line, 0)
+      lenses.push(
+        new vscode.CodeLens(at, {
+          title: "$(check) Accept",
+          command: TWINNY_COMMAND_NAME.acceptEdit,
+          arguments: [index],
+          tooltip: "Keep this hunk's new lines and delete its old ones"
+        }),
+        new vscode.CodeLens(at, {
+          title: "$(close) Reject",
+          command: TWINNY_COMMAND_NAME.rejectEdit,
+          arguments: [index],
+          tooltip: "Delete this hunk's new lines and keep its old ones"
+        })
+      )
+    })
+    return lenses
   }
 }

@@ -230,11 +230,11 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.edit, (args?: InlineEditArgs) =>
       inlineEdit.run(args)
     ),
-    commands.registerCommand(TWINNY_COMMAND_NAME.acceptEdit, () =>
-      inlineEdit.accept()
+    commands.registerCommand(TWINNY_COMMAND_NAME.acceptEdit, (hunk?: number) =>
+      inlineEdit.accept(typeof hunk === "number" ? hunk : undefined)
     ),
-    commands.registerCommand(TWINNY_COMMAND_NAME.rejectEdit, () =>
-      inlineEdit.reject()
+    commands.registerCommand(TWINNY_COMMAND_NAME.rejectEdit, (hunk?: number) =>
+      inlineEdit.reject(typeof hunk === "number" ? hunk : undefined)
     ),
     ...Object.entries(TEMPLATE_COMMANDS).map(([command, template]) =>
       commands.registerCommand(command, () => runTemplate(template))

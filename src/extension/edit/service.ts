@@ -34,6 +34,15 @@ export interface InlineEditArgs {
 export interface PendingEditInfo {
   line: number
   streaming: boolean
+  /** First line of each hunk, in order. */
+  hunks: number[]
+}
+
+/** A run of neighbouring diff lines that stands or falls together. */
+export interface Hunk {
+  line: number
+  removed: number[]
+  added: number[]
 }
 
 const mac = process.platform === "darwin"
@@ -98,7 +107,11 @@ export class InlineEditService extends Base {
   public pendingFor(document: vscode.TextDocument): PendingEditInfo | undefined {
     const pending = this._pending
     if (!pending || pending.document !== document) return undefined
-    return { line: pending.range.start.line, streaming: this._running }
+    return {
+      line: pending.range.start.line,
+      streaming: this._running,
+      hunks: pending.hunks.map((hunk) => hunk.line)
+    }
   }
 
   /** The command's entry point: resolve the editor and range, ask, run. */
@@ -109,23 +122,6 @@ export class InlineEditService extends Base {
       )
       return
     }
-    if (this._pending) {
-      const choice = await vscode.window.showInformationMessage(
-        "Twinny has an edit waiting for review. Accept or reject it first.",
-        "Accept",
-        "Reject"
-      )
-      if (choice === "Accept") await this.accept()
-      else if (choice === "Reject") await this.reject()
-      else return
-    }
-
-    const editor = await this.resolveEditor(args?.uri)
-    if (!editor) {
-      vscode.window.showInformationMessage("Open a file to edit with Twinny.")
-      return
-    }
-
     const provider = this.getProvider()
     if (!provider) {
       const choice = await vscode.window.showWarningMessage(
@@ -139,6 +135,24 @@ export class InlineEditService extends Base {
       return
     }
 
+    // A pending diff is refined: the instruction applies to the proposal.
+    const pending = this._pending
+    if (pending) {
+      const editor = await this.editorFor(pending.document)
+      const instruction =
+        args?.instruction?.trim() ||
+        (await this.askInstruction(editor, pending.range, true))
+      if (!instruction) return
+      await this.edit(editor, pending, instruction, provider)
+      return
+    }
+
+    const editor = await this.resolveEditor(args?.uri)
+    if (!editor) {
+      vscode.window.showInformationMessage("Open a file to edit with Twinny.")
+      return
+    }
+
     if (args?.requireSelection && !args.range && editor.selection.isEmpty) {
       vscode.window.showInformationMessage("Select the code to edit first.")
       return
@@ -149,35 +163,41 @@ export class InlineEditService extends Base {
       args?.instruction?.trim() || (await this.askInstruction(editor, range))
     if (!instruction) return
 
-    await this.edit(editor, range, instruction, provider)
+    await this.edit(editor, new DiffRegion(editor, range), instruction, provider)
   }
 
-  /** Keep the rewrite: delete the lines it replaced. */
-  public accept() {
-    return this.resolve("accept")
+  /** Keep the rewrite, or one hunk of it: delete the lines it replaced. */
+  public accept(hunk?: number) {
+    return this.resolve("accept", hunk)
   }
 
-  /** Discard the rewrite: delete the lines it added. */
-  public reject() {
-    return this.resolve("reject")
+  /** Discard the rewrite, or one hunk of it: delete the lines it added. */
+  public reject(hunk?: number) {
+    return this.resolve("reject", hunk)
   }
 
   /* ------------------------------------------------------------------------ */
 
-  private async resolve(verdict: "accept" | "reject") {
+  private async resolve(verdict: "accept" | "reject", hunk?: number) {
     const pending = this._pending
     if (!pending || this._running) return
     const editor = await this.editorFor(pending.document)
-    this.clearPending()
-    const ok = await pending.settle(editor, verdict)
+    const ok = await pending.settle(editor, verdict, hunk)
     if (!ok) {
+      this.clearPending()
       vscode.window.showWarningMessage(
         "Twinny could not tidy up the edit; use Undo (Ctrl+Z) to revert it."
       )
       return
     }
+    const what = pending.done ? "edit" : "hunk"
+    if (pending.done) this.clearPending()
+    else {
+      this.decorate()
+      this._emitter.fire()
+    }
     vscode.window.setStatusBarMessage(
-      verdict === "accept" ? "Twinny: edit accepted" : "Twinny: edit rejected",
+      `Twinny: ${what} ${verdict === "accept" ? "accepted" : "rejected"}`,
       3000
     )
   }
@@ -219,35 +239,53 @@ export class InlineEditService extends Base {
 
   private async askInstruction(
     editor: vscode.TextEditor,
-    range: vscode.Range
+    range: vscode.Range,
+    refine = false
   ): Promise<string | undefined> {
     const lines = range.end.line - range.start.line + 1
     const what =
       lines === 1
         ? `line ${range.start.line + 1}`
         : `lines ${range.start.line + 1}-${range.end.line + 1}`
-    const value = await vscode.window.showInputBox({
-      title: `Twinny: edit ${what} of ${vscode.workspace.asRelativePath(
-        editor.document.uri
-      )}`,
-      prompt: "Describe the change. Enter to preview it, Escape to cancel.",
-      placeHolder: "e.g. add error handling, convert to async/await, rename x to count",
-      ignoreFocusOut: true
-    })
+    const file = vscode.workspace.asRelativePath(editor.document.uri)
+    const value = await vscode.window.showInputBox(
+      refine
+        ? {
+            title: `Twinny: refine the edit in ${file}`,
+            prompt:
+              "Describe how to change the proposed code. Enter to preview, Escape to keep it as is.",
+            placeHolder: "e.g. shorter, keep the original names, add a comment",
+            ignoreFocusOut: true
+          }
+        : {
+            title: `Twinny: edit ${what} of ${file}`,
+            prompt: "Describe the change. Enter to preview it, Escape to cancel.",
+            placeHolder:
+              "e.g. add error handling, convert to async/await, rename x to count",
+            ignoreFocusOut: true
+          }
+    )
     return value?.trim() || undefined
   }
 
+  /**
+   * Ask the model and stream the answer into `region`. A fresh region
+   * edits the selection; a pending one edits its proposal, and the diff
+   * keeps showing against what was there before.
+   */
   private async edit(
     editor: vscode.TextEditor,
-    range: vscode.Range,
+    region: DiffRegion,
     instruction: string,
     provider: TwinnyProvider
   ) {
     const document = editor.document
-    const original = document.getText(range)
+    const range = region.range
+    const { baseline, proposed } = region.sides()
+    const snapshot = region.snapshot()
     const messages = buildEditMessages({
       instruction,
-      code: original,
+      code: proposed,
       language: document.languageId,
       fileName: vscode.workspace.asRelativePath(document.uri),
       before: clampContext(
@@ -279,7 +317,6 @@ export class InlineEditService extends Base {
       apiKey: provider.apiKey
     })
 
-    const region = new DiffRegion(editor, range)
     this._pending = region
     this.begin()
     let reply = ""
@@ -303,7 +340,7 @@ export class InlineEditService extends Base {
           if (!delta) continue
           reply += delta
           await region.render(
-            layoutDiff(original, previewEdit(reply, original), true)
+            layoutDiff(baseline, previewEdit(reply, proposed), true)
           )
           this.decorate()
         }
@@ -323,22 +360,25 @@ export class InlineEditService extends Base {
       }
 
       if (this._controller?.signal.aborted) {
-        await region.restore(original)
-        this.clearPending()
+        await this.rewind(region, snapshot)
         vscode.window.setStatusBarMessage("Twinny: edit cancelled", 3000)
         return
       }
 
-      const final = finalizeEdit(reply, original)
-      const layout = layoutDiff(original, final)
+      const final = finalizeEdit(reply, proposed)
       logger.log(`Inline edit response: ${final.length} chars`)
-      if (!layout.removed.length && !layout.added.length) {
-        await region.restore(original)
+      if (final === proposed) {
+        await this.rewind(region, snapshot)
+        vscode.window.setStatusBarMessage("Twinny: no changes suggested", 4000)
+        return
+      }
+      const layout = layoutDiff(baseline, final)
+      await region.render(layout)
+      if (region.done) {
         this.clearPending()
         vscode.window.setStatusBarMessage("Twinny: no changes suggested", 4000)
         return
       }
-      await region.render(layout)
       this.end()
       this.decorate()
       void vscode.commands.executeCommand(
@@ -349,8 +389,8 @@ export class InlineEditService extends Base {
       this._emitter.fire()
       vscode.window.setStatusBarMessage(REVIEW_HINT, 8000)
     } catch (error) {
-      if (!region.broken) await region.restore(original)
-      this.clearPending()
+      if (!region.broken) await this.rewind(region, snapshot)
+      else this.clearPending()
       if (!isAbortError(error)) {
         logger.error(error instanceof Error ? error : String(error))
         vscode.window.showErrorMessage(
@@ -360,6 +400,18 @@ export class InlineEditService extends Base {
     } finally {
       if (this._running) this.end()
     }
+  }
+
+  /** Put the region back the way it was before a request started. */
+  private async rewind(region: DiffRegion, snapshot: DiffLayout) {
+    await region.render(snapshot)
+    if (region.done) {
+      this.clearPending()
+      return
+    }
+    this.end()
+    this.decorate()
+    this._emitter.fire()
   }
 
   /** Paint the pending diff in every editor showing its document. */
@@ -468,12 +520,10 @@ export class DiffRegion {
   private _queue: Promise<boolean> = Promise.resolve(true)
   private _first = true
   private _applying = false
-  private _current: string
 
   constructor(private readonly _editor: vscode.TextEditor, range: vscode.Range) {
     this.document = _editor.document
     this.range = range
-    this._current = this.document.getText(range)
   }
 
   /** Replace the region with a layout; resolves false once it cannot. */
@@ -482,39 +532,113 @@ export class DiffRegion {
     return this._queue
   }
 
-  /** Put `original` back and close the undo stop. */
-  public restore(original: string): Promise<boolean> {
-    return this.render({
-      text: original,
-      removed: [],
-      added: [],
-      removedWords: [],
-      addedWords: []
-    })
+  /** The two sides of the diff as the document shows them right now. */
+  public sides(): { baseline: string; proposed: string } {
+    const lines = this.document.getText(this.range).split("\n")
+    const base = this.range.start.line
+    const removed = new Set(this.removed.map((line) => line - base))
+    const added = new Set(this.added.map((line) => line - base))
+    return {
+      baseline: lines.filter((_, i) => !added.has(i)).join("\n"),
+      proposed: lines.filter((_, i) => !removed.has(i)).join("\n")
+    }
+  }
+
+  /** The current state as a layout, so it can be rendered again later. */
+  public snapshot(): DiffLayout {
+    const base = this.range.start.line
+    const local = (span: Span) => ({ ...span, line: span.line - base })
+    return {
+      text: this.document.getText(this.range),
+      removed: this.removed.map((line) => line - base),
+      added: this.added.map((line) => line - base),
+      removedWords: this.removedWords.map(local),
+      addedWords: this.addedWords.map(local)
+    }
   }
 
   /** Delete the losing side's lines and close the undo stop. */
   public async settle(
     editor: vscode.TextEditor,
-    verdict: "accept" | "reject"
+    verdict: "accept" | "reject",
+    hunk?: number
   ): Promise<boolean> {
     await this._queue
     if (this.broken) return false
-    const doomed = verdict === "accept" ? this.removed : this.added
-    if (!doomed.length) return true
-    this._applying = true
-    try {
-      return await editor.edit(
-        (builder) => {
-          for (const range of lineRuns(this.document, doomed)) {
-            builder.delete(range)
-          }
-        },
-        { undoStopBefore: false, undoStopAfter: true }
-      )
-    } finally {
-      this._applying = false
+    const hunks = this.hunks
+    const targets = hunk === undefined ? hunks : [hunks[hunk]].filter(Boolean)
+    const doomed = targets.flatMap((h) => (verdict === "accept" ? h.removed : h.added))
+    const settled = new Set(targets.flatMap((h) => [...h.removed, ...h.added]))
+    const last = settled.size === this.removed.length + this.added.length
+
+    let ok = true
+    if (doomed.length) {
+      this._applying = true
+      try {
+        ok = await editor.edit(
+          (builder) => {
+            for (const range of lineRuns(this.document, doomed)) {
+              builder.delete(range)
+            }
+          },
+          { undoStopBefore: false, undoStopAfter: last }
+        )
+      } finally {
+        this._applying = false
+      }
     }
+    if (!ok) {
+      this.broken = true
+      return false
+    }
+
+    // Forget the settled hunks and close the gaps the deletions left.
+    const gone = [...doomed].sort((a, b) => a - b)
+    const shift = (line: number) => {
+      let n = 0
+      while (n < gone.length && gone[n] < line) n++
+      return line - n
+    }
+    const keep = (line: number) => !settled.has(line)
+    this.removed = this.removed.filter(keep).map(shift)
+    this.added = this.added.filter(keep).map(shift)
+    const keepSpan = (span: Span) => keep(span.line)
+    const shiftSpan = (span: Span) => ({ ...span, line: shift(span.line) })
+    this.removedWords = this.removedWords.filter(keepSpan).map(shiftSpan)
+    this.addedWords = this.addedWords.filter(keepSpan).map(shiftSpan)
+    const end = Math.max(this.range.start.line, shift(this.range.end.line + 1) - 1)
+    this.range = new vscode.Range(
+      this.range.start.line,
+      0,
+      end,
+      this.document.lineAt(end).range.end.character
+    )
+    return true
+  }
+
+  /** Nothing left to decide. */
+  public get done() {
+    return !this.removed.length && !this.added.length
+  }
+
+  /** The diff lines grouped into runs of neighbours. */
+  public get hunks(): Hunk[] {
+    const lines = [
+      ...this.removed.map((line) => ({ line, removed: true })),
+      ...this.added.map((line) => ({ line, removed: false }))
+    ].sort((a, b) => a.line - b.line)
+    const hunks: Hunk[] = []
+    for (const { line, removed } of lines) {
+      let hunk = hunks[hunks.length - 1]
+      const previous = hunk && Math.max(...hunk.removed, ...hunk.added)
+      if (!hunk || line !== previous + 1) {
+        hunk = { line, removed: [], added: [] }
+        hunks.push(hunk)
+      }
+      const side = removed ? hunk.removed : hunk.added
+      side.push(line)
+    }
+    return hunks
   }
 
   /** Follow changes somebody else made; false when they were our own. */
@@ -562,7 +686,7 @@ export class DiffRegion {
   private async replace(layout: DiffLayout): Promise<boolean> {
     if (this.broken) return false
     const start = this.range.start
-    if (layout.text !== this._current) {
+    if (layout.text !== this.document.getText(this.range)) {
       this._applying = true
       let ok: boolean
       try {
@@ -579,7 +703,6 @@ export class DiffRegion {
         return false
       }
       this.range = endOf(start, layout.text)
-      this._current = layout.text
     }
     this.removed = layout.removed.map((line) => start.line + line)
     this.added = layout.added.map((line) => start.line + line)

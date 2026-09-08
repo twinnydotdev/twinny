@@ -84,6 +84,61 @@ suite("Inline edit region", () => {
     v.dispose()
   })
 
+  test("settles one hunk at a time", async () => {
+    const t = await open("a\nb\nc\nd\ne", 0, 4)
+    await t.region.render(layoutDiff("a\nb\nc\nd\ne", "A\nb\nc\nD\ne"))
+    assert.strictEqual(t.document.getText(), "a\nA\nb\nc\nd\nD\ne")
+    assert.deepStrictEqual(
+      t.region.hunks,
+      [
+        { line: 0, removed: [0], added: [1] },
+        { line: 4, removed: [4], added: [5] }
+      ]
+    )
+
+    assert.ok(await t.region.settle(t.editor, "accept", 0))
+    assert.strictEqual(t.document.getText(), "A\nb\nc\nd\nD\ne")
+    assert.ok(!t.region.done)
+    assert.deepStrictEqual(t.region.hunks, [{ line: 3, removed: [3], added: [4] }])
+    assert.deepStrictEqual(t.region.removedWords, [])
+
+    assert.ok(await t.region.settle(t.editor, "reject", 0))
+    assert.strictEqual(t.document.getText(), "A\nb\nc\nd\ne")
+    assert.ok(t.region.done)
+
+    await vscode.commands.executeCommand("undo")
+    assert.strictEqual(t.document.getText(), "a\nb\nc\nd\ne", "still one undo step")
+    t.dispose()
+  })
+
+  test("exposes both sides and can rewind to a snapshot", async () => {
+    const t = await open("a\nb\nc", 0, 2)
+    await t.region.render(layoutDiff("a\nb\nc", "a\nB\nc\nd"))
+    assert.deepStrictEqual(t.region.sides(), {
+      baseline: "a\nb\nc",
+      proposed: "a\nB\nc\nd"
+    })
+
+    const snapshot = t.region.snapshot()
+    assert.strictEqual(snapshot.text, "a\nb\nB\nc\nd")
+    assert.deepStrictEqual(snapshot.removed, [1])
+    assert.deepStrictEqual(snapshot.added, [2, 4])
+
+    // A refinement streams over the region, then is abandoned.
+    await t.region.render(layoutDiff("a\nb\nc", "a\nX", true))
+    await t.region.render(snapshot)
+    assert.strictEqual(t.document.getText(), "a\nb\nB\nc\nd")
+    assert.deepStrictEqual(t.region.removed, [1])
+    assert.deepStrictEqual(t.region.added, [2, 4])
+
+    // After settling a hunk the range still covers whole lines.
+    assert.ok(await t.region.settle(t.editor, "accept", 0))
+    assert.strictEqual(t.document.getText(), "a\nB\nc\nd")
+    assert.strictEqual(t.document.getText(t.region.range), "a\nB\nc\nd")
+    assert.deepStrictEqual(t.region.sides(), { baseline: "a\nB\nc", proposed: "a\nB\nc\nd" })
+    t.dispose()
+  })
+
   test("follows lines inserted above and edits inside the diff", async () => {
     const t = await open("a\nb\nc", 1, 1)
     await t.region.render(layoutDiff("b", "B"))
