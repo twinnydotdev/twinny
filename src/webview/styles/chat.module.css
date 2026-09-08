@@ -80,6 +80,149 @@
 }
 
 /*
+ * Before the first message. Quiet: the title types itself out under a
+ * block cursor, then the line naming the provider fades in. Nothing else
+ * moves, and nothing moves under prefers-reduced-motion.
+ */
+.emptyChat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 var(--tw-pad);
+}
+
+.crt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+
+.crtGlyph {
+  color: var(--tw-fg-faint);
+  font-family: var(--tw-font);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.crtTitle {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  max-width: 100%;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: none;
+}
+
+.crtTyped {
+  display: inline-block;
+  max-width: calc(var(--chars) * 1ch + var(--chars) * var(--tw-track));
+  overflow: hidden;
+  white-space: nowrap;
+  animation: crt-type 0.9s steps(var(--chars), end) 0.2s both;
+}
+
+.crtCursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  margin-left: 2px;
+  background: var(--tw-cursor);
+  animation: crt-blink 1s steps(2, start) infinite;
+}
+
+/* Wraps between items only, never inside a model name. */
+.crtLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 8px;
+  max-width: 100%;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
+  animation: crt-fade 0.4s ease-out 1.1s both;
+}
+
+.crtLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.crtLabel .codicon {
+  flex-shrink: 0;
+  font-size: 13px !important;
+}
+
+/* A sentence, not a tag: it may wrap, and takes the whole line. */
+.crtNote {
+  flex-basis: 100%;
+  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  text-align: left;
+  white-space: normal;
+}
+
+.crtNote .codicon {
+  margin-top: 2px;
+}
+
+.crtProvider {
+  color: var(--tw-fg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.crtModel {
+  max-width: 100%;
+  color: var(--tw-code);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes crt-type {
+  from {
+    max-width: 0;
+  }
+}
+
+@keyframes crt-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@keyframes crt-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crtTyped,
+  .crtCursor,
+  .crtLine {
+    animation: none;
+  }
+}
+
+/*
  * Status strip between the transcript and the composer. Empty most of the
  * time, so it collapses to a hairline rather than reserving a bar of space.
  */
@@ -147,6 +290,15 @@
 
 .chatBox:focus-within {
   background: var(--tw-surface);
+}
+
+.chatBoxDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chatBoxDisabled .tiptap {
+  pointer-events: none;
 }
 
 /* The prompt glyph is the one place colour is spent. */

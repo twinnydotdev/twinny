@@ -1,16 +1,18 @@
-import React, { useState } from "react"
+import React, { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
 import {
   API_PROVIDERS,
   DEFAULT_PROVIDER_FORM_VALUES,
+  EVENT_NAME,
   FIM_TEMPLATE_FORMAT
 } from "../../common/constants"
 import {
   P2pDeviceStatus,
   ProviderTestResult
 } from "../../common/messaging/protocol"
+import { pickModel } from "../../common/model-pick"
 import {
   getEndpointDefaults,
   isP2pProvider,
@@ -19,12 +21,14 @@ import {
 } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
 import { useProviders } from "../hooks/useProviders"
+import { emit } from "../messaging"
 
 import { DeviceJobs, DevicesSection } from "./devices"
 import { PresetGallery } from "./presets"
 import { ProviderCard } from "./provider-card"
-import { pickModel, ProviderForm } from "./provider-form"
+import { ProviderForm } from "./provider-form"
 import { SetupCheck } from "./setup-check"
+import { Welcome } from "./welcome"
 
 import styles from "../styles/providers.module.css"
 
@@ -39,7 +43,7 @@ const SECTION_ICONS: Record<ProviderType, string> = {
   embedding: "database"
 }
 
-/** A blank draft for the custom form, pointed at Ollama's usual address. */
+/** A blank draft for the custom form: any OpenAI-compatible server, on the usual local port. */
 const blankProvider = (type: ProviderType): TwinnyProvider => {
   const defaults = getEndpointDefaults(DEFAULT_PROVIDER_FORM_VALUES.provider, type)
   return {
@@ -68,9 +72,17 @@ const deviceProvider = (
   ...(type === "fim" ? { fimTemplate: FIM_TEMPLATE_FORMAT.automatic } : {})
 })
 
-export const Providers = () => {
+interface ProvidersProps {
+  /** Called once a chat provider exists where there was none: back to chat. */
+  onDone?: () => void
+}
+
+export const Providers = ({ onDone }: ProvidersProps) => {
   const { t } = useTranslation()
   const [view, setView] = useState<View>({ name: "list" })
+  // Set when the gallery was opened from the welcome, so saving the first
+  // chat provider finishes the setup rather than showing the list.
+  const fromWelcome = useRef(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [results, setResults] = useState<Record<string, ProviderTestResult>>({})
   const [testing, setTesting] = useState<Set<string>>(new Set())
@@ -171,6 +183,17 @@ export const Providers = () => {
   const openForm = (provider: TwinnyProvider) => setView({ name: "form", provider })
   const closeView = () => setView({ name: "list" })
 
+  const finishSetup = () => {
+    fromWelcome.current = false
+    emit(EVENT_NAME.twinnyHideBackButton)
+    onDone?.()
+  }
+
+  const chooseFromWelcome = (type: ProviderType) => {
+    fromWelcome.current = true
+    openGallery(type)
+  }
+
   if (view.name === "gallery") {
     return (
       <div className={styles.page}>
@@ -198,11 +221,16 @@ export const Providers = () => {
               delete next[saved.id]
               return next
             })
+            if (fromWelcome.current && saved.type === "chat") finishSetup()
           }}
         />
       </div>
     )
   }
+
+  // Nothing configured: the welcome takes the whole tab. The header stays
+  // so the toolbar (import, in particular) is still reachable.
+  const empty = Object.keys(providers).length === 0
 
   const renderSection = (type: ProviderType) => {
     // Device-backed providers live on their device card, not here.
@@ -322,6 +350,17 @@ export const Providers = () => {
         </div>
       )}
 
+      {empty && (
+        <Welcome
+          onChoose={chooseFromWelcome}
+          onImport={triggerImportProviders}
+          onUsed={(created) => {
+            if (created.some((p) => p.type === "chat")) finishSetup()
+          }}
+        />
+      )}
+
+      {!empty && (
       <SetupCheck
         roles={PROVIDER_TYPES.map((type) => {
           const provider = activeProviders[type]
@@ -337,10 +376,11 @@ export const Providers = () => {
         onAdd={openGallery}
         onFix={openForm}
       />
+      )}
 
       <DevicesSection onUse={assignDevice} jobsFor={jobsFor} />
 
-      {PROVIDER_TYPES.map(renderSection)}
+      {!empty && PROVIDER_TYPES.map(renderSection)}
     </div>
   )
 }

@@ -12,7 +12,6 @@ export const EVENT_NAME = {
   twinnyChatMessage: "twinny-chat-message",
   twinnyClickSuggestion: "twinny-click-suggestion",
   twinnyEditDefaultTemplates: "twinny-edit-default-templates",
-  twinnyFetchOllamaModels: "twinny-fetch-ollama-models",
   twinnyFileListRequest: "twinny-file-list-request",
   twinnyGetConfigValue: "twinny-get-config-value",
   twinnyGetContextItems: "twinny-get-context-items",
@@ -67,6 +66,7 @@ export const EMBEDDING_EVENT_NAME = {
 export const PROVIDER_EVENT_NAME = {
   addProvider: "twinny.add-provider",
   copyProvider: "twinny.copy-provider",
+  discoverProviders: "twinny.discover-providers",
   exportProviders: "twinny.export-providers",
   focusProviderTab: "twinny.focus-provider-tab",
   getActiveChatProvider: "twinny.get-active-provider",
@@ -81,7 +81,8 @@ export const PROVIDER_EVENT_NAME = {
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
   testProvider: "twinny.test-provider",
-  updateProvider: "twinny.update-provider"
+  updateProvider: "twinny.update-provider",
+  useDiscoveredServer: "twinny.use-discovered-server"
 } as const
 
 export const P2P_EVENT_NAME = {

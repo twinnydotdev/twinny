@@ -5,10 +5,7 @@ import Mention from "@tiptap/extension-mention"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Editor, EditorContent, JSONContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
-import {
-  VSCodeButton,
-  VSCodePanelView
-} from "@vscode/webview-ui-toolkit/react"
+import { VSCodeButton, VSCodePanelView } from "@vscode/webview-ui-toolkit/react"
 import * as cheerio from "cheerio"
 import cx from "classnames"
 import { v4 as uuidv4 } from "uuid"
@@ -23,11 +20,13 @@ import {
 
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useConversationHistory } from "./hooks/useConversationHistory"
+import { useProviders } from "./hooks/useProviders"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
 import { useTheme } from "./hooks/useTheme"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { ProviderSelect } from "./providers/provider-select"
+import { EmptyChat } from "./empty-chat"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { emit, useServerEvent } from "./messaging"
@@ -55,6 +54,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const [isLoading, setIsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [messages, setMessages] = useState<ChatCompletionMessage[]>([])
+  // Nothing can answer without a chat provider, so the composer is off
+  // until one is set; the empty transcript says where to set it.
+  const { chatProvider, ready: providersReady } = useProviders()
+  const chatDisabled = providersReady && !chatProvider
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { contextItems, removeContextItem } = useWorkspaceContext()
@@ -258,7 +261,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       .text()
       .trim()
 
-    if (!text || generatingRef.current || !input) return
+    if (!text || generatingRef.current || !input || chatDisabled) return
 
     generatingRef.current = true
 
@@ -267,7 +270,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(true)
     clearEditor()
 
-    const conversationId = conversation?.id || uuidv4();
+    const conversationId = conversation?.id || uuidv4()
 
     setMessages((prevMessages) => {
       const updatedMessages: ChatCompletionMessage[] = [
@@ -283,7 +286,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         id: conversationId,
         messages: updatedMessages,
         title: conversation?.title || t("chat-new-conversation-title")
-      };
+      }
 
       imagesRef.current = []
       saveLastConversation(currentConversation)
@@ -297,17 +300,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       return updatedMessages
     })
-  }, [
-    conversation?.id,
-    t
-  ])
+  }, [conversation?.id, t, chatDisabled])
 
   const handleNewConversation = useCallback(() => {
     setActiveConversation({
       id: uuidv4(),
       title: t("chat-new-conversation-title"),
       messages: []
-    });
+    })
 
     emit(EVENT_NAME.twinnyNewConversation)
   }, [setActiveConversation, t])
@@ -338,9 +338,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [JSON.stringify(filePaths)]
   )
 
-
   const CustomImageExtension = createCustomImageExtension((id: string) => {
-    imagesRef.current = imagesRef.current.filter(img => img.id !== id)
+    imagesRef.current = imagesRef.current.filter((img) => img.id !== id)
   })
 
   const editor = useEditor(
@@ -357,84 +356,118 @@ export const Chat = (props: ChatProps): JSX.Element => {
           }
         }),
         CustomImageExtension.configure({
-          allowBase64: true,
+          allowBase64: true
         }),
         CustomKeyMap.configure({
           handleSubmitForm,
           clearEditor
         }),
         Placeholder.configure({
-          placeholder: t("placeholder")
+          placeholder: t("placeholder"),
+          // Still shown while the composer is off for want of a provider.
+          showOnlyWhenEditable: false
         })
       ]
     },
     [memoizedSuggestion, handleSubmitForm, clearEditor, t, imagesRef]
   )
 
-  const handleImageUpload = useCallback((file: File) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string
-      const imageData = base64.startsWith("data:") ? base64 : `data:${file.type};base64,${base64.split(",").pop()}`
-      const id = crypto.randomUUID()
-      const newImage = { id, data: imageData, type: file.type }
+  useEffect(() => {
+    editor?.setEditable(!chatDisabled)
+  }, [editor, chatDisabled])
 
-      imagesRef.current = [...imagesRef.current, newImage]
+  const handleImageUpload = useCallback(
+    (file: File) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string
+        const imageData = base64.startsWith("data:")
+          ? base64
+          : `data:${file.type};base64,${base64.split(",").pop()}`
+        const id = crypto.randomUUID()
+        const newImage = { id, data: imageData, type: file.type }
 
-      const { state } = editor?.view || {}
+        imagesRef.current = [...imagesRef.current, newImage]
 
-      if (state) {
-        if (state.selection.empty && state.selection.$head.pos === state.doc.content.size) {
+        const { state } = editor?.view || {}
+
+        if (state) {
+          if (
+            state.selection.empty &&
+            state.selection.$head.pos === state.doc.content.size
+          ) {
+            editor?.chain().focus().createParagraphNear().run()
+          }
+
+          editor
+            ?.chain()
+            .focus()
+            .insertContent({
+              type: "image",
+              attrs: { src: imageData, id }
+            })
+            .run()
+
           editor?.chain().focus().createParagraphNear().run()
+        } else {
+          editor
+            ?.chain()
+            .focus()
+            .insertContent({
+              type: "image",
+              attrs: { src: imageData, id }
+            })
+            .run()
         }
-
-        editor?.chain().focus().insertContent({
-          type: "image",
-          attrs: { src: imageData, id }
-        }).run()
-
-        editor?.chain().focus().createParagraphNear().run()
-      } else {
-        editor?.chain().focus().insertContent({
-          type: "image",
-          attrs: { src: imageData, id }
-        }).run()
       }
-    }
-    reader.readAsDataURL(file)
-  }, [editor])
+      reader.readAsDataURL(file)
+    },
+    [editor]
+  )
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith("image/"))
-    files.forEach(handleImageUpload)
-  }, [handleImageUpload])
-
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLFormElement>) => {
-    const items = Array.from(e.clipboardData?.items || [])
-    const imageItem = items.find(item => item.type.startsWith("image/"))
-
-    if (imageItem) {
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
       e.preventDefault()
-      const file = imageItem.getAsFile()
-      if (file) handleImageUpload(file)
-      return
-    }
+      const files = Array.from(e.dataTransfer.files).filter((file) =>
+        file.type.startsWith("image/")
+      )
+      files.forEach(handleImageUpload)
+    },
+    [handleImageUpload]
+  )
 
-  }, [handleImageUpload])
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLFormElement>) => {
+      const items = Array.from(e.clipboardData?.items || [])
+      const imageItem = items.find((item) => item.type.startsWith("image/"))
+
+      if (imageItem) {
+        e.preventDefault()
+        const file = imageItem.getAsFile()
+        if (file) handleImageUpload(file)
+        return
+      }
+    },
+    [handleImageUpload]
+  )
 
   const handleFileSelect = useCallback(() => {
     fileInputRef.current?.click()
   }, [])
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(file => file.type.startsWith("image/"))
-    files.forEach(handleImageUpload)
-    e.target.value = ""
-  }, [handleImageUpload])
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []).filter((file) =>
+        file.type.startsWith("image/")
+      )
+      files.forEach(handleImageUpload)
+      e.target.value = ""
+    },
+    [handleImageUpload]
+  )
 
   const handleDeleteImage = (id: string) => {
-    imagesRef.current = imagesRef.current.filter(img => img.id !== id)
+    imagesRef.current = imagesRef.current.filter((img) => img.id !== id)
   }
 
   useAutosizeTextArea(chatRef, editorRef.current?.getText() || "")
@@ -502,11 +535,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
     []
   )
 
-  const handleResizeEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!resizeRef.current) return
-    resizeRef.current = null
-    e.currentTarget.releasePointerCapture(e.pointerId)
-  }, [])
+  const handleResizeEnd = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!resizeRef.current) return
+      resizeRef.current = null
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    },
+    []
+  )
 
   const scrollToBottom = useCallback(() => {
     virtuosoRef.current?.scrollTo({
@@ -555,7 +591,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [handleOpenFile, removeContextItem]
   )
 
-
   const itemContent = useCallback(
     (index: number) => (
       <MessageItem
@@ -600,28 +635,34 @@ export const Chat = (props: ChatProps): JSX.Element => {
           </div>
         )}
         {!!contextItems.length && (
-          <div className={styles.contextItems}>{contextItems.map(renderContextItem)}</div>
+          <div className={styles.contextItems}>
+            {contextItems.map(renderContextItem)}
+          </div>
         )}
         <div className={styles.transcript}>
-          <Virtuoso
-            followOutput
-            style={{ height: "100%" }}
-            ref={virtuosoRef}
-            data={messages}
-            initialTopMostItemIndex={messages?.length}
-            defaultItemHeight={800}
-            itemContent={itemContent}
-            atBottomThreshold={20}
-            atBottomStateChange={(bottom) => setIsBottom(bottom)}
-            alignToBottom
-          />
+          {messages.length === 0 ? (
+            <EmptyChat />
+          ) : (
+            <Virtuoso
+              followOutput
+              style={{ height: "100%" }}
+              ref={virtuosoRef}
+              data={messages}
+              initialTopMostItemIndex={messages?.length}
+              defaultItemHeight={800}
+              itemContent={itemContent}
+              atBottomThreshold={20}
+              atBottomStateChange={(bottom) => setIsBottom(bottom)}
+              alignToBottom
+            />
+          )}
         </div>
         {!!selection.length && (
-          <Suggestions isDisabled={!!generatingRef.current} />
+          <Suggestions isDisabled={!!generatingRef.current || chatDisabled} />
         )}
         <div className={styles.chatOptions}>
           <div>
-            {!isBottom && (
+            {!isBottom && messages.length > 0 && (
               <VSCodeButton
                 appearance="icon"
                 onClick={scrollToBottom}
@@ -663,7 +704,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
           </div>
           <form onDrop={handleDrop} onPaste={handlePaste}>
             <div
-              className={styles.chatBox}
+              className={cx(styles.chatBox, {
+                [styles.chatBoxDisabled]: chatDisabled
+              })}
+              title={chatDisabled ? t("chat-disabled-no-provider") : undefined}
               onMouseDown={handleComposerMouseDown}
             >
               <input
@@ -695,6 +739,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 <VSCodeButton
                   appearance="icon"
                   role="button"
+                  disabled={chatDisabled}
                   onClick={handleFileSelect}
                   title={t("upload-image")}
                 >
@@ -703,6 +748,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 <VSCodeButton
                   appearance="icon"
                   role="button"
+                  disabled={chatDisabled}
                   onClick={handleSubmitForm}
                   title={t("send")}
                 >

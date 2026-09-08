@@ -7,9 +7,9 @@ import {
   PROVIDER_EVENT_NAME,
   REVIEW_EVENT_NAME
 } from "../constants"
+import type { DiscoveredServer } from "../provider-discovery"
 import type {
   AnyContextItem,
-  ApiModel,
   ChatCompletionMessage,
   Conversation,
   GitHubPr,
@@ -208,7 +208,6 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyChatMessage]: Channel<ChatRequest>
   [EVENT_NAME.twinnyClickSuggestion]: Channel<string>
   [EVENT_NAME.twinnyEditDefaultTemplates]: Channel
-  [EVENT_NAME.twinnyFetchOllamaModels]: Channel<void, ApiModel[]>
   [EVENT_NAME.twinnyFileListRequest]: Channel<void, string[]>
   [EVENT_NAME.twinnyGetConfigValue]: Channel<{ key: string }, ConfigValue>
   [EVENT_NAME.twinnyGetContextItems]: Channel
@@ -252,6 +251,7 @@ export interface ClientEvents {
 
   [PROVIDER_EVENT_NAME.addProvider]: Channel<TwinnyProvider, ProviderSaveResult>
   [PROVIDER_EVENT_NAME.copyProvider]: Channel<TwinnyProvider>
+  [PROVIDER_EVENT_NAME.discoverProviders]: Channel<void, DiscoveredServer[]>
   [PROVIDER_EVENT_NAME.exportProviders]: Channel
   [PROVIDER_EVENT_NAME.getActiveChatProvider]: Channel
   [PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider]: Channel
@@ -271,6 +271,10 @@ export interface ClientEvents {
   [PROVIDER_EVENT_NAME.updateProvider]: Channel<
     TwinnyProvider,
     ProviderSaveResult
+  >
+  [PROVIDER_EVENT_NAME.useDiscoveredServer]: Channel<
+    DiscoveredServer,
+    TwinnyProvider[]
   >
 
   [GITHUB_EVENT_NAME.getPullRequests]: Channel<PullRequestQuery, GitHubPr[]>
@@ -296,7 +300,6 @@ export interface ClientEvents {
 
 export interface ServerEvents {
   [EVENT_NAME.twinnyAddMessage]: ChatCompletionMessage | undefined
-  [EVENT_NAME.twinnyFetchOllamaModels]: ApiModel[]
   [EVENT_NAME.twinnyGetConfigValue]: ConfigValue
   [EVENT_NAME.twinnyGetModels]: ModelCatalogue
   [EVENT_NAME.twinnyGetWorkspaceContext]: ContextValue

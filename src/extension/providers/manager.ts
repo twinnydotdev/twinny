@@ -3,41 +3,29 @@ import { v4 as uuidv4 } from "uuid"
 import { ExtensionContext, Uri, window, workspace } from "vscode"
 
 import {
-  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
-  ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
-  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   API_PROVIDERS,
-  EVENT_NAME,
-  FIM_TEMPLATE_FORMAT,
-  GLOBAL_STORAGE_KEY,
-  INFERENCE_PROVIDERS_STORAGE_KEY,
   PROVIDER_EVENT_NAME,
-  TWINNY_PROVIDERS_FILENAME,
   WEBUI_TABS
 } from "../../common/constants"
 import { ProviderSaveResult } from "../../common/messaging/protocol"
+import { DiscoveredServer } from "../../common/provider-discovery"
 import {
   isProviderLike,
   normalizeProvider,
+  PROVIDER_TYPES,
   ProviderType,
   validateProvider
 } from "../../common/provider-validation"
-import { ApiModel, TwinnyProvider } from "../../common/types"
+import { TwinnyProvider } from "../../common/types"
 import { ExtensionBridge } from "../messaging/bridge"
 import { resolveProviderEndpoint } from "../p2p/endpoint"
 
-import { OllamaService } from "./ollama"
+import { applyDiscoveredServer, discoverLocalServers } from "./discovery"
 import { listProviderModels, testProvider } from "./probe"
+import { whenProviderSetupDone } from "./setup"
+import { asType, ProviderStore } from "./store"
 
 export type { TwinnyProvider }
-
-type Providers = Record<string, TwinnyProvider>
-
-const ACTIVE_KEYS: Record<ProviderType, string> = {
-  chat: ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
-  fim: ACTIVE_FIM_PROVIDER_STORAGE_KEY,
-  embedding: ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY
-}
 
 const ACTIVE_EVENTS = {
   chat: PROVIDER_EVENT_NAME.getActiveChatProvider,
@@ -45,59 +33,36 @@ const ACTIVE_EVENTS = {
   embedding: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider
 } as const
 
-const EMBEDDING_MODEL_PATTERN = /embed|minilm|bge|e5|nomic/i
-const FIM_MODEL_PATTERN =
-  /code|coder|fim|starcoder|codestral|codegemma|stable-code/i
-
-const FALLBACK_CHAT_MODEL = "codellama:7b-instruct"
-const FALLBACK_FIM_MODEL = "codellama:7b-code"
-const FALLBACK_EMBEDDINGS_MODEL = "all-minilm:latest"
-
-const asType = (type: string): ProviderType =>
-  type === "fim" || type === "embedding" ? type : "chat"
-
 /**
- * Owns the list of providers and which one is active for each job.
- *
- * Providers live either in global state or in a JSON file (a setting), and
- * the active chat / FIM / embedding provider is a separate global-state entry
- * each, so the request paths can read it without touching the list.
+ * The webview's window onto the provider list: every add, edit, switch,
+ * test and import comes through here, and every change is announced back.
+ * Storage itself is `ProviderStore`, which activation also uses.
  */
 export class ProviderManager {
-  private readonly _context: ExtensionContext
+  private readonly _store: ProviderStore
   private readonly _bridge: ExtensionBridge
-  private readonly _storageLocation: string
 
   constructor(context: ExtensionContext, bridge: ExtensionBridge) {
-    this._context = context
+    this._store = new ProviderStore(context)
     this._bridge = bridge
-    this._storageLocation =
-      workspace.getConfiguration("twinny").get("providerStorageLocation") ||
-      "globalState"
     void this._initialize()
     this._registerHandlers()
   }
 
   private async _initialize(): Promise<void> {
-    const providers = await this.getProviders()
-    if (Object.keys(providers).length === 0) {
-      const legacy = this._context.globalState.get<Providers>(
-        INFERENCE_PROVIDERS_STORAGE_KEY
-      )
-      if (this._storageLocation === "file" && legacy && Object.keys(legacy).length) {
-        await this._saveProviders(legacy)
-      } else {
-        await this.addDefaultProviders()
-      }
-    }
-    await this._repairActiveProviders()
+    // First-run discovery may still be probing; showing an empty list it
+    // is about to fill would send the person off to configure by hand.
+    await whenProviderSetupDone()
+    await this._store.repairActive()
     await this.broadcastProviders()
+    if (!(await this._store.hasProviders())) this.focusProviderTab()
   }
 
   private _registerHandlers() {
     this._bridge.handleAll({
       [PROVIDER_EVENT_NAME.addProvider]: (p) => this.addProvider(p),
       [PROVIDER_EVENT_NAME.copyProvider]: (p) => this.copyProvider(p),
+      [PROVIDER_EVENT_NAME.discoverProviders]: () => discoverLocalServers(),
       [PROVIDER_EVENT_NAME.exportProviders]: () => this.exportProviders(),
       [PROVIDER_EVENT_NAME.getActiveChatProvider]: () =>
         void this.broadcastActive("chat"),
@@ -120,172 +85,29 @@ export class ProviderManager {
         this.setActiveProvider("fim", p),
       [PROVIDER_EVENT_NAME.testProvider]: (p) =>
         testProvider(resolveProviderEndpoint(normalizeProvider(p))),
-      [PROVIDER_EVENT_NAME.updateProvider]: (p) => this.updateProvider(p)
+      [PROVIDER_EVENT_NAME.updateProvider]: (p) => this.updateProvider(p),
+      [PROVIDER_EVENT_NAME.useDiscoveredServer]: (server) =>
+        this.useDiscoveredServer(server)
     })
   }
 
   /* ------------------------------------------------------------------------ */
-  /*  Defaults                                                                */
+  /*  Reading                                                                  */
   /* ------------------------------------------------------------------------ */
 
-  public getOllamaConnection() {
-    const config = workspace.getConfiguration("twinny")
-    return {
-      apiHostname: config.get<string>("ollamaHostname") || "0.0.0.0",
-      apiPort: config.get<number>("ollamaApiPort") || 11434,
-      apiProtocol: config.get<boolean>("ollamaUseTls") ? "https" : "http"
-    }
-  }
-
-  /**
-   * The models installed locally, so the default providers point at something
-   * which actually exists instead of a hardcoded name which 404s on first run.
-   */
-  private async _getInstalledOllamaModels(): Promise<string[]> {
-    try {
-      const models = (await new OllamaService().fetchModels()) as ApiModel[]
-      return models.map((model) => model?.name).filter(Boolean)
-    } catch {
-      return []
-    }
-  }
-
-  public getDefaultChatProvider(installedModels: string[] = []): TwinnyProvider {
-    return {
-      ...this.getOllamaConnection(),
-      apiPath: "/v1",
-      id: uuidv4(),
-      label: "Ollama",
-      modelName:
-        installedModels.find((model) => !EMBEDDING_MODEL_PATTERN.test(model)) ||
-        FALLBACK_CHAT_MODEL,
-      provider: API_PROVIDERS.Ollama,
-      type: "chat"
-    }
-  }
-
-  public getDefaultEmbeddingsProvider(
-    installedModels: string[] = []
-  ): TwinnyProvider {
-    return {
-      ...this.getOllamaConnection(),
-      apiPath: "/api/embed",
-      id: uuidv4(),
-      label: "Ollama Embedding",
-      modelName:
-        installedModels.find((model) => EMBEDDING_MODEL_PATTERN.test(model)) ||
-        FALLBACK_EMBEDDINGS_MODEL,
-      provider: API_PROVIDERS.Ollama,
-      type: "embedding"
-    }
-  }
-
-  public getDefaultFimProvider(installedModels: string[] = []): TwinnyProvider {
-    const fimModel = installedModels.find(
-      (model) =>
-        FIM_MODEL_PATTERN.test(model) && !EMBEDDING_MODEL_PATTERN.test(model)
-    )
-    return {
-      ...this.getOllamaConnection(),
-      apiPath: "/api/generate",
-      fimTemplate: fimModel
-        ? FIM_TEMPLATE_FORMAT.automatic
-        : FIM_TEMPLATE_FORMAT.codellama,
-      id: uuidv4(),
-      label: "Ollama FIM",
-      modelName: fimModel || FALLBACK_FIM_MODEL,
-      provider: API_PROVIDERS.Ollama,
-      type: "fim"
-    }
-  }
-
-  public async addDefaultProviders(): Promise<TwinnyProvider[]> {
-    const installed = await this._getInstalledOllamaModels()
-    const defaults = [
-      this.getDefaultChatProvider(installed),
-      this.getDefaultFimProvider(installed),
-      this.getDefaultEmbeddingsProvider(installed)
-    ]
-    const providers = await this.getProviders()
-    for (const provider of defaults) {
-      providers[provider.id] = provider
-      if (!this.getActiveProvider(asType(provider.type))) {
-        await this._storeActive(asType(provider.type), provider)
-      }
-    }
-    await this._saveProviders(providers)
-    return defaults
-  }
-
-  /* ------------------------------------------------------------------------ */
-  /*  Storage                                                                  */
-  /* ------------------------------------------------------------------------ */
-
-  private async _saveProviders(providers: Providers): Promise<void> {
-    if (this._storageLocation === "file") {
-      await this._saveProvidersToFile(providers)
-    } else {
-      await this._context.globalState.update(
-        INFERENCE_PROVIDERS_STORAGE_KEY,
-        providers
-      )
-    }
-  }
-
-  public async getProviders(): Promise<Providers> {
-    const providers =
-      this._storageLocation === "file"
-        ? await this._getProvidersFromFile()
-        : this._context.globalState.get<Providers>(
-            INFERENCE_PROVIDERS_STORAGE_KEY
-          )
-    return providers && typeof providers === "object" ? providers : {}
+  public getProviders() {
+    return this._store.getProviders()
   }
 
   public async broadcastProviders() {
     this._bridge.emit(
       PROVIDER_EVENT_NAME.getAllProviders,
-      await this.getProviders()
+      await this._store.getProviders()
     )
   }
 
-  private _providersFileUri() {
-    return Uri.joinPath(this._context.globalStorageUri, TWINNY_PROVIDERS_FILENAME)
-  }
-
-  private async _getProvidersFromFile(): Promise<Providers | undefined> {
-    try {
-      const content = await workspace.fs.readFile(this._providersFileUri())
-      return JSON.parse(new TextDecoder().decode(content)) as Providers
-    } catch {
-      return undefined
-    }
-  }
-
-  private async _saveProvidersToFile(providers: Providers): Promise<void> {
-    try {
-      await workspace.fs.createDirectory(this._context.globalStorageUri)
-      const content = JSON.stringify(providers, null, 2)
-      await workspace.fs.writeFile(
-        this._providersFileUri(),
-        new TextEncoder().encode(content)
-      )
-    } catch (e) {
-      console.error(e)
-      window.showErrorMessage(
-        `twinny could not write ${TWINNY_PROVIDERS_FILENAME}: ${
-          e instanceof Error ? e.message : String(e)
-        }`
-      )
-    }
-  }
-
-  /* ------------------------------------------------------------------------ */
-  /*  Active providers                                                         */
-  /* ------------------------------------------------------------------------ */
-
   public getActiveProvider(type: ProviderType): TwinnyProvider | undefined {
-    return this._context.globalState.get<TwinnyProvider>(ACTIVE_KEYS[type])
+    return this._store.getActive(type)
   }
 
   public getActiveChatProvider() {
@@ -300,19 +122,21 @@ export class ProviderManager {
     return this.getActiveProvider("embedding")
   }
 
-  private async _storeActive(type: ProviderType, provider?: TwinnyProvider) {
-    await this._context.globalState.update(ACTIVE_KEYS[type], provider)
-    if (type === "chat") {
-      await this._context.globalState.update(
-        `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.selectedModel}`,
-        provider?.modelName
-      )
-    }
+  public broadcastActive(type: ProviderType) {
+    this._bridge.emit(ACTIVE_EVENTS[type], this._store.getActive(type))
   }
 
-  public broadcastActive(type: ProviderType) {
-    this._bridge.emit(ACTIVE_EVENTS[type], this.getActiveProvider(type))
+  private broadcastAllActive() {
+    for (const type of PROVIDER_TYPES) this.broadcastActive(type)
   }
+
+  public focusProviderTab = () => {
+    this._bridge.emit(PROVIDER_EVENT_NAME.focusProviderTab, WEBUI_TABS.providers)
+  }
+
+  /* ------------------------------------------------------------------------ */
+  /*  Active providers                                                         */
+  /* ------------------------------------------------------------------------ */
 
   /**
    * Makes a provider the one used for a job. A model picked along the way
@@ -321,7 +145,7 @@ export class ProviderManager {
    */
   public async setActiveProvider(type: ProviderType, provider?: TwinnyProvider) {
     if (!provider) return
-    const providers = await this.getProviders()
+    const providers = await this._store.getProviders()
     const stored = providers[provider.id]
     let active = provider
     if (stored) {
@@ -329,11 +153,11 @@ export class ProviderManager {
       active = { ...stored, modelName }
       if (modelName !== stored.modelName) {
         providers[provider.id] = active
-        await this._saveProviders(providers)
+        await this._store.saveProviders(providers)
         await this.broadcastProviders()
       }
     }
-    await this._storeActive(type, active)
+    await this._store.setActive(type, active)
     this.broadcastActive(type)
   }
 
@@ -349,19 +173,32 @@ export class ProviderManager {
     return this.setActiveProvider("embedding", provider)
   }
 
+  /* ------------------------------------------------------------------------ */
+  /*  Discovery                                                                */
+  /* ------------------------------------------------------------------------ */
+
+  /** The providers tab's "use this one" on a server discovery found. */
+  public async useDiscoveredServer(
+    server?: DiscoveredServer
+  ): Promise<TwinnyProvider[]> {
+    if (!server) return []
+    const providers = await applyDiscoveredServer(this._store, server)
+    this.broadcastAllActive()
+    await this.broadcastProviders()
+    return providers
+  }
+
   /**
-   * An active entry can point at a provider that no longer exists (deleted
-   * from a file, or an older build that never cleared it). Fall back to any
-   * provider of the same type so the feature keeps working.
+   * Starts over: clears everything, which puts the tab back on its welcome.
+   * The welcome then searches for local servers and offers what it finds,
+   * so a reset looks exactly like a first run.
    */
-  private async _repairActiveProviders() {
-    const providers = Object.values(await this.getProviders())
-    for (const type of ["chat", "fim", "embedding"] as ProviderType[]) {
-      const active = this.getActiveProvider(type)
-      if (active && providers.some((p) => p.id === active.id)) continue
-      const replacement = providers.find((p) => p.type === type)
-      if (replacement || active) await this._storeActive(type, replacement)
-    }
+  public async resetProvidersToDefaults(): Promise<void> {
+    for (const type of PROVIDER_TYPES) await this._store.setActive(type, undefined)
+    await this._store.saveProviders({})
+    this.broadcastAllActive()
+    await this.broadcastProviders()
+    this.focusProviderTab()
   }
 
   /* ------------------------------------------------------------------------ */
@@ -380,16 +217,8 @@ export class ProviderManager {
     if (!result.success || !result.provider) return result
     const provider = { ...result.provider, id: uuidv4() }
 
-    const providers = await this.getProviders()
-    providers[provider.id] = provider
-    await this._saveProviders(providers)
-
-    const type = asType(provider.type)
-    if (!this.getActiveProvider(type)) {
-      await this._storeActive(type, provider)
-      this.broadcastActive(type)
-    }
-
+    const activated = await this._store.addAll([provider])
+    for (const type of activated) this.broadcastActive(type)
     await this.broadcastProviders()
     return { success: true, provider }
   }
@@ -404,29 +233,29 @@ export class ProviderManager {
       return { success: false, errors: { id: "The provider has no id." } }
     }
 
-    const providers = await this.getProviders()
+    const providers = await this._store.getProviders()
     const previous = providers[provider.id]
     providers[provider.id] = provider
-    await this._saveProviders(providers)
+    await this._store.saveProviders(providers)
 
-    for (const type of ["chat", "fim", "embedding"] as ProviderType[]) {
-      if (this.getActiveProvider(type)?.id !== provider.id) continue
+    for (const type of PROVIDER_TYPES) {
+      if (this._store.getActive(type)?.id !== provider.id) continue
       // Changing a provider's type leaves its old role without an active
       // entry; the same rules as a delete apply there.
       if (asType(provider.type) === type) {
-        await this._storeActive(type, provider)
+        await this._store.setActive(type, provider)
       } else {
         const replacement = Object.values(providers).find(
           (p) => p.type === type && p.id !== provider.id
         )
-        await this._storeActive(type, replacement)
+        await this._store.setActive(type, replacement)
       }
       this.broadcastActive(type)
     }
     if (previous?.type !== provider.type) {
       const type = asType(provider.type)
-      if (!this.getActiveProvider(type)) {
-        await this._storeActive(type, provider)
+      if (!this._store.getActive(type)) {
+        await this._store.setActive(type, provider)
         this.broadcastActive(type)
       }
     }
@@ -442,14 +271,14 @@ export class ProviderManager {
 
   public async removeProvider(provider?: TwinnyProvider) {
     if (!provider) return
-    const providers = await this.getProviders()
+    const providers = await this._store.getProviders()
     delete providers[provider.id]
-    await this._saveProviders(providers)
+    await this._store.saveProviders(providers)
 
-    for (const type of ["chat", "fim", "embedding"] as ProviderType[]) {
-      if (this.getActiveProvider(type)?.id !== provider.id) continue
+    for (const type of PROVIDER_TYPES) {
+      if (this._store.getActive(type)?.id !== provider.id) continue
       const replacement = Object.values(providers).find((p) => p.type === type)
-      await this._storeActive(type, replacement)
+      await this._store.setActive(type, replacement)
       this.broadcastActive(type)
     }
     await this.broadcastProviders()
@@ -457,28 +286,11 @@ export class ProviderManager {
 
   /** A device that was unpaired takes its providers with it. */
   public async removeProvidersForDevice(deviceId: string): Promise<void> {
-    const providers = await this.getProviders()
+    const providers = await this._store.getProviders()
     const doomed = Object.values(providers).filter(
       (p) => p.provider === API_PROVIDERS.TwinnyP2P && p.deviceId === deviceId
     )
     for (const provider of doomed) await this.removeProvider(provider)
-  }
-
-  public async resetProvidersToDefaults(): Promise<void> {
-    for (const type of ["chat", "fim", "embedding"] as ProviderType[]) {
-      await this._storeActive(type, undefined)
-    }
-    await this._saveProviders({})
-    await this.addDefaultProviders()
-    for (const type of ["chat", "fim", "embedding"] as ProviderType[]) {
-      this.broadcastActive(type)
-    }
-    await this.broadcastProviders()
-    this.focusProviderTab()
-  }
-
-  public focusProviderTab = () => {
-    this._bridge.emit(PROVIDER_EVENT_NAME.focusProviderTab, WEBUI_TABS.providers)
   }
 
   /* ------------------------------------------------------------------------ */
@@ -513,7 +325,7 @@ export class ProviderManager {
         ? Object.values(parsed as Record<string, unknown>)
         : []
 
-    const providers = await this.getProviders()
+    const providers = await this._store.getProviders()
     const problems: string[] = []
     let imported = 0
 
@@ -545,11 +357,9 @@ export class ProviderManager {
       return
     }
 
-    await this._saveProviders(providers)
-    await this._repairActiveProviders()
-    for (const type of ["chat", "fim", "embedding"] as ProviderType[]) {
-      this.broadcastActive(type)
-    }
+    await this._store.saveProviders(providers)
+    await this._store.repairActive()
+    this.broadcastAllActive()
     await this.broadcastProviders()
 
     const skipped = problems.length ? `, ${problems.length} skipped` : ""
@@ -558,7 +368,7 @@ export class ProviderManager {
   }
 
   public async exportProviders(): Promise<void> {
-    const providers = await this.getProviders()
+    const providers = await this._store.getProviders()
     if (Object.keys(providers).length === 0) {
       window.showInformationMessage("No providers to export.")
       return

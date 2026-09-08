@@ -6,6 +6,7 @@ import {
   ProviderSaveResult,
   ProviderTestResult
 } from "../../common/messaging/protocol"
+import { DiscoveredServer } from "../../common/provider-discovery"
 import { ProviderType } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
 import { bridge, emit, useServerEvent } from "../messaging"
@@ -21,10 +22,13 @@ export const useProviders = () => {
   const [fimProvider, setFimProvider] = useState<TwinnyProvider | null>(null)
   const [embeddingProvider, setEmbeddingProvider] =
     useState<TwinnyProvider | null>(null)
+  /** False until the extension has answered once; the list is unknown before. */
+  const [ready, setReady] = useState(false)
 
-  useServerEvent(PROVIDER_EVENT_NAME.getAllProviders, (all) =>
+  useServerEvent(PROVIDER_EVENT_NAME.getAllProviders, (all) => {
     setProviders(all || {})
-  )
+    setReady(true)
+  })
   useServerEvent(PROVIDER_EVENT_NAME.getActiveChatProvider, (provider) =>
     setChatProvider(provider || null)
   )
@@ -69,6 +73,7 @@ export const useProviders = () => {
   return {
     activeProviders,
     chatProvider,
+    ready,
     embeddingProvider,
     fimProvider,
     getProvidersByType,
@@ -92,6 +97,14 @@ export const useProviders = () => {
       bridge
         .request(PROVIDER_EVENT_NAME.listProviderModels, p)
         .catch((error) => ({ models: [], error: failed(error).error })),
+    /** Asks the usual local ports which model servers are running. */
+    discoverServers: (): Promise<DiscoveredServer[]> =>
+      bridge.request(PROVIDER_EVENT_NAME.discoverProviders).catch(() => []),
+    /** Creates providers for a found server and makes them active. */
+    useDiscoveredServer: (server: DiscoveredServer): Promise<TwinnyProvider[]> =>
+      bridge
+        .request(PROVIDER_EVENT_NAME.useDiscoveredServer, server)
+        .catch(() => []),
     setActiveChatProvider: (p: TwinnyProvider) =>
       emit(PROVIDER_EVENT_NAME.setActiveChatProvider, p),
     setActiveEmbeddingsProvider: (p: TwinnyProvider) =>

@@ -491,6 +491,99 @@
 }
 
 /* ------------------------------------------------------------------------ */
+/*  Welcome (no providers yet)                                               */
+/* ------------------------------------------------------------------------ */
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 16px;
+  border: 1px solid var(--tw-rule);
+}
+
+.welcome h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  text-transform: none;
+}
+
+.welcomeIntro {
+  margin: 0;
+  color: var(--tw-fg-dim);
+  line-height: 1.5;
+}
+
+.welcomeSearch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.welcomeStatus {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--tw-surface);
+  color: var(--tw-fg-dim);
+  line-height: 1.5;
+}
+
+.welcomeStatus .codicon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.welcomeServers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.welcomeServer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--tw-rule);
+}
+
+.welcomeServer > .codicon:first-child {
+  flex-shrink: 0;
+  font-size: 18px !important;
+  opacity: 0.85;
+}
+
+.welcomeServerText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.welcomeActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tw-rule-soft);
+}
+
+.welcomeActions vscode-button .codicon {
+  margin-right: 4px;
+}
+
+/* ------------------------------------------------------------------------ */
 /*  Form                                                                     */
 /* ------------------------------------------------------------------------ */
 
@@ -640,6 +733,22 @@
   border-left: 1px solid var(--tw-rule-soft);
 }
 
+.providerSelectorProvider {
+  display: flex;
+  align-items: center;
+}
+
+.providerSelectorProvider > .codicon {
+  flex-shrink: 0;
+  padding-left: 10px;
+  font-size: 13px !important;
+  color: var(--tw-fg-faint);
+}
+
+.providerSelectorProvider vscode-dropdown::part(control) {
+  padding-left: 6px;
+}
+
 .providerSelector vscode-dropdown,
 .providerSelector vscode-text-field {
   width: 100%;
@@ -655,7 +764,7 @@
   padding-left: 10px;
   background: transparent;
   border: none;
-  color: var(--tw-fg-faint);
+  color: var(--tw-fg-dim);
   font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
@@ -663,7 +772,7 @@
 
 .providerSelector vscode-dropdown:hover::part(control),
 .providerSelector vscode-text-field:hover::part(root) {
-  color: var(--tw-fg-dim);
+  color: var(--tw-fg);
 }
 
 /* A nudge in the composer footer when nothing is configured for chat. */

@@ -12,9 +12,11 @@ import {
 import {
   API_PROVIDERS,
   DEFAULT_PROVIDER_FORM_VALUES,
-  FIM_TEMPLATE_FORMAT
+  FIM_TEMPLATE_FORMAT,
+  PROVIDER_DISPLAY_NAMES
 } from "../../common/constants"
 import { ProviderTestResult } from "../../common/messaging/protocol"
+import { pickModel } from "../../common/model-pick"
 import {
   describeProviderEndpoint,
   expectsApiKey,
@@ -34,42 +36,6 @@ import { useProviders } from "../hooks/useProviders"
 import { ProviderTestBadge } from "./provider-test-badge"
 
 import styles from "../styles/providers.module.css"
-
-const PROVIDER_NAMES: Record<string, string> = {
-  [API_PROVIDERS.Anthropic]: "Anthropic",
-  [API_PROVIDERS.Cohere]: "Cohere",
-  [API_PROVIDERS.Deepseek]: "DeepSeek",
-  [API_PROVIDERS.Gemini]: "Gemini",
-  [API_PROVIDERS.Groq]: "Groq",
-  [API_PROVIDERS.LiteLLM]: "LiteLLM",
-  [API_PROVIDERS.LlamaCpp]: "llama.cpp",
-  [API_PROVIDERS.LMStudio]: "LM Studio",
-  [API_PROVIDERS.Mistral]: "Mistral",
-  [API_PROVIDERS.Ollama]: "Ollama",
-  [API_PROVIDERS.Oobabooga]: "Oobabooga",
-  [API_PROVIDERS.OpenAI]: "OpenAI",
-  [API_PROVIDERS.OpenAICompatible]: "OpenAI-compatible server",
-  [API_PROVIDERS.OpenRouter]: "OpenRouter",
-  [API_PROVIDERS.OpenWebUI]: "Open WebUI",
-  [API_PROVIDERS.Perplexity]: "Perplexity",
-  [API_PROVIDERS.TwinnyP2P]: "Twinny device (P2P)"
-}
-
-const EMBEDDING_MODEL_PATTERN = /embed|minilm|bge|e5|nomic/i
-const FIM_MODEL_PATTERN =
-  /code|coder|fim|starcoder|codestral|codegemma|stable-code/i
-
-/** When the server lists models, the first one that fits the job. */
-export const pickModel = (models: string[], type: string) => {
-  if (type === "embedding") {
-    return models.find((m) => EMBEDDING_MODEL_PATTERN.test(m)) || models[0]
-  }
-  const nonEmbedding = models.filter((m) => !EMBEDDING_MODEL_PATTERN.test(m))
-  if (type === "fim") {
-    return nonEmbedding.find((m) => FIM_MODEL_PATTERN.test(m)) || nonEmbedding[0]
-  }
-  return nonEmbedding[0] || models[0]
-}
 
 type InputEvent = Event | React.FormEvent<HTMLElement>
 
@@ -260,7 +226,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         (supportsType(name, draft.type) && !isP2pProvider(name)) ||
         name === draft.provider
     )
-    .sort((a, b) => PROVIDER_NAMES[a].localeCompare(PROVIDER_NAMES[b]))
+    .sort((a, b) => PROVIDER_DISPLAY_NAMES[a].localeCompare(PROVIDER_DISPLAY_NAMES[b]))
 
   return (
     <form onSubmit={handleSubmit} className={styles.providerForm} noValidate>
@@ -309,7 +275,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
           >
             {providerOptions.map((name) => (
               <VSCodeOption key={name} value={name}>
-                {PROVIDER_NAMES[name] || name}
+                {PROVIDER_DISPLAY_NAMES[name] || name}
               </VSCodeOption>
             ))}
           </VSCodeDropdown>

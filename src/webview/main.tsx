@@ -17,7 +17,6 @@ import styles from "./styles/main.module.css"
 
 const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.settings]: <Settings />,
-  [WEBUI_TABS.providers]: <Providers />,
   [WEBUI_TABS.review]: <Review />,
   [WEBUI_TABS.embeddings]: <EmbeddingOptions />
 }
@@ -30,7 +29,9 @@ export const Main = ({ fullScreen }: MainProps) => {
   const [tab, setTab] = useState<string | undefined>(WEBUI_TABS.chat)
   const { locale, renderKey } = useLocale()
   const tabsWithProps = {
-    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />
+    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />,
+    // Setting up the first chat provider lands back in the chat, ready to go.
+    [WEBUI_TABS.providers]: <Providers onDone={() => setTab(WEBUI_TABS.chat)} />
   }
 
   useServerEvent(EVENT_NAME.twinnySetTab, setTab)

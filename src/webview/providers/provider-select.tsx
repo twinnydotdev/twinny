@@ -5,9 +5,9 @@ import {
   VSCodeOption,
   VSCodeTextField} from "@vscode/webview-ui-toolkit/react"
 
-import { API_PROVIDERS, EVENT_NAME } from "../../common/constants"
+import { EVENT_NAME } from "../../common/constants"
+import { usesEndpoint } from "../../common/provider-validation"
 import { useModels } from "../hooks/useModels"
-import { useOllamaModels } from "../hooks/useOllamaModels"
 import { useProviders } from "../hooks/useProviders"
 import { emit } from "../messaging"
 
@@ -15,7 +15,6 @@ import styles from "../styles/providers.module.css"
 
 export const ProviderSelect = () => {
   const { t } = useTranslation()
-  const ollamaModels = useOllamaModels()
   const { models } = useModels()
   const {
     getProvidersByType,
@@ -47,29 +46,39 @@ export const ProviderSelect = () => {
     }
   }, [chatProvider, chatProviders, isActiveProviderInList])
 
-  // A paired device's models come from the device itself.
-  const [remoteModels, setRemoteModels] = React.useState<string[]>([])
-  const remoteKey = `${effectiveProvider?.id}|${effectiveProvider?.deviceId}`
+  // A server (local, or a paired device) is asked what it has; a hosted
+  // API's models come from the catalogue.
+  const servesModels =
+    !!effectiveProvider && usesEndpoint(effectiveProvider.provider, "chat")
+  const [endpointModels, setEndpointModels] = React.useState<string[]>([])
+  const endpointKey = effectiveProvider
+    ? [
+        effectiveProvider.id,
+        effectiveProvider.provider,
+        effectiveProvider.apiProtocol,
+        effectiveProvider.apiHostname,
+        effectiveProvider.apiPort,
+        effectiveProvider.apiPath,
+        effectiveProvider.deviceId
+      ].join("|")
+    : ""
   React.useEffect(() => {
-    if (effectiveProvider?.provider !== API_PROVIDERS.TwinnyP2P) {
-      setRemoteModels([])
+    if (!effectiveProvider || !servesModels) {
+      setEndpointModels([])
       return
     }
     let cancelled = false
     listModels(effectiveProvider).then((result) => {
-      if (!cancelled) setRemoteModels(result.models)
+      if (!cancelled) setEndpointModels(result.models)
     })
     return () => {
       cancelled = true
     }
-  }, [remoteKey])
+  }, [endpointKey])
 
-  const providerModels =
-    effectiveProvider?.provider === API_PROVIDERS.TwinnyP2P
-      ? remoteModels
-      : effectiveProvider?.provider === API_PROVIDERS.Ollama
-        ? ollamaModels.models?.map(({ name }) => name) || []
-        : models[effectiveProvider?.provider as keyof typeof models]?.models || []
+  const providerModels = servesModels
+    ? endpointModels
+    : models[effectiveProvider?.provider as keyof typeof models]?.models || []
 
   // The active provider is the one source of truth for the model, so this
   // dropdown, the providers tab and a device's chips always agree.
@@ -103,7 +112,11 @@ export const ProviderSelect = () => {
 
   return (
     <div className={styles.providerSelector}>
-      <div>
+      <div className={styles.providerSelectorProvider}>
+        <i
+          className="codicon codicon-server-environment"
+          title={t("chat-provider")}
+        />
         <VSCodeDropdown
           value={effectiveProvider?.id || ""}
           name="provider"

@@ -29,6 +29,8 @@ import { InlineEditCodeActionProvider } from "./extension/edit/code-actions"
 import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
 import { EmbeddingDatabase } from "./extension/embeddings/database"
 import { P2pRuntime } from "./extension/p2p/runtime"
+import { setUpProvidersOnFirstRun } from "./extension/providers/setup"
+import { ProviderStore } from "./extension/providers/store"
 import { generateCommitMessage } from "./extension/review/commit-message"
 import { SessionManager } from "./extension/session-manager"
 import { TwinnyStatusBar } from "./extension/status-bar"
@@ -155,6 +157,13 @@ export async function activate(context: ExtensionContext) {
   // since a P2P provider's address is the gateway's.
   const p2p = new P2pRuntime(context)
   await p2p.start()
+
+  // Nothing configured yet: use whichever local server is running, or say
+  // so. Runs in the background; the sidebar waits on it before listing.
+  const providerSetup = setUpProvidersOnFirstRun(
+    context,
+    new ProviderStore(context)
+  )
 
   const fullScreenProvider = new FullScreenProvider(
     context,
@@ -474,6 +483,7 @@ export async function activate(context: ExtensionContext) {
   )
 
   statusBar.refresh()
+  void providerSetup.then(() => statusBar.refresh())
 
   logger.log("Twinny extension activation complete")
 }

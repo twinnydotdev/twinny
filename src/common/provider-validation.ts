@@ -198,7 +198,7 @@ export const normalizeProvider = (input: TwinnyProvider): TwinnyProvider => {
       ? trim(input.type)
       : "chat"
   ) as ProviderType
-  const providerName = trim(input.provider) || API_PROVIDERS.Ollama
+  const providerName = trim(input.provider) || API_PROVIDERS.OpenAICompatible
 
   const pasted = splitPastedUrl(trim(input.apiHostname))
   const hostname = pasted.hostname.toLowerCase()

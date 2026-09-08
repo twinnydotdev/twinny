@@ -23,7 +23,6 @@ import { P2pBridge } from "../p2p/bridge"
 import { resolveProviderEndpoint } from "../p2p/endpoint"
 import { P2pRuntime } from "../p2p/runtime"
 import { ProviderManager } from "../providers/manager"
-import { OllamaService } from "../providers/ollama"
 import { ReviewService } from "../review/service"
 import { SessionManager } from "../session-manager"
 import { TwinnyStatusBar } from "../status-bar"
@@ -41,7 +40,6 @@ export class BaseProvider {
   private _diffManager = new DiffManager()
   private _embeddingDatabase: EmbeddingDatabase | undefined
   private _fileTreeProvider: FileTreeProvider
-  private _ollamaService: OllamaService | undefined
   private _p2p: P2pRuntime | undefined
   private _p2pBridge: P2pBridge | undefined
   private _sessionManager: SessionManager | undefined
@@ -73,7 +71,6 @@ export class BaseProvider {
     this.context = context
     this._fileTreeProvider = new FileTreeProvider()
     this._embeddingDatabase = db
-    this._ollamaService = new OllamaService()
     this._p2p = p2p
     this._sessionManager = sessionManager
     this._statusBarItem = statusBar
@@ -155,7 +152,6 @@ export class BaseProvider {
           template
         ),
       [EVENT_NAME.twinnyEditDefaultTemplates]: () => this.editDefaultTemplates(),
-      [EVENT_NAME.twinnyFetchOllamaModels]: () => this.fetchOllamaModels(),
       [EVENT_NAME.twinnyFileListRequest]: () =>
         this._fileTreeProvider.getAllFiles(),
       [EVENT_NAME.twinnyGetConfigValue]: ({ key }) => ({
@@ -335,14 +331,6 @@ export class BaseProvider {
   private newConversation = () => {
     this.conversationHistory?.resetConversation()
     this.bridge?.emit(EVENT_NAME.twinnyNewConversation)
-  }
-
-  private fetchOllamaModels = async () => {
-    try {
-      return (await this._ollamaService?.fetchModels()) || []
-    } catch {
-      return []
-    }
   }
 
   private createNewUntitledDocument = async (content: string) => {

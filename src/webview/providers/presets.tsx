@@ -2,7 +2,11 @@ import React, { ReactNode, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
-import { API_PROVIDERS, FIM_TEMPLATE_FORMAT } from "../../common/constants"
+import {
+  API_PROVIDERS,
+  FIM_TEMPLATE_FORMAT,
+  PROVIDER_DISPLAY_NAMES
+} from "../../common/constants"
 import {
   getEndpointDefaults,
   ProviderType
@@ -49,16 +53,6 @@ const LOCAL_LOGOS: Record<string, ReactNode> = {
   [API_PROVIDERS.OpenAICompatible]: codicon("plug")
 }
 
-const LOCAL_NAMES: Record<string, string> = {
-  [API_PROVIDERS.Ollama]: "Ollama",
-  [API_PROVIDERS.LMStudio]: "LM Studio",
-  [API_PROVIDERS.LlamaCpp]: "llama.cpp",
-  [API_PROVIDERS.OpenWebUI]: "Open WebUI",
-  [API_PROVIDERS.LiteLLM]: "LiteLLM",
-  [API_PROVIDERS.Oobabooga]: "Oobabooga",
-  [API_PROVIDERS.OpenAICompatible]: "OpenAI-compatible server"
-}
-
 const local = (
   provider: string,
   type: ProviderType,
@@ -66,7 +60,7 @@ const local = (
   fimTemplate?: string
 ): ProviderPreset => ({
   key: `${provider}-${type}`,
-  label: LOCAL_NAMES[provider],
+  label: PROVIDER_DISPLAY_NAMES[provider],
   descriptionKey: `preset-${provider}`,
   logo: LOCAL_LOGOS[provider],
   provider,
