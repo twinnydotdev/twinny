@@ -155,6 +155,14 @@
         {
           "command": "twinny.statusBarMenu",
           "when": "false"
+        },
+        {
+          "command": "twinny.acceptEdit",
+          "when": "twinnyInlineEditPending"
+        },
+        {
+          "command": "twinny.rejectEdit",
+          "when": "twinnyInlineEditPending"
         }
       ],
       "explorer/context": [
@@ -177,6 +185,14 @@
       {
         "command": "twinny.edit",
         "title": "Twinny - Edit with instruction..."
+      },
+      {
+        "command": "twinny.acceptEdit",
+        "title": "Twinny - Accept edit"
+      },
+      {
+        "command": "twinny.rejectEdit",
+        "title": "Twinny - Reject edit"
       },
       {
         "command": "twinny.addTypes",
@@ -307,6 +323,18 @@
         "key": "CTRL+SHIFT+/",
         "command": "twinny.stopGeneration",
         "when": "twinnyGeneratingText"
+      },
+      {
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "command": "twinny.acceptEdit",
+        "when": "twinnyInlineEditPending && editorTextFocus"
+      },
+      {
+        "key": "ctrl+shift+backspace",
+        "mac": "cmd+shift+backspace",
+        "command": "twinny.rejectEdit",
+        "when": "twinnyInlineEditPending && editorTextFocus"
       }
     ],
     "viewsContainers": {

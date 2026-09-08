@@ -138,6 +138,13 @@ export const matchIndentation = (edited: string, original: string): string => {
 }
 
 /**
+ * What a reply looks like so far: unwrapped and re-indented, but with its
+ * unfinished last line and trailing whitespace left alone.
+ */
+export const previewEdit = (reply: string, original: string): string =>
+  matchIndentation(extractEditedCode(reply), original)
+
+/**
  * The final replacement text for a completed reply: unwrapped, re-indented,
  * and ending the way the original ended.
  */

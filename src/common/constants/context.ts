@@ -2,6 +2,7 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: "twinnyConversationHistory",
   twinnyEnableRag: "twinnyEnableRag",
   twinnyGeneratingText: "twinnyGeneratingText",
+  twinnyInlineEditPending: "twinnyInlineEditPending",
   twinnyManageProviders: "twinnyManageProviders",
   twinnyManageTemplates: "twinnyManageTemplates",
   twinnyMaxChunkSize: "twinnyMaxChunkSize",

@@ -26,6 +26,7 @@ import { FileInteractionCache } from "./extension/completion/file-interaction"
 import { CompletionProvider } from "./extension/completion/provider"
 import { setContext } from "./extension/context"
 import { InlineEditCodeActionProvider } from "./extension/edit/code-actions"
+import { InlineEditCodeLensProvider } from "./extension/edit/code-lens"
 import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
 import { EmbeddingDatabase } from "./extension/embeddings/database"
 import { P2pRuntime } from "./extension/p2p/runtime"
@@ -222,8 +223,18 @@ export async function activate(context: ExtensionContext) {
           InlineEditCodeActionProvider.providedCodeActionKinds
       }
     ),
+    languages.registerCodeLensProvider(
+      { pattern: "**" },
+      new InlineEditCodeLensProvider(inlineEdit)
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.edit, (args?: InlineEditArgs) =>
       inlineEdit.run(args)
+    ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.acceptEdit, () =>
+      inlineEdit.accept()
+    ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.rejectEdit, () =>
+      inlineEdit.reject()
     ),
     ...Object.entries(TEMPLATE_COMMANDS).map(([command, template]) =>
       commands.registerCommand(command, () => runTemplate(template))

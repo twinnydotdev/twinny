@@ -4,6 +4,8 @@ export const TWINNY_COMMAND_NAME = {
   conversationHistory: "twinny.conversationHistory",
   disable: "twinny.disable",
   edit: "twinny.edit",
+  acceptEdit: "twinny.acceptEdit",
+  rejectEdit: "twinny.rejectEdit",
   embeddings: "twinny.embeddings",
   enable: "twinny.enable",
   review: "twinny.review",
