@@ -139,6 +139,17 @@ suite("Inline edit region", () => {
     t.dispose()
   })
 
+  test("inserts a snippet at a line and can take it back", async () => {
+    const t = await open("a\nb", 1, 1)
+    t.region.range = new vscode.Range(1, 0, 1, 0)
+    await t.region.render(layoutDiff("", "x\ny\n"))
+    assert.strictEqual(t.document.getText(), "a\nx\ny\nb")
+    assert.deepStrictEqual(t.region.added, [1, 2])
+    assert.ok(await t.region.settle(t.editor, "reject"))
+    assert.strictEqual(t.document.getText(), "a\nb")
+    t.dispose()
+  })
+
   test("follows lines inserted above and edits inside the diff", async () => {
     const t = await open("a\nb\nc", 1, 1)
     await t.region.render(layoutDiff("b", "B"))

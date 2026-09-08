@@ -311,5 +311,6 @@
   "pairing-code-share-hint": "On your other device: Twinny → Providers → Devices → Add device, and paste this code. It works once.",
   "host-port": "UDP {{port}}",
   "host-port-hint": "Other devices reach this computer on UDP port {{port}}. If this computer runs a firewall, allow that port, e.g. `sudo ufw allow {{port}}/udp`.",
-  "remove-trusted-peer": "Unpair this device"
+  "remove-trusted-peer": "Unpair this device",
+  "apply-code": "Apply to the editor as a diff you can accept or reject"
 }

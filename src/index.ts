@@ -236,6 +236,9 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.rejectEdit, (hunk?: number) =>
       inlineEdit.reject(typeof hunk === "number" ? hunk : undefined)
     ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.applyCode, (code: string) =>
+      inlineEdit.propose(String(code ?? ""))
+    ),
     ...Object.entries(TEMPLATE_COMMANDS).map(([command, template]) =>
       commands.registerCommand(command, () => runTemplate(template))
     ),

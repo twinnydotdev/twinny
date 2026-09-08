@@ -220,7 +220,6 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyNewConversation]: Channel
   [EVENT_NAME.twinnyNewDocument]: Channel<string>
   [EVENT_NAME.twinnyNotification]: Channel<string>
-  [EVENT_NAME.twinnyOpenDiff]: Channel<string>
   [EVENT_NAME.twinnyOpenFile]: Channel<string>
   [EVENT_NAME.twinnyOpenProviders]: Channel
   [EVENT_NAME.twinnyRemoveContextItem]: Channel<string>

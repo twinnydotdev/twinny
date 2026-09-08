@@ -39,9 +39,7 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   const handleNewDocument = () => emit(EVENT_NAME.twinnyNewDocument, code())
 
-  const handleAccept = () => emit(EVENT_NAME.twinnyAcceptSolution, code())
-
-  const handleOpenDiff = () => emit(EVENT_NAME.twinnyOpenDiff, code())
+  const handleApply = () => emit(EVENT_NAME.twinnyAcceptSolution, code())
 
   return (
     <div className={styles.codeBlock}>
@@ -51,11 +49,11 @@ export const CodeBlock = (props: CodeBlockProps) => {
         {role === ASSISTANT && (
           <div className={styles.codeOptions}>
             <VSCodeButton
-              title={t("accept-solution")}
-              onClick={handleAccept}
+              title={t("apply-code")}
+              onClick={handleApply}
               appearance="icon"
             >
-              <span className="codicon codicon-check"></span>
+              <span className="codicon codicon-diff"></span>
             </VSCodeButton>
             <VSCodeButton
               title={t("copy-code")}
@@ -70,13 +68,6 @@ export const CodeBlock = (props: CodeBlockProps) => {
               appearance="icon"
             >
               <span className="codicon codicon-new-file"></span>
-            </VSCodeButton>
-            <VSCodeButton
-              title={t("open-diff")}
-              onClick={handleOpenDiff}
-              appearance="icon"
-            >
-              <span className="codicon codicon-diff"></span>
             </VSCodeButton>
           </div>
         )}

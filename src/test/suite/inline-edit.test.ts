@@ -1,6 +1,11 @@
 import * as assert from "assert"
 
-import { diffLines, diffWords, layoutDiff } from "../../extension/edit/diff"
+import {
+  diffLines,
+  diffWords,
+  layoutDiff,
+  locateSnippet
+} from "../../extension/edit/diff"
 import {
   buildEditMessages,
   buildEditPrompt,
@@ -179,9 +184,45 @@ suite("Inline edit", () => {
       assert.deepStrictEqual(kinds(diffLines([], [])), [])
     })
 
+    test("early mode matches an ambiguous line as soon as it can", () => {
+      const late = kinds(diffLines(["}", "x", "}"], ["y", "}"]))
+      assert.deepStrictEqual(late, ["r:}", "r:x", "a:y", "e:}"])
+      const early = kinds(diffLines(["}", "x", "}"], ["y", "}"], true))
+      assert.deepStrictEqual(early, ["a:y", "e:}", "r:x", "r:}"])
+    })
+
     test("finds the longest common subsequence in the middle", () => {
       const ops = kinds(diffLines(["x", "a", "b", "c", "y"], ["x", "b", "d", "y"]))
       assert.deepStrictEqual(ops, ["e:x", "r:a", "e:b", "r:c", "a:d", "e:y"])
+    })
+  })
+
+  suite("locateSnippet", () => {
+    const file = [
+      "import x from \"x\"",
+      "",
+      "export const a = () => {",
+      "  return 1",
+      "}",
+      "",
+      "export const b = () => {",
+      "  return 2",
+      "}"
+    ]
+
+    test("finds the function a snippet rewrites", () => {
+      const snippet = ["export const b = () => {", "  return 3", "}"]
+      assert.deepStrictEqual(locateSnippet(file, snippet), { start: 6, end: 8 })
+    })
+
+    test("ignores elision comments and blank lines", () => {
+      const snippet = ["export const a = () => {", "  // ...", "  return 10", "}"]
+      assert.deepStrictEqual(locateSnippet(file, snippet), { start: 2, end: 4 })
+    })
+
+    test("gives up on code the file does not contain", () => {
+      assert.strictEqual(locateSnippet(file, ["const z = 9", "z()"]), undefined)
+      assert.strictEqual(locateSnippet(file, ["", "// ..."]), undefined)
     })
   })
 
@@ -216,6 +257,13 @@ suite("Inline edit", () => {
       )
       assert.deepStrictEqual(layout.removedWords, [])
       assert.deepStrictEqual(layout.addedWords, [{ line: 2, start: 17, end: 33 }])
+    })
+
+    test("an insertion is all additions with no removed blank line", () => {
+      const layout = layoutDiff("", "a\nb\n")
+      assert.strictEqual(layout.text, "a\nb\n")
+      assert.deepStrictEqual(layout.removed, [])
+      assert.deepStrictEqual(layout.added, [0, 1])
     })
 
     test("does not pair a streaming partial line", () => {

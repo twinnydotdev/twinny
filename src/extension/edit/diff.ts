@@ -25,24 +25,28 @@ const add = op("add")
 /**
  * Line-level diff of `a` against `b` as an ordered list of ops. Within a
  * hunk removals come before additions, which is how the review reads best.
+ * With `early`, a line of `b` that could match in several places matches
+ * the earliest; the hunk order flips, so only use it to locate things.
  */
-export const diffLines = (a: string[], b: string[]): DiffOp[] => {
+export const diffLines = (a: string[], b: string[], early = false): DiffOp[] => {
   let start = 0
   while (start < a.length && start < b.length && a[start] === b[start]) start++
   let endA = a.length
   let endB = b.length
-  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+  // Trimming a shared suffix would pin it to the end of `a`, which is the
+  // late match early mode exists to avoid.
+  while (!early && endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
     endA--
     endB--
   }
   return [
     ...a.slice(0, start).map(equal),
-    ...lcsDiff(a.slice(start, endA), b.slice(start, endB)),
+    ...lcsDiff(a.slice(start, endA), b.slice(start, endB), early),
     ...a.slice(endA).map(equal)
   ]
 }
 
-const lcsDiff = (a: string[], b: string[]): DiffOp[] => {
+const lcsDiff = (a: string[], b: string[], early: boolean): DiffOp[] => {
   if (!a.length) return b.map(add)
   if (!b.length) return a.map(remove)
   if (a.length * b.length > MAX_CELLS) return [...a.map(remove), ...b.map(add)]
@@ -66,7 +70,11 @@ const lcsDiff = (a: string[], b: string[]): DiffOp[] => {
     if (a[i] === b[j]) {
       ops.push(equal(a[i++]))
       j++
-    } else if (table[(i + 1) * width + j] >= table[i * width + j + 1]) {
+    } else if (
+      early
+        ? table[(i + 1) * width + j] > table[i * width + j + 1]
+        : table[(i + 1) * width + j] >= table[i * width + j + 1]
+    ) {
       ops.push(remove(a[i++]))
     } else {
       ops.push(add(b[j++]))
@@ -149,10 +157,16 @@ export const layoutDiff = (
   edited: string,
   streaming = false
 ): DiffLayout => {
-  const oldLines = original.split("\n")
+  const oldLines = original ? original.split("\n") : []
   const newLines = edited.split("\n")
   // The last line of a stream is unfinished (or empty, right after a newline).
   const partial = streaming ? newLines.pop() || undefined : undefined
+  // Inserting: a trailing line break is not an extra line, but it stays.
+  let tail = ""
+  if (!oldLines.length && !streaming && newLines[newLines.length - 1] === "") {
+    newLines.pop()
+    tail = "\n"
+  }
 
   const ops = diffLines(oldLines, newLines)
   if (partial !== undefined) ops.push(add(partial))
@@ -166,7 +180,7 @@ export const layoutDiff = (
     lines.push(line)
   }
   const words = highlightWords(ops, partial !== undefined)
-  return { text: lines.join("\n"), removed, added, ...words }
+  return { text: lines.join("\n") + tail, removed, added, ...words }
 }
 
 /** How much of two lines their word diff keeps; below half, they differ. */
@@ -232,4 +246,37 @@ const likeness = (before: string, after: string): number => {
   return ops
     .filter((op) => op.kind === "equal" && op.line.trim())
     .reduce((n, op) => n + op.line.length, 0)
+}
+
+/** Lines a model writes to stand for code it left out. */
+const ELISION = /^\s*(\/\/|#|--|\/\*|<!--)?\s*(\.\.\.|…)/
+
+/**
+ * Where a snippet from the chat belongs in a file: the stretch between the
+ * first and last file lines the snippet repeats. Undefined when the snippet
+ * shares too little with the file to be a rewrite of any part of it.
+ */
+export const locateSnippet = (
+  fileLines: string[],
+  snippet: string[]
+): { start: number; end: number } | undefined => {
+  const wanted = snippet.filter((line) => line.trim() && !ELISION.test(line))
+  if (!wanted.length) return undefined
+
+  let matched = 0
+  let first: number | undefined
+  let last: number | undefined
+  let line = 0
+  for (const op of diffLines(fileLines, snippet, true)) {
+    if (op.kind === "add") continue
+    if (op.kind === "equal" && op.line.trim()) {
+      matched++
+      first ??= line
+      last = line
+    }
+    line++
+  }
+  if (first === undefined || last === undefined) return undefined
+  if (matched * 2 < wanted.length) return undefined
+  return { start: first, end: last }
 }

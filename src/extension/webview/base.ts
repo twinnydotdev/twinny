@@ -29,7 +29,6 @@ import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../templates/provider"
 import { getLanguage, getTextSelection, getTheme } from "../utils"
 
-import { DiffManager } from "./diff"
 import { FileHandler } from "./file-handler"
 import { FileTreeProvider } from "./file-tree"
 
@@ -37,7 +36,6 @@ import { FileTreeProvider } from "./file-tree"
 const storageKeyFor = (scope: string, key: string) => `${scope}-${key}`
 
 export class BaseProvider {
-  private _diffManager = new DiffManager()
   private _embeddingDatabase: EmbeddingDatabase | undefined
   private _fileTreeProvider: FileTreeProvider
   private _p2p: P2pRuntime | undefined
@@ -143,7 +141,7 @@ export class BaseProvider {
     bridge.handleAll({
       [EVENT_NAME.twinntGetLocale]: () => this.getLocale(),
       [EVENT_NAME.twinnyAcceptSolution]: (code) =>
-        this._diffManager.acceptSolution(code),
+        void vscode.commands.executeCommand(TWINNY_COMMAND_NAME.applyCode, code),
       [EVENT_NAME.twinnyChatMessage]: ({ messages, mentions, conversationId }) =>
         void this.chat?.completion(messages, mentions, conversationId),
       [EVENT_NAME.twinnyClickSuggestion]: (template) =>
@@ -188,7 +186,6 @@ export class BaseProvider {
         this.createNewUntitledDocument(content),
       [EVENT_NAME.twinnyNotification]: (message) =>
         void vscode.window.showInformationMessage(message),
-      [EVENT_NAME.twinnyOpenDiff]: (code) => this._diffManager.openDiff(code),
       [EVENT_NAME.twinnyRemoveContextItem]: (id) => this.removeContextItem(id),
       [EVENT_NAME.twinnySendLanguage]: () => getLanguage(),
       [EVENT_NAME.twinnySendTheme]: () => getTheme(),

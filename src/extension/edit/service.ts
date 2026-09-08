@@ -13,12 +13,13 @@ import { Base } from "../providers/base"
 import { describeProviderErrorPlain, isAbortError } from "../providers/errors"
 import { TwinnyStatusBar } from "../status-bar"
 
-import { DiffLayout, layoutDiff, Span } from "./diff"
+import { DiffLayout, layoutDiff, locateSnippet, Span } from "./diff"
 import {
   buildEditMessages,
   clampContext,
   EDIT_CONTEXT_LINES,
   finalizeEdit,
+  matchIndentation,
   previewEdit
 } from "./prompt"
 
@@ -164,6 +165,70 @@ export class InlineEditService extends Base {
     if (!instruction) return
 
     await this.edit(editor, new DiffRegion(editor, range), instruction, provider)
+  }
+
+  /**
+   * Put a piece of code from the chat into the active editor for review.
+   * A selection is replaced. Without one the snippet is matched against the
+   * file and shown over the stretch it rewrites; a snippet that matches
+   * nothing is inserted at the cursor.
+   */
+  public async propose(code: string) {
+    if (this._running || this._pending) {
+      vscode.window.showInformationMessage(
+        "Twinny has an edit in progress. Accept or reject it first."
+      )
+      return
+    }
+    const editor = vscode.window.activeTextEditor
+    if (!editor) {
+      vscode.window.showInformationMessage("Open a file to apply the code to.")
+      return
+    }
+    const document = editor.document
+    const snippet = code.replace(/\s+$/, "")
+    if (!snippet.trim()) return
+
+    let range: vscode.Range
+    let text: string
+    let how: string
+    if (!editor.selection.isEmpty) {
+      range = this.wholeLines(document, editor.selection)
+      text = matchIndentation(snippet, document.getText(range))
+      how = "over the selection"
+    } else {
+      const found = locateSnippet(
+        document.getText().split("\n"),
+        snippet.split("\n")
+      )
+      if (found) {
+        range = new vscode.Range(
+          found.start,
+          0,
+          found.end,
+          document.lineAt(found.end).range.end.character
+        )
+        text = matchIndentation(snippet, document.getText(range))
+        how = `over lines ${found.start + 1}-${found.end + 1}`
+      } else {
+        const line = editor.selection.active.line
+        range = new vscode.Range(line, 0, line, 0)
+        text = snippet + "\n"
+        how = `at line ${line + 1}`
+      }
+    }
+
+    const region = new DiffRegion(editor, range)
+    const layout = layoutDiff(document.getText(range), text)
+    if (!layout.removed.length && !layout.added.length) {
+      vscode.window.setStatusBarMessage("Twinny: the file already has that code", 4000)
+      return
+    }
+    this._pending = region
+    await region.render(layout)
+    editor.revealRange(region.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport)
+    this.present()
+    logger.log(`Applied chat code ${how} in ${vscode.workspace.asRelativePath(document.uri)}`)
   }
 
   /** Keep the rewrite, or one hunk of it: delete the lines it replaced. */
@@ -380,14 +445,7 @@ export class InlineEditService extends Base {
         return
       }
       this.end()
-      this.decorate()
-      void vscode.commands.executeCommand(
-        "setContext",
-        EXTENSION_CONTEXT_NAME.twinnyInlineEditPending,
-        true
-      )
-      this._emitter.fire()
-      vscode.window.setStatusBarMessage(REVIEW_HINT, 8000)
+      this.present()
     } catch (error) {
       if (!region.broken) await this.rewind(region, snapshot)
       else this.clearPending()
@@ -400,6 +458,18 @@ export class InlineEditService extends Base {
     } finally {
       if (this._running) this.end()
     }
+  }
+
+  /** Hand the rendered diff over to the user for a verdict. */
+  private present() {
+    this.decorate()
+    void vscode.commands.executeCommand(
+      "setContext",
+      EXTENSION_CONTEXT_NAME.twinnyInlineEditPending,
+      true
+    )
+    this._emitter.fire()
+    vscode.window.setStatusBarMessage(REVIEW_HINT, 8000)
   }
 
   /** Put the region back the way it was before a request started. */
