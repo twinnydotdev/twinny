@@ -64,7 +64,9 @@ export const Settings = () => {
 
   return (
     <div className={styles.settingsContainer}>
-      <h1>{t("edit-default-templates")}</h1>
+      <div className="tw-page-header">
+        <h3>{t("edit-default-templates")}</h3>
+      </div>
       <p>{t("edit-default-templates-description")}</p>
       <div className={styles.templateEditor}>
         <VSCodeButton onClick={handleEditDefaultTemplates}>
@@ -72,7 +74,7 @@ export const Settings = () => {
         </VSCodeButton>
       </div>
 
-      <h3>{t("template-settings")}</h3>
+      <h4>{t("template-settings")}</h4>
       <p>{t("template-settings-description")}</p>
 
       <div className={styles.checkboxGroup}>

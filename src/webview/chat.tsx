@@ -671,16 +671,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 <i className="codicon codicon-arrow-down" />
               </VSCodeButton>
             )}
-            {generatingRef.current && (
-              <VSCodeButton
-                type="button"
-                appearance="icon"
-                onClick={handleStopGeneration}
-                aria-label={t("stop-generation")}
-              >
-                <span className="codicon codicon-debug-stop"></span>
-              </VSCodeButton>
-            )}
           </div>
           {!!selection.length && (
             <span className={styles.selectionCount}>
@@ -745,15 +735,28 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 >
                   <span className="codicon codicon-device-camera" />
                 </VSCodeButton>
-                <VSCodeButton
-                  appearance="icon"
-                  role="button"
-                  disabled={chatDisabled}
-                  onClick={handleSubmitForm}
-                  title={t("send")}
-                >
-                  <span className="codicon codicon-send"></span>
-                </VSCodeButton>
+                {generatingRef.current ? (
+                  <VSCodeButton
+                    appearance="icon"
+                    role="button"
+                    className={styles.stopButton}
+                    onClick={handleStopGeneration}
+                    title={t("stop-generation")}
+                    aria-label={t("stop-generation")}
+                  >
+                    <span className="codicon codicon-debug-stop"></span>
+                  </VSCodeButton>
+                ) : (
+                  <VSCodeButton
+                    appearance="icon"
+                    role="button"
+                    disabled={chatDisabled}
+                    onClick={handleSubmitForm}
+                    title={t("send")}
+                  >
+                    <span className="codicon codicon-send"></span>
+                  </VSCodeButton>
+                )}
               </div>
             </div>
           </form>

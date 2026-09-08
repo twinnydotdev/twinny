@@ -200,7 +200,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
+      <div className="tw-page-header">
         <h3>
           {t("conversation-history")}
           <span className={styles.count}>{total}</span>

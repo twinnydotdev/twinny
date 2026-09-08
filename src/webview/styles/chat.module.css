@@ -355,6 +355,10 @@
   gap: 2px;
 }
 
+.stopButton {
+  color: var(--vscode-errorForeground);
+}
+
 .footer {
   display: flex;
   align-items: center;

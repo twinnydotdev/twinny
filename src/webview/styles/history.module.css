@@ -7,25 +7,6 @@
   max-width: 720px;
 }
 
-.pageHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 24px;
-}
-
-.pageHeader h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: var(--tw-fs);
-  font-weight: 600;
-  letter-spacing: var(--tw-track);
-  text-transform: uppercase;
-}
-
 .count {
   padding: 0 6px;
   border: 1px solid var(--tw-rule);

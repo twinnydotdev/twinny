@@ -298,7 +298,7 @@ export const Providers = ({ onDone }: ProvidersProps) => {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
+      <div className="tw-page-header">
         <h3>{t("providers")}</h3>
         <div className={styles.toolbar}>
           <VSCodeButton

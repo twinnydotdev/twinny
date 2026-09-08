@@ -1,3 +1,7 @@
+.settingsContainer :global(.tw-page-header) {
+  margin-bottom: 12px;
+}
+
 .settingsContainer p {
   font-size: var(--tw-fs);
   margin: 0.25rem 0 0.75rem;

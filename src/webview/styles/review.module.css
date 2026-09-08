@@ -5,15 +5,13 @@
   --font-size-base: 0.85rem;
 }
 
-.reviewContainer h4,
-.reviewContainer p {
-  font-size: var(--font-size-base);
-  color: var(--vscode-foreground);
+.reviewContainer :global(.tw-page-header) {
+  margin-bottom: 12px;
 }
 
-.reviewContainer h4 {
-  font-weight: 600;
-  margin: var(--spacing-md) 0 var(--spacing-sm);
+.reviewContainer p {
+  font-size: var(--tw-fs);
+  color: var(--vscode-foreground);
 }
 
 .reviewContainer p {
@@ -85,15 +83,6 @@
 
 .prItem>vscode-button:hover {
   background: var(--vscode-toolbar-hoverBackground);
-}
-
-.reviewContainer h3 {
-  font-size: 0.95rem;
-  margin: var(--spacing-md) 0 var(--spacing-xs);
-}
-
-.reviewContainer h3:first-child {
-  margin-top: 0;
 }
 
 .localActions {

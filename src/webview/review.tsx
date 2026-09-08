@@ -96,7 +96,9 @@ export const Review = () => {
 
   return (
     <div className={styles.reviewContainer}>
-      <h3>{t("review-local-title")}</h3>
+      <div className="tw-page-header">
+        <h3>{t("review-local-title")}</h3>
+      </div>
       {localLoading ? null : !local?.isRepository ? (
         <p>{t("review-no-repository")}</p>
       ) : (
@@ -147,7 +149,7 @@ export const Review = () => {
       )}
       <p className={styles.hint}>{t("review-how-it-works")}</p>
 
-      <h3>{t("review-github-title")}</h3>
+      <h4>{t("review-github-title")}</h4>
       <p>{t("review-github-intro")}</p>
       {detected && (
         <div className={styles.detected}>

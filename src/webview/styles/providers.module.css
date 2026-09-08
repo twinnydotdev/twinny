@@ -13,15 +13,6 @@
   max-width: 720px;
 }
 
-.page h3 {
-  margin: 0;
-  font-size: var(--tw-fs);
-  font-weight: 600;
-  letter-spacing: var(--tw-track);
-  text-transform: uppercase;
-}
-
-.pageHeader,
 .viewHeader,
 .sectionHeader,
 .setupHeader {

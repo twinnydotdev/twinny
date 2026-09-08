@@ -254,8 +254,29 @@ h6 {
   text-transform: lowercase;
 }
 
-h1 {
-  font-size: 14px;
+/*
+ * Every non-chat tab opens with the same header row: an uppercase title on
+ * the left, optional icon toolbar on the right. Tabs share these two global
+ * classes so the size, weight, tracking and spacing never drift apart.
+ */
+.tw-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.tw-page-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  line-height: 24px;
+  text-transform: uppercase;
 }
 
 h1:first-child,

@@ -7,14 +7,6 @@
   max-width: 720px;
 }
 
-.pageHeader h3 {
-  margin: 0;
-  font-size: var(--tw-fs);
-  font-weight: 600;
-  letter-spacing: var(--tw-track);
-  text-transform: uppercase;
-}
-
 .intro {
   margin: -8px 0 0;
   color: var(--tw-fg-dim);

@@ -171,7 +171,7 @@ export const EmbeddingOptions = () => {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
+      <div className="tw-page-header">
         <h3>{t("embeddings")}</h3>
       </div>
       <p className={styles.intro}>{t("embeddings-intro")}</p>
