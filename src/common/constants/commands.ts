@@ -3,6 +3,7 @@ export const TWINNY_COMMAND_NAME = {
   addTypes: "twinny.addTypes",
   conversationHistory: "twinny.conversationHistory",
   disable: "twinny.disable",
+  edit: "twinny.edit",
   embeddings: "twinny.embeddings",
   enable: "twinny.enable",
   review: "twinny.review",

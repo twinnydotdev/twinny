@@ -20,5 +20,5 @@
       "src/common/types.ts"
     ]
   },
-  "exclude": ["node_modules", ".vscode-test", "out", "scripts", "assets"]
+  "exclude": ["node_modules", ".vscode-test", "out", "dist", "scripts", "assets"]
 }

@@ -72,6 +72,10 @@
           "command": "twinny.refactor"
         },
         {
+          "when": "editorTextFocus && !editorReadonly",
+          "command": "twinny.edit"
+        },
+        {
           "when": "editorTextFocus",
           "command": "twinny.addTypes"
         },
@@ -169,6 +173,10 @@
       {
         "command": "twinny.refactor",
         "title": "Twinny - Refactor"
+      },
+      {
+        "command": "twinny.edit",
+        "title": "Twinny - Edit with instruction..."
       },
       {
         "command": "twinny.addTypes",
@@ -287,6 +295,12 @@
       {
         "key": "Alt+\\",
         "command": "editor.action.inlineSuggest.trigger",
+        "when": "editorTextFocus && !editorReadonly"
+      },
+      {
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "command": "twinny.edit",
         "when": "editorTextFocus && !editorReadonly"
       },
       {

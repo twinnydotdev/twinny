@@ -25,6 +25,8 @@ import { ContextItem, SelectionContextItem } from "./common/types"
 import { FileInteractionCache } from "./extension/completion/file-interaction"
 import { CompletionProvider } from "./extension/completion/provider"
 import { setContext } from "./extension/context"
+import { InlineEditCodeActionProvider } from "./extension/edit/code-actions"
+import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
 import { EmbeddingDatabase } from "./extension/embeddings/database"
 import { P2pRuntime } from "./extension/p2p/runtime"
 import { generateCommitMessage } from "./extension/review/commit-message"
@@ -35,13 +37,23 @@ import { delayExecution, sanitizeWorkspaceName } from "./extension/utils"
 import { FullScreenProvider } from "./extension/webview/panel"
 import { SidebarProvider } from "./extension/webview/sidebar"
 
-/** The editor commands that hand a selection to a chat template. */
+/**
+ * The editor commands whose answer is not a replacement for the selection
+ * (prose, or a new file of tests): these go to the chat.
+ */
 const TEMPLATE_COMMANDS: Record<string, string> = {
   [TWINNY_COMMAND_NAME.explain]: "explain",
-  [TWINNY_COMMAND_NAME.addTypes]: "add-types",
-  [TWINNY_COMMAND_NAME.refactor]: "refactor",
-  [TWINNY_COMMAND_NAME.generateDocs]: "generate-docs",
   [TWINNY_COMMAND_NAME.addTests]: "add-tests"
+}
+
+/** The editor commands that rewrite the selection in place, via inline edit. */
+const EDIT_COMMANDS: Record<string, string> = {
+  [TWINNY_COMMAND_NAME.refactor]:
+    "Refactor this code to improve readability and efficiency without changing its behaviour.",
+  [TWINNY_COMMAND_NAME.addTypes]:
+    "Add precise type annotations, keeping the logic unchanged.",
+  [TWINNY_COMMAND_NAME.generateDocs]:
+    "Add documentation comments in the standard format for this language (JSDoc, docstrings, etc.). Keep the code itself unchanged."
 }
 
 /** Clicking the idle status bar item: the most-used toggles, one click away. */
@@ -169,6 +181,8 @@ export async function activate(context: ExtensionContext) {
     context
   )
 
+  const inlineEdit = new InlineEditService(context, statusBar)
+
   templateProvider.init()
 
   const runTemplate = async (template: string) => {
@@ -186,12 +200,29 @@ export async function activate(context: ExtensionContext) {
     statusBar,
     p2p,
     fileInteractionCache,
+    inlineEdit,
     languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
       completionProvider
     ),
+    languages.registerCodeActionsProvider(
+      { scheme: "file" },
+      new InlineEditCodeActionProvider(),
+      {
+        providedCodeActionKinds:
+          InlineEditCodeActionProvider.providedCodeActionKinds
+      }
+    ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.edit, (args?: InlineEditArgs) =>
+      inlineEdit.run(args)
+    ),
     ...Object.entries(TEMPLATE_COMMANDS).map(([command, template]) =>
       commands.registerCommand(command, () => runTemplate(template))
+    ),
+    ...Object.entries(EDIT_COMMANDS).map(([command, instruction]) =>
+      commands.registerCommand(command, () =>
+        inlineEdit.run({ instruction, requireSelection: true })
+      )
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.enable, () => setEnabled(true)),
     commands.registerCommand(TWINNY_COMMAND_NAME.disable, () =>
@@ -207,6 +238,7 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.stopGeneration, () => {
       completionProvider.onError()
       sidebarProvider.destroyStream()
+      inlineEdit.abort()
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageProviders, async () => {
       commands.executeCommand(
