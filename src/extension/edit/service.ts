@@ -1,9 +1,11 @@
 import { TokenJS } from "fluency.js"
+import * as fs from "fs"
+import * as path from "path"
 import * as vscode from "vscode"
 
 import { EXTENSION_CONTEXT_NAME } from "../../common/constants"
 import { logger } from "../../common/logger"
-import { TwinnyProvider } from "../../common/types"
+import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
 import {
   buildBlockingRequest,
   buildStreamingRequest,
@@ -22,6 +24,14 @@ import {
   matchIndentation,
   previewEdit
 } from "./prompt"
+import {
+  appendTests,
+  buildTestMessages,
+  declaredDependencies,
+  isTestFile,
+  testFilePath,
+  testFrameworkFor
+} from "./tests"
 
 export interface InlineEditArgs {
   uri?: vscode.Uri | string
@@ -44,6 +54,20 @@ export interface Hunk {
   line: number
   removed: number[]
   added: number[]
+}
+
+/** One request to the model whose answer streams into a region. */
+interface Generation {
+  region: DiffRegion
+  messages: ChatCompletionMessage[]
+  /** The region's proposed text for what the model has said so far. */
+  preview: (reply: string) => string
+  /** The region's proposed text for the complete reply. */
+  finalize: (reply: string) => string
+  /** For the log and the messages: "edit" or "tests". */
+  what: string
+  /** The log line describing the request. */
+  describe: string
 }
 
 const mac = process.platform === "darwin"
@@ -123,18 +147,8 @@ export class InlineEditService extends Base {
       )
       return
     }
-    const provider = this.getProvider()
-    if (!provider) {
-      const choice = await vscode.window.showWarningMessage(
-        "Twinny has no chat provider configured.",
-        "Manage providers"
-      )
-      if (choice) {
-        await vscode.commands.executeCommand("twinny.sidebar.focus")
-        await vscode.commands.executeCommand("twinny.manageProviders")
-      }
-      return
-    }
+    const provider = await this.requireProvider()
+    if (!provider) return
 
     // A pending diff is refined: the instruction applies to the proposal.
     const pending = this._pending
@@ -231,6 +245,91 @@ export class InlineEditService extends Base {
     logger.log(`Applied chat code ${how} in ${vscode.workspace.asRelativePath(document.uri)}`)
   }
 
+  /**
+   * Write tests for the selection (or the whole file) into the file's test
+   * file, opened beside it. A test file that does not exist yet opens
+   * untitled with its path, so nothing lands on disk until it is saved;
+   * one that exists gets the new tests appended. Either way the tests
+   * stream in as a diff to accept or reject, like an edit.
+   */
+  public async writeTests() {
+    if (this._running || this._pending) {
+      vscode.window.showInformationMessage(
+        "Twinny has an edit in progress. Accept or reject it first."
+      )
+      return
+    }
+    const provider = await this.requireProvider()
+    if (!provider) return
+
+    const source = vscode.window.activeTextEditor
+    if (!source || source.document.uri.scheme !== "file") {
+      vscode.window.showInformationMessage("Open a file to write tests for.")
+      return
+    }
+    const document = source.document
+    if (isTestFile(document.uri.fsPath)) {
+      vscode.window.showInformationMessage(
+        "This is a test file already. Open the code to test and try again."
+      )
+      return
+    }
+
+    const range = source.selection.isEmpty
+      ? new vscode.Range(
+          0,
+          0,
+          document.lineCount - 1,
+          document.lineAt(document.lineCount - 1).range.end.character
+        )
+      : this.wholeLines(document, source.selection)
+    const code = document.getText(range)
+    if (!code.trim()) {
+      vscode.window.showInformationMessage("There is no code to write tests for.")
+      return
+    }
+
+    const target = vscode.Uri.file(testFilePath(document.uri.fsPath, document.languageId))
+    const editor = await this.openTestFile(target, document.languageId, source)
+    const testDocument = editor.document
+    const last = testDocument.lineCount - 1
+    const region = new DiffRegion(
+      editor,
+      new vscode.Range(last, 0, last, testDocument.lineAt(last).range.end.character)
+    )
+    const lastLine = testDocument.getText(region.range)
+    const empty = !testDocument.getText().trim()
+    const shape = (body: string) => appendTests(lastLine, empty, body)
+
+    const messages = buildTestMessages({
+      code,
+      language: document.languageId,
+      fileName: vscode.workspace.asRelativePath(document.uri),
+      testFileName: vscode.workspace.asRelativePath(target),
+      framework: testFrameworkFor(
+        document.languageId,
+        this.dependenciesNear(document.uri.fsPath)
+      ),
+      existing: empty ? undefined : testDocument.getText()
+    })
+
+    await this.generate(provider, {
+      region,
+      messages,
+      preview: (reply) => shape(previewEdit(reply, "")),
+      finalize: (reply) => {
+        const body = finalizeEdit(reply, "")
+        return body ? shape(body) + "\n" : lastLine
+      },
+      what: "tests",
+      describe: JSON.stringify({
+        file: vscode.workspace.asRelativePath(document.uri),
+        lines: `${range.start.line + 1}-${range.end.line + 1}`,
+        testFile: vscode.workspace.asRelativePath(target)
+      })
+    })
+  }
+
   /** Keep the rewrite, or one hunk of it: delete the lines it replaced. */
   public accept(hunk?: number) {
     return this.resolve("accept", hunk)
@@ -256,8 +355,10 @@ export class InlineEditService extends Base {
       return
     }
     const what = pending.done ? "edit" : "hunk"
-    if (pending.done) this.clearPending()
-    else {
+    if (pending.done) {
+      this.clearPending()
+      if (verdict === "reject") await this.closeIfEmptyUntitled(pending.document)
+    } else {
       this.decorate()
       this._emitter.fire()
     }
@@ -267,11 +368,91 @@ export class InlineEditService extends Base {
     )
   }
 
+  private async requireProvider(): Promise<TwinnyProvider | undefined> {
+    const provider = this.getProvider()
+    if (provider) return provider
+    const choice = await vscode.window.showWarningMessage(
+      "Twinny has no chat provider configured.",
+      "Manage providers"
+    )
+    if (choice) {
+      await vscode.commands.executeCommand("twinny.sidebar.focus")
+      await vscode.commands.executeCommand("twinny.manageProviders")
+    }
+    return undefined
+  }
+
   private async editorFor(document: vscode.TextDocument) {
     const visible = vscode.window.visibleTextEditors.find(
       (editor) => editor.document === document
     )
     return visible ?? vscode.window.showTextDocument(document)
+  }
+
+  /**
+   * The test file in an editor beside the source. An existing file opens
+   * as itself; a new one opens untitled at that path, so saving it puts
+   * it there and rejecting the tests leaves nothing behind.
+   */
+  private async openTestFile(
+    target: vscode.Uri,
+    languageId: string,
+    source: vscode.TextEditor
+  ): Promise<vscode.TextEditor> {
+    const exists = fs.existsSync(target.fsPath)
+    const uri = exists ? target : target.with({ scheme: "untitled" })
+    const shown = vscode.window.visibleTextEditors.find(
+      (editor) => editor.document.uri.toString() === uri.toString()
+    )
+    if (shown) return shown
+    const document = await vscode.workspace.openTextDocument(uri)
+    if (!exists && document.languageId !== languageId) {
+      await vscode.languages.setTextDocumentLanguage(document, languageId)
+    }
+    // Beside means the group next to the active one, so make sure the
+    // source is the active editor first.
+    if (vscode.window.activeTextEditor !== source) {
+      await vscode.window.showTextDocument(source.document, source.viewColumn)
+    }
+    return vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Beside,
+      preview: false
+    })
+  }
+
+  /** The dependencies of the nearest package.json above a file. */
+  private dependenciesNear(filePath: string): string[] {
+    let dir = path.dirname(filePath)
+    for (let depth = 0; depth < 12; depth++) {
+      const candidate = path.join(dir, "package.json")
+      if (fs.existsSync(candidate)) {
+        try {
+          return declaredDependencies(fs.readFileSync(candidate, "utf8"))
+        } catch {
+          return []
+        }
+      }
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+    return []
+  }
+
+  /**
+   * An untitled test file with nothing left in it is closed rather than
+   * left behind asking to be saved.
+   */
+  private async closeIfEmptyUntitled(document: vscode.TextDocument) {
+    if (!document.isUntitled || document.getText().trim()) return
+    const editor = vscode.window.visibleTextEditors.find(
+      (candidate) => candidate.document === document
+    )
+    if (!editor) return
+    await vscode.window.showTextDocument(document, editor.viewColumn)
+    await vscode.commands.executeCommand(
+      "workbench.action.revertAndCloseActiveEditor"
+    )
   }
 
   private async resolveEditor(
@@ -334,9 +515,9 @@ export class InlineEditService extends Base {
   }
 
   /**
-   * Ask the model and stream the answer into `region`. A fresh region
-   * edits the selection; a pending one edits its proposal, and the diff
-   * keeps showing against what was there before.
+   * Rewrite `region` to an instruction. A fresh region edits the
+   * selection; a pending one edits its proposal, and the diff keeps
+   * showing against what was there before.
    */
   private async edit(
     editor: vscode.TextEditor,
@@ -346,8 +527,7 @@ export class InlineEditService extends Base {
   ) {
     const document = editor.document
     const range = region.range
-    const { baseline, proposed } = region.sides()
-    const snapshot = region.snapshot()
+    const { proposed } = region.sides()
     const messages = buildEditMessages({
       instruction,
       code: proposed,
@@ -377,6 +557,30 @@ export class InlineEditService extends Base {
       )
     })
 
+    await this.generate(provider, {
+      region,
+      messages,
+      preview: (reply) => previewEdit(reply, proposed),
+      finalize: (reply) => finalizeEdit(reply, proposed),
+      what: "edit",
+      describe: JSON.stringify({
+        file: vscode.workspace.asRelativePath(document.uri),
+        lines: `${range.start.line + 1}-${range.end.line + 1}`,
+        instruction
+      })
+    })
+  }
+
+  /**
+   * Ask the model and stream the answer into the generation's region as
+   * a diff against what the region shows now, then hand it over for a
+   * verdict. Nothing changes if the model has nothing to add.
+   */
+  private async generate(provider: TwinnyProvider, generation: Generation) {
+    const { region, messages, what } = generation
+    const { baseline, proposed } = region.sides()
+    const snapshot = region.snapshot()
+
     const client = new TokenJS({
       baseURL: this.getProviderBaseUrl(provider),
       apiKey: provider.apiKey
@@ -388,11 +592,7 @@ export class InlineEditService extends Base {
 
     try {
       logger.log(
-        `Inline edit request (${provider.modelName}): ${JSON.stringify({
-          file: vscode.workspace.asRelativePath(document.uri),
-          lines: `${range.start.line + 1}-${range.end.line + 1}`,
-          instruction
-        })}`
+        `Inline ${what} request (${provider.modelName}): ${generation.describe}`
       )
 
       if (supportsStreaming(provider)) {
@@ -405,7 +605,7 @@ export class InlineEditService extends Base {
           if (!delta) continue
           reply += delta
           await region.render(
-            layoutDiff(baseline, previewEdit(reply, proposed), true)
+            layoutDiff(baseline, generation.preview(reply), true)
           )
           this.decorate()
         }
@@ -419,29 +619,31 @@ export class InlineEditService extends Base {
       if (region.broken) {
         this.clearPending()
         vscode.window.showWarningMessage(
-          "Twinny stopped: the file changed under the edit. Undo (Ctrl+Z) reverts it."
+          `Twinny stopped: the file changed under the ${what}. Undo (Ctrl+Z) reverts it.`
         )
         return
       }
 
       if (this._controller?.signal.aborted) {
         await this.rewind(region, snapshot)
-        vscode.window.setStatusBarMessage("Twinny: edit cancelled", 3000)
+        vscode.window.setStatusBarMessage(`Twinny: ${what} cancelled`, 3000)
         return
       }
 
-      const final = finalizeEdit(reply, proposed)
-      logger.log(`Inline edit response: ${final.length} chars`)
+      const final = generation.finalize(reply)
+      logger.log(`Inline ${what} response: ${final.length} chars`)
+      const nothing =
+        what === "edit" ? "no changes suggested" : `no ${what} written`
       if (final === proposed) {
         await this.rewind(region, snapshot)
-        vscode.window.setStatusBarMessage("Twinny: no changes suggested", 4000)
+        vscode.window.setStatusBarMessage(`Twinny: ${nothing}`, 4000)
         return
       }
       const layout = layoutDiff(baseline, final)
       await region.render(layout)
       if (region.done) {
         this.clearPending()
-        vscode.window.setStatusBarMessage("Twinny: no changes suggested", 4000)
+        vscode.window.setStatusBarMessage(`Twinny: ${nothing}`, 4000)
         return
       }
       this.end()
@@ -452,7 +654,7 @@ export class InlineEditService extends Base {
       if (!isAbortError(error)) {
         logger.error(error instanceof Error ? error : String(error))
         vscode.window.showErrorMessage(
-          `Twinny could not edit: ${describeProviderErrorPlain(error, provider)}`
+          `Twinny could not write the ${what}: ${describeProviderErrorPlain(error, provider)}`
         )
       }
     } finally {
@@ -477,6 +679,7 @@ export class InlineEditService extends Base {
     await region.render(snapshot)
     if (region.done) {
       this.clearPending()
+      await this.closeIfEmptyUntitled(region.document)
       return
     }
     this.end()

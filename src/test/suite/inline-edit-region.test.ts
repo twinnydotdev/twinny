@@ -186,4 +186,33 @@ suite("Inline edit region", () => {
     assert.strictEqual(t.document.getText(), "a\nb\nc\nd")
     t.dispose()
   })
+
+  test("streams new tests into an untitled file that saves to its path", async () => {
+    // How writeTests opens a test file that does not exist yet.
+    const target = vscode.Uri.file("/tmp/twinny-write-tests/math.test.ts")
+    const document = await vscode.workspace.openTextDocument(
+      target.with({ scheme: "untitled" })
+    )
+    const editor = await vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Beside
+    })
+    assert.ok(document.isUntitled)
+    assert.strictEqual(document.uri.fsPath, target.fsPath)
+    assert.strictEqual(document.languageId, "typescript", "language from the path")
+    assert.strictEqual(document.getText(), "")
+
+    const region = new DiffRegion(editor, new vscode.Range(0, 0, 0, 0))
+    await region.render(layoutDiff("", "import { add } from './math'\n\ntest('adds'", true))
+    await region.render(layoutDiff("", "import { add } from './math'\n\ntest('adds', () => {})\n"))
+    assert.deepStrictEqual(region.removed, [])
+    assert.deepStrictEqual(region.added, [0, 1, 2])
+    assert.ok(await region.settle(editor, "reject"))
+    assert.strictEqual(document.getText(), "", "rejecting empties the untitled file")
+    await vscode.window.showTextDocument(document, editor.viewColumn)
+    await vscode.commands.executeCommand("workbench.action.revertAndCloseActiveEditor")
+    assert.ok(
+      !vscode.window.visibleTextEditors.some((e) => e.document === document),
+      "closed without a save prompt"
+    )
+  })
 })

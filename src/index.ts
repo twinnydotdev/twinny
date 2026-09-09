@@ -41,12 +41,11 @@ import { FullScreenProvider } from "./extension/webview/panel"
 import { SidebarProvider } from "./extension/webview/sidebar"
 
 /**
- * The editor commands whose answer is not a replacement for the selection
- * (prose, or a new file of tests): these go to the chat.
+ * The editor commands whose answer is prose rather than code: these go
+ * to the chat.
  */
 const TEMPLATE_COMMANDS: Record<string, string> = {
-  [TWINNY_COMMAND_NAME.explain]: "explain",
-  [TWINNY_COMMAND_NAME.addTests]: "add-tests"
+  [TWINNY_COMMAND_NAME.explain]: "explain"
 }
 
 /** The editor commands that rewrite the selection in place, via inline edit. */
@@ -238,6 +237,9 @@ export async function activate(context: ExtensionContext) {
     ),
     commands.registerCommand(TWINNY_COMMAND_NAME.applyCode, (code: string) =>
       inlineEdit.propose(String(code ?? ""))
+    ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.addTests, () =>
+      inlineEdit.writeTests()
     ),
     ...Object.entries(TEMPLATE_COMMANDS).map(([command, template]) =>
       commands.registerCommand(command, () => runTemplate(template))
