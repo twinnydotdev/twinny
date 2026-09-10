@@ -20,6 +20,7 @@ import { TemplateProvider } from "../templates/provider"
 import { getLanguage } from "../utils"
 
 import { ChatContextBuilder } from "./context"
+import { ContextEntry, formatContextEntries } from "./context-files"
 import { ChatGeneration } from "./generation"
 import {
   buildBlockingRequest,
@@ -99,6 +100,37 @@ export class Chat extends Base {
     const provider = this.start()
     if (!provider) return ""
     this._conversation = await this.buildTemplateConversation(template, context)
+    return this.run(provider)
+  }
+
+  /**
+   * A question raised by a command rather than typed: shown in the chat as
+   * if the user had sent `display`, answered from `prompt` with `attached`
+   * code, and kept in the conversation so follow-ups work.
+   */
+  public async ask(
+    display: string,
+    prompt: string,
+    attached: ContextEntry[] = []
+  ): Promise<string> {
+    const provider = this.start()
+    if (!provider) return ""
+    this._bridge.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
+    this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+      role: USER,
+      content: display
+    })
+    const code = formatContextEntries(attached)
+    const content = code ? `${prompt}\n\nAttached code:\n\n${code}` : prompt
+    if (!this._conversation.length) {
+      this._conversation = [
+        { role: SYSTEM, content: await this._context.systemPrompt() }
+      ]
+    }
+    this._conversation = [
+      ...this._conversation,
+      { role: USER, content: content.trim() }
+    ]
     return this.run(provider)
   }
 

@@ -38,6 +38,7 @@ import {
 } from "../common/types"
 
 import { getParser } from "./completion/parser"
+import { isIndexablePath } from "./embeddings/indexable"
 import { ExtensionBridge } from "./messaging/bridge"
 import { TwinnyProvider } from "./providers/manager"
 
@@ -509,7 +510,7 @@ export async function getAllFilePaths(dirPath: string): Promise<string[]> {
 
     if (dirent.isDirectory()) {
       filePaths.push(...(await getAllFilePaths(fullPath)))
-    } else if (dirent.isFile()) {
+    } else if (dirent.isFile() && isIndexablePath(fullPath)) {
       filePaths.push(relativePath)
     }
   }

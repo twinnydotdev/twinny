@@ -32,7 +32,7 @@
   "license": "MIT",
   "publisher": "rjmacarthy",
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.93.0"
   },
   "bugs": {
     "url": "https://github.com/twinnydotdev/twinny/issues"
@@ -163,6 +163,16 @@
         {
           "command": "twinny.rejectEdit",
           "when": "twinnyInlineEditPending"
+        }
+      ],
+      "terminal/context": [
+        {
+          "command": "twinny.fixTerminalError",
+          "group": "twinny@1"
+        },
+        {
+          "command": "twinny.terminalCommand",
+          "group": "twinny@2"
         }
       ],
       "explorer/context": [
@@ -305,6 +315,14 @@
       {
         "command": "twinny.shareOllama",
         "title": "Twinny - Share this computer's Ollama with my other devices (P2P)"
+      },
+      {
+        "command": "twinny.terminalCommand",
+        "title": "Twinny - Write a terminal command from a description"
+      },
+      {
+        "command": "twinny.fixTerminalError",
+        "title": "Twinny - Fix the last terminal error"
       }
     ],
     "keybindings": [
@@ -497,7 +515,7 @@
           "order": 14,
           "type": "array",
           "default": [],
-          "markdownDescription": "Specifies file patterns to ignore when calculating embeddings, such as `**/*.md`, `**/node_modules/**`."
+          "markdownDescription": "Extra file patterns to skip when building embeddings, such as `**/*.md` or `**/fixtures/**`. Only source, config and documentation files are indexed to begin with; binaries such as fonts and images are always skipped."
         },
         "twinny.ollamaHostname": {
           "order": 15,
@@ -593,7 +611,7 @@
     "@types/react-dom": "^18.2.18",
     "@types/react-syntax-highlighter": "^15.5.11",
     "@types/uuid": "^9.0.8",
-    "@types/vscode": "^1.70.0",
+    "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
     "@vscode/test-cli": "^0.0.6",

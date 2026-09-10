@@ -29,5 +29,7 @@ export const TWINNY_COMMAND_NAME = {
   addFileToContext: "twinny.addFileToContext",
   getContextFiles: "twinny.getContextFiles",
   addSelectionToContext: "twinny.addSelectionToContext",
-  shareOllama: "twinny.shareOllama"
+  shareOllama: "twinny.shareOllama",
+  terminalCommand: "twinny.terminalCommand",
+  fixTerminalError: "twinny.fixTerminalError"
 }

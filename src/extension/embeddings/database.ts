@@ -21,6 +21,8 @@ import {
   sanitizeWorkspaceName
 } from "../utils"
 
+import { isIndexablePath, looksBinary } from "./indexable"
+
 /** How many files are embedded at once. */
 const INGEST_CONCURRENCY = 30
 /** Rows are written to the database in batches of this many files. */
@@ -159,7 +161,7 @@ export class EmbeddingDatabase extends Base {
 
       if (dirent.isDirectory()) {
         filePaths.push(...(await this.getAllFilePaths(rootPath, fullPath, ig)))
-      } else if (dirent.isFile()) {
+      } else if (dirent.isFile() && isIndexablePath(fullPath)) {
         filePaths.push(fullPath)
       }
     }
@@ -225,7 +227,9 @@ export class EmbeddingDatabase extends Base {
         const stats = await fs.promises.stat(filePath)
         if (stats.size === 0 || stats.size > MAX_FILE_BYTES) return
 
-        const content = await fs.promises.readFile(filePath, "utf-8")
+        const buffer = await fs.promises.readFile(filePath)
+        if (looksBinary(buffer)) return
+        const content = buffer.toString("utf-8")
         const chunks = [
           ...new Set(await getDocumentSplitChunks(content, filePath, this.context))
         ]

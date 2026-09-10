@@ -48,7 +48,15 @@ export const knownErrorMessages = [
   "The 'transform.readable' property must be an instance of ReadableStream. Received an instance of h" //When you try to enable the Node.js compatibility mode Compat to solve the problem, this error may pop up
 ]
 
+/**
+ * Mentions that stand for a source of context rather than a file. Picking
+ * one inserts `@name`; the chat service reads the name back out of the text.
+ */
 export const topLevelItems: ContextItem[] = [
-  { name: "workspace", path: "", category: "files", id: "workspace" },
-  { name: "problems", path: "", category: "files", id: "problems" }
+  { name: "workspace", path: "", category: "workspace", id: "workspace" },
+  { name: "problems", path: "", category: "problems", id: "problems" },
+  { name: "git", path: "", category: "git", id: "git" },
+  { name: "terminal", path: "", category: "terminal", id: "terminal" }
 ]
+
+export const TOP_LEVEL_MENTIONS = new Set(topLevelItems.map((item) => item.name))

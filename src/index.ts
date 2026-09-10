@@ -36,6 +36,9 @@ import { generateCommitMessage } from "./extension/review/commit-message"
 import { SessionManager } from "./extension/session-manager"
 import { TwinnyStatusBar } from "./extension/status-bar"
 import { TemplateProvider } from "./extension/templates/provider"
+import { terminalHistory } from "./extension/terminal"
+import { runDescribedCommand } from "./extension/terminal/command"
+import { fixTerminalError } from "./extension/terminal/fix"
 import { delayExecution, sanitizeWorkspaceName } from "./extension/utils"
 import { FullScreenProvider } from "./extension/webview/panel"
 import { SidebarProvider } from "./extension/webview/sidebar"
@@ -200,6 +203,15 @@ export async function activate(context: ExtensionContext) {
     sidebarProvider.streamTemplateCompletion(template)
   }
 
+  // The chat service only exists once the sidebar has been shown.
+  const requireChat = async () => {
+    if (!sidebarProvider.chat) {
+      await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+      await sidebarProvider.waitForSidebarReady()
+    }
+    return sidebarProvider.chat
+  }
+
   const setEnabled = (enabled: boolean) =>
     workspace
       .getConfiguration("twinny")
@@ -210,6 +222,15 @@ export async function activate(context: ExtensionContext) {
     p2p,
     fileInteractionCache,
     inlineEdit,
+    terminalHistory,
+    commands.registerCommand(TWINNY_COMMAND_NAME.terminalCommand, async () => {
+      const chat = await requireChat()
+      if (chat) await runDescribedCommand(chat, terminalHistory)
+    }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.fixTerminalError, async () => {
+      const chat = await requireChat()
+      if (chat) await fixTerminalError(chat, terminalHistory)
+    }),
     languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
       completionProvider
@@ -343,13 +364,8 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(
       TWINNY_COMMAND_NAME.generateCommitMessage,
       async () => {
-        // The chat service only exists once the sidebar has been shown.
-        if (!sidebarProvider.chat) {
-          await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
-          await sidebarProvider.waitForSidebarReady()
-        }
-        if (!sidebarProvider.chat) return
-        await generateCommitMessage(sidebarProvider.chat, templateProvider)
+        const chat = await requireChat()
+        if (chat) await generateCommitMessage(chat, templateProvider)
       }
     ),
     // Turn this machine into a node and put a pairing code on the clipboard.

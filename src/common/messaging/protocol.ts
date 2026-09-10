@@ -11,6 +11,7 @@ import type { DiscoveredServer } from "../provider-discovery"
 import type {
   AnyContextItem,
   ChatCompletionMessage,
+  ContextItem,
   Conversation,
   GitHubPr,
   LanguageType,
@@ -232,6 +233,7 @@ export interface ClientEvents {
   [EVENT_NAME.twinnySetWorkspaceContext]: Channel<ContextValue>
   [EVENT_NAME.twinnySidebarReady]: Channel
   [EVENT_NAME.twinnyStopGeneration]: Channel
+  [EVENT_NAME.twinnySymbolSearch]: Channel<{ query: string }, ContextItem[]>
   [EVENT_NAME.twinnyTextSelection]: Channel<void, string>
 
   [CONVERSATION_EVENT_NAME.clearAllConversations]: Channel

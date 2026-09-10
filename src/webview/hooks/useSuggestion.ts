@@ -5,11 +5,12 @@ import { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion"
 import Fuse from "fuse.js"
 import tippy, { Instance as TippyInstance } from "tippy.js"
 
-import { topLevelItems } from "../../common/constants"
+import { EVENT_NAME, topLevelItems } from "../../common/constants"
 import { CategoryType, ContextItem } from "../../common/types"
 import { MentionList, MentionListProps, MentionListRef } from "../mention-list"
+import { bridge } from "../messaging"
 
-import { useFilePaths } from "./useFilePaths" // Adjusted import path
+import { useFilePaths } from "./useFilePaths"
 
 export const useSuggestion = () => {
   const { filePaths } = useFilePaths()
@@ -17,7 +18,7 @@ export const useSuggestion = () => {
   const getFilePaths = useCallback(() => filePaths, [filePaths])
 
   const suggestionItems = useCallback(
-    ({ query }: { query: string }) => {
+    async ({ query }: { query: string }) => {
       const filePaths = getFilePaths()
       const fileItems = createFileItems(filePaths)
       const allItems = [...topLevelItems, ...fileItems]
@@ -32,13 +33,26 @@ export const useSuggestion = () => {
         ? fuse.search(query).map((result) => result.item)
         : allItems
 
-      const groupedItems = groupItemsByCategory(filteredItems)
+      // Symbols come from the language servers, already matched to the
+      // query, so they bypass the fuzzy search over file names.
+      const symbolItems = await searchSymbols(query)
+
+      const groupedItems = groupItemsByCategory([...filteredItems, ...symbolItems])
       const sortedItems = sortItemsByCategory(groupedItems)
 
-      return Promise.resolve(sortedItems)
+      return sortedItems
     },
     [getFilePaths]
   )
+
+  const searchSymbols = async (query: string): Promise<ContextItem[]> => {
+    try {
+      const items = await bridge.request(EVENT_NAME.twinnySymbolSearch, { query })
+      return Array.isArray(items) ? items : []
+    } catch {
+      return []
+    }
+  }
 
   const createFileItems = (filePaths: string[]): ContextItem[] =>
     filePaths.map((path) => ({
@@ -56,7 +70,14 @@ export const useSuggestion = () => {
       return acc
     }, {} as Record<string, ContextItem[]>)
 
-  const orderedCategories: CategoryType[] = ["workspace", "problems", "files"]
+  const orderedCategories: CategoryType[] = [
+    "workspace",
+    "problems",
+    "git",
+    "terminal",
+    "files",
+    "symbols"
+  ]
 
   const sortItemsByCategory = (
     groupedItems: Record<string, ContextItem[]>

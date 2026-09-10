@@ -3,7 +3,7 @@ import * as os from "os"
 import * as path from "path"
 import { ExtensionContext, window, workspace } from "vscode"
 
-import { WORKSPACE_STORAGE_KEY } from "../../common/constants"
+import { TOP_LEVEL_MENTIONS, WORKSPACE_STORAGE_KEY } from "../../common/constants"
 import { CodeLanguageDetails } from "../../common/languages"
 import { logger } from "../../common/logger"
 import {
@@ -14,6 +14,8 @@ import {
 } from "../../common/types"
 import { ExtensionBridge } from "../messaging/bridge"
 import { TemplateProvider } from "../templates/provider"
+import { NO_TERMINAL_OUTPUT, terminalHistory } from "../terminal"
+import { formatTerminalRun } from "../terminal/output"
 import { updateLoadingMessage } from "../utils"
 
 import {
@@ -21,13 +23,16 @@ import {
   formatContextEntries,
   normalizeWorkspacePath
 } from "./context-files"
+import { getGitContext } from "./git-context"
 import { getProblemsContext } from "./problems"
+import { isSymbolRef } from "./symbol-ref"
+import { readSymbolEntry } from "./symbols"
 import { WorkspaceSearch } from "./workspace-search"
 
 /**
  * Everything that goes into a prompt besides the user's own words: the
- * system prompt, the editor selection, `@workspace` / `@problems` lookups,
- * and the files the user attached or pinned.
+ * system prompt, the editor selection, `@workspace` / `@problems` / `@git` /
+ * `@terminal` lookups, and the files and symbols the user attached or pinned.
  */
 export class ChatContextBuilder {
   constructor(
@@ -64,7 +69,7 @@ export class ChatContextBuilder {
     return { prompt: prompt || "", selection }
   }
 
-  /** What `@workspace` and `@problems` in the message pull in. */
+  /** What `@workspace`, `@problems`, `@git` and `@terminal` pull in. */
   public async ragContext(text?: string): Promise<string | null> {
     let combined = ""
 
@@ -73,9 +78,20 @@ export class ChatContextBuilder {
       if (problems) combined += `${problems}\n\n`
     }
 
+    if (text?.includes("@git")) {
+      const root = workspace.workspaceFolders?.[0]?.uri.fsPath
+      const git = root ? await getGitContext(root) : undefined
+      combined += `${git ?? "Git: the workspace is not a git repository."}\n\n`
+    }
+
+    if (text?.includes("@terminal")) {
+      const run = terminalHistory.last()
+      combined += `${run ? formatTerminalRun(run) : `Terminal: ${NO_TERMINAL_OUTPUT}`}\n\n`
+    }
+
     if (text?.includes("@workspace")) {
       updateLoadingMessage(this._bridge, "Exploring knowledge base")
-      const query = text.replace(/@workspace|@problems/g, "")
+      const query = text.replace(/@(workspace|problems|git|terminal)\b/g, "")
       const files = await this._search.relevantFiles(query)
       const code = await this._search.relevantCode(query, files)
 
@@ -130,7 +146,12 @@ export class ChatContextBuilder {
     const entries: ContextEntry[] = []
 
     for (const mention of mentions) {
-      if (!mention.path) continue
+      if (!mention.path || TOP_LEVEL_MENTIONS.has(mention.path)) continue
+      if (isSymbolRef(mention.path)) {
+        const entry = await readSymbolEntry(mention.path)
+        if (entry) entries.push(entry)
+        continue
+      }
       const mentionPath = normalizeWorkspacePath(mention.path)
       const content = await this.readWorkspaceFile(mentionPath)
       if (content !== undefined) entries.push({ path: mentionPath, content })

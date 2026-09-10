@@ -16,6 +16,7 @@ import {
 } from "../../common/types"
 import { Chat } from "../chat"
 import { ConversationHistory } from "../chat/conversation-history"
+import { searchSymbols } from "../chat/symbols"
 import { EmbeddingDatabase } from "../embeddings/database"
 import { EmbeddingService } from "../embeddings/service"
 import { ExtensionBridge } from "../messaging/bridge"
@@ -195,6 +196,7 @@ export class BaseProvider {
           .update(key, value, vscode.ConfigurationTarget.Global),
       [EVENT_NAME.twinnySidebarReady]: () => this._sidebarReadyHandler?.(),
       [EVENT_NAME.twinnyStopGeneration]: () => this.destroyStream(),
+      [EVENT_NAME.twinnySymbolSearch]: ({ query }) => searchSymbols(query),
       [EVENT_NAME.twinnyTextSelection]: () => getTextSelection()
     })
   }
