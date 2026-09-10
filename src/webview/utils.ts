@@ -1,10 +1,12 @@
-import { MentionPluginKey } from "@tiptap/extension-mention"
+import { PluginKey } from "@tiptap/pm/state" // or 'prosemirror-state'
 import { Extension } from "@tiptap/react"
 
 import { CodeLanguage, supportedLanguages } from "../common/languages"
 import { LanguageType } from "../common/types"
 
 export { getLineBreakCount, kebabToSentence } from "../common/text"
+
+const MentionPluginKey = new PluginKey("mention")
 
 export const getLanguageMatch = (
   language: LanguageType | undefined,
