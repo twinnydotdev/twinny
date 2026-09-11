@@ -198,6 +198,26 @@ export const SvgOpenRouter = () => {
   )
 }
 
+/** A plain "R" mark; Requesty has no monochrome vector logo in this set. */
+export const SvgRequesty = () => {
+  return (
+    <svg
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+      width="1em"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <title>Requesty</title>
+      <rect x="2" y="2" width="20" height="20" rx="5"></rect>
+      <path d="M8.5 17.5v-11h4.25a3.25 3.25 0 010 6.5H8.5m4 0 3.5 4.5"></path>
+    </svg>
+  )
+}
+
 export const SvgPerplexity = () => {
   return (
     <svg viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg">

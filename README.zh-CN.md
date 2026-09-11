@@ -8,6 +8,7 @@ Twinny 是一个免费的 Visual Studio Code AI 扩展，提供强大的 AI 辅�
 - [OpenAI](https://openai.com)
 - [Anthropic](https://www.anthropic.com)
 - [OpenRouter](https://openrouter.ai)
+- [Requesty](https://requesty.ai)
 - [Deepseek](https://www.deepseek.com)
 - [Cohere](https://www.cohere.ai)
 - [Mistral AI](https://mistral.ai)

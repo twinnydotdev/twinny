@@ -88,6 +88,7 @@
   "providers-openai-name": "OpenAI",
   "providers-openrouter-name": "OpenRouter",
   "providers-perplexity-name": "Perplexity",
+  "providers-requesty-name": "Requesty",
   "pull-requests": "Demandes de tirage",
   "regenerate-message": "Régénérer le message",
   "relevant-code-snippets": "Extraits de code pertinents",
