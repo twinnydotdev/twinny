@@ -88,6 +88,7 @@
   "providers-openai-name": "OpenAI",
   "providers-openrouter-name": "OpenRouter",
   "providers-perplexity-name": "Perplexity",
+  "providers-requesty-name": "Requesty",
   "pull-requests": "拉取請求",
   "regenerate-message": "重新生成消息",
   "relevant-code-snippets": "相關代碼片段",

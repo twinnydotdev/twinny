@@ -27,6 +27,7 @@ export const HOSTED_PROVIDERS: string[] = [
   API_PROVIDERS.Mistral,
   API_PROVIDERS.Groq,
   API_PROVIDERS.OpenRouter,
+  API_PROVIDERS.Requesty,
   API_PROVIDERS.Cohere,
   API_PROVIDERS.Perplexity,
   API_PROVIDERS.Gemini
@@ -38,13 +39,18 @@ const KEY_REQUIRED_PROVIDERS: string[] = [
   API_PROVIDERS.Deepseek
 ]
 
-/** Hosted APIs that offer no completions endpoint twinny can drive for FIM. */
+/**
+ * Hosted APIs that offer no completions endpoint twinny can drive for FIM.
+ * Requesty serves chat completions and embeddings but no raw
+ * `/v1/completions`, so it is chat-only here.
+ */
 const CHAT_ONLY_PROVIDERS: string[] = [
   API_PROVIDERS.Anthropic,
   API_PROVIDERS.Groq,
   API_PROVIDERS.Cohere,
   API_PROVIDERS.Perplexity,
-  API_PROVIDERS.Gemini
+  API_PROVIDERS.Gemini,
+  API_PROVIDERS.Requesty
 ]
 
 export const isHostedProvider = (provider: string) =>

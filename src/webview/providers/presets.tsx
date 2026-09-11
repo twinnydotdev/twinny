@@ -22,7 +22,8 @@ import {
   SvgOllama,
   SvgOpenAI,
   SvgOpenRouter,
-  SvgPerplexity
+  SvgPerplexity,
+  SvgRequesty
 } from "../icons"
 
 import styles from "../styles/providers.module.css"
@@ -115,6 +116,7 @@ export const PRESETS: ProviderPreset[] = [
   hosted(API_PROVIDERS.Groq, "Groq", <SvgGroq />, "llama-3.3-70b-versatile"),
   hosted(API_PROVIDERS.Mistral, "Mistral", <SvgMistral />, "mistral-small-latest"),
   hosted(API_PROVIDERS.OpenRouter, "OpenRouter", <SvgOpenRouter />, "openai/gpt-4.1"),
+  hosted(API_PROVIDERS.Requesty, "Requesty", <SvgRequesty />, "openai/gpt-4o-mini"),
   hosted(API_PROVIDERS.Cohere, "Cohere", <SvgCohere />, "command-r-plus"),
   hosted(
     API_PROVIDERS.Perplexity,

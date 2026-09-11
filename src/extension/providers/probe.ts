@@ -294,13 +294,74 @@ const fetchList = async (
 
 const hostedModels = (provider: string): string[] => {
   // The catalogue types `models` as a tuple per provider, or `true` for the
-  // open-ended ones (OpenRouter); only the tuples are listable.
+  // open-ended ones (OpenRouter, Requesty); only the tuples are listable.
   const entry = (
     hostedCatalogue as unknown as Record<string, { models?: unknown }>
   )[provider]
   return Array.isArray(entry?.models)
     ? entry.models.filter((m): m is string => typeof m === "string")
     : []
+}
+
+const REQUESTY_ORIGIN = "https://router.requesty.ai"
+
+/** Requesty lists chat and embedding models together; `api` tells them apart. */
+const requestyChatModels = (json: unknown): string[] => {
+  const data = (json as { data?: unknown })?.data
+  if (!Array.isArray(data)) return []
+  const chat = data.filter(
+    (item) => (item as { api?: unknown })?.api === "chat"
+  )
+  return names(chat, "id")
+}
+
+const fetchRequestyList = async (
+  provider: TwinnyProvider,
+  path: string
+): Promise<string[]> => {
+  const { signal, done } = withTimeout(LIST_TIMEOUT_MS)
+  try {
+    const response = await fetch(`${REQUESTY_ORIGIN}${path}`, {
+      headers: authHeaders(provider),
+      signal
+    })
+    if (!response.ok) throw await httpError(response)
+    return requestyChatModels(await response.json())
+  } finally {
+    done()
+  }
+}
+
+/**
+ * Requesty has a fixed address, so its list cannot come from the endpoint
+ * fields the way a local server's does. `/v1/models/managed` holds the
+ * curated routing policies (short ids such as `claude-sonnet-4-5`) and goes
+ * first; the full `vendor/model` catalogue from `/v1/models` follows. Either
+ * route answering is enough. The managed list is public, so a wrong key still
+ * gets a dropdown; with a good key the catalogue is narrowed to what the
+ * organisation has approved, and the Test button is what reports a bad key.
+ */
+const listRequestyModels = async (
+  provider: TwinnyProvider
+): Promise<ProviderModelList> => {
+  const [managed, catalogue] = await Promise.allSettled([
+    fetchRequestyList(provider, "/v1/models/managed"),
+    fetchRequestyList(provider, "/v1/models")
+  ])
+  const listed = (attempt: PromiseSettledResult<string[]>) =>
+    attempt.status === "fulfilled" ? [...attempt.value].sort() : []
+  const models = [...new Set([...listed(managed), ...listed(catalogue)])]
+  if (models.length > 0) return { models }
+
+  const firstFailure = [managed, catalogue].find(
+    (attempt): attempt is PromiseRejectedResult => attempt.status === "rejected"
+  )
+  return {
+    models,
+    error: firstFailure
+      ? describeProviderErrorPlain(firstFailure.reason, provider)
+      : "The server did not list any models."
+  }
 }
 
 /**
@@ -312,7 +373,9 @@ export const listProviderModels = async (
   provider: TwinnyProvider
 ): Promise<ProviderModelList> => {
   if (!usesEndpoint(provider.provider, provider.type)) {
-    return { models: hostedModels(provider.provider) }
+    return provider.provider === API_PROVIDERS.Requesty
+      ? listRequestyModels(provider)
+      : { models: hostedModels(provider.provider) }
   }
   if (!provider.apiHostname) {
     return { models: [], error: "No hostname set." }
