@@ -1,4 +1,3 @@
-import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 import { v4 as uuidv4 } from "uuid"
@@ -28,7 +27,7 @@ import { setContext } from "./extension/context"
 import { InlineEditCodeActionProvider } from "./extension/edit/code-actions"
 import { InlineEditCodeLensProvider } from "./extension/edit/code-lens"
 import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
-import { EmbeddingDatabase } from "./extension/embeddings/database"
+import { WorkspaceIndex } from "./extension/embeddings"
 import { P2pRuntime } from "./extension/p2p/runtime"
 import { setUpProvidersOnFirstRun } from "./extension/providers/setup"
 import { ProviderStore } from "./extension/providers/store"
@@ -39,7 +38,7 @@ import { TemplateProvider } from "./extension/templates/provider"
 import { terminalHistory } from "./extension/terminal"
 import { runDescribedCommand } from "./extension/terminal/command"
 import { fixTerminalError } from "./extension/terminal/fix"
-import { delayExecution, sanitizeWorkspaceName } from "./extension/utils"
+import { delayExecution } from "./extension/utils"
 import { FullScreenProvider } from "./extension/webview/panel"
 import { SidebarProvider } from "./extension/webview/sidebar"
 
@@ -116,33 +115,6 @@ async function showStatusBarMenu(statusBar: TwinnyStatusBar) {
   }
 }
 
-/**
- * Embeddings live in a per-workspace LanceDB under ~/.twinny. If that fails
- * to open (unsupported platform, corrupt directory) the rest of the
- * extension must still come up; only the embeddings tab goes without.
- */
-async function openEmbeddingDatabase(
-  context: ExtensionContext
-): Promise<EmbeddingDatabase | undefined> {
-  const workspaceName = sanitizeWorkspaceName(workspace.name)
-  if (!workspaceName) return undefined
-
-  try {
-    const dbDir = path.join(os.homedir(), ".twinny/embeddings")
-    if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
-    const db = new EmbeddingDatabase(path.join(dbDir, workspaceName), context)
-    await db.connect()
-    return db
-  } catch (error) {
-    logger.error(
-      `Embedding database unavailable: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    )
-    return undefined
-  }
-}
-
 export async function activate(context: ExtensionContext) {
   setContext(context)
   const statusBar = new TwinnyStatusBar(
@@ -175,13 +147,14 @@ export async function activate(context: ExtensionContext) {
     p2p
   )
 
-  const db = await openEmbeddingDatabase(context)
+  const workspaceIndex = await WorkspaceIndex.open(context)
+  if (workspaceIndex) context.subscriptions.push(workspaceIndex)
 
   const sidebarProvider = new SidebarProvider(
     statusBar,
     context,
     templateDir,
-    db,
+    workspaceIndex,
     sessionManager,
     p2p
   )

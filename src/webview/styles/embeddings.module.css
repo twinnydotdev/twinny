@@ -32,6 +32,16 @@
   min-height: 24px;
 }
 
+/* Title and buttons share a row when there is room; the buttons drop
+   below it at sidebar width instead of squeezing the title. */
+.cardHeader {
+  flex-wrap: wrap;
+}
+
+.cardHeader h4 {
+  flex: 1 1 160px;
+}
+
 .cardHeader h4,
 .group h4 {
   display: flex;
@@ -194,4 +204,31 @@
   width: 100%;
   margin: 4px 0;
   accent-color: var(--tw-accent);
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.modelLine {
+  margin: 4px 0 0 22px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+}
+
+.stateWarn {
+  color: var(--vscode-editorWarning-foreground, var(--vscode-terminal-ansiYellow));
+}
+
+/* Scanning and finishing have no count to show: pulse the bar instead. */
+.progressBusy {
+  animation: busy 1.2s ease-in-out infinite;
+}
+
+@keyframes busy {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
 }

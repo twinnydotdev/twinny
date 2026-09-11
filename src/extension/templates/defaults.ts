@@ -70,22 +70,9 @@ For code refactoring, use markdown with appropriate code formatting.`.trim()
   {
     name: "relevant-code",
     template: `
-The following code snippet may be relevant to your query. Incorporate pertinent information in your response:
+Code from the workspace that may be relevant. Each block is labelled with its file and line range; refer to those when you answer. Ignore any block that does not bear on the question.
 
-Limit your answer to three sentences.
-
-{{{code}}}
-
-Disregard if not relevant to the current query.`.trim()
-  },
-  {
-    name: "relevant-files",
-    template: `
-These file paths may be relevant to your query:
-
-{{{code}}}
-
-Consider these in your response if pertinent. Disregard if not relevant.`.trim()
+{{{code}}}`.trim()
   },
   {
     name: "fim",

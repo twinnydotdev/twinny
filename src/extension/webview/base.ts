@@ -17,7 +17,7 @@ import {
 import { Chat } from "../chat"
 import { ConversationHistory } from "../chat/conversation-history"
 import { searchSymbols } from "../chat/symbols"
-import { EmbeddingDatabase } from "../embeddings/database"
+import { WorkspaceIndex } from "../embeddings"
 import { EmbeddingService } from "../embeddings/service"
 import { ExtensionBridge } from "../messaging/bridge"
 import { P2pBridge } from "../p2p/bridge"
@@ -37,7 +37,8 @@ import { FileTreeProvider } from "./file-tree"
 const storageKeyFor = (scope: string, key: string) => `${scope}-${key}`
 
 export class BaseProvider {
-  private _embeddingDatabase: EmbeddingDatabase | undefined
+  private _workspaceIndex: WorkspaceIndex | undefined
+  private _embeddingService: EmbeddingService | undefined
   private _fileTreeProvider: FileTreeProvider
   private _p2p: P2pRuntime | undefined
   private _p2pBridge: P2pBridge | undefined
@@ -63,13 +64,13 @@ export class BaseProvider {
     context: vscode.ExtensionContext,
     templateDir: string,
     statusBar: TwinnyStatusBar,
-    db?: EmbeddingDatabase,
+    index?: WorkspaceIndex,
     sessionManager?: SessionManager,
     p2p?: P2pRuntime
   ) {
     this.context = context
     this._fileTreeProvider = new FileTreeProvider()
-    this._embeddingDatabase = db
+    this._workspaceIndex = index
     this._p2p = p2p
     this._sessionManager = sessionManager
     this._statusBarItem = statusBar
@@ -93,6 +94,8 @@ export class BaseProvider {
     this._p2pBridge?.dispose()
     this._p2pBridge = undefined
     this.chat?.dispose()
+    this._embeddingService?.dispose()
+    this._embeddingService = undefined
     this.conversationHistory?.dispose()
     this._disposables.forEach((disposable) => disposable.dispose())
     this._disposables = []
@@ -104,7 +107,7 @@ export class BaseProvider {
       this._templateDir,
       this.context,
       bridge,
-      this._embeddingDatabase
+      this._workspaceIndex?.search
     )
 
     this.conversationHistory = new ConversationHistory(
@@ -125,7 +128,11 @@ export class BaseProvider {
     if (this._p2p) {
       this._p2pBridge = new P2pBridge(this._p2p, bridge, providerManager)
     }
-    new EmbeddingService(this.context, bridge, this._embeddingDatabase)
+    this._embeddingService = new EmbeddingService(
+      this.context,
+      bridge,
+      this._workspaceIndex
+    )
     new FileHandler(bridge)
 
     logger.log("Provider services initialized successfully")
@@ -143,8 +150,8 @@ export class BaseProvider {
       [EVENT_NAME.twinntGetLocale]: () => this.getLocale(),
       [EVENT_NAME.twinnyAcceptSolution]: (code) =>
         void vscode.commands.executeCommand(TWINNY_COMMAND_NAME.applyCode, code),
-      [EVENT_NAME.twinnyChatMessage]: ({ messages, mentions, conversationId }) =>
-        void this.chat?.completion(messages, mentions, conversationId),
+      [EVENT_NAME.twinnyChatMessage]: ({ messages, mentions }) =>
+        void this.chat?.completion(messages, mentions),
       [EVENT_NAME.twinnyClickSuggestion]: (template) =>
         void vscode.commands.executeCommand(
           TWINNY_COMMAND_NAME.templateCompletion,

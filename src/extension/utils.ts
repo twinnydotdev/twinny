@@ -4,7 +4,6 @@ import path from "path"
 import * as vscode from "vscode"
 import {
   ColorThemeKind,
-  ExtensionContext,
   Position,
   Range,
   Terminal,
@@ -16,9 +15,7 @@ import { SyntaxNode } from "web-tree-sitter"
 
 import {
   API_PROVIDERS,
-  defaultChunkOptions,
   EVENT_NAME,
-  EXTENSION_CONTEXT_NAME,
   FIM_MAX_PREFIX_CHARS,
   FIM_MAX_SUFFIX_CHARS,
   knownErrorMessages,
@@ -30,14 +27,12 @@ import { supportedLanguages } from "../common/languages"
 import { logger } from "../common/logger"
 import {
   ChatCompletionMessage,
-  ChunkOptions,
   LanguageType,
   PrefixSuffix,
   StreamResponse,
   Theme
 } from "../common/types"
 
-import { getParser } from "./completion/parser"
 import { isIndexablePath } from "./embeddings/indexable"
 import { ExtensionBridge } from "./messaging/bridge"
 import { TwinnyProvider } from "./providers/manager"
@@ -305,134 +300,6 @@ export const getTerminalExists = (): boolean => {
 
 export const getNormalisedText = (text: string) =>
   text.replace(NORMALIZE_REGEX, " ")
-
-function getSplitChunks(node: SyntaxNode, options: ChunkOptions): string[] {
-  const { minSize = 50, maxSize = 500 } = options
-  const chunks: string[] = []
-
-  function traverse(node: SyntaxNode) {
-    if (node.text.length <= maxSize && node.text.length >= minSize) {
-      chunks.push(node.text)
-    } else if (node.children.length > 0) {
-      for (const child of node.children) {
-        traverse(child)
-      }
-    } else if (node.text.length > maxSize) {
-      let start = 0
-      while (start < node.text.length) {
-        const end = Math.min(start + maxSize, node.text.length)
-        chunks.push(node.text.slice(start, end))
-        start = end
-      }
-    }
-  }
-
-  traverse(node)
-  return chunks
-}
-
-export const getChunkOptions = (
-  context: ExtensionContext | undefined
-): ChunkOptions => {
-  if (!context) return defaultChunkOptions
-  const maxChunkSizeContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize}`
-  const minChunkSizeContext = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyMinChunkSize}`
-  const overlap = `${EVENT_NAME.twinnyGlobalContext}-${EXTENSION_CONTEXT_NAME.twinnyOverlapSize}`
-
-  const options = {
-    maxSize: Number(context.globalState.get(maxChunkSizeContext)) || 500,
-    minSize: Number(context.globalState.get(minChunkSizeContext)) || 50,
-    overlap: Number(context.globalState.get(overlap)) || 10
-  }
-
-  return options
-}
-
-export async function getDocumentSplitChunks(
-  content: string,
-  filePath: string,
-  context: ExtensionContext | undefined
-): Promise<string[]> {
-  if (!context) return []
-
-  const options = getChunkOptions(context)
-
-  try {
-    const parser = await getParser(filePath)
-
-    if (!parser) {
-      return simpleChunk(content, options)
-    }
-
-    const tree = parser.parse(content)
-    const chunks = getSplitChunks(tree.rootNode, options)
-    return combineChunks(chunks, options)
-  } catch (error) {
-    console.error(`Error parsing file ${filePath}: ${error}`)
-    return simpleChunk(content, options)
-  }
-}
-
-function combineChunks(chunks: string[], options: ChunkOptions): string[] {
-  const { minSize, maxSize, overlap } = options
-  const result: string[] = []
-  let currentChunk = ""
-
-  for (const chunk of chunks) {
-    if (currentChunk.length + chunk.length > maxSize) {
-      if (currentChunk.length >= minSize) {
-        result.push(currentChunk)
-        currentChunk = chunk
-      } else {
-        currentChunk += " " + chunk
-      }
-    } else {
-      currentChunk += (currentChunk ? " " : "") + chunk
-    }
-    if (currentChunk.length >= maxSize - overlap) {
-      result.push(currentChunk)
-      currentChunk = currentChunk.slice(-overlap)
-    }
-  }
-
-  if (currentChunk.length >= minSize) {
-    result.push(currentChunk)
-  }
-
-  return result
-}
-
-function simpleChunk(content: string, options: ChunkOptions): string[] {
-  const { minSize = 50, maxSize = 500, overlap = 50 } = options
-  const chunks: string[] = []
-  let start = 0
-
-  while (start < content.length) {
-    const end = Math.min(start + maxSize, content.length)
-    const chunk = content.slice(start, end)
-
-    try {
-      chunks.push(chunk)
-    } catch (error) {
-      if (
-        error instanceof RangeError &&
-        error.message.includes("Invalid array length")
-      ) {
-        break
-      } else {
-        throw error
-      }
-    }
-
-    start = end - overlap > start ? end - overlap : end
-
-    if (end === content.length) break
-  }
-
-  return chunks.filter(
-    (chunk, index) => chunk.length >= minSize || index === chunks.length - 1
-  )
-}
 
 export const updateLoadingMessage = (
   bridge: ExtensionBridge | undefined,

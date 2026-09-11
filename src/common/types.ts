@@ -112,13 +112,10 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
   images?: ImageAttachment[] | string[]
 }
 
-export type CompletionStreamingWithId = CompletionStreaming<LLMProvider> & {
-  id?: string
-}
+// Only real API parameters: these are forwarded to the provider verbatim.
+export type CompletionStreamingWithId = CompletionStreaming<LLMProvider>
 
-export type CompletionNonStreamingWithId = CompletionNonStreaming<LLMProvider> & {
-  id?: string
-}
+export type CompletionNonStreamingWithId = CompletionNonStreaming<LLMProvider>
 
 export interface Conversation {
   id?: string

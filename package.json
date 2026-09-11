@@ -517,6 +517,12 @@
           "default": [],
           "markdownDescription": "Extra file patterns to skip when building embeddings, such as `**/*.md` or `**/fixtures/**`. Only source, config and documentation files are indexed to begin with; binaries such as fonts and images are always skipped."
         },
+        "twinny.embeddingUpdateOnSave": {
+          "order": 14,
+          "type": "boolean",
+          "default": true,
+          "description": "Keep the workspace index current: re-embed a file when it is saved and forget it when it is deleted. Only applies once the workspace has been indexed."
+        },
         "twinny.ollamaHostname": {
           "order": 15,
           "type": "string",

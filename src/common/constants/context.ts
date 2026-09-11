@@ -1,6 +1,5 @@
 export const EXTENSION_CONTEXT_NAME = {
   twinnyConversationHistory: "twinnyConversationHistory",
-  twinnyEnableRag: "twinnyEnableRag",
   twinnyGeneratingText: "twinnyGeneratingText",
   twinnyInlineEditPending: "twinnyInlineEditPending",
   twinnyManageProviders: "twinnyManageProviders",
@@ -9,8 +8,8 @@ export const EXTENSION_CONTEXT_NAME = {
   twinnyMinChunkSize: "twinnyMinChunkSize",
   twinnyOverlapSize: "twinnyOverlapSize",
   twinnyRelevantCodeSnippets: "twinnyRelevantCodeSnippets",
-  twinnyRelevantFilePaths: "twinnyRelevantFilePaths",
   twinnyRerankThreshold: "twinnyRerankThreshold",
+  twinnyWorkspaceAutoContext: "twinnyWorkspaceAutoContext",
   twinnyReviewTab: "twinnyReviewTab",
   twinnyEmbeddingsTab: "twinnyEmbeddingsTab"
 }

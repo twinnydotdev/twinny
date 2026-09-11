@@ -1,125 +1,173 @@
-import * as ort from "onnxruntime-web"
+import fs from "fs"
+import os from "os"
 import * as path from "path"
-import { Toxe } from "toxe"
+import { Worker } from "worker_threads"
 
 import { logger } from "../../common/logger"
 
-ort.env.wasm.numThreads = 1
+import { RerankReply, RerankRequest, RerankWorkerData } from "./rerank-worker"
 
+/** Workers idle this long are shut down; the next search reloads them (~0.7s). */
+const IDLE_MS = 5 * 60_000
+/** Each worker holds its own copy of the model (~150 MB), so few of them. */
+const POOL_SIZE = Math.min(3, Math.max(1, Math.floor(os.cpus().length / 4)))
+
+interface PoolWorker {
+  worker: Worker
+  ready: Promise<boolean>
+  pending: Map<number, { resolve: (scores: number[]) => void; reject: (error: Error) => void }>
+}
+
+/**
+ * A cross-encoder that reads the question and a candidate chunk together
+ * and says how likely the chunk is to answer it. Unlike a vector distance
+ * the score is absolute, so a threshold means the same thing whatever else
+ * was in the candidate list.
+ *
+ * Scoring runs in worker threads (see `rerank-worker.ts`) so the extension
+ * host stays responsive, and a candidate list is split across the pool.
+ */
 export class Reranker {
-  private _tokenizer: Toxe | null = null
-  private _session: ort.InferenceSession | null = null
-  private readonly _modelPath: string
-  private readonly _tokenizerPath: string
+  private readonly _data: RerankWorkerData
+  private readonly _script: string | undefined
+  private _pool: PoolWorker[] = []
+  private _idleTimer?: NodeJS.Timeout
+  private _nextId = 1
+  private _broken = false
 
-
-  constructor() {
-    this._modelPath = path.join(__dirname, "..", "models", "reranker.onnx")
-    this._tokenizerPath = path.join(__dirname, "..", "models", "spm.model")
-    this.init()
+  constructor(modelDir = path.join(__dirname, "..", "models")) {
+    this._data = {
+      modelPath: path.join(modelDir, "reranker.onnx"),
+      tokenizerPath: path.join(modelDir, "spm.model"),
+      wasmDir: Reranker.findWasmDir()
+    }
+    this._script = Reranker.findScript()
   }
 
-  public async init(): Promise<void> {
+  /** Where the worker bundle lives: next to this file in the bundle, or under the tsc tree. */
+  private static findScript(): string | undefined {
+    return [
+      path.join(__dirname, "rerank-worker.js"),
+      path.join(__dirname, "extension", "embeddings", "rerank-worker.js")
+    ].find((candidate) => fs.existsSync(candidate))
+  }
+
+  /** Where onnxruntime's wasm is: the bundle root, or node_modules in development. */
+  private static findWasmDir(): string {
+    return (
+      [
+        __dirname,
+        path.join(__dirname, "..", ".."),
+        path.join(__dirname, "..", "..", "..", "node_modules", "onnxruntime-web", "dist")
+      ].find((dir) => fs.existsSync(path.join(dir, "ort-wasm-simd.wasm"))) || __dirname
+    )
+  }
+
+  /** Resolves true once the model is usable, false if it cannot be. */
+  public get ready(): Promise<boolean> {
+    return this.pool()[0]?.ready ?? Promise.resolve(false)
+  }
+
+  /**
+   * One relevance probability (0..1) per passage, in input order, or
+   * nothing when the model is unavailable so the caller can fall back to
+   * the retrieval order.
+   */
+  public async rerank(query: string, passages: string[]): Promise<number[] | undefined> {
+    if (!passages.length) return []
+    const pool = this.pool()
+    if (!pool.length || !(await pool[0].ready)) return undefined
+    this.touch()
+
+    // Spread the passages over the workers; each scores its share.
+    const workers = pool.length
+    const per = Math.ceil(passages.length / workers)
+    const parts = Array.from({ length: workers }, (_, i) =>
+      passages.slice(i * per, (i + 1) * per)
+    ).filter((part) => part.length)
     try {
-      await Promise.all([this.loadModel(), this.loadTokenizer()])
-      logger.log("Reranker initialized successfully")
+      const results = await Promise.all(
+        parts.map((part, i) => this.send(pool[i], query, part))
+      )
+      return results.flat()
     } catch (error) {
-      console.error(error)
+      logger.error(`Reranking failed: ${error instanceof Error ? error.message : error}`)
+      return undefined
     }
   }
 
-  public async rerank(
-    sample: string,
-    samples: string[]
-  ): Promise<number[] | undefined> {
-    const ids = await this._tokenizer?.encode(sample, samples)
-    if (!ids?.length) return undefined
-
-    const inputTensor = this.getInputTensor(ids, samples.length)
-    const attentionMaskTensor = this.getOutputTensor(
-      ids.length,
-      samples.length
-    )
-
-    const output = await this._session?.run({
-      input_ids: inputTensor,
-      attention_mask: attentionMaskTensor,
-    })
-
-    if (!output) return undefined
-
-    const logits = await this.getLogits(output)
-    const normalizedProbabilities = this.softmax(logits)
-
-    logger.log(
-      `Reranked samples: \n${this.formatResults(
-        samples,
-        normalizedProbabilities
-      )}`
-    )
-    return normalizedProbabilities
-  }
-
-  private getInputTensor(ids: number[], sampleCount: number): ort.Tensor {
-    const inputIds = ids.map(BigInt)
-    return new ort.Tensor("int64", BigInt64Array.from(inputIds), [
-      sampleCount,
-      inputIds.length / sampleCount,
-    ])
-  }
-
-  private getOutputTensor(
-    inputLength: number,
-    sampleCount: number
-  ): ort.Tensor {
-    return new ort.Tensor("int64", new BigInt64Array(inputLength).fill(1n), [
-      sampleCount,
-      inputLength / sampleCount,
-    ])
-  }
-
-  private async getLogits(
-    output: ort.InferenceSession.OnnxValueMapType
-  ): Promise<number[]> {
-    const data = await output.logits.getData()
-    const logits = Array.prototype.slice.call(data)
-    return logits
-  }
-
-  private softmax(logits: number[]): number[] {
-    const maxLogit = Math.max(...logits)
-    const scores = logits.map((l) => Math.exp(l - maxLogit))
-    const sum = scores.reduce((a, b) => a + b, 0)
-    return scores.map((s) => s / sum)
-  }
-
-  private formatResults(samples: string[], probabilities: number[]): string {
-    return Array.from(new Set(samples))
-      .map((s, i) => `${i + 1}. ${s}: ${probabilities[i].toFixed(3)}`.trim())
-      .join("\n")
-  }
-
-  private async loadModel(): Promise<void> {
-    try {
-      logger.log("Loading reranker model...")
-      this._session = await ort.InferenceSession.create(this._modelPath, {
-        executionProviders: ["wasm"],
+  private send(entry: PoolWorker, query: string, passages: string[]): Promise<number[]> {
+    return entry.ready.then((ok) => {
+      if (!ok) throw new Error("reranker worker failed to load")
+      const id = this._nextId++
+      return new Promise<number[]>((resolve, reject) => {
+        entry.pending.set(id, { resolve, reject })
+        entry.worker.postMessage({ id, query, passages } satisfies RerankRequest)
       })
-      logger.log("Reranker model loaded")
-    } catch (error) {
-      console.error(error)
-      throw error
-    }
+    })
   }
 
-  private async loadTokenizer(): Promise<void> {
-    try {
-      logger.log("Loading tokenizer...")
-      this._tokenizer = new Toxe(this._tokenizerPath)
-      logger.log("Tokenizer loaded")
-    } catch (error) {
-      console.error(error)
-      throw error
+  private pool(): PoolWorker[] {
+    if (this._broken || !this._script) return []
+    if (!this._pool.length) {
+      for (let i = 0; i < POOL_SIZE; i++) this._pool.push(this.spawn())
+      this.touch()
     }
+    return this._pool
+  }
+
+  private spawn(): PoolWorker {
+    const worker = new Worker(this._script!, { workerData: this._data })
+    const pending: PoolWorker["pending"] = new Map()
+    const ready = new Promise<boolean>((resolve) => {
+      const startedAt = Date.now()
+      worker.on("message", (reply: RerankReply) => {
+        if ("ready" in reply) {
+          if (reply.ready) {
+            logger.log(`Reranker worker ready in ${Date.now() - startedAt}ms`)
+          } else {
+            logger.error(`Reranker unavailable, results keep retrieval order: ${reply.error}`)
+            this._broken = true
+          }
+          resolve(reply.ready)
+          return
+        }
+        const request = pending.get(reply.id)
+        pending.delete(reply.id)
+        if (!request) return
+        if ("scores" in reply) request.resolve(reply.scores)
+        else request.reject(new Error(reply.error))
+      })
+      worker.on("error", (error) => {
+        logger.error(`Reranker worker crashed: ${error.message}`)
+        for (const request of pending.values()) request.reject(error)
+        pending.clear()
+        resolve(false)
+      })
+      worker.on("exit", () => {
+        for (const request of pending.values()) request.reject(new Error("reranker worker exited"))
+        pending.clear()
+        resolve(false)
+      })
+    })
+    return { worker, ready, pending }
+  }
+
+  private touch() {
+    clearTimeout(this._idleTimer)
+    this._idleTimer = setTimeout(() => this.shutdown(), IDLE_MS)
+    this._idleTimer.unref?.()
+  }
+
+  /** Stops the workers; they are started again by the next search. */
+  public shutdown() {
+    clearTimeout(this._idleTimer)
+    const pool = this._pool
+    this._pool = []
+    for (const entry of pool) void entry.worker.terminate()
+  }
+
+  public dispose() {
+    this.shutdown()
   }
 }

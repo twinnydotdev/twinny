@@ -10,8 +10,7 @@ import {
   MentionType,
   TwinnyProvider
 } from "../../common/types"
-import { EmbeddingDatabase } from "../embeddings/database"
-import { Reranker } from "../embeddings/reranker"
+import { WorkspaceSearch } from "../embeddings/search"
 import { ExtensionBridge } from "../messaging/bridge"
 import { Base } from "../providers/base"
 import { describeProviderError, stripThinking } from "../providers/errors"
@@ -29,7 +28,6 @@ import {
   supportsStreaming,
   toApiMessages
 } from "./messages"
-import { WorkspaceSearch } from "./workspace-search"
 
 /** Templates whose answer benefits from `@workspace`-style lookups. */
 const TEMPLATES_WITH_RAG = ["explain"]
@@ -52,7 +50,7 @@ export class Chat extends Base {
     templateDir: string | undefined,
     extensionContext: ExtensionContext,
     bridge: ExtensionBridge,
-    db: EmbeddingDatabase | undefined
+    search: WorkspaceSearch | undefined
   ) {
     super(extensionContext)
     this._bridge = bridge
@@ -61,7 +59,7 @@ export class Chat extends Base {
       extensionContext,
       bridge,
       new TemplateProvider(templateDir),
-      new WorkspaceSearch(extensionContext, db, new Reranker())
+      search
     )
   }
 
@@ -82,17 +80,12 @@ export class Chat extends Base {
   /** A message typed in the chat, with whatever the user attached. */
   public async completion(
     messages: ChatCompletionMessage[],
-    mentions?: MentionType[],
-    conversationId?: string
+    mentions?: MentionType[]
   ): Promise<string | undefined> {
     const provider = this.start()
     if (!provider) return undefined
-    this._conversation = await this.buildConversation(
-      messages,
-      mentions,
-      conversationId
-    )
-    return this.run(provider, conversationId)
+    this._conversation = await this.buildConversation(messages, mentions)
+    return this.run(provider)
   }
 
   /** A code action (explain, refactor…) run over the editor selection. */
@@ -146,7 +139,7 @@ export class Chat extends Base {
     const provider = this.start()
     if (!provider) return ""
     this._conversation = messages
-    return this.run(provider, undefined, prefix)
+    return this.run(provider, prefix)
   }
 
   /** One-shot, no UI: used for conversation titles and commit messages. */
@@ -193,12 +186,12 @@ export class Chat extends Base {
     })
   }
 
-  private run(provider: TwinnyProvider, conversationId?: string, prefix = "") {
+  private run(provider: TwinnyProvider, prefix = "") {
     const client = this.client(provider)
     return supportsStreaming(provider)
       ? this._generation.stream(
           client,
-          buildStreamingRequest(provider, this._conversation, conversationId),
+          buildStreamingRequest(provider, this._conversation),
           provider,
           prefix
         )
@@ -212,8 +205,7 @@ export class Chat extends Base {
 
   private async buildConversation(
     messages: ChatCompletionMessage[],
-    mentions: MentionType[] | undefined,
-    id?: string
+    mentions: MentionType[] | undefined
   ): Promise<ChatCompletionMessage[]> {
     const last = messages[messages.length - 1]
     const extra = await this._context.additionalContext(
@@ -221,7 +213,7 @@ export class Chat extends Base {
       mentions
     )
     return toApiMessages([
-      { role: SYSTEM, content: await this._context.systemPrompt(), id },
+      { role: SYSTEM, content: await this._context.systemPrompt() },
       ...messages.slice(0, -1),
       {
         role: USER,

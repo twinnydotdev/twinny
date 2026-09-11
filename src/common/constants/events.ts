@@ -60,7 +60,8 @@ export const EMBEDDING_EVENT_NAME = {
   cancel: "embeddings.cancel",
   embed: "embeddings.embed",
   getStatus: "embeddings.getStatus",
-  progress: "embeddings.progress"
+  progress: "embeddings.progress",
+  rebuild: "embeddings.rebuild"
 } as const
 
 export const PROVIDER_EVENT_NAME = {

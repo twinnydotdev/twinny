@@ -2,12 +2,18 @@ import React, { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import {
   VSCodeButton,
+  VSCodeCheckbox,
   VSCodeDropdown,
   VSCodeOption,
   VSCodeTextField
 } from "@vscode/webview-ui-toolkit/react"
 
-import { EVENT_NAME, EXTENSION_CONTEXT_NAME } from "../../common/constants"
+import {
+  DEFAULT_RERANK_THRESHOLD,
+  defaultChunkOptions,
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME
+} from "../../common/constants"
 import { formatRelativeTime } from "../../common/time"
 import { useEmbeddings } from "../hooks/useEmbeddings"
 import { useProviders } from "../hooks/useProviders"
@@ -63,7 +69,7 @@ const NumberField = ({
 
 export const EmbeddingOptions = () => {
   const { t } = useTranslation()
-  const { status, progress, embed, cancel } = useEmbeddings()
+  const { status, progress, update, rebuild, cancel } = useEmbeddings()
   const {
     embeddingProvider,
     getProvidersByType,
@@ -78,15 +84,31 @@ export const EmbeddingOptions = () => {
     )
     return [context ?? fallback, setContext] as const
   }
-  const [maxChunk, setMaxChunk] = setting(EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize, "500")
-  const [minChunk, setMinChunk] = setting(EXTENSION_CONTEXT_NAME.twinnyMinChunkSize, "200")
-  const [overlap, setOverlap] = setting(EXTENSION_CONTEXT_NAME.twinnyOverlapSize, "20")
-  const [snippets, setSnippets] = setting(EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets, "5")
-  const [filePaths, setFilePaths] = setting(EXTENSION_CONTEXT_NAME.twinnyRelevantFilePaths, "10")
-  const { context: threshold = 0.5, setContext: setThreshold } =
+  const [maxChunk, setMaxChunk] = setting(
+    EXTENSION_CONTEXT_NAME.twinnyMaxChunkSize,
+    String(defaultChunkOptions.maxSize)
+  )
+  const [minChunk, setMinChunk] = setting(
+    EXTENSION_CONTEXT_NAME.twinnyMinChunkSize,
+    String(defaultChunkOptions.minSize)
+  )
+  const [overlap, setOverlap] = setting(
+    EXTENSION_CONTEXT_NAME.twinnyOverlapSize,
+    String(defaultChunkOptions.overlap)
+  )
+  const [snippets, setSnippets] = setting(
+    EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets,
+    "6"
+  )
+  const { context: threshold = DEFAULT_RERANK_THRESHOLD, setContext: setThreshold } =
     useStorageContext<number>(
       StorageType.Global,
       EXTENSION_CONTEXT_NAME.twinnyRerankThreshold
+    )
+  const { context: automatic = false, setContext: setAutomatic } =
+    useStorageContext<boolean>(
+      StorageType.Global,
+      EXTENSION_CONTEXT_NAME.twinnyWorkspaceAutoContext
     )
 
   const embeddingProviders = useMemo(
@@ -116,19 +138,30 @@ export const EmbeddingOptions = () => {
 
   const renderIndexState = () => {
     if (running) {
+      const label =
+        progress.phase === "scanning"
+          ? t("embeddings-scanning")
+          : progress.phase === "finishing"
+            ? t("embeddings-finishing")
+            : t("embeddings-indexing", {
+                processed: progress.processed,
+                total: progress.total
+              })
       return (
         <>
           <div className={styles.progressLine}>
-            <span>
-              {t("embeddings-indexing", {
-                processed: progress.processed,
-                total: progress.total
-              })}
-            </span>
-            <span className={styles.progressPercent}>{percent}%</span>
+            <span>{label}</span>
+            {progress.phase === "embedding" && (
+              <span className={styles.progressPercent}>{percent}%</span>
+            )}
           </div>
           <div className={styles.progressBar} role="progressbar" aria-valuenow={percent}>
-            <div className={styles.progressFill} style={{ width: `${percent}%` }} />
+            <div
+              className={`${styles.progressFill} ${
+                progress.phase !== "embedding" ? styles.progressBusy : ""
+              }`}
+              style={{ width: progress.phase === "embedding" ? `${percent}%` : "100%" }}
+            />
           </div>
           {progress.currentFiles.length > 0 && (
             <div className={styles.progressFiles}>
@@ -156,16 +189,77 @@ export const EmbeddingOptions = () => {
       )
     }
     return (
-      <p className={`${styles.stateLine} ${styles.stateOk}`}>
-        <i className="codicon codicon-pass-filled" />
-        <span>
-          {t("embeddings-indexed", { files: status.files, chunks: status.chunks })}
-          {status.updatedAt
-            ? ` · ${formatRelativeTime(status.updatedAt)}`
-            : ""}
-          {progress.cancelled ? ` · ${t("embeddings-cancelled")}` : ""}
-        </span>
-      </p>
+      <>
+        <p className={`${styles.stateLine} ${styles.stateOk}`}>
+          <i className="codicon codicon-pass-filled" />
+          <span>
+            {t("embeddings-indexed", { files: status.files, chunks: status.chunks })}
+            {status.updatedAt
+              ? ` · ${formatRelativeTime(status.updatedAt)}`
+              : ""}
+            {progress.cancelled ? ` · ${t("embeddings-cancelled")}` : ""}
+          </span>
+        </p>
+        {status.model && (
+          <p className={styles.modelLine}>
+            {t("embeddings-model", { model: status.model })}
+          </p>
+        )}
+        {status.modelChanged && (
+          <p className={`${styles.stateLine} ${styles.stateWarn}`}>
+            <i className="codicon codicon-warning" />
+            <span>
+              {t("embeddings-model-changed", {
+                indexed: status.model,
+                active: status.activeModel
+              })}
+            </span>
+          </p>
+        )}
+      </>
+    )
+  }
+
+  const renderActions = () => {
+    if (running) {
+      return (
+        <VSCodeButton appearance="secondary" onClick={cancel}>
+          <i className="codicon codicon-debug-stop" />
+          {t("cancel")}
+        </VSCodeButton>
+      )
+    }
+    const disabled = !embeddingProvider
+    const title = disabled ? t("embeddings-need-provider") : undefined
+    if (!status?.indexed) {
+      return (
+        <VSCodeButton appearance="primary" disabled={disabled} onClick={update} title={title}>
+          <i className="codicon codicon-sync" />
+          {t("embeddings-index")}
+        </VSCodeButton>
+      )
+    }
+    return (
+      <div className={styles.actions}>
+        <VSCodeButton
+          appearance={status.modelChanged ? "secondary" : "primary"}
+          disabled={disabled || status.modelChanged}
+          onClick={update}
+          title={title || t("embeddings-update-hint")}
+        >
+          <i className="codicon codicon-sync" />
+          {t("embeddings-update")}
+        </VSCodeButton>
+        <VSCodeButton
+          appearance={status.modelChanged ? "primary" : "secondary"}
+          disabled={disabled}
+          onClick={rebuild}
+          title={title || t("embeddings-rebuild-hint")}
+        >
+          <i className="codicon codicon-refresh" />
+          {t("embeddings-rebuild")}
+        </VSCodeButton>
+      </div>
     )
   }
 
@@ -185,24 +279,22 @@ export const EmbeddingOptions = () => {
               <span className={styles.workspaceName}>{status.workspace}</span>
             )}
           </h4>
-          {running ? (
-            <VSCodeButton appearance="secondary" onClick={cancel}>
-              <i className="codicon codicon-debug-stop" />
-              {t("cancel")}
-            </VSCodeButton>
-          ) : (
-            <VSCodeButton
-              appearance="primary"
-              disabled={!embeddingProvider}
-              onClick={embed}
-              title={!embeddingProvider ? t("embeddings-need-provider") : undefined}
-            >
-              <i className="codicon codicon-sync" />
-              {status?.indexed ? t("embeddings-reindex") : t("embeddings-index")}
-            </VSCodeButton>
-          )}
+          {renderActions()}
         </div>
         {renderIndexState()}
+      </section>
+
+      <section className={styles.group}>
+        <h4>{t("embeddings-usage")}</h4>
+        <VSCodeCheckbox
+          checked={automatic}
+          onChange={(e) =>
+            setAutomatic((e.target as HTMLInputElement).checked)
+          }
+        >
+          {t("embeddings-automatic")}
+        </VSCodeCheckbox>
+        <p className={styles.groupBlurb}>{t("embeddings-automatic-blurb")}</p>
       </section>
 
       <section className={styles.group}>
@@ -238,43 +330,6 @@ export const EmbeddingOptions = () => {
       </section>
 
       <section className={styles.group}>
-        <h4>{t("embeddings-chunking")}</h4>
-        <p className={styles.groupBlurb}>{t("embeddings-chunking-blurb")}</p>
-        <div className={styles.fieldRow}>
-          <NumberField
-            id="maxChunk"
-            label={t("max-chunk-size")}
-            hint={t("embeddings-chars")}
-            value={maxChunk}
-            min={100}
-            max={4000}
-            onChange={setMaxChunk}
-          />
-          <NumberField
-            id="minChunk"
-            label={t("min-chunk-size")}
-            hint={t("embeddings-chars")}
-            value={minChunk}
-            min={20}
-            max={4000}
-            error={chunkErrors.min}
-            onChange={setMinChunk}
-          />
-          <NumberField
-            id="overlap"
-            label={t("overlap-size")}
-            hint={t("embeddings-chars")}
-            value={overlap}
-            min={0}
-            max={1000}
-            error={chunkErrors.overlap}
-            onChange={setOverlap}
-          />
-        </div>
-        <p className={styles.groupNote}>{t("embeddings-chunking-note")}</p>
-      </section>
-
-      <section className={styles.group}>
         <h4>{t("embeddings-retrieval")}</h4>
         <p className={styles.groupBlurb}>{t("embeddings-retrieval-blurb")}</p>
         <div className={styles.fieldRow}>
@@ -284,17 +339,8 @@ export const EmbeddingOptions = () => {
             hint={t("number-code-snippets")}
             value={snippets}
             min={1}
-            max={50}
+            max={30}
             onChange={setSnippets}
-          />
-          <NumberField
-            id="filePaths"
-            label={t("relevant-file-paths")}
-            hint={t("number-code-filepaths")}
-            value={filePaths}
-            min={1}
-            max={100}
-            onChange={setFilePaths}
           />
         </div>
         <div className={styles.field}>
@@ -306,14 +352,51 @@ export const EmbeddingOptions = () => {
             className={styles.slider}
             type="range"
             id="threshold"
-            min="0.05"
-            max="0.15"
+            min="0.02"
+            max="0.6"
             step="0.01"
             value={threshold}
             onChange={(e) => setThreshold(parseFloat(e.target.value))}
           />
           <span className={styles.fieldHint}>{t("rerank-threshold-description")}</span>
         </div>
+      </section>
+
+      <section className={styles.group}>
+        <h4>{t("embeddings-chunking")}</h4>
+        <p className={styles.groupBlurb}>{t("embeddings-chunking-blurb")}</p>
+        <div className={styles.fieldRow}>
+          <NumberField
+            id="maxChunk"
+            label={t("max-chunk-size")}
+            hint={t("embeddings-chars")}
+            value={maxChunk}
+            min={200}
+            max={6000}
+            onChange={setMaxChunk}
+          />
+          <NumberField
+            id="minChunk"
+            label={t("min-chunk-size")}
+            hint={t("embeddings-chars")}
+            value={minChunk}
+            min={20}
+            max={6000}
+            error={chunkErrors.min}
+            onChange={setMinChunk}
+          />
+          <NumberField
+            id="overlap"
+            label={t("overlap-size")}
+            hint={t("embeddings-chars")}
+            value={overlap}
+            min={0}
+            max={2000}
+            error={chunkErrors.overlap}
+            onChange={setOverlap}
+          />
+        </div>
+        <p className={styles.groupNote}>{t("embeddings-chunking-note")}</p>
       </section>
     </div>
   )

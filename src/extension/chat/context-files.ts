@@ -91,7 +91,7 @@ const fence = (content: string) => {
 const formatEntry = (entry: ContextEntry, content: string): string => {
   const language = languageForPath(entry.path)
   const heading = entry.range
-    ? `Selection from ${entry.path} (lines ${entry.range.startLine + 1}-${
+    ? `${entry.path} (lines ${entry.range.startLine + 1}-${
         entry.range.endLine + 1
       })`
     : `File: ${entry.path}`

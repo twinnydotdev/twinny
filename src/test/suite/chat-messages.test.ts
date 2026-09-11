@@ -67,9 +67,16 @@ suite("Chat messages", () => {
       { role: "user", content: "u" }
     ]
     assert.strictEqual(buildBlockingRequest(provider, messages).messages.length, 1)
-    const streaming = buildStreamingRequest(provider, messages, "conv-1")
+    const streaming = buildStreamingRequest(provider, messages)
     assert.strictEqual(streaming.messages.length, 2)
-    assert.strictEqual(streaming.id, "conv-1")
     assert.strictEqual(streaming.stream, true)
+  })
+
+  test("sends no twinny-only fields to the provider", () => {
+    const request = buildStreamingRequest(provider, [
+      toApiMessage({ role: "system", content: "s", id: "conv-1" })
+    ])
+    assert.ok(!("id" in request))
+    assert.ok(!("id" in request.messages[0]))
   })
 })

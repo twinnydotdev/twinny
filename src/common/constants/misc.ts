@@ -16,13 +16,22 @@ export const NORMALIZE_REGEX = /\s*\r?\n|\r/g
 export const FILE_NAME_REGEX =
   /(?:^|\s|`)(?:@\/|\.\/|(?:[\w-]+\/)*)?\.?[\w.-]+\.(?:jsx?|tsx?|css|s[ac]ss|less|styl|html?|json|jsonc|md|markdown|py|ipynb|java|class|jar|cpp|hpp|cc|hh|c|h|rs|go|php|rb|swift|kt|gradle|m|mm|cs|fs|fsx|elm|lua|sql|ya?ml|toml|xml|conf|ini|env|sh|bash|zsh|ps1|bat|cmd|txt|log|text|doc|rtf|pdf|lock|editorconfig|gitignore|eslintrc|prettier|babelrc|d\.ts|test\.tsx?|spec\.tsx?|snap|svg|graphql|gql|proto|vue|svelte|astro|razor|cshtml|aspx?|jsx?\.map|tsx?\.map|min\.js|chunk\.js|bundle\.js)(?=\s|$|`)/g
 export const QUOTES_REGEX = /["'`]/g
-export const DEFAULT_RERANK_THRESHOLD = 0.5
+/**
+ * Reranker probability below which a chunk is left out of the prompt. The
+ * cross-encoder puts unrelated code near 0.01 and on-topic code between
+ * 0.12 and 0.9, so this is the gap between them, not a midpoint.
+ */
+export const DEFAULT_RERANK_THRESHOLD = 0.08
 export const TWINNY_PROVIDERS_FILENAME = "twinny-providers.json"
 
+/**
+ * Characters per indexed chunk: about 25 lines of code. Sized so the
+ * reranker reads a whole chunk within its token budget.
+ */
 export const defaultChunkOptions = {
-  maxSize: 500,
-  minSize: 50,
-  overlap: 50
+  maxSize: 1000,
+  minSize: 100,
+  overlap: 100
 }
 
 export const TITLE_GENERATION_PROMPT_MESAGE = `
@@ -30,8 +39,9 @@ export const TITLE_GENERATION_PROMPT_MESAGE = `
   It should not contain any special characters or quotes.
 `
 
-export const DEFAULT_RELEVANT_FILE_COUNT = 10
-export const DEFAULT_RELEVANT_CODE_COUNT = 5
+export const DEFAULT_RELEVANT_CODE_COUNT = 6
+/** Characters of retrieved code one @workspace question may add to a prompt. */
+export const DEFAULT_WORKSPACE_CONTEXT_CHARS = 12000
 
 // FIM (inline completion) tuning
 export const FIM_MAX_EMPTY_COMPLETION_CHARS = 250

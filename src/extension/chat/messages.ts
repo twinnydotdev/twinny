@@ -57,7 +57,6 @@ export const toApiMessage = (
     content: images.length ? [textPart, ...images] : [textPart]
   }
   if (message.role === "function" && message.name) result.name = message.name
-  if (message.id) result.id = message.id
   return result as ChatCompletionMessage
 }
 
@@ -77,15 +76,17 @@ export const supportsStreaming = (provider: TwinnyProvider): boolean => {
   return Array.isArray(streaming) ? streaming.includes(provider.modelName) : true
 }
 
+/**
+ * Everything here is forwarded to the provider as-is, so it must carry only
+ * real API parameters: OpenAI rejects unknown ones such as an `id`.
+ */
 export const buildStreamingRequest = (
   provider: TwinnyProvider,
-  messages: ChatCompletionMessage[],
-  conversationId?: string
+  messages: ChatCompletionMessage[]
 ): CompletionStreamingWithId => ({
   messages,
   model: provider.modelName,
   stream: true,
-  id: conversationId,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   provider: getFluencyProvider(provider) as any
 })

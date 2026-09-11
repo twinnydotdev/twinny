@@ -6,6 +6,7 @@ import { emit, useServerEvent, useServerState } from "../messaging"
 
 const IDLE: EmbeddingProgress = {
   running: false,
+  phase: "embedding",
   processed: 0,
   total: 0,
   currentFiles: []
@@ -25,7 +26,10 @@ export const useEmbeddings = () => {
     status: status.data,
     statusLoading: status.isLoading,
     progress,
-    embed: () => emit(EMBEDDING_EVENT_NAME.embed),
+    /** Embed what changed since the last run. */
+    update: () => emit(EMBEDDING_EVENT_NAME.embed),
+    /** Start over: needed after switching embedding model or chunk sizes. */
+    rebuild: () => emit(EMBEDDING_EVENT_NAME.rebuild),
     cancel: () => emit(EMBEDDING_EVENT_NAME.cancel)
   }
 }

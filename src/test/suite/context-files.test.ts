@@ -56,7 +56,7 @@ suite("Attached context", () => {
         "const a = 1",
         "```",
         "",
-        "Selection from src/b.py (lines 5-6)",
+        "src/b.py (lines 5-6)",
         "```python",
         "print(1)",
         "```"

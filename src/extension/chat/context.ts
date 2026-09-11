@@ -3,7 +3,15 @@ import * as os from "os"
 import * as path from "path"
 import { ExtensionContext, window, workspace } from "vscode"
 
-import { TOP_LEVEL_MENTIONS, WORKSPACE_STORAGE_KEY } from "../../common/constants"
+import {
+  DEFAULT_RELEVANT_CODE_COUNT,
+  DEFAULT_RERANK_THRESHOLD,
+  DEFAULT_WORKSPACE_CONTEXT_CHARS,
+  EVENT_NAME,
+  EXTENSION_CONTEXT_NAME,
+  TOP_LEVEL_MENTIONS,
+  WORKSPACE_STORAGE_KEY
+} from "../../common/constants"
 import { CodeLanguageDetails } from "../../common/languages"
 import { logger } from "../../common/logger"
 import {
@@ -12,6 +20,7 @@ import {
   SelectionContextItem,
   TemplateData
 } from "../../common/types"
+import { Hit, WorkspaceSearch } from "../embeddings/search"
 import { ExtensionBridge } from "../messaging/bridge"
 import { TemplateProvider } from "../templates/provider"
 import { NO_TERMINAL_OUTPUT, terminalHistory } from "../terminal"
@@ -27,7 +36,6 @@ import { getGitContext } from "./git-context"
 import { getProblemsContext } from "./problems"
 import { isSymbolRef } from "./symbol-ref"
 import { readSymbolEntry } from "./symbols"
-import { WorkspaceSearch } from "./workspace-search"
 
 /**
  * Everything that goes into a prompt besides the user's own words: the
@@ -39,8 +47,14 @@ export class ChatContextBuilder {
     private readonly _context: ExtensionContext,
     private readonly _bridge: ExtensionBridge,
     private readonly _templates: TemplateProvider,
-    private readonly _search: WorkspaceSearch
+    private readonly _search: WorkspaceSearch | undefined
   ) {}
+
+  private globalSetting<T>(key: string): T | undefined {
+    return this._context.globalState.get<T>(
+      `${EVENT_NAME.twinnyGlobalContext}-${key}`
+    )
+  }
 
   public async systemPrompt(): Promise<string> {
     return (
@@ -89,28 +103,55 @@ export class ChatContextBuilder {
       combined += `${run ? formatTerminalRun(run) : `Terminal: ${NO_TERMINAL_OUTPUT}`}\n\n`
     }
 
-    if (text?.includes("@workspace")) {
-      updateLoadingMessage(this._bridge, "Exploring knowledge base")
-      const query = text.replace(/@(workspace|problems|git|terminal)\b/g, "")
-      const files = await this._search.relevantFiles(query)
-      const code = await this._search.relevantCode(query, files)
-
-      if (files.length) {
-        const filesTemplate = await this._templates.readTemplate<TemplateData>(
-          "relevant-files",
-          { code: files.map(([file]) => file).join(", ") }
-        )
-        combined += `${filesTemplate}\n\n`
-      }
-      if (code) {
-        combined += await this._templates.readTemplate<TemplateData>(
-          "relevant-code",
-          { code }
-        )
-      }
-    }
+    const indexed = await this.workspaceContext(text)
+    if (indexed) combined += `${indexed}\n\n`
 
     return combined.trim() || null
+  }
+
+  /**
+   * What the index has to say about the message. Runs for `@workspace`, or
+   * for every message when the user turned that on in the embeddings tab.
+   * Nothing when there is no index yet, so the toggle is safe to leave on.
+   */
+  private async workspaceContext(text?: string): Promise<string | null> {
+    if (!text || !this._search?.available) return null
+    const mentioned = text.includes("@workspace")
+    const automatic = this.globalSetting<boolean>(
+      EXTENSION_CONTEXT_NAME.twinnyWorkspaceAutoContext
+    )
+    if (!mentioned && !automatic) return null
+
+    updateLoadingMessage(this._bridge, "Searching the workspace")
+    const query = text.replace(/@(workspace|problems|git|terminal)\b/g, " ").trim()
+    const hits = await this._search.search(query, {
+      limit:
+        Number(this.globalSetting(EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets)) ||
+        DEFAULT_RELEVANT_CODE_COUNT,
+      threshold:
+        Number(this.globalSetting(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)) ||
+        DEFAULT_RERANK_THRESHOLD,
+      maxChars: DEFAULT_WORKSPACE_CONTEXT_CHARS
+    })
+    if (!hits.length) return null
+
+    logger.log(
+      `@workspace: ${hits.length} hits\n${hits
+        .map((hit) => `  ${hit.score.toFixed(2)} ${this.describeHit(hit)}`)
+        .join("\n")}`
+    )
+    const code = formatContextEntries(
+      hits.map((hit) => ({
+        path: workspace.asRelativePath(hit.file),
+        content: hit.content,
+        range: { startLine: hit.startLine, endLine: hit.endLine }
+      }))
+    )
+    return this._templates.readTemplate<TemplateData>("relevant-code", { code })
+  }
+
+  private describeHit(hit: Hit): string {
+    return `${workspace.asRelativePath(hit.file)}:${hit.startLine + 1}-${hit.endLine + 1}`
   }
 
   /** The block appended to the user's last message. */

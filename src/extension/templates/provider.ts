@@ -110,7 +110,6 @@ export class TemplateProvider {
     "commit-message",
     "fim",
     "relevant-code",
-    "relevant-files",
     "review"
   ]
 

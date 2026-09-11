@@ -83,6 +83,12 @@ export interface EmbeddingStatus {
   chunks: number
   /** Unix ms of the last completed index run. */
   updatedAt?: number
+  /** The embedding model the index was built with. */
+  model?: string
+  /** The model the active embedding provider uses now. */
+  activeModel?: string
+  /** The two differ: search will be wrong until the index is rebuilt. */
+  modelChanged: boolean
   running: boolean
   workspace?: string
 }
@@ -90,6 +96,8 @@ export interface EmbeddingStatus {
 /** Live progress of an index run, pushed as files are processed. */
 export interface EmbeddingProgress {
   running: boolean
+  phase: "scanning" | "embedding" | "finishing"
+  /** Files embedded so far, of those that changed. */
   processed: number
   total: number
   /** Files in flight right now, for the status line. */
@@ -248,6 +256,7 @@ export interface ClientEvents {
 
   [EMBEDDING_EVENT_NAME.cancel]: Channel
   [EMBEDDING_EVENT_NAME.embed]: Channel
+  [EMBEDDING_EVENT_NAME.rebuild]: Channel
   [EMBEDDING_EVENT_NAME.getStatus]: Channel<void, EmbeddingStatus>
 
   [PROVIDER_EVENT_NAME.addProvider]: Channel<TwinnyProvider, ProviderSaveResult>

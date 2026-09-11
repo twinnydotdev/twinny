@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 
 import { logger } from "../../common/logger"
-import { EmbeddingDatabase } from "../embeddings/database"
+import { WorkspaceIndex } from "../embeddings"
 import { P2pRuntime } from "../p2p/runtime"
 import { SessionManager } from "../session-manager"
 import { TwinnyStatusBar } from "../status-bar"
@@ -17,11 +17,11 @@ export class SidebarProvider extends BaseProvider {
     statusBarItem: TwinnyStatusBar,
     context: vscode.ExtensionContext,
     templateDir: string,
-    db: EmbeddingDatabase | undefined,
+    index: WorkspaceIndex | undefined,
     sessionManager: SessionManager,
     p2p?: P2pRuntime
   ) {
-    super(context, templateDir, statusBarItem, db, sessionManager, p2p)
+    super(context, templateDir, statusBarItem, index, sessionManager, p2p)
     this.context = context
     this.registerSidebarReadyHandler(this.handleSidebarReady)
   }
