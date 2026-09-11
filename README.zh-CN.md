@@ -30,7 +30,7 @@
 | --- | --- |
 | **本机** | [Ollama](https://docs.twinny.dev/zh-cn/providers/ollama/)、[LM Studio](https://docs.twinny.dev/zh-cn/providers/lm-studio/)、[llama.cpp](https://docs.twinny.dev/zh-cn/providers/llama-cpp/)、QVAC、Oobabooga、LiteLLM、Open WebUI，或[任何 OpenAI 兼容服务器](https://docs.twinny.dev/zh-cn/providers/other-local-servers/)。 |
 | **你的另一台电脑** | [设备](https://docs.twinny.dev/zh-cn/providers/devices/)：用配对码配对，通过加密的点对点链路使用那台机器的 GPU。无账户，无中继。 |
-| **托管 API** | [OpenAI、Anthropic、Mistral（Codestral 用于补全）、DeepSeek、OpenRouter、Gemini、Groq、Cohere、Perplexity](https://docs.twinny.dev/zh-cn/providers/hosted-apis/)。 |
+| **托管 API** | [OpenAI、Anthropic、Mistral（Codestral 用于补全）、DeepSeek、OpenRouter、Requesty、Gemini、Groq、Cohere、Perplexity](https://docs.twinny.dev/zh-cn/providers/hosted-apis/)。 |
 | **团队网关** | 连接到一个 `twinny-server`，使用团队配置好的模型。见下文。 |
 
 可以混用：本地模型做补全，托管模型做对话。[支持的模型](https://docs.twinny.dev/zh-cn/providers/supported-models/)页面说明哪些模型在哪种硬件上适合哪项工作。

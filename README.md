@@ -32,7 +32,7 @@ Everything runs against a server you control. No telemetry, no account. See [Sta
 | --- | --- |
 | **On your machine** | [Ollama](https://docs.twinny.dev/providers/ollama/), [LM Studio](https://docs.twinny.dev/providers/lm-studio/), [llama.cpp](https://docs.twinny.dev/providers/llama-cpp/), QVAC, Oobabooga, LiteLLM, Open WebUI, or [any OpenAI-compatible server](https://docs.twinny.dev/providers/other-local-servers/). |
 | **On another of your computers** | [Devices](https://docs.twinny.dev/providers/devices/): pair with a code and use that machine's GPU over an encrypted peer-to-peer link. No account, no relay. |
-| **On a hosted API** | [OpenAI, Anthropic, Mistral (Codestral for completion), DeepSeek, OpenRouter, Gemini, Groq, Cohere, Perplexity](https://docs.twinny.dev/providers/hosted-apis/). |
+| **On a hosted API** | [OpenAI, Anthropic, Mistral (Codestral for completion), DeepSeek, OpenRouter, Requesty, Gemini, Groq, Cohere, Perplexity](https://docs.twinny.dev/providers/hosted-apis/). |
 | **On your team's gateway** | Connect to a `twinny-server` and use the models the team set up. See below. |
 
 Mix them: a local model for completion, a hosted one for chat. The [supported models](https://docs.twinny.dev/providers/supported-models/) page says which models work for which job on which hardware.

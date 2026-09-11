@@ -32,7 +32,7 @@ Tudo roda contra um servidor que você controla. Sem telemetria, sem conta. Veja
 | --- | --- |
 | **Na sua máquina** | [Ollama](https://docs.twinny.dev/providers/ollama/), [LM Studio](https://docs.twinny.dev/providers/lm-studio/), [llama.cpp](https://docs.twinny.dev/providers/llama-cpp/), QVAC, Oobabooga, LiteLLM, Open WebUI ou [qualquer servidor compatível com a OpenAI](https://docs.twinny.dev/providers/other-local-servers/). |
 | **Em outro computador seu** | [Dispositivos](https://docs.twinny.dev/providers/devices/): pareie com um código e use a GPU daquela máquina por um link ponto a ponto criptografado. Sem conta, sem relay. |
-| **Em uma API hospedada** | [OpenAI, Anthropic, Mistral (Codestral para autocompletar), DeepSeek, OpenRouter, Gemini, Groq, Cohere, Perplexity](https://docs.twinny.dev/providers/hosted-apis/). |
+| **Em uma API hospedada** | [OpenAI, Anthropic, Mistral (Codestral para autocompletar), DeepSeek, OpenRouter, Requesty, Gemini, Groq, Cohere, Perplexity](https://docs.twinny.dev/providers/hosted-apis/). |
 | **No gateway da sua equipe** | Conecte-se a um `twinny-server` e use os modelos que a equipe configurou. Veja abaixo. |
 
 Misture: um modelo local para autocompletar, um hospedado para o chat. A página de [modelos compatíveis](https://docs.twinny.dev/providers/supported-models/) diz quais modelos servem para qual tarefa em qual hardware.

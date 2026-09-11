@@ -18,6 +18,7 @@ export const API_PROVIDERS = {
   Mistral: "mistral",
   Groq: "groq",
   OpenRouter: "openrouter",
+  Requesty: "requesty",
   Cohere: "cohere",
   Perplexity: "perplexity",
   Gemini: "gemini",
@@ -48,6 +49,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.OpenWebUI]: "Open WebUI",
   [API_PROVIDERS.Perplexity]: "Perplexity",
   [API_PROVIDERS.Qvac]: "QVAC",
+  [API_PROVIDERS.Requesty]: "Requesty",
   [API_PROVIDERS.TwinnyP2P]: "Twinny device (P2P)",
   [API_PROVIDERS.TwinnyRemote]: "Twinny gateway"
 }
