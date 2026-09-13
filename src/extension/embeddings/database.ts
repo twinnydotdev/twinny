@@ -159,11 +159,20 @@ export class EmbeddingDatabase {
   public async finishWrites() {
     const table = await this.table()
     if (!table) return
-    const indices = await table.listIndices()
-    if (!indices.some((index) => index.columns.includes("content"))) {
-      await table.createIndex("content", { config: lancedb.Index.fts() })
-    }
+    await this.ensureTextIndex(table)
     await table.optimize()
+  }
+
+  /** The BM25 index over `content`; built when missing. Returns whether it was. */
+  private async ensureTextIndex(table: lancedb.Table): Promise<boolean> {
+    const indices = await table.listIndices()
+    if (indices.some((index) => index.columns.includes("content"))) return false
+    const started = Date.now()
+    await table.createIndex("content", { config: lancedb.Index.fts() })
+    logger.info(
+      `Built the keyword index over ${await table.countRows()} chunks in ${Date.now() - started}ms`
+    )
+    return true
   }
 
   /* ------------------------------------------------------------------------ */
@@ -221,11 +230,23 @@ export class EmbeddingDatabase {
     try {
       const table = await this.table()
       if (!table) return []
-      let search = table.search(query, "fts", "content")
-      if (files?.length) search = search.where(fileFilter(files))
-      return this.toCandidates(await search.limit(limit).toArray())
+      const run = async () => {
+        let search = table.search(query, "fts", "content")
+        if (files?.length) search = search.where(fileFilter(files))
+        return this.toCandidates(await search.limit(limit).toArray())
+      }
+      try {
+        return await run()
+      } catch (error) {
+        // An index run that died before its last step leaves rows with no
+        // keyword index. Build it now rather than failing every search.
+        if (!/no inverted index/i.test(String(error))) throw error
+        logger.warn("Keyword index missing (an earlier index run did not finish); building it")
+        if (!(await this.ensureTextIndex(table))) throw error
+        return await run()
+      }
     } catch (error) {
-      logger.error(`Keyword search failed: ${error}`)
+      logger.error(`Keyword search failed, results come from vector search only: ${error}`)
       return []
     }
   }

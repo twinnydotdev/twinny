@@ -313,9 +313,16 @@ export class WorkspaceIndexer {
 
     onProgress?.({ phase: "finishing", processed, total, currentFiles: [] })
     await flush()
+    // Whatever was written must stay searchable by keyword too, even when
+    // the run is about to report a failure.
+    try {
+      await this._db.finishWrites()
+    } catch (error) {
+      if (!failure) throw error
+      logger.warn(`Could not finish the index after a failed run: ${error}`)
+    }
     if (failure) throw failure
 
-    await this._db.finishWrites()
     if (!token?.isCancellationRequested) manifest.updatedAt = Date.now()
     await this._db.saveManifest(manifest)
 
