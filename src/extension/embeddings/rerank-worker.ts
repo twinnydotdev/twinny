@@ -16,11 +16,12 @@ import { parentPort, workerData } from "worker_threads"
 import { sigmoid } from "./rank"
 
 /**
- * Total tokens per pair. The model allows 512 and attention cost grows with
- * the square of this, so it is the smallest budget that still fits a whole
- * default-sized chunk (1000 chars is about 300 tokens of code).
+ * Total tokens per pair, the most the model allows. A default-sized chunk
+ * (1000 chars) is 250 to 450 tokens of code with its path, and a chunk cut
+ * short hides whatever answered the question in its tail; the extra time
+ * over a smaller budget is worth that.
  */
-const MAX_TOKENS = 384
+const MAX_TOKENS = 512
 /** Tokens of the question kept when it is long, leaving room for the passage. */
 const MAX_QUERY_TOKENS = 64
 const PAD_ID = 0

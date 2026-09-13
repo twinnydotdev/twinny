@@ -109,28 +109,6 @@ export const fitHitsToBudget = (hits: Hit[], maxChars: number): Hit[] => {
   return kept
 }
 
-/**
- * The words in a question that a keyword index can match: identifiers kept
- * whole and also split on case and underscores (`fetchModelEmbedding` →
- * `fetch`, `model`, `embedding`), everything else dropped. Empty when the
- * question has no searchable words, in which case the keyword pass is
- * skipped.
- */
-export const keywordQuery = (text: string): string => {
-  const words = new Set<string>()
-  for (const token of text.match(/[A-Za-z_][A-Za-z0-9_]{1,}/g) || []) {
-    words.add(token)
-    const parts = token
-      .split(/_+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/)
-      .filter((part) => part.length > 2)
-    for (const part of parts) words.add(part.toLowerCase())
-  }
-  return [...words].join(" ")
-}
-
-/** A string literal for a LanceDB `where` clause. */
-export const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`
-
 /** Words that carry no meaning for a search on their own. */
 const STOP_WORDS = new Set([
   "a", "an", "the", "and", "or", "but", "so", "then", "also", "of", "in",
@@ -140,6 +118,77 @@ const STOP_WORDS = new Set([
   "i", "me", "my", "we", "you", "your", "it", "its", "this", "that",
   "these", "those", "they", "them", "there", "ok", "okay", "please", "about"
 ])
+
+/**
+ * The words inside one identifier: `fetchModelEmbedding` → `fetch`,
+ * `model`, `embedding`; `MAX_FILE_BYTES` → `max`, `file`, `bytes`. Digits
+ * stay attached (`utf8Decoder` → `utf8`, `decoder`; `i18n` stays whole)
+ * and single letters are dropped, they match everything.
+ */
+export const splitIdentifier = (token: string): string[] =>
+  token
+    .split(/_+|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/)
+    .map((part) => part.toLowerCase())
+    .filter((part) => part.length > 1)
+
+/** Identifier-like runs of a text, in order. */
+const identifiers = (text: string): string[] =>
+  text.match(/[A-Za-z_][A-Za-z0-9_]+/g) || []
+
+/**
+ * What the keyword index stores for a chunk: every identifier lowercased
+ * and whole, followed by its parts, so `statusBar` in the code is found by
+ * "status bar" and by "statusBar" alike. Repetition is kept on purpose, it
+ * is what BM25 weighs. The tokenizer over this column splits on spaces and
+ * punctuation and stems, so only the words themselves matter here.
+ */
+export const keywordText = (text: string): string => {
+  const words: string[] = []
+  for (const token of identifiers(text)) {
+    const whole = token.toLowerCase()
+    const parts = splitIdentifier(token)
+    words.push(whole)
+    if (parts.length > 1 || parts[0] !== whole) words.push(...parts)
+  }
+  return words.join(" ")
+}
+
+/**
+ * Words of a file path worth matching: `src/extension/status-bar.ts` →
+ * `src`, `extension`, `status`, `bar`, `ts`. Lets "where is the auth
+ * stuff" find `auth/` and "csp" find `csp.ts` when the code inside never
+ * says so.
+ */
+export const pathKeywords = (relativePath: string): string => {
+  const words = new Set<string>()
+  for (const token of relativePath.split(/[^A-Za-z0-9_]+/)) {
+    if (!token) continue
+    words.add(token.toLowerCase())
+    for (const part of splitIdentifier(token)) words.add(part)
+  }
+  return [...words].join(" ")
+}
+
+/**
+ * The words in a question that the keyword index can match, in the same
+ * shape as `keywordText` stores them: identifiers whole and split, stop
+ * words dropped. Empty when the question has no searchable words, in which
+ * case the keyword pass is skipped.
+ */
+export const keywordQuery = (text: string): string => {
+  const words = new Set<string>()
+  for (const token of identifiers(text)) {
+    const whole = token.toLowerCase()
+    if (!STOP_WORDS.has(whole)) words.add(whole)
+    for (const part of splitIdentifier(token)) {
+      if (!STOP_WORDS.has(part)) words.add(part)
+    }
+  }
+  return [...words].join(" ")
+}
+
+/** A string literal for a LanceDB `where` clause. */
+export const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`
 
 /** Words that point back at something already said. */
 const PRONOUN = /\b(it|its|this|that|these|those|they|them|there|one|ones)\b/i

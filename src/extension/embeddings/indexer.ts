@@ -8,10 +8,11 @@ import * as vscode from "vscode"
 import { logger } from "../../common/logger"
 import { readGitSubmodulesFile } from "../utils"
 
-import { chunkDocument, getChunkOptions } from "./chunker"
+import { chunkDocument, embeddingWindows, getChunkOptions } from "./chunker"
 import { ChunkRow, EmbeddingDatabase, FileStamp, IndexManifest } from "./database"
 import { Embedder } from "./embedder"
 import { isIndexablePath, looksBinary } from "./indexable"
+import { keywordText, pathKeywords } from "./rank"
 
 /** Files embedded at once. Each one is a few batched requests. */
 const FILE_CONCURRENCY = 4
@@ -19,6 +20,15 @@ const FILE_CONCURRENCY = 4
 const WRITE_EVERY_FILES = 25
 /** Files bigger than this are skipped: minified bundles, data dumps. */
 const MAX_FILE_BYTES = 512 * 1024
+/**
+ * Characters of a chunk embedded at once, with its path in front. Sized for
+ * the smallest common embedding model: Ollama runs all-minilm with a
+ * 256-token window and drops everything after it without a word, and code
+ * is about three characters a token. A chunk longer than this is embedded
+ * in overlapping windows, one row each.
+ */
+const EMBED_WINDOW_CHARS = 600
+const EMBED_WINDOW_OVERLAP = 80
 
 export type IndexPhase = "scanning" | "embedding" | "finishing"
 
@@ -154,7 +164,8 @@ export class WorkspaceIndexer {
    * The rows for one file, or nothing when it is unchanged, binary, or
    * empty. Each chunk is embedded with its path in front: the model then
    * knows `parse()` in `src/dates.ts` is about dates, which a bare snippet
-   * cannot say.
+   * cannot say. Long chunks are embedded in windows, one row per window,
+   * so no line of the file is beyond the model's reach.
    */
   private async embedFile(
     scanned: ScannedFile,
@@ -184,19 +195,31 @@ export class WorkspaceIndexer {
     if (!chunks.length) return "skipped"
 
     const label = scanned.relative.split(path.sep).join("/")
-    const vectors = await this._embedder.embed(
-      chunks.map((chunk) => `${label}\n${chunk.content}`),
-      "document"
-    )
+    const pathWords = pathKeywords(label)
+    const rows: Array<
+      Pick<ChunkRow, "file" | "content" | "startLine" | "endLine" | "keywords" | "part">
+    > = []
+    const inputs: string[] = []
+    for (const chunk of chunks) {
+      const keywords = `${pathWords} ${keywordText(chunk.content)}`
+      embeddingWindows(chunk.content, EMBED_WINDOW_CHARS, EMBED_WINDOW_OVERLAP).forEach(
+        (window, part) => {
+          inputs.push(`${label}\n${window}`)
+          rows.push({
+            file: scanned.file,
+            content: chunk.content,
+            startLine: chunk.startLine,
+            endLine: chunk.endLine,
+            keywords,
+            part
+          })
+        }
+      )
+    }
+    const vectors = await this._embedder.embed(inputs, "document")
     return {
       stamp: { hash, size: scanned.size, mtimeMs: scanned.mtimeMs, chunks: chunks.length },
-      rows: chunks.map((chunk, i) => ({
-        file: scanned.file,
-        content: chunk.content,
-        startLine: chunk.startLine,
-        endLine: chunk.endLine,
-        vector: vectors[i]
-      }))
+      rows: rows.map((row, i) => ({ ...row, vector: vectors[i] }))
     }
   }
 
@@ -296,7 +319,7 @@ export class WorkspaceIndexer {
             pendingRows.push(...result.rows)
             pendingStamps[entry.file] = result.stamp
             embedded++
-            chunks += result.rows.length
+            chunks += result.stamp.chunks
             if (pendingFiles.length >= WRITE_EVERY_FILES) await flush()
           }
         } catch (error) {

@@ -2,6 +2,7 @@ import * as assert from "assert"
 
 import {
   chunkText,
+  embeddingWindows,
   packSegments,
   proseBreaks
 } from "../../extension/embeddings/chunker"
@@ -81,5 +82,23 @@ suite("Embeddings: chunker", () => {
   test("whitespace-only input yields nothing", () => {
     assert.deepStrictEqual(chunkText("\n\n  \n", options), [])
     assert.deepStrictEqual(chunkText("", options), [])
+  })
+
+  test("embedding windows cover every line of a long chunk with overlap", () => {
+    const lines = Array.from({ length: 12 }, (_, i) => `line number ${i} of the chunk`)
+    const content = lines.join("\n")
+    const windows = embeddingWindows(content, 100, 30)
+    assert.ok(windows.length > 1)
+    for (const window of windows) assert.ok(window.length <= 100, window)
+    for (const line of lines) assert.ok(windows.some((window) => window.includes(line)), line)
+    // Consecutive windows share their seam.
+    for (let i = 1; i < windows.length; i++) {
+      const firstLine = windows[i].split("\n")[0]
+      assert.ok(windows[i - 1].includes(firstLine), `window ${i} starts with a line of ${i - 1}`)
+    }
+    // A chunk that fits is left whole; a giant line is cut on characters.
+    assert.deepStrictEqual(embeddingWindows(content, 10000, 30), [content])
+    const giant = "x".repeat(250)
+    assert.deepStrictEqual(embeddingWindows(giant, 100, 0).map((w) => w.length), [100, 100, 50])
   })
 })

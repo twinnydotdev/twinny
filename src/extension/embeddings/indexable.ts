@@ -31,7 +31,7 @@ const INDEXABLE_EXTENSIONS = new Set([
   "md", "mdx", "markdown", "rst", "adoc", "txt", "text", "org", "tex", "bib",
   // Misc text
   "diff", "patch", "editorconfig", "gitattributes", "dockerignore",
-  "npmrc", "nvmrc", "prettierrc", "eslintrc", "babelrc", "svg"
+  "npmrc", "nvmrc", "prettierrc", "eslintrc", "babelrc"
 ])
 
 const INDEXABLE_FILENAMES = new Set([
@@ -50,7 +50,8 @@ const SKIPPED_FILENAMES = new Set([
   "go.sum", "flake.lock", "packages.lock.json"
 ])
 
-const SKIPPED_SUFFIXES = [".min.js", ".min.css", ".map", ".snap", ".lock"]
+/** Images and generated files: text, but never an answer to a question. */
+const SKIPPED_SUFFIXES = [".min.js", ".min.css", ".map", ".snap", ".lock", ".svg"]
 
 /** Should this path be read and embedded, judging by its name alone? */
 export function isIndexablePath(filePath: string): boolean {

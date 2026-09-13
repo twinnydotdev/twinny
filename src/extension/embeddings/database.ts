@@ -7,15 +7,25 @@ import { logger } from "../../common/logger"
 import { Candidate, sqlString } from "./rank"
 
 const CHUNK_TABLE = "chunks"
+const KEYWORD_COLUMN = "keywords"
 const MANIFEST_FILE = "manifest.json"
-const MANIFEST_VERSION = 2
+const MANIFEST_VERSION = 3
 
-/** One indexed chunk as stored. `file` is absolute so it can be re-read. */
+/**
+ * One stored row. A chunk is stored once per embedding window (see
+ * `embeddingWindows`): every row of a chunk carries the whole chunk, and
+ * `part` numbers the windows. The keyword index covers part 0 only, so a
+ * chunk is one keyword hit; the vector search sees all parts and the
+ * duplicates are folded. `file` is absolute so the chunk can be re-read.
+ */
 export interface ChunkRow extends Record<string, unknown> {
   file: string
   content: string
   startLine: number
   endLine: number
+  /** The words of `content` and of the path, as `keywordText` makes them. */
+  keywords: string
+  part: number
   vector: number[]
 }
 
@@ -163,12 +173,23 @@ export class EmbeddingDatabase {
     await table.optimize()
   }
 
-  /** The BM25 index over `content`; built when missing. Returns whether it was. */
+  /** The BM25 index over `keywords`; built when missing. Returns whether it was. */
   private async ensureTextIndex(table: lancedb.Table): Promise<boolean> {
     const indices = await table.listIndices()
-    if (indices.some((index) => index.columns.includes("content"))) return false
+    if (indices.some((index) => index.columns.includes(KEYWORD_COLUMN))) return false
     const started = Date.now()
-    await table.createIndex("content", { config: lancedb.Index.fts() })
+    // The column is already lowercased words split from identifiers;
+    // stemming makes "chunks" find "chunk", and positions are not needed
+    // since nothing runs phrase queries.
+    await table.createIndex(KEYWORD_COLUMN, {
+      config: lancedb.Index.fts({
+        withPosition: false,
+        lowercase: true,
+        stem: true,
+        removeStopWords: true,
+        language: "English"
+      })
+    })
     logger.info(
       `Built the keyword index over ${await table.countRows()} chunks in ${Date.now() - started}ms`
     )
@@ -179,9 +200,10 @@ export class EmbeddingDatabase {
   /*  Reads                                                                    */
   /* ------------------------------------------------------------------------ */
 
+  /** Chunks in the store, each counted once however many windows it has. */
   public async countChunks(): Promise<number> {
     try {
-      return (await (await this.table())?.countRows()) ?? 0
+      return (await (await this.table())?.countRows("part = 0")) ?? 0
     } catch {
       return 0
     }
@@ -198,7 +220,8 @@ export class EmbeddingDatabase {
 
   /**
    * Nearest chunks by vector distance, best first; only from `files` when
-   * given.
+   * given. A chunk embedded in several windows is returned once, at the
+   * rank of its nearest window.
    */
   public async vectorSearch(
     vector: number[],
@@ -210,7 +233,15 @@ export class EmbeddingDatabase {
       if (!table) return []
       let query = table.vectorSearch(vector)
       if (files?.length) query = query.where(fileFilter(files))
-      return this.toCandidates(await query.limit(limit).toArray())
+      const rows = await query.limit(limit * 2).toArray()
+      const seen = new Set<string>()
+      const unique = rows.filter((row) => {
+        const key = `${row.file}:${row.startLine}-${row.endLine}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      return this.toCandidates(unique.slice(0, limit))
     } catch (error) {
       logger.error(`Vector search failed: ${error}`)
       return []
@@ -218,8 +249,9 @@ export class EmbeddingDatabase {
   }
 
   /**
-   * Chunks matching the query's words (BM25), best first; only from `files`
-   * when given.
+   * Chunks whose identifiers match the query's words (BM25), best first;
+   * only from `files` when given. The query must come from `keywordQuery`
+   * so it is split the way the index is.
    */
   public async textSearch(
     query: string,
@@ -231,8 +263,8 @@ export class EmbeddingDatabase {
       const table = await this.table()
       if (!table) return []
       const run = async () => {
-        let search = table.search(query, "fts", "content")
-        if (files?.length) search = search.where(fileFilter(files))
+        let search = table.search(query, "fts", KEYWORD_COLUMN)
+        search = search.where(files?.length ? `part = 0 AND ${fileFilter(files)}` : "part = 0")
         return this.toCandidates(await search.limit(limit).toArray())
       }
       try {

@@ -154,6 +154,44 @@ export const packSegments = (
     .filter((chunk) => chunk.content.trim().length > 0)
 }
 
+/**
+ * The pieces of a chunk that go to the embedding model, each at most
+ * `maxChars` long and cut on line boundaries, with the last line or so of
+ * one piece repeated at the start of the next. A chunk that fits is one
+ * piece. Small embedding models see only a couple of hundred tokens and
+ * silently drop the rest, so a chunk longer than their window would never
+ * be found by anything said in its second half; embedding it in pieces
+ * keeps every line of it searchable.
+ */
+export const embeddingWindows = (
+  content: string,
+  maxChars: number,
+  overlap: number
+): string[] => {
+  if (content.length <= maxChars) return [content]
+  const lines = content.split("\n")
+  const windows: string[] = []
+  let from = 0
+  while (from < lines.length) {
+    let to = from
+    while (to + 1 < lines.length && lineLength(lines, from, to + 1) <= maxChars) to++
+    const text = lines.slice(from, to + 1).join("\n")
+    if (text.length > maxChars) {
+      // One line longer than the window: cut it on characters.
+      for (let offset = 0; offset < text.length; offset += maxChars) {
+        windows.push(text.slice(offset, offset + maxChars))
+      }
+    } else {
+      windows.push(text)
+    }
+    if (to + 1 >= lines.length) break
+    let next = to + 1
+    while (next > from + 1 && lineLength(lines, next - 1, to) <= overlap) next--
+    from = next
+  }
+  return windows.filter((window) => window.trim().length > 0)
+}
+
 /** The chunk sizes the user set in the embeddings tab, or the defaults. */
 export const getChunkOptions = (
   context: ExtensionContext | undefined

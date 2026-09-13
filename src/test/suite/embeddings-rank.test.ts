@@ -8,7 +8,9 @@ import {
   Hit,
   isFollowUp,
   keywordQuery,
+  keywordText,
   mergeAdjacentHits,
+  pathKeywords,
   searchQuery,
   sigmoid,
   sqlString
@@ -76,11 +78,38 @@ suite("Embeddings: ranking", () => {
 
   test("keyword query keeps identifiers and splits them into words", () => {
     const query = keywordQuery("where does fetchModelEmbedding call getProviderOrigin?")
-    for (const word of ["fetchModelEmbedding", "fetch", "model", "embedding", "provider", "origin"]) {
+    for (const word of ["fetchmodelembedding", "fetch", "model", "embedding", "provider", "origin"]) {
       assert.ok(query.split(" ").includes(word), `${word} in "${query}"`)
     }
     assert.ok(!query.includes("?"))
+    // Stop words match every chunk and drown the real ones.
+    assert.ok(!query.split(" ").includes("where"), query)
+    assert.ok(!query.split(" ").includes("does"), query)
     assert.strictEqual(keywordQuery("?? !!"), "")
+    assert.strictEqual(keywordQuery("how does it"), "")
+    assert.deepStrictEqual(keywordQuery("how is i18n set up").split(" "), ["i18n", "set", "up"])
+    assert.ok(keywordQuery("utf8Decoder").split(" ").includes("utf8"))
+  })
+
+  test("keyword text splits identifiers the same way as the query", () => {
+    const text = keywordText("const statusBar = new StatusBarItem(MAX_FILE_BYTES)")
+    const words = text.split(" ")
+    for (const word of ["statusbar", "status", "bar", "statusbaritem", "item", "max", "file", "bytes"]) {
+      assert.ok(words.includes(word), `${word} in "${text}"`)
+    }
+    // A plain word is stored once, not once whole and once as its only part.
+    assert.deepStrictEqual(keywordText("const chunk").split(" "), ["const", "chunk"])
+    assert.ok(words.every((word) => word === word.toLowerCase()))
+  })
+
+  test("path keywords make a file findable by its name", () => {
+    const words = pathKeywords("src/extension/status-bar.ts").split(" ")
+    for (const word of ["src", "extension", "status", "bar", "ts"]) {
+      assert.ok(words.includes(word), `${word} in "${words}"`)
+    }
+    const nested = pathKeywords("src/main/bridge/heimdall/heimdall.contract.ts").split(" ")
+    assert.ok(nested.includes("heimdall") && nested.includes("contract"))
+    assert.ok(pathKeywords("src/main/csp.ts").split(" ").includes("csp"))
   })
 
   test("sql strings escape quotes", () => {
