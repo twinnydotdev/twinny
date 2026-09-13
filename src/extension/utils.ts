@@ -14,26 +14,18 @@ import {
 import { SyntaxNode } from "web-tree-sitter"
 
 import {
-  API_PROVIDERS,
   EVENT_NAME,
   FIM_MAX_PREFIX_CHARS,
   FIM_MAX_SUFFIX_CHARS,
   knownErrorMessages,
   NORMALIZE_REGEX,
-  OPEN_AI_COMPATIBLE_PROVIDERS,
   TWINNY
 } from "../common/constants"
 import { supportedLanguages } from "../common/languages"
-import {
-  LanguageType,
-  PrefixSuffix,
-  StreamResponse,
-  Theme
-} from "../common/types"
+import { LanguageType, PrefixSuffix, Theme } from "../common/types"
 
 import { isIndexablePath } from "./embeddings/indexable"
 import { ExtensionBridge } from "./messaging/bridge"
-import { TwinnyProvider } from "./providers/manager"
 
 export const delayExecution = <T extends () => void>(
   fn: T,
@@ -182,73 +174,6 @@ export const getTheme = () => {
     return Theme.Dark
   } else {
     return Theme.Contrast
-  }
-}
-
-export const getResponseData = (data: StreamResponse) => {
-  return {
-    type: "content" as const,
-    content:
-      data?.choices?.[0]?.delta?.content ||
-      data.choices[0].message?.content ||
-      ""
-  }
-}
-
-export const getIsOpenAICompatible = (provider: TwinnyProvider) => {
-  const providers = Object.values(OPEN_AI_COMPATIBLE_PROVIDERS) as string[]
-  return providers.includes(provider.provider)
-}
-
-/**
- * Pulls the streamed text out of a chunk. Providers are checked for their
- * native shape first, then every known shape is tried so a misconfigured
- * provider type still works as long as the server speaks a common dialect.
- */
-export const getFimDataFromProvider = (
-  provider: string,
-  data: StreamResponse | undefined
-): string | undefined => {
-  if (!data) return undefined
-
-  switch (provider) {
-    case API_PROVIDERS.OpenAICompatible:
-    case API_PROVIDERS.Ollama:
-    case API_PROVIDERS.OpenWebUI:
-    case API_PROVIDERS.TwinnyP2P:
-      if (typeof data.response === "string") return data.response
-      break
-    case API_PROVIDERS.LlamaCpp:
-      if (typeof data.content === "string") return data.content
-      break
-  }
-
-  const choice = data.choices?.[0]
-  if (typeof choice?.text === "string") return choice.text
-  if (typeof choice?.delta?.content === "string") return choice.delta.content
-  if (typeof choice?.message?.content === "string") return choice.message.content
-  if (typeof data.response === "string") return data.response
-  if (typeof data.content === "string") return data.content
-  return undefined
-}
-
-export function isStreamWithDataPrefix(stringBuffer: string) {
-  return stringBuffer.startsWith("data:")
-}
-
-export function safeParseJsonResponse(
-  stringBuffer: string
-): StreamResponse | undefined {
-  try {
-    const line = stringBuffer.trim()
-    if (!line) return undefined
-    const payload = isStreamWithDataPrefix(line)
-      ? line.slice("data:".length).trim()
-      : line
-    if (!payload || payload === "[DONE]") return undefined
-    return JSON.parse(payload)
-  } catch {
-    return undefined
   }
 }
 

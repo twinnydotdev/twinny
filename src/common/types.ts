@@ -1,75 +1,14 @@
 import { ReactNode } from "react"
 import { ChatCompletionMessageParam } from "fluency.js"
-import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { InlineCompletionItem, InlineCompletionList } from "vscode"
 
 import type { WorkspaceSearchReport } from "./messaging/protocol"
-import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
+import { ALL_BRACKETS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
-
-export interface RequestBodyBase {
-  stream: boolean
-  n_predict?: number
-  temperature?: number
-  messages?: ChatCompletionMessageParam[]
-  stop?: string[]
-}
-
-export interface RequestOptionsOllama extends RequestBodyBase {
-  model: string
-  keep_alive?: string | number
-  prompt?: string
-  input?: string
-  options: Record<string, unknown>
-}
-
-export interface StreamBodyOpenAI extends RequestBodyBase {
-  max_tokens?: number
-}
 
 export interface PrefixSuffix {
   prefix: string
   suffix: string
-}
-
-export interface StreamResponse {
-  model: string
-  created_at: string
-  response: string
-  content: string
-  message: {
-    content: string
-    role: "assistant"
-  }
-  done: boolean
-  context: number[]
-  total_duration: number
-  load_duration: number
-  prompt_eval_count: number
-  prompt_eval_duration: number
-  eval_count: number
-  eval_duration: number
-  type?: string
-  system_fingerprint: string
-  choices: [
-    {
-      text: string
-      delta: {
-        content: string
-      }
-      index: number
-      message: {
-        role: "assistant"
-        content: string
-      }
-      finish_reason: "stop"
-    }
-  ]
-  usage: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-  }
 }
 
 export interface LanguageType {
@@ -118,11 +57,6 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
    */
   context?: WorkspaceSearchReport
 }
-
-// Only real API parameters: these are forwarded to the provider verbatim.
-export type CompletionStreamingWithId = CompletionStreaming<LLMProvider>
-
-export type CompletionNonStreamingWithId = CompletionNonStreaming<LLMProvider>
 
 export interface Conversation {
   id?: string
@@ -199,24 +133,6 @@ export interface ApiProviders {
 
 export type Bracket = (typeof ALL_BRACKETS)[number]
 
-export interface StreamRequestOptions {
-  hostname: string
-  path: string
-  port?: string | number
-  protocol: string
-  method: string
-  headers: Record<string, string>
-}
-
-export interface StreamRequest {
-  body: RequestBodyBase | StreamBodyOpenAI
-  options: StreamRequestOptions
-  onEnd?: (response?: StreamResponse) => void
-  onStart?: (controller: AbortController) => void
-  onError?: (error: Error) => void
-  onData: (streamResponse: StreamResponse) => void
-}
-
 export interface UiTabs {
   [key: string]: JSX.Element
 }
@@ -286,18 +202,6 @@ export interface TwinnyProvider {
   provider: string
   repositoryLevel?: boolean
   type: string
-}
-
-export interface InferenceProvider {
-  apiBaseUrl?: string
-  apiHostname?: string
-  apiKey?: string
-  apiPath?: string
-  apiPort?: number
-  apiProtocol?: string
-  modelName?: string
-  name: string
-  type: (typeof API_PROVIDERS)[keyof typeof API_PROVIDERS]
 }
 
 export interface ChunkOptions {

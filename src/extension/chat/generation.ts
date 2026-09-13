@@ -1,14 +1,9 @@
-import { TokenJS } from "fluency.js"
 import { commands } from "vscode"
 
 import { ASSISTANT, EVENT_NAME, EXTENSION_CONTEXT_NAME } from "../../common/constants"
 import { formatCount, logger } from "../../common/logger"
-import {
-  ChatCompletionMessage,
-  CompletionNonStreamingWithId,
-  CompletionStreamingWithId,
-  TwinnyProvider
-} from "../../common/types"
+import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
+import { ChatRequest, InferenceClient, isCancelled } from "../inference"
 import { ExtensionBridge } from "../messaging/bridge"
 import { describeProviderError, describeProviderErrorPlain, isAbortError } from "../providers/errors"
 import { TwinnyStatusBar } from "../status-bar"
@@ -59,29 +54,34 @@ export class ChatGeneration {
     this.end()
   }
 
-  public async stream(
-    client: TokenJS,
-    request: CompletionStreamingWithId,
+  /**
+   * Run one request against a resolved provider and show the reply as it
+   * streams. Whether the provider streams or answers whole is its business.
+   */
+  public async generate(
+    inference: InferenceClient,
+    request: ChatRequest,
     provider: TwinnyProvider,
     prefix = ""
   ): Promise<string> {
     if (this._cancelled) return ""
     this.begin()
     let text = prefix
-    const elapsed = this.logRequest(request.messages, provider, "streaming")
+    const elapsed = this.logRequest(request.messages, provider)
 
     try {
-      const parts = await client.chat.completions.create(request)
-
-      for await (const part of parts) {
-        if (this._controller?.signal.aborted) break
-        const delta = part.choices[0]?.delta?.content
-        if (!delta) continue
-        text += delta
-        this._bridge.emit(EVENT_NAME.twinnyOnCompletion, {
-          content: text.trimStart() || " ",
-          role: ASSISTANT
-        })
+      const chunks = inference.chat(request, { signal: this._controller?.signal })
+      try {
+        for await (const chunk of chunks) {
+          text += chunk.content
+          this._bridge.emit(EVENT_NAME.twinnyOnCompletion, {
+            content: text.trimStart() || " ",
+            role: ASSISTANT
+          })
+        }
+      } catch (error) {
+        // Stopping is not a failure: what arrived is the reply.
+        if (!isCancelled(error)) throw error
       }
 
       const reply = text.trim()
@@ -100,31 +100,6 @@ export class ChatGeneration {
       if (partial) this.addMessage(partial)
       this.report(error, provider)
       return partial
-    } finally {
-      this.end()
-    }
-  }
-
-  public async block(
-    client: TokenJS,
-    request: CompletionNonStreamingWithId,
-    provider: TwinnyProvider,
-    prefix = ""
-  ): Promise<string> {
-    if (this._cancelled) return ""
-    this.begin()
-    const elapsed = this.logRequest(request.messages, provider, "blocking")
-    try {
-      const result = await client.chat.completions.create(request)
-      const content = `${prefix}${result.choices[0].message.content || ""}`
-      logger.info(`Chat ← ${elapsed()} · ${formatCount(content.length)} chars`)
-      logger.block("Chat reply", content)
-      this.addMessage(content)
-      return content
-    } catch (error) {
-      this._controller?.abort()
-      this.report(error, provider)
-      return ""
     } finally {
       this.end()
     }
@@ -164,14 +139,13 @@ export class ChatGeneration {
    */
   private logRequest(
     messages: ChatCompletionMessage[],
-    provider: TwinnyProvider,
-    mode: string
+    provider: TwinnyProvider
   ) {
     const chars = messages.reduce((sum, m) => sum + contentLength(m.content), 0)
     logger.info(
       `Chat → ${provider.modelName} (${provider.label}) · ` +
         `${messages.length} message${messages.length === 1 ? "" : "s"}, ` +
-        `${formatCount(chars)} chars · ${mode}`
+        `${formatCount(chars)} chars`
     )
     logger.block(
       "Chat messages",

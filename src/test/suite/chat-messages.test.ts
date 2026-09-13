@@ -2,14 +2,13 @@ import * as assert from "assert"
 
 import { API_PROVIDERS } from "../../common/constants"
 import { ChatCompletionMessage } from "../../common/types"
+import { cleanMessageHtml, toApiMessage } from "../../extension/chat/messages"
 import {
   buildBlockingRequest,
   buildStreamingRequest,
-  cleanMessageHtml,
   getFluencyProvider,
-  supportsStreaming,
-  toApiMessage
-} from "../../extension/chat/messages"
+  supportsStreaming
+} from "../../extension/inference/adapters/fluency"
 
 const provider = {
   id: "1",

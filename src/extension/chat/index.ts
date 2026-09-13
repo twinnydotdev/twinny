@@ -1,5 +1,3 @@
-import { TokenJS } from "fluency.js"
-import { CompletionNonStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { ExtensionContext } from "vscode"
 
 import { EVENT_NAME, SYSTEM, USER, WEBUI_TABS } from "../../common/constants"
@@ -11,6 +9,7 @@ import {
   TwinnyProvider
 } from "../../common/types"
 import { WorkspaceSearch } from "../embeddings/search"
+import { readText, resolveInferenceProvider } from "../inference"
 import { ExtensionBridge } from "../messaging/bridge"
 import { Base } from "../providers/base"
 import { describeProviderError, stripThinking } from "../providers/errors"
@@ -21,13 +20,7 @@ import { getLanguage } from "../utils"
 import { ChatContextBuilder } from "./context"
 import { ContextEntry, formatContextEntries } from "./context-files"
 import { ChatGeneration } from "./generation"
-import {
-  buildBlockingRequest,
-  buildStreamingRequest,
-  getFluencyProvider,
-  supportsStreaming,
-  toApiMessages
-} from "./messages"
+import { toApiMessages } from "./messages"
 
 /** Templates whose answer benefits from `@workspace`-style lookups. */
 const TEMPLATES_WITH_RAG = ["explain"]
@@ -36,8 +29,9 @@ const TEMPLATES_WITH_RAG = ["explain"]
  * The chat feature's front door.
  *
  * Takes what the webview or a command hands over, builds the full prompt
- * (`ChatContextBuilder`), converts it for the API (`messages.ts`) and runs
- * it (`ChatGeneration`). Holds the running conversation between turns.
+ * (`ChatContextBuilder`), converts it to plain messages (`messages.ts`) and
+ * runs it (`ChatGeneration`) against whichever provider the inference layer
+ * resolves. Holds the running conversation between turns.
  */
 export class Chat extends Base {
   private _conversation: ChatCompletionMessage[] = []
@@ -151,15 +145,14 @@ export class Chat extends Base {
       logger.error("No chat provider configured.")
       return undefined
     }
-    const request: CompletionNonStreaming<LLMProvider> = {
-      messages: [{ role: USER, content: prompt }],
-      model: provider.modelName,
-      provider: getFluencyProvider(provider)
-    }
     try {
-      const result = await this.client(provider).chat.completions.create(request)
-      const content = result.choices?.[0]?.message?.content
-      return typeof content === "string" ? stripThinking(content) || undefined : undefined
+      const content = await readText(
+        resolveInferenceProvider(provider).chat({
+          model: provider.modelName,
+          messages: [{ role: USER, content: prompt }]
+        })
+      )
+      return stripThinking(content) || undefined
     } catch (error) {
       logger.error(
         `Simple completion failed: ${describeProviderError(error, provider)}`
@@ -179,28 +172,13 @@ export class Chat extends Base {
     return this.getProvider()
   }
 
-  private client(provider: TwinnyProvider) {
-    return new TokenJS({
-      baseURL: this.getProviderBaseUrl(provider),
-      apiKey: provider.apiKey
-    })
-  }
-
   private run(provider: TwinnyProvider, prefix = "") {
-    const client = this.client(provider)
-    return supportsStreaming(provider)
-      ? this._generation.stream(
-          client,
-          buildStreamingRequest(provider, this._conversation),
-          provider,
-          prefix
-        )
-      : this._generation.block(
-          client,
-          buildBlockingRequest(provider, this._conversation),
-          provider,
-          prefix
-        )
+    return this._generation.generate(
+      resolveInferenceProvider(provider),
+      { model: provider.modelName, messages: this._conversation },
+      provider,
+      prefix
+    )
   }
 
   private async buildConversation(

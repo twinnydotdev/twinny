@@ -1,21 +1,12 @@
 /**
- * Turning the webview's conversation into what fluency.js wants.
+ * Turning the webview's conversation into plain chat messages.
  *
  * Pure: the chat composer produces HTML (mentions are `<span>`s, pasted
  * images are `<img>`s) and the model wants plain text plus image parts.
  */
 import * as cheerio from "cheerio"
-import { LLMProvider } from "fluency.js/dist/chat"
 
-import { API_PROVIDERS } from "../../common/constants"
-import { models } from "../../common/models"
-import { isOpenAICompatibleProvider } from "../../common/provider-validation"
-import {
-  ChatCompletionMessage,
-  CompletionNonStreamingWithId,
-  CompletionStreamingWithId,
-  TwinnyProvider
-} from "../../common/types"
+import { ChatCompletionMessage } from "../../common/types"
 
 /** The composer's HTML as the plain text the user meant. */
 export const cleanMessageHtml = (html: string): string => {
@@ -62,41 +53,3 @@ export const toApiMessage = (
 
 export const toApiMessages = (conversation: ChatCompletionMessage[]) =>
   conversation.map(toApiMessage)
-
-/** fluency.js routes every local server through its OpenAI-compatible client. */
-export const getFluencyProvider = (provider: TwinnyProvider): LLMProvider =>
-  (isOpenAICompatibleProvider(provider.provider)
-    ? API_PROVIDERS.OpenAICompatible
-    : provider.provider) as LLMProvider
-
-/** Some hosted models refuse `stream: true`; the catalogue says which. */
-export const supportsStreaming = (provider: TwinnyProvider): boolean => {
-  const entry = models[provider.provider as keyof typeof models]
-  const streaming = entry?.supportsStreaming
-  return Array.isArray(streaming) ? streaming.includes(provider.modelName) : true
-}
-
-/**
- * Everything here is forwarded to the provider as-is, so it must carry only
- * real API parameters: OpenAI rejects unknown ones such as an `id`.
- */
-export const buildStreamingRequest = (
-  provider: TwinnyProvider,
-  messages: ChatCompletionMessage[]
-): CompletionStreamingWithId => ({
-  messages,
-  model: provider.modelName,
-  stream: true,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  provider: getFluencyProvider(provider) as any
-})
-
-export const buildBlockingRequest = (
-  provider: TwinnyProvider,
-  messages: ChatCompletionMessage[]
-): CompletionNonStreamingWithId => ({
-  messages: messages.filter((m) => m.role !== "system"),
-  model: provider.modelName,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  provider: getFluencyProvider(provider) as any
-})

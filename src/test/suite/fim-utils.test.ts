@@ -2,14 +2,17 @@ import * as assert from "assert"
 import * as vscode from "vscode"
 
 import { API_PROVIDERS } from "../../common/constants"
-import { RequestOptionsOllama, StreamResponse } from "../../common/types"
-import { createStreamRequestBodyFim } from "../../extension/completion/request-body"
 import {
+  createStreamRequestBodyFim,
   getFimDataFromProvider,
+  RequestOptionsOllama,
+  StreamResponse
+} from "../../extension/inference/adapters/fim-dialects"
+import { safeParseJsonResponse } from "../../extension/inference/adapters/json-stream"
+import {
   getIsMiddleOfWord,
   getPrefixSuffix,
   getShouldUseMultiline,
-  safeParseJsonResponse,
   trimToLineBoundary
 } from "../../extension/utils"
 

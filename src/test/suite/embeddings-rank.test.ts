@@ -1,6 +1,6 @@
 import * as assert from "assert"
 
-import { vectorsFromResponse, withTaskPrefix } from "../../extension/embeddings/embedder"
+import { withTaskPrefix } from "../../extension/embeddings/embedder"
 import {
   Candidate,
   fitHitsToBudget,
@@ -15,6 +15,7 @@ import {
   sigmoid,
   sqlString
 } from "../../extension/embeddings/rank"
+import { vectorsFromResponse } from "../../extension/inference/adapters/fim-dialects"
 
 const candidate = (file: string, startLine: number, endLine = startLine): Candidate => ({
   file,

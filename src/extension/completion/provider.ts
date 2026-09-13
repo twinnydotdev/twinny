@@ -26,20 +26,19 @@ import { formatCount, logger } from "../../common/logger"
 import {
   FimContextFile,
   FimTemplateData,
-  PrefixSuffix,
-  StreamRequestOptions
+  PrefixSuffix
 } from "../../common/types"
+import { FimRequest, isCancelled, resolveInferenceProvider } from "../inference"
 import { Base } from "../providers/base"
 import { describeProviderErrorPlain } from "../providers/errors"
-import { llm } from "../providers/http"
 import { TwinnyProvider } from "../providers/manager"
 import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../templates/provider"
 import {
-  getFimDataFromProvider,
   getIsMiddleOfWord,
   getPrefixSuffix,
   getShouldUseMultiline,
+  notifyKnownErrors,
   sanitizeWorkspaceName
 } from "../utils"
 
@@ -56,7 +55,6 @@ import { getImportedFiles } from "./imports"
 import { LspContext } from "./lsp-context"
 import { getNodeAtPosition, getParser } from "./parser"
 import { RecentEdits } from "./recent-edits"
-import { createStreamRequestBodyFim } from "./request-body"
 import { CompletionStream } from "./stream"
 
 /** Everything one inline-completion request needs, kept off the instance. */
@@ -260,65 +258,50 @@ export class CompletionProvider
       suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix)
     })
 
-    const { body, options } = this.buildFimRequest(prompt, provider, stopWords)
+    const inference = resolveInferenceProvider(provider)
+    const controller = new AbortController()
+    this._abortController = controller
+    // Why the request was stopped, when it was: a timeout keeps what has
+    // arrived, the editor moving on wants nothing.
+    let stoppedBy: "timeout" | "editor" | undefined
+    const timeout = setTimeout(() => {
+      logger.warn(
+        `FIM #${request.id} gave up after ${FIM_STREAM_TIMEOUT_MS / 1000}s; ` +
+          `keeping the ${stream.value.length} chars received`
+      )
+      stoppedBy = "timeout"
+      controller.abort()
+    }, FIM_STREAM_TIMEOUT_MS)
+    const cancellation = token.onCancellationRequested(() => {
+      logger.debug(`FIM #${request.id} cancelled by the editor after ${elapsed()}`)
+      stoppedBy = "editor"
+      controller.abort()
+    })
 
-    const completion = await new Promise<string>((resolve) => {
-      let controller: AbortController | null = null
-      let settled = false
-      const settle = (text: string) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timeout)
-        cancellation.dispose()
-        resolve(text)
+    let completion = ""
+    try {
+      const chunks = inference.fim(
+        this.buildFimRequest(prompt, provider, stopWords, prefixSuffix),
+        { signal: controller.signal }
+      )
+      for await (const chunk of chunks) {
+        if (stream.push(chunk.text).done) break
       }
-      const timeout = setTimeout(() => {
-        logger.warn(
-          `FIM #${request.id} gave up after ${FIM_STREAM_TIMEOUT_MS / 1000}s; ` +
-            `keeping the ${stream.value.length} chars received`
-        )
-        controller?.abort()
-        settle(stream.finish())
-      }, FIM_STREAM_TIMEOUT_MS)
-      const cancellation = token.onCancellationRequested(() => {
-        logger.debug(`FIM #${request.id} cancelled by the editor after ${elapsed()}`)
-        controller?.abort()
-        settle("")
-      })
-
-      llm({
-        body,
-        options,
-        onStart: (abortController) => {
-          controller = abortController
-          this._abortController = abortController
-        },
-        onData: (data) => {
-          const text = getFimDataFromProvider(provider.provider, data)
-          if (text === undefined) return
-          const { done } = stream.push(text)
-          if (done) {
-            controller?.abort()
-            settle(stream.value)
-          }
-        },
-        onEnd: () => settle(stream.finish()),
-        onError: (error) => {
-          logger.error(
-            `FIM #${request.id} failed: ${describeProviderErrorPlain(error, provider)}`
-          )
-          settle("")
-        }
-      }).catch((error) => {
+      completion = stream.finish()
+    } catch (error) {
+      if (isCancelled(error)) {
+        completion = stoppedBy === "timeout" ? stream.finish() : ""
+      } else {
         logger.error(
           `FIM #${request.id} failed: ${describeProviderErrorPlain(error, provider)}`
         )
-        settle("")
-      })
-    })
-
-    if (this._abortController && request.id === this._requestId) {
-      this._abortController = null
+        if (error instanceof Error) notifyKnownErrors(error)
+      }
+    } finally {
+      clearTimeout(timeout)
+      cancellation.dispose()
+      controller.abort()
+      if (this._abortController === controller) this._abortController = null
     }
 
     const outcome = (what: string) =>
@@ -405,32 +388,23 @@ export class CompletionProvider
     }
   }
 
+  /** What is asked of the model, in terms no provider can tell apart. */
   private buildFimRequest(
     prompt: string,
     provider: TwinnyProvider,
-    stopWords: string[]
-  ) {
-    const body = createStreamRequestBodyFim(provider.provider, prompt, {
+    stopWords: string[],
+    prefixSuffix: PrefixSuffix
+  ): FimRequest {
+    return {
       model: provider.modelName,
-      numPredictFim: this.config.get<number>("numPredictFim", 512),
+      prompt,
+      prefix: prefixSuffix.prefix,
+      suffix: prefixSuffix.suffix,
+      stop: stopWords,
+      maxTokens: this.config.get<number>("numPredictFim", 512),
       temperature: this.config.get<number>("temperature", 0.2),
-      keepAlive: this.config.get<string>("keepAlive"),
-      stop: stopWords
-    })
-
-    const options: StreamRequestOptions = {
-      hostname: provider.apiHostname || "",
-      port: provider.apiPort ? Number(provider.apiPort) : undefined,
-      path: provider.apiPath || "",
-      protocol: provider.apiProtocol || "",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: provider.apiKey ? `Bearer ${provider.apiKey}` : ""
-      }
+      keepAlive: this.config.get<string>("keepAlive")
     }
-
-    return { options, body }
   }
 
   private getPromptHeader(languageId: string, uri: Uri) {

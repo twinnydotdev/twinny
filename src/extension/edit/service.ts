@@ -1,4 +1,3 @@
-import { TokenJS } from "fluency.js"
 import * as fs from "fs"
 import * as path from "path"
 import * as vscode from "vscode"
@@ -6,11 +5,7 @@ import * as vscode from "vscode"
 import { EXTENSION_CONTEXT_NAME } from "../../common/constants"
 import { logger } from "../../common/logger"
 import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
-import {
-  buildBlockingRequest,
-  buildStreamingRequest,
-  supportsStreaming
-} from "../chat/messages"
+import { isCancelled, resolveInferenceProvider } from "../inference"
 import { Base } from "../providers/base"
 import { describeProviderErrorPlain, isAbortError } from "../providers/errors"
 import { TwinnyStatusBar } from "../status-bar"
@@ -581,10 +576,7 @@ export class InlineEditService extends Base {
     const { baseline, proposed } = region.sides()
     const snapshot = region.snapshot()
 
-    const client = new TokenJS({
-      baseURL: this.getProviderBaseUrl(provider),
-      apiKey: provider.apiKey
-    })
+    const inference = resolveInferenceProvider(provider)
 
     this._pending = region
     this.begin()
@@ -595,25 +587,22 @@ export class InlineEditService extends Base {
         `Inline ${what} request (${provider.modelName}): ${generation.describe}`
       )
 
-      if (supportsStreaming(provider)) {
-        const parts = await client.chat.completions.create(
-          buildStreamingRequest(provider, messages)
-        )
-        for await (const part of parts) {
-          if (this._controller?.signal.aborted || region.broken) break
-          const delta = part.choices[0]?.delta?.content
-          if (!delta) continue
-          reply += delta
+      const chunks = inference.chat(
+        { model: provider.modelName, messages },
+        { signal: this._controller?.signal }
+      )
+      try {
+        for await (const chunk of chunks) {
+          if (region.broken) break
+          reply += chunk.content
           await region.render(
             layoutDiff(baseline, generation.preview(reply), true)
           )
           this.decorate()
         }
-      } else {
-        const result = await client.chat.completions.create(
-          buildBlockingRequest(provider, messages)
-        )
-        reply = result.choices[0]?.message?.content || ""
+      } catch (error) {
+        // The user stopped it; the checks below put the region back.
+        if (!isCancelled(error)) throw error
       }
 
       if (region.broken) {

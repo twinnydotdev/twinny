@@ -1,5 +1,5 @@
-import { getProviderOrigin } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
+import { resolveInferenceProvider } from "../inference"
 import { describeProviderErrorPlain } from "../providers/errors"
 
 /** Texts per request. Ollama, llama.cpp and OpenAI-style servers all take a list. */
@@ -25,28 +25,6 @@ export const withTaskPrefix = (
 ): string => {
   const prefix = TASK_PREFIXES.find((entry) => entry.match.test(model))
   return prefix ? `${prefix[kind]}${text}` : text
-}
-
-interface EmbeddingResponse {
-  /** OpenAI, LM Studio, vLLM, llama.cpp `/v1/embeddings`. */
-  data?: Array<{ index?: number; embedding: number[] }>
-  /** Ollama `/api/embed`. */
-  embeddings?: number[][]
-  /** llama.cpp `/embedding` and the legacy Ollama route. */
-  embedding?: number[]
-}
-
-/** Every vector in a response, in input order, whatever the server's dialect. */
-export const vectorsFromResponse = (body: EmbeddingResponse): number[][] => {
-  if (Array.isArray(body.data)) {
-    return [...body.data]
-      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-      .map((item) => item.embedding)
-      .filter(Array.isArray)
-  }
-  if (Array.isArray(body.embeddings)) return body.embeddings.filter(Array.isArray)
-  if (Array.isArray(body.embedding)) return [body.embedding]
-  return []
 }
 
 /**
@@ -123,32 +101,15 @@ export class Embedder {
   ): Promise<number[][]> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), EMBED_TIMEOUT_MS)
-    const url = `${getProviderOrigin({
-      ...provider,
-      apiHostname: provider.apiHostname || "localhost"
-    })}${provider.apiPath || "/api/embed"}`
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {})
-        },
-        body: JSON.stringify({ model: provider.modelName, input, stream: false }),
-        signal: controller.signal
-      })
-      if (!response.ok) {
-        const detail = (await response.text().catch(() => "")).slice(0, 200)
-        throw Object.assign(
-          new Error(`${response.status} ${response.statusText} ${detail}`.trim()),
-          { status: response.status }
-        )
-      }
-      const vectors = vectorsFromResponse(await response.json())
-      if (!vectors.length) {
-        throw new Error("The server answered but returned no embedding vector.")
-      }
+      const { vectors } = await resolveInferenceProvider({
+        ...provider,
+        apiPath: provider.apiPath || "/api/embed"
+      }).embeddings(
+        { model: provider.modelName, input },
+        { signal: controller.signal }
+      )
       return vectors
     } catch (error) {
       throw Object.assign(new Error(describeProviderErrorPlain(error, provider)), {

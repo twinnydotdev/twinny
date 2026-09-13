@@ -6,7 +6,6 @@ import {
   ACTIVE_FIM_PROVIDER_STORAGE_KEY
 } from "../../common/constants"
 import { resolveProviderEndpoint } from "../p2p/endpoint"
-import { getIsOpenAICompatible } from "../utils"
 
 import { TwinnyProvider } from "./manager"
 
@@ -36,16 +35,6 @@ export class Base {
       ACTIVE_FIM_PROVIDER_STORAGE_KEY
     )
     return resolveProviderEndpoint(provider)
-  }
-
-  public getProviderBaseUrl = (provider: TwinnyProvider) => {
-    if (getIsOpenAICompatible(provider)) {
-      return `${provider.apiProtocol}://${provider.apiHostname}${
-        provider.apiPort ? `:${provider.apiPort}` : ""
-      }${provider.apiPath ? provider.apiPath : ""}`
-    } else {
-      return ""
-    }
   }
 
   /**
