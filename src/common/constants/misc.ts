@@ -42,6 +42,11 @@ export const TITLE_GENERATION_PROMPT_MESAGE = `
 export const DEFAULT_RELEVANT_CODE_COUNT = 6
 /** Characters of retrieved code one @workspace question may add to a prompt. */
 export const DEFAULT_WORKSPACE_CONTEXT_CHARS = 12000
+/**
+ * Characters a hit may grow to when widened to the function or class
+ * around it: three chunks' worth, enough for most definitions.
+ */
+export const DEFAULT_WORKSPACE_HIT_CHARS = 3000
 
 // FIM (inline completion) tuning
 export const FIM_MAX_EMPTY_COMPLETION_CHARS = 250

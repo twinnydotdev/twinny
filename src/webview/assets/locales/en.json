@@ -248,6 +248,8 @@
   "workspace-context-open": "Open {{path}} at lines {{range}}",
   "workspace-context-preview": "Chunk preview",
   "workspace-context-score": "Reranker score {{score}}: how likely this chunk answers the question",
+  "workspace-context-imports": "imports",
+  "workspace-context-imports-title": "The file's imports, added so the names in the hit above resolve",
   "workspace-context-more": "{{lines}} more lines",
   "workspace-context-less": "less",
   "embeddings-intro": "Index the workspace so chat can find the code a question is about. Type @workspace in a message to use it, or turn on automatic use below.",

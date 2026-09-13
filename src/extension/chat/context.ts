@@ -7,9 +7,11 @@ import {
   DEFAULT_RELEVANT_CODE_COUNT,
   DEFAULT_RERANK_THRESHOLD,
   DEFAULT_WORKSPACE_CONTEXT_CHARS,
+  DEFAULT_WORKSPACE_HIT_CHARS,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   TOP_LEVEL_MENTIONS,
+  USER,
   WORKSPACE_STORAGE_KEY
 } from "../../common/constants"
 import { CodeLanguageDetails } from "../../common/languages"
@@ -17,10 +19,12 @@ import { logger } from "../../common/logger"
 import { WorkspaceSearchReport } from "../../common/messaging/protocol"
 import {
   AnyContextItem,
+  ChatCompletionMessage,
   MentionType,
   SelectionContextItem,
   TemplateData
 } from "../../common/types"
+import { searchQuery } from "../embeddings/rank"
 import { Hit, WorkspaceSearch } from "../embeddings/search"
 import { ExtensionBridge } from "../messaging/bridge"
 import { TemplateProvider } from "../templates/provider"
@@ -37,6 +41,36 @@ import { getGitContext } from "./git-context"
 import { getProblemsContext } from "./problems"
 import { isSymbolRef } from "./symbol-ref"
 import { readSymbolEntry } from "./symbols"
+
+/** A message without the words that name a context source. */
+const stripMentions = (text: string) =>
+  text.replace(/@(workspace|problems|git|terminal)\b/g, " ").trim()
+
+/** The user's question before this one, for a follow-up to lean on. */
+const previousQuestion = (history: ChatCompletionMessage[]): string | undefined => {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const message = history[i]
+    if (message.role === USER && typeof message.content === "string") {
+      return stripMentions(message.content)
+    }
+  }
+  return undefined
+}
+
+/** The files the last answer's sources came from, best first, absolute. */
+const previousSourceFiles = (
+  history: ChatCompletionMessage[],
+  root: string | undefined
+): string[] => {
+  if (!root) return []
+  for (let i = history.length - 1; i >= 0; i--) {
+    const hits = history[i].context?.hits
+    if (hits?.length) {
+      return [...new Set(hits.map((hit) => path.join(root, hit.path)))]
+    }
+  }
+  return []
+}
 
 /**
  * Everything that goes into a prompt besides the user's own words: the
@@ -84,8 +118,14 @@ export class ChatContextBuilder {
     return { prompt: prompt || "", selection }
   }
 
-  /** What `@workspace`, `@problems`, `@git` and `@terminal` pull in. */
-  public async ragContext(text?: string): Promise<string | null> {
+  /**
+   * What `@workspace`, `@problems`, `@git` and `@terminal` pull in. The
+   * earlier messages let a follow-up be searched with its question.
+   */
+  public async ragContext(
+    text?: string,
+    history: ChatCompletionMessage[] = []
+  ): Promise<string | null> {
     let combined = ""
 
     if (text?.includes("@problems")) {
@@ -104,7 +144,7 @@ export class ChatContextBuilder {
       combined += `${run ? formatTerminalRun(run) : `Terminal: ${NO_TERMINAL_OUTPUT}`}\n\n`
     }
 
-    const indexed = await this.workspaceContext(text)
+    const indexed = await this.workspaceContext(text, history)
     if (indexed) combined += `${indexed}\n\n`
 
     return combined.trim() || null
@@ -116,10 +156,18 @@ export class ChatContextBuilder {
    * Nothing when there is no index yet, so the toggle is safe to leave on;
    * an explicit `@workspace` with no index is told so in the chat.
    *
+   * A follow-up ("and how is it tested?") is searched together with the
+   * question before it, and the files the user is working in, plus the
+   * files the last answer used, are searched on their own so they are
+   * always in the running.
+   *
    * Every stage is reported to the webview, which shows the search under
    * the reply as it happens and keeps the sources with the message.
    */
-  private async workspaceContext(text?: string): Promise<string | null> {
+  private async workspaceContext(
+    text: string | undefined,
+    history: ChatCompletionMessage[]
+  ): Promise<string | null> {
     if (!text) return null
     const mentioned = text.includes("@workspace")
     const automatic = this.globalSetting<boolean>(
@@ -127,7 +175,9 @@ export class ChatContextBuilder {
     )
     if (!mentioned && !automatic) return null
 
-    const query = text.replace(/@(workspace|problems|git|terminal)\b/g, " ").trim()
+    const query = searchQuery(stripMentions(text), previousQuestion(history))
+    const root = workspace.workspaceFolders?.[0]?.uri.fsPath
+    const focus = this.focusFiles(previousSourceFiles(history, root))
     const threshold =
       Number(this.globalSetting(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)) ||
       DEFAULT_RERANK_THRESHOLD
@@ -153,6 +203,8 @@ export class ChatContextBuilder {
         DEFAULT_RELEVANT_CODE_COUNT,
       threshold,
       maxChars: DEFAULT_WORKSPACE_CONTEXT_CHARS,
+      focus,
+      expandChars: DEFAULT_WORKSPACE_HIT_CHARS,
       onProgress: (progress) => {
         report.stage = progress.stage
         if (progress.stage === "reranking") report.candidates = progress.candidates
@@ -169,7 +221,8 @@ export class ChatContextBuilder {
       startLine: hit.startLine,
       endLine: hit.endLine,
       score: hit.score,
-      content: hit.content
+      content: hit.content,
+      kind: hit.kind
     }))
     report.nearMisses = result.nearMisses.map((hit) => ({
       path: workspace.asRelativePath(hit.file),
@@ -197,6 +250,22 @@ export class ChatContextBuilder {
     return this._templates.readTemplate<TemplateData>("relevant-code", { code })
   }
 
+  /**
+   * Where the user is working, hottest first: the active editor, the other
+   * visible ones, the files behind the last answer, then every open file.
+   */
+  private focusFiles(previous: string[]): string[] {
+    const files: string[] = []
+    const add = (uri: { scheme: string; fsPath: string } | undefined) => {
+      if (uri?.scheme === "file") files.push(uri.fsPath)
+    }
+    add(window.activeTextEditor?.document.uri)
+    for (const editor of window.visibleTextEditors) add(editor.document.uri)
+    files.push(...previous)
+    for (const document of workspace.textDocuments) add(document.uri)
+    return [...new Set(files)]
+  }
+
   private describeHit(hit: Hit): string {
     return `${workspace.asRelativePath(hit.file)}:${hit.startLine + 1}-${hit.endLine + 1}`
   }
@@ -204,14 +273,15 @@ export class ChatContextBuilder {
   /** The block appended to the user's last message. */
   public async additionalContext(
     message: string,
-    mentions: MentionType[] = []
+    mentions: MentionType[] = [],
+    history: ChatCompletionMessage[] = []
   ): Promise<string> {
     const editor = window.activeTextEditor
     const selection = editor?.document.getText(editor.selection)
 
     let context = selection ? `Selected Code:\n${selection}\n\n` : ""
 
-    const rag = await this.ragContext(message)
+    const rag = await this.ragContext(message, history)
     if (rag) context += `Additional Context:\n${rag}\n\n`
 
     const pinned =

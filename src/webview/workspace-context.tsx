@@ -102,7 +102,13 @@ const HitRow = ({ hit, best }: HitRowProps) => {
           <span className={styles.hitName}>{name}</span>
         </span>
         <span className={styles.hitLines}>{range}</span>
-        <Score score={hit.score} />
+        {hit.kind === "imports" ? (
+          <span className={styles.kind} title={t("workspace-context-imports-title")}>
+            {t("workspace-context-imports")}
+          </span>
+        ) : (
+          <Score score={hit.score} />
+        )}
       </button>
       <div
         className={cx(styles.preview, { [styles.previewOpen]: showAll })}
@@ -224,7 +230,7 @@ export const WorkspaceContext = ({ report }: WorkspaceContextProps) => {
         return t("workspace-context-reranking", { count: report.candidates ?? 0 })
       case "done":
         return t("workspace-context-done", {
-          chunks: report.hits.length,
+          chunks: report.hits.filter((hit) => !hit.kind).length,
           files,
           count: files
         })

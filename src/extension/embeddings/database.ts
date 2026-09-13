@@ -54,6 +54,10 @@ const emptyManifest = (model = "", dimensions = 0): IndexManifest => ({
  * Purely storage; embedding and searching logic lives in the indexer and
  * the search.
  */
+/** A `where` clause selecting the rows of these files. */
+const fileFilter = (files: string[]) =>
+  `file IN (${files.map(sqlString).join(", ")})`
+
 export class EmbeddingDatabase {
   private _db: lancedb.Connection | null = null
   private _manifest: IndexManifest | null = null
@@ -122,7 +126,7 @@ export class EmbeddingDatabase {
     if (!this._db) throw new Error("The embedding database is not open.")
     const table = await this.table()
     if (table && files.length) {
-      await table.delete(`file IN (${files.map(sqlString).join(", ")})`)
+      await table.delete(fileFilter(files))
     }
     if (!rows.length) return
     if (table) {
@@ -135,7 +139,7 @@ export class EmbeddingDatabase {
   public async removeFiles(files: string[]) {
     if (!files.length) return
     const table = await this.table()
-    await table?.delete(`file IN (${files.map(sqlString).join(", ")})`)
+    await table?.delete(fileFilter(files))
   }
 
   /** Drops everything, ready for a rebuild. */
@@ -183,27 +187,43 @@ export class EmbeddingDatabase {
     }))
   }
 
-  /** Nearest chunks by vector distance, best first. */
-  public async vectorSearch(vector: number[], limit: number): Promise<Candidate[]> {
+  /**
+   * Nearest chunks by vector distance, best first; only from `files` when
+   * given.
+   */
+  public async vectorSearch(
+    vector: number[],
+    limit: number,
+    files?: string[]
+  ): Promise<Candidate[]> {
     try {
       const table = await this.table()
       if (!table) return []
-      return this.toCandidates(await table.vectorSearch(vector).limit(limit).toArray())
+      let query = table.vectorSearch(vector)
+      if (files?.length) query = query.where(fileFilter(files))
+      return this.toCandidates(await query.limit(limit).toArray())
     } catch (error) {
       logger.error(`Vector search failed: ${error}`)
       return []
     }
   }
 
-  /** Chunks matching the query's words (BM25), best first. */
-  public async textSearch(query: string, limit: number): Promise<Candidate[]> {
+  /**
+   * Chunks matching the query's words (BM25), best first; only from `files`
+   * when given.
+   */
+  public async textSearch(
+    query: string,
+    limit: number,
+    files?: string[]
+  ): Promise<Candidate[]> {
     if (!query.trim()) return []
     try {
       const table = await this.table()
       if (!table) return []
-      return this.toCandidates(
-        await table.search(query, "fts", "content").limit(limit).toArray()
-      )
+      let search = table.search(query, "fts", "content")
+      if (files?.length) search = search.where(fileFilter(files))
+      return this.toCandidates(await search.limit(limit).toArray())
     } catch (error) {
       logger.error(`Keyword search failed: ${error}`)
       return []

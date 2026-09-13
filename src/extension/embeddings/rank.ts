@@ -12,6 +12,11 @@ export interface Hit {
   endLine: number
   /** Reranker probability that the chunk answers the query, 0..1. */
   score: number
+  /**
+   * Set on a block added for the reader's sake rather than found: the
+   * imports of a file another hit came from. Its score is that hit's.
+   */
+  kind?: "imports"
 }
 
 /** A row as the vector store returns it, before scoring. */
@@ -76,7 +81,8 @@ export const mergeAdjacentHits = (
           ...current,
           endLine,
           content: joined,
-          score: Math.max(current.score, next.score)
+          score: Math.max(current.score, next.score),
+          kind: current.kind === next.kind ? current.kind : undefined
         }
       } else {
         merged.push(current)
@@ -124,3 +130,46 @@ export const keywordQuery = (text: string): string => {
 
 /** A string literal for a LanceDB `where` clause. */
 export const sqlString = (value: string) => `'${value.replace(/'/g, "''")}'`
+
+/** Words that carry no meaning for a search on their own. */
+const STOP_WORDS = new Set([
+  "a", "an", "the", "and", "or", "but", "so", "then", "also", "of", "in",
+  "on", "to", "for", "with", "from", "by", "at", "as", "is", "are", "was",
+  "were", "be", "been", "do", "does", "did", "can", "could", "should",
+  "would", "will", "how", "what", "where", "why", "when", "which", "who",
+  "i", "me", "my", "we", "you", "your", "it", "its", "this", "that",
+  "these", "those", "they", "them", "there", "ok", "okay", "please", "about"
+])
+
+/** Words that point back at something already said. */
+const PRONOUN = /\b(it|its|this|that|these|those|they|them|there|one|ones)\b/i
+
+const contentWords = (text: string): string[] =>
+  (text.toLowerCase().match(/[a-z_][a-z0-9_]+/g) || []).filter(
+    (word) => !STOP_WORDS.has(word)
+  )
+
+/**
+ * Whether a message leans on the one before it: "and how is it tested?",
+ * "why?", "what about the other one". Such a message has too few words of
+ * its own to search with. The tell is a pronoun with little else, or almost
+ * no content words at all; a short but self-contained question ("where is
+ * the login handled") is left alone.
+ */
+export const isFollowUp = (text: string): boolean => {
+  const words = contentWords(text)
+  if (words.length < 2) return true
+  return words.length < 3 && PRONOUN.test(text)
+}
+
+/**
+ * The text to search for a message: the message itself, or, for a
+ * follow-up, the previous question and the follow-up together so the
+ * retrievers and the reranker know what "it" is.
+ */
+export const searchQuery = (text: string, previous?: string): string => {
+  const current = text.trim()
+  const before = previous?.trim()
+  if (!before || !current || !isFollowUp(current)) return current
+  return `${before}\n${current}`
+}

@@ -210,7 +210,8 @@ export class Chat extends Base {
     const last = messages[messages.length - 1]
     const extra = await this._context.additionalContext(
       last.content?.toString() || "",
-      mentions
+      mentions,
+      messages.slice(0, -1)
     )
     return toApiMessages([
       { role: SYSTEM, content: await this._context.systemPrompt() },

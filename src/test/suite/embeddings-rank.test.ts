@@ -6,8 +6,10 @@ import {
   fitHitsToBudget,
   fuseRankings,
   Hit,
+  isFollowUp,
   keywordQuery,
   mergeAdjacentHits,
+  searchQuery,
   sigmoid,
   sqlString
 } from "../../extension/embeddings/rank"
@@ -101,5 +103,54 @@ suite("Embeddings: embedder", () => {
     assert.strictEqual(withTaskPrefix("nomic-embed-text", "query", "q"), "search_query: q")
     assert.strictEqual(withTaskPrefix("nomic-embed-text", "document", "d"), "search_document: d")
     assert.strictEqual(withTaskPrefix("all-minilm", "query", "q"), "q")
+  })
+})
+
+suite("Embeddings: follow-up questions", () => {
+  test("a message with almost nothing to search is a follow-up", () => {
+    assert.ok(isFollowUp("why?"))
+    assert.ok(isFollowUp("and how is it tested?"))
+    assert.ok(isFollowUp("what about caching"))
+    assert.ok(isFollowUp("explain this"))
+  })
+
+  test("a short message with a pronoun leans on the last one", () => {
+    assert.ok(isFollowUp("does that use a cache"))
+    assert.ok(isFollowUp("where is it called from"))
+  })
+
+  test("a short but self-contained question stands alone", () => {
+    assert.ok(!isFollowUp("where is the login handled"))
+    assert.ok(!isFollowUp("fix the bug in parseConfig"))
+    assert.ok(!isFollowUp("how does the embedding indexer decide what to skip"))
+  })
+
+  test("the search text carries the previous question only for a follow-up", () => {
+    assert.strictEqual(
+      searchQuery("and how is it tested?", "how does the indexer work"),
+      "how does the indexer work\nand how is it tested?"
+    )
+    assert.strictEqual(
+      searchQuery("where is the login handled", "how does the indexer work"),
+      "where is the login handled"
+    )
+    assert.strictEqual(searchQuery("why?", undefined), "why?")
+    assert.strictEqual(searchQuery("  why?  ", "   "), "why?")
+  })
+
+  test("merging keeps a kind only when both sides share it", () => {
+    const hit = (startLine: number, endLine: number, kind?: "imports"): Hit => ({
+      file: "a.ts",
+      content: "",
+      startLine,
+      endLine,
+      score: 0.5,
+      kind
+    })
+    const lines = () => Array.from({ length: 10 }, (_, i) => `line ${i}`)
+    const [merged] = mergeAdjacentHits([hit(0, 1, "imports"), hit(2, 4)], lines)
+    assert.strictEqual(merged.startLine, 0)
+    assert.strictEqual(merged.endLine, 4)
+    assert.strictEqual(merged.kind, undefined)
   })
 })

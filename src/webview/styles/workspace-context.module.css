@@ -280,6 +280,14 @@
   letter-spacing: var(--tw-track);
 }
 
+.kind {
+  flex-shrink: 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
 .score {
   display: inline-flex;
   align-items: center;

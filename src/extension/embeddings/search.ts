@@ -2,9 +2,11 @@ import * as fs from "fs/promises"
 import { workspace } from "vscode"
 
 import { logger } from "../../common/logger"
+import { getParser } from "../completion/parser"
 
 import { EmbeddingDatabase } from "./database"
 import { Embedder } from "./embedder"
+import { enclosingRange, importRange, SyntaxLike } from "./expand"
 import {
   Candidate,
   fitHitsToBudget,
@@ -22,6 +24,12 @@ const RETRIEVE_LIMIT = 20
  * few hundred milliseconds of CPU, so this is the speed/recall dial.
  */
 const RERANK_LIMIT = 12
+/** Rows fetched from the focus files alone, by each retriever. */
+const FOCUS_LIMIT = 6
+/** Focus files searched; the list is ordered, so the tail is the least hot. */
+const FOCUS_FILE_LIMIT = 8
+/** Characters of a file's imports worth adding under its hits. */
+const IMPORT_CHARS = 1200
 
 export interface SearchOptions {
   /** Hits returned at most. */
@@ -30,6 +38,18 @@ export interface SearchOptions {
   threshold: number
   /** Characters of chunk content across all hits. */
   maxChars: number
+  /**
+   * Absolute paths of the files the user is working in, hottest first: the
+   * active editor, the visible ones, the files the last answer used. Their
+   * chunks are retrieved on their own as well, so the file under the
+   * cursor is always among the candidates, and the fusion weighs them up.
+   */
+  focus?: string[]
+  /**
+   * Characters a hit may grow to when widened to the function or class
+   * around it, with the file's imports added once. Off when unset.
+   */
+  expandChars?: number
   /** Told about each stage as the search moves through it. */
   onProgress?: (progress: SearchProgress) => void
 }
@@ -55,24 +75,44 @@ export interface SearchResult {
 /** Near misses kept for the user to see why nothing was found. */
 const NEAR_MISS_LIMIT = 3
 
+/** A parsed file, released once the hits in it have been widened. */
+export interface ParsedFile {
+  root: SyntaxLike
+  dispose(): void
+}
+
+/** Parses a file for expansion; undefined when there is no grammar for it. */
+export type FileParser = (file: string, text: string) => Promise<ParsedFile | undefined>
+
+const parseWithTreeSitter: FileParser = async (file, text) => {
+  const parser = await getParser(file)
+  if (!parser) return undefined
+  const tree = parser.parse(text)
+  return { root: tree.rootNode, dispose: () => tree.delete() }
+}
+
 export { Hit }
 
 /**
- * Answers "what in the workspace is about this?" Three stages:
+ * Answers "what in the workspace is about this?" Four stages:
  *
  * 1. Retrieve. Nearest chunks by embedding, and chunks that share the
  *    question's identifiers (BM25). Vectors find paraphrases; keywords find
- *    the exact function the user named. Both lists are fused by rank.
+ *    the exact function the user named. The focus files get their own pass
+ *    of each. All lists are fused by rank.
  * 2. Rerank. A cross-encoder reads the question with each candidate and
  *    gives an absolute relevance score, so a threshold has one meaning.
- * 3. Tidy. Adjacent hits from one file become one block, and the result is
+ * 3. Widen. A hit grows to the definition around it when that fits, and
+ *    each file's imports come along once, so the model reads whole code.
+ * 4. Tidy. Adjacent hits from one file become one block, and the result is
  *    cut to a character budget so the prompt stays a prompt.
  */
 export class WorkspaceSearch {
   constructor(
     private readonly _db: EmbeddingDatabase,
     private readonly _embedder: Embedder,
-    private readonly _reranker: Reranker
+    private readonly _reranker: Reranker,
+    private readonly _parse: FileParser = parseWithTreeSitter
   ) {}
 
   /** Whether a search can return anything right now. */
@@ -98,11 +138,15 @@ export class WorkspaceSearch {
     const notes: string[] = []
     const vector = await this.embedQuery(text, notes)
     progress({ stage: "retrieving" })
-    const [byVector, byKeyword] = await Promise.all([
+    const keywords = keywordQuery(text)
+    const focus = (options.focus ?? []).slice(0, FOCUS_FILE_LIMIT)
+    const lists = await Promise.all([
       vector ? this._db.vectorSearch(vector, RETRIEVE_LIMIT) : [],
-      this._db.textSearch(keywordQuery(text), RETRIEVE_LIMIT)
+      this._db.textSearch(keywords, RETRIEVE_LIMIT),
+      vector && focus.length ? this._db.vectorSearch(vector, FOCUS_LIMIT, focus) : [],
+      focus.length ? this._db.textSearch(keywords, FOCUS_LIMIT, focus) : []
     ])
-    const candidates = fuseRankings([byVector, byKeyword]).slice(0, RERANK_LIMIT)
+    const candidates = fuseRankings(lists).slice(0, RERANK_LIMIT)
     if (!candidates.length) return { ...empty, note: notes[0] }
 
     progress({ stage: "reranking", candidates: candidates.length })
@@ -119,9 +163,25 @@ export class WorkspaceSearch {
     for (const file of new Set(kept.map((hit) => hit.file))) {
       sources.set(file, await this.readLines(file))
     }
-    const merged = mergeAdjacentHits(kept, (file) => sources.get(file))
+    const { widened, imports } = await this.widen(kept, sources, options.expandChars)
+    const merged = mergeAdjacentHits(widened, (file) => sources.get(file)).slice(
+      0,
+      options.limit
+    )
+    // Imports come last so the budget spends itself on the code first, and
+    // only for files whose hits do not already show them.
+    const trailing = [...imports.values()].filter(
+      (block) =>
+        merged.some((hit) => hit.file === block.file) &&
+        !merged.some(
+          (hit) =>
+            hit.file === block.file &&
+            hit.startLine <= block.startLine &&
+            hit.endLine >= block.endLine
+        )
+    )
     return {
-      hits: fitHitsToBudget(merged.slice(0, options.limit), options.maxChars),
+      hits: fitHitsToBudget([...merged, ...trailing], options.maxChars),
       candidates: candidates.length,
       nearMisses,
       note: notes[0]
@@ -163,6 +223,67 @@ export class WorkspaceSearch {
       }))
     }
     return candidates.map((candidate, i) => ({ ...candidate, score: scores[i] }))
+  }
+
+  /**
+   * Each hit grown to the definition around it, and per file an imports
+   * block carrying the file's best score. Files without a grammar, or that
+   * cannot be parsed, keep their hits as they were.
+   */
+  private async widen(
+    hits: Hit[],
+    sources: Map<string, string[] | undefined>,
+    maxChars: number | undefined
+  ): Promise<{ widened: Hit[]; imports: Map<string, Hit> }> {
+    const imports = new Map<string, Hit>()
+    if (!maxChars) return { widened: hits, imports }
+
+    const widened: Hit[] = []
+    const byFile = new Map<string, Hit[]>()
+    for (const hit of hits) byFile.set(hit.file, [...(byFile.get(hit.file) || []), hit])
+
+    for (const [file, fileHits] of byFile) {
+      const lines = sources.get(file)
+      const parsed = lines && (await this.parseSafely(file, lines.join("\n")))
+      if (!lines || !parsed) {
+        widened.push(...fileHits)
+        continue
+      }
+      try {
+        const slice = ([from, to]: [number, number]) => lines.slice(from, to + 1).join("\n")
+        for (const hit of fileHits) {
+          const range = enclosingRange(parsed.root, lines, hit.startLine, hit.endLine, maxChars)
+          widened.push(
+            range
+              ? { ...hit, startLine: range[0], endLine: range[1], content: slice(range) }
+              : hit
+          )
+        }
+        const range = importRange(parsed.root, lines, IMPORT_CHARS)
+        if (range) {
+          imports.set(file, {
+            file,
+            startLine: range[0],
+            endLine: range[1],
+            content: slice(range),
+            score: Math.max(...fileHits.map((hit) => hit.score)),
+            kind: "imports"
+          })
+        }
+      } finally {
+        parsed.dispose()
+      }
+    }
+    return { widened, imports }
+  }
+
+  private async parseSafely(file: string, text: string): Promise<ParsedFile | undefined> {
+    try {
+      return await this._parse(file, text)
+    } catch (error) {
+      logger.error(`Could not parse ${file} to widen hits: ${error}`)
+      return undefined
+    }
   }
 
   /** Current lines of a file: the editor buffer when open, else the disk. */
