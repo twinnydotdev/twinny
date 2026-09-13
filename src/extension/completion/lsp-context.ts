@@ -4,8 +4,10 @@ import {
   CompletionItem,
   CompletionItemKind,
   CompletionList,
+  MarkdownString,
   Position,
   Range,
+  SignatureHelp,
   TextDocument
 } from "vscode"
 
@@ -14,6 +16,31 @@ const MAX_CHARS = 2000
 const TIMEOUT_MS = 150
 
 const compact = (value: string) => value.replace(/\s+/g, " ").trim().slice(0, 200)
+
+const docText = (documentation: string | MarkdownString | undefined) =>
+  typeof documentation === "string" ? documentation : documentation?.value || ""
+
+/**
+ * The signature of the call the cursor is inside, with the parameter being
+ * typed named, so the model knows what goes in the hole. Empty when the
+ * cursor is not in a call or the language server has nothing.
+ */
+export function formatSignatureHelp(help: SignatureHelp | undefined): string {
+  const signature = help?.signatures[help.activeSignature ?? 0]
+  if (!signature?.label) return ""
+  const lines = [`Signature at the cursor: ${compact(signature.label)}`]
+  const parameter = signature.parameters?.[help?.activeParameter ?? -1]
+  if (parameter) {
+    const label =
+      typeof parameter.label === "string"
+        ? parameter.label
+        : signature.label.slice(parameter.label[0], parameter.label[1])
+    if (label) lines.push(`Parameter being typed: ${compact(label)}`)
+  }
+  const doc = compact(docText(signature.documentation))
+  if (doc) lines.push(doc)
+  return lines.join("\n")
+}
 
 /** Keep useful symbols and their available signatures, without large docs/snippets. */
 export function formatLspSuggestions(items: CompletionItem[], prefix: string) {
@@ -76,12 +103,29 @@ export class LspContext {
       // https://code.visualstudio.com/api/references/commands
       void (async () => {
         try {
-          const list = await commands.executeCommand<CompletionList>(
-            "vscode.executeCompletionItemProvider", document.uri, position
-          )
+          const [list, help] = await Promise.all([
+            commands.executeCommand<CompletionList>(
+              "vscode.executeCompletionItemProvider", document.uri, position
+            ),
+            commands
+              .executeCommand<SignatureHelp>(
+                "vscode.executeSignatureHelpProvider", document.uri, position
+              )
+              .then(
+                (value) => value,
+                () => undefined
+              )
+          ])
           if (settled) return
-          finish(document.version === version && !token.isCancellationRequested
-            ? formatLspSuggestions(list?.items || [], prefix) : "")
+          if (document.version !== version || token.isCancellationRequested) {
+            finish("")
+            return
+          }
+          finish(
+            [formatSignatureHelp(help), formatLspSuggestions(list?.items || [], prefix)]
+              .filter(Boolean)
+              .join("\n\n")
+          )
         } catch {
           finish("")
         } finally {

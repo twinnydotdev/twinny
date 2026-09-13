@@ -3,7 +3,7 @@ import * as vscode from "vscode"
 
 import { FIM_TEMPLATE_FORMAT } from "../../common/constants"
 import { getFimPrompt, getFimTemplateRepositoryLevel } from "../../extension/completion/fim-templates"
-import { formatLspSuggestions, LspContext } from "../../extension/completion/lsp-context"
+import { formatLspSuggestions, formatSignatureHelp, LspContext } from "../../extension/completion/lsp-context"
 
 suite("FIM IntelliSense context", () => {
   test("filters by typed prefix, respects ranking, retains types and deduplicates", () => {
@@ -23,6 +23,31 @@ suite("FIM IntelliSense context", () => {
     assert.strictEqual(result.split("getName").length, 2)
     assert.ok(!result.includes("setName") && !result.includes("getSnippet"))
     assert.strictEqual(formatLspSuggestions([], ""), "")
+  })
+
+  test("signature help names the call, the parameter being typed and the docs", () => {
+    const signature = new vscode.SignatureInformation(
+      "applyDiscount(cart: Cart, rate: number): number",
+      new vscode.MarkdownString("Applies a **rate** to the cart total.")
+    )
+    signature.parameters = [
+      new vscode.ParameterInformation("cart: Cart"),
+      new vscode.ParameterInformation([26, 38])
+    ]
+    const help = new vscode.SignatureHelp()
+    help.signatures = [signature]
+    help.activeSignature = 0
+    help.activeParameter = 1
+    assert.strictEqual(
+      formatSignatureHelp(help),
+      [
+        "Signature at the cursor: applyDiscount(cart: Cart, rate: number): number",
+        "Parameter being typed: rate: number",
+        "Applies a **rate** to the cart total."
+      ].join("\n")
+    )
+    assert.strictEqual(formatSignatureHelp(undefined), "")
+    assert.strictEqual(formatSignatureHelp(new vscode.SignatureHelp()), "")
   })
 
   test("bounds both the item count and prompt size", () => {

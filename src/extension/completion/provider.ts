@@ -43,6 +43,7 @@ import {
 } from "../utils"
 
 import { cache, getSuggestionContinuation, LastSuggestion } from "./cache"
+import { DefinitionContext } from "./definitions"
 import { FileInteractionCache } from "./file-interaction"
 import {
   getFimPrompt,
@@ -83,6 +84,7 @@ export class CompletionProvider
 {
   private _abortController: AbortController | null = null
   private _acceptedLastCompletion = false
+  private _definitions = new DefinitionContext()
   private _fileInteractionCache: FileInteractionCache
   private _lastSuggestion: LastSuggestion | undefined
   private _lspContext = new LspContext()
@@ -464,14 +466,26 @@ export class CompletionProvider
 
     const wantsContext =
       this.config.get<boolean>("fileContextEnabled") || provider.repositoryLevel
-    const [contextFiles, lspContext] = await Promise.all([
+    const wantsLsp = this.config.get<boolean>("lspContextEnabled", true)
+    const visibleLines: [number, number] = [
+      request.position.line - (prefixSuffix.prefix.split("\n").length - 1),
+      request.position.line + (prefixSuffix.suffix.split("\n").length - 1)
+    ]
+    const [contextFiles, definitions, lspContext] = await Promise.all([
       wantsContext ? this.getContextFiles(document) : Promise.resolve([]),
-      this.config.get<boolean>("lspContextEnabled", true)
+      wantsLsp
+        ? this._definitions.get(document, request.position, visibleLines, request.token)
+        : Promise.resolve([]),
+      wantsLsp
         ? this._lspContext.get(document, request.position, request.token)
         : Promise.resolve("")
     ])
+    // Nearest the prefix goes last: what the model reads just before the
+    // hole matters most, so the definitions of the names being used and
+    // the signature at the cursor follow the broader file windows.
+    contextFiles.push(...definitions)
     if (lspContext) {
-      contextFiles.unshift({ name: "IntelliSense context", text: lspContext })
+      contextFiles.push({ name: "IntelliSense context", text: lspContext })
     }
 
     if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
