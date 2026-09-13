@@ -4,6 +4,7 @@ import * as path from "path"
 import * as vscode from "vscode"
 
 import { EVENT_NAME } from "../../common/constants"
+import { FileLocation } from "../../common/messaging/protocol"
 import { ExtensionBridge } from "../messaging/bridge"
 
 export class FileHandler {
@@ -72,7 +73,14 @@ export class FileHandler {
     return dirMatch
   }
 
-  public async handleOpenFile(filePath: string) {
+  /**
+   * Opens a workspace file, scrolled to and selecting the given lines when
+   * there are any (a chunk the workspace search used, a pinned selection).
+   */
+  public async handleOpenFile(target: string | FileLocation) {
+    const location: FileLocation =
+      typeof target === "string" ? { path: target } : target
+    const filePath = location.path
     if (filePath && vscode.workspace.workspaceFolders) {
       const fullPath = path.join(
         vscode.workspace.workspaceFolders[0].uri.fsPath,
@@ -80,7 +88,20 @@ export class FileHandler {
       )
       try {
         const doc = await vscode.workspace.openTextDocument(fullPath)
-        await vscode.window.showTextDocument(doc)
+        const editor = await vscode.window.showTextDocument(doc)
+        if (location.startLine !== undefined) {
+          const start = new vscode.Position(location.startLine, 0)
+          const endLine = Math.min(
+            location.endLine ?? location.startLine,
+            Math.max(0, doc.lineCount - 1)
+          )
+          const end = doc.lineAt(endLine).range.end
+          editor.selection = new vscode.Selection(start, end)
+          editor.revealRange(
+            new vscode.Range(start, end),
+            vscode.TextEditorRevealType.InCenter
+          )
+        }
       } catch (error) {
         console.error(`Error opening file ${filePath}:`, error)
 

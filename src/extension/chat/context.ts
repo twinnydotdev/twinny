@@ -14,6 +14,7 @@ import {
 } from "../../common/constants"
 import { CodeLanguageDetails } from "../../common/languages"
 import { logger } from "../../common/logger"
+import { WorkspaceSearchReport } from "../../common/messaging/protocol"
 import {
   AnyContextItem,
   MentionType,
@@ -112,27 +113,73 @@ export class ChatContextBuilder {
   /**
    * What the index has to say about the message. Runs for `@workspace`, or
    * for every message when the user turned that on in the embeddings tab.
-   * Nothing when there is no index yet, so the toggle is safe to leave on.
+   * Nothing when there is no index yet, so the toggle is safe to leave on;
+   * an explicit `@workspace` with no index is told so in the chat.
+   *
+   * Every stage is reported to the webview, which shows the search under
+   * the reply as it happens and keeps the sources with the message.
    */
   private async workspaceContext(text?: string): Promise<string | null> {
-    if (!text || !this._search?.available) return null
+    if (!text) return null
     const mentioned = text.includes("@workspace")
     const automatic = this.globalSetting<boolean>(
       EXTENSION_CONTEXT_NAME.twinnyWorkspaceAutoContext
     )
     if (!mentioned && !automatic) return null
 
-    updateLoadingMessage(this._bridge, "Searching the workspace")
     const query = text.replace(/@(workspace|problems|git|terminal)\b/g, " ").trim()
-    const hits = await this._search.search(query, {
+    const threshold =
+      Number(this.globalSetting(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)) ||
+      DEFAULT_RERANK_THRESHOLD
+    const report: WorkspaceSearchReport = {
+      stage: "unavailable",
+      query,
+      threshold,
+      hits: [],
+      nearMisses: []
+    }
+    const send = () => this._bridge.emit(EVENT_NAME.twinnyWorkspaceSearch, { ...report })
+
+    if (!this._search?.available) {
+      if (mentioned) send()
+      return null
+    }
+
+    updateLoadingMessage(this._bridge, "Searching the workspace")
+    const startedAt = Date.now()
+    const result = await this._search.searchDetailed(query, {
       limit:
         Number(this.globalSetting(EXTENSION_CONTEXT_NAME.twinnyRelevantCodeSnippets)) ||
         DEFAULT_RELEVANT_CODE_COUNT,
-      threshold:
-        Number(this.globalSetting(EXTENSION_CONTEXT_NAME.twinnyRerankThreshold)) ||
-        DEFAULT_RERANK_THRESHOLD,
-      maxChars: DEFAULT_WORKSPACE_CONTEXT_CHARS
+      threshold,
+      maxChars: DEFAULT_WORKSPACE_CONTEXT_CHARS,
+      onProgress: (progress) => {
+        report.stage = progress.stage
+        if (progress.stage === "reranking") report.candidates = progress.candidates
+        send()
+      }
     })
+
+    report.stage = result.hits.length ? "done" : "empty"
+    report.candidates = result.candidates
+    report.elapsedMs = Date.now() - startedAt
+    report.note = result.note
+    report.hits = result.hits.map((hit) => ({
+      path: workspace.asRelativePath(hit.file),
+      startLine: hit.startLine,
+      endLine: hit.endLine,
+      score: hit.score,
+      content: hit.content
+    }))
+    report.nearMisses = result.nearMisses.map((hit) => ({
+      path: workspace.asRelativePath(hit.file),
+      startLine: hit.startLine,
+      endLine: hit.endLine,
+      score: hit.score
+    }))
+    send()
+
+    const { hits } = result
     if (!hits.length) return null
 
     logger.log(

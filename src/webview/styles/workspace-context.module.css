@@ -1,0 +1,413 @@
+/*
+ * The workspace search behind a reply. One quiet line under the "twinny"
+ * label; the sources unfold beneath it on request. Same idiom as the
+ * thinking section: a left rule, small tracked type, nothing boxed.
+ */
+.panel {
+  position: relative;
+  margin: -2px 0 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--tw-rule);
+  font-size: var(--tw-fs-sm);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg-faint);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  line-height: 18px;
+  text-align: left;
+  text-transform: lowercase;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+
+.header:disabled {
+  cursor: default;
+}
+
+.header:not(:disabled):hover,
+.header:focus-visible {
+  color: var(--tw-fg-dim);
+  outline: none;
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.glyph .codicon {
+  font-size: 12px !important;
+  opacity: 0.8;
+}
+
+.label {
+  flex-shrink: 0;
+}
+
+.summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: none;
+}
+
+.panelBusy .summary {
+  color: var(--tw-fg-dim);
+}
+
+.elapsed {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.chevron {
+  flex-shrink: 0;
+  font-size: 12px !important;
+  opacity: 0.7;
+}
+
+/*
+ * A braille spinner: the terminal's own way of saying "working". The glyph
+ * is swapped by a stepped animation on generated content.
+ */
+.spinner::before {
+  content: "⠋";
+  display: inline-block;
+  color: var(--tw-cursor);
+  font-family: var(--tw-font);
+  font-size: 12px;
+  line-height: 1;
+  animation: braille 0.8s steps(1, end) infinite;
+}
+
+@keyframes braille {
+  0% { content: "⠋"; }
+  10% { content: "⠙"; }
+  20% { content: "⠹"; }
+  30% { content: "⠸"; }
+  40% { content: "⠼"; }
+  50% { content: "⠴"; }
+  60% { content: "⠦"; }
+  70% { content: "⠧"; }
+  80% { content: "⠇"; }
+  90% { content: "⠏"; }
+}
+
+/*
+ * A hairline that sweeps while the search runs: the indeterminate bar,
+ * one pixel tall so it reads as activity rather than as chrome.
+ */
+.sweep {
+  display: block;
+  height: 1px;
+  margin-top: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--tw-accent) 50%,
+    transparent 100%
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.panelBusy .sweep {
+  opacity: 0.8;
+  animation: sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+
+.body {
+  margin-top: 6px;
+  animation: unfold 0.18s ease-out;
+}
+
+@keyframes unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+/*
+ * `.panel` is repeated on the list and the paragraphs so these rules win
+ * over the transcript's markdown styling (`.message ul`, `.message p`).
+ */
+.panel .note,
+.panel .hint,
+.panel .missTitle {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+}
+
+.note .codicon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 12px !important;
+  color: var(--vscode-editorWarning-foreground, var(--tw-fg-dim));
+}
+
+.panel .missTitle {
+  margin-top: 2px;
+  letter-spacing: var(--tw-track);
+  text-transform: lowercase;
+}
+
+.panel .hint {
+  margin: 6px 0 0;
+  color: var(--tw-fg-faint);
+}
+
+.panel .hits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel .hit {
+  position: relative;
+  margin: 0;
+  min-width: 0;
+}
+
+.panel .hit::before {
+  content: none;
+}
+
+/* The header row is a button so it is keyboard-reachable; styled as text. */
+.hitHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-sm);
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.hitHeader:hover,
+.hitHeader:focus-visible {
+  color: var(--tw-fg);
+  outline: none;
+}
+
+.hitHeader:hover .hitName,
+.hitHeader:focus-visible .hitName {
+  color: var(--tw-link);
+  border-bottom-color: var(--tw-link-soft, var(--tw-link));
+}
+
+.hitPath {
+  flex: 1 1 auto;
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/*
+ * The directory gives way first; the file name is what matters. A
+ * right-to-left box clips from the start, so the ellipsis lands on the
+ * left; the `<bdi>` inside keeps the path itself reading left-to-right.
+ */
+.hitDir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--tw-fg-faint);
+  direction: rtl;
+  text-align: left;
+}
+
+.hitName {
+  flex-shrink: 0;
+  color: var(--tw-fg);
+  border-bottom: 1px solid transparent;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.hitBest .hitName {
+  font-weight: 600;
+}
+
+.hitLines {
+  flex-shrink: 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tw-track);
+}
+
+.score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: var(--tw-fs-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tw-track);
+}
+
+.meter {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 3px;
+  background: var(--tw-rule);
+  overflow: hidden;
+}
+
+.meterFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--tw-accent);
+  transform-origin: left;
+  animation: fill 0.5s ease-out;
+}
+
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.scoreValue {
+  min-width: 3ch;
+  text-align: right;
+}
+
+.score-high .scoreValue {
+  color: var(--tw-fg);
+}
+
+.score-mid .scoreValue {
+  color: var(--tw-fg-dim);
+}
+
+.score-low .scoreValue {
+  color: var(--tw-fg-faint);
+}
+
+.score-low .meterFill {
+  opacity: 0.45;
+}
+
+.score-mid .meterFill {
+  opacity: 0.7;
+}
+
+/* A near miss is deliberately quieter than a hit. */
+.miss .hitName {
+  color: var(--tw-fg-dim);
+  font-weight: 400;
+}
+
+/*
+ * The chunk itself: a few lines, faint, no wrapping. Each line is its own
+ * element so a long line clips with an ellipsis instead of scrolling.
+ */
+.preview {
+  display: flex;
+  flex-direction: column;
+  margin: 3px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 1px solid var(--tw-rule-soft);
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+.previewLine {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.previewOpen {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.more {
+  margin: 2px 0 0 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg-faint);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: lowercase;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.more:hover,
+.more:focus-visible {
+  color: var(--tw-fg-dim);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner::before {
+    content: "⠿";
+    animation: none;
+  }
+
+  .panelBusy .sweep {
+    animation: none;
+    background: var(--tw-accent);
+    background-size: 100% 100%;
+    opacity: 0.4;
+  }
+
+  .body,
+  .meterFill {
+    animation: none;
+  }
+}

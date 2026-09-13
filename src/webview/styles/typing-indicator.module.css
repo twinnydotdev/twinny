@@ -1,13 +1,23 @@
 .pending {
+  padding: 12px var(--tw-pad) 14px calc(var(--tw-pad) + var(--tw-gutter));
+  user-select: none;
+}
+
+.label {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px var(--tw-pad) 14px calc(var(--tw-pad) + var(--tw-gutter));
+  min-height: 18px;
   color: var(--tw-fg-faint);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
   text-transform: lowercase;
-  user-select: none;
+}
+
+/* Same offset the message header leaves before its content. */
+.context {
+  margin-top: 8px;
+  user-select: text;
 }
 
 /* A blinking block cursor: the terminal's own "working" signal. */

@@ -43,7 +43,8 @@ export const EVENT_NAME = {
   twinnyStopGeneration: "twinny-stop-generation",
   twinnySymbolSearch: "twinny-symbol-search",
   twinnyTextSelection: "twinny-text-selection",
-  twinnyUpdateContextItems: "twinny-update-context-items"
+  twinnyUpdateContextItems: "twinny-update-context-items",
+  twinnyWorkspaceSearch: "twinny-workspace-search"
 } as const
 
 export const CONVERSATION_EVENT_NAME = {

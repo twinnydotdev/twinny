@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm"
 import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
+import { WorkspaceSearchReport } from "../common/messaging/protocol"
 import { ChatCompletionMessage, ImageAttachment, MentionType, ThemeType } from "../common/types"
 
 import { useSuggestion } from "./hooks/useSuggestion"
@@ -19,12 +20,18 @@ import { MentionExtension } from "./mention-extention"
 import { emit } from "./messaging"
 import { useToast } from "./toast"
 import { getThinkingMessage } from "./utils"
+import WorkspaceContext from "./workspace-context"
 
 import styles from "./styles/message.module.css"
 
 interface MessageProps {
   index?: number
   isAssistant?: boolean
+  /**
+   * The workspace search behind a reply still streaming. A finished reply
+   * carries its own in `message.context`.
+   */
+  context?: WorkspaceSearchReport
   isLoading?: boolean
   message?: ChatCompletionMessage
   messages?: ChatCompletionMessage[]
@@ -119,6 +126,7 @@ const ThinkingSection = React.memo(
 export const Message: React.FC<MessageProps> = ({
   index = 0,
   isAssistant,
+  context,
   isLoading,
   message,
   onDelete,
@@ -507,6 +515,9 @@ export const Message: React.FC<MessageProps> = ({
           )}
         </div>
       </div>
+      {message.role === ASSISTANT && (
+        <WorkspaceContext report={message.context ?? context} />
+      )}
       {editing ? (
         <EditorContent className={styles.tiptap} editor={editor} />
       ) : message.role === ASSISTANT ? (

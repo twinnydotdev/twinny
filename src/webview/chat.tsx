@@ -10,7 +10,7 @@ import * as cheerio from "cheerio"
 import cx from "classnames"
 import { v4 as uuidv4 } from "uuid"
 
-import { EVENT_NAME, USER } from "../common/constants"
+import { ASSISTANT, EVENT_NAME, USER } from "../common/constants"
 import {
   AnyContextItem,
   ChatCompletionMessage,
@@ -25,6 +25,7 @@ import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
 import { useTheme } from "./hooks/useTheme"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
+import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch"
 import { ProviderSelect } from "./providers/provider-select"
 import { EmptyChat } from "./empty-chat"
 import { createCustomImageExtension } from "./image-extension"
@@ -61,6 +62,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { contextItems, removeContextItem } = useWorkspaceContext()
+  const {
+    report: searchReport,
+    clear: clearSearchReport,
+    take: takeSearchReport
+  } = useWorkspaceSearch()
   const [isBottom, setIsBottom] = useState(false)
 
   const { conversation, saveLastConversation, setActiveConversation } =
@@ -74,12 +80,22 @@ export const Chat = (props: ChatProps): JSX.Element => {
     return stored > 0 ? stored : null
   })
 
-  const handleAddMessage = (incoming: ChatCompletionMessage | undefined) => {
-    if (!incoming) {
+  const handleAddMessage = (added: ChatCompletionMessage | undefined) => {
+    if (!added) {
       setCompletion(null)
       setIsLoading(false)
       generatingRef.current = false
       return
+    }
+
+    // A reply keeps the workspace search that fed it, so the sources stay
+    // with the message once it is saved. A new user turn starts afresh.
+    let incoming = added
+    if (added.role === ASSISTANT) {
+      const context = takeSearchReport()
+      if (context) incoming = { ...added, context }
+    } else {
+      clearSearchReport()
     }
 
     setMessages((prev) => {
@@ -127,6 +143,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   useServerEvent(EVENT_NAME.twinnyNewConversation, () => {
     setMessages([])
     setCompletion(null)
+    clearSearchReport()
     setActiveConversation({
       id: uuidv4(),
       title: t("chat-new-conversation-title"),
@@ -160,6 +177,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   ): void => {
     generatingRef.current = true
     setIsLoading(true)
+    clearSearchReport()
     setMessages((prev) => {
       if (!prev) return prev
       const updatedMessages = prev.slice(0, index)
@@ -201,6 +219,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   ): void => {
     generatingRef.current = true
     setIsLoading(true)
+    clearSearchReport()
     setMessages((prev) => {
       if (!prev) return prev
 
@@ -268,6 +287,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     const mentions = getMentions()
 
     setIsLoading(true)
+    clearSearchReport()
     clearEditor()
 
     const conversationId = conversation?.id || uuidv4()
@@ -300,7 +320,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       return updatedMessages
     })
-  }, [conversation?.id, t, chatDisabled])
+  }, [conversation?.id, t, chatDisabled, clearSearchReport])
 
   const handleNewConversation = useCallback(() => {
     setActiveConversation({
@@ -596,6 +616,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       <MessageItem
         key={`message-list-${index}`}
         completion={completion}
+        context={searchReport}
         generatingRef={generatingRef}
         handleDeleteImage={handleDeleteImage}
         handleDeleteMessage={handleDeleteMessage}
@@ -615,6 +636,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       isLoading,
       messages,
       completion,
+      searchReport,
       theme,
       generatingRef
     ]

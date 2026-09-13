@@ -3,6 +3,7 @@ import { ChatCompletionMessageParam } from "fluency.js"
 import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
 import { InlineCompletionItem, InlineCompletionList } from "vscode"
 
+import type { WorkspaceSearchReport } from "./messaging/protocol"
 import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
 
@@ -110,6 +111,12 @@ export interface ImageAttachment {
 export type ChatCompletionMessage = ChatCompletionMessageParam & {
   id?: string
   images?: ImageAttachment[] | string[]
+  /**
+   * The workspace chunks that were searched out for this reply, kept with
+   * the message so a saved conversation still shows its sources. Never
+   * sent to the model: `toApiMessage` builds the API shape from scratch.
+   */
+  context?: WorkspaceSearchReport
 }
 
 // Only real API parameters: these are forwarded to the provider verbatim.

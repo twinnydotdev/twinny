@@ -33,6 +33,13 @@ export interface Channel<Payload = void, Reply = never> {
   reply: Reply
 }
 
+/** A file to open, optionally scrolled to a range (zero-based, inclusive). */
+export interface FileLocation {
+  path: string
+  startLine?: number
+  endLine?: number
+}
+
 /** Reading and writing a value in one of the extension's storage scopes. */
 export interface ContextValue<T = unknown> {
   key: string
@@ -94,6 +101,60 @@ export interface EmbeddingStatus {
 }
 
 /** Live progress of an index run, pushed as files are processed. */
+/** One chunk the workspace search handed to the model, as the chat shows it. */
+export interface WorkspaceHitSummary {
+  /** Workspace-relative path. */
+  path: string
+  /** Zero-based, inclusive. */
+  startLine: number
+  endLine: number
+  /** Reranker probability that the chunk answers the question, 0..1. */
+  score: number
+  /** The chunk itself, so the chat can show it without another round trip. */
+  content: string
+}
+
+/** A candidate that was scored but fell under the threshold. */
+export interface WorkspaceNearMiss {
+  path: string
+  startLine: number
+  endLine: number
+  score: number
+}
+
+export type WorkspaceSearchStage =
+  /** `@workspace` was asked for but there is no index to search. */
+  | "unavailable"
+  | "embedding"
+  | "retrieving"
+  | "reranking"
+  /** Finished with at least one hit. */
+  | "done"
+  /** Finished; nothing scored above the threshold. */
+  | "empty"
+
+/**
+ * What the workspace search is doing for the message being answered, and
+ * what it found. Pushed once per stage so the chat can narrate the search
+ * as it runs, then kept with the reply so the sources stay visible.
+ */
+export interface WorkspaceSearchReport {
+  stage: WorkspaceSearchStage
+  /** The question as searched, mentions stripped. */
+  query: string
+  /** Minimum reranker score a chunk needed. */
+  threshold: number
+  /** Fused candidates that went to the reranker, once known. */
+  candidates?: number
+  hits: WorkspaceHitSummary[]
+  /** The best candidates that did not make the cut, highest first. */
+  nearMisses: WorkspaceNearMiss[]
+  /** Set once the search is over. */
+  elapsedMs?: number
+  /** Something worth telling the user: the embedding server was down, etc. */
+  note?: string
+}
+
 export interface EmbeddingProgress {
   running: boolean
   phase: "scanning" | "embedding" | "finishing"
@@ -229,7 +290,7 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyNewConversation]: Channel
   [EVENT_NAME.twinnyNewDocument]: Channel<string>
   [EVENT_NAME.twinnyNotification]: Channel<string>
-  [EVENT_NAME.twinnyOpenFile]: Channel<string>
+  [EVENT_NAME.twinnyOpenFile]: Channel<string | FileLocation>
   [EVENT_NAME.twinnyOpenProviders]: Channel
   [EVENT_NAME.twinnyRemoveContextItem]: Channel<string>
   [EVENT_NAME.twinnySendLanguage]: Channel<void, LanguageType>
@@ -327,6 +388,7 @@ export interface ServerEvents {
   [EVENT_NAME.twinnyStopGeneration]: void
   [EVENT_NAME.twinnyTextSelection]: string
   [EVENT_NAME.twinnyUpdateContextItems]: AnyContextItem[]
+  [EVENT_NAME.twinnyWorkspaceSearch]: WorkspaceSearchReport
 
   [CONVERSATION_EVENT_NAME.getConversations]: Record<string, Conversation>
   [CONVERSATION_EVENT_NAME.setActiveConversation]: Conversation | undefined
