@@ -85,7 +85,7 @@ export class BaseProvider {
     this.initializeServices(this.bridge)
     this.registerHandlers(this.bridge)
     this.registerEditorListeners(this.bridge)
-    logger.log("Webview registered successfully")
+    logger.info("Webview registered successfully")
   }
 
   public dispose() {
@@ -135,7 +135,7 @@ export class BaseProvider {
     )
     new FileHandler(bridge)
 
-    logger.log("Provider services initialized successfully")
+    logger.info("Provider services initialized successfully")
   }
 
   /**

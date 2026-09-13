@@ -161,7 +161,7 @@ export class P2pGateway {
       server.listen(0, "127.0.0.1", () => {
         server.removeListener("error", reject)
         this._port = (server.address() as AddressInfo).port
-        logger.log(`p2p gateway listening on 127.0.0.1:${this._port}`)
+        logger.info(`p2p gateway listening on 127.0.0.1:${this._port}`)
         resolve(this._port)
       })
     })

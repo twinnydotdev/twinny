@@ -242,7 +242,7 @@ export class InlineEditService extends Base {
     await region.render(layout)
     editor.revealRange(region.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport)
     this.present()
-    logger.log(`Applied chat code ${how} in ${vscode.workspace.asRelativePath(document.uri)}`)
+    logger.info(`Applied chat code ${how} in ${vscode.workspace.asRelativePath(document.uri)}`)
   }
 
   /**
@@ -591,7 +591,7 @@ export class InlineEditService extends Base {
     let reply = ""
 
     try {
-      logger.log(
+      logger.info(
         `Inline ${what} request (${provider.modelName}): ${generation.describe}`
       )
 
@@ -631,7 +631,7 @@ export class InlineEditService extends Base {
       }
 
       const final = generation.finalize(reply)
-      logger.log(`Inline ${what} response: ${final.length} chars`)
+      logger.info(`Inline ${what} response: ${final.length} chars`)
       const nothing =
         what === "edit" ? "no changes suggested" : `no ${what} written`
       if (final === proposed) {

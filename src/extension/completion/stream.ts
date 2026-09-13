@@ -25,6 +25,19 @@ export interface StreamDecision {
   text: string
 }
 
+/** Why a completion ended, for the log. */
+export type StopReason =
+  | "stop word"
+  | "only whitespace"
+  | "misread hole"
+  | "single line"
+  | "blank line after block"
+  | "reached suffix"
+  | "dedent"
+  | "closed block"
+  | "max lines"
+  | "model stopped"
+
 const leadingWhitespace = (line: string) => line.length - line.trimStart().length
 
 const isCloserOnly = (line: string) =>
@@ -76,6 +89,8 @@ export class CompletionStream {
   private lineCount = 0
   private seenContent = false
   private finished = false
+  /** Set once the completion ends; "model stopped" when the stream ran dry. */
+  public stoppedBy: StopReason | "" = ""
   private readonly baseIndent: number
   private readonly blockIndent: number
   private readonly cursorLineHasContent: boolean
@@ -105,13 +120,13 @@ export class CompletionStream {
     if (this.finished) return { done: true, text: this.text }
     this.text += chunk
 
-    if (this.cutAtStopWord()) return this.stop(this.text)
+    if (this.cutAtStopWord()) return this.stop(this.text, "stop word")
 
     if (
       this.text.length > FIM_MAX_EMPTY_COMPLETION_CHARS &&
       this.text.trim().length === 0
     ) {
-      return this.stop("")
+      return this.stop("", "only whitespace")
     }
 
     let newline = this.text.indexOf("\n", this.judgedUpTo)
@@ -128,16 +143,17 @@ export class CompletionStream {
   /** The stream ended on its own; judge the trailing partial line. */
   finish(): string {
     if (this.finished) return this.text
-    this.cutAtStopWord()
+    const cut = this.cutAtStopWord()
     if (this.judgedUpTo < this.text.length) {
       const decision = this.judgeLine(this.judgedUpTo, this.text.length)
       if (decision) return decision.text
     }
-    return this.stop(this.text).text
+    return this.stop(this.text, cut ? "stop word" : "model stopped").text
   }
 
-  private stop(text: string): StreamDecision {
+  private stop(text: string, reason: StopReason): StreamDecision {
     this.finished = true
+    this.stoppedBy = reason
     this.text = text
     return { done: true, text }
   }
@@ -167,16 +183,18 @@ export class CompletionStream {
     // With code after the cursor on this line, a completion that starts on
     // the next line would tear the line apart: the model has misread the hole.
     if (isFirstLine && blank && this.options.textAfterCursor.trim()) {
-      return this.stop("")
+      return this.stop("", "misread hole")
     }
 
     if (!this.options.multiline) {
-      if (this.seenContent || !blank) return this.stop(this.text.slice(0, end))
+      if (this.seenContent || !blank) {
+        return this.stop(this.text.slice(0, end), "single line")
+      }
       return undefined
     }
 
     if (!isFirstLine && blank && this.seenContent && this.depth <= 0) {
-      return this.stop(before)
+      return this.stop(before, "blank line after block")
     }
 
     // The model has reached what already follows the cursor.
@@ -186,7 +204,7 @@ export class CompletionStream {
       this.options.suffixFirstLine.length > 1 &&
       line.trim() === this.options.suffixFirstLine
     ) {
-      return this.stop(before)
+      return this.stop(before, "reached suffix")
     }
 
     if (!isFirstLine && !blank) {
@@ -200,9 +218,9 @@ export class CompletionStream {
           this.options.suffixFirstLine.length > 0 &&
           line.trim() === this.options.suffixFirstLine
         if (closesCursorLine && !duplicatesSuffix) {
-          return this.stop(this.text.slice(0, end))
+          return this.stop(this.text.slice(0, end), "closed block")
         }
-        return this.stop(before)
+        return this.stop(before, "dedent")
       }
     }
 
@@ -213,12 +231,15 @@ export class CompletionStream {
       const duplicatesSuffix =
         this.options.suffixFirstLine.length > 0 &&
         this.options.suffixFirstLine.startsWith(line.trim().charAt(0))
-      return this.stop(duplicatesSuffix ? before : this.text.slice(0, end))
+      return this.stop(
+        duplicatesSuffix ? before : this.text.slice(0, end),
+        "closed block"
+      )
     }
 
     this.lineCount++
     if (this.lineCount >= this.options.maxLines) {
-      return this.stop(this.text.slice(0, end))
+      return this.stop(this.text.slice(0, end), "max lines")
     }
 
     return undefined

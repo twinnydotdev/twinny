@@ -3,6 +3,7 @@ import { Position } from "vscode"
 import Parser, { SyntaxNode } from "web-tree-sitter"
 
 import { WASM_LANGUAGES } from "../../common/constants"
+import { assetPath } from "../context"
 
 const parserCache: { [language: string]: Parser } = {}
 
@@ -27,8 +28,8 @@ export const getParser = async (
     }
 
     const parser = new Parser()
-    const wasmPath = path.join(
-      __dirname,
+    const wasmPath = assetPath(
+      "out",
       "tree-sitter-wasms",
       `tree-sitter-${language}.wasm`
     )

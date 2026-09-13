@@ -108,6 +108,7 @@ export { Hit }
  *    cut to a character budget so the prompt stays a prompt.
  */
 export class WorkspaceSearch {
+  private readonly _reportedParseErrors = new Set<string>()
   constructor(
     private readonly _db: EmbeddingDatabase,
     private readonly _embedder: Embedder,
@@ -281,7 +282,12 @@ export class WorkspaceSearch {
     try {
       return await this._parse(file, text)
     } catch (error) {
-      logger.error(`Could not parse ${file} to widen hits: ${error}`)
+      // One missing grammar fails every file of that language; say it once.
+      const message = error instanceof Error ? error.message : String(error)
+      if (!this._reportedParseErrors.has(message)) {
+        this._reportedParseErrors.add(message)
+        logger.warn(`Could not parse ${file} to widen hits (hits stay as chunks): ${message}`)
+      }
       return undefined
     }
   }

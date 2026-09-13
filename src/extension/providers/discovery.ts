@@ -72,7 +72,7 @@ export const discoverLocalServers = async (
   const found = dedupeServers(
     results.filter((server): server is DiscoveredServer => !!server)
   )
-  logger.log(
+  logger.info(
     found.length
       ? `Found local model servers: ${found
           .map((s) => `${s.label} (${s.models.length} models)`)

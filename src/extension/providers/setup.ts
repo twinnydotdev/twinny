@@ -66,7 +66,7 @@ async function run(context: ExtensionContext, store: ProviderStore) {
   if (servers.length > 0) {
     const server = servers[0]
     const providers = await applyDiscoveredServer(store, server)
-    logger.log(`Set up ${listJobs(providers)} from ${describeServer(server)}`)
+    logger.info(`Set up ${listJobs(providers)} from ${describeServer(server)}`)
     void window
       .showInformationMessage(
         `Twinny found ${describeServer(server)} and set it up for ${listJobs(

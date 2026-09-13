@@ -4,6 +4,7 @@ import * as path from "path"
 import { Worker } from "worker_threads"
 
 import { logger } from "../../common/logger"
+import { assetPath } from "../context"
 
 import { RerankReply, RerankRequest, RerankWorkerData } from "./rerank-worker"
 
@@ -35,7 +36,7 @@ export class Reranker {
   private _nextId = 1
   private _broken = false
 
-  constructor(modelDir = path.join(__dirname, "..", "models")) {
+  constructor(modelDir = assetPath("models")) {
     this._data = {
       modelPath: path.join(modelDir, "reranker.onnx"),
       tokenizerPath: path.join(modelDir, "spm.model"),
@@ -47,6 +48,7 @@ export class Reranker {
   /** Where the worker bundle lives: next to this file in the bundle, or under the tsc tree. */
   private static findScript(): string | undefined {
     return [
+      assetPath("out", "rerank-worker.js"),
       path.join(__dirname, "rerank-worker.js"),
       path.join(__dirname, "extension", "embeddings", "rerank-worker.js")
     ].find((candidate) => fs.existsSync(candidate))
@@ -56,6 +58,7 @@ export class Reranker {
   private static findWasmDir(): string {
     return (
       [
+        assetPath("out"),
         __dirname,
         path.join(__dirname, "..", ".."),
         path.join(__dirname, "..", "..", "..", "node_modules", "onnxruntime-web", "dist")
@@ -124,9 +127,12 @@ export class Reranker {
       worker.on("message", (reply: RerankReply) => {
         if ("ready" in reply) {
           if (reply.ready) {
-            logger.log(`Reranker worker ready in ${Date.now() - startedAt}ms`)
+            logger.info(`Reranker worker ready in ${Date.now() - startedAt}ms`)
           } else {
-            logger.error(`Reranker unavailable, results keep retrieval order: ${reply.error}`)
+            // Every worker in the pool fails the same way; say it once.
+            if (!this._broken) {
+              logger.warn(`Reranker unavailable, results keep retrieval order: ${reply.error}`)
+            }
             this._broken = true
           }
           resolve(reply.ready)

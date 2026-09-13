@@ -12,13 +12,16 @@ import {
 import * as vscode from "vscode"
 
 import {
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
+  ACTIVE_FIM_PROVIDER_STORAGE_KEY,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_NAME,
   TWINNY_COMMAND_NAME,
   WEBUI_TABS
 } from "./common/constants"
-import { logger } from "./common/logger"
+import { formatMs, logger } from "./common/logger"
 import { getLineBreakCount } from "./common/text"
 import { ContextItem, SelectionContextItem } from "./common/types"
 import { FileInteractionCache } from "./extension/completion/file-interaction"
@@ -29,6 +32,8 @@ import { InlineEditCodeLensProvider } from "./extension/edit/code-lens"
 import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
 import { WorkspaceIndex } from "./extension/embeddings"
 import { P2pRuntime } from "./extension/p2p/runtime"
+import { providerUrl } from "./extension/providers/errors"
+import { TwinnyProvider } from "./extension/providers/manager"
 import { setUpProvidersOnFirstRun } from "./extension/providers/setup"
 import { ProviderStore } from "./extension/providers/store"
 import { generateCommitMessage } from "./extension/review/commit-message"
@@ -87,6 +92,11 @@ async function showStatusBarMenu(statusBar: TwinnyStatusBar) {
       {
         label: "$(gear) Settings",
         action: "settings"
+      },
+      {
+        label: "$(output) Show logs",
+        description: "Requests, timings and errors in the Output panel",
+        action: "logs"
       }
     ],
     { title: "Twinny", placeHolder: "What would you like to do?" }
@@ -112,7 +122,29 @@ async function showStatusBarMenu(statusBar: TwinnyStatusBar) {
     case "settings":
       await commands.executeCommand(TWINNY_COMMAND_NAME.settings)
       break
+    case "logs":
+      logger.show()
+      break
   }
+}
+
+/** `codellama:7b-code via Ollama at http://localhost:11434/api/generate`. */
+const describeProvider = (provider: TwinnyProvider | undefined) =>
+  provider
+    ? `${provider.modelName} via ${provider.label} at ${providerUrl(provider) || "(no address)"}`
+    : "none"
+
+/** What a bug report needs first: version, editor, and which models are wired up. */
+const logStartup = (context: ExtensionContext, startedAt: number) => {
+  const version = context.extension.packageJSON.version
+  const read = (key: string) => context.globalState.get<TwinnyProvider>(key)
+  logger.info(
+    `Twinny ${version} ready in ${formatMs(Date.now() - startedAt)} · ` +
+      `VS Code ${vscode.version} · ${os.platform()} ${os.release()}`
+  )
+  logger.info(`  completions: ${describeProvider(read(ACTIVE_FIM_PROVIDER_STORAGE_KEY))}`)
+  logger.info(`  chat:        ${describeProvider(read(ACTIVE_CHAT_PROVIDER_STORAGE_KEY))}`)
+  logger.info(`  embeddings:  ${describeProvider(read(ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY))}`)
 }
 
 export async function activate(context: ExtensionContext) {
@@ -122,7 +154,7 @@ export async function activate(context: ExtensionContext) {
     context
   )
 
-  logger.log("Twinny extension starting")
+  const startedAt = Date.now()
   const templateDir = path.join(os.homedir(), ".twinny/templates") as string
   const templateProvider = new TemplateProvider(templateDir)
   const fileInteractionCache = new FileInteractionCache()
@@ -194,8 +226,10 @@ export async function activate(context: ExtensionContext) {
     statusBar,
     p2p,
     fileInteractionCache,
+    completionProvider,
     inlineEdit,
     terminalHistory,
+    commands.registerCommand(TWINNY_COMMAND_NAME.showLogs, () => logger.show()),
     commands.registerCommand(TWINNY_COMMAND_NAME.terminalCommand, async () => {
       const chat = await requireChat()
       if (chat) await runDescribedCommand(chat, terminalHistory)
@@ -488,11 +522,12 @@ export async function activate(context: ExtensionContext) {
   )
 
   statusBar.refresh()
-  void providerSetup.then(() => statusBar.refresh())
-
-  logger.log("Twinny extension activation complete")
+  void providerSetup.then(() => {
+    statusBar.refresh()
+    logStartup(context, startedAt)
+  })
 }
 
 export function deactivate() {
-  logger.log("Twinny extension deactivated")
+  logger.info("Twinny deactivated")
 }

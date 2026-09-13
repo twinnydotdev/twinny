@@ -31,5 +31,6 @@ export const TWINNY_COMMAND_NAME = {
   addSelectionToContext: "twinny.addSelectionToContext",
   shareOllama: "twinny.shareOllama",
   terminalCommand: "twinny.terminalCommand",
-  fixTerminalError: "twinny.fixTerminalError"
+  fixTerminalError: "twinny.fixTerminalError",
+  showLogs: "twinny.showLogs"
 }

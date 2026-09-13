@@ -24,9 +24,7 @@ import {
   TWINNY
 } from "../common/constants"
 import { supportedLanguages } from "../common/languages"
-import { logger } from "../common/logger"
 import {
-  ChatCompletionMessage,
   LanguageType,
   PrefixSuffix,
   StreamResponse,
@@ -420,42 +418,6 @@ export function readGitIgnoreFile(): string[] | undefined {
     console.error("Error reading .gitignore file:", e)
     return undefined
   }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const logStreamOptions = (opts: any) => {
-  const hostname = opts.options?.hostname ?? "unknown"
-  const port = opts.options?.port ?? undefined
-  const body = opts.body ?? {}
-  const options = opts.options ?? {}
-
-  const totalCharacters = calculateTotalCharacters(body.messages)
-
-  const logMessage = `
-    ***Twinny Stream Debug***
-    Streaming response from ${hostname}${port ? `:${port}` : ""}.
-    Request body:
-    ${JSON.stringify(body, null, 2)}
-
-    Request options:
-    ${JSON.stringify(options, null, 2)}
-
-    Number characters in all messages = ${totalCharacters}
-  `.trim()
-
-  logger.log(logMessage)
-}
-
-const calculateTotalCharacters = (
-  messages: ChatCompletionMessage[] | undefined
-): number => {
-  if (!Array.isArray(messages)) {
-    return 0
-  }
-
-  return messages.reduce((acc: number, msg: ChatCompletionMessage) => {
-    return acc + (typeof msg.content === "string" ? msg.content.length : 0)
-  }, 0)
 }
 
 export function notifyKnownErrors(error: Error) {

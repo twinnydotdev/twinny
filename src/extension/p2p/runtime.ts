@@ -268,7 +268,7 @@ export class P2pRuntime implements Disposable {
   private watch(client: P2pClient) {
     client.on(CLIENT_EVENT.dialFailed, (error: Error) => {
       const code = (error as { code?: unknown }).code
-      logger.log(
+      logger.info(
         `p2p dial to ${client.remotePublicKeyHex.slice(0, 8)} failed: ${
           typeof code === "string" && !error.message.startsWith(code) ? `${code}: ` : ""
         }${error.message}`

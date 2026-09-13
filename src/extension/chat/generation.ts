@@ -2,15 +2,30 @@ import { TokenJS } from "fluency.js"
 import { commands } from "vscode"
 
 import { ASSISTANT, EVENT_NAME, EXTENSION_CONTEXT_NAME } from "../../common/constants"
-import { logger } from "../../common/logger"
+import { formatCount, logger } from "../../common/logger"
 import {
+  ChatCompletionMessage,
   CompletionNonStreamingWithId,
   CompletionStreamingWithId,
   TwinnyProvider
 } from "../../common/types"
 import { ExtensionBridge } from "../messaging/bridge"
-import { describeProviderError, isAbortError } from "../providers/errors"
+import { describeProviderError, describeProviderErrorPlain, isAbortError } from "../providers/errors"
 import { TwinnyStatusBar } from "../status-bar"
+
+/** Message content is a string, or text parts alongside images. */
+const contentText = (content: ChatCompletionMessage["content"]): string => {
+  if (typeof content === "string") return content
+  if (!Array.isArray(content)) return ""
+  return content
+    .map((part) =>
+      part.type === "text" ? part.text : `[${part.type}]`
+    )
+    .join("\n")
+}
+
+const contentLength = (content: ChatCompletionMessage["content"]) =>
+  contentText(content).length
 
 /**
  * One chat request from start to finish: the spinner, the stop keybinding's
@@ -53,15 +68,9 @@ export class ChatGeneration {
     if (this._cancelled) return ""
     this.begin()
     let text = prefix
+    const elapsed = this.logRequest(request.messages, provider, "streaming")
 
     try {
-      logger.log(
-        `Chat completion request: ${JSON.stringify({
-          model: request.model,
-          messages: request.messages,
-          stream: true
-        })}`
-      )
       const parts = await client.chat.completions.create(request)
 
       for await (const part of parts) {
@@ -76,7 +85,11 @@ export class ChatGeneration {
       }
 
       const reply = text.trim()
-      logger.log(`Chat completion response (${request.model}): ${reply.length} chars`)
+      logger.info(
+        `Chat ← ${elapsed()} · ${formatCount(reply.length)} chars` +
+          (this._controller?.signal.aborted ? " · stopped by the user" : "")
+      )
+      logger.block("Chat reply", reply)
       if (reply) this.addMessage(reply)
       return reply
     } catch (error) {
@@ -100,9 +113,12 @@ export class ChatGeneration {
   ): Promise<string> {
     if (this._cancelled) return ""
     this.begin()
+    const elapsed = this.logRequest(request.messages, provider, "blocking")
     try {
       const result = await client.chat.completions.create(request)
       const content = `${prefix}${result.choices[0].message.content || ""}`
+      logger.info(`Chat ← ${elapsed()} · ${formatCount(content.length)} chars`)
+      logger.block("Chat reply", content)
       this.addMessage(content)
       return content
     } catch (error) {
@@ -142,10 +158,34 @@ export class ChatGeneration {
     this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
   }
 
+  /**
+   * One line saying what is being sent and to whom; the messages
+   * themselves at debug level. Returns the stopwatch for the reply line.
+   */
+  private logRequest(
+    messages: ChatCompletionMessage[],
+    provider: TwinnyProvider,
+    mode: string
+  ) {
+    const chars = messages.reduce((sum, m) => sum + contentLength(m.content), 0)
+    logger.info(
+      `Chat → ${provider.modelName} (${provider.label}) · ` +
+        `${messages.length} message${messages.length === 1 ? "" : "s"}, ` +
+        `${formatCount(chars)} chars · ${mode}`
+    )
+    logger.block(
+      "Chat messages",
+      messages
+        .map((m) => `[${m.role}]\n${contentText(m.content)}`)
+        .join("\n\n")
+    )
+    return logger.timer()
+  }
+
   /** A stopped request is not an error; anything else gets explained. */
   private report(error: unknown, provider: TwinnyProvider) {
     if (isAbortError(error) || this._cancelled) return
-    logger.error(error instanceof Error ? error : String(error))
+    logger.error(`Chat failed: ${describeProviderErrorPlain(error, provider)}`)
     this.addMessage(describeProviderError(error, provider))
   }
 }

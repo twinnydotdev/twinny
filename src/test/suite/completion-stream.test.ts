@@ -197,3 +197,42 @@ suite("Completion stream", () => {
     assert.strictEqual(stream.finish(), "a")
   })
 })
+
+suite("Completion stream stop reasons", () => {
+  const make = (overrides = {}) =>
+    new CompletionStream({
+      stopWords: ["<EOT>"],
+      multiline: true,
+      maxLines: 3,
+      textBeforeCursor: "",
+      textAfterCursor: "",
+      suffixFirstLine: "",
+      ...overrides
+    })
+
+  test("names why a completion ended", () => {
+    const stopWord = make()
+    stopWord.push("a<EOT>b")
+    assert.strictEqual(stopWord.stoppedBy, "stop word")
+
+    const single = make({ multiline: false })
+    single.push("one\ntwo")
+    assert.strictEqual(single.stoppedBy, "single line")
+
+    const blank = make()
+    blank.push("one\n\nthree")
+    assert.strictEqual(blank.stoppedBy, "blank line after block")
+
+    const max = make()
+    max.push("a\nb\nc\nd\n")
+    assert.strictEqual(max.stoppedBy, "max lines")
+
+    const dry = make()
+    dry.push("a")
+    dry.finish()
+    assert.strictEqual(dry.stoppedBy, "model stopped")
+
+    const idle = make()
+    assert.strictEqual(idle.stoppedBy, "")
+  })
+})

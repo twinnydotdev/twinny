@@ -235,7 +235,7 @@ export class ChatContextBuilder {
     const { hits } = result
     if (!hits.length) return null
 
-    logger.log(
+    logger.info(
       `@workspace: ${hits.length} hits\n${hits
         .map((hit) => `  ${hit.score.toFixed(2)} ${this.describeHit(hit)}`)
         .join("\n")}`

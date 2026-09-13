@@ -59,7 +59,7 @@ export class SidebarProvider extends BaseProvider {
     }
 
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview)
-    logger.log("Sidebar webview view resolved")
+    logger.info("Sidebar webview view resolved")
 
     this.registerWebView(webviewView.webview)
 

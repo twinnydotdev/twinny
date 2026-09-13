@@ -22,7 +22,7 @@ import {
   FIM_TEMPLATE_FORMAT
 } from "../../common/constants"
 import { supportedLanguages } from "../../common/languages"
-import { logger } from "../../common/logger"
+import { formatCount, logger } from "../../common/logger"
 import {
   FimContextFile,
   FimTemplateData,
@@ -30,6 +30,7 @@ import {
   StreamRequestOptions
 } from "../../common/types"
 import { Base } from "../providers/base"
+import { describeProviderErrorPlain } from "../providers/errors"
 import { llm } from "../providers/http"
 import { TwinnyProvider } from "../providers/manager"
 import { TwinnyStatusBar } from "../status-bar"
@@ -54,6 +55,7 @@ import { CompletionFormatter } from "./formatter"
 import { getImportedFiles } from "./imports"
 import { LspContext } from "./lsp-context"
 import { getNodeAtPosition, getParser } from "./parser"
+import { RecentEdits } from "./recent-edits"
 import { createStreamRequestBodyFim } from "./request-body"
 import { CompletionStream } from "./stream"
 
@@ -88,6 +90,7 @@ export class CompletionProvider
   private _fileInteractionCache: FileInteractionCache
   private _lastSuggestion: LastSuggestion | undefined
   private _lspContext = new LspContext()
+  private _recentEdits = new RecentEdits()
   private _requestId = 0
   private _statusBar: TwinnyStatusBar
   private _templateProvider: TemplateProvider
@@ -103,6 +106,11 @@ export class CompletionProvider
     this._statusBar = statusBar
     this._fileInteractionCache = fileInteractionCache
     this._templateProvider = templateProvider
+  }
+
+  public dispose() {
+    super.dispose()
+    this._recentEdits.dispose()
   }
 
   public async provideInlineCompletionItems(
@@ -151,12 +159,16 @@ export class CompletionProvider
       scope
     )
     if (continuation) {
+      logger.debug("FIM served from the previous suggestion (typed through)")
       return this.toInlineCompletion(continuation, position)
     }
 
     if (this.config.get<boolean>("completionCacheEnabled")) {
       const cached = cache.getCache(prefixSuffix, cacheScope)
-      if (cached) return this.toInlineCompletion(cached, position)
+      if (cached) {
+        logger.debug("FIM served from the completion cache")
+        return this.toInlineCompletion(cached, position)
+      }
     }
 
     if (
@@ -211,6 +223,8 @@ export class CompletionProvider
     const { document, position, prefixSuffix, provider, token } = request
 
     this._statusBar.busy()
+    const elapsed = logger.timer()
+    const where = `${workspace.asRelativePath(document.uri)}:${position.line + 1}`
 
     if (this.isStale(request)) return
     const [node, prompt] = await Promise.all([
@@ -221,6 +235,10 @@ export class CompletionProvider
       this.setIdle()
       return
     }
+    logger.info(
+      `FIM #${request.id} → ${provider.modelName} · ${where} · ` +
+        `prompt ${formatCount(prompt.length)} chars`
+    )
 
     const stopWords = getStopWords(provider.modelName, provider.fimTemplate)
     const lineText = document.lineAt(position.line).text
@@ -255,11 +273,15 @@ export class CompletionProvider
         resolve(text)
       }
       const timeout = setTimeout(() => {
-        logger.log(`FIM request ${request.id} timed out`)
+        logger.warn(
+          `FIM #${request.id} gave up after ${FIM_STREAM_TIMEOUT_MS / 1000}s; ` +
+            `keeping the ${stream.value.length} chars received`
+        )
         controller?.abort()
         settle(stream.finish())
       }, FIM_STREAM_TIMEOUT_MS)
       const cancellation = token.onCancellationRequested(() => {
+        logger.debug(`FIM #${request.id} cancelled by the editor after ${elapsed()}`)
         controller?.abort()
         settle("")
       })
@@ -282,11 +304,15 @@ export class CompletionProvider
         },
         onEnd: () => settle(stream.finish()),
         onError: (error) => {
-          logger.error(error)
+          logger.error(
+            `FIM #${request.id} failed: ${describeProviderErrorPlain(error, provider)}`
+          )
           settle("")
         }
       }).catch((error) => {
-        logger.error(error)
+        logger.error(
+          `FIM #${request.id} failed: ${describeProviderErrorPlain(error, provider)}`
+        )
         settle("")
       })
     })
@@ -295,13 +321,24 @@ export class CompletionProvider
       this._abortController = null
     }
 
-    if (this.isStale(request) || !completion) {
+    const outcome = (what: string) =>
+      `FIM #${request.id} ← ${elapsed()} · ${what}` +
+      (stream.stoppedBy ? ` · ended by ${stream.stoppedBy}` : "")
+
+    if (this.isStale(request)) {
+      logger.debug(outcome("dropped, the document moved on"))
+      this.setIdle()
+      return
+    }
+    if (!completion) {
+      logger.info(outcome("nothing usable"))
       this.setIdle()
       return
     }
 
     const editor = window.activeTextEditor
     if (!editor || editor.document !== document) {
+      logger.debug(outcome("dropped, editor changed"))
       this.setIdle()
       return
     }
@@ -310,12 +347,18 @@ export class CompletionProvider
       completion
     )
 
-    logger.log(
-      `FIM request ${request.id} (${document.uri.fsPath})\n` +
-        `  multiline: ${multiline}\n` +
-        `  raw: ${JSON.stringify(completion)}\n` +
-        `  formatted: ${JSON.stringify(formatted)}`
+    const lines = formatted.split("\n").length
+    logger.info(
+      outcome(
+        formatted
+          ? `${formatted.length} chars, ${lines} line${lines === 1 ? "" : "s"}${multiline ? "" : " (single-line mode)"}`
+          : `formatter discarded ${completion.length} chars`
+      )
     )
+    logger.block(`FIM #${request.id} raw`, completion)
+    if (formatted && formatted !== completion) {
+      logger.block(`FIM #${request.id} formatted`, formatted)
+    }
 
     if (!formatted) {
       this.setIdle()
@@ -481,11 +524,25 @@ export class CompletionProvider
         : Promise.resolve("")
     ])
     // Nearest the prefix goes last: what the model reads just before the
-    // hole matters most, so the definitions of the names being used and
-    // the signature at the cursor follow the broader file windows.
+    // hole matters most, so the broader file windows come first, then what
+    // the user just changed, then the definitions of the names being used
+    // and the signature at the cursor.
+    if (this.config.get<boolean>("recentEditsEnabled", true)) {
+      const recent = this._recentEdits.get(document, request.position.line)
+      if (recent) contextFiles.push(recent)
+    }
     contextFiles.push(...definitions)
     if (lspContext) {
       contextFiles.push({ name: "IntelliSense context", text: lspContext })
+    }
+
+    if (contextFiles.length) {
+      logger.debug(
+        `FIM #${request.id} context: ` +
+          contextFiles
+            .map((file) => `${file.name} (${formatCount(file.text.length)})`)
+            .join(", ")
+      )
     }
 
     if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {

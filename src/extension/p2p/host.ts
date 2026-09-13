@@ -177,7 +177,7 @@ export class P2pHost implements Disposable {
       this._node = node
       if (this._trust.list().length === 0) this.openPairing()
       void this.checkOllama()
-      logger.log(`p2p host sharing as ${node.publicKeyHex}`)
+      logger.info(`p2p host sharing as ${node.publicKeyHex}`)
     } catch (error) {
       this._error = error instanceof Error ? error.message : String(error)
       this.releaseLock()
@@ -334,7 +334,7 @@ export class P2pHost implements Disposable {
   }
 
   private listen(node: TwinnyNode) {
-    const log = (message: string) => logger.log(`p2p host: ${message}`)
+    const log = (message: string) => logger.info(`p2p host: ${message}`)
     const refresh = () => this.changed()
     const short = (key: string) => key.slice(0, 8)
     node.on(NODE_EVENT.peerConnected, ({ publicKey, trusted }) => {

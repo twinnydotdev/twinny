@@ -1,68 +1,114 @@
+/**
+ * The "Twinny" output channel.
+ *
+ * Built on VS Code's log channel, so every line carries a timestamp and a
+ * level, and the panel's own level picker (or "Developer: Set Log Level…")
+ * chooses how much to see. Info is the narrative: one line when a request
+ * goes out, one when it comes back, with timings and sizes. Debug adds the
+ * prompts and replies themselves. Warnings and errors are always written;
+ * the `twinny.enableLogging` setting turns everything else off.
+ */
 import * as vscode from "vscode"
+
+/** Text a prompt or reply is cut to in the log. */
+const MAX_BLOCK_CHARS = 8000
+
+/** Keys and headers that must never reach the log. */
+const SECRET_KEY = /("?(?:api[_-]?key|authorization|token|secret|password)"?\s*[:=]\s*)("?)(?!Bearer\b)[^"\s,}&]+/gi
+const BEARER = /Bearer\s+[A-Za-z0-9._~+/=-]+/g
+
+export const redact = (text: string): string =>
+  text
+    .replace(BEARER, "Bearer ***")
+    .replace(SECRET_KEY, (_, key: string, quote: string) => `${key}${quote}***`)
+
+const describe = (error: unknown): string => {
+  if (error instanceof Error) {
+    const cause = (error as Error & { cause?: unknown }).cause
+    const causeText = cause instanceof Error ? ` (${cause.message})` : ""
+    return `${error.message}${causeText}`
+  }
+  return String(error)
+}
+
+/** `1.2s` or `840ms`. */
+export const formatMs = (ms: number): string =>
+  ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`
+
+/** `12.3k` or `840`. */
+export const formatCount = (n: number): string =>
+  n >= 10_000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+
+/** A block cut to size, every line indented so it reads as one entry. */
+const indent = (text: string, max = MAX_BLOCK_CHARS): string => {
+  const cut =
+    text.length > max
+      ? `${text.slice(0, max)}\n… ${formatCount(text.length - max)} more characters`
+      : text
+  return cut
+    .split("\n")
+    .map((line) => `    ${line}`)
+    .join("\n")
+}
 
 export class Logger {
   private static instance: Logger
-  private outputChannel: vscode.OutputChannel
-
-  private static colorCodes: Record<string, number> = {
-    Default: 0,
-    FetchError: 91,
-    Abort: 90,
-    Timeout: 33
-  }
+  private readonly channel: vscode.LogOutputChannel
 
   private constructor() {
-    this.outputChannel = vscode.window.createOutputChannel("Twinny")
+    this.channel = vscode.window.createOutputChannel("Twinny", { log: true })
   }
 
   public static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger()
-    }
+    if (!Logger.instance) Logger.instance = new Logger()
     return Logger.instance
   }
 
-  private isEnabled() {
-    return vscode.workspace.getConfiguration("twinny").get<boolean>("enableLogging", true)
+  private get enabled() {
+    return vscode.workspace
+      .getConfiguration("twinny")
+      .get<boolean>("enableLogging", true)
   }
 
-  public log = (message: string) => {
-    if (!this.isEnabled()) return
-    console.log(`[twinny] ${message}`)
-    this.outputChannel.appendLine(`[INFO] ${message}`)
+  /** Bring the channel into view. */
+  public show() {
+    this.channel.show(true)
   }
 
-  public error = (error: Error | string) => {
-    const errorMessage = error instanceof Error ? error.message : error
-    console.error(`[twinny:ERROR] ${errorMessage}`)
-    this.outputChannel.appendLine(`[ERROR] ${errorMessage}`)
+  public info(message: string) {
+    if (this.enabled) this.channel.info(redact(message))
   }
 
-  public logError(errorType: string, message: string, error: Error | string) {
-    const colorCode = Logger.colorCodes[errorType] || Logger.colorCodes.Default
-    const formattedErrorMessage = this.formatErrorMessage(
-      colorCode,
-      message,
-      error
-    )
-    console.error(formattedErrorMessage)
-
-    const errorName = error instanceof Error ? error.name : "Unknown Error"
-    const errorMessage = error instanceof Error ? error.message : error
-    this.outputChannel.appendLine(`[ERROR_${errorType}] ${message}`)
-    this.outputChannel.appendLine(`  Error Type: ${errorName}`)
-    this.outputChannel.appendLine(`  Error Message: ${errorMessage}`)
+  public warn(message: string) {
+    this.channel.warn(redact(message))
   }
 
-  private formatErrorMessage(
-    colorCode: number,
-    message: string,
-    error: Error | string
-  ) {
-    const errorName = error instanceof Error ? error.name : "Unknown Error"
-    const errorMessage = error instanceof Error ? error.message : error
-    const coloredMessage = `\x1b[${colorCode}m [ERROR_twinny] \x1b[32m Message: ${message} \n \x1b[${colorCode}m Error Type: ${errorName} \n  Error Message: ${errorMessage} \n \x1b[31m`
-    return coloredMessage
+  public error(message: string | Error, error?: unknown) {
+    const text =
+      typeof message === "string"
+        ? error === undefined
+          ? message
+          : `${message}: ${describe(error)}`
+        : describe(message)
+    this.channel.error(redact(text))
+    console.error(`[twinny] ${redact(text)}`)
+  }
+
+  /** Detail worth having when something is wrong: prompts, replies, bodies. */
+  public debug(message: string) {
+    if (this.enabled) this.channel.debug(redact(message))
+  }
+
+  /** A titled block of text at debug level: a prompt, a reply, a request body. */
+  public block(title: string, text: string) {
+    if (!this.enabled || !text) return
+    this.channel.debug(`${redact(title)}\n${indent(redact(text))}`)
+  }
+
+  /** Start a stopwatch; the returned function gives elapsed time as text. */
+  public timer(): () => string {
+    const started = Date.now()
+    return () => formatMs(Date.now() - started)
   }
 }
 

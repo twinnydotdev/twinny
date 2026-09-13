@@ -353,7 +353,7 @@ export class WorkspaceIndexer {
       manifest.files[file] = result.stamp
       await this._db.saveManifest(manifest)
       await this._db.finishWrites()
-      logger.log(`Re-indexed ${path.basename(file)} (${result.rows.length} chunks)`)
+      logger.info(`Re-indexed ${path.basename(file)} (${result.rows.length} chunks)`)
       return true
     } catch (error) {
       logger.error(`Could not re-index ${file}: ${error}`)

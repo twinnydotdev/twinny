@@ -40,7 +40,7 @@ export const isAbortError = (error: unknown): boolean => {
   return /aborted/i.test(e.message || "") || isAbortError(e.cause)
 }
 
-const providerUrl = (provider: ProviderSummary) => {
+export const providerUrl = (provider: ProviderSummary) => {
   if (!provider.apiHostname) return ""
   const protocol = provider.apiProtocol || "http"
   const port = provider.apiPort ? `:${provider.apiPort}` : ""
