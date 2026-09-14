@@ -8,7 +8,10 @@ import {
   WORKSPACE_STORAGE_KEY
 } from "../../common/constants"
 import { logger } from "../../common/logger"
-import { ContextValue } from "../../common/messaging/protocol"
+import {
+  ContextValue,
+  NewDocumentRequest
+} from "../../common/messaging/protocol"
 import {
   AnyContextItem,
   ModelCatalogue,
@@ -28,8 +31,9 @@ import { ReviewService } from "../review/service"
 import { SessionManager } from "../session-manager"
 import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../templates/provider"
-import { getLanguage, getTextSelection, getTheme } from "../utils"
+import { getLanguage, getTerminal, getTextSelection, getTheme } from "../utils"
 
+import { resolveLanguageId, stripShellPrompts } from "./code-actions"
 import { FileHandler } from "./file-handler"
 import { FileTreeProvider } from "./file-tree"
 
@@ -190,11 +194,13 @@ export class BaseProvider {
       [EVENT_NAME.twinnyListTemplates]: () =>
         this._templateProvider.listTemplates(),
       [EVENT_NAME.twinnyNewConversation]: () => this.newConversation(),
-      [EVENT_NAME.twinnyNewDocument]: (content) =>
-        this.createNewUntitledDocument(content),
+      [EVENT_NAME.twinnyNewDocument]: (request) =>
+        this.createNewUntitledDocument(request),
       [EVENT_NAME.twinnyNotification]: (message) =>
         void vscode.window.showInformationMessage(message),
       [EVENT_NAME.twinnyRemoveContextItem]: (id) => this.removeContextItem(id),
+      [EVENT_NAME.twinnyRunInTerminal]: (command) =>
+        this.sendToTerminal(command),
       [EVENT_NAME.twinnySendLanguage]: () => getLanguage(),
       [EVENT_NAME.twinnySendTheme]: () => getTheme(),
       [EVENT_NAME.twinnySetConfigValue]: ({ key, value }) =>
@@ -339,11 +345,26 @@ export class BaseProvider {
     this.bridge?.emit(EVENT_NAME.twinnyNewConversation)
   }
 
-  private createNewUntitledDocument = async (content: string) => {
+  private createNewUntitledDocument = async ({
+    content,
+    language
+  }: NewDocumentRequest) => {
     const document = await vscode.workspace.openTextDocument({
       content,
-      language: getLanguage().languageId
+      language: await resolveLanguageId(language, getLanguage().languageId)
     })
     await vscode.window.showTextDocument(document)
+  }
+
+  /*
+   * Pasted, not executed: the user reads the command in the terminal and
+   * presses Enter themselves. Models get commands wrong often enough that an
+   * auto-run button would be a foot-gun.
+   */
+  private sendToTerminal = async (command: string) => {
+    const terminal = await getTerminal()
+    if (!terminal) return
+    terminal.show()
+    terminal.sendText(stripShellPrompts(command), false)
   }
 }

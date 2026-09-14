@@ -11,7 +11,7 @@ import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, ImageAttachment, MentionType, ThemeType } from "../common/types"
+import { ChatCompletionMessage, ImageAttachment, MentionType } from "../common/types"
 
 import { useSuggestion } from "./hooks/useSuggestion"
 import CodeBlock from "./code-block"
@@ -44,7 +44,6 @@ interface MessageProps {
     images?: ImageAttachment[]
   ) => void
   onHeightChange?: () => void
-  theme: ThemeType | undefined
   onDeleteImage?: (id: string) => void
 }
 
@@ -133,7 +132,6 @@ export const Message: React.FC<MessageProps> = ({
   onRegenerate,
   onEdit,
   onHeightChange,
-  theme,
   messages,
   onDeleteImage
 }) => {
@@ -387,12 +385,12 @@ export const Message: React.FC<MessageProps> = ({
     }: { children: React.ReactNode } & React.HTMLProps<HTMLPreElement>) => {
       if (React.isValidElement(children)) {
         return (
-          <CodeBlock role={message?.role} {...children.props} theme={theme} />
+          <CodeBlock role={message?.role} {...children.props} />
         )
       }
       return <pre {...props}>{children}</pre>
     },
-    [message?.role, theme]
+    [message?.role]
   )
 
   const markdownComponents = useMemo(
@@ -431,10 +429,11 @@ export const Message: React.FC<MessageProps> = ({
   return (
     <div
       ref={messageRef}
-      className={`${styles.message} ${message.role === ASSISTANT
-        ? styles.assistantMessage
-        : styles.userMessage
-        }`}
+      className={
+        message.role === ASSISTANT
+          ? styles.message
+          : `${styles.message} ${styles.userMessage}`
+      }
     >
       {Toast}
       {thinking && (

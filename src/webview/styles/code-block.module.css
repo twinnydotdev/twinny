@@ -1,6 +1,8 @@
 /*
  * Code blocks are the one place the transcript is allowed extra weight: a
- * hairline frame and a slightly lifted ground, no radius, no shadow.
+ * hairline frame and a slightly lifted ground, no radius, no shadow. The
+ * header strip (language + actions) is part of the frame, not a float above
+ * it, so the buttons always have a home and never drift.
  */
 pre {
   margin: 12px 0;
@@ -28,39 +30,115 @@ pre code * {
 .codeBlock {
   position: relative;
   margin: 12px 0;
+  border: 1px solid var(--tw-rule);
+  background: var(--tw-surface);
+  container-type: inline-size;
 }
 
 .codeBlock pre {
-  margin: 0;
+  margin: 0 !important;
+  border: none;
 }
 
-/* Language tag + actions share one strip that only lights up on hover. */
+/*
+ * The header sticks to the top of the scrolling transcript while a long block
+ * scrolls past, so copy/apply stay within reach without scrolling back up.
+ */
 .codeBar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 2px 3px;
+  min-height: 24px;
+  padding: 0 4px 0 10px;
+  border-bottom: 1px solid var(--tw-rule);
+  background: var(--tw-bg);
   color: var(--tw-fg-faint);
+  font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
 }
 
 .codeLang {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-transform: lowercase;
   user-select: none;
 }
 
 .codeOptions {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  opacity: 0;
+  gap: 0;
+  opacity: 0.7;
   transition: opacity 0.12s ease;
 }
 
 .codeBlock:hover .codeOptions,
 .codeBlock:focus-within .codeOptions {
   opacity: 1;
+}
+
+/* Plain buttons: no web component, so they render the same in every host. */
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  margin: 0;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: lowercase;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+}
+
+.action .codicon {
+  font-size: 13px;
+}
+
+.actionActive {
+  color: var(--tw-fg);
+}
+
+/* Words go first when the block is too narrow to carry them. */
+@container (max-width: 260px) {
+  .actionLabel {
+    display: none;
+  }
+
+  .action {
+    padding: 0 4px;
+  }
+}
+
+.action:hover {
+  color: var(--tw-fg);
+  background: var(--tw-surface);
+}
+
+.action:focus-visible {
+  outline: 1px solid var(--tw-accent);
+  outline-offset: -1px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }

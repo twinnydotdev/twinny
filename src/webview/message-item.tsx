@@ -1,7 +1,7 @@
 import React, { memo } from "react"
 
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
+import { ChatCompletionMessage, MentionType, } from "../common/types"
 
 import Message from "./message"
 import TypingIndicator from "./typing-indicator"
@@ -15,7 +15,6 @@ interface MessageListProps {
   isLoading: boolean
   index: number
   generatingRef: React.RefObject<boolean>
-  theme: ThemeType
   handleDeleteMessage: (index: number) => void
   handleEditMessage: (
     message: string,
@@ -36,7 +35,6 @@ const MessageItem = memo(
     completion,
     context,
     isLoading,
-    theme,
     index,
     handleDeleteMessage,
     handleEditMessage,
@@ -54,7 +52,6 @@ const MessageItem = memo(
           <Message
             key={messageKey}
             message={message}
-            theme={theme}
             index={index}
             isLoading={isLoading}
             messages={messages}
@@ -68,7 +65,6 @@ const MessageItem = memo(
           <Message
             key={messageKey}
             message={message}
-            theme={theme}
             index={index}
             isLoading={isLoading}
             messages={messages}
@@ -85,7 +81,6 @@ const MessageItem = memo(
             isAssistant={true}
             message={completion}
             context={context}
-            theme={theme}
             index={index}
             isLoading={isLoading}
             messages={messages}

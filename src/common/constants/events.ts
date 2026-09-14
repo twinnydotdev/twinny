@@ -29,6 +29,7 @@ export const EVENT_NAME = {
   twinnyOpenFile: "twinny-open-file",
   twinnyOpenProviders: "twinny-open-providers",
   twinnyRemoveContextItem: "twinny-remove-context-item",
+  twinnyRunInTerminal: "twinny-run-in-terminal",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
   twinnySendTheme: "twinny-send-theme",

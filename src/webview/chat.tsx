@@ -23,7 +23,6 @@ import { useConversationHistory } from "./hooks/useConversationHistory"
 import { useProviders } from "./hooks/useProviders"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
-import { useTheme } from "./hooks/useTheme"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch"
 import { ProviderSelect } from "./providers/provider-select"
@@ -49,7 +48,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const editorRef = useRef<Editor | null>(null)
   const imagesRef = useRef<ImageAttachment[]>([])
   const stopRef = useRef(false)
-  const theme = useTheme()
   const selection = useSelection()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
@@ -626,7 +624,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
         isLoading={isLoading}
         message={messages[index]}
         messages={messages}
-        theme={theme}
       />
     ),
     [
@@ -637,7 +634,6 @@ export const Chat = (props: ChatProps): JSX.Element => {
       messages,
       completion,
       searchReport,
-      theme,
       generatingRef
     ]
   )

@@ -270,6 +270,13 @@ export interface LocalReviewRequest {
   base?: string
 }
 
+/** A code block sent to a fresh untitled editor. */
+export interface NewDocumentRequest {
+  content: string
+  /** Fence language as written in the markdown (`ts`, `bash`, ...). */
+  language?: string
+}
+
 /* -------------------------------------------------------------------------- */
 /*  webview  ->  extension                                                    */
 /* -------------------------------------------------------------------------- */
@@ -290,11 +297,12 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyHideBackButton]: Channel
   [EVENT_NAME.twinnyListTemplates]: Channel<void, string[]>
   [EVENT_NAME.twinnyNewConversation]: Channel
-  [EVENT_NAME.twinnyNewDocument]: Channel<string>
+  [EVENT_NAME.twinnyNewDocument]: Channel<NewDocumentRequest>
   [EVENT_NAME.twinnyNotification]: Channel<string>
   [EVENT_NAME.twinnyOpenFile]: Channel<string | FileLocation>
   [EVENT_NAME.twinnyOpenProviders]: Channel
   [EVENT_NAME.twinnyRemoveContextItem]: Channel<string>
+  [EVENT_NAME.twinnyRunInTerminal]: Channel<string>
   [EVENT_NAME.twinnySendLanguage]: Channel<void, LanguageType>
   [EVENT_NAME.twinnySendTheme]: Channel<void, ThemeType>
   [EVENT_NAME.twinnySessionContext]: Channel<{ key: string }, ContextValue>
