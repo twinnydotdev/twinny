@@ -4,7 +4,8 @@ import {
   dedupeContextEntries,
   formatContextEntries,
   languageForPath,
-  normalizeWorkspacePath
+  normalizeWorkspacePath,
+  workspacePathCandidates
 } from "../../extension/chat/context-files"
 
 suite("Attached context", () => {
@@ -15,6 +16,32 @@ suite("Attached context", () => {
     assert.strictEqual(normalizeWorkspacePath("\\src\\a.ts"), "src\\a.ts")
     assert.strictEqual(normalizeWorkspacePath("C:\\repo\\a.ts"), "C:\\repo\\a.ts")
     assert.strictEqual(normalizeWorkspacePath(""), "")
+  })
+
+  test("resolves multi-root paths that carry the folder name", () => {
+    const roots = [
+      { name: "Agent-Test", fsPath: "/Docker/Project/MCP-Server/Agent-Test" },
+      { name: "Web server 3", fsPath: "/Docker/Project/Web server 3" }
+    ]
+    assert.strictEqual(
+      workspacePathCandidates("Agent-Test/test.php", roots)[0],
+      "/Docker/Project/MCP-Server/Agent-Test/test.php"
+    )
+    assert.strictEqual(
+      workspacePathCandidates("Web server 3/Model.ini", roots)[0],
+      "/Docker/Project/Web server 3/Model.ini"
+    )
+    assert.deepStrictEqual(
+      workspacePathCandidates("/src/a.ts", [{ name: "repo", fsPath: "/repo" }]),
+      ["/repo/src/a.ts", "/src/a.ts"]
+    )
+    // Single root: a directory that happens to share the folder's name
+    assert.ok(
+      workspacePathCandidates("repo/a.ts", [
+        { name: "repo", fsPath: "/repo" }
+      ]).includes("/repo/repo/a.ts")
+    )
+    assert.deepStrictEqual(workspacePathCandidates("", roots), [])
   })
 
   test("maps file extensions to fence languages", () => {

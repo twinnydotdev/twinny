@@ -5,6 +5,7 @@ import * as vscode from "vscode"
 
 import { EVENT_NAME } from "../../common/constants"
 import { FileLocation } from "../../common/messaging/protocol"
+import { workspacePathCandidates } from "../chat/context-files"
 import { ExtensionBridge } from "../messaging/bridge"
 
 export class FileHandler {
@@ -82,10 +83,16 @@ export class FileHandler {
       typeof target === "string" ? { path: target } : target
     const filePath = location.path
     if (filePath && vscode.workspace.workspaceFolders) {
-      const fullPath = path.join(
-        vscode.workspace.workspaceFolders[0].uri.fsPath,
-        filePath
-      )
+      const candidates = workspacePathCandidates(
+        filePath,
+        vscode.workspace.workspaceFolders.map((folder) => ({
+          name: folder.name,
+          fsPath: folder.uri.fsPath
+        }))
+      ).map((candidate) => path.normalize(candidate))
+      const fullPath =
+        candidates.find((candidate) => fs.existsSync(candidate)) ??
+        path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, filePath)
       try {
         const doc = await vscode.workspace.openTextDocument(fullPath)
         const editor = await vscode.window.showTextDocument(doc)

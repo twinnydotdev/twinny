@@ -35,7 +35,8 @@ import { updateLoadingMessage } from "../utils"
 import {
   ContextEntry,
   formatContextEntries,
-  normalizeWorkspacePath
+  normalizeWorkspacePath,
+  workspacePathCandidates
 } from "./context-files"
 import { getGitContext } from "./git-context"
 import { getProblemsContext } from "./problems"
@@ -352,18 +353,20 @@ export class ChatContextBuilder {
   /**
    * Current text of a workspace file: the editor buffer when it is open (so
    * unsaved edits count), otherwise the file on disk. The path is resolved
-   * against the workspace root first; a path that only makes sense as an
-   * absolute one (a file outside the workspace) is tried as-is after that.
+   * against every workspace folder (multi-root paths carry the folder name);
+   * a path that only makes sense as an absolute one (a file outside the
+   * workspace) is tried as-is after that.
    */
   private async readWorkspaceFile(
     filePath: string
   ): Promise<string | undefined> {
-    const root = workspace.workspaceFolders?.[0]?.uri.fsPath
-    const relative = normalizeWorkspacePath(filePath)
-    const candidates = [
-      ...(root ? [path.join(root, relative)] : []),
-      ...(path.isAbsolute(filePath) ? [filePath] : [])
-    ]
+    const candidates = workspacePathCandidates(
+      filePath,
+      (workspace.workspaceFolders ?? []).map((folder) => ({
+        name: folder.name,
+        fsPath: folder.uri.fsPath
+      }))
+    ).map((candidate) => path.normalize(candidate))
     if (!candidates.length) return undefined
 
     for (const fullPath of candidates) {

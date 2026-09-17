@@ -47,6 +47,39 @@ export const normalizeWorkspacePath = (filePath: string): string => {
   return trimmed.replace(/^[\\/]+/, "")
 }
 
+export interface WorkspaceRoot {
+  name: string
+  fsPath: string
+}
+
+/**
+ * Absolute paths a context path could mean, most likely first. In a
+ * multi-root workspace `asRelativePath` prefixes the folder name
+ * (`api/src/a.ts`), so that prefix is resolved against its own folder before
+ * the path is tried under every root; a genuinely absolute path goes last.
+ */
+export const workspacePathCandidates = (
+  filePath: string,
+  roots: WorkspaceRoot[]
+): string[] => {
+  const relative = normalizeWorkspacePath(filePath)
+  if (!relative) return []
+  const join = (root: string, rest: string) =>
+    `${root.replace(/[\\/]+$/, "")}/${rest}`
+  const candidates: string[] = []
+  for (const root of roots) {
+    const match = relative.slice(root.name.length, root.name.length + 1)
+    if (relative.startsWith(root.name) && (match === "/" || match === "\\")) {
+      candidates.push(join(root.fsPath, relative.slice(root.name.length + 1)))
+    }
+  }
+  for (const root of roots) candidates.push(join(root.fsPath, relative))
+  if (/^([\\/]|[A-Za-z]:[\\/])/.test(filePath.trim())) {
+    candidates.push(filePath.trim())
+  }
+  return [...new Set(candidates)]
+}
+
 /** Markdown fence hint for a path, so the model knows what it is reading. */
 export const languageForPath = (filePath: string): string => {
   const dot = filePath.lastIndexOf(".")
