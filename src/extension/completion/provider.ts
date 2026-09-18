@@ -7,6 +7,7 @@ import {
   InlineCompletionTriggerKind,
   Position,
   Range,
+  SelectedCompletionInfo,
   TextDocument,
   Uri,
   window,
@@ -66,6 +67,15 @@ interface CompletionRequest {
   document: TextDocument
   position: Position
   prefixSuffix: PrefixSuffix
+  /** The current line up to the cursor and after it, as the model should see them. */
+  lineBefore: string
+  lineAfter: string
+  /**
+   * Set while the suggest widget is open: VS Code only shows a completion
+   * that begins with the item it highlights, so the request is made as if
+   * that item were already accepted and the result is returned with it.
+   */
+  selected?: SelectedCompletionInfo
   provider: TwinnyProvider
   token: CancellationToken
 }
@@ -132,11 +142,28 @@ export class CompletionProvider
       return
     }
 
-    const prefixSuffix = getPrefixSuffix(
+    let prefixSuffix = getPrefixSuffix(
       this.config.get<number>("contextLength", 100),
       document,
       position
     )
+    const lineText = document.lineAt(position.line).text
+    let lineBefore = lineText.slice(0, position.character)
+    let lineAfter = lineText.slice(position.character)
+    const selected = context.selectedCompletionInfo
+    if (selected) {
+      // IntelliSense is open. VS Code cancelled the plain request when the
+      // widget appeared and asks again with the highlighted item; answering
+      // as if that item were typed is the only way a completion shows now.
+      const typed = Math.max(0, position.character - selected.range.start.character)
+      const trailing = Math.max(0, selected.range.end.character - position.character)
+      prefixSuffix = {
+        prefix: prefixSuffix.prefix.slice(0, prefixSuffix.prefix.length - typed) + selected.text,
+        suffix: prefixSuffix.suffix.slice(trailing)
+      }
+      lineBefore = lineText.slice(0, selected.range.start.character) + selected.text
+      lineAfter = lineText.slice(selected.range.end.character)
+    }
 
     const scope = JSON.stringify([
       document.uri.toString(), document.languageId,
@@ -158,14 +185,14 @@ export class CompletionProvider
     )
     if (continuation) {
       logger.debug("FIM served from the previous suggestion (typed through)")
-      return this.toInlineCompletion(continuation, position)
+      return this.toInlineCompletion(continuation, position, selected)
     }
 
     if (this.config.get<boolean>("completionCacheEnabled")) {
       const cached = cache.getCache(prefixSuffix, cacheScope)
       if (cached) {
         logger.debug("FIM served from the completion cache")
-        return this.toInlineCompletion(cached, position)
+        return this.toInlineCompletion(cached, position, selected)
       }
     }
 
@@ -176,7 +203,9 @@ export class CompletionProvider
       return
     }
 
-    if (getIsMiddleOfWord(document, position)) return
+    // Mid-word the model would only finish the word; with the widget open
+    // the highlighted item already does that and the request starts after it.
+    if (!selected && getIsMiddleOfWord(document, position)) return
 
     const request: CompletionRequest = {
       id: this._requestId,
@@ -186,6 +215,9 @@ export class CompletionProvider
       document,
       position,
       prefixSuffix,
+      lineBefore,
+      lineAfter,
+      selected,
       provider,
       token
     }
@@ -239,7 +271,6 @@ export class CompletionProvider
     )
 
     const stopWords = getStopWords(provider.modelName, provider.fimTemplate)
-    const lineText = document.lineAt(position.line).text
     const multiline = getShouldUseMultiline({
       document,
       position,
@@ -253,8 +284,8 @@ export class CompletionProvider
       stopWords,
       multiline,
       maxLines: this.config.get<number>("maxLines", 40),
-      textBeforeCursor: lineText.slice(0, position.character),
-      textAfterCursor: lineText.slice(position.character),
+      textBeforeCursor: request.lineBefore,
+      textAfterCursor: request.lineAfter,
       suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix)
     })
 
@@ -279,14 +310,23 @@ export class CompletionProvider
     })
 
     let completion = ""
+    // Whether the backend finished on its own. Stopping early (enough
+    // lines, reached the suffix) is normal and aborts to free the GPU; a
+    // stream that ended by itself must not be reported as cancelled.
+    let streamEnded = false
     try {
       const chunks = inference.fim(
         this.buildFimRequest(prompt, provider, stopWords, prefixSuffix),
         { signal: controller.signal }
       )
+      let stoppedEarly = false
       for await (const chunk of chunks) {
-        if (stream.push(chunk.text).done) break
+        if (stream.push(chunk.text).done) {
+          stoppedEarly = true
+          break
+        }
       }
+      streamEnded = !stoppedEarly
       completion = stream.finish()
     } catch (error) {
       if (isCancelled(error)) {
@@ -300,7 +340,7 @@ export class CompletionProvider
     } finally {
       clearTimeout(timeout)
       cancellation.dispose()
-      controller.abort()
+      if (!streamEnded) controller.abort()
       if (this._abortController === controller) this._abortController = null
     }
 
@@ -353,12 +393,24 @@ export class CompletionProvider
     }
 
     this._lastSuggestion = { ...prefixSuffix, completion: formatted, scope: request.scope }
-    return this.toInlineCompletion(formatted, position)
+    return this.toInlineCompletion(formatted, position, request.selected)
   }
 
-  private toInlineCompletion(text: string, position: Position) {
+  /**
+   * The item VS Code shows. With the suggest widget open it must begin
+   * with the highlighted suggestion and replace that suggestion's range;
+   * VS Code hides anything else.
+   */
+  private toInlineCompletion(
+    text: string,
+    position: Position,
+    selected?: SelectedCompletionInfo
+  ) {
     this.setIdle()
     this.lastCompletionText = text
+    if (selected) {
+      return [new InlineCompletionItem(selected.text + text, selected.range)]
+    }
     return [new InlineCompletionItem(text, new Range(position, position))]
   }
 
@@ -565,9 +617,13 @@ export class CompletionProvider
     this.abortCompletion()
   }
 
+  /** The editor moved on (cursor moved, stop pressed): drop whatever is in flight. */
   public abortCompletion() {
     this._requestId++
-    this._abortController?.abort()
+    if (this._abortController) {
+      logger.debug(`FIM #${this._requestId - 1} aborted: the cursor moved or generation was stopped`)
+      this._abortController.abort()
+    }
     this._abortController = null
     this.setIdle()
   }

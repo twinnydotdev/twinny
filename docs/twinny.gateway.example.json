@@ -1,0 +1,36 @@
+{
+  "listen": { "host": "127.0.0.1", "port": 8765 },
+  "auth": {
+    "tokenEnv": "TWINNY_GATEWAY_TOKEN",
+    "keysFile": "~/.twinny/server/keys.json"
+  },
+  "usage": { "dir": "~/.twinny/server/usage", "retentionDays": 30 },
+  "providers": {
+    "local-ollama": {
+      "provider": "ollama",
+      "apiProtocol": "http",
+      "apiHostname": "127.0.0.1",
+      "apiPort": 11434
+    }
+  },
+  "models": [
+    {
+      "alias": "coder",
+      "provider": "local-ollama",
+      "model": "gemma3:4",
+      "capabilities": ["fim", "chat"]
+    },
+    {
+      "alias": "embed",
+      "provider": "local-ollama",
+      "model": "nomic-embed-text",
+      "capabilities": ["embeddings"]
+    }
+  ],
+  "limits": {
+    "maxActiveRequests": 4,
+    "requestDeadlineMs": 120000,
+    "maxBodyBytes": 8388608,
+    "shutdownGraceMs": 5000
+  }
+}

@@ -7,9 +7,10 @@
  * request is made, cancellation ends a read at once, and whatever a client
  * throws comes out as an `InferenceError`.
  */
-import { OPEN_AI_COMPATIBLE_PROVIDERS } from "../../common/constants"
+import { API_PROVIDERS, OPEN_AI_COMPATIBLE_PROVIDERS } from "../../common/constants"
 import { HOSTED_PROVIDERS } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
+import { RemoteInferenceProvider } from "../../protocol/client"
 
 import { HostedInferenceProvider } from "./adapters/hosted"
 import { HttpInferenceProvider } from "./adapters/http"
@@ -30,8 +31,8 @@ export interface InferenceAdapter {
 
 const guardedStream = <T>(
   provider: InferenceProvider,
-  capability: InferenceCapability,
   run: (() => AsyncIterable<T>) | undefined,
+  capability: InferenceCapability,
   options?: InferenceOptions
 ): AsyncIterable<T> => {
   if (!run || !provider.capabilities().includes(capability)) {
@@ -70,15 +71,15 @@ export const guard = (provider: InferenceProvider): InferenceClient => ({
   fim: (request, options) =>
     guardedStream(
       provider,
-      "fim",
       provider.fim && (() => provider.fim!(request, options)),
+      "fim",
       options
     ),
   chat: (request, options) =>
     guardedStream(
       provider,
-      "chat",
       provider.chat && (() => provider.chat!(request, options)),
+      "chat",
       options
     ),
   embeddings: (request, options) =>
@@ -140,10 +141,17 @@ export const hostedAdapter: InferenceAdapter = {
   create: (config) => new HostedInferenceProvider(config)
 }
 
+/** A Twinny gateway: the same jobs, carried over the remote protocol. */
+export const remoteAdapter: InferenceAdapter = {
+  id: "remote",
+  create: (config) => RemoteInferenceProvider.fromProvider(config)
+}
+
 /** The registry the extension uses, with every built-in kind served. */
 export const providerRegistry = new ProviderRegistry()
   .register(Object.values(OPEN_AI_COMPATIBLE_PROVIDERS), httpAdapter)
   .register(HOSTED_PROVIDERS, hostedAdapter)
+  .register(API_PROVIDERS.TwinnyRemote, remoteAdapter)
 
 export const resolveInferenceProvider = (config: TwinnyProvider): InferenceClient =>
   providerRegistry.resolve(config)

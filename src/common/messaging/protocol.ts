@@ -5,9 +5,22 @@ import {
   GITHUB_EVENT_NAME,
   P2P_EVENT_NAME,
   PROVIDER_EVENT_NAME,
-  REVIEW_EVENT_NAME
+  REVIEW_EVENT_NAME,
+  TEAM_SHARE_EVENT_NAME
 } from "../constants"
 import type { DiscoveredServer } from "../provider-discovery"
+import type {
+  TeamApplyRequest,
+  TeamApplyResult,
+  TeamConnectionRequest,
+  TeamOpen,
+  TeamPreview,
+  TeamShareBackend,
+  TeamShareStatus,
+  TeamSignInStart,
+  TeamSignInStatus,
+  TeamStatus
+} from "../team"
 import type {
   AnyContextItem,
   ChatCompletionMessage,
@@ -67,6 +80,8 @@ export interface ProviderTestResult {
   latencyMs?: number
   /** What came back, e.g. the first few tokens, to show the model is alive. */
   sample?: string
+  /** For a Twinny gateway: the key name the gateway attributed the test to. */
+  identity?: string
 }
 
 /** Models a provider's endpoint says it serves. */
@@ -331,6 +346,15 @@ export interface ClientEvents {
   [EMBEDDING_EVENT_NAME.getStatus]: Channel<void, EmbeddingStatus>
 
   [PROVIDER_EVENT_NAME.addProvider]: Channel<TwinnyProvider, ProviderSaveResult>
+  [PROVIDER_EVENT_NAME.previewTeam]: Channel<TeamConnectionRequest, TeamPreview>
+  [PROVIDER_EVENT_NAME.applyTeam]: Channel<TeamApplyRequest, TeamApplyResult>
+  [PROVIDER_EVENT_NAME.cancelTeam]: Channel
+  [PROVIDER_EVENT_NAME.getTeamPolicy]: Channel<void, TeamStatus | null>
+  [PROVIDER_EVENT_NAME.leaveTeam]: Channel<void, { removed: number }>
+  [PROVIDER_EVENT_NAME.startTeamSignIn]: Channel<{ url: string }, TeamSignInStart>
+  [PROVIDER_EVENT_NAME.pollTeamSignIn]: Channel<{ id: string }, TeamSignInStatus>
+  /** What an invite link asked the tab to show, once; null when nothing is waiting. */
+  [PROVIDER_EVENT_NAME.takeTeamOpen]: Channel<void, TeamOpen | null>
   [PROVIDER_EVENT_NAME.copyProvider]: Channel<TwinnyProvider>
   [PROVIDER_EVENT_NAME.discoverProviders]: Channel<void, DiscoveredServer[]>
   [PROVIDER_EVENT_NAME.exportProviders]: Channel
@@ -373,6 +397,12 @@ export interface ClientEvents {
 
   [REVIEW_EVENT_NAME.getLocalStatus]: Channel<void, LocalReviewStatus>
   [REVIEW_EVENT_NAME.reviewLocal]: Channel<LocalReviewRequest>
+
+  [TEAM_SHARE_EVENT_NAME.get]: Channel<void, TeamShareStatus>
+  [TEAM_SHARE_EVENT_NAME.start]: Channel<void, TeamShareStatus>
+  [TEAM_SHARE_EVENT_NAME.stop]: Channel<void, TeamShareStatus>
+  [TEAM_SHARE_EVENT_NAME.setBackend]: Channel<TeamShareBackend, TeamShareStatus>
+  [TEAM_SHARE_EVENT_NAME.discover]: Channel<void, TeamShareBackend[]>
 }
 
 /* -------------------------------------------------------------------------- */
@@ -411,11 +441,15 @@ export interface ServerEvents {
   [PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider]: TwinnyProvider | undefined
   [PROVIDER_EVENT_NAME.getActiveFimProvider]: TwinnyProvider | undefined
   [PROVIDER_EVENT_NAME.getAllProviders]: Record<string, TwinnyProvider>
+  [PROVIDER_EVENT_NAME.getTeamPolicy]: TeamStatus | null
+  [PROVIDER_EVENT_NAME.openTeam]: TeamOpen
 
   [GITHUB_EVENT_NAME.getPullRequests]: GitHubPr[]
 
   [P2P_EVENT_NAME.getDevices]: P2pDeviceStatus[]
   [P2P_EVENT_NAME.getHost]: P2pHostStatus
+
+  [TEAM_SHARE_EVENT_NAME.get]: TeamShareStatus
 }
 
 /* -------------------------------------------------------------------------- */
@@ -451,6 +485,7 @@ type EveryName =
   | (typeof GITHUB_EVENT_NAME)[keyof typeof GITHUB_EVENT_NAME]
   | (typeof P2P_EVENT_NAME)[keyof typeof P2P_EVENT_NAME]
   | (typeof REVIEW_EVENT_NAME)[keyof typeof REVIEW_EVENT_NAME]
+  | (typeof TEAM_SHARE_EVENT_NAME)[keyof typeof TEAM_SHARE_EVENT_NAME]
 
 /**
  * Every declared name must be used by at least one direction, and no channel

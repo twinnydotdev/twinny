@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
@@ -6,7 +6,8 @@ import {
   API_PROVIDERS,
   DEFAULT_PROVIDER_FORM_VALUES,
   EVENT_NAME,
-  FIM_TEMPLATE_FORMAT
+  FIM_TEMPLATE_FORMAT,
+  PROVIDER_EVENT_NAME
 } from "../../common/constants"
 import {
   P2pDeviceStatus,
@@ -19,21 +20,25 @@ import {
   PROVIDER_TYPES,
   ProviderType
 } from "../../common/provider-validation"
+import type { TeamOpen, TeamStatus } from "../../common/team"
+import { describePooling, describeRecording, policyIsEmpty, policyRefusal } from "../../common/team-policy"
 import { TwinnyProvider } from "../../common/types"
 import { useProviders } from "../hooks/useProviders"
-import { emit } from "../messaging"
+import { bridge, emit, useServerEvent } from "../messaging"
 
 import { DeviceJobs, DevicesSection } from "./devices"
 import { PresetGallery } from "./presets"
 import { ProviderCard } from "./provider-card"
 import { ProviderForm } from "./provider-form"
-import { SetupCheck } from "./setup-check"
+import { ShareCard } from "./share"
+import { ConnectTeam } from "./team"
 import { Welcome } from "./welcome"
 
 import styles from "../styles/providers.module.css"
 
 type View =
   | { name: "list" }
+  | { name: "team"; open?: TeamOpen }
   | { name: "gallery"; type: ProviderType }
   | { name: "form"; provider: TwinnyProvider }
 
@@ -86,8 +91,37 @@ export const Providers = ({ onDone }: ProvidersProps) => {
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [results, setResults] = useState<Record<string, ProviderTestResult>>({})
   const [testing, setTesting] = useState<Set<string>>(new Set())
-  const [checkingSetup, setCheckingSetup] = useState(false)
   const [collapsed, setCollapsed] = useState<Partial<Record<ProviderType, boolean>>>({})
+  const [policy, setPolicy] = useState<TeamStatus | null>(null)
+  const [leaving, setLeaving] = useState(false)
+  const [confirmingLeave, setConfirmingLeave] = useState(false)
+  useServerEvent(PROVIDER_EVENT_NAME.getTeamPolicy, (state) => setPolicy(state ?? null))
+  useEffect(() => {
+    bridge.request(PROVIDER_EVENT_NAME.getTeamPolicy).then((state) => setPolicy(state ?? null)).catch(() => setPolicy(null))
+  }, [])
+  // An invite link opened in VS Code: shown as it arrives, or collected on
+  // mount when the link was opened before this tab existed.
+  const showTeamOpen = (open: TeamOpen | null) => {
+    if (open) setView({ name: "team", open })
+  }
+  useServerEvent(PROVIDER_EVENT_NAME.openTeam, (open) => {
+    showTeamOpen(open)
+    // Collected, so a later mount does not show it twice.
+    bridge.request(PROVIDER_EVENT_NAME.takeTeamOpen).catch(() => undefined)
+  })
+  useEffect(() => {
+    bridge.request(PROVIDER_EVENT_NAME.takeTeamOpen).then(showTeamOpen).catch(() => undefined)
+  }, [])
+  const leaveTeam = async () => {
+    setLeaving(true)
+    try {
+      await bridge.request(PROVIDER_EVENT_NAME.leaveTeam)
+      setPolicy(null)
+    } finally {
+      setLeaving(false)
+      setConfirmingLeave(false)
+    }
+  }
 
   const {
     activeProviders,
@@ -169,15 +203,6 @@ export const Providers = ({ onDone }: ProvidersProps) => {
     })
   }
 
-  const runSetupCheck = async () => {
-    setCheckingSetup(true)
-    await Promise.all(
-      PROVIDER_TYPES.map((type) => activeProviders[type])
-        .filter((provider): provider is TwinnyProvider => !!provider)
-        .map(runTest)
-    )
-    setCheckingSetup(false)
-  }
 
   const openGallery = (type: ProviderType) => setView({ name: "gallery", type })
   const openForm = (provider: TwinnyProvider) => setView({ name: "form", provider })
@@ -194,6 +219,19 @@ export const Providers = ({ onDone }: ProvidersProps) => {
     openGallery(type)
   }
 
+  if (view.name === "team") {
+    return (
+      <div className={styles.page}>
+        <ConnectTeam
+          onClose={closeView}
+          onDone={finishSetup}
+          {...(view.open ? { open: view.open } : {})}
+          {...(policy ? { connected: { url: policy.url, ...(policy.keyMissing ? { keyMissing: true } : {}) } } : {})}
+        />
+      </div>
+    )
+  }
+
   if (view.name === "gallery") {
     return (
       <div className={styles.page}>
@@ -202,6 +240,7 @@ export const Providers = ({ onDone }: ProvidersProps) => {
           onSelect={openForm}
           onCustom={() => openForm(blankProvider(view.type))}
           onBack={closeView}
+          teamOnly={policy?.policy.teamOnly}
         />
       </div>
     )
@@ -284,6 +323,7 @@ export const Providers = ({ onDone }: ProvidersProps) => {
                 active={active?.id === provider.id}
                 testResult={results[provider.id]}
                 testing={testing.has(provider.id)}
+                blocked={policyRefusal(policy ?? undefined, "activate", provider, type)}
                 onActivate={() => setActiveProvider(type, provider)}
                 onTest={() => runTest(provider)}
                 onEdit={() => openForm(provider)}
@@ -330,7 +370,10 @@ export const Providers = ({ onDone }: ProvidersProps) => {
 
       {confirmingReset && (
         <div className={styles.confirmBanner}>
-          <span>{t("reset-providers-confirm")}</span>
+          <span>
+            {t("reset-providers-confirm")}
+            {policy && ` ${t("reset-keeps-team")}`}
+          </span>
           <VSCodeButton
             appearance="secondary"
             onClick={() => setConfirmingReset(false)}
@@ -350,6 +393,43 @@ export const Providers = ({ onDone }: ProvidersProps) => {
         </div>
       )}
 
+      {policy ? (
+        <div className={styles.teamBanner}>
+          <span>
+            <strong>{policyIsEmpty(policy.policy) ? "Connected to your team" : "Managed by your team"}</strong> · {policy.url}
+            {policy.keyMissing ? (
+              <p className={styles.teamHint} role="alert">
+                Your team key is no longer in this machine&apos;s secret storage. Use Reconnect to sign in again.
+              </p>
+            ) : null}
+            <ul>
+              {policy.policy.teamOnly ? <li>Only the team gateway may be used: no other providers can be added or made active.</li> : null}
+              {policy.policy.lockDefaults ? <li>The team's default models stay active for chat, autocomplete and embeddings.</li> : null}
+              {policy.policy.recording?.length ? <li>{describeRecording(policy.policy.recording)}</li> : null}
+              {policy.policy.peers?.length ? <li>{describePooling(policy.policy.peers)}</li> : null}
+            </ul>
+          </span>
+          {confirmingLeave ? (
+            <span className={styles.teamActions}>
+              <VSCodeButton disabled={leaving} onClick={() => void leaveTeam()}>Leave team and remove its providers</VSCodeButton>
+              <VSCodeButton appearance="secondary" disabled={leaving} onClick={() => setConfirmingLeave(false)}>Keep</VSCodeButton>
+            </span>
+          ) : (
+            <span className={styles.teamActions}>
+              <VSCodeButton appearance="secondary" onClick={() => setView({ name: "team" })}>Reconnect</VSCodeButton>
+              <VSCodeButton appearance="secondary" onClick={() => setConfirmingLeave(true)}>Leave team</VSCodeButton>
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className={styles.teamEntry}>
+          <span><strong>Using Twinny with your team?</strong><br />Open the invite link your admin sent, or connect here with the gateway address.</span>
+          <VSCodeButton appearance="secondary" onClick={() => setView({ name: "team" })}>Connect to team</VSCodeButton>
+        </div>
+      )}
+
+      <ShareCard />
+
       {empty && (
         <Welcome
           onChoose={chooseFromWelcome}
@@ -360,23 +440,6 @@ export const Providers = ({ onDone }: ProvidersProps) => {
         />
       )}
 
-      {!empty && (
-      <SetupCheck
-        roles={PROVIDER_TYPES.map((type) => {
-          const provider = activeProviders[type]
-          return {
-            type,
-            provider,
-            result: provider ? results[provider.id] : undefined,
-            pending: provider ? testing.has(provider.id) : false
-          }
-        })}
-        running={checkingSetup}
-        onRun={runSetupCheck}
-        onAdd={openGallery}
-        onFix={openForm}
-      />
-      )}
 
       <DevicesSection onUse={assignDevice} jobsFor={jobsFor} />
 

@@ -39,6 +39,8 @@ export interface ProviderPreset {
   fimTemplate?: string
   /** Local servers are listed first: they are what twinny is built around. */
   local: boolean
+  /** A Twinny gateway on another machine: its own group, between local and hosted. */
+  gateway?: boolean
 }
 
 const codicon = (name: string) => <i className={`codicon codicon-${name}`} />
@@ -68,6 +70,19 @@ const local = (
   modelName,
   fimTemplate,
   local: true
+})
+
+const gateway = (type: ProviderType): ProviderPreset => ({
+  key: `${API_PROVIDERS.TwinnyRemote}-${type}`,
+  label: PROVIDER_DISPLAY_NAMES[API_PROVIDERS.TwinnyRemote],
+  descriptionKey: "preset-twinny-remote",
+  logo: codicon("remote"),
+  provider: API_PROVIDERS.TwinnyRemote,
+  type,
+  modelName: "",
+  fimTemplate: type === "fim" ? FIM_TEMPLATE_FORMAT.automatic : undefined,
+  local: false,
+  gateway: true
 })
 
 const hosted = (
@@ -103,6 +118,7 @@ export const PRESETS: ProviderPreset[] = [
   local(API_PROVIDERS.OpenWebUI, "chat"),
   local(API_PROVIDERS.LiteLLM, "chat"),
   local(API_PROVIDERS.Oobabooga, "chat"),
+  gateway("chat"),
   hosted(API_PROVIDERS.OpenAI, "OpenAI", <SvgOpenAI />, "gpt-4.1"),
   hosted(
     API_PROVIDERS.Anthropic,
@@ -127,6 +143,7 @@ export const PRESETS: ProviderPreset[] = [
   local(API_PROVIDERS.LMStudio, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
   local(API_PROVIDERS.LlamaCpp, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
   local(API_PROVIDERS.OpenAICompatible, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
+  gateway("fim"),
   hosted(
     API_PROVIDERS.Mistral,
     "Codestral",
@@ -140,6 +157,7 @@ export const PRESETS: ProviderPreset[] = [
   local(API_PROVIDERS.LMStudio, "embedding"),
   local(API_PROVIDERS.LlamaCpp, "embedding"),
   local(API_PROVIDERS.OpenAICompatible, "embedding"),
+  gateway("embedding"),
   hosted(
     API_PROVIDERS.OpenAI,
     "OpenAI",
@@ -175,19 +193,27 @@ interface PresetGalleryProps {
   onSelect: (provider: TwinnyProvider) => void
   onCustom: () => void
   onBack: () => void
+  /** The team allows only its gateway: only gateway presets are shown. */
+  teamOnly?: boolean
 }
 
 export const PresetGallery = ({
   type,
   onSelect,
   onCustom,
-  onBack
+  onBack,
+  teamOnly
 }: PresetGalleryProps) => {
   const { t } = useTranslation()
   const [showAll, setShowAll] = useState(false)
-  const presets = PRESETS.filter((preset) => preset.type === type)
+  const presets = PRESETS.filter(
+    (preset) =>
+      preset.type === type &&
+      (!teamOnly || preset.gateway)
+  )
   const localPresets = presets.filter((preset) => preset.local)
-  const hostedPresets = presets.filter((preset) => !preset.local)
+  const gatewayPresets = presets.filter((preset) => preset.gateway)
+  const hostedPresets = presets.filter((preset) => !preset.local && !preset.gateway)
 
   const renderPreset = (preset: ProviderPreset) => (
     <button
@@ -230,6 +256,13 @@ export const PresetGallery = ({
         >
           {t("preset-show-more", { count: localPresets.length - 4 })}
         </button>
+      )}
+
+      {gatewayPresets.length > 0 && (
+        <>
+          <h5 className={styles.galleryGroup}>{t("preset-group-gateway")}</h5>
+          <div className={styles.presetList}>{gatewayPresets.map(renderPreset)}</div>
+        </>
       )}
 
       {hostedPresets.length > 0 && (

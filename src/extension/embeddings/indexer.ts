@@ -14,8 +14,6 @@ import { Embedder } from "./embedder"
 import { isIndexablePath, looksBinary } from "./indexable"
 import { keywordText, pathKeywords } from "./rank"
 
-/** Files embedded at once. Each one is a few batched requests. */
-const FILE_CONCURRENCY = 4
 /** Rows are written once this many files are ready, or at the end. */
 const WRITE_EVERY_FILES = 25
 /** Files bigger than this are skipped: minified bundles, data dumps. */
@@ -157,7 +155,7 @@ export class WorkspaceIndexer {
   /* ------------------------------------------------------------------------ */
 
   private hash(buffer: Buffer): string {
-    return crypto.createHash("sha1").update(buffer).digest("hex")
+    return crypto.createHash("sha1").update(buffer as Uint8Array).digest("hex")
   }
 
   /**
@@ -295,12 +293,15 @@ export class WorkspaceIndexer {
       await this._db.saveManifest(manifest)
     }
 
-    const queue = new PQueue({ concurrency: FILE_CONCURRENCY })
+    // Stopping early clears the queue. A cleared task's promise from
+    // `add` never settles, so the run waits for the queue to drain rather
+    // than for every task; each task swallows its own errors.
+    const queue = new PQueue({ concurrency: this._embedder.parallel })
     token?.onCancellationRequested(() => queue.clear())
     report()
 
-    const work = stale.map((entry) =>
-      queue.add(async () => {
+    for (const entry of stale) {
+      void queue.add(async () => {
         if (failure || token?.isCancellationRequested) return
         const name = path.basename(entry.file)
         inFlight.add(name)
@@ -331,8 +332,8 @@ export class WorkspaceIndexer {
           report()
         }
       })
-    )
-    await Promise.all(work)
+    }
+    await queue.onIdle()
 
     onProgress?.({ phase: "finishing", processed, total, currentFiles: [] })
     await flush()

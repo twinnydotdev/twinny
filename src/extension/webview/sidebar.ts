@@ -5,6 +5,7 @@ import { WorkspaceIndex } from "../embeddings"
 import { P2pRuntime } from "../p2p/runtime"
 import { SessionManager } from "../session-manager"
 import { TwinnyStatusBar } from "../status-bar"
+import { TeamShare } from "../team/share"
 import { getNonce } from "../utils"
 
 import { BaseProvider } from "./base"
@@ -19,9 +20,10 @@ export class SidebarProvider extends BaseProvider {
     templateDir: string,
     index: WorkspaceIndex | undefined,
     sessionManager: SessionManager,
-    p2p?: P2pRuntime
+    p2p?: P2pRuntime,
+    teamShare?: TeamShare
   ) {
-    super(context, templateDir, statusBarItem, index, sessionManager, p2p)
+    super(context, templateDir, statusBarItem, index, sessionManager, p2p, teamShare)
     this.context = context
     this.registerSidebarReadyHandler(this.handleSidebarReady)
   }

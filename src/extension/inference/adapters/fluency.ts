@@ -22,6 +22,7 @@ import {
   InferenceOptions
 } from "../types"
 
+import { StreamResponse, usageFromResponse } from "./fim-dialects"
 import { logRequest } from "./json-stream"
 
 /** fluency.js routes every local server through its OpenAI-compatible client. */
@@ -91,7 +92,9 @@ export async function* fluencyChat(
     for await (const part of parts) {
       if (options?.signal?.aborted) break
       const delta = part.choices[0]?.delta?.content
-      if (delta) yield { content: delta }
+      const usage = usageFromResponse(part as unknown as { usage?: StreamResponse["usage"] })
+      if (usage) yield { content: delta || "", usage }
+      else if (delta) yield { content: delta }
     }
     return
   }
@@ -99,7 +102,9 @@ export async function* fluencyChat(
   logRequest(`${config.provider}/chat.completions`, body)
   const result = await client.chat.completions.create(body)
   const content = result.choices[0]?.message?.content
-  if (content) yield { content }
+  const usage = usageFromResponse(result as unknown as { usage?: StreamResponse["usage"] })
+  if (usage) yield { content: content || "", usage }
+  else if (content) yield { content }
 }
 
 /** What fluency.js knows a hosted API serves, for the model dropdown. */

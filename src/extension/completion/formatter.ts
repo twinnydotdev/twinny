@@ -141,6 +141,31 @@ export class CompletionFormatter {
     return this
   }
 
+  /**
+   * Mid-line, a weak model sometimes rewrites what already follows the cursor
+   * instead of filling the hole: `hasVotedMany|: (args: A) =>` completed with
+   * `: (args: B) =>`. Ghost text can only insert, so accepting would keep both
+   * annotations. A completion that begins the way the suffix begins is a
+   * rewrite, not a fill, and the only honest answer is nothing.
+   */
+  protected skipRewrittenSuffix(): this {
+    const after = this.textAfterCursor.trimStart()
+    const completion = this.completion.trimStart()
+    if (!after || !completion) return this
+
+    let shared = 0
+    while (
+      shared < after.length &&
+      shared < completion.length &&
+      after[shared] === completion[shared]
+    ) {
+      shared++
+    }
+    const significant = after.slice(0, shared).replace(/\s/g, "").length
+    if (significant >= 3) this.completion = ""
+    return this
+  }
+
   protected isCursorAtMiddleOfWord(): boolean {
     return /\w/.test(this.charAfterCursor) && /\w/.test(this.charBeforeCursor)
   }
@@ -311,6 +336,7 @@ export class CompletionFormatter {
       .ignoreBlankLines()
       .removeInvalidLineBreaks()
       .removeDuplicateText()
+      .skipRewrittenSuffix()
       .skipMiddleOfWord()
       .skipSimilarCompletions()
       .trimStart()

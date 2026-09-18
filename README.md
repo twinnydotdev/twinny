@@ -46,6 +46,9 @@ Use the sidebar to discuss your code with AI, getting explanations, tests, refac
 ### Workspace Embeddings
 Twinny uses workspace embeddings to provide context-aware AI assistance, improving the relevance of suggestions.
 
+### Teams: one gateway for everyone
+Run your models on one machine and use them from VS Code on every other: `npx twinny-server quickstart` finds your model server, makes an admin key and serves. From its admin page you set the team's default models, invite each developer with a link that opens VS Code and connects them, and see usage per person and per model. Free for teams of five; a licence adds seats, team policy and recording. See the [teams guide](https://twinnydotdev.github.io/twinny-docs/teams/overview/) and [docs/gateway.md](docs/gateway.md).
+
 
 ## Known Issues
 

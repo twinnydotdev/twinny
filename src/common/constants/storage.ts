@@ -15,6 +15,8 @@ export const P2P_HOST_SECRET_KEY = "twinny.p2p.host-seed"
 export const P2P_HOST_ENABLED_STORAGE_KEY = "twinny.p2p.host-enabled"
 /** Devices allowed to use this machine's Ollama. */
 export const P2P_TRUSTED_PEERS_STORAGE_KEY = "twinny.p2p.trusted-peers"
+/** Whether this machine shares its local server with the team, and which one. */
+export const TEAM_SHARE_STORAGE_KEY = "twinny.teamShare"
 
 export const GLOBAL_STORAGE_KEY = {
   selectedModel: "twinny.selectedModel"

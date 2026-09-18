@@ -14,8 +14,7 @@
 }
 
 .viewHeader,
-.sectionHeader,
-.setupHeader {
+.sectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -28,8 +27,7 @@
 }
 
 .viewHeader h4,
-.sectionHeader h4,
-.setupHeader h4 {
+.sectionHeader h4 {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -46,124 +44,6 @@
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-/* ------------------------------------------------------------------------ */
-/*  Setup check                                                              */
-/* ------------------------------------------------------------------------ */
-
-.setup {
-  padding: 10px 12px 12px;
-  border: 1px solid var(--tw-rule);
-  background: var(--tw-surface);
-}
-
-.setup .setupHeader vscode-button .codicon {
-  margin-right: 6px;
-}
-
-.roles {
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.role {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/*
- * A row is a button so the whole line takes you to the provider. Two lines:
- * the job and its state on the first, which provider answers it on the
- * second, so nothing has to be squeezed to fit a narrow sidebar.
- */
-.roleLine {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  column-gap: 8px;
-  row-gap: 1px;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-  padding: 5px 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--tw-fg);
-  font-family: var(--tw-font);
-  font-size: var(--tw-fs-sm);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.12s ease;
-}
-
-.roleLine:hover,
-.roleLine:focus-visible {
-  border-color: var(--tw-rule);
-  outline: none;
-}
-
-.roleLine > .codicon:first-child {
-  grid-row: 1 / span 2;
-  opacity: 0.6;
-}
-
-.roleName {
-  grid-column: 2;
-  grid-row: 1;
-  font-weight: 600;
-}
-
-.roleProvider {
-  grid-column: 2 / span 2;
-  grid-row: 2;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--tw-fg-dim);
-}
-
-.roleState {
-  grid-column: 3;
-  grid-row: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
-  text-transform: uppercase;
-  color: var(--tw-fg-faint);
-}
-
-.role-ok .roleState {
-  color: var(--vscode-testing-iconPassed, var(--tw-accent));
-}
-
-.role-failed .roleState {
-  color: var(--vscode-editorError-foreground);
-}
-
-.role-missing .roleState {
-  color: var(--vscode-editorWarning-foreground, var(--tw-fg-dim));
-}
-
-.roleDetail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  margin-left: 22px;
-  padding: 6px 8px;
-  border-left: 2px solid var(--tw-rule);
-  color: var(--tw-fg-dim);
-  font-size: var(--tw-fs-sm);
-  line-height: 1.5;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -606,7 +486,10 @@
 
 .fieldInvalid vscode-text-field::part(root),
 .fieldInvalid vscode-dropdown::part(control) {
-  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  border-color: var(
+    --vscode-inputValidation-errorBorder,
+    var(--vscode-errorForeground)
+  );
 }
 
 .fieldRow {
@@ -627,7 +510,10 @@
 
 .fieldError {
   margin: 0;
-  color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground));
+  color: var(
+    --vscode-inputValidation-errorForeground,
+    var(--vscode-errorForeground)
+  );
 }
 
 .inlineControl {
@@ -1009,4 +895,201 @@
 .jobChip-active .jobChipModel {
   color: inherit;
   opacity: 0.8;
+}
+/* Team onboarding shares the host editor's theme and works in narrow sidebars. */
+.teamEntry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 5px;
+  margin-bottom: 16px;
+}
+.teamEntry span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+.teamEntry strong {
+  color: var(--vscode-foreground);
+}
+.teamConnect {
+  max-width: 620px;
+  margin: 0 auto;
+}
+.teamConnect h3 {
+  margin: 20px 0 6px;
+  font-size: 19px;
+  font-weight: 500;
+}
+.teamConnect > p {
+  line-height: 1.5;
+}
+.teamField {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 18px 0;
+}
+.teamField input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 8px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  font: inherit;
+}
+.teamField input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+.teamHint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.teamIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+.teamIdentity span {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.teamRoles {
+  padding: 0;
+  margin: 12px 0;
+  list-style: none;
+}
+.teamRoles li {
+  border: 1px solid var(--vscode-widget-border);
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+.teamRoles p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+.teamRoleHeading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.teamRoleHeading span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+.teamConsent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 18px 0;
+  line-height: 1.5;
+}
+.teamConsent input {
+  flex-shrink: 0;
+  accent-color: var(--vscode-button-background);
+}
+.teamActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.teamError {
+  color: var(--vscode-errorForeground);
+  overflow-wrap: anywhere;
+}
+.teamSignIn {
+  margin: 18px 0;
+}
+.teamPolicy {
+  border: 1px solid var(--vscode-widget-border);
+  border-left: 3px solid var(--vscode-button-background);
+  border-radius: 5px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.teamPolicy ul {
+  margin: 8px 0;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+.cardBlocked {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+.teamBanner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--vscode-widget-border);
+  border-left: 3px solid var(--vscode-button-background);
+  border-radius: 5px;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+.teamBanner ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.teamSignIn p {
+  margin: 0 0 8px;
+}
+.teamCode {
+  display: inline-block;
+  margin: 6px 0 14px;
+  padding: 10px 16px;
+  font-size: 28px;
+  letter-spacing: 0.12em;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  user-select: all;
+}
+
+/* Share this computer with the team */
+.shareHint,
+.shareError {
+  margin: 0;
+  padding: 6px 10px 8px;
+  font-size: var(--tw-fs-sm);
+  color: var(--tw-fg-dim);
+  line-height: 1.5;
+}
+.shareHint code {
+  font-family: var(--vscode-editor-font-family);
+  user-select: all;
+}
+.shareError {
+  color: var(--vscode-errorForeground);
+}
+.shareFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 6px 10px;
+  border-top: 1px solid var(--tw-rule);
+}
+.shareFooter > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

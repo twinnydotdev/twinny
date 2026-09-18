@@ -32,13 +32,17 @@ import { InlineEditCodeLensProvider } from "./extension/edit/code-lens"
 import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
 import { WorkspaceIndex } from "./extension/embeddings"
 import { P2pRuntime } from "./extension/p2p/runtime"
+import { RemoteCredentials } from "./extension/providers/credentials"
 import { providerUrl } from "./extension/providers/errors"
 import { TwinnyProvider } from "./extension/providers/manager"
+import { TeamPolicyStore } from "./extension/providers/policy"
 import { setUpProvidersOnFirstRun } from "./extension/providers/setup"
 import { ProviderStore } from "./extension/providers/store"
+import { teamSession } from "./extension/providers/team"
 import { generateCommitMessage } from "./extension/review/commit-message"
 import { SessionManager } from "./extension/session-manager"
 import { TwinnyStatusBar } from "./extension/status-bar"
+import { TeamShare } from "./extension/team/share"
 import { TemplateProvider } from "./extension/templates/provider"
 import { terminalHistory } from "./extension/terminal"
 import { runDescribedCommand } from "./extension/terminal/command"
@@ -165,6 +169,11 @@ export async function activate(context: ExtensionContext) {
   const p2p = new P2pRuntime(context)
   await p2p.start()
 
+  // Gateway tokens live in secret storage; requests read them from memory.
+  const credentials = new RemoteCredentials(context)
+  await credentials.load(Object.values(await new ProviderStore(context).getProviders()))
+  context.subscriptions.push(credentials)
+
   // Nothing configured yet: use whichever local server is running, or say
   // so. Runs in the background; the sidebar waits on it before listing.
   const providerSetup = setUpProvidersOnFirstRun(
@@ -172,11 +181,19 @@ export async function activate(context: ExtensionContext) {
     new ProviderStore(context)
   )
 
+  // This computer as part of the team's pool, when the developer switched
+  // it on. Resumes after the team connection's key is loaded.
+  const teamShare = new TeamShare(context, () =>
+    teamSession(new ProviderStore(context), credentials, new TeamPolicyStore(context.globalState))
+  )
+  void teamShare.autoStart()
+
   const fullScreenProvider = new FullScreenProvider(
     context,
     templateDir,
     statusBar,
-    p2p
+    p2p,
+    teamShare
   )
 
   const workspaceIndex = await WorkspaceIndex.open(context)
@@ -188,7 +205,8 @@ export async function activate(context: ExtensionContext) {
     templateDir,
     workspaceIndex,
     sessionManager,
-    p2p
+    p2p,
+    teamShare
   )
 
   const completionProvider = new CompletionProvider(
@@ -222,13 +240,48 @@ export async function activate(context: ExtensionContext) {
       .getConfiguration("twinny")
       .update("enabled", enabled, vscode.ConfigurationTarget.Global)
 
+  // vscode://rjmacarthy.twinny/join?url=…&code=…  (an admin's invite link)
+  // vscode://rjmacarthy.twinny/team?url=…          (the gateway address alone)
+  // Either opens the Providers tab on Connect to team; an invite is opened
+  // by the extension first, so the key never passes through the browser.
+  const openTeamLink = async (uri: vscode.Uri) => {
+    const params = new URLSearchParams(uri.query)
+    const url = params.get("url")?.trim() ?? ""
+    const code = params.get("code")?.trim() || undefined
+    if (!url) {
+      void window.showWarningMessage("That Twinny link names no gateway. Ask your admin for a new invite.")
+      return
+    }
+    await commands.executeCommand(TWINNY_COMMAND_NAME.focusSidebar)
+    await sidebarProvider.waitForSidebarReady()
+    const providers = sidebarProvider.providers
+    if (!providers) {
+      logger.warn("Team link opened before the sidebar's providers were ready")
+      return
+    }
+    const open = await providers.openTeam({ url, code })
+    if (open.invite) {
+      void window.showInformationMessage(`Welcome, ${open.invite.name}. Confirm the team's models in the Twinny sidebar to finish connecting.`)
+    } else if (open.error) {
+      void window.showWarningMessage(`Twinny could not open the invite: ${open.error}`)
+    }
+  }
+
   context.subscriptions.push(
     statusBar,
     p2p,
+    teamShare,
     fileInteractionCache,
     completionProvider,
     inlineEdit,
     terminalHistory,
+    window.registerUriHandler({
+      handleUri: (uri) => {
+        if (uri.path === "/join" || uri.path === "/team") {
+          openTeamLink(uri).catch((error) => logger.error(`Team link failed: ${error instanceof Error ? error.message : String(error)}`))
+        }
+      }
+    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.showLogs, () => logger.show()),
     commands.registerCommand(TWINNY_COMMAND_NAME.terminalCommand, async () => {
       const chat = await requireChat()

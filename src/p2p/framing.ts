@@ -51,7 +51,7 @@ export class FrameDecoder {
         this.reset()
         throw new FrameTooLargeError(this._maxBytes)
       }
-      this._pending.push(Buffer.from(rest))
+      this._pending.push(rest)
     }
 
     return frames

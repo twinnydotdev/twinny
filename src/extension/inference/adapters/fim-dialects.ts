@@ -3,7 +3,7 @@
  * them. This is the only place a provider name decides a wire format.
  */
 import { API_PROVIDERS, USER } from "../../../common/constants"
-import { ChatMessage } from "../types"
+import { ChatMessage, InferenceUsage } from "../types"
 
 /** OpenAI's completions API rejects more than four stop sequences. */
 const MAX_HOSTED_STOP_SEQUENCES = 4
@@ -68,6 +68,32 @@ export interface StreamResponse {
     prompt_tokens: number
     completion_tokens: number
     total_tokens: number
+  }
+  /** llama.cpp `/completion` counts. */
+  tokens_evaluated?: number
+  tokens_predicted?: number
+}
+
+const count = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined
+
+/**
+ * Token counts a streamed line carries, in whichever dialect: Ollama puts
+ * them on its final line, OpenAI-style servers in `usage`, llama.cpp in
+ * `tokens_*`. Nothing is estimated; a line without counts gives nothing.
+ */
+export const usageFromResponse = (
+  data: Partial<StreamResponse> | undefined
+): InferenceUsage | undefined => {
+  if (!data) return undefined
+  const promptTokens =
+    count(data.usage?.prompt_tokens) ?? count(data.prompt_eval_count) ?? count(data.tokens_evaluated)
+  const completionTokens =
+    count(data.usage?.completion_tokens) ?? count(data.eval_count) ?? count(data.tokens_predicted)
+  if (promptTokens === undefined && completionTokens === undefined) return undefined
+  return {
+    ...(promptTokens !== undefined ? { promptTokens } : {}),
+    ...(completionTokens !== undefined ? { completionTokens } : {})
   }
 }
 
@@ -185,6 +211,9 @@ export const getFimDataFromProvider = (
 }
 
 interface EmbeddingResponseBody {
+  /** OpenAI-style `usage`, Ollama's `prompt_eval_count`. */
+  usage?: { prompt_tokens?: number }
+  prompt_eval_count?: number
   /** OpenAI, LM Studio, vLLM, llama.cpp `/v1/embeddings`. */
   data?: Array<{ index?: number; embedding: number[] }>
   /** Ollama `/api/embed`. */
@@ -204,4 +233,12 @@ export const vectorsFromResponse = (body: EmbeddingResponseBody): number[][] => 
   if (Array.isArray(body.embeddings)) return body.embeddings.filter(Array.isArray)
   if (Array.isArray(body.embedding)) return [body.embedding]
   return []
+}
+
+/** The prompt tokens an embedding reply reports, if any. */
+export const usageFromEmbeddingResponse = (
+  body: EmbeddingResponseBody
+): InferenceUsage | undefined => {
+  const promptTokens = count(body.usage?.prompt_tokens) ?? count(body.prompt_eval_count)
+  return promptTokens === undefined ? undefined : { promptTokens }
 }

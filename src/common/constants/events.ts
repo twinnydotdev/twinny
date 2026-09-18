@@ -68,6 +68,15 @@ export const EMBEDDING_EVENT_NAME = {
 
 export const PROVIDER_EVENT_NAME = {
   addProvider: "twinny.add-provider",
+  previewTeam: "twinny.preview-team",
+  applyTeam: "twinny.apply-team",
+  cancelTeam: "twinny.cancel-team",
+  getTeamPolicy: "twinny.get-team-policy",
+  leaveTeam: "twinny.leave-team",
+  startTeamSignIn: "twinny.start-team-sign-in",
+  pollTeamSignIn: "twinny.poll-team-sign-in",
+  openTeam: "twinny.open-team",
+  takeTeamOpen: "twinny.take-team-open",
   copyProvider: "twinny.copy-provider",
   discoverProviders: "twinny.discover-providers",
   exportProviders: "twinny.export-providers",
@@ -86,6 +95,14 @@ export const PROVIDER_EVENT_NAME = {
   testProvider: "twinny.test-provider",
   updateProvider: "twinny.update-provider",
   useDiscoveredServer: "twinny.use-discovered-server"
+} as const
+
+export const TEAM_SHARE_EVENT_NAME = {
+  get: "twinny.get-team-share",
+  start: "twinny.start-team-share",
+  stop: "twinny.stop-team-share",
+  setBackend: "twinny.set-team-share-backend",
+  discover: "twinny.discover-team-share-backends"
 } as const
 
 export const P2P_EVENT_NAME = {

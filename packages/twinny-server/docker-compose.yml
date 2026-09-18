@@ -1,0 +1,47 @@
+# Ollama plus twinny-server on one machine. The gateway reaches Ollama by
+# its service name; only the gateway's port is published, and only to
+# loopback, so a reverse proxy (Caddy, nginx) or a tunnel adds TLS.
+#
+#   docker compose up -d ollama
+#   docker compose exec ollama ollama pull qwen2.5-coder:7b
+#   docker compose exec ollama ollama pull codellama:7b-code
+#   docker compose exec ollama ollama pull nomic-embed-text
+#   docker compose run --rm twinny-server init /data/twinny.gateway.json --host 0.0.0.0 --ollama ollama
+#   docker compose run --rm twinny-server keys create you --admin --config /data/twinny.gateway.json
+#   docker compose up -d
+#   docker compose run --rm twinny-server license set twl1.… --config /data/twinny.gateway.json
+#
+# Every `run --rm twinny-server …` shares the data volume with the running
+# gateway, so keys and the licence take effect without a restart.
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama
+    # NVIDIA GPU: uncomment (needs the NVIDIA Container Toolkit on the host).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  twinny-server:
+    image: ghcr.io/twinnydotdev/twinny-server:latest
+    build: .
+    depends_on:
+      - ollama
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - twinny-data:/data
+    # Backend API keys, if a provider in the config names one:
+    # environment:
+    #   GROQ_API_KEY: ${GROQ_API_KEY}
+    restart: unless-stopped
+
+volumes:
+  ollama:
+  twinny-data:

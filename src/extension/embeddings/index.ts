@@ -6,7 +6,7 @@ import * as vscode from "vscode"
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../../common/constants"
 import { logger } from "../../common/logger"
 import { TwinnyProvider } from "../../common/types"
-import { resolveProviderEndpoint } from "../p2p/endpoint"
+import { resolveProviderEndpoint } from "../providers/endpoint"
 import { sanitizeWorkspaceName } from "../utils"
 
 import { EmbeddingDatabase } from "./database"

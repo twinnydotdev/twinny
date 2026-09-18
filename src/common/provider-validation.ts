@@ -8,6 +8,7 @@
  */
 import {
   API_PROVIDERS,
+  DEFAULT_GATEWAY_PORT,
   FIM_TEMPLATE_FORMAT,
   OPEN_AI_COMPATIBLE_PROVIDERS
 } from "./constants"
@@ -60,6 +61,15 @@ export const isOpenAICompatibleProvider = (provider: string) =>
  */
 export const isP2pProvider = (provider: string) =>
   provider === API_PROVIDERS.TwinnyP2P
+
+/**
+ * A standalone Twinny gateway. The address is the gateway's; the path is
+ * only a base for a reverse proxy, the protocol routes are added to it.
+ * The API key field holds the gateway token, which the extension keeps in
+ * secret storage rather than with the provider.
+ */
+export const isRemoteProvider = (provider: string) =>
+  provider === API_PROVIDERS.TwinnyRemote
 
 /**
  * Whether the hostname / port / path fields matter for this provider + type.
@@ -130,6 +140,11 @@ const ENDPOINT_DEFAULTS: Record<
     fim: { apiHostname: "localhost", apiPort: 8080, apiPath: "/v1/completions" },
     embedding: { apiHostname: "localhost", apiPort: 8080, apiPath: "/v1/embeddings" }
   },
+  [API_PROVIDERS.Qvac]: {
+    chat: { apiHostname: "localhost", apiPort: 11435, apiPath: "/v1" },
+    fim: { apiHostname: "localhost", apiPort: 11435, apiPath: "/v1/completions" },
+    embedding: { apiHostname: "localhost", apiPort: 11435, apiPath: "/v1/embeddings" }
+  },
   [API_PROVIDERS.Deepseek]: {
     chat: { apiHostname: "api.deepseek.com", apiProtocol: "https", apiPath: "/v1" },
     fim: { apiHostname: "api.deepseek.com", apiProtocol: "https", apiPath: "/beta/completions" }
@@ -142,6 +157,11 @@ const ENDPOINT_DEFAULTS: Record<
   },
   [API_PROVIDERS.OpenAI]: {
     embedding: { apiHostname: "api.openai.com", apiProtocol: "https", apiPath: "/v1/embeddings" }
+  },
+  [API_PROVIDERS.TwinnyRemote]: {
+    chat: { apiHostname: "localhost", apiPort: DEFAULT_GATEWAY_PORT, apiPath: "" },
+    fim: { apiHostname: "localhost", apiPort: DEFAULT_GATEWAY_PORT, apiPath: "" },
+    embedding: { apiHostname: "localhost", apiPort: DEFAULT_GATEWAY_PORT, apiPath: "" }
   }
 }
 
@@ -342,7 +362,7 @@ export const validateProvider = (
       )
     }
 
-    if (type !== "chat" && !path) {
+    if (type !== "chat" && !path && !isRemoteProvider(providerName)) {
       const suggested = getEndpointDefaults(providerName, type)?.apiPath
       warnings.push(
         suggested
@@ -401,8 +421,9 @@ export const describeProviderEndpoint = (provider: TwinnyProvider) => {
   const origin = getProviderOrigin(provider)
   if (!origin) return ""
   const path = provider.apiPath || ""
-  const route =
-    provider.type === "chat" && isOpenAICompatibleProvider(provider.provider)
+  const route = isRemoteProvider(provider.provider)
+    ? `${path}/twinny/v1/${provider.type === "embedding" ? "embeddings" : provider.type}`
+    : provider.type === "chat" && isOpenAICompatibleProvider(provider.provider)
       ? `${path}/chat/completions`
       : path
   return `${origin}${route}`
@@ -412,7 +433,9 @@ export const describeProviderEndpoint = (provider: TwinnyProvider) => {
 export const summarizeProvider = (provider: TwinnyProvider) => {
   const where = isP2pProvider(provider.provider)
     ? "P2P device"
-    : usesEndpoint(provider.provider, provider.type)
+    : isRemoteProvider(provider.provider)
+      ? `gateway ${provider.apiHostname || "?"}${provider.apiPort ? `:${provider.apiPort}` : ""}`
+      : usesEndpoint(provider.provider, provider.type)
       ? `${provider.apiHostname || "?"}${provider.apiPort ? `:${provider.apiPort}` : ""}`
       : provider.provider
   return [provider.modelName || "no model", where].join(" · ")

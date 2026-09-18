@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "4.0.20",
+  "version": "4.1.1",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -50,7 +50,8 @@
     "Linters"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onUri"
   ],
   "author": {
     "name": "rjmacarthy"
@@ -558,6 +559,14 @@
           "maximum": 65535,
           "markdownDescription": "UDP port this computer listens on when sharing its Ollama with paired devices (Providers → Devices → Share). Devices on your network connect to this port, so a firewall on this computer must allow it, e.g. `sudo ufw allow 49737/udp`. Takes effect the next time sharing starts."
         },
+        "twinny.teamShareSlots": {
+          "order": 16,
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "markdownDescription": "How many teammates' requests this computer runs at once while sharing it with the team (Providers → Share this computer). Takes effect the next time sharing starts."
+        },
         "twinny.keepAlive": {
           "order": 17,
           "type": "string",
@@ -612,6 +621,7 @@
     "package": "node scripts/build.mjs",
     "pretest": "npm run clean && npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",
+    "test:sqlite": "node --test out/test/standalone/*.standalone.js",
     "vscode:package": "npm exec vsce package",
     "vscode:prepublish": "npm run package",
     "vscode:publish": "npm exec vsce publish",

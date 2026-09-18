@@ -25,6 +25,8 @@ import {
 import {
   createStreamRequestBodyFim,
   getFimDataFromProvider,
+  usageFromEmbeddingResponse,
+  usageFromResponse,
   vectorsFromResponse
 } from "./fim-dialects"
 import { fluencyChat } from "./fluency"
@@ -141,7 +143,9 @@ export class HttpInferenceProvider implements InferenceProvider {
     })
     for await (const line of lines) {
       const text = getFimDataFromProvider(kind, line)
-      if (text !== undefined) yield { text }
+      const usage = usageFromResponse(line)
+      if (usage) yield { text: text ?? "", usage }
+      else if (text !== undefined) yield { text }
     }
   }
 
@@ -167,11 +171,13 @@ export class HttpInferenceProvider implements InferenceProvider {
       signal: options?.signal
     })
     if (!response.ok) throw await responseError(response)
-    const vectors = vectorsFromResponse(await response.json())
+    const reply = await response.json()
+    const vectors = vectorsFromResponse(reply)
     if (!vectors.length) {
       throw new Error("The server answered but returned no embedding vector.")
     }
-    return { vectors }
+    const usage = usageFromEmbeddingResponse(reply)
+    return usage ? { vectors, usage } : { vectors }
   }
 
   /**

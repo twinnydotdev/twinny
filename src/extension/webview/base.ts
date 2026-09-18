@@ -24,12 +24,14 @@ import { WorkspaceIndex } from "../embeddings"
 import { EmbeddingService } from "../embeddings/service"
 import { ExtensionBridge } from "../messaging/bridge"
 import { P2pBridge } from "../p2p/bridge"
-import { resolveProviderEndpoint } from "../p2p/endpoint"
 import { P2pRuntime } from "../p2p/runtime"
+import { resolveProviderEndpoint } from "../providers/endpoint"
 import { ProviderManager } from "../providers/manager"
 import { ReviewService } from "../review/service"
 import { SessionManager } from "../session-manager"
 import { TwinnyStatusBar } from "../status-bar"
+import { TeamShareBridge } from "../team/bridge"
+import { TeamShare } from "../team/share"
 import { TemplateProvider } from "../templates/provider"
 import { getLanguage, getTerminal, getTextSelection, getTheme } from "../utils"
 
@@ -46,6 +48,8 @@ export class BaseProvider {
   private _fileTreeProvider: FileTreeProvider
   private _p2p: P2pRuntime | undefined
   private _p2pBridge: P2pBridge | undefined
+  private _teamShare: TeamShare | undefined
+  private _teamShareBridge: TeamShareBridge | undefined
   private _sessionManager: SessionManager | undefined
   private _statusBarItem: TwinnyStatusBar
   private _templateDir: string | undefined
@@ -53,6 +57,7 @@ export class BaseProvider {
   private _disposables: vscode.Disposable[] = []
   public bridge: ExtensionBridge | undefined
   public chat: Chat | undefined
+  public providers: ProviderManager | undefined
   public context: vscode.ExtensionContext
   public conversationHistory: ConversationHistory | undefined
   public reviewService: ReviewService | undefined
@@ -70,12 +75,14 @@ export class BaseProvider {
     statusBar: TwinnyStatusBar,
     index?: WorkspaceIndex,
     sessionManager?: SessionManager,
-    p2p?: P2pRuntime
+    p2p?: P2pRuntime,
+    teamShare?: TeamShare
   ) {
     this.context = context
     this._fileTreeProvider = new FileTreeProvider()
     this._workspaceIndex = index
     this._p2p = p2p
+    this._teamShare = teamShare
     this._sessionManager = sessionManager
     this._statusBarItem = statusBar
     this._templateDir = templateDir
@@ -97,6 +104,8 @@ export class BaseProvider {
     this.bridge = undefined
     this._p2pBridge?.dispose()
     this._p2pBridge = undefined
+    this._teamShareBridge?.dispose()
+    this._teamShareBridge = undefined
     this.chat?.dispose()
     this._embeddingService?.dispose()
     this._embeddingService = undefined
@@ -128,9 +137,16 @@ export class BaseProvider {
       this.conversationHistory
     )
 
-    const providerManager = new ProviderManager(this.context, bridge)
+    const teamShare = this._teamShare
+    const providerManager = new ProviderManager(this.context, bridge, {
+      teamChanged: () => teamShare?.teamChanged()
+    })
+    this.providers = providerManager
     if (this._p2p) {
       this._p2pBridge = new P2pBridge(this._p2p, bridge, providerManager)
+    }
+    if (teamShare) {
+      this._teamShareBridge = new TeamShareBridge(teamShare, bridge)
     }
     this._embeddingService = new EmbeddingService(
       this.context,

@@ -165,6 +165,7 @@ export class ProviderStore {
           e instanceof Error ? e.message : String(e)
         }`
       )
+      throw e
     }
   }
 }

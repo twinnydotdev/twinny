@@ -439,6 +439,65 @@ suite("Inference layer", function () {
       assert.deepStrictEqual(ollama.received[0].body.input, ["a", "b"])
       assert.strictEqual(ollama.received[0].body.model, "codellama:7b-code")
     })
+
+    test("a provider saved without a route gets its kind's usual one", async () => {
+      // A team provider's path is the gateway's base; the protocol route
+      // is added to it. A fixed "/api/embed" here once sent the request to
+      // /api/embed/twinny/v1/embeddings, which the gateway does not serve.
+      const gateway = await serve(
+        startServer((request, response) => {
+          const inputs = request.body.input as string[]
+          response.end(JSON.stringify({ vectors: inputs.map((_, i) => [i, 3]) }))
+        })
+      )
+      const ollama = await serve(
+        startServer((request, response) => {
+          const inputs = request.body.input as string[]
+          response.end(JSON.stringify({ embeddings: inputs.map((_, i) => [i, 1]) }))
+        })
+      )
+      const cases: Array<[TwinnyProvider, string, number[][]]> = [
+        [
+          { ...fimConfig(API_PROVIDERS.TwinnyRemote, gateway.port, ""), type: "embedding" },
+          "/twinny/v1/embeddings",
+          [[0, 3], [1, 3]]
+        ],
+        [
+          { ...fimConfig(API_PROVIDERS.Ollama, ollama.port, ""), type: "embedding" },
+          "/api/embed",
+          [[0, 1], [1, 1]]
+        ]
+      ]
+      for (const [config, , expected] of cases) {
+        const embedder = new Embedder(() => config)
+        assert.deepStrictEqual(await embedder.embed(["a", "b"], "document"), expected)
+      }
+      assert.strictEqual(gateway.received[0].path, cases[0][1])
+      assert.strictEqual(ollama.received[0].path, cases[1][1])
+    })
+
+    test("a busy server is waited out, and never mistaken for one wanting single strings", async () => {
+      let refusals = 2
+      const busy = await serve(
+        startServer((request, response) => {
+          if (refusals-- > 0) {
+            response.writeHead(429, { "Retry-After": "1" })
+            response.end(JSON.stringify({ error: { message: "The gateway is busy: 2 request(s) already running." } }))
+            return
+          }
+          const inputs = request.body.input as string[]
+          response.end(JSON.stringify({ embeddings: inputs.map((_, i) => [i, 1]) }))
+        })
+      )
+      const config: TwinnyProvider = { ...fimConfig(API_PROVIDERS.Ollama, busy.port, "/api/embed"), type: "embedding" }
+      const embedder = new Embedder(() => config, { rateLimitDelaysMs: [10, 10, 10] })
+      assert.deepStrictEqual(await embedder.embed(["a", "b"], "document"), [[0, 1], [1, 1]])
+      assert.strictEqual(busy.received.length, 3, "two refusals, then the answer")
+      assert.ok(busy.received.every((r) => Array.isArray(r.body.input)), "the list was sent each time")
+
+      refusals = 99
+      await assert.rejects(embedder.embed(["c"], "document"), /rate limiting requests/)
+    })
   })
 
   suite("errors", () => {

@@ -8,7 +8,38 @@
  * prompts and replies themselves. Warnings and errors are always written;
  * the `twinny.enableLogging` setting turns everything else off.
  */
-import * as vscode from "vscode"
+import type * as VsCode from "vscode"
+
+/**
+ * The gateway CLI shares the inference adapters, and so this logger, with
+ * no VS Code around. There the channel is stderr, warnings and errors
+ * only: what a request carried is never written by a headless process.
+ */
+const loadVsCode = (): typeof VsCode | undefined => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("vscode") as typeof VsCode
+  } catch {
+    return undefined
+  }
+}
+const vscode = loadVsCode()
+
+interface LogSink {
+  info(message: string): void
+  warn(message: string): void
+  error(message: string): void
+  debug(message: string): void
+  show(preserveFocus?: boolean): void
+}
+
+const headlessSink = (): LogSink => ({
+  info: () => undefined,
+  debug: () => undefined,
+  warn: (message) => process.stderr.write(`[twinny] warn ${message}\n`),
+  error: (message) => process.stderr.write(`[twinny] error ${message}\n`),
+  show: () => undefined
+})
 
 /** Text a prompt or reply is cut to in the log. */
 const MAX_BLOCK_CHARS = 8000
@@ -53,10 +84,12 @@ const indent = (text: string, max = MAX_BLOCK_CHARS): string => {
 
 export class Logger {
   private static instance: Logger
-  private readonly channel: vscode.LogOutputChannel
+  private readonly channel: LogSink
 
   private constructor() {
-    this.channel = vscode.window.createOutputChannel("Twinny", { log: true })
+    this.channel = vscode
+      ? vscode.window.createOutputChannel("Twinny", { log: true })
+      : headlessSink()
   }
 
   public static getInstance(): Logger {
@@ -65,6 +98,7 @@ export class Logger {
   }
 
   private get enabled() {
+    if (!vscode) return false
     return vscode.workspace
       .getConfiguration("twinny")
       .get<boolean>("enableLogging", true)
@@ -91,7 +125,7 @@ export class Logger {
           : `${message}: ${describe(error)}`
         : describe(message)
     this.channel.error(redact(text))
-    console.error(`[twinny] ${redact(text)}`)
+    if (vscode) console.error(`[twinny] ${redact(text)}`)
   }
 
   /** Detail worth having when something is wrong: prompts, replies, bodies. */

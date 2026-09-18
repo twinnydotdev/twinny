@@ -5,8 +5,8 @@ import {
   ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY,
   ACTIVE_FIM_PROVIDER_STORAGE_KEY
 } from "../../common/constants"
-import { resolveProviderEndpoint } from "../p2p/endpoint"
 
+import { resolveProviderEndpoint } from "./endpoint"
 import { TwinnyProvider } from "./manager"
 
 export class Base {

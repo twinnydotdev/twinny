@@ -22,9 +22,11 @@ const describeModels = (models: Array<{ name: string; parameterSize?: string }>)
     : "  (no models installed — run `ollama pull <model>`)"
 
 async function main() {
+  const argv = process.argv.slice(2)
+
   let parsed
   try {
-    parsed = parseArgs(process.argv.slice(2))
+    parsed = parseArgs(argv)
   } catch (error) {
     out(error instanceof Error ? error.message : String(error))
     process.exit(2)

@@ -15,6 +15,7 @@ export {
   type InferenceAdapter,
   ProviderRegistry,
   providerRegistry,
+  remoteAdapter,
   resolveInferenceProvider
 } from "./registry"
 export { abortable, readText } from "./stream"
@@ -31,6 +32,7 @@ export type {
   InferenceModel,
   InferenceOptions,
   InferenceProvider,
-  InferenceStream
+  InferenceStream,
+  InferenceUsage
 } from "./types"
 export { INFERENCE_CAPABILITIES } from "./types"

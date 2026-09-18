@@ -13,9 +13,7 @@
  * show that sharing is happening elsewhere and take over if it goes away.
  */
 
-import fs from "node:fs"
 import os from "node:os"
-import path from "node:path"
 import {
   Disposable,
   Event,
@@ -36,6 +34,7 @@ import { DEFAULT_NODE_PORT } from "../../node/config"
 import { TrustStorage, TrustStore } from "../../node/peers"
 import { NODE_EVENT, TwinnyNode } from "../../node/server"
 import { createSeed, keyPairFromSeed, toHex } from "../../p2p"
+import { WindowLock } from "../utils/window-lock"
 
 const LOCK_FILE = "p2p-host.lock"
 /** How often a window re-checks the lock and the shared on/off switch. */
@@ -75,12 +74,17 @@ export class P2pHost implements Disposable {
   private _ollamaOk?: boolean
   private _error?: string
   private _runningElsewhere = false
-  private _lockHeld = false
+  private readonly _lock: WindowLock
   private _poll?: ReturnType<typeof setInterval>
   private _disposed = false
 
   constructor(private readonly _context: ExtensionContext) {
     this._trust = new TrustStore(mementoTrustStorage(_context.globalState))
+    this._lock = new WindowLock({
+      dir: _context.globalStorageUri.fsPath,
+      name: LOCK_FILE,
+      warn: (message) => logger.error(`p2p host ${message}`)
+    })
   }
 
   public get enabled(): boolean {
@@ -239,48 +243,13 @@ export class P2pHost implements Disposable {
   /*  One node per machine                                                     */
   /* ------------------------------------------------------------------------ */
 
-  private get lockPath(): string {
-    return path.join(this._context.globalStorageUri.fsPath, LOCK_FILE)
-  }
-
-  /**
-   * Claims the right to run the node. Returns false when a live process in
-   * another window holds it. A lock left by a process that died is taken
-   * over; if the file system refuses to play, sharing goes ahead unguarded.
-   */
+  /** Claims the right to run the node; false when another window's live process holds it. */
   private acquireLock(): boolean {
-    if (this._lockHeld) return true
-    const file = this.lockPath
-    const claim = JSON.stringify({ pid: process.pid, since: Date.now() })
-    try {
-      fs.mkdirSync(path.dirname(file), { recursive: true })
-      try {
-        fs.writeFileSync(file, claim, { flag: "wx" })
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
-        const holder = readLockPid(file)
-        if (holder !== undefined && holder !== process.pid && isAlive(holder)) {
-          return false
-        }
-        fs.writeFileSync(file, claim)
-      }
-    } catch (error) {
-      logger.error(
-        `p2p host lock unavailable, sharing without it: ${error instanceof Error ? error.message : String(error)}`
-      )
-    }
-    this._lockHeld = true
-    return true
+    return this._lock.acquire()
   }
 
   private releaseLock() {
-    if (!this._lockHeld) return
-    this._lockHeld = false
-    try {
-      if (readLockPid(this.lockPath) === process.pid) fs.unlinkSync(this.lockPath)
-    } catch {
-      // Nothing to release, or not ours any more.
-    }
+    this._lock.release()
   }
 
   private startPolling() {
@@ -375,24 +344,5 @@ export class P2pHost implements Disposable {
   private changed() {
     if (this._disposed) return
     this._onDidChange.fire(this.status())
-  }
-}
-
-const readLockPid = (file: string): number | undefined => {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(file, "utf8"))
-    return Number.isInteger(parsed?.pid) ? Number(parsed.pid) : undefined
-  } catch {
-    return undefined
-  }
-}
-
-const isAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    // No permission to signal it means it exists and is someone else's.
-    return (error as NodeJS.ErrnoException).code === "EPERM"
   }
 }

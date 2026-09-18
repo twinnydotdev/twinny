@@ -23,6 +23,7 @@ import {
   getEndpointDefaults,
   hasConfigurableEndpoint,
   isP2pProvider,
+  isRemoteProvider,
   normalizeProvider,
   PROVIDER_TYPES,
   ProviderField,
@@ -80,6 +81,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const validation = useMemo(() => validateProvider(normalized), [normalized])
   const endpoint = describeProviderEndpoint(normalized)
   const isP2p = isP2pProvider(draft.provider)
+  const isRemote = isRemoteProvider(draft.provider)
   const showEndpointFields = hasConfigurableEndpoint(draft.provider, draft.type)
   const device = isP2p ? devices.find((d) => d.id === draft.deviceId) : undefined
 
@@ -375,16 +377,20 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       {!isP2p &&
         field(
         "apiKey",
-        t("api-key"),
+        isRemote ? t("gateway-token") : t("api-key"),
         <div className={styles.inlineControl}>
           <VSCodeTextField
             id="apiKey"
             type={showKey ? TextFieldType.text : TextFieldType.password}
             value={draft.apiKey || ""}
             placeholder={
-              expectsApiKey(draft.provider)
-                ? t("api-key-required-placeholder")
-                : t("api-key-placeholder")
+              isRemote
+                ? isEditing
+                  ? t("gateway-token-keep-placeholder")
+                  : t("gateway-token-placeholder")
+                : expectsApiKey(draft.provider)
+                  ? t("api-key-required-placeholder")
+                  : t("api-key-placeholder")
             }
             onInput={(e) => update({ apiKey: valueOf(e) })}
           />
@@ -395,7 +401,8 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
           >
             <i className={`codicon codicon-${showKey ? "eye-closed" : "eye"}`} />
           </VSCodeButton>
-        </div>
+        </div>,
+        isRemote ? t("gateway-token-hint") : undefined
       )}
 
       {field(

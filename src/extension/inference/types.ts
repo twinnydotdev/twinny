@@ -32,6 +32,12 @@ export interface InferenceOptions {
    * reading, does nothing.
    */
   signal?: AbortSignal
+  /**
+   * Called by a provider that chooses among several backends per request
+   * (a pool of teammates' machines, say) with the name of the one it
+   * used, so the host can record it. Most providers never call it.
+   */
+  onBackend?(name: string): void
 }
 
 export interface FimRequest {
@@ -49,8 +55,19 @@ export interface FimRequest {
   keepAlive?: string | number
 }
 
+/**
+ * What a backend said it spent, when it says. Only ever reported, never
+ * estimated: a backend that stays silent leaves this undefined.
+ */
+export interface InferenceUsage {
+  promptTokens?: number
+  completionTokens?: number
+}
+
 export interface FimChunk {
   text: string
+  /** Usually on the last chunk, from backends that count. */
+  usage?: InferenceUsage
 }
 
 /**
@@ -68,6 +85,8 @@ export interface ChatRequest {
 
 export interface ChatChunk {
   content: string
+  /** Usually on the last chunk, from backends that count. */
+  usage?: InferenceUsage
 }
 
 export interface EmbeddingRequest {
@@ -78,6 +97,7 @@ export interface EmbeddingRequest {
 export interface EmbeddingResponse {
   /** One vector per input, in input order. */
   vectors: number[][]
+  usage?: InferenceUsage
 }
 
 /**

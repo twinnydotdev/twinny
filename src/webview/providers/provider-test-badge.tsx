@@ -29,6 +29,7 @@ export const ProviderTestBadge = ({ result, pending, verbose }: Props) => {
   if (result.success) {
     const detail = [
       result.latencyMs !== undefined ? `${result.latencyMs} ms` : "",
+      result.identity ? t("gateway-connected-as", { name: result.identity }) : "",
       result.sample ? `“${result.sample}”` : ""
     ]
       .filter(Boolean)

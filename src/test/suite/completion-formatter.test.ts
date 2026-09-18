@@ -240,6 +240,38 @@ suite("Completion formatter", () => {
     )
   })
 
+  test("drops a completion that rewrites the text after the cursor", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "  hasVotedMany: (args: SerializedHeimdallLink[]) =>",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, "  hasVotedMany".length)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor, position)
+    assert.strictEqual(
+      completionFormatter.format(": (args: SerializedProposal) =>"),
+      ""
+    )
+    // Repeating the suffix and carrying on past it is the same mistake.
+    assert.strictEqual(
+      completionFormatter.format(": (args: SerializedHeimdallLink[]) => boolean;"),
+      ""
+    )
+  })
+
+  test("keeps a completion that fills the hole before the suffix", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "const x = foo(bar)",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, "const x = foo(".length)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor, position)
+    assert.strictEqual(completionFormatter.format("baz, "), "baz,")
+    // Only a short shared opener, e.g. a closing bracket, is not a rewrite.
+    assert.strictEqual(completionFormatter.format("b, bar)"), "b, ")
+  })
+
   test("prevents quotation completions", async () => {
     const document = await vscode.workspace.openTextDocument()
     editor = await vscode.window.showTextDocument(document)

@@ -46,8 +46,8 @@ Twinny 提供 AI 驱动的实时代码建议，增强您的编码体验。
 ### 工作区嵌入
 Twinny 使用工作区嵌入提供上下文感知的 AI 辅助，提高建议的相关性。
 
-### 点对点
-Twinny 提供了一个可选的点对点连接管理器（`src/extension/p2p`），任何 P2P 功能都可以在其基础上构建。默认情况下不启用 — 请参阅其 [README](src/extension/p2p/README.md)。
+### 团队：一个网关，全员共用
+在一台机器上运行模型，让团队里每个人的 VS Code 都能使用：`npx twinny-server quickstart` 会自动找到本机的模型服务、生成管理员密钥并开始服务。在它的管理页面上，你可以设置团队默认模型、用一个链接邀请每位开发者（打开 VS Code 即可完成连接），并查看每人、每个模型的用量。五人以内的团队免费；购买许可证可增加席位，并开启团队策略和请求记录。详见[团队指南](https://twinnydotdev.github.io/twinny-docs/teams/overview/)和 [docs/gateway.md](docs/gateway.md)。
 
 ## 已知问题
 

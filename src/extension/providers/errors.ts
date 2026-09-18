@@ -59,8 +59,11 @@ export const describeProviderError = (
       break
     case "authentication":
       summary =
-        `${name} rejected the request as unauthorised. ` +
-        "Check the API key on the provider."
+        provider.provider === "twinny-remote"
+          ? `${name} refused the request: ${raw.replace(/^The gateway responded with status \d+:?\s*/i, "")} ` +
+            "Enter a current gateway key on the provider."
+          : `${name} rejected the request as unauthorised. ` +
+            "Check the API key on the provider."
       break
     case "model-unavailable":
       summary =

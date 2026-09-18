@@ -12,8 +12,18 @@ vsc-extension-quickstart.md
 scripts
 .github
 docs
+deploy
+packages/**
 target
 .vscode-test.json
+
+# Never in the extension: local state, editor-side tooling, compiled tests, packages.
+.claude/**
+.vscode-test.js
+twinny.gateway.json
+out/test/**
+*.vsix
+*.tgz
 
 !node_modules/udx-native/**
 !node_modules/sodium-native/**

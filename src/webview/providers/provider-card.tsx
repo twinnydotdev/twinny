@@ -15,6 +15,8 @@ interface Props {
   active: boolean
   testResult?: ProviderTestResult | null
   testing?: boolean
+  /** Why the team's policy refuses this provider; shown on the card and blocks activating. */
+  blocked?: string
   onActivate: () => void
   onTest: () => void
   onEdit: () => void
@@ -27,6 +29,7 @@ export const ProviderCard = ({
   active,
   testResult,
   testing,
+  blocked,
   onActivate,
   onTest,
   onEdit,
@@ -45,8 +48,9 @@ export const ProviderCard = ({
         <button
           type="button"
           className={styles.cardSelect}
-          title={active ? t("active-provider") : t("use-provider")}
+          title={blocked ?? (active ? t("active-provider") : t("use-provider"))}
           aria-pressed={active}
+          disabled={!!blocked && !active}
           onClick={onActivate}
         >
           <i
@@ -57,6 +61,7 @@ export const ProviderCard = ({
           <div className={styles.cardTitle}>
             <span className={styles.cardLabel}>{t(provider.label)}</span>
             {active && <span className={styles.cardBadge}>{t("active")}</span>}
+            {blocked && <span className={styles.cardBlocked} title={blocked}>not allowed by your team</span>}
           </div>
           <div className={styles.cardSummary} title={summarizeProvider(provider)}>
             {summarizeProvider(provider)}

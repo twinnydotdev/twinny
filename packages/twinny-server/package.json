@@ -1,0 +1,41 @@
+{
+  "name": "twinny-server",
+  "version": "4.1.1",
+  "description": "Serve your local models to the Twinny VS Code extension on other machines.",
+  "license": "MIT",
+  "author": {
+    "name": "rjmacarthy"
+  },
+  "homepage": "https://github.com/twinnydotdev/twinny/blob/main/docs/gateway.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/twinnydotdev/twinny",
+    "directory": "packages/twinny-server"
+  },
+  "bugs": {
+    "url": "https://github.com/twinnydotdev/twinny/issues"
+  },
+  "keywords": [
+    "twinny",
+    "ollama",
+    "llama.cpp",
+    "lm-studio",
+    "code-completion",
+    "inference",
+    "gateway",
+    "vscode"
+  ],
+  "bin": {
+    "twinny-server": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "prepublishOnly": "node -e \"require('fs').accessSync('cli.js')\" || (echo 'Run npm run build in the repository root first' && exit 1)"
+  }
+}

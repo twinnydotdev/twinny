@@ -11,8 +11,9 @@ import {
   ProviderModelList,
   ProviderTestResult
 } from "../../common/messaging/protocol"
-import { usesEndpoint } from "../../common/provider-validation"
+import { isRemoteProvider, usesEndpoint } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
+import { fetchRemoteIdentity } from "../../protocol/client"
 import { InferenceClient, readText, resolveInferenceProvider } from "../inference"
 
 import { describeProviderErrorPlain } from "./errors"
@@ -83,10 +84,11 @@ const testEmbedding = async (
 }
 
 export const testProvider = async (
-  provider: TwinnyProvider
+  provider: TwinnyProvider,
+  timeoutMs = PROBE_TIMEOUT_MS
 ): Promise<ProviderTestResult> => {
   const started = Date.now()
-  const { signal, done } = withTimeout(PROBE_TIMEOUT_MS)
+  const { signal, done } = withTimeout(timeoutMs)
   try {
     const client = resolveInferenceProvider(provider)
     let sample: string
@@ -100,10 +102,23 @@ export const testProvider = async (
       default:
         sample = await testChat(client, provider, signal)
     }
+    const latencyMs = Date.now() - started
+    // A gateway also says which key it took the test for; worth showing,
+    // since the key is the only thing that tells developers apart.
+    let identity: string | undefined
+    if (isRemoteProvider(provider.provider)) {
+      try {
+        const who = await fetchRemoteIdentity(provider, { signal })
+        identity = who.shared ? "shared token" : who.key
+      } catch {
+        // An older gateway without the route; the test itself passed.
+      }
+    }
     return {
       success: true,
-      latencyMs: Date.now() - started,
-      sample: sample.trim().slice(0, 60)
+      latencyMs,
+      sample: sample.trim().slice(0, 60),
+      ...(identity ? { identity } : {})
     }
   } catch (error) {
     return {

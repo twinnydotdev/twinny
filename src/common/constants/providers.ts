@@ -7,6 +7,7 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   Ollama: "ollama",
   LlamaCpp: "llamacpp",
   OpenAICompatible: "openai-compatible",
+  Qvac: "qvac",
   /** Another machine's Ollama, reached over an encrypted peer-to-peer link. */
   TwinnyP2P: "twinny-p2p"
 }
@@ -20,8 +21,13 @@ export const API_PROVIDERS = {
   Cohere: "cohere",
   Perplexity: "perplexity",
   Gemini: "gemini",
+  /** A standalone Twinny gateway, reached over the Twinny remote protocol. */
+  TwinnyRemote: "twinny-remote",
   ...OPEN_AI_COMPATIBLE_PROVIDERS
 }
+
+/** Where a gateway listens unless its configuration says otherwise. */
+export const DEFAULT_GATEWAY_PORT = 8765
 
 /** How each provider is named in the UI. */
 export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -41,7 +47,9 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.OpenRouter]: "OpenRouter",
   [API_PROVIDERS.OpenWebUI]: "Open WebUI",
   [API_PROVIDERS.Perplexity]: "Perplexity",
-  [API_PROVIDERS.TwinnyP2P]: "Twinny device (P2P)"
+  [API_PROVIDERS.Qvac]: "QVAC",
+  [API_PROVIDERS.TwinnyP2P]: "Twinny device (P2P)",
+  [API_PROVIDERS.TwinnyRemote]: "Twinny gateway"
 }
 
 /**
