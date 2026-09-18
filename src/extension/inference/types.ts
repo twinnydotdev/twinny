@@ -23,6 +23,12 @@ export interface InferenceModel {
   name: string
   capabilities: InferenceCapability[]
   contextWindow?: number
+  /**
+   * The backend model behind a gateway alias, when the listing comes from a
+   * gateway. The alias can be called anything; this is what decides the
+   * fill-in-the-middle prompt format on the developer's side.
+   */
+  model?: string
 }
 
 export interface InferenceOptions {

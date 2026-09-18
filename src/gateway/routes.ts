@@ -112,6 +112,7 @@ export const buildRouteTable = (
       id: model.alias,
       name: model.alias,
       capabilities: [...model.capabilities],
+      model: model.model,
       ...(model.contextWindow ? { contextWindow: model.contextWindow } : {})
     })
   }

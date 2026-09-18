@@ -46,7 +46,7 @@ suite("Connect to team", function () {
       protocol: 1,
       defaults: { chat: "coder", fim: "coder", embeddings: "embed" },
       models: [
-        { id: "coder", name: "coder", capabilities: ["chat", "fim"] },
+        { id: "coder", name: "coder", capabilities: ["chat", "fim"], model: "codestral-latest" },
         { id: "embed", name: "embed", capabilities: ["embeddings"] }
       ]
     }
@@ -214,6 +214,8 @@ suite("Connect to team", function () {
     )
     assert.strictEqual(active.chat?.modelName, "coder")
     assert.strictEqual(active.embedding?.modelName, "embed")
+    assert.strictEqual(active.fim?.modelName, "coder", "the alias is what the gateway is asked for")
+    assert.strictEqual(active.fim?.fimTemplate, "codestral", "but the prompt format follows the backend model behind it")
     assert.ok(!JSON.stringify(providers).includes(token))
   })
 

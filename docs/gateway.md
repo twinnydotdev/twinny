@@ -490,7 +490,7 @@ balancing, no fallback chain and no automatic download.
 | Route | Method | Token | Purpose |
 | --- | --- | --- | --- |
 | `/healthz` | GET | no | `{"status":"ok"}` while the listener is up, `503 {"status":"stopping"}` while draining. Nothing else. |
-| `/twinny/v1/models` | GET | yes | The configured aliases and their capabilities. |
+| `/twinny/v1/models` | GET | yes | The configured aliases, their capabilities, and the backend model behind each (the extension picks its fill-in-the-middle prompt format from that, so an alias can be called anything). |
 | `/twinny/v1/team` | GET | yes | The team's default chat, FIM and embedding aliases, plus the model catalogue. No backend addresses or credentials. |
 | `/twinny/v1/whoami` | GET | yes | Which key the credential belongs to (`key`, `shared`, `admin`). The provider test in VS Code shows it as "as alice". |
 | `/twinny/v1/status` | GET | yes | Asks every backend whether it answers (5 s each) and which aliases that affects. A `team` provider reports `peers`, how many computers are sharing. |

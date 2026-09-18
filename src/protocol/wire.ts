@@ -406,7 +406,8 @@ export const parseModels = (input: unknown): InferenceModel[] => {
       capabilities,
       ...(typeof entry.contextWindow === "number"
         ? { contextWindow: entry.contextWindow }
-        : {})
+        : {}),
+      ...(typeof entry.model === "string" && entry.model ? { model: entry.model } : {})
     })
   }
   return parsed

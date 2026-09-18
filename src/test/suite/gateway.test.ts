@@ -231,13 +231,13 @@ suite("Gateway process", function () {
     assert.ok(!text.includes("coder") && !text.includes(String(backend.port)))
   })
 
-  test("discovery lists the configured aliases and their capabilities only", async () => {
+  test("discovery lists the configured aliases, their capabilities and the backend model behind each", async () => {
     const models = await resolveInferenceProvider(remoteProvider(gateway)).models()
     assert.deepStrictEqual(
-      models.map((m) => [m.id, m.capabilities]),
+      models.map((m) => [m.id, m.capabilities, m.model]),
       [
-        ["coder", ["fim", "chat"]],
-        ["embed", ["embeddings"]]
+        ["coder", ["fim", "chat"], "backend-coder:7b"],
+        ["embed", ["embeddings"], "backend-embed"]
       ]
     )
     assert.strictEqual(backend.requests.length, 0, "discovery never touches the backend")

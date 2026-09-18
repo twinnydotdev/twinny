@@ -16,6 +16,7 @@ import type {
 import { TwinnyProvider } from "../../common/types"
 import { RemoteInferenceProvider } from "../../protocol/client"
 import type { RemoteTeam } from "../../protocol/types"
+import { resolveFimFormat } from "../completion/fim-templates"
 
 import { isTeamProvider, policyIsEmpty, TeamPolicyStorage } from "./policy"
 
@@ -252,8 +253,17 @@ export class TeamConnection {
             ),
             apiPath: parsed.pathname.replace(/\/+$/, ""),
             apiKey: "",
+            // The alias is what the gateway is asked for, so it is the model
+            // name here; the prompt format comes from the backend model the
+            // gateway says sits behind it (an older gateway says nothing, and
+            // then the alias name is all there is to go on).
             ...(type === "fim"
-              ? { fimTemplate: FIM_TEMPLATE_FORMAT.automatic }
+              ? {
+                  fimTemplate: resolveFimFormat(
+                    team.models.find((m) => m.id === alias)?.model ?? alias,
+                    FIM_TEMPLATE_FORMAT.automatic
+                  )
+                }
               : {})
           }
           providers.push(provider)
