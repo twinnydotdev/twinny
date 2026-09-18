@@ -140,7 +140,10 @@ export function createStreamRequestBodyFim(
         stop
       }
     case API_PROVIDERS.Deepseek:
+    case API_PROVIDERS.Mistral:
     case API_PROVIDERS.OpenRouter:
+      // Hosted completion endpoints (Mistral's /v1/fim/completions among
+      // them) name the model in the body and refuse a request without it.
       return {
         model: options.model,
         prompt,

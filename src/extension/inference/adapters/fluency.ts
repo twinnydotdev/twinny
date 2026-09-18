@@ -38,6 +38,22 @@ export const supportsStreaming = (provider: TwinnyProvider): boolean => {
   return Array.isArray(streaming) ? streaming.includes(provider.modelName) : true
 }
 
+/**
+ * A message whose content is only text parts, as a plain string. The
+ * extension builds every message as parts (text, plus images when attached);
+ * the SDKs accept that for images, but Mistral rejects a parts list for
+ * plain text, and a string is what every provider expects for it anyway.
+ * Messages with images keep their parts.
+ */
+export const flattenTextContent = (messages: ChatMessage[]): ChatMessage[] =>
+  messages.map((message) => {
+    const content = message.content as unknown
+    if (!Array.isArray(content) || !content.length) return message
+    const parts = content as Array<{ type?: string; text?: string }>
+    if (!parts.every((part) => part && part.type === "text" && typeof part.text === "string")) return message
+    return { ...message, content: parts.map((part) => part.text).join("\n") } as ChatMessage
+  })
+
 /** Only real API parameters: OpenAI rejects unknown ones such as an `id`. */
 const requestParameters = (request: Pick<ChatRequest, "maxTokens" | "temperature">) => ({
   ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
@@ -53,7 +69,7 @@ export const buildStreamingRequest = (
   messages: ChatMessage[],
   parameters: Pick<ChatRequest, "maxTokens" | "temperature"> = {}
 ): CompletionStreaming<LLMProvider> => ({
-  messages,
+  messages: flattenTextContent(messages),
   model: provider.modelName,
   stream: true,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,7 +82,7 @@ export const buildBlockingRequest = (
   messages: ChatMessage[],
   parameters: Pick<ChatRequest, "maxTokens" | "temperature"> = {}
 ): CompletionNonStreaming<LLMProvider> => ({
-  messages: messages.filter((m) => m.role !== "system"),
+  messages: flattenTextContent(messages.filter((m) => m.role !== "system")),
   model: provider.modelName,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   provider: getFluencyProvider(provider) as any,

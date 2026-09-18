@@ -71,6 +71,17 @@ suite("Chat messages", () => {
     assert.strictEqual(streaming.stream, true)
   })
 
+  test("text-only parts go to the provider as a plain string; images keep their parts", () => {
+    const plain = toApiMessage({ role: "user", content: "Hi" })
+    const withImage = toApiMessage({ role: "user", content: "<p>look</p>", images: ["data:image/png;base64,AAAA"] })
+    const request = buildStreamingRequest(provider, [plain, withImage])
+    assert.strictEqual(request.messages[0].content, "Hi", "Mistral rejects a parts list for plain text")
+    assert.ok(Array.isArray(request.messages[1].content))
+    assert.strictEqual((request.messages[1].content as Array<{ type: string }>).length, 2)
+    const blocking = buildBlockingRequest(provider, [plain])
+    assert.strictEqual(blocking.messages[0].content, "Hi")
+  })
+
   test("sends no twinny-only fields to the provider", () => {
     const request = buildStreamingRequest(provider, [
       toApiMessage({ role: "system", content: "s", id: "conv-1" })

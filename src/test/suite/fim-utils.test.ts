@@ -124,6 +124,18 @@ suite("FIM utilities", () => {
       })
     })
 
+    test("Mistral's completion endpoint gets the model in the body, like the other hosted APIs", () => {
+      const body = createStreamRequestBodyFim(API_PROVIDERS.Mistral, "p", options)
+      assert.deepStrictEqual(body, {
+        model: "m",
+        prompt: "p",
+        stream: true,
+        temperature: 0.1,
+        max_tokens: 128,
+        stop: ["<a>", "<b>", "<c>", "<d>"]
+      })
+    })
+
     test("caps stop sequences for hosted OpenAI-style APIs", () => {
       const body = createStreamRequestBodyFim(API_PROVIDERS.OpenRouter, "p", options)
       assert.deepStrictEqual(body.stop, ["<a>", "<b>", "<c>", "<d>"])
