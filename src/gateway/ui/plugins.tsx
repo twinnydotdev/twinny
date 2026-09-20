@@ -8,8 +8,8 @@ import React, { useState } from "react"
 import type { PluginSummary } from "../plugins/host"
 
 import { BackupsPanel } from "./backups"
+import { NotifyPanel } from "./notify"
 import { PullsPanel } from "./pulls"
-import { SlackPanel } from "./slack"
 
 /** Brand marks, inline so the page's content-security policy allows them. */
 const ICONS: Record<string, { viewBox: string; path: string; color?: string }> = {
@@ -22,6 +22,28 @@ const ICONS: Record<string, { viewBox: string; path: string; color?: string }> =
     color: "#3987e5",
     // An archive box: lid, body, and the handle slot.
     path: "M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-.75.75H14v6.25A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25V6h-.25A.75.75 0 0 1 1 5.25v-2.5zm1.5.75v1h11v-1h-11zM3.5 6v6.25c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6h-9zm2.75 1.5h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1 0-1.5z"
+  },
+  gitea: {
+    viewBox: "0 0 24 24",
+    color: "#609926",
+    // A mug with a handle: the teacup.
+    path: "M4 5.5A1.5 1.5 0 0 1 5.5 4h10A1.5 1.5 0 0 1 17 5.5V7h2.25A2.75 2.75 0 0 1 22 9.75v1.5A3.75 3.75 0 0 1 18.25 15H17v.5A4.5 4.5 0 0 1 12.5 20h-4A4.5 4.5 0 0 1 4 15.5v-10zM17 9v4h1.25A1.75 1.75 0 0 0 20 11.25v-1.5A.75.75 0 0 0 19.25 9H17zm-9 2.5h5v-2H8v2zm0 4h5v-2H8v2z"
+  },
+  bitbucket: {
+    viewBox: "0 0 24 24",
+    color: "#2684ff",
+    path: "M.778 1.213a.768.768 0 0 0-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 0 0 .77-.646l3.27-20.03a.768.768 0 0 0-.768-.891zM14.52 15.53H9.522L8.17 8.466h7.561z"
+  },
+  discord: {
+    viewBox: "0 0 24 24",
+    color: "#5865f2",
+    path: "M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"
+  },
+  teams: {
+    viewBox: "0 0 24 24",
+    color: "#6264a7",
+    // Two people on a card, as the Teams mark suggests.
+    path: "M14.5 3.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19.5 5.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM3 8.75A1.75 1.75 0 0 1 4.75 7h9.5A1.75 1.75 0 0 1 16 8.75V15a4 4 0 0 1-8 0v-1H4.75A1.75 1.75 0 0 1 3 12.25v-3.5zm3 1.25v1.5h1.5V17h1.5v-5.5h1.5V10H6zm11 0h3.25c.966 0 1.75.784 1.75 1.75v3.5A3.5 3.5 0 0 1 18.5 19h-.86A5.98 5.98 0 0 0 18 15v-5z"
   },
   slack: {
     viewBox: "0 0 24 24",
@@ -175,8 +197,8 @@ export const PageSkeleton = ({ tiles = 4, rows = 5, title }: { tiles?: number; r
 
 /** The page an enabled plugin shows; plugins without one say so. */
 export const PluginPage = ({ id, apiKey }: { id: string; apiKey: string }) => {
-  if (id === "github" || id === "gitlab") return <PullsPanel host={id} apiKey={apiKey} />
+  if (id === "github" || id === "gitlab" || id === "gitea" || id === "bitbucket") return <PullsPanel host={id} apiKey={apiKey} />
   if (id === "backups") return <BackupsPanel apiKey={apiKey} />
-  if (id === "slack") return <SlackPanel apiKey={apiKey} />
+  if (id === "slack" || id === "discord" || id === "teams") return <NotifyPanel host={id} apiKey={apiKey} />
   return <div className="empty">This plugin has no page.</div>
 }

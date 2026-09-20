@@ -866,6 +866,47 @@ export const rec = (value: unknown): Record<string, unknown> =>
 export const arr = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : []
 
+/**
+ * A whole unified diff (as `git diff` or a host's `.diff` route gives it)
+ * split into one entry per file, with counts, capped like everything else.
+ */
+export const splitUnifiedDiff = (text: string): { files: PullFile[]; moreFiles: number } => {
+  const files: PullFile[] = []
+  let moreFiles = 0
+  const chunks = text.split(/^(?=diff --git )/m).filter((chunk) => chunk.startsWith("diff --git "))
+  for (const chunk of chunks) {
+    if (files.length >= MAX_FILES) {
+      moreFiles++
+      continue
+    }
+    const lines = chunk.split("\n")
+    const header = /^diff --git a\/(.+?) b\/(.+)$/.exec(lines[0])
+    const oldPath = header?.[1] ?? ""
+    const newPath = header?.[2] ?? oldPath
+    let status: PullFile["status"] = "modified"
+    if (lines.some((line) => line.startsWith("new file mode"))) status = "added"
+    else if (lines.some((line) => line.startsWith("deleted file mode"))) status = "removed"
+    else if (lines.some((line) => line.startsWith("rename from")) || (oldPath && newPath && oldPath !== newPath)) status = "renamed"
+    const bodyStart = lines.findIndex((line) => line.startsWith("@@"))
+    const body = bodyStart === -1 ? "" : lines.slice(bodyStart).join("\n").replace(/\n$/, "")
+    let additions = 0
+    let deletions = 0
+    for (const line of body.split("\n")) {
+      if (line.startsWith("+") && !line.startsWith("+++")) additions++
+      else if (line.startsWith("-") && !line.startsWith("---")) deletions++
+    }
+    files.push({
+      path: status === "removed" ? oldPath : newPath,
+      ...(status === "renamed" ? { previousPath: oldPath } : {}),
+      status,
+      additions,
+      deletions,
+      ...cutPatch(body || undefined)
+    })
+  }
+  return { files, moreFiles }
+}
+
 /** One state for a set of checks: any failure fails, any pending pends. */
 export const rollup = (checks: PullCheck[]): CheckState => {
   if (checks.length === 0) return "none"

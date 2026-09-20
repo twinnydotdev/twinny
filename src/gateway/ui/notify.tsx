@@ -1,11 +1,12 @@
 /**
- * The Slack plugin's page: the webhooks (one per channel) and what each
- * gets, a test button, and the recent deliveries with their outcome.
+ * The page of a notifier plugin (Slack, Discord, Teams): the webhooks
+ * (one per channel) and what each gets, a test button, and the recent
+ * deliveries with their outcome.
  */
 import React, { FormEvent, useCallback, useEffect, useState } from "react"
 
 import type { PluginEventKind } from "../plugins/events"
-import type { Delivery, WebhookView } from "../plugins/slack"
+import type { Delivery, WebhookView } from "../plugins/notify"
 
 import { api } from "./api"
 import { fmt, timeAgo } from "./format"
@@ -17,6 +18,16 @@ interface Overview {
   deliveries: Delivery[]
   health: boolean
   backends: Array<{ provider: string; ok: boolean }>
+  urlExample: string
+}
+
+export type NotifyHostId = "slack" | "discord" | "teams"
+
+const NAMES: Record<NotifyHostId, string> = { slack: "Slack", discord: "Discord", teams: "Microsoft Teams" }
+const HOW: Record<NotifyHostId, string> = {
+  slack: "In Slack: Apps → Incoming Webhooks → add to a channel, copy the URL. Mattermost: Integrations → Incoming Webhooks.",
+  discord: "In Discord: Server settings → Integrations → Webhooks → New webhook, pick the channel, copy the URL.",
+  teams: "In Teams: the channel's ⋯ → Workflows → \"Post to a channel when a webhook request is received\", copy the URL. An older Incoming Webhook connector works too."
 }
 
 const EventPicker = ({ kinds, value, onChange, disabled }: { kinds: PluginEventKind[]; value: string[]; onChange: (events: string[]) => void; disabled?: boolean }) => (
@@ -36,15 +47,16 @@ const EventPicker = ({ kinds, value, onChange, disabled }: { kinds: PluginEventK
   </div>
 )
 
-export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
-  const base = "/twinny/v1/admin/plugins/slack/api"
+export const NotifyPanel = ({ host, apiKey }: { host: NotifyHostId; apiKey: string }) => {
+  const base = `/twinny/v1/admin/plugins/${host}/api`
+  const name = NAMES[host]
   const [overview, setOverview] = useState<Overview | null>(null)
   const [error, setError] = useState<string | undefined>()
   const [notice, setNotice] = useState<string | undefined>()
   const [busy, setBusy] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
-  const [name, setName] = useState("")
+  const [hookName, setHookName] = useState("")
   const [url, setUrl] = useState("")
   const [events, setEvents] = useState<string[]>([])
 
@@ -87,7 +99,7 @@ export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
 
   const reset = (kinds: PluginEventKind[]) => {
     setEditing(null)
-    setName("")
+    setHookName("")
     setUrl("")
     setEvents(kinds.map((kind) => kind.type))
   }
@@ -96,9 +108,9 @@ export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
     e.preventDefault()
     if (!overview) return
     if (editing) {
-      void run("save", () => api(`${base}/webhooks/${editing}`, apiKey, { method: "PUT", body: { name, ...(url.trim() ? { url } : {}), events } }).then(() => reset(overview.kinds)), "Webhook saved.")
+      void run("save", () => api(`${base}/webhooks/${editing}`, apiKey, { method: "PUT", body: { name: hookName, ...(url.trim() ? { url } : {}), events } }).then(() => reset(overview.kinds)), "Webhook saved.")
     } else {
-      void run("save", () => api(`${base}/webhooks`, apiKey, { method: "POST", body: { name, url, events } }).then(() => reset(overview.kinds)), "Webhook added. Send a test to see it in the channel.")
+      void run("save", () => api(`${base}/webhooks`, apiKey, { method: "POST", body: { name: hookName, url, events } }).then(() => reset(overview.kinds)), "Webhook added. Send a test to see it in the channel.")
     }
   }
 
@@ -107,12 +119,12 @@ export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
       <div className="error-bar">{error}</div>
     ) : (
       <PageSkeleton
-        tiles={3}
+        tiles={4}
         rows={3}
         title={
           <h2 className="plugin-name">
-            <PluginIcon id="slack" size={22} />
-            Slack
+            <PluginIcon id={host} size={22} />
+            {name}
           </h2>
         }
       />
@@ -126,8 +138,8 @@ export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
     <>
       <div className="page-title">
         <h2 className="plugin-name">
-          <PluginIcon id="slack" size={22} />
-          Slack
+          <PluginIcon id={host} size={22} />
+          {name}
         </h2>
         <p>Reviews, new pulls, failing checks, backups and backend outages, posted to the channels you choose.</p>
       </div>
@@ -204,7 +216,7 @@ export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
                         disabled={busy !== null}
                         onClick={() => {
                           setEditing(webhook.id)
-                          setName(webhook.name)
+                          setHookName(webhook.name)
                           setUrl("")
                           setEvents(webhook.events)
                         }}
@@ -237,16 +249,16 @@ export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
           <div className="config-fields">
             <label className="config-field">
               <span>channel name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="#eng-reviews" disabled={busy !== null} />
+              <input value={hookName} onChange={(e) => setHookName(e.target.value)} placeholder={host === "discord" ? "#deploys" : "#eng-reviews"} disabled={busy !== null} />
             </label>
             <label className="config-field">
               <span>incoming webhook URL {editing && <em className="muted">(leave blank to keep)</em>}</span>
-              <input type="password" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://hooks.slack.com/services/…" disabled={busy !== null} autoComplete="off" spellCheck={false} />
+              <input type="password" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={overview.urlExample} disabled={busy !== null} autoComplete="off" spellCheck={false} />
             </label>
           </div>
           <EventPicker kinds={overview.kinds} value={events} onChange={setEvents} disabled={busy !== null} />
           <div className="row-actions">
-            <button type="submit" className="primary" disabled={busy !== null || !name.trim() || (!editing && !url.trim())}>
+            <button type="submit" className="primary" disabled={busy !== null || !hookName.trim() || (!editing && !url.trim())}>
               {busy === "save" ? "…" : editing ? "save webhook" : "add webhook"}
             </button>
             {editing && (
@@ -254,9 +266,7 @@ export const SlackPanel = ({ apiKey }: { apiKey: string }) => {
                 cancel
               </button>
             )}
-            <span className="muted">
-              In Slack: Apps → Incoming Webhooks → add to a channel, copy the URL. Mattermost: Integrations → Incoming Webhooks. The URL is kept on this server and never shown again.
-            </span>
+            <span className="muted">{HOW[host]} The URL is kept on this server and never shown again.</span>
           </div>
         </form>
       </section>

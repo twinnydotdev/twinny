@@ -459,3 +459,14 @@ td.auto input { accent-color: var(--accent); }
 .event-picker .policy-option input { margin-top: 3px; }
 .event-picker .policy-option.on { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .event-picker .policy-option input { width: auto; }
+
+/* Scrollbars: the panel's own, not the browser's */
+.scroll, .code pre, .turn-body, textarea { scrollbar-width: thin; scrollbar-color: var(--ink-3) transparent; }
+.scroll::-webkit-scrollbar, .code pre::-webkit-scrollbar, .turn-body::-webkit-scrollbar, textarea::-webkit-scrollbar { height: 8px; width: 8px; }
+.scroll::-webkit-scrollbar-track, .code pre::-webkit-scrollbar-track, .turn-body::-webkit-scrollbar-track, textarea::-webkit-scrollbar-track { background: transparent; }
+.scroll::-webkit-scrollbar-thumb, .code pre::-webkit-scrollbar-thumb, .turn-body::-webkit-scrollbar-thumb, textarea::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-3) 70%, transparent); border-radius: 999px; border: 2px solid var(--panel); }
+.scroll::-webkit-scrollbar-thumb:hover, .code pre::-webkit-scrollbar-thumb:hover { background: var(--ink-2); }
+.scroll::-webkit-scrollbar-corner, .code pre::-webkit-scrollbar-corner { background: transparent; }
+.scroll { padding-bottom: 2px; }
+/* A soft edge says there is more to the right, without a scrollbar always showing. */
+.scroll.scroll-more { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }

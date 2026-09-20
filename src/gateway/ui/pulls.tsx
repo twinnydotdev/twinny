@@ -15,7 +15,9 @@ import { fmt, plural, timeAgo } from "./format"
 import { DiffBlock, MarkdownView } from "./markdown"
 import { PageSkeleton, PluginIcon } from "./plugins"
 
-export type PullsHost = "github" | "gitlab"
+export type PullsHost = "github" | "gitlab" | "gitea" | "bitbucket"
+
+const HOST_NAMES: Record<PullsHost, string> = { github: "GitHub", gitlab: "GitLab", gitea: "Gitea / Forgejo", bitbucket: "Bitbucket" }
 
 interface HostWords {
   noun: string
@@ -43,6 +45,22 @@ const WORDS: Record<PullsHost, HostWords> = {
     repoNoun: "project",
     tokenHint: "A project, group or personal access token with the read_api scope.",
     fullNameHint: "group/project"
+  },
+  gitea: {
+    noun: "pull request",
+    nouns: "pull requests",
+    hash: "#",
+    repoNoun: "repository",
+    tokenHint: "An access token from Settings → Applications with read access to repositories. Set your instance's URL below; codeberg.org is the default.",
+    fullNameHint: "owner/name"
+  },
+  bitbucket: {
+    noun: "pull request",
+    nouns: "pull requests",
+    hash: "#",
+    repoNoun: "repository",
+    tokenHint: "An app password as user:app-password (Repositories and Pull requests: read), or an API token.",
+    fullNameHint: "workspace/repo-slug"
   }
 }
 
@@ -404,7 +422,7 @@ const HostPanel = ({ host, overview, base, apiKey, onChanged }: HostPanelProps) 
         }}
       >
         <label>
-          <span className="muted">{host === "github" ? "GitHub Enterprise URL" : "GitLab URL"}</span>
+          <span className="muted">{host === "github" ? "GitHub Enterprise URL" : `${HOST_NAMES[host]} URL`}</span>
           <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} aria-label="Host URL" disabled={busy} spellCheck={false} />
         </label>
         <button type="submit" className="ghost" disabled={busy || baseUrl.trim() === overview.host.baseUrl}>
@@ -427,12 +445,13 @@ const languageOf = (path: string): string => {
 interface PullViewProps {
   detail: PullPage
   words: HostWords
+  host: PullsHost
   review: ReviewSetup
   onBack: () => void
   onReview: () => Promise<void>
 }
 
-const PullView = ({ detail, words, review, onBack, onReview }: PullViewProps) => {
+const PullView = ({ detail, words, review, host, onBack, onReview }: PullViewProps) => {
   const { pull } = detail
   const [reviewing, setReviewing] = useState(detail.reviewing)
   const [reviewError, setReviewError] = useState<string | undefined>()
@@ -462,7 +481,7 @@ const PullView = ({ detail, words, review, onBack, onReview }: PullViewProps) =>
             {pull.number}
           </b>
           <a href={pull.url} target="_blank" rel="noreferrer">
-            open on {pull.url.startsWith("https://github.com") ? "GitHub" : pull.url.includes("gitlab") ? "GitLab" : "the host"}
+            open on {HOST_NAMES[host]}
           </a>
         </h2>
         <span className="links">
@@ -727,7 +746,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
         title={
           <h2 className="plugin-name">
             <PluginIcon id={host} size={22} />
-            {host === "github" ? "GitHub" : "GitLab"}
+            {HOST_NAMES[host]}
           </h2>
         }
       />
@@ -738,7 +757,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
       <div className="page-title">
         <h2 className="plugin-name">
           <PluginIcon id={host} size={22} />
-          {host === "github" ? "GitHub" : "GitLab"}
+          {HOST_NAMES[host]}
         </h2>
         <p>
           Open {words.nouns} on the {words.repoNoun === "project" ? "projects" : "repositories"} this gateway watches, synced every five minutes.{" "}
@@ -777,6 +796,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
           <PullView
             detail={detail}
             words={words}
+            host={host}
             review={overview.review}
             onBack={() => setOpened(null)}
             onReview={async () => {

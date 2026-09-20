@@ -307,7 +307,7 @@ suite("Plugin store", function () {
     const listed = await request(`${url}/twinny/v1/admin/plugins`, "GET", admin)
     assert.strictEqual(listed.status, 200)
     const ids = (listed.body.plugins as Array<{ id: string; enabled: boolean }>).map((plugin) => `${plugin.id}:${plugin.enabled}`)
-    assert.deepStrictEqual(ids, ["github:false", "gitlab:false", "backups:false", "slack:false"])
+    assert.deepStrictEqual(ids, ["github:false", "gitlab:false", "gitea:false", "bitbucket:false", "slack:false", "discord:false", "teams:false", "backups:false"])
     assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins`, "GET", dev)).status, 403)
   })
 

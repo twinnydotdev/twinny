@@ -14,7 +14,7 @@ import { createGatewayLog } from "../../gateway/log"
 import { PluginEventBus } from "../../gateway/plugins/events"
 import type { PluginContext, PluginError } from "../../gateway/plugins/host"
 import { PullsPlugin, summaryOf, verdictOf } from "../../gateway/plugins/pulls"
-import { slackPayload, SlackPlugin, WebhookStore } from "../../gateway/plugins/slack"
+import { slackHost, slackPayload, SlackPlugin, WebhookStore } from "../../gateway/plugins/slack"
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-slack-test-"))
 
@@ -62,7 +62,7 @@ suite("Slack plugin", function () {
     const dir = path.join(scratch, "slack")
     fs.mkdirSync(dir, { recursive: true })
     const context: PluginContext = { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, events: bus }
-    const plugin = new SlackPlugin(context, 0)
+    const plugin = new SlackPlugin(context, slackHost, 0)
     plugin.start()
     try {
       const bad = await plugin.handle(req("POST", "webhooks", { name: "#eng", url: "not a url" })).catch((e: PluginError) => e)
@@ -76,7 +76,7 @@ suite("Slack plugin", function () {
       const ops = (only.body as { webhook: { id: string; host: string } }).webhook
       assert.strictEqual(ops.host, new URL(slack.url).host)
       const overview = await plugin.handle(req("GET", ""))
-      assert.ok(!JSON.stringify(overview.body).includes("/services/"), "URLs never come back")
+      assert.ok(!JSON.stringify(overview.body).includes("/T/B/"), "URLs never come back")
       assert.strictEqual(fs.statSync(path.join(dir, "webhooks.json")).mode & 0o777, 0o600)
       assert.strictEqual(WebhookStore.open(path.join(dir, "webhooks.json")).all()[1].url, `${slack.url}/services/T/B/ops`)
 
@@ -125,7 +125,7 @@ suite("Slack plugin", function () {
     let ok = true
     const dir = path.join(scratch, "health")
     fs.mkdirSync(dir, { recursive: true })
-    const plugin = new SlackPlugin({ dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, events: bus, health: async () => [{ provider: "local", ok, ...(ok ? {} : { kind: "provider-unavailable" }) }] }, 0)
+    const plugin = new SlackPlugin({ dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, events: bus, health: async () => [{ provider: "local", ok, ...(ok ? {} : { kind: "provider-unavailable" }) }] }, slackHost, 0)
     await plugin.pollHealth()
     await plugin.pollHealth()
     assert.strictEqual(seen.length, 0, "the first look sets the baseline; nothing changed after")

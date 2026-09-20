@@ -1245,6 +1245,31 @@ fails with that reason rather than "answered nothing".
 | `PUT /settings` `{ baseUrl?, reviewAlias? }` | the host URL; the chat alias reviews use |
 | `PUT /app` `{ appId, privateKey }`, `DELETE /app`, `GET /app/repositories` | the GitHub App (GitHub only) |
 
+### Gitea, Forgejo and Bitbucket
+
+Two more forges on the same pull-request core, with the same page,
+reviews and events as GitHub and GitLab:
+
+- **Gitea / Forgejo** (also Codeberg, which runs Forgejo): set your
+  instance's URL on the plugin page, then watch repositories with an
+  access token (*Settings → Applications*, read access to repositories).
+  Statuses of the head commit and reviews are read from their own
+  routes; a pull's changes from its `.diff`.
+- **Bitbucket** (Bitbucket Cloud): watch `workspace/repo-slug` with an
+  app password given as `user:app-password` (sent as Basic auth) or an
+  API token. Build statuses come from the head commit, approvals from
+  the pull's participants.
+
+### Discord and Microsoft Teams
+
+The same notifier as Slack with the message shape each host takes:
+Discord gets an embed (title linked, colour by level) through a channel
+webhook (*Server settings → Integrations → Webhooks*); Teams gets an
+Adaptive Card, which both a Workflows "post to a channel when a webhook
+request is received" flow and the older Incoming Webhook connector
+accept. Routes, event catalogue, delivery log and secrecy of the URLs are
+as for Slack, under `/twinny/v1/admin/plugins/<discord|teams>/api/`.
+
 ### Backups
 
 The Backups plugin makes a nightly copy of what the gateway would miss:
