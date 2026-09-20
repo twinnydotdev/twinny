@@ -11,6 +11,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto"
 import http from "node:http"
 import { AddressInfo } from "node:net"
 
+import { isHostedProvider } from "../common/provider-validation"
 import { InferenceError } from "../extension/inference/errors"
 import { handleRemoteRequest } from "../protocol/handler"
 import { PEER_CLOSE, peerRoutePath } from "../protocol/peer"
@@ -44,6 +45,7 @@ import {
   hasTeamPool,
   isTeamProvider,
   PerKeyLimits,
+  policyForExtensions,
   teamPooledAliases,
   teamWantedModels
 } from "./config"
@@ -65,6 +67,7 @@ import { LicenseStore } from "./license"
 import { GatewayLog } from "./log"
 import type { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
+import { QuotaMeter, refuseByRouting } from "./quotas"
 import { RouteTable } from "./routes"
 import { isUserCode, normalizeUserCode, SignInRequests } from "./signin"
 import { parseSince, summarizeUsage, UsageRecorder } from "./usage"
@@ -105,6 +108,8 @@ export interface GatewayServerOptions {
   metrics?: GatewayMetrics
   /** The gateway's version, for /metrics. */
   version?: string
+  /** Daily quotas per key; enforced only with the policy licence feature. */
+  quotas?: QuotaMeter
 }
 
 /** Who a request came from: a key's name, or `shared` for the shared token. */
@@ -294,6 +299,8 @@ export class GatewayServer {
   private _generating = 0
   private _draining = false
   private _nextId = 1
+  /** Keys told about a reached quota today, so the log and the bus hear it once. */
+  private readonly _quotaSaid = new Set<string>()
   private _address?: GatewayAddress
 
   constructor(private readonly _options: GatewayServerOptions) {
@@ -616,6 +623,7 @@ export class GatewayServer {
           this._options.keys.active().length
         )
         this._options.recorder?.update(configuration.current.recording)
+        this._options.quotas?.update(configuration.current.policy?.quotas)
         if (hasTeamPool(configuration.current))
           this._options.peers?.refreshWanted()
         else
@@ -665,6 +673,21 @@ export class GatewayServer {
     }
     if (route === "audit" || route === "audit/export") {
       this.handleAudit(route, url, req, res)
+      return
+    }
+    if (route === "quotas") {
+      if (req.method !== "GET") {
+        sendJson(res, 405, { error: { message: "Quotas are read with GET; set them on Policy." } }, { Allow: "GET" })
+        return
+      }
+      const quotas = this._options.quotas
+      this._options.keys.refresh()
+      const names = this._options.keys.active().map((key) => key.name)
+      sendJson(res, 200, {
+        enforced: !!quotas && this._options.license?.current().features.includes("policy") === true,
+        policy: quotas?.policy ?? null,
+        standings: quotas ? quotas.standings(names) : {}
+      })
       return
     }
     const revoke = /^keys\/([0-9a-f]{8})\/revoke$/.exec(route)
@@ -1909,8 +1932,29 @@ export class GatewayServer {
     // Each request keeps the routing table it started with, even across an admin save.
     const routes = this.routes
     const { maxOutputTokens } = this.config.limits
+    const policyLicensed = this._options.license?.current().features.includes("policy") === true
+    const policy = policyLicensed ? this.config.policy : undefined
+    const workspaceHeader = req.headers["x-twinny-workspace"]
+    const workspace = typeof workspaceHeader === "string" ? workspaceHeader.slice(0, 200) : undefined
+    const quotas = policyLicensed ? this._options.quotas : undefined
     const route: RouteTable["route"] = (alias, capability) => {
       const target = routes.route(alias, capability)
+      // Routing rules: some workspaces may only use some aliases, or only local backends.
+      const providerName = routes.providerOf(alias)
+      const providerKind = providerName ? this.config.providers[providerName]?.provider : undefined
+      const routingRefusal = refuseByRouting(policy?.routing, workspace, alias, !!providerKind && isHostedProvider(providerKind))
+      if (routingRefusal) throw new InferenceError("authentication", routingRefusal)
+      // Quotas: refused before a backend is touched.
+      const quotaRefusal = quotas?.refuse(principal)
+      if (quotaRefusal) {
+        this._options.metrics?.quotaRefused(principal)
+        if (!this._quotaSaid.has(`${principal}:${new Date().toISOString().slice(0, 10)}`)) {
+          this._quotaSaid.add(`${principal}:${new Date().toISOString().slice(0, 10)}`)
+          this._options.log.warn({ event: "quota.reached", key: principal })
+          this._options.plugins?.events.emit({ type: "quota.reached", source: "gateway", level: "warn", title: `${principal} reached today's quota`, text: quotaRefusal, data: { key: principal } })
+        }
+        throw new InferenceError("rate-limited", quotaRefusal)
+      }
       return maxOutputTokens === undefined
         ? target
         : capOutputTokens(target, maxOutputTokens)
@@ -1941,7 +1985,7 @@ export class GatewayServer {
           }
         },
         team: () => {
-          const configured = routes.policy()
+          const configured = policyForExtensions(routes.policy())
           const licensed =
             this._options.license?.current().features.includes("policy") ===
             true
@@ -2069,6 +2113,13 @@ export class GatewayServer {
         ...(outcome.backend ? { peer: outcome.backend } : {}),
         usage: outcome.usage
       })
+      if (quotas && outcome.outcome !== "error") {
+        const counted = quotas.count(principal, (outcome.usage?.promptTokens ?? 0) + (outcome.usage?.completionTokens ?? 0))
+        if (counted.warning) {
+          this._options.log.warn({ event: "quota.warning", key: principal, message: counted.warning })
+          this._options.plugins?.events.emit({ type: "quota.warning", source: "gateway", level: "warn", title: `${principal} is near today's quota`, text: counted.warning, data: { key: principal } })
+        }
+      }
       this._options.metrics?.request({
         key: principal,
         route: match.route as "fim" | "chat" | "embeddings",

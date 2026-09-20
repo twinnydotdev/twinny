@@ -100,11 +100,13 @@ export class RemoteInferenceProvider implements InferenceProvider {
 
   constructor(
     private readonly _endpoint: RemoteEndpoint,
-    private readonly _fetch: Fetch = fetch
+    private readonly _fetch: Fetch = fetch,
+    /** The workspace the request is for, sent as `X-Twinny-Workspace` so routing rules can apply. */
+    private readonly _workspace: () => string | undefined = () => undefined
   ) {}
 
-  public static fromProvider(config: TwinnyProvider, fetchImpl?: Fetch) {
-    return new RemoteInferenceProvider(endpointFromProvider(config), fetchImpl)
+  public static fromProvider(config: TwinnyProvider, fetchImpl?: Fetch, workspace?: () => string | undefined) {
+    return new RemoteInferenceProvider(endpointFromProvider(config), fetchImpl, workspace)
   }
 
   /** The gateway decides per alias; the client can attempt any of them. */
@@ -224,7 +226,8 @@ export class RemoteInferenceProvider implements InferenceProvider {
     return {
       Accept: "application/json, application/x-ndjson",
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(this._workspace() ? { "X-Twinny-Workspace": String(this._workspace()).slice(0, 200) } : {})
     }
   }
 

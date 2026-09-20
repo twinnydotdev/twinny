@@ -11,12 +11,13 @@ import {
   InferenceModel
 } from "../extension/inference/types"
 import { RemoteRouteTarget } from "../protocol/handler"
-import type { TeamDefaults, TeamPolicy } from "../protocol/types"
+import type { TeamDefaults } from "../protocol/types"
 import { RemoteBackendStatus, RemoteStatus } from "../protocol/types"
 
 import {
   GatewayConfig,
   GatewayConfigError,
+  GatewayPolicy,
   GatewaySecrets,
   providerForRoute
 } from "./config"
@@ -24,7 +25,7 @@ import {
 export interface RouteTable {
   teamDefaults(): TeamDefaults
   /** The configured policy, or nothing. Whether to send it is the caller's decision. */
-  policy(): TeamPolicy | undefined
+  policy(): GatewayPolicy | undefined
   models(): InferenceModel[]
   route(alias: string, capability: InferenceCapability): RemoteRouteTarget
   /** How many alias/capability pairs are served. */

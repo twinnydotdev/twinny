@@ -13,8 +13,9 @@
 import type { Memento } from "vscode"
 
 import type { TeamPolicyState } from "../../common/team"
+import { rememberTeamPolicy } from "../../common/team-policy"
 
-export { describePolicy, isTeamProvider, policyIsEmpty, policyRefusal, teamProviderIdFor } from "../../common/team-policy"
+export { currentTeamPolicy, describePolicy, isTeamProvider, policyIsEmpty, policyRefusal, teamProviderIdFor } from "../../common/team-policy"
 
 export const TEAM_POLICY_STORAGE_KEY = "twinny.teamPolicy"
 
@@ -31,16 +32,20 @@ export class TeamPolicyStore implements TeamPolicyStorage {
   public get(): TeamPolicyState | undefined {
     const stored = this._state.get<TeamPolicyState>(TEAM_POLICY_STORAGE_KEY)
     if (!stored || typeof stored.url !== "string" || !Array.isArray(stored.providerIds) || typeof stored.policy !== "object") {
+      rememberTeamPolicy(undefined)
       return undefined
     }
+    rememberTeamPolicy(stored.policy)
     return stored
   }
 
   public async set(state: TeamPolicyState): Promise<void> {
     await this._state.update(TEAM_POLICY_STORAGE_KEY, state)
+    rememberTeamPolicy(state.policy)
   }
 
   public async clear(): Promise<void> {
     await this._state.update(TEAM_POLICY_STORAGE_KEY, undefined)
+    rememberTeamPolicy(undefined)
   }
 }

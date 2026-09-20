@@ -17,6 +17,7 @@ import {
 import { CodeLanguageDetails } from "../../common/languages"
 import { logger } from "../../common/logger"
 import { WorkspaceSearchReport } from "../../common/messaging/protocol"
+import { currentTeamPolicy } from "../../common/team-policy"
 import {
   AnyContextItem,
   ChatCompletionMessage,
@@ -93,14 +94,16 @@ export class ChatContextBuilder {
   }
 
   public async systemPrompt(): Promise<string> {
-    return (
+    const own =
       (await this._templates.readTemplate<TemplateData>("system", {
         cwd: workspace.workspaceFolders?.[0].uri.fsPath,
         defaultShell: os.userInfo().shell,
         osName: os.platform(),
         homedir: os.homedir()
       })) || ""
-    )
+    // The team's system prompt, when connected to a team that sets one, comes first.
+    const team = currentTeamPolicy()?.systemPrompt?.trim()
+    return team ? `${team}\n\n${own}` : own
   }
 
   /** A code-action template (explain, refactor…) filled with the selection. */

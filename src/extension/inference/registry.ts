@@ -142,9 +142,20 @@ export const hostedAdapter: InferenceAdapter = {
 }
 
 /** A Twinny gateway: the same jobs, carried over the remote protocol. */
+/** The open workspace's name, when VS Code is around; the gateway's routing rules match on it. */
+const workspaceName = (): string | undefined => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const vscode = require("vscode") as typeof import("vscode")
+    return vscode.workspace.workspaceFolders?.[0]?.name
+  } catch {
+    return undefined
+  }
+}
+
 export const remoteAdapter: InferenceAdapter = {
   id: "remote",
-  create: (config) => RemoteInferenceProvider.fromProvider(config)
+  create: (config) => RemoteInferenceProvider.fromProvider(config, undefined, workspaceName)
 }
 
 /** The registry the extension uses, with every built-in kind served. */

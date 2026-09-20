@@ -635,6 +635,58 @@ hash; a developer who lost one signs in again and the admin approves with
 Without the feature the policy is saved but not sent; the admin page says
 so next to the section.
 
+### Prompt library and team system prompt
+
+With the `policy` licence feature, `policy.systemPrompt` is put before
+every chat's system prompt on connected extensions, and
+`policy.templates` (name, optional description, a Handlebars prompt
+with `{{code}}`, `{{language}}` and `{{selection}}` filled in) appear in
+every developer's template picker beside their own; a shared name wins
+over a local file of the same name. Both are shown on the consent card
+before connecting and re-read at every VS Code start. Edit them under
+**Policy → Prompt library**.
+
+### Quotas
+
+`policy.quotas` caps what a key may use per UTC day, in requests
+(`requestsPerDay`) and in tokens the backends reported
+(`tokensPerDay`): a `default` for every key and `keys` by name for
+exceptions. At `warnAt` (0.8 unless set) a `quota.warning` event goes
+out once per key per day (the Slack, Discord and Teams plugins can post
+it); at the cap the request is refused with 429 before it reaches a
+backend and a `quota.reached` event goes out. Counts are seeded from
+today's usage at start, so a restart resets nobody. Quotas need the
+`policy` licence feature and are never sent to extensions. `GET
+/twinny/v1/admin/quotas` shows every key's standing; the People page
+shows it as a bar.
+
+```json
+"policy": {
+  "quotas": { "default": { "requestsPerDay": 2000, "tokensPerDay": 2000000 }, "keys": { "ci": { "requestsPerDay": 20000 } }, "warnAt": 0.8 }
+}
+```
+
+### Routing rules
+
+`policy.routing` decides which aliases may serve a workspace. The
+extension sends the open workspace's folder name as
+`X-Twinny-Workspace`; the first rule whose glob matches applies:
+
+```json
+"policy": {
+  "routing": [
+    { "workspace": "payments-*", "localOnly": true },
+    { "workspace": "docs", "aliases": ["cheap"] }
+  ]
+}
+```
+
+`localOnly` refuses any alias served by a hosted provider (OpenAI,
+Anthropic, Mistral and the like) for that workspace; `aliases` allows
+only those named. A refused request fails with a message that says
+which rule. Rules need the `policy` licence feature and stay on the
+gateway. Edit them under **Policy → Routing rules**.
+
 ## Pooling teammates' computers
 
 A developer who is connected to the team can click **Share this computer

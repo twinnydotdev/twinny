@@ -2,7 +2,7 @@ import React, { FormEvent, useEffect, useState } from "react"
 
 import type { InferenceCapability } from "../../extension/inference/types"
 import type { RemoteStatus, TeamPolicy } from "../../protocol/types"
-import type { GatewayModelConfig, GatewayProviderConfig } from "../config"
+import type { GatewayModelConfig, GatewayPolicy,GatewayProviderConfig  } from "../config"
 import type {
   ConfigurationSnapshot,
   InferenceConfiguration,
@@ -392,6 +392,33 @@ type Editor =
 
 export type ConfigurationSection = "models" | "policy"
 
+type SetDraft = (draft: InferenceConfiguration) => void
+
+/** Sets one number of a quota (the default's, or a key's) from an input. */
+const setQuota = (draft: InferenceConfiguration, setDraft: SetDraft, key: string | undefined, field: "requestsPerDay" | "tokensPerDay", value: string, setNotice: (s: string) => void) => {
+  const n = Number(value)
+  const quotas = { ...draft.policy?.quotas }
+  if (key === undefined) {
+    const quota = { ...quotas.default }
+    if (value && Number.isInteger(n) && n > 0) quota[field] = n
+    else delete quota[field]
+    if (Object.keys(quota).length) quotas.default = quota
+    else delete quotas.default
+  } else {
+    const keys = { ...quotas.keys }
+    const quota = { ...keys[key] }
+    if (value && Number.isInteger(n) && n > 0) quota[field] = n
+    else delete quota[field]
+    keys[key] = quota
+    quotas.keys = keys
+  }
+  const policy: GatewayPolicy = { ...draft.policy }
+  if (Object.keys(quotas).length) policy.quotas = quotas
+  else delete policy.quotas
+  setDraft({ ...draft, policy })
+  setNotice("")
+}
+
 export const ConfigurationPanel = ({
   apiKey,
   onSaved,
@@ -416,6 +443,7 @@ export const ConfigurationPanel = ({
 }) => {
   const [saved, setSaved] = useState<ConfigurationSnapshot | null>(null)
   const [draft, setDraft] = useState<InferenceConfiguration | null>(null)
+  const [quotaKey, setQuotaKey] = useState("")
   const [editor, setEditor] = useState<Editor | null>(null)
   const [confirming, setConfirming] = useState<Editor | "reload" | null>(null)
   const [busy, setBusy] = useState(false)
@@ -671,6 +699,185 @@ export const ConfigurationPanel = ({
               <span><b>Keep the team defaults active</b><small>Chat, autocomplete and embeddings stay on the team's models; developers cannot switch them to another provider while connected.</small></span>
             </label>
           </fieldset>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Prompt library</h2>
+            <span className="muted">Sent to connected extensions; developers keep their own templates beside these</span>
+          </div>
+          <label className="config-field" style={{ marginBottom: 14 }}>
+            <span>team system prompt (put before every chat's system prompt)</span>
+            <textarea rows={4} value={draft.policy?.systemPrompt ?? ""} disabled={locked} placeholder="e.g. We write TypeScript with strict mode. Prefer small functions. Never suggest adding dependencies without saying why." onChange={(event) => {
+              const policy: GatewayPolicy = { ...draft.policy }
+              if (event.target.value.trim()) policy.systemPrompt = event.target.value
+              else delete policy.systemPrompt
+              setDraft({ ...draft, policy }); setNotice("")
+            }} />
+          </label>
+          {(draft.policy?.templates ?? []).map((template, index) => (
+            <div key={index} className="policy-template">
+              <div className="config-fields">
+                <label className="config-field">
+                  <span>name (shown in the picker)</span>
+                  <input value={template.name} disabled={locked} placeholder="security-review" onChange={(event) => {
+                    const templates = [...(draft.policy?.templates ?? [])]
+                    templates[index] = { ...template, name: event.target.value }
+                    setDraft({ ...draft, policy: { ...draft.policy, templates } }); setNotice("")
+                  }} />
+                </label>
+                <label className="config-field">
+                  <span>description</span>
+                  <input value={template.description ?? ""} disabled={locked} onChange={(event) => {
+                    const templates = [...(draft.policy?.templates ?? [])]
+                    templates[index] = { ...template, ...(event.target.value ? { description: event.target.value } : {}) }
+                    if (!event.target.value) delete templates[index].description
+                    setDraft({ ...draft, policy: { ...draft.policy, templates } }); setNotice("")
+                  }} />
+                </label>
+              </div>
+              <label className="config-field">
+                <span>prompt (Handlebars; {"{{code}}"}, {"{{language}}"} and {"{{selection}}"} are filled in)</span>
+                <textarea rows={4} value={template.prompt} disabled={locked} onChange={(event) => {
+                  const templates = [...(draft.policy?.templates ?? [])]
+                  templates[index] = { ...template, prompt: event.target.value }
+                  setDraft({ ...draft, policy: { ...draft.policy, templates } }); setNotice("")
+                }} />
+              </label>
+              <div className="row-actions">
+                <button type="button" className="ghost mini" disabled={locked} onClick={() => {
+                  const templates = (draft.policy?.templates ?? []).filter((_, i) => i !== index)
+                  const policy: GatewayPolicy = { ...draft.policy }
+                  if (templates.length) policy.templates = templates
+                  else delete policy.templates
+                  setDraft({ ...draft, policy }); setNotice("")
+                }}>remove template</button>
+              </div>
+            </div>
+          ))}
+          <button type="button" disabled={locked} onClick={() => {
+            const templates = [...(draft.policy?.templates ?? []), { name: "", prompt: "" }]
+            setDraft({ ...draft, policy: { ...draft.policy, templates } }); setNotice("")
+          }}>+ Add template</button>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Quotas</h2>
+            <span className="muted">Per key, per UTC day; refused with 429 at the cap. Only the gateway sees these.</span>
+          </div>
+          <div className="config-fields">
+            <label className="config-field">
+              <span>default requests per day (blank: no cap)</span>
+              <input inputMode="numeric" value={draft.policy?.quotas?.default?.requestsPerDay ?? ""} disabled={locked} onChange={(event) => setQuota(draft, setDraft, undefined, "requestsPerDay", event.target.value, setNotice)} />
+            </label>
+            <label className="config-field">
+              <span>default tokens per day (blank: no cap)</span>
+              <input inputMode="numeric" value={draft.policy?.quotas?.default?.tokensPerDay ?? ""} disabled={locked} onChange={(event) => setQuota(draft, setDraft, undefined, "tokensPerDay", event.target.value, setNotice)} />
+            </label>
+            <label className="config-field">
+              <span>warn at (share of the cap, 0.5–0.99)</span>
+              <input inputMode="decimal" value={draft.policy?.quotas?.warnAt ?? ""} placeholder="0.8" disabled={locked} onChange={(event) => {
+                const quotas = { ...draft.policy?.quotas }
+                const n = Number(event.target.value)
+                if (event.target.value && Number.isFinite(n)) quotas.warnAt = n
+                else delete quotas.warnAt
+                setDraft({ ...draft, policy: { ...draft.policy, ...(Object.keys(quotas).length ? { quotas } : {}) } }); setNotice("")
+              }} />
+            </label>
+          </div>
+          {Object.entries(draft.policy?.quotas?.keys ?? {}).map(([name, quota]) => (
+            <div key={name} className="config-fields" style={{ marginTop: 10 }}>
+              <label className="config-field">
+                <span>key</span>
+                <input value={name} disabled />
+              </label>
+              <label className="config-field">
+                <span>requests per day</span>
+                <input inputMode="numeric" value={quota.requestsPerDay ?? ""} disabled={locked} onChange={(event) => setQuota(draft, setDraft, name, "requestsPerDay", event.target.value, setNotice)} />
+              </label>
+              <label className="config-field">
+                <span>tokens per day</span>
+                <input inputMode="numeric" value={quota.tokensPerDay ?? ""} disabled={locked} onChange={(event) => setQuota(draft, setDraft, name, "tokensPerDay", event.target.value, setNotice)} />
+              </label>
+              <div className="config-field">
+                <span>&nbsp;</span>
+                <button type="button" className="ghost mini" disabled={locked} onClick={() => {
+                  const keys = { ...draft.policy?.quotas?.keys }
+                  delete keys[name]
+                  const quotas = { ...draft.policy?.quotas, ...(Object.keys(keys).length ? { keys } : {}) }
+                  if (!Object.keys(keys).length) delete quotas.keys
+                  setDraft({ ...draft, policy: { ...draft.policy, ...(Object.keys(quotas).length ? { quotas } : {}) } }); setNotice("")
+                }}>remove</button>
+              </div>
+            </div>
+          ))}
+          <form className="newkey" style={{ marginTop: 10 }} onSubmit={(event) => {
+            event.preventDefault()
+            const name = quotaKey.trim()
+            if (!name) return
+            const keys = { ...draft.policy?.quotas?.keys, [name]: {} }
+            setDraft({ ...draft, policy: { ...draft.policy, quotas: { ...draft.policy?.quotas, keys } } }); setNotice(""); setQuotaKey("")
+          }}>
+            <input value={quotaKey} disabled={locked} placeholder="key name for its own quota" onChange={(event) => setQuotaKey(event.target.value)} />
+            <button type="submit" disabled={locked || !quotaKey.trim()}>+ Add key quota</button>
+          </form>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Routing rules</h2>
+            <span className="muted">By the workspace name the extension sends; the first matching rule decides</span>
+          </div>
+          {(draft.policy?.routing ?? []).map((rule, index) => (
+            <div key={index} className="config-fields" style={{ marginBottom: 10 }}>
+              <label className="config-field">
+                <span>workspace (glob, e.g. payments-*)</span>
+                <input value={rule.workspace} disabled={locked} onChange={(event) => {
+                  const routing = [...(draft.policy?.routing ?? [])]
+                  routing[index] = { ...rule, workspace: event.target.value }
+                  setDraft({ ...draft, policy: { ...draft.policy, routing } }); setNotice("")
+                }} />
+              </label>
+              <label className="config-field">
+                <span>only these aliases (comma-separated; blank: any)</span>
+                <input value={(rule.aliases ?? []).join(", ")} disabled={locked} onChange={(event) => {
+                  const routing = [...(draft.policy?.routing ?? [])]
+                  const aliases = event.target.value.split(",").map((a) => a.trim()).filter(Boolean)
+                  routing[index] = { ...rule, ...(aliases.length ? { aliases } : {}) }
+                  if (!aliases.length) delete routing[index].aliases
+                  setDraft({ ...draft, policy: { ...draft.policy, routing } }); setNotice("")
+                }} />
+              </label>
+              <div className="config-field">
+                <span>&nbsp;</span>
+                <label className="policy-option">
+                  <input type="checkbox" checked={rule.localOnly === true} disabled={locked} onChange={(event) => {
+                    const routing = [...(draft.policy?.routing ?? [])]
+                    routing[index] = { ...rule }
+                    if (event.target.checked) routing[index].localOnly = true
+                    else delete routing[index].localOnly
+                    setDraft({ ...draft, policy: { ...draft.policy, routing } }); setNotice("")
+                  }} />
+                  <span><b>local backends only</b><small>never a hosted provider</small></span>
+                </label>
+              </div>
+              <div className="config-field">
+                <span>&nbsp;</span>
+                <button type="button" className="ghost mini" disabled={locked} onClick={() => {
+                  const routing = (draft.policy?.routing ?? []).filter((_, i) => i !== index)
+                  const policy: GatewayPolicy = { ...draft.policy }
+                  if (routing.length) policy.routing = routing
+                  else delete policy.routing
+                  setDraft({ ...draft, policy }); setNotice("")
+                }}>remove rule</button>
+              </div>
+            </div>
+          ))}
+          <button type="button" disabled={locked} onClick={() => {
+            const routing = [...(draft.policy?.routing ?? []), { workspace: "", localOnly: true }]
+            setDraft({ ...draft, policy: { ...draft.policy, routing } }); setNotice("")
+          }}>+ Add rule</button>
         </section>
       </div>
       <section className="panel" hidden={section !== "models"}>

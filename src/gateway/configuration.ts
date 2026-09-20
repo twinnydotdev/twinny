@@ -11,13 +11,12 @@ import type { TeamDefaults, TeamPolicy } from "../protocol/types"
 import {
   GatewayConfig,
   GatewayModelConfig,
-  GatewayProviderConfig,
+GatewayPolicy,  GatewayProviderConfig,
   GatewayRecordingConfig,
   parseGatewayConfig,
   providerForRoute,
   readGatewaySecrets,
-  TEAM_PROVIDER_KIND
-} from "./config"
+  TEAM_PROVIDER_KIND } from "./config"
 import { buildRouteTable, RouteTable } from "./routes"
 
 export interface ProviderKind {
@@ -28,7 +27,7 @@ export interface ProviderKind {
 
 export interface InferenceConfiguration {
   teamDefaults?: TeamDefaults
-  policy?: TeamPolicy
+  policy?: GatewayPolicy
   /** As written in the file; every field optional there. */
   recording?: Partial<GatewayRecordingConfig>
   providers: Record<string, GatewayProviderConfig>
