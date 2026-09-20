@@ -17,7 +17,7 @@ import { fmt } from "./format"
 import { OTHER, OverviewPage, Series } from "./overview"
 import { CreatedKey, KeysResponse, PeoplePage } from "./people"
 import { PlanPage } from "./plan"
-import { PluginPage, PluginsPage } from "./plugins"
+import { PluginIcon, PluginPage, PluginsPage } from "./plugins"
 import { RecordingsPanel } from "./recordings"
 import { UsagePage } from "./usage"
 
@@ -385,7 +385,15 @@ const App = () => {
           {navButton("plan", <>Plan &amp; licence{planAttention && <span className="badge bad">!</span>}</>)}
           <div className="group">Plugins</div>
           {navButton("plugins", <>Store{enabledPlugins.length > 0 && <span className="badge">{fmt(enabledPlugins.length)}</span>}</>)}
-          {enabledPlugins.map((plugin) => navButton(`plugin:${plugin.id}`, plugin.name))}
+          {enabledPlugins.map((plugin) =>
+            navButton(
+              `plugin:${plugin.id}`,
+              <span className="nav-plugin">
+                <PluginIcon id={plugin.id} size={14} />
+                {plugin.name}
+              </span>
+            )
+          )}
         </nav>
         <div className="main">
           {error && <div className="error-bar">{error}</div>}

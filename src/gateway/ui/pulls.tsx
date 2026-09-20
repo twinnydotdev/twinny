@@ -13,6 +13,7 @@ import type { ReviewRecord } from "../plugins/reviews"
 import { api, ApiError } from "./api"
 import { fmt, plural, timeAgo } from "./format"
 import { DiffBlock, MarkdownView } from "./markdown"
+import { PluginIcon } from "./plugins"
 
 export type PullsHost = "github" | "gitlab"
 
@@ -722,7 +723,10 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
   return (
     <>
       <div className="page-title">
-        <h2>{host === "github" ? "GitHub" : "GitLab"}</h2>
+        <h2 className="plugin-name">
+          <PluginIcon id={host} size={22} />
+          {host === "github" ? "GitHub" : "GitLab"}
+        </h2>
         <p>
           Open {words.nouns} on the {words.repoNoun === "project" ? "projects" : "repositories"} this gateway watches, synced every five minutes.{" "}
           <button type="button" className="link" onClick={() => void syncAll()} disabled={syncing}>

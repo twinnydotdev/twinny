@@ -439,3 +439,6 @@ table.pulls td { vertical-align: top; }
 .tag.stale { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); margin-left: 6px; }
 .tag.failed { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); margin-left: 6px; }
 td.auto input { accent-color: var(--accent); }
+.plugin-icon { display: inline-block; vertical-align: -3px; flex: none; }
+.plugin-name { display: inline-flex; align-items: center; gap: 8px; }
+.nav-plugin { display: inline-flex; align-items: center; gap: 7px; }
