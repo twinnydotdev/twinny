@@ -87,12 +87,19 @@ export interface ChatRequest {
   messages: ChatMessage[]
   maxTokens?: number
   temperature?: number
+  /**
+   * `false` asks a reasoning model not to think before answering, on
+   * backends that take the request (Ollama). Others ignore it.
+   */
+  think?: boolean
 }
 
 export interface ChatChunk {
   content: string
   /** Usually on the last chunk, from backends that count. */
   usage?: InferenceUsage
+  /** A reasoning model's thinking, when the backend streams it apart from the answer. */
+  reasoning?: string
 }
 
 export interface EmbeddingRequest {

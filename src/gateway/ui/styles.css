@@ -442,3 +442,15 @@ td.auto input { accent-color: var(--accent); }
 .plugin-icon { display: inline-block; vertical-align: -3px; flex: none; }
 .plugin-name { display: inline-flex; align-items: center; gap: 8px; }
 .nav-plugin { display: inline-flex; align-items: center; gap: 7px; }
+
+/* Skeleton loaders */
+@keyframes skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.skeleton { display: inline-block; border-radius: 4px; background: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--ink-3) 35%, var(--line)) 50%, var(--line) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; vertical-align: middle; }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.skeleton-rows { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
+.skeleton-row { display: flex; align-items: center; gap: 16px; }
+.skeleton-row .skeleton:first-child { flex: 0 1 auto; }
+.skeleton-page .page-title { align-items: center; }
+.backup-options { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 16px; }
+.backup-options .policy-option { flex: 1 1 260px; max-width: 420px; }
+.backup-options .policy-option input { width: auto; }

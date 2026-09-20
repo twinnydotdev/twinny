@@ -54,11 +54,26 @@ export const flattenTextContent = (messages: ChatMessage[]): ChatMessage[] =>
     return { ...message, content: parts.map((part) => part.text).join("\n") } as ChatMessage
   })
 
-/** Only real API parameters: OpenAI rejects unknown ones such as an `id`. */
-const requestParameters = (request: Pick<ChatRequest, "maxTokens" | "temperature">) => ({
+type ChatParameters = Pick<ChatRequest, "maxTokens" | "temperature" | "think">
+
+/**
+ * Only real API parameters: OpenAI rejects unknown ones such as an `id`.
+ * `think: false` goes to Ollama only, which takes it on its OpenAI-style
+ * route too; other servers would refuse an unknown field.
+ */
+const requestParameters = (provider: TwinnyProvider, request: ChatParameters) => ({
   ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
-  ...(request.temperature !== undefined ? { temperature: request.temperature } : {})
+  ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+  ...(request.think === false && provider.provider === API_PROVIDERS.Ollama ? { think: false } : {})
 })
+
+/** The thinking a reasoning model streams beside its answer, under whichever name the server uses. */
+const reasoningOf = (delta: unknown): string | undefined => {
+  if (!delta || typeof delta !== "object") return undefined
+  const part = delta as { reasoning?: unknown; reasoning_content?: unknown; thinking?: unknown }
+  const text = part.reasoning ?? part.reasoning_content ?? part.thinking
+  return typeof text === "string" && text ? text : undefined
+}
 
 /**
  * Everything here is forwarded to the provider as-is, so it must carry only
@@ -67,26 +82,26 @@ const requestParameters = (request: Pick<ChatRequest, "maxTokens" | "temperature
 export const buildStreamingRequest = (
   provider: TwinnyProvider,
   messages: ChatMessage[],
-  parameters: Pick<ChatRequest, "maxTokens" | "temperature"> = {}
+  parameters: ChatParameters = {}
 ): CompletionStreaming<LLMProvider> => ({
   messages: flattenTextContent(messages),
   model: provider.modelName,
   stream: true,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   provider: getFluencyProvider(provider) as any,
-  ...requestParameters(parameters)
+  ...requestParameters(provider, parameters)
 })
 
 export const buildBlockingRequest = (
   provider: TwinnyProvider,
   messages: ChatMessage[],
-  parameters: Pick<ChatRequest, "maxTokens" | "temperature"> = {}
+  parameters: ChatParameters = {}
 ): CompletionNonStreaming<LLMProvider> => ({
   messages: flattenTextContent(messages.filter((m) => m.role !== "system")),
   model: provider.modelName,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   provider: getFluencyProvider(provider) as any,
-  ...requestParameters(parameters)
+  ...requestParameters(provider, parameters)
 })
 
 /**
@@ -108,9 +123,11 @@ export async function* fluencyChat(
     for await (const part of parts) {
       if (options?.signal?.aborted) break
       const delta = part.choices[0]?.delta?.content
+      const reasoning = reasoningOf(part.choices[0]?.delta)
       const usage = usageFromResponse(part as unknown as { usage?: StreamResponse["usage"] })
-      if (usage) yield { content: delta || "", usage }
+      if (usage) yield { content: delta || "", usage, ...(reasoning ? { reasoning } : {}) }
       else if (delta) yield { content: delta }
+      else if (reasoning) yield { content: "", reasoning }
     }
     return
   }

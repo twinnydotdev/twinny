@@ -20,7 +20,7 @@ import { createGatewayLog } from "../../gateway/log"
 import { BUNDLED_PLUGINS, PluginContext, PluginError, PluginHost, PluginInstance, pluginsFileFor, PluginStore } from "../../gateway/plugins"
 import { appJwt } from "../../gateway/plugins/github"
 import { PullPage, PullsPlugin, RepoStore } from "../../gateway/plugins/pulls"
-import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore } from "../../gateway/plugins/reviews"
+import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore, stripThinking } from "../../gateway/plugins/reviews"
 import { buildRouteTable } from "../../gateway/routes"
 import { GatewayServer } from "../../gateway/server"
 
@@ -307,7 +307,7 @@ suite("Plugin store", function () {
     const listed = await request(`${url}/twinny/v1/admin/plugins`, "GET", admin)
     assert.strictEqual(listed.status, 200)
     const ids = (listed.body.plugins as Array<{ id: string; enabled: boolean }>).map((plugin) => `${plugin.id}:${plugin.enabled}`)
-    assert.deepStrictEqual(ids, ["github:false", "gitlab:false"])
+    assert.deepStrictEqual(ids, ["github:false", "gitlab:false", "backups:false"])
     assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins`, "GET", dev)).status, 403)
   })
 
@@ -864,5 +864,46 @@ suite("Pull-request reviews", function () {
     assert.match(user, /small\.ts[\s\S]*```diff\n\+x\n```/)
     assert.match(user, /huge\.ts \(\+9 −0\)\n\(diff left out: too large for this review\)/)
     assert.match(user, /\(2 more changed files not shown\)/)
+  })
+})
+
+suite("Reviews and reasoning models", () => {
+  test("inline and unclosed <think> blocks are stripped from an answer", () => {
+    assert.strictEqual(stripThinking("<think>hmm</think>\n## Summary\nFine."), "## Summary\nFine.")
+    assert.strictEqual(stripThinking("<think>still thinking when the budget ran out"), "")
+    assert.strictEqual(stripThinking("## Summary\nNo thinking here."), "## Summary\nNo thinking here.")
+  })
+
+  test("a model that only reasons fails with a reason, and think:false is asked for", async () => {
+    let asked: { think?: boolean } = {}
+    const inference = {
+      chatAliases: () => ["chat"],
+      active: () => 0,
+      async *chat(_alias: string, _messages: ChatMessage[], options: { think?: boolean; onReasoning?: (t: string) => void }) {
+        asked = { think: options.think }
+        options.onReasoning?.("Let me think about this diff very carefully...")
+        yield ""
+      }
+    }
+    const dir = path.join(scratch, "reviews-thinking")
+    fs.mkdirSync(dir, { recursive: true })
+    const forge = () => ({
+      noun: "Pull request",
+      repoUrl: (name: string) => `x://${name}`,
+      hasAppAuth: () => true,
+      checkRepo: async (repo: { fullName: string }) => repo.fullName,
+      listPulls: async (repo: { fullName: string }) => [{ repo: repo.fullName, number: 1, title: "t", author: "a", url: "", draft: false, createdAt: "", updatedAt: "2026-09-19T00:00:00Z", headRef: "h", baseRef: "m", headSha: "s", checks: "none" as const, checkRuns: [], mergeable: "unknown" as const, review: "none" as const, labels: [] }],
+      pullContent: async () => ({ body: "", files: [], moreFiles: 0 }),
+      status: () => ({ baseUrl: "x://" })
+    })
+    const p = new PullsPlugin({ dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference }, forge, 0)
+    p.start()
+    const repo = ((await p.handle({ method: "POST", path: "repos", query: new URLSearchParams(), body: async () => ({ fullName: "acme/think" }), principal: "op" })).body as { repo: { id: string } }).repo
+    const reviewed = await p.handle({ method: "POST", path: `repos/${repo.id}/pulls/1/review`, query: new URLSearchParams(), body: async () => ({}), principal: "op" })
+    const review = (reviewed.body as { review: ReviewRecord }).review
+    assert.strictEqual(review.status, "failed")
+    assert.match(review.error ?? "", /spent its whole answer thinking \(46 characters of reasoning\)/)
+    assert.strictEqual(asked.think, false)
+    await p.stop()
   })
 })

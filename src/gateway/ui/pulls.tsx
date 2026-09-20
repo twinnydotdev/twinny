@@ -13,7 +13,7 @@ import type { ReviewRecord } from "../plugins/reviews"
 import { api, ApiError } from "./api"
 import { fmt, plural, timeAgo } from "./format"
 import { DiffBlock, MarkdownView } from "./markdown"
-import { PluginIcon } from "./plugins"
+import { PageSkeleton, PluginIcon } from "./plugins"
 
 export type PullsHost = "github" | "gitlab"
 
@@ -718,7 +718,20 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
     drafts: all.filter((pull) => matches(pull, "drafts")).length
   }
 
-  if (!overview) return error ? <div className="error-bar">{error}</div> : <div className="loading">Loading…</div>
+  if (!overview)
+    return error ? (
+      <div className="error-bar">{error}</div>
+    ) : (
+      <PageSkeleton
+        tiles={5}
+        title={
+          <h2 className="plugin-name">
+            <PluginIcon id={host} size={22} />
+            {host === "github" ? "GitHub" : "GitLab"}
+          </h2>
+        }
+      />
+    )
 
   return (
     <>
@@ -777,7 +790,16 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             <button type="button" className="ghost mini" onClick={() => setOpened(null)}>
               ← {words.nouns}
             </button>
-            {detailError ? <div className="error">{detailError}</div> : <div className="loading">Loading the {words.noun}…</div>}
+            {detailError ? (
+              <div className="error">{detailError}</div>
+            ) : (
+              <div className="skeleton-rows" aria-busy="true" aria-label={`Loading the ${words.noun}`}>
+                <span className="skeleton" style={{ width: "50%", height: 18, marginTop: 10 }} />
+                <span className="skeleton" style={{ width: "70%", height: 12 }} />
+                <span className="skeleton" style={{ width: "100%", height: 120, marginTop: 8 }} />
+                <span className="skeleton" style={{ width: "100%", height: 180 }} />
+              </div>
+            )}
           </section>
         )
       ) : (

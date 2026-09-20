@@ -10,6 +10,7 @@
  * dependencies, so `npx twinny-server` needs nothing but Node.
  */
 import { runInvites, runKeys, runLicense, runRecordings, runUsage } from "./admin"
+import { runBackup } from "./backup-cli"
 import { INIT_HELP, runInit } from "./init"
 import { runQuickstart, runReset } from "./quickstart"
 import { defaultServeIo, EXIT_CODE, runServe, SERVE_HELP } from "./serve"
@@ -28,6 +29,7 @@ Commands:
   keys create <name>       Make an access key for a developer (shown once)
   keys list                Show keys and whether they are active
   keys revoke <name|id>    Stop a key; takes effect without a restart
+  backup now|list|restore  The Backups plugin from the shell; restore with the gateway stopped
   invites create <name>    Make an invite link; opening it in VS Code connects the developer
   usage [--since 7d]       Requests, failures and token counts by key and model
   license [set|remove]     Show the plan and seats; install or remove a licence token
@@ -83,6 +85,9 @@ export const main = async (argv: string[]): Promise<number> => {
       return runLicense(rest, { out, err })
     case "recordings":
       return runRecordings(rest, { out, err })
+    case "backup":
+    case "backups":
+      return runBackup(rest, { out, err, env: process.env })
     case "--version":
     case "-v":
       out(VERSION)

@@ -14,6 +14,10 @@ export interface PluginChatOptions {
   signal: AbortSignal
   maxTokens?: number
   temperature?: number
+  /** `false` asks a reasoning model to answer without thinking first, where the backend allows. */
+  think?: boolean
+  /** Called with the thinking a reasoning model streams, so a caller can tell "thought" from "silent". */
+  onReasoning?: (text: string) => void
 }
 
 export interface PluginInference {
@@ -85,12 +89,14 @@ export const gatewayInference = (
           ...(maxTokens !== undefined ? { maxTokens } : {}),
           ...(chatOptions.temperature !== undefined
             ? { temperature: chatOptions.temperature }
-            : {})
+            : {}),
+          ...(chatOptions.think !== undefined ? { think: chatOptions.think } : {})
         },
         { signal: chatOptions.signal }
       )
       for await (const chunk of stream) {
         if (chunk.usage) usage = chunk.usage
+        if (chunk.reasoning) chatOptions.onReasoning?.(chunk.reasoning)
         if (!chunk.content) continue
         chunks++
         yield chunk.content

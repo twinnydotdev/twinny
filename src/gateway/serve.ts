@@ -331,6 +331,14 @@ export const runServe = async (
       dataDir: path.dirname(config.auth.keysFile),
       log,
       licensed: () => license.current().features.includes("plugins"),
+      paths: {
+        configFile: args.config,
+        dataDir: path.dirname(config.auth.keysFile),
+        keysFile: config.auth.keysFile,
+        licenseFile: config.auth.licenseFile,
+        usageDir: config.usage.dir,
+        recordingsDir: config.recording.dir
+      },
       // Plugins use the gateway's own models, routed as a developer's request
       // is and recorded under the plugin's name; `server` exists before any
       // plugin starts.

@@ -1225,6 +1225,12 @@ what they cost. The prompt carries at most 24k characters of description
 and diff (larger patches are named but left out) and asks for at most
 1,500 tokens back, to suit local models with small contexts.
 
+**Reasoning models.** A model that thinks before answering (Qwen 3 and
+the like) is asked not to (`think: false`, which Ollama honours); a model
+that thinks anyway gets a 4,000-token budget, inline `<think>` blocks are
+removed from the answer, and a review that came back as thinking only
+fails with that reason rather than "answered nothing".
+
 **Plugin routes** under `/twinny/v1/admin/plugins/<github|gitlab>/api/`:
 
 | Route | Does |
@@ -1238,3 +1244,46 @@ and diff (larger patches are named but left out) and asks for at most
 | `PUT /repos/<id>` `{ autoReview }` | review new and updated pulls in the background |
 | `PUT /settings` `{ baseUrl?, reviewAlias? }` | the host URL; the chat alias reviews use |
 | `PUT /app` `{ appId, privateKey }`, `DELETE /app`, `GET /app/repositories` | the GitHub App (GitHub only) |
+
+### Backups
+
+The Backups plugin makes a nightly copy of what the gateway would miss:
+the configuration file, keys, licence, invites, `plugins.json` and every
+plugin's files, and the usage records; recordings too when asked (they
+can be large and hold code). The copy goes to a directory on the server
+or to any S3-compatible bucket (AWS, Cloudflare R2, MinIO, Backblaze,
+Wasabi, Hetzner…), signed by the server itself with no extra packages.
+Set the destination, the time (server local), how many archives to
+keep, and optionally a passphrase on the plugin's page; **test
+destination** writes and deletes a probe, **back up now** does one at
+once.
+
+An archive is a gzipped tar with a manifest (sizes and SHA-256 hashes,
+checked on restore), readable by `tar` when not encrypted. With a
+passphrase it is AES-256-GCM encrypted (`.tar.gz.enc`); keep the
+passphrase somewhere other than the server, since the settings file that
+holds it is inside the backup. After a successful run, archives beyond
+the kept count are deleted, oldest first.
+
+Restoring is a CLI job done with the gateway stopped:
+
+```sh
+twinny-server backup list --config twinny.gateway.json
+twinny-server backup restore twinny-backup-20260920-030000.tar.gz.enc --config twinny.gateway.json
+twinny-server backup restore twinny-backup-20260920-030000.tar.gz.enc --config twinny.gateway.json --yes
+```
+
+Without `--yes` it only prints what would be written where. The archive
+is a file path, or a name at the configured destination. On another
+machine the passphrase comes from `TWINNY_BACKUP_PASSPHRASE` (or the
+variable named by `--passphrase-env`). Files not in the backup are left
+as they are. `twinny-server backup now` makes a copy from cron or a
+shell as the schedule would.
+
+| Route under `/twinny/v1/admin/plugins/backups/api/` | Does |
+| --- | --- |
+| `GET /` | settings without secrets, the last and next run, the archives at the destination |
+| `PUT /settings` | destination (`path` or `s3`), time, `keep`, `includeRecordings`, `schedule`, `passphrase` |
+| `POST /check` | writes and deletes a probe at the destination |
+| `POST /run` | back up now |
+| `GET /archives`, `DELETE /archives/<name>` | list and delete archives |

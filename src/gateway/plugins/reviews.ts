@@ -20,7 +20,8 @@ import type { PullDetail, PullSummary } from "./pulls"
 /** Characters of description and patches a prompt may carry, for small local contexts. */
 export const REVIEW_PROMPT_BUDGET = 24_000
 const DESCRIPTION_BUDGET = 3_000
-export const REVIEW_MAX_TOKENS = 1_500
+/** Room for the answer, and for a reasoning model that thinks first despite being asked not to. */
+export const REVIEW_MAX_TOKENS = 4_000
 export const REVIEW_TIMEOUT_MS = 10 * 60_000
 /** Reviews kept per plugin; the oldest go first. */
 const MAX_REVIEWS = 1_000
@@ -252,6 +253,17 @@ export const reviewMessages = (
   ]
 }
 
+/**
+ * The answer without any inline thinking: some reasoning models put their
+ * thoughts in `<think>…</think>` in the content itself. An unclosed block
+ * (a budget spent thinking) leaves nothing.
+ */
+export const stripThinking = (text: string): string =>
+  text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<think>[\s\S]*$/i, "")
+    .trim()
+
 export interface ReviewJob {
   repoId: string
   pull: PullSummary
@@ -324,19 +336,35 @@ export class Reviewer {
     try {
       const detail = await job.detail()
       let text = ""
+      let thought = 0
       for await (const piece of inference.chat(
         job.alias,
         reviewMessages(detail, job.noun),
-        { signal, maxTokens: REVIEW_MAX_TOKENS, temperature: 0.2 }
+        {
+          signal,
+          maxTokens: REVIEW_MAX_TOKENS,
+          temperature: 0.2,
+          think: false,
+          onReasoning: (reasoning) => (thought += reasoning.length)
+        }
       ))
         text += piece
+      const answer = stripThinking(text)
       const review: ReviewRecord = {
         ...base,
         createdAt: new Date(this._now()).toISOString(),
         ms: this._now() - started,
-        status: text.trim() ? "done" : "failed",
-        text: text.trim(),
-        ...(text.trim() ? {} : { error: "The model answered nothing." })
+        status: answer ? "done" : "failed",
+        text: answer,
+        ...(answer
+          ? {}
+          : {
+              error: thought
+                ? `The model spent its whole answer thinking (${thought.toLocaleString("en-US")} characters of reasoning) and never wrote the review. Pick a model that does not reason, or one that honours "think: false".`
+                : text.trim()
+                  ? "The model answered only with thinking and no review."
+                  : "The model answered nothing. Check the alias on Providers & models, and that the model is loaded."
+            })
       }
       this._store.put(review)
       return review

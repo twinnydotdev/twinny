@@ -22,6 +22,17 @@ import type { PluginInference } from "./inference"
 
 export const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9-]{1,31}$/
 
+/** Where the gateway keeps its files, for plugins that copy or move them. */
+export interface GatewayPaths {
+  /** The configuration file, when the gateway was started with one. */
+  configFile?: string
+  dataDir: string
+  keysFile: string
+  licenseFile: string
+  usageDir: string
+  recordingsDir: string
+}
+
 /** What a plugin gets from the gateway. Nothing else. */
 export interface PluginContext {
   /** A directory of the plugin's own, under the gateway data directory. */
@@ -32,6 +43,8 @@ export interface PluginContext {
   now: () => number
   /** The gateway's models, when the host offers them. */
   inference?: PluginInference
+  /** The gateway's files, when the host says where they are. */
+  paths?: GatewayPaths
 }
 
 /** One admin request handed to a plugin: already authenticated as an admin. */
@@ -191,6 +204,7 @@ export interface PluginHostOptions {
   now?: () => number
   /** The gateway's models for a plugin, by plugin id; read when the plugin starts. */
   inference?: (id: string) => PluginInference | undefined
+  paths?: GatewayPaths
   /**
    * Whether the plan allows plugins. Read at every switch and request, so
    * a licence installed or lapsing applies at once; absent means allowed.
@@ -344,7 +358,8 @@ export class PluginHost {
       now: this._options.now ?? Date.now,
       ...(this._options.inference
         ? { inference: this._options.inference(id) }
-        : {})
+        : {}),
+      ...(this._options.paths ? { paths: this._options.paths } : {})
     })
     this._running.set(id, instance)
     instance.start?.()
