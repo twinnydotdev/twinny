@@ -245,7 +245,7 @@ export const NotifyPanel = ({ host, apiKey }: { host: NotifyHostId; apiKey: stri
           </div>
         )}
 
-        <form className="newkey create" onSubmit={submit} style={{ display: "block" }}>
+        <form className="create-form" onSubmit={submit}>
           <div className="config-fields">
             <label className="config-field">
               <span>channel name</span>

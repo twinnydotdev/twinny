@@ -403,7 +403,7 @@ export class OidcPlugin implements PluginInstance {
 
 export const oidcPlugin: GatewayPlugin = {
   id: "oidc",
-  name: "SSO sign-in (OIDC)",
+  name: "SSO sign-in",
   description:
     "Developers sign in with your identity provider (Okta, Entra ID, Google Workspace, Keycloak, any OpenID Connect) and VS Code connects with a key of their own; no invites or codes.",
   create: (context) => new OidcPlugin(context)

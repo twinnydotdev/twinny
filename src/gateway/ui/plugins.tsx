@@ -8,6 +8,7 @@ import React, { useState } from "react"
 import type { PluginSummary } from "../plugins/host"
 
 import { BackupsPanel } from "./backups"
+import { ContextPanel } from "./context"
 import { NotifyPanel } from "./notify"
 import { OidcPanel } from "./oidc"
 import { PullsPanel } from "./pulls"
@@ -45,6 +46,12 @@ const ICONS: Record<string, { viewBox: string; path: string; color?: string }> =
     color: "#6264a7",
     // Two people on a card, as the Teams mark suggests.
     path: "M14.5 3.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19.5 5.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM3 8.75A1.75 1.75 0 0 1 4.75 7h9.5A1.75 1.75 0 0 1 16 8.75V15a4 4 0 0 1-8 0v-1H4.75A1.75 1.75 0 0 1 3 12.25v-3.5zm3 1.25v1.5h1.5V17h1.5v-5.5h1.5V10H6zm11 0h3.25c.966 0 1.75.784 1.75 1.75v3.5A3.5 3.5 0 0 1 18.5 19h-.86A5.98 5.98 0 0 0 18 15v-5z"
+  },
+  context: {
+    viewBox: "0 0 16 16",
+    color: "#9085e9",
+    // Stacked layers: one index over many repositories.
+    path: "M8 1.25a.75.75 0 0 1 .34.08l6 3a.75.75 0 0 1 0 1.34l-6 3a.75.75 0 0 1-.68 0l-6-3a.75.75 0 0 1 0-1.34l6-3A.75.75 0 0 1 8 1.25zM3.93 5 8 7.04 12.07 5 8 2.96 3.93 5zM1.6 8.16a.75.75 0 0 1 1-.32L8 10.54l5.4-2.7a.75.75 0 0 1 .68 1.34l-5.74 2.87a.75.75 0 0 1-.68 0L1.92 9.18a.75.75 0 0 1-.32-1.02zm0 3a.75.75 0 0 1 1-.32L8 13.54l5.4-2.7a.75.75 0 0 1 .68 1.34l-5.74 2.87a.75.75 0 0 1-.68 0l-5.74-2.87a.75.75 0 0 1-.32-1.02z"
   },
   oidc: {
     viewBox: "0 0 16 16",
@@ -207,6 +214,7 @@ export const PluginPage = ({ id, apiKey }: { id: string; apiKey: string }) => {
   if (id === "github" || id === "gitlab" || id === "gitea" || id === "bitbucket") return <PullsPanel host={id} apiKey={apiKey} />
   if (id === "backups") return <BackupsPanel apiKey={apiKey} />
   if (id === "oidc") return <OidcPanel apiKey={apiKey} />
+  if (id === "context") return <ContextPanel apiKey={apiKey} />
   if (id === "slack" || id === "discord" || id === "teams") return <NotifyPanel host={id} apiKey={apiKey} />
   return <div className="empty">This plugin has no page.</div>
 }

@@ -1414,6 +1414,28 @@ the key (`email` unless the provider has none; `preferred_username` or
 not send `X-Forwarded-Proto`. Provider secrets live in the plugin's
 `settings.json`, owner-readable, and never come back from any route.
 
+### Shared context
+
+The Shared context plugin keeps one index of the team's repositories on
+the gateway, built with an embeddings alias the gateway serves, so every
+connected developer's chat can draw on the whole codebase and not only
+the clone on their laptop. Add a repository by clone URL (https with a
+token for private ones, ssh with the server's key, or a path on the
+server); it is cloned shallow under the plugin's directory, chunked by
+lines, embedded in batches, and re-indexed on the interval (60 minutes
+unless set) while no developer request is running, embedding only the
+files whose content changed. **Try a search** on the page shows what a
+chat would pull in.
+
+Connected extensions ask `POST /twinny/v1/plugins/context/search`
+`{ query, k? }` with their gateway key and merge the hits into the
+"relevant code" their chat already gathers from the local workspace, so
+nothing changes for the developer except better answers. The route needs
+a key; the admin page's search uses the admin route instead. Search is
+cosine similarity over every chunk plus a bonus for query words present
+in the chunk, capped at 24k characters so it fits a prompt. Embedding
+runs are recorded in usage under `plugin:context`.
+
 ### Backups
 
 The Backups plugin makes a nightly copy of what the gateway would miss:

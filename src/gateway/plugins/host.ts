@@ -84,6 +84,8 @@ export interface PublicPluginRequest {
   /** The client address, for logs and throttles. */
   address: string
   body: () => Promise<Record<string, unknown>>
+  /** The key's name when the request carried a valid gateway key; plugins that serve developers require it. */
+  principal?: string
 }
 
 /** A running plugin. */

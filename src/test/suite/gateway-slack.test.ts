@@ -145,6 +145,8 @@ suite("Slack plugin", function () {
     const heads: Record<number, { sha: string; checks: "success" | "failure" | "none" }> = { 1: { sha: "a", checks: "success" } }
     const inference = {
       chatAliases: () => ["chat"],
+      embeddingAliases: () => [],
+      embed: async () => [],
       active: () => 0,
       async *chat() {
         yield "## Summary\nSwaps the loop for a batch call.\n\n## Issues\n- none\n\n## Verdict\n**Request changes** - the retry is missing."

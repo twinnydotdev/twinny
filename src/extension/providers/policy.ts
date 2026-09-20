@@ -35,13 +35,13 @@ export class TeamPolicyStore implements TeamPolicyStorage {
       rememberTeamPolicy(undefined)
       return undefined
     }
-    rememberTeamPolicy(stored.policy)
+    rememberTeamPolicy(stored.policy, stored)
     return stored
   }
 
   public async set(state: TeamPolicyState): Promise<void> {
     await this._state.update(TEAM_POLICY_STORAGE_KEY, state)
-    rememberTeamPolicy(state.policy)
+    rememberTeamPolicy(state.policy, state)
   }
 
   public async clear(): Promise<void> {

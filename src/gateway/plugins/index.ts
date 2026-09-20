@@ -4,6 +4,7 @@
  */
 import { backupsPlugin } from "./backups"
 import { bitbucketPlugin } from "./bitbucket"
+import { contextPlugin } from "./context"
 import { discordPlugin } from "./discord"
 import { giteaPlugin } from "./gitea"
 import { githubPlugin } from "./github"
@@ -22,6 +23,7 @@ export const BUNDLED_PLUGINS: GatewayPlugin[] = [
   discordPlugin,
   teamsPlugin,
   oidcPlugin,
+  contextPlugin,
   backupsPlugin
 ]
 

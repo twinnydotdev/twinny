@@ -1616,7 +1616,13 @@ export class GatewayServer {
           "x-forwarded-host": typeof req.headers["x-forwarded-host"] === "string" ? req.headers["x-forwarded-host"] : undefined
         },
         address: clientAddress(req),
-        body: () => readJsonBody(req, 64 * 1024)
+        body: () => readJsonBody(req, 64 * 1024),
+        ...(() => {
+          // A developer's key, when one is sent, names the caller; a bad one is simply absent.
+          if (!req.headers.authorization) return {}
+          const auth = this.authenticate(req.headers.authorization)
+          return "refused" in auth || auth.visitor ? {} : { principal: auth.principal }
+        })()
       })
       req.resume()
       sendPlugin(res, answer)

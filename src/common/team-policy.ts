@@ -48,13 +48,18 @@ export const describePolicy = (policy: TeamPolicy): string[] => {
 }
 
 let currentPolicy: TeamPolicy | undefined
+let currentState: TeamPolicyState | undefined
 
 /** What the extension applies right now: set by the team connection whenever the policy loads or goes. */
-export const rememberTeamPolicy = (policy: TeamPolicy | undefined): void => {
+export const rememberTeamPolicy = (policy: TeamPolicy | undefined, state?: TeamPolicyState): void => {
   currentPolicy = policy && !policyIsEmpty(policy) ? policy : undefined
+  currentState = state
 }
 
 export const currentTeamPolicy = (): TeamPolicy | undefined => currentPolicy
+
+/** The team connected right now (its gateway and provider ids), or nothing. */
+export const currentTeamState = (): TeamPolicyState | undefined => currentState
 
 const leaveHint = "To use your own settings, leave the team from the Providers tab."
 

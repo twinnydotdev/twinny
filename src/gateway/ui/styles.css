@@ -480,3 +480,14 @@ td.auto input { accent-color: var(--accent); }
 .policy-template, .policy-entry { margin-bottom: 14px; }
 .panel > .policy-template:first-of-type, .panel > .policy-entry:first-of-type { margin-top: 4px; }
 .created a.button { display: inline-block; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; text-decoration: none; color: var(--ink); }
+.policy-entry .backup-options { align-items: center; }
+.policy-entry .backup-options > button, .policy-entry .row-actions > button:last-child { margin-left: auto; }
+.create-form { border: 1px dashed var(--line); border-radius: 6px; padding: 14px; margin-top: 14px; }
+.create-form .row-actions { margin-top: 14px; }
+.create-form .row-actions .muted { font-size: 12px; }
+.config-field > span { text-align: left; }
+.sync-progress { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 12px; }
+.sync-progress .meter { flex: none; }
+@keyframes meter-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+.meter-fill.indeterminate { animation: meter-slide 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .meter-fill.indeterminate { animation: none; } }

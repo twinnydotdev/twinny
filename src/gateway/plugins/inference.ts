@@ -23,6 +23,10 @@ export interface PluginChatOptions {
 export interface PluginInference {
   /** The aliases that can chat, as configured right now. */
   chatAliases(): string[]
+  /** The aliases that can embed, as configured right now. */
+  embeddingAliases(): string[]
+  /** One vector per input, through the alias, recorded like any other request. */
+  embed(alias: string, inputs: string[], signal: AbortSignal): Promise<number[][]>
   /** Streams the reply's text. Throws an `InferenceError` when the alias cannot answer. */
   chat(
     alias: string,
@@ -54,7 +58,45 @@ export const gatewayInference = (
       .models()
       .filter((model) => model.capabilities.includes("chat"))
       .map((model) => model.id),
+  embeddingAliases: () =>
+    options
+      .routes()
+      .models()
+      .filter((model) => model.capabilities.includes("embeddings"))
+      .map((model) => model.id),
   active: options.active,
+  async embed(alias, inputs, signal) {
+    const started = Date.now()
+    const target = options.routes().route(alias, "embeddings")
+    try {
+      const answer = await target.client.embeddings({ model: target.model, input: inputs }, { signal })
+      options.usage?.record({
+        key: options.principal,
+        route: "embeddings",
+        alias,
+        outcome: "ok",
+        status: 200,
+        ms: Date.now() - started,
+        inputs: inputs.length,
+        ...(target.provider ? { peer: target.provider } : {}),
+        usage: answer.usage
+      })
+      return answer.vectors
+    } catch (error) {
+      const failure = toInferenceError(error)
+      options.usage?.record({
+        key: options.principal,
+        route: "embeddings",
+        alias,
+        outcome: failure.kind === "cancelled" ? "cancelled" : "error",
+        kind: failure.kind,
+        status: failure.kind === "cancelled" ? 499 : 502,
+        ms: Date.now() - started,
+        inputs: inputs.length
+      })
+      throw failure
+    }
+  },
   async *chat(alias, messages, chatOptions) {
     const started = Date.now()
     const target = options.routes().route(alias, "chat")

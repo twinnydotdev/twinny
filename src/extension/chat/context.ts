@@ -43,6 +43,7 @@ import { getGitContext } from "./git-context"
 import { getProblemsContext } from "./problems"
 import { isSymbolRef } from "./symbol-ref"
 import { readSymbolEntry } from "./symbols"
+import { searchTeamContext } from "./team-context"
 
 /** A message without the words that name a context source. */
 const stripMentions = (text: string) =>
@@ -79,6 +80,9 @@ const previousSourceFiles = (
  * system prompt, the editor selection, `@workspace` / `@problems` / `@git` /
  * `@terminal` lookups, and the files and symbols the user attached or pinned.
  */
+/** Hits asked of the team gateway's shared index per question. */
+const DEFAULT_TEAM_CONTEXT_COUNT = 6
+
 export class ChatContextBuilder {
   constructor(
     private readonly _context: ExtensionContext,
@@ -194,9 +198,21 @@ export class ChatContextBuilder {
     }
     const send = () => this._bridge.emit(EVENT_NAME.twinnyWorkspaceSearch, { ...report })
 
+    // The team's shared index, when connected to one that has it, is asked alongside.
+    const teamHits = searchTeamContext(query, DEFAULT_TEAM_CONTEXT_COUNT)
     if (!this._search?.available) {
-      if (mentioned) send()
-      return null
+      const fromTeam = await teamHits
+      if (!fromTeam.length) {
+        if (mentioned) send()
+        return null
+      }
+      report.stage = "done"
+      report.hits = fromTeam.map((hit) => ({ path: hit.file, startLine: hit.startLine, endLine: hit.endLine, score: hit.score, content: hit.content, kind: hit.kind }))
+      send()
+      logger.info(`@team: ${fromTeam.length} hits`)
+      return this._templates.readTemplate<TemplateData>("relevant-code", {
+        code: formatContextEntries(fromTeam.map((hit) => ({ path: hit.file, content: hit.content, range: { startLine: hit.startLine, endLine: hit.endLine } })))
+      })
     }
 
     updateLoadingMessage(this._bridge, "Searching the workspace")
@@ -216,6 +232,8 @@ export class ChatContextBuilder {
       }
     })
 
+    const fromTeam = await teamHits
+    if (fromTeam.length) result.hits = [...result.hits, ...fromTeam]
     report.stage = result.hits.length ? "done" : "empty"
     report.candidates = result.candidates
     report.elapsedMs = Date.now() - startedAt

@@ -307,7 +307,7 @@ suite("Plugin store", function () {
     const listed = await request(`${url}/twinny/v1/admin/plugins`, "GET", admin)
     assert.strictEqual(listed.status, 200)
     const ids = (listed.body.plugins as Array<{ id: string; enabled: boolean }>).map((plugin) => `${plugin.id}:${plugin.enabled}`)
-    assert.deepStrictEqual(ids, ["github:false", "gitlab:false", "gitea:false", "bitbucket:false", "slack:false", "discord:false", "teams:false", "oidc:false", "backups:false"])
+    assert.deepStrictEqual(ids, ["github:false", "gitlab:false", "gitea:false", "bitbucket:false", "slack:false", "discord:false", "teams:false", "oidc:false", "context:false", "backups:false"])
     assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins`, "GET", dev)).status, 403)
   })
 
@@ -693,6 +693,8 @@ suite("Pull-request reviews", function () {
     const calls: Array<{ alias: string; prompt: string }> = []
     const inference = {
       chatAliases: () => ["coder", "chat"],
+      embeddingAliases: () => [],
+      embed: async () => [],
       active: options.active ?? (() => 0),
       async *chat(alias: string, messages: ChatMessage[]) {
         calls.push({ alias, prompt: messages.map((m) => String(m.content)).join("\n") })
@@ -878,6 +880,8 @@ suite("Reviews and reasoning models", () => {
     let asked: { think?: boolean } = {}
     const inference = {
       chatAliases: () => ["chat"],
+      embeddingAliases: () => [],
+      embed: async () => [],
       active: () => 0,
       async *chat(_alias: string, _messages: ChatMessage[], options: { think?: boolean; onReasoning?: (t: string) => void }) {
         asked = { think: options.think }

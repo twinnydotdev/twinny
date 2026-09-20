@@ -16,7 +16,7 @@ export interface Hit {
    * Set on a block added for the reader's sake rather than found: the
    * imports of a file another hit came from. Its score is that hit's.
    */
-  kind?: "imports"
+  kind?: "imports" | "team"
 }
 
 /** A row as the vector store returns it, before scoring. */

@@ -128,7 +128,7 @@ export interface WorkspaceHitSummary {
   /** The chunk itself, so the chat can show it without another round trip. */
   content: string
   /** An imports block added under another hit from the file, not a match. */
-  kind?: "imports"
+  kind?: "imports" | "team"
 }
 
 /** A candidate that was scored but fell under the threshold. */
