@@ -344,6 +344,22 @@ const ModelEditor = ({
           min={1}
           placeholder="Optional"
         />
+        <Field
+          label="Price per million input tokens (for the Usage page)"
+          value={value.price?.input ?? ""}
+          onChange={(v) => setValue({ ...value, price: v || value.price?.output !== undefined ? { input: v ? Number(v) : 0, output: value.price?.output ?? 0 } : undefined })}
+          type="number"
+          min={0}
+          placeholder="Optional, e.g. 0.15"
+        />
+        <Field
+          label="Price per million output tokens"
+          value={value.price?.output ?? ""}
+          onChange={(v) => setValue({ ...value, price: v || value.price?.input !== undefined ? { input: value.price?.input ?? 0, output: v ? Number(v) : 0 } : undefined })}
+          type="number"
+          min={0}
+          placeholder="Optional, e.g. 0.60"
+        />
       </div>
       <fieldset className="capability-picker">
         <legend>Capabilities</legend>
@@ -879,6 +895,25 @@ export const ConfigurationPanel = ({
           }}>+ Add rule</button>
         </section>
       </div>
+      <section className="panel" hidden={section !== "models"}>
+        <div className="section-heading">
+          <h2>Prices</h2>
+          <span className="muted">what the Usage page multiplies token counts by; set per alias in its form</span>
+        </div>
+        <div className="newkey">
+          <label>
+            <span className="muted">currency</span>
+            <input value={draft.pricing?.currency ?? ""} placeholder="USD" maxLength={3} disabled={locked} style={{ width: 80 }} onChange={(event) => {
+              const currency = event.target.value.toUpperCase()
+              const next = { ...draft }
+              if (currency) next.pricing = { currency }
+              else delete next.pricing
+              setDraft(next); setNotice("")
+            }} />
+          </label>
+          <span className="muted">{draft.models.filter((model) => model.price).length ? `${draft.models.filter((model) => model.price).length} of ${draft.models.length} aliases have a price.` : "No alias has a price yet; open a model and set one per million tokens."}</span>
+        </div>
+      </section>
       <section className="panel" hidden={section !== "models"}>
         <div className="section-heading">
           <h2>

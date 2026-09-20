@@ -81,3 +81,26 @@ suite("gateway usage summary", () => {
     assert.strictEqual(summary.byPeer["carol@box"].requests, 1)
   })
 })
+
+suite("Usage costs", () => {
+  test("tokens are priced per alias when prices are given, and the currency rides on the summary", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-usage-cost-"))
+    const ts = new Date().toISOString()
+    const lines: UsageRecord[] = [
+      { ts, key: "alice", route: "chat", alias: "gpt", outcome: "ok", status: 200, ms: 10, promptTokens: 1_000_000, completionTokens: 500_000 },
+      { ts, key: "alice", route: "fim", alias: "coder", outcome: "ok", status: 200, ms: 10, promptTokens: 2_000_000, completionTokens: 0 },
+      { ts, key: "bob", route: "chat", alias: "gpt", outcome: "ok", status: 200, ms: 10, promptTokens: 0, completionTokens: 1_000_000 }
+    ]
+    fs.writeFileSync(path.join(dir, `${ts.slice(0, 10)}.jsonl`), lines.map((r) => JSON.stringify(r)).join("\n") + "\n")
+    const since = new Date(Date.now() - 60_000)
+    const priced = summarizeUsage(dir, since, new Date(), { currency: "EUR", prices: { gpt: { input: 2, output: 8 } } })
+    assert.strictEqual(priced.currency, "EUR")
+    assert.strictEqual(priced.byKey.alice.cost, 2 + 4)
+    assert.strictEqual(priced.byKey.bob.cost, 8)
+    assert.strictEqual(priced.byModel.coder.cost, undefined, "no price, no cost")
+    assert.strictEqual(priced.total.cost, 14)
+    const unpriced = summarizeUsage(dir, since, new Date(), { currency: "EUR", prices: {} })
+    assert.strictEqual(unpriced.currency, undefined)
+    assert.strictEqual(unpriced.total.cost, undefined)
+  })
+})

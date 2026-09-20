@@ -969,6 +969,21 @@ bob    coder        96   90       6          0       28974        2109     702  
 
 The report reads the files directly; the server need not be running.
 
+## Costs
+
+Give an alias a price and the Usage page shows what its tokens cost:
+in the model's form on **Providers & models** (per million input and
+output tokens), with the currency set once on the same page. The
+summary then carries a cost per developer, per model and in total for
+the period, computed from the token counts the backends reported, so a
+local model with no price shows nothing and a hosted one shows the bill.
+In the file:
+
+```json
+"pricing": { "currency": "USD" },
+"models": [{ "alias": "gpt", "provider": "cloud", "model": "gpt-4o-mini", "capabilities": ["chat"], "price": { "input": 0.15, "output": 0.6 } }]
+```
+
 ## Backends that are down
 
 A backend being unreachable is never a configuration error. At startup the

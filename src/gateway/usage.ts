@@ -147,6 +147,8 @@ export interface UsageTotals {
   /** How many requests carried any token count. */
   counted: number
   ms: number
+  /** What the tokens cost at the configured prices; absent when no alias has a price. */
+  cost?: number
   indexing: IndexingTotals
 }
 
@@ -158,9 +160,17 @@ export interface UsageDay {
   byKey: Record<string, number>
 }
 
+/** Per million tokens, in the summary's currency. */
+export interface AliasPrice {
+  input: number
+  output: number
+}
+
 export interface UsageSummary {
   since: Date
   until: Date
+  /** Set when any alias has a price; costs are in it. */
+  currency?: string
   total: UsageTotals
   byKey: Record<string, UsageTotals>
   byModel: Record<string, UsageTotals>
@@ -193,7 +203,7 @@ type Runs = Map<string, { last: number; failed: boolean; counted: boolean }>
  * which fails once any call does. Returns whether the record counts as
  * a request: always for chat and fim, for embeddings when a run starts.
  */
-const add = (totals: UsageTotals, record: UsageRecord, runs: Runs): boolean => {
+const add = (totals: UsageTotals, record: UsageRecord, runs: Runs, prices?: Record<string, AliasPrice>): boolean => {
   if (record.route === "embeddings") {
     const at = new Date(record.ts).getTime()
     const id = `${record.key}|${record.alias ?? ""}`
@@ -218,6 +228,7 @@ const add = (totals: UsageTotals, record: UsageRecord, runs: Runs): boolean => {
     if (record.promptTokens !== undefined || record.completionTokens !== undefined) {
       totals.promptTokens += record.promptTokens ?? 0
       totals.completionTokens += record.completionTokens ?? 0
+      addCost(totals, record, prices)
       if (!run!.counted) {
         run!.counted = true
         totals.counted++
@@ -237,6 +248,7 @@ const add = (totals: UsageTotals, record: UsageRecord, runs: Runs): boolean => {
     totals.counted++
     totals.promptTokens += record.promptTokens ?? 0
     totals.completionTokens += record.completionTokens ?? 0
+    addCost(totals, record, prices)
   }
   return true
 }
@@ -273,14 +285,25 @@ export const readUsage = (
   return records
 }
 
+/** Adds what a record's tokens cost, when its alias has a price. */
+const addCost = (totals: UsageTotals, record: UsageRecord, prices?: Record<string, AliasPrice>): void => {
+  const price = record.alias ? prices?.[record.alias] : undefined
+  if (!price) return
+  const cost = ((record.promptTokens ?? 0) / 1_000_000) * price.input + ((record.completionTokens ?? 0) / 1_000_000) * price.output
+  totals.cost = (totals.cost ?? 0) + cost
+}
+
 export const summarizeUsage = (
   dir: string,
   since: Date,
-  until = new Date()
+  until = new Date(),
+  pricing?: { currency: string; prices: Record<string, AliasPrice> }
 ): UsageSummary => {
+  const prices = pricing && Object.keys(pricing.prices).length ? pricing.prices : undefined
   const summary: UsageSummary = {
     since,
     until,
+    ...(prices ? { currency: pricing?.currency ?? "USD" } : {}),
     total: emptyTotals(),
     byKey: {},
     byModel: {},
@@ -297,13 +320,13 @@ export const summarizeUsage = (
   }
   for (const record of readUsage(dir, since, until)) {
     const model = record.alias || "(none)"
-    const counts = add(summary.total, record, runsOf("total"))
-    add((summary.byKey[record.key] ??= emptyTotals()), record, runsOf(`key:${record.key}`))
-    add((summary.byModel[model] ??= emptyTotals()), record, runsOf(`model:${model}`))
+    const counts = add(summary.total, record, runsOf("total"), prices)
+    add((summary.byKey[record.key] ??= emptyTotals()), record, runsOf(`key:${record.key}`), prices)
+    add((summary.byModel[model] ??= emptyTotals()), record, runsOf(`model:${model}`), prices)
     const perKey = (summary.byKeyAndModel[record.key] ??= {})
-    add((perKey[model] ??= emptyTotals()), record, runsOf(`key-model:${record.key}|${model}`))
+    add((perKey[model] ??= emptyTotals()), record, runsOf(`key-model:${record.key}|${model}`), prices)
     if (record.peer)
-      add((summary.byPeer[record.peer] ??= emptyTotals()), record, runsOf(`peer:${record.peer}`))
+      add((summary.byPeer[record.peer] ??= emptyTotals()), record, runsOf(`peer:${record.peer}`), prices)
     if (!counts) continue
     const day = record.ts.slice(0, 10)
     const entry = days.get(day) ?? { day, requests: 0, byKey: {} }

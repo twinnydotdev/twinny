@@ -8,15 +8,7 @@ import { getEndpointDefaults, validateProvider } from "../common/provider-valida
 import { providerRegistry } from "../extension/inference/registry"
 import type { TeamDefaults } from "../protocol/types"
 
-import {
-  GatewayConfig,
-  GatewayModelConfig,
-GatewayPolicy,  GatewayProviderConfig,
-  GatewayRecordingConfig,
-  parseGatewayConfig,
-  providerForRoute,
-  readGatewaySecrets,
-  TEAM_PROVIDER_KIND } from "./config"
+import { GatewayConfig, GatewayModelConfig, GatewayPolicy, GatewayPricing,GatewayProviderConfig, GatewayRecordingConfig, parseGatewayConfig, providerForRoute, readGatewaySecrets, TEAM_PROVIDER_KIND } from "./config"
 import { buildRouteTable, RouteTable } from "./routes"
 
 export interface ProviderKind {
@@ -28,6 +20,7 @@ export interface ProviderKind {
 export interface InferenceConfiguration {
   teamDefaults?: TeamDefaults
   policy?: GatewayPolicy
+  pricing?: GatewayPricing
   /** As written in the file; every field optional there. */
   recording?: Partial<GatewayRecordingConfig>
   providers: Record<string, GatewayProviderConfig>
@@ -99,6 +92,7 @@ export class GatewayConfiguration {
       providers: this._raw.providers,
       models: this._raw.models,
       teamDefaults: this._raw.teamDefaults ?? {},
+      ...(this._raw.pricing ? { pricing: this._raw.pricing } : {}),
       policy: this._raw.policy ?? {},
       recording: this._raw.recording ?? {},
       kinds: listKinds()
@@ -129,7 +123,7 @@ export class GatewayConfiguration {
 
   /** Synchronous validation + atomic replacement prevents concurrent admin saves interleaving. */
   public save(input: Record<string, unknown>, activeKeys: number): ConfigurationSnapshot {
-    if (Object.keys(input).some((key) => !["revision", "providers", "models", "teamDefaults", "policy", "recording"].includes(key))) {
+    if (Object.keys(input).some((key) => !["revision", "providers", "models", "teamDefaults", "policy", "recording", "pricing"].includes(key))) {
       throw new Error("Only providers, models, team defaults, policy and recording can be changed here.")
     }
     if (typeof input.revision !== "string" || input.revision !== revisionOf(this._text)) {
@@ -142,6 +136,7 @@ export class GatewayConfiguration {
       providers: input.providers ?? this._raw.providers,
       models: input.models ?? this._raw.models,
       ...(input.teamDefaults !== undefined ? { teamDefaults: input.teamDefaults } : {}),
+      ...(input.pricing !== undefined ? { pricing: input.pricing } : {}),
       ...(input.policy !== undefined ? { policy: input.policy } : {}),
       ...(input.recording !== undefined ? { recording: input.recording } : {}) }
     const config = parseGatewayConfig(raw, providerRegistry.providerIds())
@@ -158,6 +153,8 @@ export class GatewayConfiguration {
     raw.providers = config.providers
     raw.models = config.models
     if (config.teamDefaults) raw.teamDefaults = config.teamDefaults
+    if (config.pricing) raw.pricing = config.pricing
+    else delete raw.pricing
     if (input.policy !== undefined) {
       if (config.policy) raw.policy = config.policy
       else delete raw.policy

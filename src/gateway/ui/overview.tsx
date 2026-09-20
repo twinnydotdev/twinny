@@ -10,6 +10,7 @@ import type { UsageSummary, UsageTotals } from "../usage"
 
 import { compact, duration, fmt, pct, plural } from "./format"
 import type { KeysResponse } from "./people"
+import { money } from "./usage"
 
 export interface Series {
   name: string
@@ -353,6 +354,13 @@ export const OverviewPage = ({
               : "backends reported no counts"}
           </div>
         </div>
+        {usage.currency && (
+          <div className="tile">
+            <div className="label">Cost</div>
+            <div className="value">{money(total.cost ?? 0, usage.currency)}</div>
+            <div className="sub">at the prices set per alias</div>
+          </div>
+        )}
         <div className="tile">
           <div className="label">Avg latency</div>
           <div className="value">

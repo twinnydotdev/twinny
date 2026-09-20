@@ -66,6 +66,13 @@ export interface GatewayModelConfig {
   model: string
   capabilities: InferenceCapability[]
   contextWindow?: number
+  /** What a million tokens cost through this alias, for the Usage page; in `pricing.currency`. */
+  price?: { input: number; output: number }
+}
+
+export interface GatewayPricing {
+  /** An ISO code such as USD or EUR; only a label on the page. */
+  currency: string
 }
 
 export interface PerKeyLimits {
@@ -122,6 +129,7 @@ export interface GatewayConfig {
   teamDefaults?: TeamDefaults
   /** Sent to connected developers when the licence allows it. */
   policy?: GatewayPolicy
+  pricing?: GatewayPricing
   /** Which request content to keep; recorded only with the `recording` licence feature. */
   recording: GatewayRecordingConfig
   listen: GatewayListen
@@ -303,7 +311,7 @@ export const parseGatewayConfig = (
   if (!isRecord(input)) {
     throw new GatewayConfigError("invalid-config", ["The configuration must be a JSON object."])
   }
-  problems.unknownKeys("config", input, ["listen", "auth", "providers", "models", "limits", "usage", "teamDefaults", "policy", "recording"])
+  problems.unknownKeys("config", input, ["listen", "auth", "providers", "models", "limits", "usage", "teamDefaults", "policy", "recording", "pricing"])
 
   /* listen */
   const listenIn = input.listen ?? {}
@@ -448,7 +456,7 @@ export const parseGatewayConfig = (
         problems.add(`${where} must be an object.`)
         return
       }
-      problems.unknownKeys(where, raw, ["alias", "provider", "model", "capabilities", "contextWindow"])
+      problems.unknownKeys(where, raw, ["alias", "provider", "model", "capabilities", "contextWindow", "price"])
       const alias = problems.string(`${where}.alias`, raw.alias).trim()
       if (!ALIAS_PATTERN.test(alias)) {
         problems.add(`${where}.alias "${alias}" is not a valid alias.`)
@@ -482,6 +490,11 @@ export const parseGatewayConfig = (
         }
       }
       const entry: GatewayModelConfig = { alias, provider, model, capabilities }
+      if (raw.price !== undefined) {
+        if (!isRecord(raw.price) || typeof raw.price.input !== "number" || typeof raw.price.output !== "number" || raw.price.input < 0 || raw.price.output < 0)
+          problems.add(`${where}.price must be { input, output }: the cost of a million tokens each, 0 or more.`)
+        else entry.price = { input: raw.price.input, output: raw.price.output }
+      }
       if (raw.contextWindow !== undefined) {
         entry.contextWindow = problems.integer(`${where}.contextWindow`, raw.contextWindow, 0, 1)
       }
@@ -570,6 +583,17 @@ export const parseGatewayConfig = (
       if (!model || !model.capabilities.includes(capability)) {
         problems.add(`teamDefaults.${capability} must name a model alias that supports ${capability}.`)
       } else config.teamDefaults[capability] = model.alias
+    }
+  }
+
+  /* pricing */
+  if (input.pricing !== undefined) {
+    if (!isRecord(input.pricing)) problems.add("pricing must be an object.")
+    else {
+      problems.unknownKeys("pricing", input.pricing, ["currency"])
+      const currency = typeof input.pricing.currency === "string" ? input.pricing.currency.trim().toUpperCase() : ""
+      if (!/^[A-Z]{3}$/.test(currency)) problems.add("pricing.currency is a three-letter code such as USD.")
+      else config.pricing = { currency }
     }
   }
 
@@ -765,3 +789,9 @@ export const loadGatewayConfig = (
   }
   return parseGatewayConfig(parsed, knownProviders)
 }
+
+/** What the usage summary needs to price tokens: every alias with a price, and the currency. */
+export const pricingOf = (config: Pick<GatewayConfig, "models" | "pricing">): { currency: string; prices: Record<string, { input: number; output: number }> } => ({
+  currency: config.pricing?.currency ?? "USD",
+  prices: Object.fromEntries(config.models.filter((model) => model.price).map((model) => [model.alias, model.price as { input: number; output: number }]))
+})
