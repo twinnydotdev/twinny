@@ -835,7 +835,7 @@ export class GatewayServer {
             })
             return
           }
-          sendJson(res, 200, summarizeUsage(usage.dir, since, now))
+          sendJson(res, 200, summarizeUsage(usage.dir, since, now, pricingOf(this.config)))
           return
         }
         case "keys": {

@@ -22,6 +22,7 @@ import { PluginEventBus } from "../../gateway/plugins/events"
 import { appJwt } from "../../gateway/plugins/github"
 import { PullPage, PullsPlugin, RepoStore } from "../../gateway/plugins/pulls"
 import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore, stripThinking } from "../../gateway/plugins/reviews"
+import { parseTriage, TriageRecord } from "../../gateway/plugins/triage"
 import { buildRouteTable } from "../../gateway/routes"
 import { GatewayServer } from "../../gateway/server"
 
@@ -892,6 +893,78 @@ suite("Pull-request reviews", function () {
     assert.strictEqual((auto.body as { review: ReviewRecord }).review.postedAs, "comment")
     assert.strictEqual((auto.body as { review: ReviewRecord }).review.postedBy, "auto")
     assert.deepStrictEqual(posts.map((post) => `${post.number}:${post.as}`), ["1:approve", "2:comment"])
+    await p.stop()
+  })
+
+
+  test("the model's JSON is read leniently and labels are matched to the project's own", () => {
+    const parsed = parseTriage("Sure! ```json\n{\"labels\": [\"BUG\", \"nope\"], \"duplicateOf\": 12, \"priority\": \"high\", \"reply\": \"Thanks.\"}\n```", ["bug", "docs"])
+    assert.deepStrictEqual(parsed, { labels: ["bug"], duplicateOf: 12, priority: "high", reply: "Thanks." })
+    assert.deepStrictEqual(parseTriage("{\"labels\": [], \"duplicateOf\": null, \"priority\": \"urgent\", \"reply\": \"\"}", []), { labels: [], reply: "" })
+    assert.throws(() => parseTriage("no json here", []), /did not answer with JSON/)
+  })
+
+  test("issues are synced, triaged on demand or in the background, and the reply and labels are posted on request", async () => {
+    const { inference, calls } = scripted("{\"labels\": [\"bug\"], \"duplicateOf\": 7, \"priority\": \"high\", \"reply\": \"Thanks, this looks like #7; which version?\"}")
+    const comments: Array<{ number: number; body: string }> = []
+    const labelled: Array<{ number: number; labels: string[] }> = []
+    const bus = new PluginEventBus()
+    const seen: string[] = []
+    bus.on((event) => seen.push(event.type))
+    const dir = path.join(scratch, "triage")
+    fs.mkdirSync(dir, { recursive: true })
+    const issue = (number: number, title: string) => ({ repo: "acme/tri", number, title, author: "dana", url: `x://issues/${number}`, createdAt: "", updatedAt: `2026-09-1${number}T00:00:00Z`, labels: [], comments: 0 })
+    const p = new PullsPlugin(
+      { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference, events: bus },
+      () => ({
+        ...forge({})(),
+        listIssues: async () => [issue(7, "Crash on start"), issue(9, "Crashes when starting")],
+        issueBody: async () => "It crashes.",
+        listLabels: async () => ["bug", "docs"],
+        commentIssue: async (_r: unknown, number: number, body: string) => {
+          comments.push({ number, body })
+          return { url: `x://c/${number}` }
+        },
+        labelIssue: async (_r: unknown, number: number, labels: string[]) => {
+          labelled.push({ number, labels })
+        }
+      }),
+      0
+    )
+    p.start()
+    const repo = ((await p.handle(req("POST", "repos", { fullName: "acme/tri" }))).body as { repo: { id: string; issues: unknown[]; issuesSupported: boolean } }).repo
+    assert.strictEqual(repo.issuesSupported, true)
+    assert.strictEqual(repo.issues.length, 2)
+
+    const triaged = await p.handle(req("POST", `repos/${repo.id}/issues/9/triage`))
+    const record = (triaged.body as { triage: TriageRecord }).triage
+    assert.strictEqual(record.status, "done")
+    assert.deepStrictEqual(record.labels, ["bug"])
+    assert.strictEqual(record.duplicateOf, 7)
+    assert.strictEqual(record.priority, "high")
+    assert.match(calls[0].prompt, /#7: Crash on start/)
+    assert.match(calls[0].prompt, /Labels the project uses\nbug, docs/)
+    assert.ok(seen.includes("issue.triaged"))
+    const detail = await p.handle(req("GET", `repos/${repo.id}/issues/9`))
+    assert.strictEqual((detail.body as { body: string }).body, "It crashes.")
+    const listing = await p.handle(req("GET", ""))
+    const view = (listing.body as { repos: Array<{ triage: Record<number, { priority: string; replied: boolean }> }> }).repos[0]
+    assert.deepStrictEqual(view.triage[9], { ...view.triage[9], priority: "high", replied: false })
+
+    const posted = await p.handle(req("POST", `repos/${repo.id}/issues/9/triage/post`, { replyText: "Thanks, see #7." }))
+    const after = (posted.body as { triage: TriageRecord }).triage
+    assert.ok(after.repliedAt && after.labeledAt)
+    assert.deepStrictEqual(comments.map((c) => c.number), [9])
+    assert.match(comments[0].body, /Thanks, see #7\.\n\n---\n_Triaged by twinny-server/)
+    assert.deepStrictEqual(labelled, [{ number: 9, labels: ["bug"] }])
+
+    // Auto-triage picks the untriaged issue when no review is due; posting still waits for a person.
+    await p.handle(req("PUT", `repos/${repo.id}`, { autoTriage: true }))
+    await p.autoReview()
+    assert.strictEqual(p.triage.latest(repo.id, 7)?.status, "done")
+    assert.strictEqual(comments.length, 1)
+    await p.autoReview()
+    assert.strictEqual(calls.length, 2, "nothing left to triage")
     await p.stop()
   })
 

@@ -36,8 +36,10 @@ import {
   ReviewRecord,
   ReviewStore
 } from "./reviews"
+import { IssueSummary, TRIAGE_TIMEOUT_MS,TriageBrief, Triager, TriageRecord, TriageStore } from "./triage"
 
 export type { ReviewPostAs } from "./reviews"
+export type { IssueSummary } from "./triage"
 
 export const SYNC_INTERVAL_MS = 5 * 60_000
 /** How often a pending background review is retried while developers are busy. */
@@ -121,6 +123,8 @@ export interface RepoRecord {
   autoReview?: boolean
   /** Post every finished review to the host as a comment, without anyone pressing the button. */
   autoPost?: boolean
+  /** Triage new issues in the background while the models are idle; replies and labels still wait for a click. */
+  autoTriage?: boolean
 }
 
 /** What the page sees: never the token. */
@@ -133,6 +137,13 @@ export interface RepoView {
   addedBy: string
   autoReview: boolean
   autoPost: boolean
+  autoTriage: boolean
+  /** Whether this host has an issue tracker the plugin can read. */
+  issuesSupported: boolean
+  issues: IssueSummary[]
+  issuesError?: string
+  /** The latest triage per issue number, without the reply. */
+  triage: Record<number, TriageBrief>
   syncing: boolean
   syncedAt?: string
   error?: string
@@ -174,6 +185,12 @@ export interface Forge {
    * can be seen, when the host says.
    */
   postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }>
+  /** Open issues, on hosts that have an issue tracker the plugin reads. */
+  listIssues?(repo: RepoRecord, signal: AbortSignal): Promise<IssueSummary[]>
+  issueBody?(repo: RepoRecord, number: number, signal: AbortSignal): Promise<string>
+  listLabels?(repo: RepoRecord, signal: AbortSignal): Promise<string[]>
+  commentIssue?(repo: RepoRecord, number: number, body: string, signal: AbortSignal): Promise<{ url?: string }>
+  labelIssue?(repo: RepoRecord, number: number, labels: string[], signal: AbortSignal): Promise<void>
   /** Host-specific state for the page (e.g. the GitHub App), never secrets. */
   status(): unknown
   /** Host-specific routes under `api/`, after the shared ones did not match. */
@@ -220,7 +237,8 @@ const parseReposFile = (text: string, file: string): ReposFile => {
       addedAt: entry.addedAt,
       addedBy: entry.addedBy,
       ...(entry.autoReview === true ? { autoReview: true } : {}),
-      ...(entry.autoPost === true ? { autoPost: true } : {})
+      ...(entry.autoPost === true ? { autoPost: true } : {}),
+      ...(entry.autoTriage === true ? { autoTriage: true } : {})
     })
   }
   return {
@@ -275,13 +293,15 @@ export class RepoStore {
     return { ...record }
   }
 
-  public update(id: string, changes: Partial<Pick<RepoRecord, "autoReview" | "autoPost">>): RepoRecord {
+  public update(id: string, changes: Partial<Pick<RepoRecord, "autoReview" | "autoPost" | "autoTriage">>): RepoRecord {
     const repo = this._repos.find((entry) => entry.id === id)
     if (!repo) throw new PluginError("No such repository.", 404)
     if (changes.autoReview === true) repo.autoReview = true
     else if (changes.autoReview === false) delete repo.autoReview
     if (changes.autoPost === true) repo.autoPost = true
     else if (changes.autoPost === false) delete repo.autoPost
+    if (changes.autoTriage === true) repo.autoTriage = true
+    else if (changes.autoTriage === false) delete repo.autoTriage
     this.save()
     return { ...repo }
   }
@@ -338,6 +358,8 @@ interface SyncState {
   syncedAt?: string
   error?: string
   pulls: PullSummary[]
+  issues?: IssueSummary[]
+  issuesError?: string
 }
 
 /** A signal that fires on a timeout or when the plugin stops, whichever first. */
@@ -382,6 +404,8 @@ export const cutPatch = (patch: string | undefined): Pick<PullFile, "patch" | "t
 export class PullsPlugin implements PluginInstance {
   public readonly store: RepoStore
   public readonly reviews: ReviewStore
+  public readonly triage: TriageStore
+  private readonly _triager: Triager
   private readonly _reviewer: Reviewer
   private readonly _state = new Map<string, SyncState>()
   private readonly _stopped = new AbortController()
@@ -402,6 +426,8 @@ export class PullsPlugin implements PluginInstance {
     this.store = RepoStore.open(path.join(_context.dataDir, "repos.json"))
     this.reviews = ReviewStore.open(path.join(_context.dataDir, "reviews.json"))
     this._reviewer = new Reviewer(this.reviews, _context.inference, _context.now)
+    this.triage = TriageStore.open(path.join(_context.dataDir, "triage.json"))
+    this._triager = new Triager(this.triage, _context.inference, _context.now)
     this._forge = forge(this.store, _context)
   }
 
@@ -456,13 +482,65 @@ export class PullsPlugin implements PluginInstance {
       .filter(({ repo, pull }) => !pull.draft && !this.reviews.hasCurrent(pull, repo.id) && !this._reviewer.isReviewing(repo.id, pull.number))
       .sort((a, b) => Date.parse(b.pull.updatedAt) - Date.parse(a.pull.updatedAt))
     const next = due[0]
-    if (!next) return Promise.resolve()
-    this._autoReviewing = this.runReview(next.repo, next.pull, alias, "auto")
+    if (next) {
+      this._autoReviewing = this.runReview(next.repo, next.pull, alias, "auto")
+        .then(() => undefined)
+        .finally(() => {
+          this._autoReviewing = undefined
+        })
+      return this._autoReviewing
+    }
+    // No review due: an untriaged issue of an auto-triage repository, newest first.
+    const issueDue = this.store
+      .repos()
+      .filter((repo) => repo.autoTriage)
+      .flatMap((repo) => (this._state.get(repo.id)?.issues ?? []).map((issue) => ({ repo, issue })))
+      .filter(({ repo, issue }) => !this.triage.latest(repo.id, issue.number) && !this._triager.isTriaging(repo.id, issue.number))
+      .sort((a, b) => Date.parse(b.issue.updatedAt) - Date.parse(a.issue.updatedAt))[0]
+    if (!issueDue) return Promise.resolve()
+    this._autoReviewing = this.runTriage(issueDue.repo, issueDue.issue, alias, "auto")
       .then(() => undefined)
       .finally(() => {
         this._autoReviewing = undefined
       })
     return this._autoReviewing
+  }
+
+  private async runTriage(repo: RepoRecord, issue: IssueSummary, alias: string, requestedBy: string): Promise<TriageRecord> {
+    const forge = this._forge
+    if (!forge.listIssues || !forge.issueBody || !forge.listLabels) throw new PluginError("This host has no issue tracker the plugin can read.", 404)
+    const signal = withTimeout(this._stopped.signal, TRIAGE_TIMEOUT_MS)
+    const record = await this._triager.triage(
+      {
+        repoId: repo.id,
+        issue,
+        alias,
+        requestedBy,
+        others: this._state.get(repo.id)?.issues ?? [],
+        body: () => forge.issueBody!(repo, issue.number, signal),
+        labels: () => forge.listLabels!(repo, signal)
+      },
+      signal
+    )
+    this._context.log.info({
+      event: record.status === "done" ? "plugin.triaged" : "plugin.triage-failed",
+      key: requestedBy,
+      reason: `${repo.fullName}#${issue.number}`,
+      alias,
+      ms: record.ms,
+      ...(record.error ? { message: record.error } : {})
+    })
+    if (record.status === "done")
+      this._context.events?.emit({
+        type: "issue.triaged",
+        source: this._pluginId,
+        level: record.priority === "high" ? "warn" : "info",
+        title: `Triaged ${repo.fullName}#${issue.number}: ${record.priority ?? "no"} priority${record.duplicateOf ? `, duplicate of #${record.duplicateOf}` : ""}`,
+        text: `${issue.title} by ${issue.author}.${record.labels.length ? ` Suggested labels: ${record.labels.join(", ")}.` : ""}`,
+        url: issue.url,
+        data: { repo: repo.fullName, number: issue.number, priority: record.priority ?? null, labels: record.labels }
+      })
+    return record
   }
 
   private async runReview(
@@ -540,6 +618,16 @@ export class PullsPlugin implements PluginInstance {
       addedBy: repo.addedBy,
       autoReview: repo.autoReview === true,
       autoPost: repo.autoPost === true,
+      autoTriage: repo.autoTriage === true,
+      issuesSupported: !!this._forge.listIssues,
+      issues: state?.issues ?? [],
+      ...(state?.issuesError ? { issuesError: state.issuesError } : {}),
+      triage: Object.fromEntries(
+        (state?.issues ?? []).flatMap((issue) => {
+          const brief = this.triage.brief(repo.id, issue.number)
+          return brief ? [[issue.number, brief]] : []
+        })
+      ),
       syncing: state?.syncing ?? false,
       ...(state?.syncedAt ? { syncedAt: state.syncedAt } : {}),
       ...(state?.error ? { error: state.error } : {}),
@@ -587,6 +675,16 @@ export class PullsPlugin implements PluginInstance {
       state.syncedAt = new Date(this._context.now()).toISOString()
       delete state.error
       if (before) this.announce(repo, before, state.pulls)
+      if (this._forge.listIssues) {
+        try {
+          state.issues = (await this._forge.listIssues(repo, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)))
+            .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+            .slice(0, MAX_PULLS_PER_REPO)
+          delete state.issuesError
+        } catch (error) {
+          state.issuesError = error instanceof Error ? error.message : String(error)
+        }
+      }
     } catch (error) {
       state.error = error instanceof Error ? error.message : String(error)
       this._context.log.warn({
@@ -627,24 +725,62 @@ export class PullsPlugin implements PluginInstance {
       const rest = repoMatch[2] ?? ""
       if (rest === "" && method === "PUT") {
         const body = await request.body()
-        if (typeof body.autoReview !== "boolean" && typeof body.autoPost !== "boolean")
-          throw new PluginError("Send { autoReview: true | false } and/or { autoPost: true | false }.", 400)
+        if (typeof body.autoReview !== "boolean" && typeof body.autoPost !== "boolean" && typeof body.autoTriage !== "boolean")
+          throw new PluginError("Send { autoReview }, { autoPost } and/or { autoTriage } as true or false.", 400)
         const updated = this.store.update(repo.id, {
           ...(typeof body.autoReview === "boolean" ? { autoReview: body.autoReview } : {}),
-          ...(typeof body.autoPost === "boolean" ? { autoPost: body.autoPost } : {})
+          ...(typeof body.autoPost === "boolean" ? { autoPost: body.autoPost } : {}),
+          ...(typeof body.autoTriage === "boolean" ? { autoTriage: body.autoTriage } : {})
         })
         this._context.log.info({
           event: "plugin.repo-updated",
           key: request.principal,
           reason: `${repo.fullName} autoReview=${updated.autoReview === true} autoPost=${updated.autoPost === true}`
         })
-        if (body.autoReview === true) void this.autoReview()
+        if (body.autoReview === true || body.autoTriage === true) void this.autoReview()
         return json({ repo: this.view(updated) })
+      }
+      const issueMatch = /^issues\/([1-9][0-9]{0,8})(\/triage(?:\/post)?)?$/.exec(rest)
+      if (issueMatch) {
+        const number = Number(issueMatch[1])
+        const issue = (this._state.get(repo.id)?.issues ?? []).find((entry) => entry.number === number)
+        if (!issue) return notFound(`${repo.fullName} has no open issue ${number}.`)
+        if (issueMatch[2] === undefined && method === "GET") {
+          const body = this._forge.issueBody ? await this._forge.issueBody(repo, number, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)) : ""
+          return json({ issue, body, triage: this.triage.latest(repo.id, number) ?? null, triaging: this._triager.isTriaging(repo.id, number) })
+        }
+        if (issueMatch[2] === "/triage" && method === "POST") {
+          const alias = this.reviewAlias()
+          if (!alias) throw new PluginError("The gateway serves no chat model, so nothing can triage.", 503)
+          return json({ triage: await this.runTriage(repo, issue, alias, request.principal) })
+        }
+        if (issueMatch[2] === "/triage/post" && method === "POST") {
+          const body = await request.body()
+          const record = this.triage.latest(repo.id, number)
+          if (!record || record.status !== "done") throw new PluginError("There is no finished triage to post.", 409)
+          const signal = withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)
+          let updated: TriageRecord = { ...record }
+          if (body.reply !== false && record.reply && this._forge.commentIssue) {
+            const text = typeof body.replyText === "string" && body.replyText.trim() ? body.replyText.trim() : record.reply
+            await this._forge.commentIssue(repo, number, `${text}\n\n---\n_Triaged by twinny-server with \`${record.alias}\`._`, signal)
+            updated = { ...updated, reply: text, repliedAt: new Date(this._context.now()).toISOString() }
+          }
+          if (body.labels !== false && record.labels.length && this._forge.labelIssue) {
+            const labels = Array.isArray(body.labelNames) ? body.labelNames.filter((l): l is string => typeof l === "string") : record.labels
+            if (labels.length) await this._forge.labelIssue(repo, number, labels, signal)
+            updated = { ...updated, labels, labeledAt: new Date(this._context.now()).toISOString() }
+          }
+          this.triage.put(updated)
+          this._context.log.info({ event: "plugin.triage-posted", key: request.principal, reason: `${repo.fullName}#${number}` })
+          return json({ triage: updated })
+        }
+        return notFound()
       }
       if (rest === "" && method === "DELETE") {
         this.store.remove(repo.id)
         this._state.delete(repo.id)
         this.reviews.forgetRepo(repo.id)
+        this.triage.forgetRepo(repo.id)
         this._context.log.info({
           event: "plugin.repo-removed",
           key: request.principal,

@@ -19,6 +19,7 @@ import {
   CheckState,
   cutPatch,
   Forge,
+  IssueSummary,
   MAX_FILES,
   MAX_PULLS_PER_REPO,
   MergeState,
@@ -240,6 +241,53 @@ export class GitLabForge implements Forge {
       )
     return arr(rec(project.mergeRequests).nodes).map((node) =>
       toPull(repo.fullName, this.baseUrl, rec(node))
+    )
+  }
+
+  public async listIssues(repo: RepoRecord, signal: AbortSignal): Promise<IssueSummary[]> {
+    const answer = await readJson(
+      await this._context.fetch(`${this.project(repo)}/issues?state=opened&per_page=${MAX_PULLS_PER_REPO}&order_by=updated_at`, { headers: this.headers(repo), signal }),
+      `Listing issues of ${repo.fullName}`
+    )
+    return arr(answer).map((entry) => {
+      const issue = rec(entry)
+      return {
+        repo: repo.fullName,
+        number: num(issue.iid) ?? 0,
+        title: str(issue.title),
+        author: str(rec(issue.author).username, "unknown"),
+        url: str(issue.web_url),
+        createdAt: str(issue.created_at),
+        updatedAt: str(issue.updated_at),
+        labels: arr(issue.labels).map((label) => (typeof label === "string" ? label : str(rec(label).name))),
+        comments: num(issue.user_notes_count) ?? 0
+      }
+    })
+  }
+
+  public async issueBody(repo: RepoRecord, number: number, signal: AbortSignal): Promise<string> {
+    const issue = await readJson(await this._context.fetch(`${this.project(repo)}/issues/${number}`, { headers: this.headers(repo), signal }), `Reading ${repo.fullName}#${number}`)
+    return str(issue.description)
+  }
+
+  public async listLabels(repo: RepoRecord, signal: AbortSignal): Promise<string[]> {
+    const answer = await readJson(await this._context.fetch(`${this.project(repo)}/labels?per_page=100`, { headers: this.headers(repo), signal }), `Listing labels of ${repo.fullName}`)
+    return arr(answer).map((label) => str(rec(label).name)).filter(Boolean)
+  }
+
+  public async commentIssue(repo: RepoRecord, number: number, body: string, signal: AbortSignal): Promise<{ url?: string }> {
+    const note = await readJson(
+      await this._context.fetch(`${this.project(repo)}/issues/${number}/notes`, { method: "POST", headers: { ...this.headers(repo), "Content-Type": "application/json" }, body: JSON.stringify({ body }), signal }),
+      `Replying on ${repo.fullName}#${number}`
+    )
+    const id = num(note.id)
+    return { url: id !== undefined ? `${this.repoUrl(repo.fullName)}/-/issues/${number}#note_${id}` : undefined }
+  }
+
+  public async labelIssue(repo: RepoRecord, number: number, labels: string[], signal: AbortSignal): Promise<void> {
+    await readJson(
+      await this._context.fetch(`${this.project(repo)}/issues/${number}`, { method: "PUT", headers: { ...this.headers(repo), "Content-Type": "application/json" }, body: JSON.stringify({ add_labels: labels.join(",") }), signal }),
+      `Labelling ${repo.fullName}#${number}`
     )
   }
 

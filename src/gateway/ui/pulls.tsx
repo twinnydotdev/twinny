@@ -9,6 +9,7 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "rea
 import type { GitHubStatus } from "../plugins/github"
 import type { PullPage, PullSummary, RepoView } from "../plugins/pulls"
 import type { ReviewRecord } from "../plugins/reviews"
+import type { TriageRecord } from "../plugins/triage"
 
 import { api, ApiError } from "./api"
 import { fmt, plural, timeAgo } from "./format"
@@ -216,6 +217,7 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                 <th>synced</th>
                 <th title="Review new and updated pulls in the background while the models are idle">auto-review</th>
                 <th title="Post every finished review to the host as a comment">auto-post</th>
+                <th title="Triage new issues in the background; replies and labels still wait for a click">auto-triage</th>
                 <th />
               </tr>
             </thead>
@@ -255,6 +257,16 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                         disabled={busy !== null}
                         aria-label={`Auto-post reviews of ${repo.fullName}`}
                         onChange={(e) => void run(`post:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { autoPost: e.target.checked } }))}
+                      />
+                    </td>
+                    <td className="auto">
+                      <input
+                        type="checkbox"
+                        checked={repo.autoTriage}
+                        disabled={busy !== null || !repo.issuesSupported || !overview.review.available}
+                        aria-label={`Auto-triage ${repo.fullName}`}
+                        title={repo.issuesSupported ? undefined : "This host has no issue tracker the plugin reads"}
+                        onChange={(e) => void run(`triage:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { autoTriage: e.target.checked } }))}
                       />
                     </td>
                     <td className="actions">
@@ -721,6 +733,227 @@ const ReviewsPanel = ({ words, overview, base, apiKey, onChanged }: { words: Hos
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Issues and triage                                                         */
+/* -------------------------------------------------------------------------- */
+
+const PRIORITY_TONE: Record<string, string> = { high: "bad", medium: "warn", low: "" }
+
+const IssuesPanel = ({ overview, base, apiKey, review, onChanged }: { overview: Overview; base: string; apiKey: string; review: ReviewSetup; onChanged: () => Promise<void> }) => {
+  const [open, setOpen] = useState<{ repoId: string; number: number } | null>(null)
+  const [detail, setDetail] = useState<{ body: string; triage: TriageRecord | null } | null>(null)
+  const [reply, setReply] = useState("")
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | undefined>()
+  const repos = overview.repos.filter((repo) => repo.issuesSupported)
+  const rows = useMemo(
+    () =>
+      repos
+        .flatMap((repo) => repo.issues.map((issue) => ({ repo, issue, triage: repo.triage[issue.number] })))
+        .sort((a, b) => Date.parse(b.issue.updatedAt) - Date.parse(a.issue.updatedAt)),
+    [repos]
+  )
+
+  useEffect(() => {
+    if (!open) {
+      setDetail(null)
+      return
+    }
+    let cancelled = false
+    setDetail(null)
+    api<{ body: string; triage: TriageRecord | null }>(`${base}/repos/${open.repoId}/issues/${open.number}`, apiKey)
+      .then((answer) => {
+        if (cancelled) return
+        setDetail(answer)
+        setReply(answer.triage?.reply ?? "")
+      })
+      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [open, base, apiKey])
+
+  const run = async (what: string, action: () => Promise<unknown>) => {
+    setBusy(what)
+    setError(undefined)
+    try {
+      await action()
+      await onChanged()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+  const triage = (repoId: string, number: number) =>
+    run(`triage:${repoId}:${number}`, async () => {
+      const answer = await api<{ triage: TriageRecord }>(`${base}/repos/${repoId}/issues/${number}/triage`, apiKey, { method: "POST" })
+      if (open?.repoId === repoId && open.number === number) {
+        setDetail((current) => (current ? { ...current, triage: answer.triage } : current))
+        setReply(answer.triage.reply)
+      }
+    })
+  const post = (repoId: string, number: number, what: "reply" | "labels") =>
+    run(`post:${what}`, async () => {
+      const answer = await api<{ triage: TriageRecord }>(`${base}/repos/${repoId}/issues/${number}/triage/post`, apiKey, { method: "POST", body: what === "reply" ? { labels: false, replyText: reply } : { reply: false } })
+      setDetail((current) => (current ? { ...current, triage: answer.triage } : current))
+    })
+
+  if (repos.length === 0) return null
+  const untriaged = rows.filter((row) => !row.triage).length
+  const high = rows.filter((row) => row.triage?.priority === "high").length
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>
+          Open issues
+          <span className="count">{fmt(rows.length)}</span>
+        </h2>
+        <span className="links">
+          {high > 0 && <span className="pill-s bad">{fmt(high)} high priority</span>}
+          <span className="muted">{untriaged ? `${fmt(untriaged)} not triaged` : "all triaged"}</span>
+        </span>
+      </div>
+      {error && <div className="error">{error}</div>}
+      {rows.length === 0 ? (
+        <div className="empty">No open issues.</div>
+      ) : (
+        <div className="scroll">
+          <table className="pulls">
+            <thead>
+              <tr>
+                <th>issue</th>
+                <th>author</th>
+                <th>triage</th>
+                <th>updated</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ repo, issue, triage: brief }) => {
+                const isOpen = open?.repoId === repo.id && open.number === issue.number
+                const key = `${repo.id}:${issue.number}`
+                return (
+                  <React.Fragment key={key}>
+                    <tr className="pull-row" onClick={() => setOpen(isOpen ? null : { repoId: repo.id, number: issue.number })}>
+                      <td>
+                        <div className="entity-name">{issue.title}</div>
+                        <div className="key-id muted">
+                          {repos.length > 1 ? `${repo.fullName} ` : ""}#{issue.number}
+                          {issue.labels.map((label) => (
+                            <span key={label} className="tag">
+                              {label}
+                            </span>
+                          ))}
+                          {issue.comments > 0 && ` · ${plural(issue.comments, "comment")}`}
+                        </div>
+                      </td>
+                      <td>{issue.author}</td>
+                      <td>
+                        {!brief ? (
+                          <span className="muted">–</span>
+                        ) : brief.status === "failed" ? (
+                          <span className="pill-s bad">failed</span>
+                        ) : (
+                          <>
+                            {brief.priority && <span className={`pill-s ${PRIORITY_TONE[brief.priority]}`}>{brief.priority}</span>}{" "}
+                            {brief.duplicateOf !== undefined && <span className="tag stale">dup of #{brief.duplicateOf}</span>}
+                            {brief.labels.map((label) => (
+                              <span key={label} className={`tag ${brief.labeled ? "reviewed" : ""}`}>
+                                {label}
+                              </span>
+                            ))}
+                            {brief.replied && <span className="tag reviewed">replied</span>}
+                          </>
+                        )}
+                      </td>
+                      <td className="muted" title={issue.updatedAt}>
+                        {timeAgo(issue.updatedAt)}
+                      </td>
+                      <td className="actions" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="ghost mini" disabled={busy !== null || !review.alias} onClick={() => void triage(repo.id, issue.number)}>
+                          {busy === `triage:${repo.id}:${issue.number}` ? "…" : brief ? "triage again" : "triage"}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="issue-detail">
+                        <td colSpan={5}>
+                          {!detail ? (
+                            <div className="skeleton-rows">
+                              <span className="skeleton" style={{ width: "60%", height: 12 }} />
+                              <span className="skeleton" style={{ width: "100%", height: 60 }} />
+                            </div>
+                          ) : (
+                            <div className="issue-open">
+                              <a href={issue.url} target="_blank" rel="noreferrer">
+                                open #{issue.number} on the host
+                              </a>
+                              {detail.body.trim() ? <MarkdownView text={detail.body} className="pull-body" /> : <div className="empty">No description.</div>}
+                              {detail.triage?.status === "done" && (
+                                <div className="triage-box">
+                                  <div className="review-meta">
+                                    <span>
+                                      <span className="meta-k">triaged by</span>
+                                      {detail.triage.alias} {timeAgo(detail.triage.createdAt)}
+                                    </span>
+                                    {detail.triage.priority && (
+                                      <span>
+                                        <span className="meta-k">priority</span>
+                                        <span className={`pill-s ${PRIORITY_TONE[detail.triage.priority]}`}>{detail.triage.priority}</span>
+                                      </span>
+                                    )}
+                                    {detail.triage.duplicateOf !== undefined && (
+                                      <span>
+                                        <span className="meta-k">duplicate of</span>#{detail.triage.duplicateOf}
+                                      </span>
+                                    )}
+                                    {detail.triage.labels.length > 0 && (
+                                      <span>
+                                        <span className="meta-k">labels</span>
+                                        {detail.triage.labels.map((label) => (
+                                          <span key={label} className="tag">
+                                            {label}
+                                          </span>
+                                        ))}
+                                        {detail.triage.labeledAt ? (
+                                          <span className="tag reviewed">applied</span>
+                                        ) : (
+                                          <button type="button" className="ghost mini" disabled={busy !== null} onClick={() => void post(repo.id, issue.number, "labels")}>
+                                            {busy === "post:labels" ? "…" : "apply labels"}
+                                          </button>
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <label className="config-field">
+                                    <span>reply to the reporter {detail.triage.repliedAt && <em className="muted">(posted {timeAgo(detail.triage.repliedAt)})</em>}</span>
+                                    <textarea rows={4} value={reply} onChange={(e) => setReply(e.target.value)} disabled={busy !== null} />
+                                  </label>
+                                  <div className="row-actions">
+                                    <button type="button" className={detail.triage.repliedAt ? "ghost" : "primary"} disabled={busy !== null || !reply.trim()} onClick={() => void post(repo.id, issue.number, "reply")}>
+                                      {busy === "post:reply" ? "posting…" : detail.triage.repliedAt ? "post again" : "post reply"}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              {detail.triage?.status === "failed" && <div className="error">{detail.triage.error}</div>}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
 /*  The page                                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -989,6 +1222,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
         </section>
       )}
 
+      <IssuesPanel overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />
       <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
       <ReviewsPanel words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
       <HostPanel host={host} overview={overview} base={base} apiKey={apiKey} onChanged={load} />

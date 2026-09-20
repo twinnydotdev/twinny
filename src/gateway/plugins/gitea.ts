@@ -10,6 +10,7 @@ import {
   baseUrlOf,
   CheckState,
   Forge,
+  IssueSummary,
   MAX_PULLS_PER_REPO,
   num,
   PullCheck,
@@ -135,6 +136,51 @@ export class GiteaForge implements Forge {
       })
     }
     return out
+  }
+
+  public async listIssues(repo: RepoRecord, signal: AbortSignal): Promise<IssueSummary[]> {
+    const answer = await this.get(repo, `/issues?type=issues&state=open&limit=${MAX_PULLS_PER_REPO}`, signal, `Listing issues of ${repo.fullName}`)
+    return arr(answer).map((entry) => {
+      const issue = rec(entry)
+      return {
+        repo: repo.fullName,
+        number: num(issue.number) ?? 0,
+        title: str(issue.title),
+        author: str(rec(issue.user).login, "unknown"),
+        url: str(issue.html_url),
+        createdAt: str(issue.created_at),
+        updatedAt: str(issue.updated_at),
+        labels: arr(issue.labels).map((label) => str(rec(label).name)),
+        comments: num(issue.comments) ?? 0
+      }
+    })
+  }
+
+  public async issueBody(repo: RepoRecord, number: number, signal: AbortSignal): Promise<string> {
+    const issue = await this.get(repo, `/issues/${number}`, signal, `Reading ${repo.fullName}#${number}`)
+    return str(issue.body)
+  }
+
+  public async listLabels(repo: RepoRecord, signal: AbortSignal): Promise<string[]> {
+    return arr(await this.get(repo, "/labels?limit=100", signal, `Listing labels of ${repo.fullName}`)).map((label) => str(rec(label).name)).filter(Boolean)
+  }
+
+  public async commentIssue(repo: RepoRecord, number: number, body: string, signal: AbortSignal): Promise<{ url?: string }> {
+    const answer = await readJson(
+      await this._context.fetch(this.api(repo, `/issues/${number}/comments`), { method: "POST", headers: { ...this.headers(repo), "Content-Type": "application/json" }, body: JSON.stringify({ body }), signal }),
+      `Replying on ${repo.fullName}#${number}`
+    )
+    return { url: str(answer.html_url) || undefined }
+  }
+
+  public async labelIssue(repo: RepoRecord, number: number, labels: string[], signal: AbortSignal): Promise<void> {
+    // Gitea labels by id, so the names are looked up first.
+    const all = arr(await this.get(repo, "/labels?limit=100", signal, `Listing labels of ${repo.fullName}`)).map((label) => rec(label))
+    const ids = labels.map((name) => num(all.find((label) => str(label.name) === name)?.id)).filter((id): id is number => id !== undefined)
+    await readJson(
+      await this._context.fetch(this.api(repo, `/issues/${number}/labels`), { method: "POST", headers: { ...this.headers(repo), "Content-Type": "application/json" }, body: JSON.stringify({ labels: ids }), signal }),
+      `Labelling ${repo.fullName}#${number}`
+    )
   }
 
   public async postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }> {

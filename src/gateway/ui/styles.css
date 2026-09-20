@@ -494,3 +494,8 @@ td.auto input { accent-color: var(--accent); }
 .review-running { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 6px; background: var(--accent-soft); margin-bottom: 12px; }
 .review-running .meter { flex: 0 0 140px; }
 .review-running b { color: var(--accent); }
+tr.issue-detail td { background: var(--bg); padding: 12px 14px; cursor: default; }
+tr.issue-detail:hover td { background: var(--bg); }
+.issue-open { display: flex; flex-direction: column; gap: 12px; }
+.triage-box { border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.triage-box .review-meta { margin: 0; }

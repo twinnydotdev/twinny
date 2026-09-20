@@ -1368,6 +1368,18 @@ without anyone pressing the button, which with **auto-review** makes a
 fully automatic first pass on every pull. A `review.posted` event goes
 out for the notifiers.
 
+**Issue triage.** On GitHub, GitLab and Gitea the plugin also lists a
+repository's open issues. **Triage** sends one to the review model with
+the project's labels and the other open issues' titles and gets back
+suggested labels, a duplicate if it sees one, a priority and a first
+reply, kept on the server. **Post reply** and **apply labels** put them
+on the host, with the reply editable first; a footer names the model.
+Ticking **auto-triage** on a repository triages new issues in the
+background while the models are idle, but replies and labels always
+wait for a person. An `issue.triaged` event goes out, marked as a
+warning when the priority is high, so a channel can hear about the
+serious ones.
+
 **Reasoning models.** A model that thinks before answering (Qwen 3 and
 the like) is asked not to (`think: false`, which Ollama honours); a model
 that thinks anyway gets a 4,000-token budget, inline `<think>` blocks are
@@ -1385,7 +1397,10 @@ fails with that reason rather than "answered nothing".
 | `GET /repos/<id>/pulls/<number>` | one pull with its description, files and latest review |
 | `POST /repos/<id>/pulls/<number>/review` | review it now with the review model; answers when the review is done |
 | `POST /repos/<id>/pulls/<number>/review/post` `{ as? }` | post the finished review to the host as `comment` (default), `request-changes` or `approve` |
-| `PUT /repos/<id>` `{ autoReview?, autoPost? }` | review new and updated pulls in the background; post every finished review as a comment |
+| `PUT /repos/<id>` `{ autoReview?, autoPost?, autoTriage? }` | review new and updated pulls in the background; post every finished review as a comment; triage new issues in the background |
+| `GET /repos/<id>/issues/<number>` | the issue with its body and latest triage |
+| `POST /repos/<id>/issues/<number>/triage` | triage it now with the review model |
+| `POST /repos/<id>/issues/<number>/triage/post` `{ reply?, replyText?, labels?, labelNames? }` | post the reply and/or apply the labels |
 | `PUT /settings` `{ baseUrl?, reviewAlias? }` | the host URL; the chat alias reviews use |
 | `PUT /app` `{ appId, privateKey }`, `DELETE /app`, `GET /app/repositories` | the GitHub App (GitHub only) |
 

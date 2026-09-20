@@ -35,6 +35,7 @@ export const EVENT_KINDS: PluginEventKind[] = [
   { type: "review.changes", label: "Review asks for changes", description: "A review's verdict was \"Request changes\"." },
   { type: "review.failed", label: "Review failed", description: "A review could not be made: no answer, or the model refused." },
   { type: "review.posted", label: "Review posted", description: "A review was posted to the host as a comment, a change request or an approval." },
+  { type: "issue.triaged", label: "Issue triaged", description: "A model suggested labels, a priority and a first reply for an issue." },
   { type: "pull.opened", label: "Pull opened", description: "A new pull request appeared on a watched repository." },
   { type: "pull.checks-failed", label: "Checks failed", description: "A watched pull's checks went from passing or pending to failing." },
   { type: "backup.ok", label: "Backup made", description: "A backup was written to its destination." },

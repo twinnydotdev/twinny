@@ -33,6 +33,7 @@ import {
   CheckState,
   cutPatch,
   Forge,
+  IssueSummary,
   MAX_FILES,
   MAX_PULLS_PER_REPO,
   MergeState,
@@ -476,6 +477,70 @@ export class GitHubForge implements Forge {
     if (total !== undefined && total > files.length)
       moreFiles = total - files.length
     return { body: str(pull.body), files, moreFiles }
+  }
+
+  public async listIssues(repo: RepoRecord, signal: AbortSignal): Promise<IssueSummary[]> {
+    const token = await this.tokenFor(repo, signal)
+    const answer = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/issues?state=open&per_page=${MAX_PULLS_PER_REPO}&sort=updated`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT },
+      signal
+    })
+    return arr(await readJson(answer, `Listing issues of ${repo.fullName}`))
+      .map((entry) => rec(entry))
+      .filter((issue) => !issue.pull_request)
+      .map((issue) => ({
+        repo: repo.fullName,
+        number: num(issue.number) ?? 0,
+        title: str(issue.title),
+        author: str(rec(issue.user).login, "ghost"),
+        url: str(issue.html_url),
+        createdAt: str(issue.created_at),
+        updatedAt: str(issue.updated_at),
+        labels: arr(issue.labels).map((label) => (typeof label === "string" ? label : str(rec(label).name))),
+        comments: num(issue.comments) ?? 0
+      }))
+  }
+
+  public async issueBody(repo: RepoRecord, number: number, signal: AbortSignal): Promise<string> {
+    const token = await this.tokenFor(repo, signal)
+    const issue = await this.rest(`/repos/${repo.fullName}/issues/${number}`, token, signal, `Reading ${repo.fullName}#${number}`)
+    return str(issue.body)
+  }
+
+  public async listLabels(repo: RepoRecord, signal: AbortSignal): Promise<string[]> {
+    const token = await this.tokenFor(repo, signal)
+    const answer = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/labels?per_page=100`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT },
+      signal
+    })
+    return arr(await readJson(answer, `Listing labels of ${repo.fullName}`)).map((label) => str(rec(label).name)).filter(Boolean)
+  }
+
+  public async commentIssue(repo: RepoRecord, number: number, body: string, signal: AbortSignal): Promise<{ url?: string }> {
+    const token = await this.tokenFor(repo, signal)
+    const answer = await readJson(
+      await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/issues/${number}/comments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT, "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+        signal
+      }),
+      `Replying on ${repo.fullName}#${number}`
+    )
+    return { url: str(answer.html_url) || undefined }
+  }
+
+  public async labelIssue(repo: RepoRecord, number: number, labels: string[], signal: AbortSignal): Promise<void> {
+    const token = await this.tokenFor(repo, signal)
+    await readJson(
+      await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/issues/${number}/labels`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT, "Content-Type": "application/json" },
+        body: JSON.stringify({ labels }),
+        signal
+      }),
+      `Labelling ${repo.fullName}#${number}`
+    )
   }
 
   public async postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }> {
