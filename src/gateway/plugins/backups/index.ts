@@ -325,10 +325,24 @@ export class BackupsPlugin implements PluginInstance {
           ms: this._context.now() - Date.parse(run.startedAt)
         })
         await this.prune(destination)
+        this._context.events?.emit({
+          type: "backup.ok",
+          source: "backups",
+          level: "info",
+          title: `Backup made: ${built.name}`,
+          text: `${built.manifest.files.length} files, ${Math.round(built.data.length / 1024)} KiB${built.encrypted ? ", encrypted" : ""}, to ${destination.describe()}.`
+        })
       } catch (error) {
         run.ok = false
         run.error = error instanceof Error ? error.message : String(error)
         this._context.log.warn({ event: "plugin.backup-failed", key: requestedBy, message: run.error })
+        this._context.events?.emit({
+          type: "backup.failed",
+          source: "backups",
+          level: "error",
+          title: "Backup failed",
+          text: run.error
+        })
       } finally {
         run.finishedAt = new Date(this._context.now()).toISOString()
       }

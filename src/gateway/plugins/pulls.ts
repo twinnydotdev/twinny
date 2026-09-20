@@ -378,7 +378,9 @@ export class PullsPlugin implements PluginInstance {
     private readonly _context: PluginContext,
     forge: (store: RepoStore, context: PluginContext) => Forge,
     /** For tests: run the loop faster, or not at all with 0. */
-    private readonly _intervalMs = SYNC_INTERVAL_MS
+    private readonly _intervalMs = SYNC_INTERVAL_MS,
+    /** Named as the source of the events it emits. */
+    private readonly _pluginId = "pulls"
   ) {
     this.store = RepoStore.open(path.join(_context.dataDir, "repos.json"))
     this.reviews = ReviewStore.open(path.join(_context.dataDir, "reviews.json"))
@@ -475,6 +477,30 @@ export class PullsPlugin implements PluginInstance {
       ms: review.ms,
       ...(review.error ? { message: review.error } : {})
     })
+    const label = `${repo.fullName}${this._forge.noun === "Merge request" ? "!" : "#"}${pull.number}`
+    if (review.status === "done") {
+      const verdict = verdictOf(review.text)
+      const changes = verdict === "request changes"
+      this._context.events?.emit({
+        type: changes ? "review.changes" : "review.done",
+        source: this._pluginId,
+        level: changes ? "warn" : "info",
+        title: `Review of ${label}: ${verdict ?? "done"}`,
+        text: `${pull.title} by ${pull.author}, reviewed by ${alias} in ${Math.round(review.ms / 1000)} s.\n${summaryOf(review.text)}`,
+        url: pull.url,
+        data: { repo: repo.fullName, number: pull.number, verdict, alias }
+      })
+    } else {
+      this._context.events?.emit({
+        type: "review.failed",
+        source: this._pluginId,
+        level: "error",
+        title: `Review of ${label} failed`,
+        text: review.error ?? "",
+        url: pull.url,
+        data: { repo: repo.fullName, number: pull.number, alias }
+      })
+    }
     return review
   }
 
@@ -532,11 +558,13 @@ export class PullsPlugin implements PluginInstance {
         repo,
         withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)
       )
+      const before = state.syncedAt ? state.pulls : undefined
       state.pulls = pulls
         .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
         .slice(0, MAX_PULLS_PER_REPO)
       state.syncedAt = new Date(this._context.now()).toISOString()
       delete state.error
+      if (before) this.announce(repo, before, state.pulls)
     } catch (error) {
       state.error = error instanceof Error ? error.message : String(error)
       this._context.log.warn({
@@ -678,6 +706,38 @@ export class PullsPlugin implements PluginInstance {
     return answered ?? notFound()
   }
 
+  /** After a sync: what is new and what started failing, for whoever listens. */
+  private announce(repo: RepoRecord, before: PullSummary[], after: PullSummary[]): void {
+    const events = this._context.events
+    if (!events) return
+    const hash = this._forge.noun === "Merge request" ? "!" : "#"
+    for (const pull of after) {
+      const old = before.find((entry) => entry.number === pull.number)
+      if (!old) {
+        events.emit({
+          type: "pull.opened",
+          source: this._pluginId,
+          level: "info",
+          title: `${repo.fullName}${hash}${pull.number} opened: ${pull.title}`,
+          text: `By ${pull.author}, ${pull.headRef} into ${pull.baseRef}${pull.draft ? " (draft)" : ""}.`,
+          url: pull.url,
+          data: { repo: repo.fullName, number: pull.number }
+        })
+      } else if (pull.checks === "failure" && old.checks !== "failure") {
+        const failing = pull.checkRuns.filter((check) => check.state === "failure").map((check) => check.name)
+        events.emit({
+          type: "pull.checks-failed",
+          source: this._pluginId,
+          level: "warn",
+          title: `Checks failed on ${repo.fullName}${hash}${pull.number}: ${pull.title}`,
+          text: `${failing.length ? `Failing: ${failing.join(", ")}. ` : ""}By ${pull.author}.`,
+          url: pull.url,
+          data: { repo: repo.fullName, number: pull.number, failing }
+        })
+      }
+    }
+  }
+
   private pull(repoId: string, number: number): PullSummary | undefined {
     return this._state.get(repoId)?.pulls.find((pull) => pull.number === number)
   }
@@ -723,6 +783,22 @@ export class PullsPlugin implements PluginInstance {
     await this.syncOne(repo)
     return json({ repo: this.view(repo) }, 201)
   }
+}
+
+/** The verdict line of a review, lower-cased: "approve", "request changes", "comment", or nothing found. */
+export const verdictOf = (text: string): string | undefined => {
+  const section = /##\s*Verdict\s*\n+([^\n]+)/i.exec(text)?.[1] ?? ""
+  const line = section.replace(/[*_`]/g, "").trim().toLowerCase()
+  if (line.startsWith("approve")) return "approve"
+  if (line.startsWith("request changes")) return "request changes"
+  if (line.startsWith("comment")) return "comment"
+  return undefined
+}
+
+/** The summary section of a review, one paragraph, for a notification. */
+export const summaryOf = (text: string): string => {
+  const section = /##\s*Summary\s*\n+([\s\S]*?)(?:\n##|$)/i.exec(text)?.[1] ?? ""
+  return section.replace(/\s+/g, " ").trim().slice(0, 400)
 }
 
 /** An `https://host` origin for a self-hosted instance; the path is dropped. */

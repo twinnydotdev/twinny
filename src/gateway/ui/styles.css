@@ -454,3 +454,8 @@ td.auto input { accent-color: var(--accent); }
 .backup-options { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 16px; }
 .backup-options .policy-option { flex: 1 1 260px; max-width: 420px; }
 .backup-options .policy-option input { width: auto; }
+.event-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 20px; margin: 14px 0; }
+.event-picker .policy-option { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; align-items: flex-start; }
+.event-picker .policy-option input { margin-top: 3px; }
+.event-picker .policy-option.on { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.event-picker .policy-option input { width: auto; }

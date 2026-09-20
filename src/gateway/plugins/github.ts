@@ -572,5 +572,5 @@ export const githubPlugin: GatewayPlugin = {
   description:
     "Watch repositories on GitHub (or GitHub Enterprise) and see their open pull requests, checks and review state. Reads with a GitHub App or a token.",
   create: (context) =>
-    new PullsPlugin(context, (store, ctx) => new GitHubForge(store, ctx))
+    new PullsPlugin(context, (store, ctx) => new GitHubForge(store, ctx), undefined, "github")
 }

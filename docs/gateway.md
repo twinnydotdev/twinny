@@ -1287,3 +1287,37 @@ shell as the schedule would.
 | `POST /check` | writes and deletes a probe at the destination |
 | `POST /run` | back up now |
 | `GET /archives`, `DELETE /archives/<name>` | list and delete archives |
+
+### Slack
+
+The Slack plugin posts what the other plugins report, and what the
+gateway sees, to Slack incoming webhooks; Mattermost and Rocket.Chat
+take the same message shape. Add a webhook per channel (Slack: *Apps →
+Incoming Webhooks*, add to a channel, copy the URL) and pick what it
+gets:
+
+| Event | When |
+| --- | --- |
+| Review finished, Review asks for changes, Review failed | a model reviewed a pull (the verdict is read from the review's Verdict section) |
+| Pull opened | a new pull appeared on a watched repository at a sync |
+| Checks failed | a watched pull's checks went from passing or pending to failing |
+| Backup made, Backup failed | the Backups plugin ran |
+| Backend down, Backend back | a configured backend stopped answering, or answers again (polled every minute) |
+
+**Test** sends a hello to the channel at once. The last hundred
+deliveries and their outcomes are shown on the page; a channel that
+refuses a message is recorded there, never retried, and never stops the
+others. Webhook URLs let anyone post to the channel, so they are kept in
+the plugin's `webhooks.json` (owner-readable) and never returned by any
+route: the page shows only the host they point at.
+
+Under the hood every plugin shares one event bus (`PluginContext.events`);
+a new plugin can emit its own events and any listener sees them.
+
+| Route under `/twinny/v1/admin/plugins/slack/api/` | Does |
+| --- | --- |
+| `GET /` | webhooks (no URLs), the event catalogue, recent deliveries, watched backends |
+| `POST /webhooks` `{ name, url, events? }` | add a channel; every event unless `events` narrows it |
+| `PUT /webhooks/<id>` `{ name?, url?, events? }` | change it; a blank URL keeps the old one |
+| `DELETE /webhooks/<id>` | remove it |
+| `POST /webhooks/<id>/test` | send a hello now |

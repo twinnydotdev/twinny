@@ -6,7 +6,9 @@ import { backupsPlugin } from "./backups"
 import { githubPlugin } from "./github"
 import { gitlabPlugin } from "./gitlab"
 import type { GatewayPlugin } from "./host"
+import { slackPlugin } from "./slack"
 
-export const BUNDLED_PLUGINS: GatewayPlugin[] = [githubPlugin, gitlabPlugin, backupsPlugin]
+export const BUNDLED_PLUGINS: GatewayPlugin[] = [githubPlugin, gitlabPlugin, backupsPlugin, slackPlugin]
 
+export * from "./events"
 export * from "./host"

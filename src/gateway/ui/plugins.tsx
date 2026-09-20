@@ -9,6 +9,7 @@ import type { PluginSummary } from "../plugins/host"
 
 import { BackupsPanel } from "./backups"
 import { PullsPanel } from "./pulls"
+import { SlackPanel } from "./slack"
 
 /** Brand marks, inline so the page's content-security policy allows them. */
 const ICONS: Record<string, { viewBox: string; path: string; color?: string }> = {
@@ -21,6 +22,12 @@ const ICONS: Record<string, { viewBox: string; path: string; color?: string }> =
     color: "#3987e5",
     // An archive box: lid, body, and the handle slot.
     path: "M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-.75.75H14v6.25A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25V6h-.25A.75.75 0 0 1 1 5.25v-2.5zm1.5.75v1h11v-1h-11zM3.5 6v6.25c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6h-9zm2.75 1.5h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1 0-1.5z"
+  },
+  slack: {
+    viewBox: "0 0 24 24",
+    color: "#e01e5a",
+    // The hash mark, one colour: four lozenges and their tabs.
+    path: "M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"
   },
   gitlab: {
     viewBox: "0 0 24 24",
@@ -170,5 +177,6 @@ export const PageSkeleton = ({ tiles = 4, rows = 5, title }: { tiles?: number; r
 export const PluginPage = ({ id, apiKey }: { id: string; apiKey: string }) => {
   if (id === "github" || id === "gitlab") return <PullsPanel host={id} apiKey={apiKey} />
   if (id === "backups") return <BackupsPanel apiKey={apiKey} />
+  if (id === "slack") return <SlackPanel apiKey={apiKey} />
   return <div className="empty">This plugin has no page.</div>
 }

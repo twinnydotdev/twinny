@@ -18,6 +18,7 @@ import path from "node:path"
 
 import type { GatewayLog } from "../log"
 
+import { PluginEventBus } from "./events"
 import type { PluginInference } from "./inference"
 
 export const PLUGIN_ID_PATTERN = /^[a-z][a-z0-9-]{1,31}$/
@@ -45,6 +46,10 @@ export interface PluginContext {
   inference?: PluginInference
   /** The gateway's files, when the host says where they are. */
   paths?: GatewayPaths
+  /** What the other plugins report; every plugin gets the same bus. */
+  events?: PluginEventBus
+  /** A live check of the backends, for plugins that watch health. */
+  health?: () => Promise<Array<{ provider: string; ok: boolean; kind?: string }>>
 }
 
 /** One admin request handed to a plugin: already authenticated as an admin. */
@@ -205,6 +210,7 @@ export interface PluginHostOptions {
   /** The gateway's models for a plugin, by plugin id; read when the plugin starts. */
   inference?: (id: string) => PluginInference | undefined
   paths?: GatewayPaths
+  health?: () => Promise<Array<{ provider: string; ok: boolean; kind?: string }>>
   /**
    * Whether the plan allows plugins. Read at every switch and request, so
    * a licence installed or lapsing applies at once; absent means allowed.
@@ -224,8 +230,12 @@ export const PLUGINS_UNLICENSED =
 export class PluginHost {
   private readonly _running = new Map<string, PluginInstance>()
   private readonly _byId = new Map<string, GatewayPlugin>()
+  public readonly events: PluginEventBus
 
   constructor(private readonly _options: PluginHostOptions) {
+    this.events = new PluginEventBus(_options.now ?? Date.now, (error) =>
+      _options.log.error({ event: "plugin.event-handler-failed", message: error instanceof Error ? error.message : String(error) })
+    )
     for (const plugin of _options.plugins) {
       if (!PLUGIN_ID_PATTERN.test(plugin.id))
         throw new Error(`"${plugin.id}" is not a valid plugin id.`)
@@ -359,7 +369,9 @@ export class PluginHost {
       ...(this._options.inference
         ? { inference: this._options.inference(id) }
         : {}),
-      ...(this._options.paths ? { paths: this._options.paths } : {})
+      ...(this._options.paths ? { paths: this._options.paths } : {}),
+      events: this.events,
+      ...(this._options.health ? { health: this._options.health } : {})
     })
     this._running.set(id, instance)
     instance.start?.()

@@ -302,5 +302,5 @@ export const gitlabPlugin: GatewayPlugin = {
   description:
     "Watch projects on gitlab.com or a self-managed GitLab and see their open merge requests, pipelines and approvals. Reads with an access token per project.",
   create: (context) =>
-    new PullsPlugin(context, (store, ctx) => new GitLabForge(store, ctx))
+    new PullsPlugin(context, (store, ctx) => new GitLabForge(store, ctx), undefined, "gitlab")
 }

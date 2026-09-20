@@ -331,6 +331,12 @@ export const runServe = async (
       dataDir: path.dirname(config.auth.keysFile),
       log,
       licensed: () => license.current().features.includes("plugins"),
+      health: async () =>
+        (await server.routes.checkBackends()).backends.map((backend) => ({
+          provider: backend.provider,
+          ok: backend.ok,
+          ...(backend.kind ? { kind: backend.kind } : {})
+        })),
       paths: {
         configFile: args.config,
         dataDir: path.dirname(config.auth.keysFile),
