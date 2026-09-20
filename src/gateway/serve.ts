@@ -330,6 +330,7 @@ export const runServe = async (
       store: PluginStore.open(pluginsFileFor(config.auth.keysFile)),
       dataDir: path.dirname(config.auth.keysFile),
       log,
+      licensed: () => license.current().features.includes("plugins"),
       // Plugins use the gateway's own models, routed as a developer's request
       // is and recorded under the plugin's name; `server` exists before any
       // plugin starts.

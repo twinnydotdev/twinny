@@ -30,6 +30,7 @@ Node 18 or newer and nothing else.
 - [Access keys and the shared token](#access-keys-and-the-shared-token)
 - [Team policy](#team-policy) — what connected extensions enforce; a licence feature
 - [Recording](#recording) — keeping request content for review and training; a licence feature
+- [Plugins](#plugins) — GitHub and GitLab pull requests, reviewed by your own models; a licence feature
 - [Running in Docker](#running-in-docker)
 - [Plans, seats and the licence](#plans-seats-and-the-licence)
 - [Usage records](#usage-records)
@@ -1153,6 +1154,12 @@ the data directory, its own admin routes and its own page. **Plugins →
 Store** on the admin page lists what this build carries; **switch on**
 starts a plugin at once and adds it to the side navigation, **switch off**
 stops it. The choice is kept in `plugins.json`, so it survives a restart.
+
+Plugins are a licence feature (`plugins`, on every Team and Enterprise
+licence). Without it the store still lists them but nothing can be
+switched on, and plugins that were on stop until a licence is installed;
+their switch is kept, so a renewed licence brings them straight back.
+The 14-day grace after expiry applies as it does to policy and recording.
 
 The API behind the page, admin keys only:
 

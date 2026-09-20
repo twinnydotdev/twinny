@@ -1415,7 +1415,10 @@ export class GatewayServer {
           )
           return
         }
-        sendJson(res, 200, { plugins: plugins.list() })
+        sendJson(res, 200, {
+          plugins: plugins.list(),
+          licensed: plugins.licensed
+        })
         return
       }
       const match = /^plugins\/([a-z][a-z0-9-]{1,31})(?:\/(enable|disable|api)(?:\/(.*))?)?$/.exec(
@@ -1629,6 +1632,7 @@ export class GatewayServer {
           const token = typeof body.token === "string" ? body.token.trim() : ""
           if (!token) throw new Error("Paste the licence token in \"token\".")
           const installed = license.install(token)
+          await this._options.plugins?.refresh()
           this._options.log.info({
             event: "admin.license-installed",
             key: auth.principal,
@@ -1640,6 +1644,7 @@ export class GatewayServer {
         }
         case "DELETE":
           license.remove()
+          await this._options.plugins?.refresh()
           this._options.log.info({
             event: "admin.license-removed",
             key: auth.principal

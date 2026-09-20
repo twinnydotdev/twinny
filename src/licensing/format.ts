@@ -24,7 +24,7 @@ export const LICENSE_CLAIMS_VERSION = 1
  *   policy     the team policy block is sent to connected developers
  *   recording  the gateway may keep the content of requests the admin chooses
  */
-export const LICENSE_FEATURES = ["policy", "recording"] as const
+export const LICENSE_FEATURES = ["policy", "recording", "plugins"] as const
 export type LicenseFeature = (typeof LICENSE_FEATURES)[number]
 
 export interface LicenseClaims {

@@ -191,7 +191,16 @@ export interface PluginHostOptions {
   now?: () => number
   /** The gateway's models for a plugin, by plugin id; read when the plugin starts. */
   inference?: (id: string) => PluginInference | undefined
+  /**
+   * Whether the plan allows plugins. Read at every switch and request, so
+   * a licence installed or lapsing applies at once; absent means allowed.
+   */
+  licensed?: () => boolean
 }
+
+export const PLUGINS_UNLICENSED =
+  "Plugins need a licence with the plugins feature. Install one under Plan & licence."
+
 
 /**
  * Runs the enabled plugins and routes admin requests to them. Switching a
@@ -212,11 +221,29 @@ export class PluginHost {
     }
   }
 
-  /** Starts every plugin the store says is on. Unknown ids are left alone. */
+  public get licensed(): boolean {
+    return this._options.licensed?.() ?? true
+  }
+
+  /** Starts every plugin the store says is on, while the plan allows. Unknown ids are left alone. */
   public start(): void {
+    if (!this.licensed) return
     for (const id of this._options.store.enabled()) {
       if (this._byId.has(id) && !this._running.has(id)) this.run(id)
     }
+  }
+
+  /**
+   * After the plan changed: starts the plugins that are on if the licence
+   * now allows them, stops them all if it no longer does. Their switch is
+   * left as it was, so a renewed licence brings them straight back.
+   */
+  public async refresh(): Promise<void> {
+    if (this.licensed) {
+      this.start()
+      return
+    }
+    for (const id of [...this._running.keys()]) await this.halt(id)
   }
 
   public async stop(): Promise<void> {
@@ -247,6 +274,7 @@ export class PluginHost {
 
   public enable(id: string): PluginSummary {
     const plugin = this.plugin(id)
+    if (!this.licensed) throw new PluginError(PLUGINS_UNLICENSED, 403)
     if (!this._running.has(id)) this.run(id)
     this._options.store.setEnabled(id, true)
     return this.summary(plugin)
@@ -265,6 +293,7 @@ export class PluginHost {
     request: PluginRequest
   ): Promise<PluginResponse> {
     const plugin = this.plugin(id)
+    if (!this.licensed) throw new PluginError(PLUGINS_UNLICENSED, 403)
     const instance = this._running.get(id)
     if (!instance)
       throw new PluginError(`The ${plugin.name} plugin is switched off.`, 409)

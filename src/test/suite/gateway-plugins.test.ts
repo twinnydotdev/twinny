@@ -24,6 +24,8 @@ import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore } from 
 import { buildRouteTable } from "../../gateway/routes"
 import { GatewayServer } from "../../gateway/server"
 
+import { generateSigningKeys, issueLicense } from "./support/sign-license"
+
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-plugins-test-"))
 
 const request = (
@@ -343,6 +345,71 @@ suite("Plugin store", function () {
     assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/nope/enable`, "POST", admin)).status, 404)
     assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/github/enable`, "GET", admin)).status, 405)
     assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/github`, "GET", admin)).status, 404)
+  })
+})
+
+suite("Plugins and the licence", function () {
+  this.timeout(20_000)
+
+  test("plugins switch on only with the plugins feature, stop when the licence goes, and come back with it", async () => {
+    const dir = path.join(scratch, "licence")
+    const signing = generateSigningKeys()
+    const config = parseGatewayConfig(
+      {
+        listen: { host: "127.0.0.1", port: 0 },
+        auth: { tokenEnv: null, keysFile: path.join(dir, "keys.json"), licenseFile: path.join(dir, "license") },
+        usage: { dir: path.join(dir, "usage") },
+        providers: { local: { provider: "ollama", apiHostname: "127.0.0.1", apiPort: 1 } },
+        models: [{ alias: "coder", provider: "local", model: "x", capabilities: ["chat"] }]
+      },
+      providerRegistry.providerIds()
+    )
+    const keys = KeyStore.open(config.auth.keysFile, 0)
+    const license = LicenseStore.open(config.auth.licenseFile, [signing.publicKeyRaw], 0)
+    const log = createGatewayLog(() => undefined)
+    const plugins = new PluginHost({
+      plugins: BUNDLED_PLUGINS,
+      store: PluginStore.open(pluginsFileFor(config.auth.keysFile)),
+      dataDir: dir,
+      log,
+      licensed: () => license.current().features.includes("plugins")
+    })
+    const server = new GatewayServer({ config, keys, license, routes: buildRouteTable(config, readGatewaySecrets(config, {}, 1), providerRegistry), log, plugins })
+    const admin = keys.create("operator", { admin: true }).key
+    const url = (await server.start()).url
+    try {
+      const listed = await request(`${url}/twinny/v1/admin/plugins`, "GET", admin)
+      assert.strictEqual(listed.body.licensed, false)
+      const refused = await request(`${url}/twinny/v1/admin/plugins/gitlab/enable`, "POST", admin)
+      assert.strictEqual(refused.status, 403)
+      assert.match(message(refused), /licence with the plugins feature/)
+
+      const token = issueLicense({ org: "Acme", seats: 10, features: ["plugins"] }, signing.privateKeyPem).token
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/license`, "PUT", admin, { token })).status, 200)
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/gitlab/enable`, "POST", admin)).status, 200)
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/gitlab/api/`, "GET", admin)).status, 200)
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins`, "GET", admin)).body.licensed, true)
+
+      // The licence goes: the plugin stops and its routes refuse, but its switch is kept.
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/license`, "DELETE", admin)).status, 200)
+      assert.strictEqual(plugins.instance("gitlab"), undefined)
+      const off = await request(`${url}/twinny/v1/admin/plugins/gitlab/api/`, "GET", admin)
+      assert.strictEqual(off.status, 403)
+      assert.deepStrictEqual(PluginStore.open(pluginsFileFor(config.auth.keysFile)).enabled(), ["gitlab"])
+      const stillListed = (await request(`${url}/twinny/v1/admin/plugins`, "GET", admin)).body.plugins as Array<{ id: string; enabled: boolean }>
+      assert.strictEqual(stillListed.find((plugin) => plugin.id === "gitlab")?.enabled, false)
+
+      // A licence without the feature is not enough; one with it brings the plugin straight back.
+      const seatsOnly = issueLicense({ org: "Acme", seats: 10, features: ["policy"] }, signing.privateKeyPem).token
+      await request(`${url}/twinny/v1/admin/license`, "PUT", admin, { token: seatsOnly })
+      assert.strictEqual(plugins.instance("gitlab"), undefined)
+      await request(`${url}/twinny/v1/admin/license`, "PUT", admin, { token })
+      assert.ok(plugins.instance("gitlab"), "running again without anyone pressing the switch")
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/gitlab/api/`, "GET", admin)).status, 200)
+    } finally {
+      await plugins.stop()
+      await server.stop()
+    }
   })
 })
 

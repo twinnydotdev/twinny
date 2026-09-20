@@ -11,11 +11,14 @@ import { PullsPanel } from "./pulls"
 
 interface PluginsPageProps {
   plugins: PluginSummary[]
+  /** Whether the plan carries the plugins feature; switches are off otherwise. */
+  licensed: boolean
   onToggle: (id: string, enabled: boolean) => Promise<void>
   onOpen: (id: string) => void
+  onNavigate: (view: "plan") => void
 }
 
-export const PluginsPage = ({ plugins, onToggle, onOpen }: PluginsPageProps) => {
+export const PluginsPage = ({ plugins, licensed, onToggle, onOpen, onNavigate }: PluginsPageProps) => {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | undefined>()
   const toggle = async (plugin: PluginSummary) => {
@@ -38,6 +41,16 @@ export const PluginsPage = ({ plugins, onToggle, onOpen }: PluginsPageProps) => 
           {on === 0 ? "Nothing switched on." : `${on} of ${plugins.length} switched on.`} A plugin keeps its own files under the data directory and adds a page here.
         </p>
       </div>
+      {!licensed && (
+        <div className="confirm-bar">
+          <span>
+            Plugins are a licence feature. {on > 0 ? "The ones switched on are stopped until a licence is installed." : "Install a licence to switch one on."}
+          </span>
+          <button type="button" className="primary" onClick={() => onNavigate("plan")}>
+            Plan &amp; licence
+          </button>
+        </div>
+      )}
       {error && <div className="error-bar">{error}</div>}
       <div className="plugin-grid">
         {plugins.map((plugin) => (
@@ -48,7 +61,7 @@ export const PluginsPage = ({ plugins, onToggle, onOpen }: PluginsPageProps) => 
             </div>
             <p className="plugin-description">{plugin.description}</p>
             <div className="row-actions">
-              <button type="button" className={plugin.enabled ? "ghost" : "primary"} disabled={busy !== null} onClick={() => void toggle(plugin)}>
+              <button type="button" className={plugin.enabled ? "ghost" : "primary"} disabled={busy !== null || (!licensed && !plugin.enabled)} title={!licensed && !plugin.enabled ? "Needs a licence with the plugins feature" : undefined} onClick={() => void toggle(plugin)}>
                 {busy === plugin.id ? "…" : plugin.enabled ? "switch off" : "switch on"}
               </button>
               {plugin.enabled && (
