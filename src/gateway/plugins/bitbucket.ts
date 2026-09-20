@@ -21,6 +21,7 @@ import {
   rec,
   RepoRecord,
   RepoStore,
+  ReviewPostAs,
   ReviewState,
   rollup,
   splitUnifiedDiff,
@@ -133,6 +134,24 @@ export class BitbucketForge implements Forge {
       })
     }
     return out
+  }
+
+  public async postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }> {
+    const what = `Posting the review on ${repo.fullName}#${pull.number}`
+    const comment = await readJson(
+      await this._context.fetch(this.api(repo, `/pullrequests/${pull.number}/comments`), {
+        method: "POST",
+        headers: { ...this.headers(repo), "Content-Type": "application/json" },
+        body: JSON.stringify({ content: { raw: body } }),
+        signal
+      }),
+      what
+    )
+    if (as !== "comment") {
+      const response = await this._context.fetch(this.api(repo, `/pullrequests/${pull.number}/${as === "approve" ? "approve" : "request-changes"}`), { method: "POST", headers: this.headers(repo), signal })
+      if (!response.ok) await readJson(response, `${what} (${as})`)
+    }
+    return { url: str(rec(rec(comment.links).html).href, pull.url) }
   }
 
   public async pullContent(repo: RepoRecord, number: number, signal: AbortSignal): Promise<PullContent> {

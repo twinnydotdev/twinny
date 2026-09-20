@@ -18,6 +18,7 @@ import { KeyStore } from "../../gateway/keys"
 import { LicenseStore } from "../../gateway/license"
 import { createGatewayLog } from "../../gateway/log"
 import { BUNDLED_PLUGINS, PluginContext, PluginError, PluginHost, PluginInstance, pluginsFileFor, PluginStore } from "../../gateway/plugins"
+import { PluginEventBus } from "../../gateway/plugins/events"
 import { appJwt } from "../../gateway/plugins/github"
 import { PullPage, PullsPlugin, RepoStore } from "../../gateway/plugins/pulls"
 import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore, stripThinking } from "../../gateway/plugins/reviews"
@@ -671,6 +672,7 @@ suite("Pull-request plugin core", () => {
           return []
         },
         pullContent: async () => ({ body: "", files: [], moreFiles: 0 }),
+        postReview: async () => ({}),
         status: () => ({ baseUrl: "x://" })
       }),
       0
@@ -729,6 +731,7 @@ suite("Pull-request reviews", function () {
         labels: []
       })),
     pullContent: async () => ({ body: "Does a thing.", files: [{ path: "a.ts", status: "modified" as const, additions: 1, deletions: 1, patch: "@@ -1 +1 @@\n-old\n+new" }], moreFiles: 0 }),
+    postReview: async () => ({}),
     status: () => ({ baseUrl: "x://" })
   })
   const req = (method: string, path: string, body: Record<string, unknown> = {}) => ({ method, path, query: new URLSearchParams(), body: async () => body, principal: "op" })
@@ -846,6 +849,52 @@ suite("Pull-request reviews", function () {
     await none.stop()
   })
 
+  test("a finished review can be posted to the host, and auto-post does it as a comment straight away", async () => {
+    const { inference } = scripted("## Summary\nOk.\n\n## Verdict\nApprove.")
+    const posts: Array<{ number: number; as: string; body: string }> = []
+    const dir = path.join(scratch, "reviews-post")
+    fs.mkdirSync(dir, { recursive: true })
+    const bus = new PluginEventBus()
+    const seen: string[] = []
+    bus.on((event) => seen.push(event.type))
+    const p = new PullsPlugin(
+      { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference, events: bus },
+      () => ({
+        ...forge({ 1: "aaa", 2: "bbb" })(),
+        postReview: async (_repo: { fullName: string }, pull: { number: number }, body: string, as: string) => {
+          posts.push({ number: pull.number, as, body })
+          return { url: `x://posted/${pull.number}` }
+        }
+      }),
+      0
+    )
+    p.start()
+    const repo = ((await p.handle(req("POST", "repos", { fullName: "acme/post" }))).body as { repo: { id: string } }).repo
+    // Nothing to post before a review exists.
+    const early = await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/post`)).catch((e: PluginError) => e)
+    assert.ok(early instanceof PluginError && early.status === 409)
+    await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))
+    const posted = await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/post`, { as: "approve" }))
+    const review = (posted.body as { review: ReviewRecord }).review
+    assert.strictEqual(review.postedAs, "approve")
+    assert.strictEqual(review.postedUrl, "x://posted/1")
+    assert.strictEqual(review.postedBy, "op")
+    assert.ok(review.postedAt)
+    assert.deepStrictEqual(posts.map((post) => `${post.number}:${post.as}`), ["1:approve"])
+    assert.match(posts[0].body, /Reviewed by twinny-server with `coder`/)
+    assert.ok(seen.includes("review.posted"))
+    const listing = await p.handle(req("GET", ""))
+    assert.strictEqual((listing.body as { repos: Array<{ reviews: Record<number, { posted?: boolean }> }> }).repos[0].reviews[1].posted, true)
+
+    // Auto-post: the next review goes straight to the host as a comment.
+    await p.handle(req("PUT", `repos/${repo.id}`, { autoPost: true }))
+    const auto = await p.handle(req("POST", `repos/${repo.id}/pulls/2/review`))
+    assert.strictEqual((auto.body as { review: ReviewRecord }).review.postedAs, "comment")
+    assert.strictEqual((auto.body as { review: ReviewRecord }).review.postedBy, "auto")
+    assert.deepStrictEqual(posts.map((post) => `${post.number}:${post.as}`), ["1:approve", "2:comment"])
+    await p.stop()
+  })
+
   test("the prompt fits a small context: patches beyond the budget are named, not sent", () => {
     const big = "+".repeat(REVIEW_PROMPT_BUDGET)
     const messages = reviewMessages(
@@ -898,6 +947,7 @@ suite("Reviews and reasoning models", () => {
       checkRepo: async (repo: { fullName: string }) => repo.fullName,
       listPulls: async (repo: { fullName: string }) => [{ repo: repo.fullName, number: 1, title: "t", author: "a", url: "", draft: false, createdAt: "", updatedAt: "2026-09-19T00:00:00Z", headRef: "h", baseRef: "m", headSha: "s", checks: "none" as const, checkRuns: [], mergeable: "unknown" as const, review: "none" as const, labels: [] }],
       pullContent: async () => ({ body: "", files: [], moreFiles: 0 }),
+      postReview: async () => ({}),
       status: () => ({ baseUrl: "x://" })
     })
     const p = new PullsPlugin({ dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference }, forge, 0)

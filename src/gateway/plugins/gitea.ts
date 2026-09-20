@@ -20,6 +20,7 @@ import {
   rec,
   RepoRecord,
   RepoStore,
+  ReviewPostAs,
   ReviewState,
   rollup,
   splitUnifiedDiff,
@@ -134,6 +135,19 @@ export class GiteaForge implements Forge {
       })
     }
     return out
+  }
+
+  public async postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }> {
+    const answer = await readJson(
+      await this._context.fetch(this.api(repo, `/pulls/${pull.number}/reviews`), {
+        method: "POST",
+        headers: { ...this.headers(repo), "Content-Type": "application/json" },
+        body: JSON.stringify({ body, event: as === "approve" ? "APPROVED" : as === "request-changes" ? "REQUEST_CHANGES" : "COMMENT" }),
+        signal
+      }),
+      `Posting the review on ${repo.fullName}#${pull.number}`
+    )
+    return { url: str(answer.html_url, pull.url) }
   }
 
   public async pullContent(repo: RepoRecord, number: number, signal: AbortSignal): Promise<PullContent> {

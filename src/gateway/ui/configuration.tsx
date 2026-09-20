@@ -31,6 +31,8 @@ const Field = ({
   required,
   type = "text",
   min,
+  step,
+  hint,
   max,
   pattern
 }: {
@@ -41,6 +43,8 @@ const Field = ({
   required?: boolean
   type?: string
   min?: number
+  step?: string
+  hint?: string
   max?: number
   pattern?: string
 }) => (
@@ -52,11 +56,13 @@ const Field = ({
       placeholder={placeholder}
       required={required}
       type={type}
+      step={step}
       min={min}
       max={max}
       pattern={pattern}
       autoComplete="off"
     />
+  {hint && <small className="muted">{hint}</small>}
   </label>
 )
 
@@ -350,7 +356,9 @@ const ModelEditor = ({
           onChange={(v) => setValue({ ...value, price: v || value.price?.output !== undefined ? { input: v ? Number(v) : 0, output: value.price?.output ?? 0 } : undefined })}
           type="number"
           min={0}
+          step="any"
           placeholder="Optional, e.g. 0.15"
+          hint="Per million tokens, in the currency set above. Examples: gpt-4o-mini 0.15 in / 0.60 out; claude-3-5-haiku 0.80 / 4.00; mistral-small 0.20 / 0.60; a local model 0 / 0 or your GPU's hourly cost spread over tokens."
         />
         <Field
           label="Price per million output tokens"
@@ -358,6 +366,7 @@ const ModelEditor = ({
           onChange={(v) => setValue({ ...value, price: v || value.price?.input !== undefined ? { input: value.price?.input ?? 0, output: v ? Number(v) : 0 } : undefined })}
           type="number"
           min={0}
+          step="any"
           placeholder="Optional, e.g. 0.60"
         />
       </div>

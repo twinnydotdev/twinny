@@ -46,10 +46,12 @@ import {
   rec,
   RepoRecord,
   RepoStore,
+  ReviewPostAs,
   ReviewState,
   rollup,
   str,
-  timeoutSignal} from "./pulls"
+  timeoutSignal
+} from "./pulls"
 
 export const GITHUB_URL = "https://github.com"
 const USER_AGENT = "twinny-server"
@@ -474,6 +476,18 @@ export class GitHubForge implements Forge {
     if (total !== undefined && total > files.length)
       moreFiles = total - files.length
     return { body: str(pull.body), files, moreFiles }
+  }
+
+  public async postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }> {
+    const token = await this.tokenFor(repo, signal)
+    const response = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/pulls/${pull.number}/reviews`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT, "Content-Type": "application/json" },
+      body: JSON.stringify({ body, event: as === "approve" ? "APPROVE" : as === "request-changes" ? "REQUEST_CHANGES" : "COMMENT" }),
+      signal
+    })
+    const answer = await readJson(response, `Posting the review on ${repo.fullName}#${pull.number}`)
+    return { url: str(answer.html_url, pull.url) }
   }
 
   public async handle(

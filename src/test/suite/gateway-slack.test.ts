@@ -181,6 +181,7 @@ suite("Slack plugin", function () {
             labels: []
           })),
         pullContent: async () => ({ body: "", files: [], moreFiles: 0 }),
+        postReview: async () => ({}),
         status: () => ({ baseUrl: "x://" })
       }),
       0,

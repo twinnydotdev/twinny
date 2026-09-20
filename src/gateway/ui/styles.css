@@ -491,3 +491,6 @@ td.auto input { accent-color: var(--accent); }
 @keyframes meter-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 .meter-fill.indeterminate { animation: meter-slide 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .meter-fill.indeterminate { animation: none; } }
+.review-running { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 6px; background: var(--accent-soft); margin-bottom: 12px; }
+.review-running .meter { flex: 0 0 140px; }
+.review-running b { color: var(--accent); }

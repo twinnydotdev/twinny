@@ -215,6 +215,7 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                 <th>failing</th>
                 <th>synced</th>
                 <th title="Review new and updated pulls in the background while the models are idle">auto-review</th>
+                <th title="Post every finished review to the host as a comment">auto-post</th>
                 <th />
               </tr>
             </thead>
@@ -245,6 +246,15 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                         aria-label={`Auto-review ${repo.fullName}`}
                         title={overview.review.available ? undefined : "Reviews are unavailable on this gateway"}
                         onChange={(e) => void run(`auto:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { autoReview: e.target.checked } }))}
+                      />
+                    </td>
+                    <td className="auto">
+                      <input
+                        type="checkbox"
+                        checked={repo.autoPost}
+                        disabled={busy !== null}
+                        aria-label={`Auto-post reviews of ${repo.fullName}`}
+                        onChange={(e) => void run(`post:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { autoPost: e.target.checked } }))}
                       />
                     </td>
                     <td className="actions">
@@ -449,13 +459,25 @@ interface PullViewProps {
   review: ReviewSetup
   onBack: () => void
   onReview: () => Promise<void>
+  onPost: (as: "comment" | "request-changes" | "approve") => Promise<void>
 }
 
-const PullView = ({ detail, words, review, host, onBack, onReview }: PullViewProps) => {
+const PullView = ({ detail, words, review, host, onBack, onReview, onPost }: PullViewProps) => {
+  const [postAs, setPostAs] = useState<"comment" | "request-changes" | "approve">("comment")
+  const [posting, setPosting] = useState(false)
+  const [postError, setPostError] = useState<string | undefined>()
   const { pull } = detail
   const [reviewing, setReviewing] = useState(detail.reviewing)
   const [reviewError, setReviewError] = useState<string | undefined>()
+  const [elapsed, setElapsed] = useState(0)
   useEffect(() => setReviewing(detail.reviewing), [detail.reviewing])
+  useEffect(() => {
+    if (!reviewing) return
+    setElapsed(0)
+    const started = Date.now()
+    const timer = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [reviewing])
   const askReview = async () => {
     setReviewing(true)
     setReviewError(undefined)
@@ -541,14 +563,25 @@ const PullView = ({ detail, words, review, host, onBack, onReview }: PullViewPro
       )}
 
       <h3 className="sub">Review</h3>
-      <div className="review-actions">
-        <button type="button" className={detail.review ? "ghost" : "primary"} disabled={reviewing || !review.available || !review.alias} onClick={() => void askReview()} title={!review.available ? "This gateway offers plugins no models" : !review.alias ? "No chat model is served" : undefined}>
-          {reviewing ? "reviewing…" : detail.review ? "review again" : "review now"}
-        </button>
-        {review.alias && <span className="muted">with {review.alias}</span>}
-        {reviewing && <span className="muted">The model is reading the {words.noun}; this can take a minute or two.</span>}
-        {reviewError && <span className="bad-text">{reviewError}</span>}
-      </div>
+      {reviewing ? (
+        <div className="review-running" aria-live="polite">
+          <span className="meter">
+            <span className="meter-fill indeterminate" style={{ width: "40%" }} />
+          </span>
+          <span>
+            Reviewing with <b>{review.alias}</b>
+            <span className="muted"> · {elapsed}s · the model is reading the {words.noun}; a minute or two is normal</span>
+          </span>
+        </div>
+      ) : (
+        <div className="review-actions">
+          <button type="button" className={detail.review ? "ghost" : "primary"} disabled={!review.available || !review.alias} onClick={() => void askReview()} title={!review.available ? "This gateway offers plugins no models" : !review.alias ? "No chat model is served" : undefined}>
+            {detail.review ? "review again" : "review now"}
+          </button>
+          {review.alias && <span className="muted">with {review.alias}</span>}
+          {reviewError && <span className="bad-text">{reviewError}</span>}
+        </div>
+      )}
       {detail.review ? (
         <>
           <div className="review-meta">
@@ -566,7 +599,44 @@ const PullView = ({ detail, words, review, host, onBack, onReview }: PullViewPro
             </span>
             {stale && <span className="tag stale">for an earlier commit {detail.review.headSha.slice(0, 7)}</span>}
             {detail.review.status === "failed" && <span className="tag failed">failed</span>}
+            {detail.review.postedAt && (
+              <span className="tag reviewed">
+                posted as {detail.review.postedAs?.replace("-", " ")} {timeAgo(detail.review.postedAt)}
+                {detail.review.postedUrl && (
+                  <>
+                    {" · "}
+                    <a href={detail.review.postedUrl} target="_blank" rel="noreferrer">
+                      view
+                    </a>
+                  </>
+                )}
+              </span>
+            )}
           </div>
+          {detail.review.status === "done" && (
+            <div className="review-actions">
+              <select value={postAs} onChange={(e) => setPostAs(e.target.value as typeof postAs)} disabled={posting} aria-label="Post as">
+                <option value="comment">as a comment</option>
+                <option value="request-changes">requesting changes</option>
+                <option value="approve">approving</option>
+              </select>
+              <button
+                type="button"
+                className={detail.review.postedAt ? "ghost" : "primary"}
+                disabled={posting}
+                onClick={() => {
+                  setPosting(true)
+                  setPostError(undefined)
+                  void onPost(postAs)
+                    .catch((e: unknown) => setPostError(e instanceof Error ? e.message : String(e)))
+                    .finally(() => setPosting(false))
+                }}
+              >
+                {posting ? "posting…" : detail.review.postedAt ? `post again to ${HOST_NAMES[host]}` : `post to ${HOST_NAMES[host]}`}
+              </button>
+              {postError && <span className="bad-text">{postError}</span>}
+            </div>
+          )}
           {detail.review.status === "failed" ? <div className="error">{detail.review.error}</div> : <MarkdownView text={detail.review.text} className="review-body" />}
         </>
       ) : (
@@ -804,6 +874,11 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
               setDetail((current) => (current ? { ...current, review: answer.review, reviewing: false } : current))
               void load()
             }}
+            onPost={async (as) => {
+              const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review/post`, apiKey, { method: "POST", body: { as } })
+              setDetail((current) => (current ? { ...current, review: answer.review } : current))
+              void load()
+            }}
           />
         ) : (
           <section className="panel">
@@ -874,7 +949,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
                           {pull.draft && <span className="tag">draft</span>} {pull.title}
                           {repo.reviews[pull.number] && (
                             <span className={`tag ${repo.reviews[pull.number].status === "failed" ? "failed" : repo.reviews[pull.number].stale ? "stale" : "reviewed"}`} title={`Reviewed by ${repo.reviews[pull.number].alias} ${timeAgo(repo.reviews[pull.number].createdAt)}`}>
-                              {repo.reviews[pull.number].status === "failed" ? "review failed" : repo.reviews[pull.number].stale ? "review stale" : "reviewed"}
+                              {repo.reviews[pull.number].status === "failed" ? "review failed" : repo.reviews[pull.number].stale ? "review stale" : repo.reviews[pull.number].posted ? "review posted" : "reviewed"}
                             </span>
                           )}
                         </div>

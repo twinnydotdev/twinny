@@ -1307,7 +1307,7 @@ Both plugins do the same thing for their host: watch repositories and
 show their open pull requests (merge requests on GitLab) with the state
 of checks, mergeability and review, and open one with its description and
 diffs. They sync every five minutes and on **sync now**; nothing is
-written back to the host.
+written back to the host unless a review is posted (see below).
 
 **Watching a repository.** Give it as `owner/name` (GitLab: the full
 `group/project` path) and an access token that can read it:
@@ -1344,7 +1344,7 @@ gateway sends the description and diffs to one of its chat aliases (the
 and keeps what came back on the server, per pull and commit, in the
 plugin's `reviews.json`. The review shows on the pull's page with the
 model, the time and who asked; a pull that has moved on marks it as
-being for an earlier commit. Nothing is posted to the host.
+being for an earlier commit. Posting it to the host is a separate, explicit step (or auto-post).
 
 Ticking **auto-review** on a repository reviews its new and updated
 pulls in the background: one at a time, newest first, never drafts, and
@@ -1355,6 +1355,18 @@ usage under `plugin:github` or `plugin:gitlab`, so the Usage page shows
 what they cost. The prompt carries at most 24k characters of description
 and diff (larger patches are named but left out) and asks for at most
 1,500 tokens back, to suit local models with small contexts.
+
+**Posting a review to the host.** A finished review has **post to
+GitHub** (or GitLab, Gitea, Bitbucket) with a choice of how the host
+should record it: a comment, a change request or an approval. GitHub and
+Gitea take all three as a review; GitLab posts a note and, for an
+approval, approves; Bitbucket posts a comment and, when asked, approves
+or requests changes. The review is posted with a footer naming the model
+and the commit, and the page shows when and where it went. Ticking
+**auto-post** on a repository posts every finished review as a comment
+without anyone pressing the button, which with **auto-review** makes a
+fully automatic first pass on every pull. A `review.posted` event goes
+out for the notifiers.
 
 **Reasoning models.** A model that thinks before answering (Qwen 3 and
 the like) is asked not to (`think: false`, which Ollama honours); a model
@@ -1372,7 +1384,8 @@ fails with that reason rather than "answered nothing".
 | `POST /repos/<id>/sync`, `POST /sync` | sync one, or all |
 | `GET /repos/<id>/pulls/<number>` | one pull with its description, files and latest review |
 | `POST /repos/<id>/pulls/<number>/review` | review it now with the review model; answers when the review is done |
-| `PUT /repos/<id>` `{ autoReview }` | review new and updated pulls in the background |
+| `POST /repos/<id>/pulls/<number>/review/post` `{ as? }` | post the finished review to the host as `comment` (default), `request-changes` or `approve` |
+| `PUT /repos/<id>` `{ autoReview?, autoPost? }` | review new and updated pulls in the background; post every finished review as a comment |
 | `PUT /settings` `{ baseUrl?, reviewAlias? }` | the host URL; the chat alias reviews use |
 | `PUT /app` `{ appId, privateKey }`, `DELETE /app`, `GET /app/repositories` | the GitHub App (GitHub only) |
 

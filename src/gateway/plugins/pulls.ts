@@ -32,8 +32,12 @@ import {
   REVIEW_TIMEOUT_MS,
   ReviewBrief,
   Reviewer,
+  ReviewPostAs,
   ReviewRecord,
-  ReviewStore} from "./reviews"
+  ReviewStore
+} from "./reviews"
+
+export type { ReviewPostAs } from "./reviews"
 
 export const SYNC_INTERVAL_MS = 5 * 60_000
 /** How often a pending background review is retried while developers are busy. */
@@ -115,6 +119,8 @@ export interface RepoRecord {
   addedBy: string
   /** Review new and updated pulls in the background while the models are idle. */
   autoReview?: boolean
+  /** Post every finished review to the host as a comment, without anyone pressing the button. */
+  autoPost?: boolean
 }
 
 /** What the page sees: never the token. */
@@ -126,6 +132,7 @@ export interface RepoView {
   addedAt: string
   addedBy: string
   autoReview: boolean
+  autoPost: boolean
   syncing: boolean
   syncedAt?: string
   error?: string
@@ -161,6 +168,12 @@ export interface Forge {
     number: number,
     signal: AbortSignal
   ): Promise<PullContent>
+  /**
+   * Posts a review to the host. `as` is what the host should record it
+   * as; a host without that notion posts a comment. Returns where it
+   * can be seen, when the host says.
+   */
+  postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }>
   /** Host-specific state for the page (e.g. the GitHub App), never secrets. */
   status(): unknown
   /** Host-specific routes under `api/`, after the shared ones did not match. */
@@ -206,7 +219,8 @@ const parseReposFile = (text: string, file: string): ReposFile => {
       ...(typeof entry.token === "string" ? { token: entry.token } : {}),
       addedAt: entry.addedAt,
       addedBy: entry.addedBy,
-      ...(entry.autoReview === true ? { autoReview: true } : {})
+      ...(entry.autoReview === true ? { autoReview: true } : {}),
+      ...(entry.autoPost === true ? { autoPost: true } : {})
     })
   }
   return {
@@ -261,11 +275,13 @@ export class RepoStore {
     return { ...record }
   }
 
-  public update(id: string, changes: Partial<Pick<RepoRecord, "autoReview">>): RepoRecord {
+  public update(id: string, changes: Partial<Pick<RepoRecord, "autoReview" | "autoPost">>): RepoRecord {
     const repo = this._repos.find((entry) => entry.id === id)
     if (!repo) throw new PluginError("No such repository.", 404)
     if (changes.autoReview === true) repo.autoReview = true
     else if (changes.autoReview === false) delete repo.autoReview
+    if (changes.autoPost === true) repo.autoPost = true
+    else if (changes.autoPost === false) delete repo.autoPost
     this.save()
     return { ...repo }
   }
@@ -331,6 +347,7 @@ const withTimeout = (parent: AbortSignal, ms: number): AbortSignal => {
     () => controller.abort(new Error(`No answer within ${ms / 1000} s.`)),
     ms
   )
+  timer.unref()
   const onParent = () => controller.abort(parent.reason)
   if (parent.aborted) onParent()
   else parent.addEventListener("abort", onParent, { once: true })
@@ -455,7 +472,7 @@ export class PullsPlugin implements PluginInstance {
     requestedBy: string
   ): Promise<ReviewRecord> {
     const signal = withTimeout(this._stopped.signal, REVIEW_TIMEOUT_MS)
-    const review = await this._reviewer.review(
+    let review = await this._reviewer.review(
       {
         repoId: repo.id,
         pull,
@@ -478,6 +495,10 @@ export class PullsPlugin implements PluginInstance {
       ...(review.error ? { message: review.error } : {})
     })
     const label = `${repo.fullName}${this._forge.noun === "Merge request" ? "!" : "#"}${pull.number}`
+    if (review.status === "done" && repo.autoPost) {
+      // Straight to the host as a comment; a failure stays on the review, not on the review run.
+      review = await this.postReview(repo, pull, review, "comment", "auto").catch(() => review)
+    }
     if (review.status === "done") {
       const verdict = verdictOf(review.text)
       const changes = verdict === "request changes"
@@ -518,6 +539,7 @@ export class PullsPlugin implements PluginInstance {
       addedAt: repo.addedAt,
       addedBy: repo.addedBy,
       autoReview: repo.autoReview === true,
+      autoPost: repo.autoPost === true,
       syncing: state?.syncing ?? false,
       ...(state?.syncedAt ? { syncedAt: state.syncedAt } : {}),
       ...(state?.error ? { error: state.error } : {}),
@@ -605,15 +627,18 @@ export class PullsPlugin implements PluginInstance {
       const rest = repoMatch[2] ?? ""
       if (rest === "" && method === "PUT") {
         const body = await request.body()
-        if (typeof body.autoReview !== "boolean")
-          throw new PluginError("Send { autoReview: true | false }.", 400)
-        const updated = this.store.update(repo.id, { autoReview: body.autoReview })
+        if (typeof body.autoReview !== "boolean" && typeof body.autoPost !== "boolean")
+          throw new PluginError("Send { autoReview: true | false } and/or { autoPost: true | false }.", 400)
+        const updated = this.store.update(repo.id, {
+          ...(typeof body.autoReview === "boolean" ? { autoReview: body.autoReview } : {}),
+          ...(typeof body.autoPost === "boolean" ? { autoPost: body.autoPost } : {})
+        })
         this._context.log.info({
           event: "plugin.repo-updated",
           key: request.principal,
-          reason: `${repo.fullName} autoReview=${body.autoReview}`
+          reason: `${repo.fullName} autoReview=${updated.autoReview === true} autoPost=${updated.autoPost === true}`
         })
-        if (body.autoReview) void this.autoReview()
+        if (body.autoReview === true) void this.autoReview()
         return json({ repo: this.view(updated) })
       }
       if (rest === "" && method === "DELETE") {
@@ -631,17 +656,26 @@ export class PullsPlugin implements PluginInstance {
         await this.syncOne(repo)
         return json({ repo: this.view(repo) })
       }
-      const pullMatch = /^pulls\/([1-9][0-9]{0,8})(\/review)?$/.exec(rest)
+      const pullMatch = /^pulls\/([1-9][0-9]{0,8})(\/review(?:\/post)?)?$/.exec(rest)
       if (pullMatch) {
         const number = Number(pullMatch[1])
-        const wantsReview = pullMatch[2] !== undefined
-        if (wantsReview ? method !== "POST" : method !== "GET") return notFound()
+        const wantsReview = pullMatch[2] === "/review"
+        const wantsPost = pullMatch[2] === "/review/post"
+        if (wantsReview || wantsPost ? method !== "POST" : method !== "GET") return notFound()
         let pull = this.pull(repo.id, number)
         if (!pull) {
           await this.syncOne(repo)
           pull = this.pull(repo.id, number)
         }
         if (!pull) return notFound(`${repo.fullName} has no open pull ${number}.`)
+        if (wantsPost) {
+          const body = await request.body()
+          const as: ReviewPostAs = body.as === "request-changes" || body.as === "approve" ? body.as : "comment"
+          const review = this.reviews.latest(repo.id, number)
+          if (!review || review.status !== "done") throw new PluginError("There is no finished review to post.", 409)
+          const posted = await this.postReview(repo, pull, review, as, request.principal)
+          return json({ review: posted })
+        }
         if (wantsReview) {
           const alias = this.reviewAlias()
           if (!alias)
@@ -735,6 +769,32 @@ export class PullsPlugin implements PluginInstance {
           data: { repo: repo.fullName, number: pull.number, failing }
         })
       }
+    }
+  }
+
+  /** Sends a finished review to the host and remembers where it went. */
+  private async postReview(repo: RepoRecord, pull: PullSummary, review: ReviewRecord, as: ReviewPostAs, by: string): Promise<ReviewRecord> {
+    const hash = this._forge.noun === "Merge request" ? "!" : "#"
+    const body = `${review.text.trim()}\n\n---\n_Reviewed by twinny-server with \`${review.alias}\`${review.headSha ? ` at ${review.headSha.slice(0, 7)}` : ""}._`
+    try {
+      const posted = await this._forge.postReview(repo, pull, body, as, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS))
+      const updated: ReviewRecord = { ...review, postedAt: new Date(this._context.now()).toISOString(), postedAs: as, postedBy: by, ...(posted.url ? { postedUrl: posted.url } : {}) }
+      this.reviews.put(updated)
+      this._context.log.info({ event: "plugin.review-posted", key: by, reason: `${repo.fullName}${hash}${pull.number}`, message: as })
+      this._context.events?.emit({
+        type: "review.posted",
+        source: this._pluginId,
+        level: "info",
+        title: `Review of ${repo.fullName}${hash}${pull.number} posted as ${as.replace("-", " ")}`,
+        text: `${pull.title} by ${pull.author}; reviewed by ${review.alias}.`,
+        url: posted.url ?? pull.url,
+        data: { repo: repo.fullName, number: pull.number, as }
+      })
+      return updated
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this._context.log.warn({ event: "plugin.review-post-failed", key: by, reason: `${repo.fullName}${hash}${pull.number}`, message })
+      throw error instanceof PluginError ? error : new PluginError(`Posting to the host failed: ${message}`, 502)
     }
   }
 

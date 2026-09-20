@@ -1,7 +1,7 @@
 /**
  * Reviews: what one of the gateway's own models makes of a pull. Kept on
  * the server, per pull and head commit, in the plugin's reviews.json;
- * shown on the pull's page and never posted anywhere.
+ * shown on the pull's page, and posted to the host only when asked (or auto-post is on).
  *
  * A review is asked for with the button, or made in the background for
  * repositories with auto-review on: one at a time, only for pulls that
@@ -39,7 +39,14 @@ export interface ReviewRecord {
   status: "done" | "failed"
   text: string
   error?: string
+  /** When and how it was posted to the host, if it was. */
+  postedAt?: string
+  postedAs?: ReviewPostAs
+  postedUrl?: string
+  postedBy?: string
 }
+
+export type ReviewPostAs = "comment" | "request-changes" | "approve"
 
 /** What a listing carries per pull, to mark it without the text. */
 export interface ReviewBrief {
@@ -47,6 +54,7 @@ export interface ReviewBrief {
   alias: string
   status: ReviewRecord["status"]
   stale: boolean
+  posted?: boolean
 }
 
 interface ReviewsFile {
@@ -91,7 +99,11 @@ const parseReviewsFile = (text: string, file: string): ReviewsFile => {
       ms: typeof entry.ms === "number" ? entry.ms : 0,
       status: entry.status,
       text: entry.text,
-      ...(typeof entry.error === "string" ? { error: entry.error } : {})
+      ...(typeof entry.error === "string" ? { error: entry.error } : {}),
+      ...(typeof entry.postedAt === "string" ? { postedAt: entry.postedAt } : {}),
+      ...(entry.postedAs === "comment" || entry.postedAs === "request-changes" || entry.postedAs === "approve" ? { postedAs: entry.postedAs } : {}),
+      ...(typeof entry.postedUrl === "string" ? { postedUrl: entry.postedUrl } : {}),
+      ...(typeof entry.postedBy === "string" ? { postedBy: entry.postedBy } : {})
     })
   }
   return { version: 1, reviews }
@@ -134,7 +146,8 @@ export class ReviewStore {
         createdAt: review.createdAt,
         alias: review.alias,
         status: review.status,
-        stale: review.headSha !== pull.headSha
+        stale: review.headSha !== pull.headSha,
+        ...(review.postedAt ? { posted: true } : {})
       }
     )
   }

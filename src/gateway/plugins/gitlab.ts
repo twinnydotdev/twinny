@@ -32,6 +32,7 @@ import {
   rec,
   RepoRecord,
   RepoStore,
+  ReviewPostAs,
   ReviewState,
   rollup,
   str
@@ -240,6 +241,24 @@ export class GitLabForge implements Forge {
     return arr(rec(project.mergeRequests).nodes).map((node) =>
       toPull(repo.fullName, this.baseUrl, rec(node))
     )
+  }
+
+  public async postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }> {
+    const what = `Posting the review on ${repo.fullName}!${pull.number}`
+    const note = await readJson(
+      await this._context.fetch(`${this.project(repo)}/merge_requests/${pull.number}/notes`, {
+        method: "POST",
+        headers: { ...this.headers(repo), "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+        signal
+      }),
+      what
+    )
+    // GitLab has approvals but no "request changes": that stays a note.
+    if (as === "approve")
+      await readJson(await this._context.fetch(`${this.project(repo)}/merge_requests/${pull.number}/approve`, { method: "POST", headers: this.headers(repo), signal }), `${what} (approve)`)
+    const id = num(note.id)
+    return { url: id !== undefined ? `${pull.url}#note_${id}` : pull.url }
   }
 
   public async pullContent(
