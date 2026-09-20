@@ -242,6 +242,27 @@ const sendJson = (
   res.end(text)
 }
 
+/** A plugin's answer: JSON, a page, or a redirect. */
+const sendPlugin = (res: http.ServerResponse, answer: { status: number; body?: unknown; headers?: Record<string, string>; html?: string }) => {
+  if (answer.html !== undefined) {
+    res.writeHead(answer.status, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": Buffer.byteLength(answer.html),
+      "Cache-Control": "no-store",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
+      ...(answer.headers ?? {})
+    })
+    res.end(answer.html)
+    return
+  }
+  if (answer.body === null && answer.status >= 300 && answer.status < 400) {
+    res.writeHead(answer.status, { "Cache-Control": "no-store", ...(answer.headers ?? {}) })
+    res.end()
+    return
+  }
+  sendJson(res, answer.status, answer.body, answer.headers)
+}
+
 const sendError = (
   res: http.ServerResponse,
   error: InferenceError,
@@ -1566,7 +1587,7 @@ export class GatewayServer {
       req.resume()
       if (req.method !== "GET" && answer.status < 400)
         this.audit(req, auth.principal, "plugin.write", id, { method: req.method ?? "", path: (rest ?? "").replace(/\/+$/, "") })
-      sendJson(res, answer.status, answer.body, answer.headers)
+      sendPlugin(res, answer)
     } catch (error) {
       const status = error instanceof PluginError ? error.status : 400
       sendJson(res, status, {
@@ -1574,6 +1595,59 @@ export class GatewayServer {
           message: error instanceof Error ? error.message : String(error)
         }
       })
+    }
+  }
+
+  /** A plugin's browser-facing routes: no credential; the plugin decides what to show. */
+  private async handlePublicPlugin(id: string, rest: string, url: URL, req: http.IncomingMessage, res: http.ServerResponse) {
+    const plugins = this._options.plugins
+    if (!plugins || !plugins.has(id)) {
+      sendJson(res, 404, { error: { message: "Not found." } })
+      return
+    }
+    try {
+      const answer = await plugins.handlePublic(id, {
+        method: req.method ?? "GET",
+        path: rest,
+        query: url.searchParams,
+        headers: {
+          host: typeof req.headers.host === "string" ? req.headers.host : undefined,
+          "x-forwarded-proto": typeof req.headers["x-forwarded-proto"] === "string" ? req.headers["x-forwarded-proto"].split(",")[0].trim() : undefined,
+          "x-forwarded-host": typeof req.headers["x-forwarded-host"] === "string" ? req.headers["x-forwarded-host"] : undefined
+        },
+        address: clientAddress(req),
+        body: () => readJsonBody(req, 64 * 1024)
+      })
+      req.resume()
+      sendPlugin(res, answer)
+    } catch (error) {
+      const status = error instanceof PluginError ? error.status : 400
+      sendJson(res, status, { error: { message: error instanceof Error ? error.message : String(error) } })
+    }
+  }
+
+  /**
+   * An invite made on a plugin's behalf, on the gateway's terms: the seat
+   * check, the name rules and the replace semantics are the same as on the
+   * People page. Used by sign-in plugins to mint a key for a verified person.
+   */
+  public async inviteFor(input: { name: string; admin?: boolean; replace?: boolean; ttlMs?: number; createdBy: string }): Promise<{ code: string; expiresAt: string }> {
+    const invites = this._options.invites
+    if (!invites) throw new PluginError("This gateway does not keep invites.", 503)
+    this._options.keys.reload()
+    const seated = this.seatHolders().filter((key) => !(input.replace && key.name === input.name))
+    const refusal = this._options.license?.refuseNewKey(seated)
+    if (refusal) throw new PluginError(refusal, 409)
+    try {
+      const made = invites.create(
+        { name: input.name, admin: input.admin, replace: input.replace, createdBy: input.createdBy, ttlMs: input.ttlMs },
+        (candidate) => this._options.keys.active().some((key) => key.name === candidate)
+      )
+      this._options.audit?.record({ action: "invite.created", actor: input.createdBy, target: input.name, details: { ...(input.admin ? { admin: true } : {}), ...(input.replace ? { replace: true } : {}) } })
+      return { code: made.code, expiresAt: made.record.expiresAt }
+    } catch (error) {
+      if (error instanceof InviteError) throw new PluginError(error.message, error.status)
+      throw error
     }
   }
 
@@ -1855,6 +1929,11 @@ export class GatewayServer {
     }
     if (url.pathname === `${REMOTE_PROTOCOL_BASE}${DEMO_INVITE_PATH}`) {
       this.handleDemoInvite(req, res)
+      return
+    }
+    const publicPlugin = /^\/twinny\/v1\/plugins\/([a-z][a-z0-9-]{1,31})(?:\/(.*))?$/.exec(url.pathname)
+    if (publicPlugin) {
+      await this.handlePublicPlugin(publicPlugin[1], (publicPlugin[2] ?? "").replace(/\/+$/, ""), url, req, res)
       return
     }
 

@@ -9,6 +9,7 @@ import { giteaPlugin } from "./gitea"
 import { githubPlugin } from "./github"
 import { gitlabPlugin } from "./gitlab"
 import type { GatewayPlugin } from "./host"
+import { oidcPlugin } from "./oidc"
 import { slackPlugin } from "./slack"
 import { teamsPlugin } from "./teams"
 
@@ -20,6 +21,7 @@ export const BUNDLED_PLUGINS: GatewayPlugin[] = [
   slackPlugin,
   discordPlugin,
   teamsPlugin,
+  oidcPlugin,
   backupsPlugin
 ]
 

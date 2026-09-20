@@ -836,6 +836,24 @@ The training format is one example per line: chat as
 and cancelled requests are left out. `--format raw` gives the records as
 stored. The admin page's Export button produces the same file.
 
+## Running on Kubernetes
+
+`deploy/helm/twinny-server` is a Helm chart: one pod, one volume, the
+configuration from `values.yaml` copied onto the volume so the admin page
+can edit it, an optional Ingress with TLS, and a ServiceMonitor for the
+Prometheus operator scraping `/metrics` with a read-only admin key.
+
+```sh
+helm install twinny ./deploy/helm/twinny-server \
+  --set config.providers.local.apiHostname=ollama.models.svc.cluster.local \
+  --set ingress.enabled=true --set ingress.host=twinny.example.com --set ingress.tls.enabled=true
+kubectl exec deploy/twinny-twinny-server -- node /app/cli.js keys create you --admin --config /data/twinny.gateway.json
+```
+
+The image is `ghcr.io/twinnydotdev/twinny-server`, built on every `v*`
+tag by `.github/workflows/docker.yml`. Keep `replicaCount` at 1: keys,
+usage and plugin files live on the one volume.
+
 ## Running in Docker
 
 `packages/twinny-server/` has a `Dockerfile` and a `docker-compose.yml`
@@ -1367,6 +1385,34 @@ Adaptive Card, which both a Workflows "post to a channel when a webhook
 request is received" flow and the older Incoming Webhook connector
 accept. Routes, event catalogue, delivery log and secrecy of the URLs are
 as for Slack, under `/twinny/v1/admin/plugins/<discord|teams>/api/`.
+
+### SSO sign-in (OIDC)
+
+The OIDC plugin lets developers sign in with the company's identity
+provider (Okta, Entra ID, Google Workspace, Keycloak, Authentik, any
+OpenID Connect provider) instead of an invite or a code. Register a
+confidential web application at the provider with the redirect URI
+`https://<gateway>/twinny/v1/plugins/oidc/callback` and the `openid`,
+`email` and `profile` scopes, then paste the issuer URL, client id and
+secret on the plugin's page. **Test provider** reads the discovery
+document and the signing keys.
+
+Developers open `https://<gateway>/twinny/v1/plugins/oidc/start` (the
+page shows the link to copy). The gateway sends them to the provider
+with PKCE, a state and a nonce; on the way back it exchanges the code,
+verifies the RS256 id_token against the provider's published keys
+(issuer, audience, expiry, nonce), checks the email's domain against
+the allowed list, and mints a key for the email through a one-time
+invite that opens VS Code. The invite replaces any key of the same
+name, so signing in again refreshes the key and revokes the old one.
+Emails in *admin emails* get admin keys. Every sign-in is written to
+the audit log and raised as a `signin.sso` event.
+
+Only RS256 tokens are accepted. `nameClaim` picks the claim that names
+the key (`email` unless the provider has none; `preferred_username` or
+`upn`). Set *public URL* when the gateway sits behind a proxy that does
+not send `X-Forwarded-Proto`. Provider secrets live in the plugin's
+`settings.json`, owner-readable, and never come back from any route.
 
 ### Backups
 

@@ -1,0 +1,82 @@
+# The Twinny gateway on Kubernetes. One pod, one volume; the models run
+# elsewhere (Ollama, vLLM, llama.cpp, a hosted API) and are named in the
+# configuration below.
+
+image:
+  repository: ghcr.io/twinnydotdev/twinny-server
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 1      # keys, usage and plugin files live on one volume; keep this at 1
+
+service:
+  type: ClusterIP
+  port: 8765
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: twinny.example.com
+  tls:
+    enabled: false
+    secretName: twinny-tls
+
+# Where keys, usage, licence, audit, plugins and recordings live.
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: ""
+  existingClaim: ""
+
+# The configuration file, written to /data/twinny.gateway.json. Everything
+# the docs describe under "Configuration" goes here; secrets are named by
+# environment variable and supplied through `env` or `envFrom` below.
+config:
+  listen: { host: "0.0.0.0", port: 8765 }
+  auth:
+    tokenEnv: null
+    keysFile: /data/keys.json
+    licenseFile: /data/license
+  usage: { dir: /data/usage }
+  recording: { dir: /data/recordings }
+  providers:
+    local:
+      provider: ollama
+      apiHostname: ollama.default.svc.cluster.local
+      apiPort: 11434
+  models:
+    - { alias: coder, provider: local, model: "qwen2.5-coder:7b", capabilities: [fim, chat] }
+    - { alias: chat, provider: local, model: "qwen2.5-coder:7b", capabilities: [chat] }
+
+# Environment for backend API keys named in the configuration (apiKeyEnv).
+env: []
+#  - name: OPENAI_API_KEY
+#    valueFrom: { secretKeyRef: { name: twinny-backends, key: openai } }
+envFrom: []
+
+# Extra flags for `serve` (e.g. ["--demo"]).
+extraArgs: []
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { memory: 1Gi }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+podSecurityContext:
+  fsGroup: 100
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+
+# A ServiceMonitor for the Prometheus operator, scraping /metrics with a
+# read-only admin key kept in the named secret (key: token).
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  secretName: twinny-metrics

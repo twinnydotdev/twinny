@@ -41,7 +41,8 @@ export const EVENT_KINDS: PluginEventKind[] = [
   { type: "backend.down", label: "Backend down", description: "A configured backend stopped answering." },
   { type: "backend.up", label: "Backend back", description: "A backend that was down answers again." },
   { type: "quota.warning", label: "Quota warning", description: "A key passed the warning share of its daily quota." },
-  { type: "quota.reached", label: "Quota reached", description: "A key hit its daily quota and requests are being refused." }
+  { type: "quota.reached", label: "Quota reached", description: "A key hit its daily quota and requests are being refused." },
+  { type: "signin.sso", label: "SSO sign-in", description: "Someone signed in through the identity provider and got a key." }
 ]
 
 export type PluginEventHandler = (event: PluginEvent) => void

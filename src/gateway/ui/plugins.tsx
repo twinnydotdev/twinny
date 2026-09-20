@@ -9,6 +9,7 @@ import type { PluginSummary } from "../plugins/host"
 
 import { BackupsPanel } from "./backups"
 import { NotifyPanel } from "./notify"
+import { OidcPanel } from "./oidc"
 import { PullsPanel } from "./pulls"
 
 /** Brand marks, inline so the page's content-security policy allows them. */
@@ -44,6 +45,12 @@ const ICONS: Record<string, { viewBox: string; path: string; color?: string }> =
     color: "#6264a7",
     // Two people on a card, as the Teams mark suggests.
     path: "M14.5 3.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19.5 5.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM3 8.75A1.75 1.75 0 0 1 4.75 7h9.5A1.75 1.75 0 0 1 16 8.75V15a4 4 0 0 1-8 0v-1H4.75A1.75 1.75 0 0 1 3 12.25v-3.5zm3 1.25v1.5h1.5V17h1.5v-5.5h1.5V10H6zm11 0h3.25c.966 0 1.75.784 1.75 1.75v3.5A3.5 3.5 0 0 1 18.5 19h-.86A5.98 5.98 0 0 0 18 15v-5z"
+  },
+  oidc: {
+    viewBox: "0 0 16 16",
+    color: "#c98500",
+    // A key.
+    path: "M10.5 0a5.5 5.5 0 0 0-5.3 6.97L.22 11.94A.75.75 0 0 0 0 12.47V15.25c0 .414.336.75.75.75h2.5a.75.75 0 0 0 .75-.75V14h1.25a.75.75 0 0 0 .75-.75V12h1.25a.75.75 0 0 0 .53-.22l1.03-1.03A5.5 5.5 0 1 0 10.5 0zm0 1.5a4 4 0 1 1-1.31 7.78.75.75 0 0 0-.78.18L7.19 10.5H5.75a.75.75 0 0 0-.75.75v1.25H3.75a.75.75 0 0 0-.75.75v1.25H1.5v-1.72l5.09-5.09a.75.75 0 0 0 .18-.78A4 4 0 0 1 10.5 1.5zM12 3.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"
   },
   slack: {
     viewBox: "0 0 24 24",
@@ -199,6 +206,7 @@ export const PageSkeleton = ({ tiles = 4, rows = 5, title }: { tiles?: number; r
 export const PluginPage = ({ id, apiKey }: { id: string; apiKey: string }) => {
   if (id === "github" || id === "gitlab" || id === "gitea" || id === "bitbucket") return <PullsPanel host={id} apiKey={apiKey} />
   if (id === "backups") return <BackupsPanel apiKey={apiKey} />
+  if (id === "oidc") return <OidcPanel apiKey={apiKey} />
   if (id === "slack" || id === "discord" || id === "teams") return <NotifyPanel host={id} apiKey={apiKey} />
   return <div className="empty">This plugin has no page.</div>
 }

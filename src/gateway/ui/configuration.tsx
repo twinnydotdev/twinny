@@ -787,7 +787,8 @@ export const ConfigurationPanel = ({
             </label>
           </div>
           {Object.entries(draft.policy?.quotas?.keys ?? {}).map(([name, quota]) => (
-            <div key={name} className="config-fields" style={{ marginTop: 10 }}>
+            <div key={name} className="policy-entry">
+            <div className="config-fields">
               <label className="config-field">
                 <span>key</span>
                 <input value={name} disabled />
@@ -800,16 +801,16 @@ export const ConfigurationPanel = ({
                 <span>tokens per day</span>
                 <input inputMode="numeric" value={quota.tokensPerDay ?? ""} disabled={locked} onChange={(event) => setQuota(draft, setDraft, name, "tokensPerDay", event.target.value, setNotice)} />
               </label>
-              <div className="config-field">
-                <span>&nbsp;</span>
-                <button type="button" className="ghost mini" disabled={locked} onClick={() => {
-                  const keys = { ...draft.policy?.quotas?.keys }
-                  delete keys[name]
-                  const quotas = { ...draft.policy?.quotas, ...(Object.keys(keys).length ? { keys } : {}) }
-                  if (!Object.keys(keys).length) delete quotas.keys
-                  setDraft({ ...draft, policy: { ...draft.policy, ...(Object.keys(quotas).length ? { quotas } : {}) } }); setNotice("")
-                }}>remove</button>
-              </div>
+            </div>
+            <div className="row-actions">
+              <button type="button" className="ghost mini" disabled={locked} onClick={() => {
+                const keys = { ...draft.policy?.quotas?.keys }
+                delete keys[name]
+                const quotas = { ...draft.policy?.quotas, ...(Object.keys(keys).length ? { keys } : {}) }
+                if (!Object.keys(keys).length) delete quotas.keys
+                setDraft({ ...draft, policy: { ...draft.policy, ...(Object.keys(quotas).length ? { quotas } : {}) } }); setNotice("")
+              }}>remove key quota</button>
+            </div>
             </div>
           ))}
           <form className="newkey" style={{ marginTop: 10 }} onSubmit={(event) => {
@@ -830,7 +831,8 @@ export const ConfigurationPanel = ({
             <span className="muted">By the workspace name the extension sends; the first matching rule decides</span>
           </div>
           {(draft.policy?.routing ?? []).map((rule, index) => (
-            <div key={index} className="config-fields" style={{ marginBottom: 10 }}>
+            <div key={index} className="policy-entry">
+            <div className="config-fields">
               <label className="config-field">
                 <span>workspace (glob, e.g. payments-*)</span>
                 <input value={rule.workspace} disabled={locked} onChange={(event) => {
@@ -849,29 +851,26 @@ export const ConfigurationPanel = ({
                   setDraft({ ...draft, policy: { ...draft.policy, routing } }); setNotice("")
                 }} />
               </label>
-              <div className="config-field">
-                <span>&nbsp;</span>
-                <label className="policy-option">
-                  <input type="checkbox" checked={rule.localOnly === true} disabled={locked} onChange={(event) => {
-                    const routing = [...(draft.policy?.routing ?? [])]
-                    routing[index] = { ...rule }
-                    if (event.target.checked) routing[index].localOnly = true
-                    else delete routing[index].localOnly
-                    setDraft({ ...draft, policy: { ...draft.policy, routing } }); setNotice("")
-                  }} />
-                  <span><b>local backends only</b><small>never a hosted provider</small></span>
-                </label>
-              </div>
-              <div className="config-field">
-                <span>&nbsp;</span>
-                <button type="button" className="ghost mini" disabled={locked} onClick={() => {
-                  const routing = (draft.policy?.routing ?? []).filter((_, i) => i !== index)
-                  const policy: GatewayPolicy = { ...draft.policy }
-                  if (routing.length) policy.routing = routing
-                  else delete policy.routing
-                  setDraft({ ...draft, policy }); setNotice("")
-                }}>remove rule</button>
-              </div>
+            </div>
+            <div className="backup-options">
+              <label className="policy-option">
+                <input type="checkbox" checked={rule.localOnly === true} disabled={locked} onChange={(event) => {
+                  const routing = [...(draft.policy?.routing ?? [])]
+                  routing[index] = { ...rule }
+                  if (event.target.checked) routing[index].localOnly = true
+                  else delete routing[index].localOnly
+                  setDraft({ ...draft, policy: { ...draft.policy, routing } }); setNotice("")
+                }} />
+                <span><b>local backends only</b><small>never a hosted provider</small></span>
+              </label>
+              <button type="button" className="ghost mini" disabled={locked} onClick={() => {
+                const routing = (draft.policy?.routing ?? []).filter((_, i) => i !== index)
+                const policy: GatewayPolicy = { ...draft.policy }
+                if (routing.length) policy.routing = routing
+                else delete policy.routing
+                setDraft({ ...draft, policy }); setNotice("")
+              }}>remove rule</button>
+            </div>
             </div>
           ))}
           <button type="button" disabled={locked} onClick={() => {

@@ -337,6 +337,7 @@ export const runServe = async (
       dataDir: path.dirname(config.auth.keysFile),
       log,
       licensed: () => license.current().features.includes("plugins"),
+      invites: { create: (input) => server.inviteFor(input) },
       health: async () =>
         (await server.routes.checkBackends()).backends.map((backend) => ({
           provider: backend.provider,

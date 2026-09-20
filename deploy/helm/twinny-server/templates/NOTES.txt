@@ -1,0 +1,16 @@
+twinny-server is starting.
+
+1. Make the first admin key (once):
+   kubectl exec deploy/{{ include "twinny-server.fullname" . }} -- node /app/cli.js keys create you --admin --config /data/twinny.gateway.json
+
+2. Reach the admin page:
+   kubectl port-forward svc/{{ include "twinny-server.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+   open http://127.0.0.1:{{ .Values.service.port }}/admin
+{{- if .Values.ingress.enabled }}
+   or https://{{ .Values.ingress.host }}/admin
+{{- end }}
+
+3. Invite developers from People, or:
+   kubectl exec deploy/{{ include "twinny-server.fullname" . }} -- node /app/cli.js invites create alice --url https://{{ .Values.ingress.host }} --config /data/twinny.gateway.json
+
+Docs: https://twinnydotdev.github.io/twinny-docs/teams/gateway/

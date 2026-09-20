@@ -50,6 +50,8 @@ export interface PluginContext {
   events?: PluginEventBus
   /** A live check of the backends, for plugins that watch health. */
   health?: () => Promise<Array<{ provider: string; ok: boolean; kind?: string }>>
+  /** Minting keys through one-time invites, for sign-in plugins. */
+  invites?: PluginInvites
 }
 
 /** One admin request handed to a plugin: already authenticated as an admin. */
@@ -66,8 +68,22 @@ export interface PluginRequest {
 
 export interface PluginResponse {
   status: number
-  body: unknown
+  /** JSON, unless `html` is set. `null` with a 3xx status and a Location header redirects. */
+  body?: unknown
   headers?: Record<string, string>
+  /** A page instead of JSON, for the browser side of a plugin. */
+  html?: string
+}
+
+/** A request on a plugin's public routes: no credential, so only what the request itself says. */
+export interface PublicPluginRequest {
+  method: string
+  path: string
+  query: URLSearchParams
+  headers: Record<string, string | undefined>
+  /** The client address, for logs and throttles. */
+  address: string
+  body: () => Promise<Record<string, unknown>>
 }
 
 /** A running plugin. */
@@ -75,6 +91,13 @@ export interface PluginInstance {
   start?(): void
   stop?(): void | Promise<void>
   handle(request: PluginRequest): Promise<PluginResponse>
+  /** Routes under `/twinny/v1/plugins/<id>/…`, open to anyone; only for plugins that need a browser flow. */
+  handlePublic?(request: PublicPluginRequest): Promise<PluginResponse>
+}
+
+/** What a plugin may ask of the gateway's keys: an invite that mints one, on the gateway's own terms (seats, names). */
+export interface PluginInvites {
+  create(input: { name: string; admin?: boolean; replace?: boolean; ttlMs?: number; createdBy: string }): Promise<{ code: string; expiresAt: string }>
 }
 
 /** A bundled plugin: how it is described in the store, and how to run it. */
@@ -211,6 +234,7 @@ export interface PluginHostOptions {
   inference?: (id: string) => PluginInference | undefined
   paths?: GatewayPaths
   health?: () => Promise<Array<{ provider: string; ok: boolean; kind?: string }>>
+  invites?: PluginInvites
   /**
    * Whether the plan allows plugins. Read at every switch and request, so
    * a licence installed or lapsing applies at once; absent means allowed.
@@ -342,6 +366,22 @@ export class PluginHost {
     }
   }
 
+  /** Hands a public (no credential) request to a running plugin that has public routes. */
+  public async handlePublic(id: string, request: PublicPluginRequest): Promise<PluginResponse> {
+    const plugin = this.plugin(id)
+    if (!this.licensed) throw new PluginError(PLUGINS_UNLICENSED, 403)
+    const instance = this._running.get(id)
+    if (!instance) throw new PluginError(`The ${plugin.name} plugin is switched off.`, 409)
+    if (!instance.handlePublic) throw new PluginError(`The ${plugin.name} plugin has no public routes.`, 404)
+    try {
+      return await instance.handlePublic(request)
+    } catch (error) {
+      if (error instanceof PluginError) return { status: error.status, body: { error: { message: error.message } } }
+      this._options.log.error({ event: "plugin.failed", reason: id, message: error instanceof Error ? error.message : String(error) })
+      return { status: 500, body: { error: { message: error instanceof Error ? error.message : String(error) } } }
+    }
+  }
+
   private plugin(id: string): GatewayPlugin {
     const plugin = this._byId.get(id)
     if (!plugin) throw new PluginError(`No plugin "${id}" is bundled.`, 404)
@@ -371,7 +411,8 @@ export class PluginHost {
         : {}),
       ...(this._options.paths ? { paths: this._options.paths } : {}),
       events: this.events,
-      ...(this._options.health ? { health: this._options.health } : {})
+      ...(this._options.health ? { health: this._options.health } : {}),
+      ...(this._options.invites ? { invites: this._options.invites } : {})
     })
     this._running.set(id, instance)
     instance.start?.()

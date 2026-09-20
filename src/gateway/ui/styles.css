@@ -470,3 +470,13 @@ td.auto input { accent-color: var(--accent); }
 .scroll { padding-bottom: 2px; }
 /* A soft edge says there is more to the right, without a scrollbar always showing. */
 .scroll.scroll-more { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+.policy-entry { border: 1px solid var(--line); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+.policy-entry .backup-options, .policy-entry .row-actions { margin-top: 10px; }
+.policy-template { border: 1px solid var(--line); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+.policy-template .config-field { margin-top: 10px; }
+.config-field textarea { width: 100%; }
+.policy-template .row-actions, .policy-entry .row-actions { margin-top: 12px; }
+.policy-template .config-fields + .config-field { margin-top: 12px; }
+.policy-template, .policy-entry { margin-bottom: 14px; }
+.panel > .policy-template:first-of-type, .panel > .policy-entry:first-of-type { margin-top: 4px; }
+.created a.button { display: inline-block; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; text-decoration: none; color: var(--ink); }

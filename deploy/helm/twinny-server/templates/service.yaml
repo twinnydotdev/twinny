@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "twinny-server.fullname" . }}
+  labels:
+    {{- include "twinny-server.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - { name: http, port: {{ .Values.service.port }}, targetPort: http }
+  selector:
+    {{- include "twinny-server.selectorLabels" . | nindent 4 }}

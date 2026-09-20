@@ -6,7 +6,7 @@ import path from "node:path"
 import { API_PROVIDERS, PROVIDER_DISPLAY_NAMES } from "../common/constants/providers"
 import { getEndpointDefaults, validateProvider } from "../common/provider-validation"
 import { providerRegistry } from "../extension/inference/registry"
-import type { TeamDefaults, TeamPolicy } from "../protocol/types"
+import type { TeamDefaults } from "../protocol/types"
 
 import {
   GatewayConfig,
