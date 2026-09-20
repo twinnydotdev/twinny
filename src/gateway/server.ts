@@ -33,6 +33,7 @@ import {
   toErrorBody
 } from "../protocol/wire"
 
+import { PluginError, PluginHost } from "./plugins/host"
 import { exportLines } from "./recording/export"
 import { Recorder } from "./recording/recorder"
 import type { RecordingQuery, RecordingRoute } from "./recording/store"
@@ -92,6 +93,8 @@ export interface GatewayServerOptions {
   peers?: PeerRegistry
   /** Demo mode: a read-only visitor on the admin page and short-lived guest keys. */
   demo?: DemoOptions
+  /** Bundled plugins; without a host the plugin routes answer 404. */
+  plugins?: PluginHost
 }
 
 /** Who a request came from: a key's name, or `shared` for the shared token. */
@@ -587,6 +590,10 @@ export class GatewayServer {
     }
     if (route === "peers" || route.startsWith("peers/")) {
       this.handlePeers(route, req, res, auth)
+      return
+    }
+    if (route === "plugins" || route.startsWith("plugins/")) {
+      await this.handlePlugins(route, url, req, res, auth)
       return
     }
     const revoke = /^keys\/([0-9a-f]{8})\/revoke$/.exec(route)
@@ -1370,6 +1377,90 @@ export class GatewayServer {
       sendJson(res, 200, { id: match[1], status: "withdrawn" })
     } catch (error) {
       const status = error instanceof InviteError ? error.status : 400
+      sendJson(res, status, {
+        error: {
+          message: error instanceof Error ? error.message : String(error)
+        }
+      })
+    }
+  }
+
+  /**
+   * The plugin store and the plugins' own routes. Enabling and disabling
+   * is logged with the admin's key; what a plugin does with a request is
+   * the plugin's business.
+   */
+  private async handlePlugins(
+    route: string,
+    url: URL,
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    auth: { principal: string; admin: boolean }
+  ) {
+    const plugins = this._options.plugins
+    if (!plugins) {
+      sendJson(res, 404, {
+        error: { message: "This gateway has no plugins." }
+      })
+      return
+    }
+    try {
+      if (route === "plugins") {
+        if (req.method !== "GET") {
+          sendJson(
+            res,
+            405,
+            { error: { message: "Use GET to list plugins." } },
+            { Allow: "GET" }
+          )
+          return
+        }
+        sendJson(res, 200, { plugins: plugins.list() })
+        return
+      }
+      const match = /^plugins\/([a-z][a-z0-9-]{1,31})(?:\/(enable|disable|api)(?:\/(.*))?)?$/.exec(
+        route
+      )
+      if (!match || !plugins.has(match[1])) {
+        sendJson(res, 404, { error: { message: "No such plugin." } })
+        return
+      }
+      const [, id, action, rest] = match
+      if (action === "enable" || action === "disable") {
+        if (req.method !== "POST") {
+          sendJson(
+            res,
+            405,
+            { error: { message: "Switching a plugin is POST." } },
+            { Allow: "POST" }
+          )
+          return
+        }
+        const summary =
+          action === "enable" ? plugins.enable(id) : await plugins.disable(id)
+        this._options.log.info({
+          event: `plugin.${action}d`,
+          key: auth.principal,
+          reason: id
+        })
+        sendJson(res, 200, { plugin: summary })
+        return
+      }
+      if (action !== "api") {
+        sendJson(res, 404, { error: { message: "Not found." } })
+        return
+      }
+      const answer = await plugins.handle(id, {
+        method: req.method ?? "GET",
+        path: (rest ?? "").replace(/\/+$/, ""),
+        query: url.searchParams,
+        body: () => readJsonBody(req, 256 * 1024),
+        principal: auth.principal
+      })
+      req.resume()
+      sendJson(res, answer.status, answer.body, answer.headers)
+    } catch (error) {
+      const status = error instanceof PluginError ? error.status : 400
       sendJson(res, status, {
         error: {
           message: error instanceof Error ? error.message : String(error)

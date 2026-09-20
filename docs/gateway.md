@@ -187,6 +187,8 @@ pass it whenever your configuration sets `auth.keysFile` or `usage.dir`.
 | Usage | `~/.twinny/server/usage/YYYY-MM-DD.jsonl` | one line per inference request: key, alias, outcome, duration, token counts | no content, but it is per-person activity |
 | Licence | `~/.twinny/server/license` | the signed licence token, when the team has one | no, but it names your organisation |
 | Recordings | `~/.twinny/server/recordings/` | the content of requests, only for routes switched on under `recording` with a licence that allows it | yes: prompts, code and replies |
+| Plugins | `~/.twinny/server/plugins.json` | which bundled plugins are switched on | no |
+| Plugin data | `~/.twinny/server/plugins/<id>/` | each plugin's own files; the GitHub and GitLab plugins keep `repos.json` and `reviews.json` there | yes: repository tokens and the GitHub App key (mode 600); reviews quote the code |
 | Shared token | the environment variable named by `auth.tokenEnv` | the token itself | yes |
 | Backend API keys | the environment variables named by `providers.*.apiKeyEnv` | the keys themselves | yes |
 
@@ -1142,3 +1144,90 @@ Out of scope for this gateway: P2P discovery, GPU sharing, scheduling and
 failover; accounts, organisations, SSO and RBAC; usage quotas,
 billing and chat storage; model installation; container or service
 packaging.
+
+## Plugins
+
+Plugins are features the server ships with but that are not the gateway:
+switched off until an admin turns them on, each with its own files under
+the data directory, its own admin routes and its own page. **Plugins →
+Store** on the admin page lists what this build carries; **switch on**
+starts a plugin at once and adds it to the side navigation, **switch off**
+stops it. The choice is kept in `plugins.json`, so it survives a restart.
+
+The API behind the page, admin keys only:
+
+| Route | Does |
+| --- | --- |
+| `GET /twinny/v1/admin/plugins` | what is bundled and what is on |
+| `POST /twinny/v1/admin/plugins/<id>/enable` | switch on |
+| `POST /twinny/v1/admin/plugins/<id>/disable` | switch off |
+| `… /twinny/v1/admin/plugins/<id>/api/<route>` | the plugin's own routes, answered by the plugin |
+
+### GitHub and GitLab
+
+Both plugins do the same thing for their host: watch repositories and
+show their open pull requests (merge requests on GitLab) with the state
+of checks, mergeability and review, and open one with its description and
+diffs. They sync every five minutes and on **sync now**; nothing is
+written back to the host.
+
+**Watching a repository.** Give it as `owner/name` (GitLab: the full
+`group/project` path) and an access token that can read it:
+
+- GitHub: a fine-grained token with read access to *Pull requests*,
+  *Contents*, *Checks* and *Commit statuses*, or a classic token with the
+  `repo` scope.
+- GitLab: a project, group or personal access token with the `read_api`
+  scope.
+
+The token is checked against the host before the repository is kept, so a
+wrong one is refused with the host's reason. Tokens live in the plugin's
+`repos.json`, readable by the server's user only, and are never shown
+again: the page says only that a repository reads with a token.
+
+**A GitHub App instead of tokens.** For a team, create a GitHub App once
+(the organisation's *Developer settings → GitHub Apps*) with read
+permission on *Pull requests*, *Contents*, *Checks* and *Commit statuses*,
+install it on the repositories, generate a private key and paste the App
+ID and the key on the plugin's page. The server checks the key by
+signing a request to GitHub before keeping it. From then on any
+repository the App is installed on can be watched with no token of its
+own, and **pick from the App** lists them. The server mints installation
+tokens itself (an hour each, renewed as needed); the private key never
+leaves the server. Removing the App stops the repositories that read
+through it until it is set up again.
+
+**Self-hosted.** Set the host URL on the page for GitHub Enterprise
+Server or a self-managed GitLab; the public hosts are the default.
+
+**Reviews by your own models.** A pull's page has **review now**: the
+gateway sends the description and diffs to one of its chat aliases (the
+*review model* on the plugin page; the first chat alias unless chosen)
+and keeps what came back on the server, per pull and commit, in the
+plugin's `reviews.json`. The review shows on the pull's page with the
+model, the time and who asked; a pull that has moved on marks it as
+being for an earlier commit. Nothing is posted to the host.
+
+Ticking **auto-review** on a repository reviews its new and updated
+pulls in the background: one at a time, newest first, never drafts, and
+only while no developer request is in flight, so completions and chats
+are never slowed down. A review that has to wait is retried every
+minute. Reviews run through the normal routing and are recorded in
+usage under `plugin:github` or `plugin:gitlab`, so the Usage page shows
+what they cost. The prompt carries at most 24k characters of description
+and diff (larger patches are named but left out) and asks for at most
+1,500 tokens back, to suit local models with small contexts.
+
+**Plugin routes** under `/twinny/v1/admin/plugins/<github|gitlab>/api/`:
+
+| Route | Does |
+| --- | --- |
+| `GET /` | repositories with their open pulls and sync state |
+| `POST /repos` `{ fullName, token? }` | watch a repository; the token may be left out when the GitHub App is set up |
+| `DELETE /repos/<id>` | stop watching |
+| `POST /repos/<id>/sync`, `POST /sync` | sync one, or all |
+| `GET /repos/<id>/pulls/<number>` | one pull with its description, files and latest review |
+| `POST /repos/<id>/pulls/<number>/review` | review it now with the review model; answers when the review is done |
+| `PUT /repos/<id>` `{ autoReview }` | review new and updated pulls in the background |
+| `PUT /settings` `{ baseUrl?, reviewAlias? }` | the host URL; the chat alias reviews use |
+| `PUT /app` `{ appId, privateKey }`, `DELETE /app`, `GET /app/repositories` | the GitHub App (GitHub only) |

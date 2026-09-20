@@ -8,6 +8,7 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "rea
 import { createRoot } from "react-dom/client"
 
 import { inviteLink, RemoteIdentity, RemoteStatus } from "../../protocol/types"
+import type { PluginSummary } from "../plugins/host"
 import type { UsageSummary } from "../usage"
 
 import { api, ApiError } from "./api"
@@ -16,11 +17,12 @@ import { fmt } from "./format"
 import { OTHER, OverviewPage, Series } from "./overview"
 import { CreatedKey, KeysResponse, PeoplePage } from "./people"
 import { PlanPage } from "./plan"
+import { PluginPage, PluginsPage } from "./plugins"
 import { RecordingsPanel } from "./recordings"
 import { UsagePage } from "./usage"
 
 type Period = "24h" | "7d" | "30d"
-type AdminView = "overview" | "usage" | "people" | "policy" | "recordings" | "models" | "plan"
+type AdminView = "overview" | "usage" | "people" | "policy" | "recordings" | "models" | "plan" | "plugins" | `plugin:${string}`
 const PERIODS: Period[] = ["24h", "7d", "30d"]
 const STORAGE_KEY = "twinny-server.admin-key"
 const VIEW_KEY = "twinny-server.admin-view"
@@ -36,7 +38,7 @@ const MAX_SERIES = SERIES.length
 const PERIOD_VIEWS = new Set<AdminView>(["overview", "usage", "people", "models"])
 
 const isView = (value: unknown): value is AdminView =>
-  value === "overview" || value === "usage" || value === "people" || value === "policy" || value === "recordings" || value === "models" || value === "plan"
+  value === "overview" || value === "usage" || value === "people" || value === "policy" || value === "recordings" || value === "models" || value === "plan" || value === "plugins" || (typeof value === "string" && /^plugin:[a-z][a-z0-9-]{1,31}$/.test(value))
 
 /* -------------------------------------------------------------------------- */
 /*  Sign-in                                                                   */
@@ -134,6 +136,7 @@ interface Data {
   status: RemoteStatus
   usage: UsageSummary
   keys: KeysResponse
+  plugins: PluginSummary[]
 }
 
 const App = () => {
@@ -227,12 +230,14 @@ const App = () => {
     if (!key || !who) return
     setLoading(true)
     try {
-      const [status, usage, keys] = await Promise.all([
+      const [status, usage, keys, plugins] = await Promise.all([
         api<RemoteStatus>("/twinny/v1/status", key),
         api<UsageSummary>(`/twinny/v1/admin/usage?since=${period}`, key),
-        api<KeysResponse>("/twinny/v1/admin/keys", key)
+        api<KeysResponse>("/twinny/v1/admin/keys", key),
+        // An older gateway has no plugins; the store is then empty.
+        api<{ plugins: PluginSummary[] }>("/twinny/v1/admin/plugins", key).then((answer) => answer.plugins, () => [] as PluginSummary[])
       ])
-      setData({ status, usage, keys })
+      setData({ status, usage, keys, plugins })
       setRefreshedAt(Date.now())
       setError(undefined)
     } catch (e) {
@@ -288,6 +293,15 @@ const App = () => {
     [key, load]
   )
 
+  const togglePlugin = useCallback(
+    async (id: string, enabled: boolean) => {
+      if (!key) throw new Error("Not signed in.")
+      await api(`/twinny/v1/admin/plugins/${id}/${enabled ? "enable" : "disable"}`, key, { method: "POST" })
+      await load()
+    },
+    [key, load]
+  )
+
   const removeLicense = useCallback(async () => {
     if (!key) throw new Error("Not signed in.")
     await api("/twinny/v1/admin/license", key, { method: "DELETE" })
@@ -313,10 +327,12 @@ const App = () => {
   const features = plan?.features ?? []
 
   const navButton = (target: AdminView, label: React.ReactNode) => (
-    <button className={view === target ? "on" : ""} onClick={() => setView(target)} aria-current={view === target ? "page" : undefined}>
+    <button key={target} className={view === target ? "on" : ""} onClick={() => setView(target)} aria-current={view === target ? "page" : undefined}>
       {label}
     </button>
   )
+  const enabledPlugins = data?.plugins.filter((plugin) => plugin.enabled) ?? []
+  const openPlugin = view.startsWith("plugin:") ? view.slice("plugin:".length) : undefined
 
   return (
     <div className="app">
@@ -366,6 +382,9 @@ const App = () => {
           <div className="group">Gateway</div>
           {navButton("models", "Providers & models")}
           {navButton("plan", <>Plan &amp; licence{planAttention && <span className="badge bad">!</span>}</>)}
+          <div className="group">Plugins</div>
+          {navButton("plugins", <>Store{enabledPlugins.length > 0 && <span className="badge">{fmt(enabledPlugins.length)}</span>}</>)}
+          {enabledPlugins.map((plugin) => navButton(`plugin:${plugin.id}`, plugin.name))}
         </nav>
         <div className="main">
           {error && <div className="error-bar">{error}</div>}
@@ -413,6 +432,25 @@ const App = () => {
               </div>
 
               <div hidden={view !== "plan"}>{plan && <PlanPage plan={plan} onInstall={installLicense} onRemove={removeLicense} onNavigate={setView} />}</div>
+
+              <div hidden={view !== "plugins"}>
+                <PluginsPage plugins={data.plugins} onToggle={togglePlugin} onOpen={(id) => setView(`plugin:${id}`)} />
+              </div>
+
+              {openPlugin && (
+                <div>
+                  {enabledPlugins.some((plugin) => plugin.id === openPlugin) ? (
+                    <PluginPage key={openPlugin} id={openPlugin} apiKey={key} />
+                  ) : (
+                    <div className="empty">
+                      This plugin is switched off.{" "}
+                      <button type="button" className="link" onClick={() => setView("plugins")}>
+                        plugins
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

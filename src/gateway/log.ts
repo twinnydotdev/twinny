@@ -26,6 +26,7 @@ const ALLOWED_FIELDS = [
   "models",
   "code",
   "reason",
+  "message",
   "signal",
   "grace",
   "provider",

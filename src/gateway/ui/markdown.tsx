@@ -279,6 +279,111 @@ export const Listing = ({ code, language, insert, startingLineNumber = 1 }: List
   )
 }
 
+/* -------------------------------------------------------------------------- */
+/*  A unified diff, highlighted in the file's language                        */
+/* -------------------------------------------------------------------------- */
+
+type DiffKind = "add" | "del" | "ctx" | "hunk" | "meta"
+
+interface DiffLine {
+  kind: DiffKind
+  /** The line without its +/-/space prefix; hunk headers keep their text. */
+  text: string
+  oldNo?: number
+  newNo?: number
+}
+
+/** Splits a unified-diff patch into lines with old/new numbers from the hunk headers. */
+export const parsePatch = (patch: string): DiffLine[] => {
+  const out: DiffLine[] = []
+  let oldNo = 0
+  let newNo = 0
+  for (const raw of patch.replace(/\n$/, "").split("\n")) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw)
+    if (hunk) {
+      oldNo = Number(hunk[1])
+      newNo = Number(hunk[2])
+      out.push({ kind: "hunk", text: raw })
+    } else if (raw.startsWith("+")) out.push({ kind: "add", text: raw.slice(1), newNo: newNo++ })
+    else if (raw.startsWith("-")) out.push({ kind: "del", text: raw.slice(1), oldNo: oldNo++ })
+    else if (raw.startsWith("\\")) out.push({ kind: "meta", text: raw })
+    else out.push({ kind: "ctx", text: raw.startsWith(" ") ? raw.slice(1) : raw, oldNo: oldNo++, newNo: newNo++ })
+  }
+  return out
+}
+
+interface DiffBlockProps {
+  patch: string
+  /** The file's language, so tokens are lit as in an editor; the +/- only tint the line. */
+  language?: string
+  title?: ReactNode
+  extra?: ReactNode
+}
+
+/**
+ * A patch as a review tool shows it: code highlighted in its own language,
+ * added lines tinted green and removed ones red, old and new line numbers
+ * in the gutter. Hunk headers are shown as they are.
+ */
+export const DiffBlock = ({ patch, language, title, extra }: DiffBlockProps) => {
+  const lang = normalizeLanguage(language)
+  const lines = useMemo(() => parsePatch(patch), [patch])
+  // The highlighter sees the code without diff markers, one row per line.
+  const code = useMemo(() => lines.map((line) => (line.kind === "hunk" || line.kind === "meta" ? "" : line.text)).join("\n"), [lines])
+  const renderer = useCallback(
+    ({ rows, stylesheet, useInlineStyles }: { rows: TokenNode[]; stylesheet: Record<string, React.CSSProperties>; useInlineStyles: boolean }) =>
+      rows.map((row, i) => {
+        const line = lines[i]
+        if (!line) return null
+        const sign = line.kind === "add" ? "+" : line.kind === "del" ? "−" : " "
+        if (line.kind === "hunk" || line.kind === "meta")
+          return (
+            <span key={i} className={`row ${line.kind}-line`}>
+              <span className="ln" aria-hidden="true" />
+              <span className="ln" aria-hidden="true" />
+              <span className="sign" aria-hidden="true" />
+              {line.text}
+              {"\n"}
+            </span>
+          )
+        const children = (row.children ?? []).map((child, k) => createElement({ node: child, stylesheet, useInlineStyles, key: `${i}-${k}` }))
+        return (
+          <span key={i} className={`row ${line.kind}-line`}>
+            <span className="ln" aria-hidden="true">
+              {line.oldNo ?? ""}
+            </span>
+            <span className="ln" aria-hidden="true">
+              {line.newNo ?? ""}
+            </span>
+            <span className="sign" aria-hidden="true">
+              {sign}
+            </span>
+            {children}
+          </span>
+        )
+      }),
+    [lines]
+  )
+  return (
+    <div className="code diff-block">
+      <div className="code-bar">
+        <span className="code-lang">{title ?? lang}</span>
+        <span className="code-actions">
+          {extra}
+          {patch && <CopyButton text={patch} />}
+        </span>
+      </div>
+      {patch ? (
+        <SyntaxHighlighter language={lang} style={THEME} PreTag="pre" wrapLines renderer={renderer}>
+          {code}
+        </SyntaxHighlighter>
+      ) : (
+        <div className="code-empty">no diff</div>
+      )}
+    </div>
+  )
+}
+
 const components: Components = {
   code({ className, children }) {
     const match = /language-([\w#+.-]+)/.exec(className ?? "")

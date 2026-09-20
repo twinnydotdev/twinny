@@ -6,9 +6,12 @@
  * or SIGTERM drains and stops within the configured grace. Nothing secret
  * and nothing a request carried is ever printed.
  */
+import path from "node:path"
+
 import { providerRegistry } from "../extension/inference/registry"
 import { REMOTE_PROTOCOL_BASE } from "../protocol/types"
 
+import { gatewayInference } from "./plugins/inference"
 import { Recorder } from "./recording/recorder"
 import { openRecordingStore } from "./recording/store"
 import {
@@ -30,6 +33,7 @@ import { KeyStore } from "./keys"
 import { describePlan, LicenseStore } from "./license"
 import { createGatewayLog, GatewayLog, LogFormat } from "./log"
 import { PeerRegistry } from "./peers"
+import { BUNDLED_PLUGINS, PluginHost, pluginsFileFor, PluginStore } from "./plugins"
 import { buildRouteTable } from "./routes"
 import {
   ADMIN_PATH,
@@ -265,6 +269,7 @@ export const runServe = async (
   let recorder: Recorder | undefined
   let sharedToken = false
   let peers: PeerRegistry
+  let plugins: PluginHost
   try {
     // The pool is an adapter like any other, registered before the
     // configuration names it. Its registry fills in as teammates connect.
@@ -320,6 +325,23 @@ export const runServe = async (
       recorder = undefined
     }
     const invites = InviteStore.open(invitesFileFor(config.auth.keysFile))
+    plugins = new PluginHost({
+      plugins: BUNDLED_PLUGINS,
+      store: PluginStore.open(pluginsFileFor(config.auth.keysFile)),
+      dataDir: path.dirname(config.auth.keysFile),
+      log,
+      // Plugins use the gateway's own models, routed as a developer's request
+      // is and recorded under the plugin's name; `server` exists before any
+      // plugin starts.
+      inference: (id) =>
+        gatewayInference({
+          routes: () => server.routes,
+          active: () => server.active,
+          usage,
+          principal: `plugin:${id}`,
+          maxOutputTokens: () => configuration.current.limits.maxOutputTokens
+        })
+    })
     server = new GatewayServer({
       config,
       token: secrets.token,
@@ -332,7 +354,8 @@ export const runServe = async (
       recorder,
       peers,
       invites,
-      demo
+      demo,
+      plugins
     })
   } catch (error) {
     if (error instanceof GatewayConfigError) {
@@ -349,6 +372,7 @@ export const runServe = async (
   let address
   try {
     address = await server.start()
+    plugins.start()
   } catch (error) {
     io.err(
       `Cannot start the gateway: ${error instanceof Error ? error.message : String(error)}`
@@ -490,6 +514,7 @@ export const runServe = async (
       hard.unref()
       void server
         .stop()
+        .then(() => plugins.stop())
         .then(() => usage.stop())
         .then(() => recorder?.stop())
         .then(() => {
