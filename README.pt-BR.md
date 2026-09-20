@@ -1,5 +1,7 @@
 # Twinny
 
+[English](README.md) | Português (BR)
+
 O Twinny é uma extensão gratuita de IA para o Visual Studio Code, com recursos avançados para auxiliar na programação.
 
 ## Provedores compatíveis
@@ -48,7 +50,7 @@ O Twinny usa embeddings do workspace para oferecer assistência contextualizada,
 
 ## Problemas conhecidos
 
-Para consultar soluções de problemas e problemas conhecidos, veja nossa [página de issues](https://github.com/rjmacarthy/twinny/issues) no GitHub.
+Para relatar problemas ou consultar soluções conhecidas, veja nossa [página de issues](https://github.com/twinnydotdev/twinny/issues) no GitHub.
 
 ## Contribuição
 
@@ -59,7 +61,7 @@ Aceitamos contribuições! Entre em contato conosco pelo [Twitter](https://x.com
 O Twinny é gratuito e de código aberto. Se quiser apoiar o projeto, agradecemos as doações:
 Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
 
-Para acompanhar as novidades, siga-nos no Twitter: https://x.com/twinnydotdev
+Para acompanhar as novidades, siga-nos no [Twitter](https://x.com/twinnydotdev).
 
 ## Aviso
 
