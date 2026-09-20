@@ -188,6 +188,7 @@ pass it whenever your configuration sets `auth.keysFile` or `usage.dir`.
 | Usage | `~/.twinny/server/usage/YYYY-MM-DD.jsonl` | one line per inference request: key, alias, outcome, duration, token counts | no content, but it is per-person activity |
 | Licence | `~/.twinny/server/license` | the signed licence token, when the team has one | no, but it names your organisation |
 | Recordings | `~/.twinny/server/recordings/` | the content of requests, only for routes switched on under `recording` with a licence that allows it | yes: prompts, code and replies |
+| Audit log | `~/.twinny/server/audit/YYYY-MM.jsonl` | who changed what, hash-chained | no, but it names people |
 | Plugins | `~/.twinny/server/plugins.json` | which bundled plugins are switched on | no |
 | Plugin data | `~/.twinny/server/plugins/<id>/` | each plugin's own files; the GitHub and GitLab plugins keep `repos.json` and `reviews.json` there | yes: repository tokens and the GitHub App key (mode 600); reviews quote the code |
 | Shared token | the environment variable named by `auth.tokenEnv` | the token itself | yes |
@@ -1145,6 +1146,51 @@ Out of scope for this gateway: P2P discovery, GPU sharing, scheduling and
 failover; accounts, organisations, SSO and RBAC; usage quotas,
 billing and chat storage; model installation; container or service
 packaging.
+
+## Audit log
+
+Every change made through the admin API or CLI-equivalent routes is
+written to `audit/YYYY-MM.jsonl` under the data directory: keys made and
+revoked, invites made, opened and withdrawn, sign-ins approved,
+configuration saves, licence changes, plugins switched on or off, and
+every write to a plugin's routes (method and path, never the body).
+Each line carries the SHA-256 of the line before it, so an edited or
+removed line breaks the chain, and **Team → Audit log** on the admin
+page says whether the chain is intact and where it breaks. Filter by
+period, actor and kind; **export** downloads the whole log as JSON
+lines. Nothing secret is written: names, actions, targets, a few short
+details and the caller's address.
+
+Routes: `GET /twinny/v1/admin/audit?since=30d&actor=&action=key.&limit=`
+returns entries newest first with the verification; `GET
+/twinny/v1/admin/audit/export` returns every line.
+
+### Read-only admins
+
+`twinny-server keys create auditor --admin --read-only` (or the
+*read-only* box next to *admin* on People) makes a key that opens the
+admin page and every admin route with `GET`, and is refused with 403 on
+anything that changes state, plugins included. For the person who needs
+to see usage, people and the audit log without being able to act.
+
+## Metrics
+
+`GET /metrics` with an admin key (read-only will do) answers in the
+Prometheus text format: requests by route, alias and outcome; a latency
+histogram; tokens and chunks; requests in flight; each backend's last
+check (`twinny_backend_up`); refused authentications; quota refusals;
+active keys and seats; plugin events. Point a scrape job at it with a
+bearer token:
+
+```yaml
+scrape_configs:
+  - job_name: twinny
+    metrics_path: /metrics
+    authorization:
+      credentials: tsk_…      # a read-only admin key
+    static_configs:
+      - targets: ["gateway.example.com:8765"]
+```
 
 ## Plugins
 

@@ -38,6 +38,7 @@ import { exportLines } from "./recording/export"
 import { Recorder } from "./recording/recorder"
 import type { RecordingQuery, RecordingRoute } from "./recording/store"
 import { adminPageHtml } from "./admin-page"
+import type { AuditLog } from "./audit"
 import {
   GatewayConfig,
   hasTeamPool,
@@ -62,12 +63,15 @@ import { InviteError, InviteStore } from "./invites"
 import { KeyRecord, KeyStore } from "./keys"
 import { LicenseStore } from "./license"
 import { GatewayLog } from "./log"
+import type { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
 import { RouteTable } from "./routes"
 import { isUserCode, normalizeUserCode, SignInRequests } from "./signin"
 import { parseSince, summarizeUsage, UsageRecorder } from "./usage"
 
 export const HEALTH_PATH = "/healthz"
+/** Prometheus metrics, for admin keys. */
+export const METRICS_PATH = "/metrics"
 /** The admin page; the app on it signs in with an admin key. */
 export const ADMIN_PATH = "/admin"
 const ADMIN_API_PREFIX = "/twinny/v1/admin/"
@@ -95,6 +99,12 @@ export interface GatewayServerOptions {
   demo?: DemoOptions
   /** Bundled plugins; without a host the plugin routes answer 404. */
   plugins?: PluginHost
+  /** Who changed what, hash-chained; without it nothing is audited. */
+  audit?: AuditLog
+  /** Prometheus counters; without them /metrics answers 404. */
+  metrics?: GatewayMetrics
+  /** The gateway's version, for /metrics. */
+  version?: string
 }
 
 /** Who a request came from: a key's name, or `shared` for the shared token. */
@@ -130,6 +140,8 @@ type AuthResult =
       admin: boolean
       /** The demo page's visitor: reads the admin API, changes nothing, runs nothing. */
       visitor?: boolean
+      /** An admin key that may read the admin API but not change anything. */
+      readOnly?: boolean
     }
   | { refused: string }
 
@@ -426,7 +438,8 @@ export class GatewayServer {
       return {
         principal: record.name,
         shared: false,
-        admin: record.admin === true
+        admin: record.admin === true,
+        ...(record.admin && record.readOnly ? { readOnly: true } : {})
       }
     }
     if (token && tokenMatches(presented, token)) {
@@ -437,6 +450,59 @@ export class GatewayServer {
         ? "The shared token does not match the gateway's."
         : "This gateway no longer accepts a shared token; use a personal gateway key."
     }
+  }
+
+  /** Writes one audit line, when the gateway keeps an audit log. */
+  private audit(
+    req: http.IncomingMessage,
+    actor: string,
+    action: string,
+    target?: string,
+    details?: Record<string, string | number | boolean>
+  ): void {
+    try {
+      this._options.audit?.record({ action, actor, target, details, from: clientAddress(req) })
+    } catch (error) {
+      this._options.log.error({
+        event: "audit.failed",
+        message: error instanceof Error ? error.message : String(error)
+      })
+    }
+  }
+
+  /** The audit log routes: a filtered listing with the chain's verdict, and a full export. */
+  private handleAudit(route: string, url: URL, req: http.IncomingMessage, res: http.ServerResponse) {
+    const audit = this._options.audit
+    if (!audit) {
+      sendJson(res, 404, { error: { message: "This gateway keeps no audit log." } })
+      return
+    }
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: { message: "The audit log is read with GET." } }, { Allow: "GET" })
+      return
+    }
+    if (route === "audit/export") {
+      const text = audit.export()
+      res.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Content-Length": Buffer.byteLength(text),
+        "Content-Disposition": "attachment; filename=\"twinny-audit.jsonl\"",
+        "Cache-Control": "no-store"
+      })
+      res.end(text)
+      return
+    }
+    const since = url.searchParams.get("since")
+    const limit = Number(url.searchParams.get("limit") ?? 200)
+    sendJson(res, 200, {
+      entries: audit.query({
+        ...(since ? { since: parseSince(since, new Date()) } : {}),
+        ...(url.searchParams.get("actor") ? { actor: url.searchParams.get("actor") as string } : {}),
+        ...(url.searchParams.get("action") ? { action: url.searchParams.get("action") as string } : {}),
+        limit: Number.isFinite(limit) ? Math.min(Math.max(1, limit), 1000) : 200
+      }),
+      verification: audit.verify()
+    })
   }
 
   /**
@@ -562,6 +628,7 @@ export class GatewayServer {
           key: auth.principal,
           models: saved.models.length
         })
+        this.audit(req, auth.principal, "config.saved", undefined, { models: saved.models.length })
         sendJson(res, 200, saved)
       } catch (error) {
         sendJson(res, error instanceof ConfigurationConflict ? 409 : 400, {
@@ -596,6 +663,10 @@ export class GatewayServer {
       await this.handlePlugins(route, url, req, res, auth)
       return
     }
+    if (route === "audit" || route === "audit/export") {
+      this.handleAudit(route, url, req, res)
+      return
+    }
     const revoke = /^keys\/([0-9a-f]{8})\/revoke$/.exec(route)
     const wantsPost = route === "keys" && req.method === "POST"
     if (!wantsPost && !revoke && req.method !== "GET") {
@@ -621,6 +692,7 @@ export class GatewayServer {
         const body = await readJsonBody(req)
         const name = typeof body.name === "string" ? body.name.trim() : ""
         const admin = body.admin === true
+        const readOnly = admin && body.readOnly === true
         const refusal = this.refuseNewKey()
         if (refusal) {
           sendJson(
@@ -635,19 +707,21 @@ export class GatewayServer {
           })
           return
         }
-        const { key, record } = this._options.keys.create(name, { admin })
+        const { key, record } = this._options.keys.create(name, { admin, readOnly })
         this._options.log.info({
           event: "admin.key-created",
           key: auth.principal,
           reason: record.name
         })
+        this.audit(req, auth.principal, "key.created", record.name, { admin, ...(readOnly ? { readOnly } : {}) })
         sendJson(res, 201, {
           key,
           record: {
             id: record.id,
             name: record.name,
             createdAt: record.createdAt,
-            ...(record.admin ? { admin: true } : {})
+            ...(record.admin ? { admin: true } : {}),
+            ...(record.readOnly ? { readOnly: true } : {})
           }
         })
         return
@@ -690,6 +764,7 @@ export class GatewayServer {
           key: auth.principal,
           reason: record?.name
         })
+        this.audit(req, auth.principal, "key.revoked", record?.name ?? id)
         sendJson(res, 200, {
           id,
           name: record?.name,
@@ -722,12 +797,13 @@ export class GatewayServer {
           this._options.keys.reload()
           const keys = this._options.keys
             .list()
-            .map(({ id, name, createdAt, revokedAt, admin }) => ({
+            .map(({ id, name, createdAt, revokedAt, admin, readOnly }) => ({
               id,
               name,
               createdAt,
               ...(revokedAt ? { revokedAt } : {}),
-              ...(admin ? { admin: true } : {})
+              ...(admin ? { admin: true } : {}),
+              ...(readOnly ? { readOnly: true } : {})
             }))
           sendJson(res, 200, {
             keys,
@@ -1248,6 +1324,7 @@ export class GatewayServer {
         const { key, record } = this._options.keys.create(name, { admin })
         return { key, name: record.name }
       })
+      this.audit(req, auth.principal, "signin.approved", name, { ...(admin ? { admin: true } : {}), ...(existing ? { replaced: true } : {}) })
       this._options.log.info({
         event: "signin.approved",
         key: auth.principal,
@@ -1346,6 +1423,7 @@ export class GatewayServer {
           reason: made.record.name,
           ...(admin ? { admin: true } : {})
         })
+        this.audit(req, auth.principal, "invite.created", made.record.name, { ...(admin ? { admin: true } : {}), ...(replace ? { replace: true } : {}) })
         sendJson(res, 201, { code: made.code, invite: made.record })
         return
       }
@@ -1374,6 +1452,7 @@ export class GatewayServer {
         key: auth.principal,
         reason: match[1]
       })
+      this.audit(req, auth.principal, "invite.withdrawn", match[1])
       sendJson(res, 200, { id: match[1], status: "withdrawn" })
     } catch (error) {
       const status = error instanceof InviteError ? error.status : 400
@@ -1446,6 +1525,7 @@ export class GatewayServer {
           key: auth.principal,
           reason: id
         })
+        this.audit(req, auth.principal, `plugin.${action}d`, id)
         sendJson(res, 200, { plugin: summary })
         return
       }
@@ -1461,6 +1541,8 @@ export class GatewayServer {
         principal: auth.principal
       })
       req.resume()
+      if (req.method !== "GET" && answer.status < 400)
+        this.audit(req, auth.principal, "plugin.write", id, { method: req.method ?? "", path: (rest ?? "").replace(/\/+$/, "") })
       sendJson(res, answer.status, answer.body, answer.headers)
     } catch (error) {
       const status = error instanceof PluginError ? error.status : 400
@@ -1533,6 +1615,7 @@ export class GatewayServer {
         key: result.name,
         ...(result.admin ? { admin: true } : {})
       })
+      this.audit(req, result.name, "invite.opened", result.name, { ...(result.admin ? { admin: true } : {}) })
       sendJson(res, 201, result)
     } catch (error) {
       const status = error instanceof InviteError ? error.status : 400
@@ -1639,6 +1722,7 @@ export class GatewayServer {
             reason: installed.licenseId ?? "",
             status: installed.status
           })
+          this.audit(req, auth.principal, "license.installed")
           sendJson(res, 200, plan())
           return
         }
@@ -1649,6 +1733,7 @@ export class GatewayServer {
             event: "admin.license-removed",
             key: auth.principal
           })
+          this.audit(req, auth.principal, "license.removed")
           sendJson(res, 200, plan())
           return
         default:
@@ -1707,6 +1792,33 @@ export class GatewayServer {
       return
     }
 
+    if (url.pathname === METRICS_PATH) {
+      const metrics = this._options.metrics
+      if (!metrics) {
+        sendJson(res, 404, { error: { message: "Metrics are off on this gateway." } })
+        return
+      }
+      const auth = this.authenticate(req.headers.authorization)
+      if ("refused" in auth || !auth.admin) {
+        sendError(res, new InferenceError("authentication", "refused" in auth ? auth.refused : "Metrics need an admin key."), {
+          "WWW-Authenticate": "Bearer"
+        })
+        return
+      }
+      this._options.keys.refresh()
+      const active = this.seatHolders().length
+      const seats = this._options.license?.summary(this.seatHolders()).seats ?? active
+      metrics.plan(active, seats)
+      const text = metrics.render(this._options.version ?? "dev")
+      res.writeHead(200, {
+        "Content-Type": "text/plain; version=0.0.4; charset=utf-8",
+        "Content-Length": Buffer.byteLength(text),
+        "Cache-Control": "no-store"
+      })
+      res.end(text)
+      return
+    }
+
     if (
       url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_SIGNIN_PATH}` ||
       url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_SIGNIN_POLL_PATH}`
@@ -1740,9 +1852,17 @@ export class GatewayServer {
         event: "auth.rejected",
         route: match?.route ?? "admin"
       })
+      this._options.metrics?.authRejected()
       return
     }
     const { principal } = auth
+
+    // A read-only admin sees everything on the page and changes nothing.
+    if (auth.readOnly && adminApi && req.method !== "GET") {
+      req.resume()
+      sendJson(res, 403, toErrorBody(new InferenceError("authentication", "This admin key is read-only: it can look at everything and change nothing.")))
+      return
+    }
 
     // The demo's visitor looks and touches nothing: reads of the admin API
     // (never recorded content) and the routes that describe the gateway.
@@ -1807,6 +1927,7 @@ export class GatewayServer {
         },
         status: async () => {
           const status = await routes.checkBackends()
+          for (const backend of status.backends) this._options.metrics?.backend(backend.provider, backend.ok, backend.ms / 1000)
           const peers = this._options.peers
           if (!peers) return status
           const config = this.config
@@ -1886,6 +2007,7 @@ export class GatewayServer {
     const entry: Inflight = { controller, principal }
     this._inflight.add(entry)
     this._active++
+    this._options.metrics?.active(this._active)
     if (metered) {
       this._generating++
       this._meter.start(principal)
@@ -1947,6 +2069,17 @@ export class GatewayServer {
         ...(outcome.backend ? { peer: outcome.backend } : {}),
         usage: outcome.usage
       })
+      this._options.metrics?.request({
+        key: principal,
+        route: match.route as "fim" | "chat" | "embeddings",
+        alias: outcome.alias,
+        outcome: outcome.outcome,
+        status: outcome.status,
+        ms,
+        ...(outcome.chunks !== undefined ? { chunks: outcome.chunks } : {}),
+        ...(outcome.usage?.promptTokens !== undefined ? { promptTokens: outcome.usage.promptTokens } : {}),
+        ...(outcome.usage?.completionTokens !== undefined ? { completionTokens: outcome.usage.completionTokens } : {})
+      })
     } catch {
       // The handler reports every failure as an outcome; this is belt and braces.
       this._options.log.error({
@@ -1964,6 +2097,7 @@ export class GatewayServer {
       clearTimeout(timer)
       this._inflight.delete(entry)
       this._active--
+      this._options.metrics?.active(this._active)
       if (metered) {
         this._generating--
         this._meter.end(principal)

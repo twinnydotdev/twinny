@@ -30,6 +30,8 @@ export interface KeyRecord {
   revokedAt?: string
   /** May read the admin routes: usage for everyone, the key list, status. */
   admin?: boolean
+  /** An admin that may look but not change anything: the audit log, usage, people, without the buttons. */
+  readOnly?: boolean
 }
 
 interface KeysFile {
@@ -70,7 +72,8 @@ const parseKeysFile = (text: string, file: string): KeysFile => {
       hash: entry.hash,
       createdAt: entry.createdAt,
       ...(typeof entry.revokedAt === "string" ? { revokedAt: entry.revokedAt } : {}),
-      ...(entry.admin === true ? { admin: true } : {})
+      ...(entry.admin === true ? { admin: true } : {}),
+      ...(entry.readOnly === true ? { readOnly: true } : {})
     })
   }
   return { version: 1, keys }
@@ -106,7 +109,7 @@ export class KeyStore {
    * Makes a key. The returned `key` is the only copy of the secret. Names
    * are unique among active keys, so a revoked name can be reused.
    */
-  public create(name: string, options: { admin?: boolean } = {}): { key: string; record: KeyRecord } {
+  public create(name: string, options: { admin?: boolean; readOnly?: boolean } = {}): { key: string; record: KeyRecord } {
     if (!KEY_NAME_PATTERN.test(name)) {
       throw new Error(
         `"${name}" is not a valid key name: letters, digits, . _ @ - and up to 64 characters.`
@@ -123,7 +126,8 @@ export class KeyStore {
       name,
       hash: hashSecret(secret),
       createdAt: new Date().toISOString(),
-      ...(options.admin ? { admin: true } : {})
+      ...(options.admin ? { admin: true } : {}),
+      ...(options.admin && options.readOnly ? { readOnly: true } : {})
     }
     this._keys.push(record)
     this.save()

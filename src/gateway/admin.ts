@@ -36,6 +36,7 @@ export const KEYS_HELP = `Usage: twinny-server keys <command> [--config <file>]
 
   create <name>      Make a key for a developer. The key is printed once and never stored.
     --admin          The key may also open the admin page (usage for everyone, keys, status).
+    --read-only      With --admin: may look at everything on the admin page but change nothing.
   list               Show every key: id, name, created, status.
   revoke <name|id>   Stop a key. Requests with it are refused from then on, without a restart.
 
@@ -182,12 +183,13 @@ export const runKeys = (argv: string[], io: AdminIo): number => {
     switch (command) {
       case "create": {
         const admin = args.includes("--admin")
-        const names = args.filter((arg) => arg !== "--admin")
+        const readOnly = args.includes("--read-only")
+        const names = args.filter((arg) => arg !== "--admin" && arg !== "--read-only")
         const name = names[0]
         if (!name || names.length > 1) throw new Error("keys create takes exactly one name.")
         const refusal = LicenseStore.open(paths.licenseFile).refuseNewKey(store.active())
         if (refusal) throw new Error(refusal)
-        const { key, record } = store.create(name, { admin })
+        const { key, record } = store.create(name, { admin, readOnly })
         io.out(`Created ${admin ? "admin " : ""}key "${record.name}" (id ${record.id}) in ${store.file}.`)
         io.out("")
         io.out(`  ${key}`)

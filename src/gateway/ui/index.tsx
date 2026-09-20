@@ -12,6 +12,7 @@ import type { PluginSummary } from "../plugins/host"
 import type { UsageSummary } from "../usage"
 
 import { api, ApiError } from "./api"
+import { AuditPage } from "./audit"
 import { ConfigurationPanel } from "./configuration"
 import { fmt } from "./format"
 import { OTHER, OverviewPage, Series } from "./overview"
@@ -22,7 +23,7 @@ import { RecordingsPanel } from "./recordings"
 import { UsagePage } from "./usage"
 
 type Period = "24h" | "7d" | "30d"
-type AdminView = "overview" | "usage" | "people" | "policy" | "recordings" | "models" | "plan" | "plugins" | `plugin:${string}`
+type AdminView = "overview" | "usage" | "people" | "policy" | "recordings" | "audit" | "models" | "plan" | "plugins" | `plugin:${string}`
 const PERIODS: Period[] = ["24h", "7d", "30d"]
 const STORAGE_KEY = "twinny-server.admin-key"
 const VIEW_KEY = "twinny-server.admin-view"
@@ -38,7 +39,7 @@ const MAX_SERIES = SERIES.length
 const PERIOD_VIEWS = new Set<AdminView>(["overview", "usage", "people", "models"])
 
 const isView = (value: unknown): value is AdminView =>
-  value === "overview" || value === "usage" || value === "people" || value === "policy" || value === "recordings" || value === "models" || value === "plan" || value === "plugins" || (typeof value === "string" && /^plugin:[a-z][a-z0-9-]{1,31}$/.test(value))
+  value === "overview" || value === "usage" || value === "people" || value === "policy" || value === "recordings" || value === "audit" || value === "models" || value === "plan" || value === "plugins" || (typeof value === "string" && /^plugin:[a-z][a-z0-9-]{1,31}$/.test(value))
 
 /* -------------------------------------------------------------------------- */
 /*  Sign-in                                                                   */
@@ -267,9 +268,9 @@ const App = () => {
   }, [who, load])
 
   const createKey = useCallback(
-    async (name: string, admin: boolean) => {
+    async (name: string, admin: boolean, readOnly = false) => {
       if (!key) throw new Error("Not signed in.")
-      const created = await api<CreatedKey>("/twinny/v1/admin/keys", key, { method: "POST", body: { name, admin } })
+      const created = await api<CreatedKey>("/twinny/v1/admin/keys", key, { method: "POST", body: { name, admin, ...(readOnly ? { readOnly: true } : {}) } })
       await load()
       return created
     },
@@ -380,6 +381,7 @@ const App = () => {
           {navButton("people", <>People{pendingSignIns > 0 && <span className="badge">{fmt(pendingSignIns)}</span>}</>)}
           {navButton("policy", "Policy")}
           {navButton("recordings", "Recordings")}
+          {navButton("audit", "Audit log")}
           <div className="group">Gateway</div>
           {navButton("models", "Providers & models")}
           {navButton("plan", <>Plan &amp; licence{planAttention && <span className="badge bad">!</span>}</>)}
@@ -400,6 +402,7 @@ const App = () => {
           {!data && !error && <div className="loading">Loading…</div>}
 
           <div hidden={view !== "recordings"}>{view === "recordings" && <RecordingsPanel apiKey={key} features={features} />}</div>
+          <div hidden={view !== "audit"}>{view === "audit" && <AuditPage apiKey={key} />}</div>
 
           <div hidden={view !== "models" && view !== "policy"}>
             <ConfigurationPanel

@@ -14,6 +14,7 @@ import { REMOTE_PROTOCOL_BASE } from "../protocol/types"
 import { gatewayInference } from "./plugins/inference"
 import { Recorder } from "./recording/recorder"
 import { openRecordingStore } from "./recording/store"
+import { AuditLog } from "./audit"
 import {
   DEFAULT_LIMITS,
   DEFAULT_LISTEN,
@@ -32,6 +33,7 @@ import { invitesFileFor,InviteStore } from "./invites"
 import { KeyStore } from "./keys"
 import { describePlan, LicenseStore } from "./license"
 import { createGatewayLog, GatewayLog, LogFormat } from "./log"
+import { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
 import { BUNDLED_PLUGINS, PluginHost, pluginsFileFor, PluginStore } from "./plugins"
 import { buildRouteTable } from "./routes"
@@ -325,6 +327,8 @@ export const runServe = async (
       recorder = undefined
     }
     const invites = InviteStore.open(invitesFileFor(config.auth.keysFile))
+    const audit = AuditLog.open(path.join(path.dirname(config.auth.keysFile), "audit"))
+    const metrics = new GatewayMetrics()
     plugins = new PluginHost({
       plugins: BUNDLED_PLUGINS,
       store: PluginStore.open(pluginsFileFor(config.auth.keysFile)),
@@ -370,8 +374,12 @@ export const runServe = async (
       peers,
       invites,
       demo,
-      plugins
+      plugins,
+      audit,
+      metrics,
+      version: SERVER_VERSION
     })
+    plugins.events.on((event) => metrics.pluginEvent(event.type))
   } catch (error) {
     if (error instanceof GatewayConfigError) {
       io.err(`Cannot start the gateway (${error.code}):`)

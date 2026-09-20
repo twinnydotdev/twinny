@@ -16,6 +16,7 @@ export interface KeyRow {
   createdAt: string
   revokedAt?: string
   admin?: boolean
+  readOnly?: boolean
 }
 
 /** The plan as the gateway reports it: `LicenseSummary` in src/gateway/license.ts. */
@@ -511,7 +512,7 @@ interface KeysPanelProps extends KeysResponse {
   me: string
   usage?: UsageSummary
   period: string
-  onCreate: (name: string, admin: boolean) => Promise<CreatedKey>
+  onCreate: (name: string, admin: boolean, readOnly?: boolean) => Promise<CreatedKey>
   onRevoke: (id: string) => Promise<void>
 }
 
@@ -530,6 +531,7 @@ export const KeysPanel = ({ keys, sharedToken, plan, me, usage, period, onCreate
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState("")
   const [admin, setAdmin] = useState(false)
+  const [readOnly, setReadOnly] = useState(false)
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState<CreatedKey | null>(null)
   const [error, setError] = useState<string | undefined>()
@@ -582,9 +584,10 @@ export const KeysPanel = ({ keys, sharedToken, plan, me, usage, period, onCreate
     setError(undefined)
     setNotice(undefined)
     try {
-      setCreated(await onCreate(name.trim(), admin))
+      setCreated(await onCreate(name.trim(), admin, admin && readOnly))
       setName("")
       setAdmin(false)
+      setReadOnly(false)
       setCopied(false)
       setCreating(false)
       if (filter === "revoked") setFilter("active")
@@ -650,6 +653,12 @@ export const KeysPanel = ({ keys, sharedToken, plan, me, usage, period, onCreate
           <label>
             <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} disabled={busy} /> admin: may open this page
           </label>
+              {admin && (
+                <label title="Sees everything on the admin page, changes nothing">
+                  <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} />
+                  read-only
+                </label>
+              )}
           <button type="submit" className="primary" disabled={busy || !name.trim() || seatsFull}>
             {busy ? "…" : "create key"}
           </button>
@@ -723,7 +732,7 @@ export const KeysPanel = ({ keys, sharedToken, plan, me, usage, period, onCreate
                   <tr key={k.id} className={`static ${live ? "" : "dim"}`}>
                     <td>
                       <span className="entity-name">{k.name}</span>
-                      {k.admin && <span className="tag admin">admin</span>}
+                      {k.admin && <span className="tag admin">admin</span>}{k.readOnly && <span className="tag admin">read-only</span>}
                       {k.name === me && <span className="tag you">you</span>}
                       <div className="key-id muted mono" title="The key's id, for twinny-server keys revoke">
                         {k.id}
@@ -970,7 +979,7 @@ interface PeoplePageProps {
   pending: number
   onPending: (count: number) => void
   onChanged: () => void
-  onCreate: (name: string, admin: boolean) => Promise<CreatedKey>
+  onCreate: (name: string, admin: boolean, readOnly?: boolean) => Promise<CreatedKey>
   onRevoke: (id: string) => Promise<void>
   onNavigate: (view: "plan") => void
 }
