@@ -1,17 +1,27 @@
 # twinny-server
 
 Serve the models on one machine to the [Twinny](https://github.com/twinnydotdev/twinny)
-VS Code extension on another. One process, one config file, one shared token.
+VS Code extension on every other. One process, one config file, a key per developer.
 
 ```
-VS Code + Twinny  →  twinny-server  →  Ollama / LM Studio / llama.cpp / any OpenAI-compatible server
+VS Code + Twinny  →  twinny-server  →  Ollama / LM Studio / llama.cpp / any OpenAI-compatible server / teammates' computers
 ```
 
 Needs Node 18 or newer. No other dependencies.
 
-Free for up to 5 developers (active keys). Larger teams install a licence
-token; see [Teams and licensing](https://twinnydotdev.github.io/twinny-docs/teams/licensing/).
-The server never contacts Twinny.
+What you get:
+
+- **Keys and usage.** A key per developer, stored as a hash, revoked live; requests, failures and token counts per person and per model, never the content.
+- **An admin page** at `/admin`: backends, usage charts, people and invite links, providers and models edited live, policy, plan.
+- **Team pooling.** Developers can share their own computer's models with the team through the gateway; no port to open on their side.
+- **Plugins** (licence): pull requests and issues from GitHub, GitLab, Gitea and Bitbucket reviewed by your own models and posted back; Slack, Discord and Teams notifications; SSO sign-in (OIDC); a shared context index; nightly backups.
+- **Policy and recording** (licence): rules the extension enforces, routing rules, a team system prompt; recorded request content for review and training data.
+- **Operations.** A hash-chained audit log, read-only admin keys, Prometheus at `/metrics`, costs when a model has a price, a bounded queue for a busy GPU, Docker and Helm.
+
+Free for up to 5 developers (active keys), for good. Larger teams install a
+licence token; see [Licensing and seats](https://twinnydotdev.github.io/twinny-docs/teams/licensing/).
+The server never contacts Twinny. What changed in each version is in the
+[changelog](https://github.com/twinnydotdev/twinny/blob/main/CHANGELOG.md).
 
 ## Quick start
 
@@ -68,16 +78,20 @@ front of it. Anything but loopback is exposed to that network.
 | `twinny-server quickstart [--yes] [--fresh] [--admin <name>] [--backend [kind=]host[:port]]` | Finds the model server (or asks the named one) for its models and writes the configuration if missing, makes an admin key if there is none, serves. `--yes` skips the questions; `--fresh` wipes keys, licence, usage, recordings and the configuration first. |
 | `twinny-server init [file] [--backend [kind=]host[:port]]` | Writes a starter configuration for one server (`lmstudio=10.0.0.5`, `llamacpp=gpu-box:8080`, `http://host:8000`; Ollama here by default). Never overwrites. |
 | `twinny-server reset --yes [--all]` | Removes keys, licence, usage and recordings; `--all` also the configuration file. Without `--yes` it only lists them. |
-| `twinny-server serve --config <file>` | Runs the gateway until SIGINT/SIGTERM. |
+| `twinny-server serve --config <file> [--port <n>] [--host <addr>]` | Runs the gateway until SIGINT/SIGTERM. `--demo` serves a public, read-only admin page with one-hour guest keys. |
 | `twinny-server keys create <name>` | Makes an access key for a developer. Printed once; only its hash is stored. |
 | `twinny-server keys list` / `revoke <name>` | Shows keys; stops one, effective without a restart. |
 | `twinny-server usage [--since 7d] [--by key]` | Requests, failures and reported token counts by key and model. |
-| `twinny-server keys create <name> --admin` | A key that can also open the admin page at `http://<gateway>/admin`. |
+| `twinny-server keys create <name> --admin [--read-only]` | A key that can also open the admin page at `http://<gateway>/admin`. Read-only admins can look but not change anything. |
+| `twinny-server invites create <name> --url <gateway> [--admin] [--replace]` / `list` / `withdraw <id>` | An invite link that opens VS Code and connects the developer. One use, seven days, no seat until opened. |
 | `twinny-server license [set <token>\|remove]` | The plan and seats. Free: up to 5 active keys. A licence from Twinny raises that; install it here or on the admin page. |
+| `twinny-server recordings export [--format training\|raw]` / `stats` | Recorded request content (licence feature) as training data. |
+| `twinny-server backup now` / `list` / `restore <archive> --yes` | The Backups plugin from the shell. Restore with the gateway stopped. |
 | `twinny-server --version` | Prints the version. Track the extension's version. |
 
-Exit codes from `serve`: `2` invalid config or arguments, `3` a named
-environment variable is unset, `4` unsupported provider kind, `5` port in use.
+Exit codes from `serve`: `2` invalid config or arguments, `3` no way in or a
+named environment variable is unset, `4` unsupported provider kind, `5` port
+in use, `6` the data directory was written by a newer twinny-server.
 
 ## Docker
 
@@ -95,6 +109,10 @@ docker compose up -d
 `ghcr.io/twinnydotdev/twinny-server`. Keys, usage and the licence live in
 the `twinny-data` volume, and every `docker compose run --rm twinny-server …`
 command shares it with the running gateway.
+
+For Kubernetes, `deploy/helm/twinny-server` in the repository is a Helm chart:
+one pod, one volume, an optional Ingress with TLS, and a ServiceMonitor for
+`/metrics`. Keep one replica.
 
 ## Backends
 
@@ -156,9 +174,19 @@ tailnet with `"listen": { "host": "0.0.0.0" }` in the configuration.
   reassign a provider's models before deleting it.
 - **Other config changes** (limits, address, auth), or direct file edits:
   edit the file and restart. Keys never need a restart.
-- **Files:** keys in `~/.twinny/server/keys.json` (hashes only), usage in
-  `~/.twinny/server/usage/`, one file per day, deleted after 30 days.
-  Back up the config and `keys.json`.
+- **Plugins:** `/admin` → **Plugins → Store** lists what this build carries;
+  switch one on and it gets its own page. Reviews and triage run on the
+  gateway's own chat aliases, in the background only while no developer
+  request is running, and appear in usage under `plugin:<id>`.
+- **Audit log:** every admin change, hash-chained, under **Team → Audit log**;
+  filter, verify and export. `/metrics` answers Prometheus scrapes with an
+  admin key (a read-only one will do).
+- **Files:** everything is in one directory, `~/.twinny/server` by default:
+  keys (hashes only), invites, the licence, `plugins/`, `audit/`, usage (one
+  file per day, deleted after 30 days) and recordings. `format.json` names
+  the layout; a newer server migrates it on start, an older one refuses to
+  start. Back it up together with the configuration, or let the Backups
+  plugin do it nightly.
 
 ## Configuration
 
@@ -204,6 +232,9 @@ lifecycle details are in
   completions, headers or backend bodies. Opt-in recording stores request content
   separately. Inference requests go to the backends you configure; there is no
   telemetry or licence check sent to Twinny.
+- Every change made through the admin page or CLI is in the audit log, each
+  line carrying the hash of the one before it; tokens for forges and webhooks
+  are kept in files only the server's user can read and never shown again.
 
 ## License
 
