@@ -132,10 +132,12 @@ interface PullFilters {
   label: string
   base: string
   age: Age
+  /** Drafts stay out of the list until switched on; the "drafts" view shows them regardless. */
+  drafts: boolean
   sort: Sort<PullSortKey>
 }
 
-const DEFAULT_PULL_FILTERS: PullFilters = { quick: "all", repo: "", author: "", label: "", base: "", age: "", sort: { key: "updated", dir: "desc" } }
+const DEFAULT_PULL_FILTERS: PullFilters = { quick: "all", repo: "", author: "", label: "", base: "", age: "", drafts: false, sort: { key: "updated", dir: "desc" } }
 
 const isPullFilters = (value: unknown): value is PullFilters => {
   if (typeof value !== "object" || value === null) return false
@@ -144,6 +146,7 @@ const isPullFilters = (value: unknown): value is PullFilters => {
   return (
     QUICKS.includes(v.quick as Quick) &&
     ["repo", "author", "label", "base", "age"].every((field) => typeof v[field] === "string") &&
+    typeof v.drafts === "boolean" &&
     sort !== undefined &&
     PULL_SORTS.some((entry) => entry.key === sort.key) &&
     (sort.dir === "asc" || sort.dir === "desc")
@@ -1377,8 +1380,8 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
 
   const all = useMemo(() => overview?.repos.flatMap((repo) => repo.pulls.map((pull) => ({ repo, pull, brief: repo.reviews[pull.number] as ReviewBrief | undefined }))) ?? [], [overview])
 
-  /** Everything but the quick view, so the chip counts say what each view would show. */
-  const narrowed = useMemo(() => {
+  /** Everything but the quick view and the drafts switch, so the chip counts say what each view would show. */
+  const narrowedWithDrafts = useMemo(() => {
     const needle = search.trim().toLowerCase()
     return all
       .filter(({ repo }) => !filters.repo || repo.id === filters.repo)
@@ -1388,24 +1391,30 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
       .filter(({ pull }) => withinAge(pull.updatedAt, filters.age))
       .filter(({ pull }) => !needle || pull.title.toLowerCase().includes(needle) || pull.author.toLowerCase().includes(needle) || String(pull.number) === needle || pull.headRef.toLowerCase().includes(needle) || pull.labels.some((label) => label.toLowerCase().includes(needle)))
   }, [all, filters.repo, filters.author, filters.label, filters.base, filters.age, search])
+  const narrowed = useMemo(() => (filters.drafts ? narrowedWithDrafts : narrowedWithDrafts.filter(({ pull }) => !pull.draft)), [narrowedWithDrafts, filters.drafts])
 
   const me = overview?.me.name
+  // The "drafts" view ignores the switch; every other view honours it.
   const pulls = useMemo(
     () =>
       sortRows(
-        narrowed.filter(({ pull, brief }) => matches(pull, filters.quick, brief, me)),
+        (filters.quick === "drafts" ? narrowedWithDrafts : narrowed).filter(({ pull, brief }) => matches(pull, filters.quick, brief, me)),
         filters.sort.dir,
         ({ pull }) => pullSortValue(pull, filters.sort.key)
       ),
-    [narrowed, filters.quick, filters.sort, me]
+    [narrowed, narrowedWithDrafts, filters.quick, filters.sort, me]
   )
 
-  const counts = useMemo(() => Object.fromEntries(QUICKS.map((quick) => [quick, narrowed.filter(({ pull, brief }) => matches(pull, quick, brief, me)).length])) as Record<Quick, number>, [narrowed, me])
+  const counts = useMemo(
+    () => Object.fromEntries(QUICKS.map((quick) => [quick, (quick === "drafts" ? narrowedWithDrafts : narrowed).filter(({ pull, brief }) => matches(pull, quick, brief, me)).length])) as Record<Quick, number>,
+    [narrowed, narrowedWithDrafts, me]
+  )
   const totals = useMemo(() => Object.fromEntries(QUICKS.map((quick) => [quick, all.filter(({ pull, brief }) => matches(pull, quick, brief, me)).length])) as Record<Quick, number>, [all, me])
   const authors = useMemo(() => distinct(all.map(({ pull }) => pull.author)), [all])
   const labels = useMemo(() => distinct(all.flatMap(({ pull }) => pull.labels)), [all])
   const bases = useMemo(() => distinct(all.map(({ pull }) => pull.baseRef)), [all])
-  const filtering = filters.quick !== "all" || Boolean(filters.repo || filters.author || filters.label || filters.base || filters.age || search.trim())
+  const filtering = filters.quick !== "all" || filters.drafts || Boolean(filters.repo || filters.author || filters.label || filters.base || filters.age || search.trim())
+  const hiddenDrafts = filters.drafts || filters.quick === "drafts" ? 0 : narrowedWithDrafts.filter(({ pull }) => pull.draft).length
   const set = <K extends keyof PullFilters>(key: K, value: PullFilters[K]) => setFilters((current) => ({ ...current, [key]: value }))
   const sortBy = (key: PullSortKey) => setFilters((current) => ({ ...current, sort: toggleSort(current.sort, key, naturalOf(PULL_SORTS, key)) }))
 
@@ -1529,6 +1538,9 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             {labels.length > 0 && <FilterSelect label="label" value={filters.label} onChange={(value) => set("label", value)} any="any label" options={labels.map((label) => ({ value: label, label }))} />}
             {bases.length > 1 && <FilterSelect label="into" value={filters.base} onChange={(value) => set("base", value)} any="any branch" options={bases.map((base) => ({ value: base, label: base }))} />}
             <FilterSelect label="activity" value={filters.age} onChange={(value) => set("age", value as Age)} options={AGE_OPTIONS} />
+            <button type="button" className={`mini toggle ${filters.drafts ? "on" : "ghost"}`} onClick={() => set("drafts", !filters.drafts)} aria-pressed={filters.drafts} title={filters.drafts ? "Drafts are in the list; click to hide them" : "Drafts are hidden; click to show them"}>
+              {filters.drafts ? "drafts shown" : `drafts hidden${hiddenDrafts ? ` · ${fmt(hiddenDrafts)}` : ""}`}
+            </button>
             {filtering && (
               <button
                 type="button"
@@ -1557,7 +1569,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             </label>
           </div>
           {pulls.length === 0 ? (
-            <div className="empty">{all.length === 0 ? `No open ${words.nouns}.` : "Nothing matches these filters."}</div>
+            <div className="empty">{all.length === 0 ? `No open ${words.nouns}.` : hiddenDrafts && narrowedWithDrafts.length === hiddenDrafts ? `Only drafts (${fmt(hiddenDrafts)}), and drafts are hidden.` : "Nothing matches these filters."}</div>
           ) : (
             <div className="scroll">
               <table className="pulls">
