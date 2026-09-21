@@ -84,6 +84,7 @@ export class GatewayMetrics {
   private readonly _tokens = new Counter("twinny_tokens_total", "Tokens the backends reported, by alias and direction.")
   private readonly _chunks = new Counter("twinny_chunks_total", "Streamed chunks delivered, by route.")
   private readonly _active = new Gauge("twinny_active_requests", "Inference requests in flight.")
+  private readonly _queued = new Gauge("twinny_queued_requests", "Generation requests waiting for a free slot.")
   private readonly _backendUp = new Gauge("twinny_backend_up", "1 when the backend answered its last check, 0 when not.")
   private readonly _backendLatency = new Gauge("twinny_backend_check_seconds", "How long the backend's last check took.")
   private readonly _auth = new Counter("twinny_auth_rejected_total", "Requests refused for a bad or missing key.")
@@ -105,6 +106,10 @@ export class GatewayMetrics {
 
   public active(count: number): void {
     this._active.set({}, count)
+  }
+
+  public queued(count: number): void {
+    this._queued.set({}, count)
   }
 
   public backend(provider: string, ok: boolean, seconds: number): void {
@@ -138,6 +143,7 @@ export class GatewayMetrics {
       this._tokens.render(),
       this._chunks.render(),
       this._active.render(),
+      this._queued.render(),
       this._backendUp.render(),
       this._backendLatency.render(),
       this._auth.render(),

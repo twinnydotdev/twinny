@@ -29,6 +29,7 @@
   ],
   "limits": {
     "maxActiveRequests": 4,
+    "queue": { "maxWaiting": 8, "fimWaitMs": 500, "chatWaitMs": 15000 },
     "requestDeadlineMs": 120000,
     "maxBodyBytes": 8388608,
     "shutdownGraceMs": 5000

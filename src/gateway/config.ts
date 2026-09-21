@@ -82,9 +82,20 @@ export interface PerKeyLimits {
   requestsPerMinute?: number
 }
 
+export interface QueueLimits {
+  /** Requests that may wait for a free slot at once; more are refused at once. `0` disables waiting. */
+  maxWaiting: number
+  /** How long an autocomplete request may wait for a slot before it is refused. */
+  fimWaitMs: number
+  /** How long a chat request may wait for a slot before it is refused. */
+  chatWaitMs: number
+}
+
 export interface GatewayLimits {
-  /** Inference requests running at once; more are refused, not queued. */
+  /** Inference requests running at once; more wait in the queue, then are refused. */
   maxActiveRequests: number
+  /** The short, bounded queue in front of the slots. */
+  queue: QueueLimits
   /** Limits applied per access key (the shared token counts as one key). */
   perKey?: PerKeyLimits
   /** How long one inference request may run before it is aborted. */
@@ -147,8 +158,15 @@ export interface GatewaySecrets {
   providerKeys: Record<string, string | undefined>
 }
 
+export const DEFAULT_QUEUE: QueueLimits = {
+  maxWaiting: 8,
+  fimWaitMs: 500,
+  chatWaitMs: 15_000
+}
+
 export const DEFAULT_LIMITS: GatewayLimits = {
   maxActiveRequests: 4,
+  queue: DEFAULT_QUEUE,
   requestDeadlineMs: 120_000,
   maxBodyBytes: 8 * 1024 * 1024,
   shutdownGraceMs: 5_000
@@ -504,13 +522,25 @@ export const parseGatewayConfig = (
 
   /* limits */
   const limitsIn = input.limits ?? {}
-  const limits: GatewayLimits = { ...DEFAULT_LIMITS }
+  const limits: GatewayLimits = { ...DEFAULT_LIMITS, queue: { ...DEFAULT_QUEUE } }
   if (!isRecord(limitsIn)) {
     problems.add("limits must be an object.")
   } else {
     problems.unknownKeys("limits", limitsIn, [
-      "maxActiveRequests", "requestDeadlineMs", "maxBodyBytes", "maxOutputTokens", "shutdownGraceMs", "perKey"
+      "maxActiveRequests", "queue", "requestDeadlineMs", "maxBodyBytes", "maxOutputTokens", "shutdownGraceMs", "perKey"
     ])
+    if (limitsIn.queue !== undefined) {
+      if (!isRecord(limitsIn.queue)) {
+        problems.add("limits.queue must be an object.")
+      } else {
+        problems.unknownKeys("limits.queue", limitsIn.queue, ["maxWaiting", "fimWaitMs", "chatWaitMs"])
+        limits.queue = {
+          maxWaiting: problems.integer("limits.queue.maxWaiting", limitsIn.queue.maxWaiting, DEFAULT_QUEUE.maxWaiting, 0, 10_000),
+          fimWaitMs: problems.integer("limits.queue.fimWaitMs", limitsIn.queue.fimWaitMs, DEFAULT_QUEUE.fimWaitMs, 0, 600_000),
+          chatWaitMs: problems.integer("limits.queue.chatWaitMs", limitsIn.queue.chatWaitMs, DEFAULT_QUEUE.chatWaitMs, 0, 600_000)
+        }
+      }
+    }
     if (limitsIn.perKey !== undefined) {
       if (!isRecord(limitsIn.perKey)) {
         problems.add("limits.perKey must be an object.")

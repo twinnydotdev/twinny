@@ -34,6 +34,7 @@ Node 18 or newer and nothing else.
 - [Running in Docker](#running-in-docker)
 - [Plans, seats and the licence](#plans-seats-and-the-licence)
 - [Usage records](#usage-records)
+- [Data directory](#data-directory) — what lives beside the keys file, and its format marker
 - [Backends that are down](#backends-that-are-down)
 - [Admin page](#admin-page)
 - [Lifecycle and limits](#lifecycle-and-limits)
@@ -104,10 +105,11 @@ to change there. To wipe a gateway and start again, stop it and run
    Twinny gateway 4.0.18 listening on http://127.0.0.1:8765
      protocol: twinny/v1 at /twinny/v1
      models:   2 aliases (coder: fim/chat, embed: embeddings)
-     limits:   2 active, 120s deadline, 5s grace
+     limits:   2 active, 8 waiting (fim 500ms, chat 15s), 120s deadline, 5s grace
      health:   http://127.0.0.1:8765/healthz
      admin:    http://127.0.0.1:8765/admin (sign in with an admin key)
      access:   1 active key
+     data:     /home/you/.twinny/server (format 1)
      usage:    /home/you/.twinny/server/usage (kept 30 days)
    ```
 
@@ -315,6 +317,12 @@ Restart = Ctrl+C (or SIGTERM), then start again. Active requests get
 `limits.shutdownGraceMs` to finish and are then cancelled; VS Code sees a
 `cancelled` error and simply retries on the next keystroke or message.
 
+Upgrading twinny-server is the same restart. A newer version that changes
+the layout of the [data directory](#data-directory) migrates it once at
+startup and says so in the log; going back to an older version afterwards
+is refused (exit `6`) rather than risked, so take a backup before a
+version bump you may want to undo.
+
 ### Retiring the shared token
 
 Once every developer has a key, set `"auth": { "tokenEnv": null }` and
@@ -403,8 +411,9 @@ Things worth knowing:
   work shows up as yours.
 - "This gateway key was revoked": ask the operator for a new one and paste
   it into the provider (edit → Gateway token; leaving it blank keeps the old one).
-- "is rate limiting requests": the gateway is busy, or your key hit its own
-  limit. It clears by itself within a minute.
+- "is rate limiting requests": the gateway is busy (your request waited
+  briefly for a free slot and none came), or your key hit its own limit. It
+  clears by itself within a minute.
 - "Could not connect": the gateway is unreachable from your machine. Check
   the address, VPN or tunnel, and that `http://<gateway>/healthz` answers.
 - Prompts and code go to the gateway and its backend only. The gateway logs
@@ -458,7 +467,10 @@ One JSON file, passed with `--config`. Every field except `providers` and
 | `recording.retentionDays` | Records older than this are deleted. | `90` |
 | `recording.dir` | Where records live. | `~/.twinny/server/recordings` |
 | `recording.store` | `auto` (sqlite on Node 22+, else jsonl), `sqlite`, or `jsonl`. | `auto` |
-| `limits.maxActiveRequests` | Chat and autocomplete requests running at once. Extra requests are refused with `rate-limited`; nothing queues. Embedding requests are not counted. | `4` |
+| `limits.maxActiveRequests` | Chat and autocomplete requests running at once. Extra requests wait in the queue below, then are refused with `rate-limited`. Embedding requests are not counted. | `4` |
+| `limits.queue.maxWaiting` | Requests that may wait for a free slot at once; beyond it a request is refused at once. `0` switches waiting off. | `8` |
+| `limits.queue.fimWaitMs` | How long an autocomplete request may wait for a slot. Keep it short: the editor has usually moved on. | `500` |
+| `limits.queue.chatWaitMs` | How long a chat request may wait for a slot. | `15000` |
 | `limits.requestDeadlineMs` | How long one inference request may run. On expiry the backend is aborted and the client receives `timeout`. | `120000` |
 | `limits.maxBodyBytes` | Largest request body accepted. | `8388608` (8 MiB) |
 | `limits.maxOutputTokens` | The most tokens one chat or autocomplete request may generate, whatever the client asks for. | unset (the client decides) |
@@ -927,6 +939,42 @@ Or paste the token on the admin page (**Plan and licence**). Either way it
 takes effect within a second, without a restart. Pass `--config` when the
 configuration moves the licence file away from the default.
 
+## Data directory
+
+Everything the gateway keeps lives in one directory, the one holding
+`auth.keysFile` (`~/.twinny/server` by default): `keys.json`, `license`,
+`invites.json`, `plugins.json`, `audit/`, `plugins/<id>/` and, unless the
+configuration moves them, `usage/` and `recordings/`. Back up the
+directory and the configuration file together; the [backups
+plugin](#backups) does exactly that.
+
+The directory carries a marker, `format.json`, naming the layout its files
+follow:
+
+```json
+{ "format": 1, "server": "4.2.0", "writtenAt": "2026-09-21T09:12:44.318Z" }
+```
+
+`format` changes only when the layout does. At startup, before any store is
+opened, the gateway reads the marker and:
+
+- writes it for an empty directory, or for one from a version before the
+  marker existed (taken as format 1);
+- runs the migrations from the format found up to its own, in order,
+  rewriting the marker after each, so an interrupted upgrade resumes where
+  it stopped;
+- refuses to start (exit `6`) when the marker names a newer format than it
+  reads, since an older server writing into a newer layout would corrupt
+  it. Upgrade twinny-server, or restore a backup taken by the version you
+  are running;
+- refuses to start when the file is present but not a marker; the message
+  says to delete it if the directory was written by this version.
+
+`server` and `writtenAt` record the version that last opened the directory
+and are refreshed on each start; they are a note for support, not a check.
+The `backup` commands carry the marker along, so a restored archive is
+checked the same way on the next start.
+
 ## Usage records
 
 Every inference request (not discovery or health) appends one JSON line to
@@ -1107,10 +1155,19 @@ the gateway.
 ## Lifecycle and limits
 
 - **Capacity.** `maxActiveRequests` counts chat and autocomplete requests
-  in flight (discovery and health are not counted). A request over the
-  limit is refused at once with `rate-limited` and `Retry-After: 1`. A slot
-  is released when the request succeeds, fails, times out, is cancelled by
-  the client, or is aborted at shutdown.
+  in flight (discovery and health are not counted). A slot is released when
+  the request succeeds, fails, times out, is cancelled by the client, or is
+  aborted at shutdown.
+- **The queue.** A request that finds every slot taken waits, oldest first,
+  for up to `limits.queue.fimWaitMs` (autocomplete) or `chatWaitMs` (chat).
+  A freed slot goes straight to the head of the queue, so a team sharing one
+  GPU sees a short pause rather than an error. A request is refused at once
+  with `rate-limited` and `Retry-After: 1` when `maxWaiting` requests are
+  already waiting, and after its wait when no slot came; the message says
+  which. A client that gives up while waiting (the editor moved on) leaves
+  the queue without touching a backend, logged as `request.abandoned`. Set
+  `maxWaiting` to `0` for the old behaviour: refuse at once. The wait is
+  reported as `waited=` on the request's log line.
 - **Embeddings are not capped.** Indexing a workspace is hundreds of small,
   quick requests, so neither `maxActiveRequests` nor the per-key limits
   count them; the deadline still applies, and a backend or teammate that
@@ -1140,7 +1197,15 @@ One line per event on stderr, fields from a fixed allow-list:
 2026-09-13T20:10:40.007Z info event=request id=3 key=alice route=fim alias=coder outcome=ok status=200 ms=812 chunks=24
 2026-09-13T20:10:41.200Z warn event=auth.rejected route=models
 2026-09-13T20:10:55.913Z info event=request id=4 key=bob route=chat alias=coder outcome=error kind=timeout status=200 ms=120004
+2026-09-13T20:11:02.118Z info event=request id=5 key=carol route=fim alias=coder outcome=ok status=200 ms=1210 waited=390 chunks=9
+2026-09-13T20:11:02.601Z warn event=request.refused id=6 key=dan route=fim kind=rate-limited active=4 waiting=8 reason=gateway
 ```
+
+`request.refused` names the reason: `gateway` (every slot and every place in
+the queue taken), `queue` (waited the route's wait and no slot came) or
+`key` (a `limits.perKey` limit). `request.abandoned` is a client that closed
+the connection while waiting. `data.format` and `data.migrate` report the
+[data directory](#data-directory) being marked or migrated at startup.
 
 `key=` names the access key (or `shared`). Prompts, completions, chat
 messages, embeddings, authorization headers, backend response bodies and
@@ -1184,6 +1249,7 @@ telemetry, conversation storage or analytics.
 | `3` | No way in (no keys and no shared token), or a named environment variable is not set. | `No way in: set the TWINNY_GATEWAY_TOKEN environment variable …, or create a named key with \`twinny-server keys create <name>\`.` |
 | `4` | A provider kind the gateway cannot serve. | `providers.x.provider "twinny-p2p" is not a provider kind this gateway can serve.` |
 | `5` | The port is taken or the host cannot be bound. | `Port 8765 on 127.0.0.1 is already in use.` |
+| `6` | The data directory was written by a newer twinny-server, or its `format.json` is unreadable. | `… was written by a newer twinny-server (data format 2, version 4.3.0; this version reads format 1).` |
 
 In VS Code:
 
@@ -1191,13 +1257,15 @@ In VS Code:
   known to the gateway", "… no longer accepts a shared token": the gateway
   says exactly why. Edit the provider and paste a current key.
 - **"is rate limiting requests"**: either the gateway's `maxActiveRequests`
-  or your key's `perKey` limit; the message names which.
+  (the request waited its `limits.queue` time and no slot came, or the
+  queue was full) or your key's `perKey` limit; the message names which.
 - **"Could not connect"**: the gateway is not reachable at that hostname,
   port and protocol. Check `/healthz` from the same machine as VS Code.
 - **"does not have the model"**: the alias is not in the gateway's
   configuration. The model dropdown on the provider lists what it serves.
 - **"cannot do this"**: the alias is configured without that capability.
-- **"is rate limiting requests"**: `maxActiveRequests` is reached.
+- **"is rate limiting requests"**: `maxActiveRequests` is reached and the
+  queue did not clear in time.
 - **"This gateway key has no seat"**: the gateway has more active keys
   than its plan allows. The operator revokes keys or adds seats; nothing
   to do on your side.
@@ -1262,10 +1330,10 @@ to see usage, people and the audit log without being able to act.
 
 `GET /metrics` with an admin key (read-only will do) answers in the
 Prometheus text format: requests by route, alias and outcome; a latency
-histogram; tokens and chunks; requests in flight; each backend's last
-check (`twinny_backend_up`); refused authentications; quota refusals;
-active keys and seats; plugin events. Point a scrape job at it with a
-bearer token:
+histogram; tokens and chunks; requests in flight and waiting for a slot
+(`twinny_queued_requests`); each backend's last check (`twinny_backend_up`);
+refused authentications; quota refusals; active keys and seats; plugin
+events. Point a scrape job at it with a bearer token:
 
 ```yaml
 scrape_configs:

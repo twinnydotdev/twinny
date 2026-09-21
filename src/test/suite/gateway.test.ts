@@ -338,9 +338,14 @@ suite("Gateway process: capacity, deadline, shutdown", function () {
     backend.requests.length = 0
   })
 
-  test("capacity one: a second request is refused, and cancelling the first frees the slot", async () => {
+  test("capacity one: a second request waits for the slot, a third finds the queue full, cancelling the first admits the waiter", async () => {
     const gateway = await startGateway(
-      writeConfig("capacity", configFor(backend.port, { limits: { maxActiveRequests: 1 } }))
+      writeConfig(
+        "capacity",
+        configFor(backend.port, {
+          limits: { maxActiveRequests: 1, queue: { maxWaiting: 1, fimWaitMs: 5_000, chatWaitMs: 5_000 } }
+        })
+      )
     )
     try {
       const client = resolveInferenceProvider(remoteProvider(gateway))
@@ -350,9 +355,16 @@ suite("Gateway process: capacity, deadline, shutdown", function () {
       const head = await iterator.next()
       assert.strictEqual((head.value as { text: string }).text, "def")
 
+      // The second request waits in the queue: nothing reaches the backend.
+      const second = readText(client.fim(fimRequest()))
+      await wait(300)
+      assert.strictEqual(backend.requests.length, 1, "the waiting request never reached the backend")
+
+      // The queue holds one; a third is refused at once and told what is waiting.
       const refused = await expectKind(() => readText(client.fim(fimRequest())), "rate-limited")
       assert.strictEqual(refused.status, 429)
-      assert.strictEqual(backend.requests.length, 1, "the refused request never reached the backend")
+      assert.match(refused.message, /1 request\(s\) already running and 1 waiting/)
+      await until(() => /event=request\.refused .*kind=rate-limited active=1 waiting=1 reason=gateway/.test(gateway.stderr))
 
       const embed = resolveInferenceProvider(remoteProvider(gateway, { type: "embedding" }))
       const { vectors } = await embed.embeddings({ model: "embed", input: ["a"] })
@@ -362,10 +374,96 @@ suite("Gateway process: capacity, deadline, shutdown", function () {
       await expectKind(() => iterator.next(), "cancelled")
       await until(() => backend.requests[0].cancelled)
 
+      // The freed slot goes straight to the waiter.
+      assert.strictEqual(await second, "def add")
+      await until(() => /event=request .*outcome=ok .*waited=\d+/.test(gateway.stderr))
       const after = await readText(client.fim(fimRequest()))
       assert.strictEqual(after, "def add")
     } finally {
       await gateway.stop()
+    }
+  })
+
+  test("a waiting request is refused once the route's wait runs out", async () => {
+    const gateway = await startGateway(
+      writeConfig(
+        "queue-wait",
+        configFor(backend.port, {
+          limits: { maxActiveRequests: 1, queue: { maxWaiting: 4, fimWaitMs: 200, chatWaitMs: 200 } }
+        })
+      )
+    )
+    try {
+      const client = resolveInferenceProvider(remoteProvider(gateway))
+      const controller = new AbortController()
+      const iterator = client.fim(fimRequest(STALL), { signal: controller.signal })[Symbol.asyncIterator]()
+      await iterator.next()
+
+      const started = Date.now()
+      const refused = await expectKind(() => readText(client.fim(fimRequest())), "rate-limited")
+      assert.ok(Date.now() - started >= 180, "the refusal came after the wait")
+      assert.strictEqual(refused.status, 429)
+      assert.match(refused.message, /waited 200 ms for a free slot/)
+      assert.strictEqual(backend.requests.length, 1)
+      await until(() => /event=request\.refused .*waited=\d+ reason=queue/.test(gateway.stderr))
+
+      controller.abort()
+      await expectKind(() => iterator.next(), "cancelled")
+    } finally {
+      await gateway.stop()
+    }
+  })
+
+  test("a client that gives up while waiting leaves the queue; queue off refuses at once", async () => {
+    const gateway = await startGateway(
+      writeConfig(
+        "queue-leave",
+        configFor(backend.port, {
+          limits: { maxActiveRequests: 1, queue: { maxWaiting: 1, fimWaitMs: 5_000, chatWaitMs: 5_000 } }
+        })
+      )
+    )
+    try {
+      const client = resolveInferenceProvider(remoteProvider(gateway))
+      const first = new AbortController()
+      const iterator = client.fim(fimRequest(STALL), { signal: first.signal })[Symbol.asyncIterator]()
+      await iterator.next()
+
+      const second = new AbortController()
+      const waiting = readText(client.fim(fimRequest(), { signal: second.signal }))
+      await wait(150)
+      second.abort()
+      await expectKind(() => waiting, "cancelled")
+      await until(() => /event=request\.abandoned .*waited=\d+/.test(gateway.stderr))
+
+      // Its place is free again: a third request waits instead of being refused.
+      const third = readText(client.fim(fimRequest()))
+      await wait(150)
+      assert.strictEqual(backend.requests.length, 1)
+      first.abort()
+      await expectKind(() => iterator.next(), "cancelled")
+      assert.strictEqual(await third, "def add")
+    } finally {
+      await gateway.stop()
+    }
+
+    const off = await startGateway(
+      writeConfig("queue-off", configFor(backend.port, { limits: { maxActiveRequests: 1, queue: { maxWaiting: 0 } } }))
+    )
+    try {
+      assert.match(off.stdout, /limits: {3}1 active, no queue/)
+      const client = resolveInferenceProvider(remoteProvider(off))
+      const controller = new AbortController()
+      const iterator = client.fim(fimRequest(STALL), { signal: controller.signal })[Symbol.asyncIterator]()
+      await iterator.next()
+      const started = Date.now()
+      const refused = await expectKind(() => readText(client.fim(fimRequest())), "rate-limited")
+      assert.ok(Date.now() - started < 1_000)
+      assert.match(refused.message, /already running\. Try again shortly/)
+      controller.abort()
+      await expectKind(() => iterator.next(), "cancelled")
+    } finally {
+      await off.stop()
     }
   })
 
@@ -444,6 +542,27 @@ suite("Gateway process: startup failures", function () {
     assert.match(top.stdout, /npx twinny-server quickstart/)
     const version = await runCli(["--version"])
     assert.match(version.stdout.trim(), /^\d+\.\d+\.\d+$/)
+  })
+
+  test("a data directory written by a newer server stops startup with exit 6; a fresh one is marked", async () => {
+    const newer = dataDirFor("newer")
+    fs.mkdirSync(newer, { recursive: true })
+    fs.writeFileSync(path.join(newer, "format.json"), JSON.stringify({ format: 99, server: "9.0.0" }))
+    const result = await runCli(["serve", "--config", writeConfig("newer", configFor(11434, {}, "newer"))], {
+      TWINNY_GATEWAY_TOKEN: TOKEN
+    })
+    assert.strictEqual(result.code, 6)
+    assert.match(result.stderr, /data-format.*newer twinny-server \(data format 99, version 9\.0\.0; this version reads format 1\)/)
+
+    const gateway = await startGateway(writeConfig("fresh", configFor(11434, {}, "fresh")))
+    try {
+      assert.match(gateway.stdout, /data: {5}.*\(format 1\)/)
+      const marker = JSON.parse(fs.readFileSync(path.join(dataDirFor("fresh"), "format.json"), "utf8")) as { format: number; server: string }
+      assert.strictEqual(marker.format, 1)
+      assert.match(marker.server, /^\d+\.\d+\.\d+$/)
+    } finally {
+      await gateway.stop()
+    }
   })
 
   test("init writes a starter config that serve accepts, and never overwrites", async () => {

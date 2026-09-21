@@ -95,6 +95,15 @@ suite("Gateway configuration", () => {
     assert.ok(problems.some((p) => /unknown field "extra"/.test(p)))
   })
 
+  test("limits.queue is validated and defaults field by field", () => {
+    const parsed = parseGatewayConfig({ ...valid(), limits: { queue: { fimWaitMs: 0 } } }, KNOWN)
+    assert.deepStrictEqual(parsed.limits.queue, { maxWaiting: 8, fimWaitMs: 0, chatWaitMs: 15_000 })
+    const { problems } = problemsOf({ ...valid(), limits: { queue: { maxWaiting: -1, chatWaitMs: "long", extra: true } } })
+    assert.ok(problems.some((p) => /limits.queue.maxWaiting/.test(p)))
+    assert.ok(problems.some((p) => /limits.queue.chatWaitMs/.test(p)))
+    assert.ok(problems.some((p) => /limits.queue: unknown field "extra"/.test(p)))
+  })
+
   test("capabilities must be real and non-empty", () => {
     const input = valid()
     input.models[0].capabilities = ["fim", "search"]

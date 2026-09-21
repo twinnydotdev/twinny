@@ -28,6 +28,7 @@ import {
   teamWantedModels
 } from "./config"
 import { GatewayConfiguration } from "./configuration"
+import { DATA_FORMAT, DataFormatError, openDataDir } from "./data-format"
 import { DEFAULT_DEMO } from "./demo"
 import { invitesFileFor,InviteStore } from "./invites"
 import { KeyStore } from "./keys"
@@ -61,7 +62,9 @@ export const EXIT_CODE = {
   /** A provider kind the gateway cannot serve. */
   unsupportedProvider: 4,
   /** The port is taken or the host cannot be bound. */
-  listen: 5
+  listen: 5,
+  /** The data directory was written by a newer server, or its marker is unreadable. */
+  data: 6
 } as const
 
 export const SERVE_HELP = `Twinny gateway — serve configured models to Twinny extensions over HTTP.
@@ -213,13 +216,18 @@ export const codeForConfigError = (error: GatewayConfigError): number => {
   }
 }
 
+const describeQueue = (queue: GatewayConfig["limits"]["queue"]): string =>
+  queue.maxWaiting === 0
+    ? "no queue"
+    : `${queue.maxWaiting} waiting (fim ${queue.fimWaitMs}ms, chat ${Math.round(queue.chatWaitMs / 1000)}s)`
+
 /** A short, secret-free account of what will be served. */
 const describeConfig = (config: GatewayConfig): string[] => [
   `  protocol: ${describeProtocol()} at ${REMOTE_PROTOCOL_BASE}`,
   `  models:   ${config.models.length} alias${config.models.length === 1 ? "" : "es"} (${config.models
     .map((m) => `${m.alias}: ${m.capabilities.join("/")}`)
     .join(", ")})`,
-  `  limits:   ${config.limits.maxActiveRequests} active, ${Math.round(config.limits.requestDeadlineMs / 1000)}s deadline, ${config.limits.shutdownGraceMs / 1000}s grace`,
+  `  limits:   ${config.limits.maxActiveRequests} active, ${describeQueue(config.limits.queue)}, ${Math.round(config.limits.requestDeadlineMs / 1000)}s deadline, ${config.limits.shutdownGraceMs / 1000}s grace`,
   ...(hasTeamPool(config)
     ? [
         `  pooling:  teammates' computers may serve ${teamWantedModels(config).join(", ") || "(no aliases yet)"}`
@@ -290,6 +298,21 @@ export const runServe = async (
     })
     providerRegistry.register(TEAM_PROVIDER_KIND, teamPoolAdapter(peers))
     config = loadGatewayConfig(args.config, providerRegistry.providerIds())
+    // The data directory is checked before any store opens: an older layout
+    // is migrated first, a newer one is never touched.
+    const opened = openDataDir(path.dirname(config.auth.keysFile), {
+      server: SERVER_VERSION,
+      log: (event, fields) => log.info({ event, ...fields })
+    })
+    if (opened.legacy || opened.migrated.length) {
+      log.info({
+        event: "data.format",
+        code: opened.format,
+        message: opened.migrated.length
+          ? `Migrated the data directory to format ${opened.format}.`
+          : `Marked the data directory as format ${opened.format}.`
+      })
+    }
     keys = KeyStore.open(config.auth.keysFile)
     license = LicenseStore.open(config.auth.licenseFile)
     const secrets = readGatewaySecrets(config, io.env, keys.active().length)
@@ -390,6 +413,10 @@ export const runServe = async (
       for (const problem of error.problems) io.err(`  - ${problem}`)
       return codeForConfigError(error)
     }
+    if (error instanceof DataFormatError) {
+      io.err(`Cannot start the gateway (data-format): ${error.message}`)
+      return EXIT_CODE.data
+    }
     io.err(
       `Cannot start the gateway: ${error instanceof Error ? error.message : String(error)}`
     )
@@ -437,6 +464,7 @@ export const runServe = async (
   )
   const plan = license.summary(keys.active())
   io.out(`  plan:     ${describePlan(plan)}`)
+  io.out(`  data:     ${path.dirname(config.auth.keysFile)} (format ${DATA_FORMAT})`)
   io.out(
     `  usage:    ${config.usage.dir} (kept ${config.usage.retentionDays} days)`
   )
