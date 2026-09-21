@@ -78,6 +78,11 @@ export class GiteaForge implements Forge {
     return readJson(await this._context.fetch(this.api(repo, route), { headers: this.headers(repo), signal }), what)
   }
 
+  public async whoAmI(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined> {
+    const answer = await readJson(await this._context.fetch(`${this.baseUrl}/api/v1/user`, { headers: this.headers(repo), signal }), "Asking the host who the token is")
+    return str(answer.login) || undefined
+  }
+
   public async checkRepo(repo: RepoRecord, signal: AbortSignal): Promise<string> {
     const answer = await this.get(repo, "", signal, `Reading ${repo.fullName}`)
     return str(answer.full_name, repo.fullName)
@@ -87,12 +92,30 @@ export class GiteaForge implements Forge {
     const what = `Listing pulls of ${repo.fullName}`
     const pulls = arr(await this.get(repo, `/pulls?state=open&sort=recentupdate&limit=${MAX_PULLS_PER_REPO}`, signal, what))
     const out: PullSummary[] = []
+    /** Required approvals per base branch; the route needs admin rights, so a refusal means "unknown". */
+    const rules = new Map<string, Promise<number | undefined>>()
+    const requiredFor = (branch: string): Promise<number | undefined> => {
+      let rule = rules.get(branch)
+      if (!rule) {
+        rule = this.get(repo, `/branch_protections/${encodeURIComponent(branch)}`, signal, `${what} (branch protection)`)
+          .then((answer) => {
+            const required = num(rec(answer).required_approvals)
+            return required !== undefined && required > 0 ? required : undefined
+          })
+          .catch(() => undefined)
+        rules.set(branch, rule)
+      }
+      return rule
+    }
     for (const entry of pulls) {
       const pull = rec(entry)
       const number = num(pull.number) ?? 0
       const sha = str(rec(pull.head).sha)
       let checkRuns: PullCheck[] = []
       let review: ReviewState = "none"
+      const approved: string[] = []
+      const changes: string[] = []
+      const pending = arr(pull.requested_reviewers).map((r) => str(rec(r).login)).filter(Boolean)
       if (sha) {
         // Combined status of the head commit, and the reviews, are their own calls.
         const [status, reviews] = await Promise.all([
@@ -112,7 +135,9 @@ export class GiteaForge implements Forge {
         }
         const states = [...latest.values()]
         review = states.includes("REQUEST_CHANGES") ? "changes-requested" : states.includes("APPROVED") ? "approved" : "none"
+        for (const [login, state] of latest) (state === "APPROVED" ? approved : changes).push(login)
       }
+      const required = await requiredFor(str(rec(pull.base).ref))
       out.push({
         repo: repo.fullName,
         number,
@@ -132,6 +157,7 @@ export class GiteaForge implements Forge {
         checkRuns,
         mergeable: pull.mergeable === true ? "mergeable" : pull.mergeable === false ? "conflicting" : "unknown",
         review,
+        approvals: { approved, changes, pending: pending.filter((login) => !approved.includes(login) && !changes.includes(login)), ...(required !== undefined ? { required } : {}) },
         labels: arr(pull.labels).map((label) => str(rec(label).name))
       })
     }

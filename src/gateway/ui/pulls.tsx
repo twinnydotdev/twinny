@@ -8,11 +8,12 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "rea
 
 import type { GitHubStatus } from "../plugins/github"
 import type { PullPage, PullSummary, RepoView } from "../plugins/pulls"
-import type { ReviewRecord } from "../plugins/reviews"
-import type { TriageRecord } from "../plugins/triage"
+import type { ReviewBrief, ReviewRecord } from "../plugins/reviews"
+import type { TriageBrief, TriagePriority, TriageRecord } from "../plugins/triage"
 
 import { api, ApiError } from "./api"
 import { fmt, plural, timeAgo } from "./format"
+import { Age, AGE_OPTIONS, distinct, FilterSelect, Sort, SortHeader, sortRows, toggleSort, useStoredState, withinAge } from "./listing"
 import { DiffBlock, MarkdownView } from "./markdown"
 import { PageSkeleton, PluginIcon } from "./plugins"
 
@@ -76,10 +77,78 @@ interface Overview {
   repos: RepoView[]
   appAuth: boolean
   host: { baseUrl: string } & Partial<GitHubStatus>
+  /** Who the operator is on the host: set by hand, or what a token said. */
+  me: { name?: string; detected?: string }
   review: ReviewSetup
 }
 
-type Filter = "all" | "failing" | "conflicts" | "review" | "drafts"
+/** The one-click views of the pulls table. */
+type Quick = "all" | "mine" | "ready" | "failing" | "conflicts" | "review" | "approved" | "drafts" | "unreviewed"
+
+const QUICK_LABEL: Record<Quick, string> = {
+  all: "all",
+  mine: "waiting for me",
+  ready: "ready to merge",
+  failing: "failing",
+  conflicts: "conflicts",
+  review: "needs review",
+  approved: "approved",
+  drafts: "drafts",
+  unreviewed: "no model review"
+}
+const QUICK_TITLE: Partial<Record<Quick, string>> = {
+  mine: "Not yours, not a draft, and without your approval",
+  ready: "Not a draft, checks green or absent, no conflicts, approved or needing no review",
+  review: "Waiting for a reviewer, or with changes requested",
+  unreviewed: "Never reviewed by a model, or the review is for an earlier commit or failed"
+}
+const QUICKS = Object.keys(QUICK_LABEL) as Quick[]
+
+type PullSortKey = "updated" | "created" | "title" | "author" | "checks" | "merge" | "review" | "approvals" | "size" | "number"
+
+const PULL_SORTS: Array<{ key: PullSortKey; label: string; natural: "asc" | "desc" }> = [
+  { key: "updated", label: "last updated", natural: "desc" },
+  { key: "created", label: "opened", natural: "desc" },
+  { key: "number", label: "number", natural: "desc" },
+  { key: "title", label: "title", natural: "asc" },
+  { key: "author", label: "author", natural: "asc" },
+  { key: "size", label: "size of change", natural: "desc" },
+  { key: "checks", label: "checks", natural: "asc" },
+  { key: "merge", label: "merge state", natural: "asc" },
+  { key: "review", label: "review state", natural: "asc" },
+  { key: "approvals", label: "approvals", natural: "desc" }
+]
+const naturalOf = <K extends string>(sorts: Array<{ key: K; natural: "asc" | "desc" }>, key: K): "asc" | "desc" => sorts.find((sort) => sort.key === key)?.natural ?? "asc"
+
+/** Worst first, so an ascending sort surfaces what needs a hand. */
+const CHECK_RANK: Record<PullSummary["checks"], number> = { failure: 0, pending: 1, none: 2, success: 3 }
+const MERGE_RANK: Record<PullSummary["mergeable"], number> = { conflicting: 0, blocked: 1, unknown: 2, mergeable: 3 }
+const REVIEW_RANK: Record<PullSummary["review"], number> = { "changes-requested": 0, "review-required": 1, none: 2, approved: 3 }
+
+interface PullFilters {
+  quick: Quick
+  repo: string
+  author: string
+  label: string
+  base: string
+  age: Age
+  sort: Sort<PullSortKey>
+}
+
+const DEFAULT_PULL_FILTERS: PullFilters = { quick: "all", repo: "", author: "", label: "", base: "", age: "", sort: { key: "updated", dir: "desc" } }
+
+const isPullFilters = (value: unknown): value is PullFilters => {
+  if (typeof value !== "object" || value === null) return false
+  const v = value as Record<string, unknown>
+  const sort = v.sort as Record<string, unknown> | undefined
+  return (
+    QUICKS.includes(v.quick as Quick) &&
+    ["repo", "author", "label", "base", "age"].every((field) => typeof v[field] === "string") &&
+    sort !== undefined &&
+    PULL_SORTS.some((entry) => entry.key === sort.key) &&
+    (sort.dir === "asc" || sort.dir === "desc")
+  )
+}
 
 const CHECK_LABEL: Record<PullSummary["checks"], string> = {
   success: "checks pass",
@@ -118,22 +187,115 @@ const REVIEW_TONE: Record<PullSummary["review"], string> = {
   none: ""
 }
 
-const matches = (pull: PullSummary, filter: Filter): boolean =>
-  filter === "all"
-    ? true
-    : filter === "failing"
-      ? pull.checks === "failure"
-      : filter === "conflicts"
-        ? pull.mergeable === "conflicting"
-        : filter === "review"
-          ? pull.review === "review-required" || pull.review === "changes-requested"
-          : pull.draft
+type MyStance = "yours" | "approved" | "changes" | "asked" | "not-reviewed"
+
+/** Where you stand on a pull, once the page knows who you are and the host said who reviewed. */
+const myStance = (pull: PullSummary, me: string | undefined): MyStance | undefined => {
+  if (me === undefined || !pull.approvals) return undefined
+  const isMe = (name: string) => name.toLowerCase() === me.toLowerCase()
+  if (isMe(pull.author)) return "yours"
+  if (pull.approvals.approved.some(isMe)) return "approved"
+  if (pull.approvals.changes.some(isMe)) return "changes"
+  if (pull.approvals.pending.some(isMe)) return "asked"
+  return "not-reviewed"
+}
+
+const STANCE_LABEL: Record<MyStance, string> = { yours: "yours", approved: "you approved", changes: "you asked for changes", asked: "your review asked", "not-reviewed": "not reviewed by you" }
+const STANCE_CLASS: Record<MyStance, string> = { yours: "", approved: "reviewed", changes: "failed", asked: "stale", "not-reviewed": "stale" }
+
+const MyReviewTag = ({ pull, me }: { pull: PullSummary; me?: string }) => {
+  const stance = myStance(pull, me)
+  return stance ? (
+    <span className={`tag stance ${STANCE_CLASS[stance]}`} title={`You are ${me}`}>
+      {STANCE_LABEL[stance]}
+    </span>
+  ) : null
+}
+
+/** Someone else's open pull that you have not approved, by the host's account of reviews. */
+const waitingForMe = (pull: PullSummary, me: string | undefined): boolean =>
+  me !== undefined && !pull.draft && pull.author.toLowerCase() !== me.toLowerCase() && pull.approvals !== undefined && !pull.approvals.approved.some((name) => name.toLowerCase() === me.toLowerCase())
+
+const matches = (pull: PullSummary, quick: Quick, brief: ReviewBrief | undefined, me: string | undefined): boolean => {
+  switch (quick) {
+    case "all":
+      return true
+    case "mine":
+      return waitingForMe(pull, me)
+    case "ready":
+      return !pull.draft && pull.checks !== "failure" && pull.checks !== "pending" && pull.mergeable === "mergeable" && (pull.review === "approved" || pull.review === "none") && !shortOfApprovals(pull)
+    case "failing":
+      return pull.checks === "failure"
+    case "conflicts":
+      return pull.mergeable === "conflicting"
+    case "review":
+      return pull.review === "review-required" || pull.review === "changes-requested" || shortOfApprovals(pull) || (pull.approvals?.pending.length ?? 0) > 0
+    case "approved":
+      return pull.review === "approved"
+    case "drafts":
+      return pull.draft
+    case "unreviewed":
+      return !brief || brief.stale || brief.status === "failed"
+  }
+}
+
+/** The base branch wants more approvals than it has. */
+const shortOfApprovals = (pull: PullSummary): boolean => pull.approvals?.required !== undefined && pull.approvals.approved.length < pull.approvals.required
+
+const pullSortValue = (pull: PullSummary, key: PullSortKey): string | number | undefined => {
+  switch (key) {
+    case "updated":
+      return Date.parse(pull.updatedAt)
+    case "created":
+      return Date.parse(pull.createdAt)
+    case "title":
+      return pull.title
+    case "author":
+      return pull.author
+    case "checks":
+      return CHECK_RANK[pull.checks]
+    case "merge":
+      return MERGE_RANK[pull.mergeable]
+    case "review":
+      return REVIEW_RANK[pull.review]
+    case "approvals":
+      return pull.approvals ? pull.approvals.approved.length - (pull.approvals.required ?? 0) / 1000 : undefined
+    case "size":
+      return pull.additions === undefined && pull.deletions === undefined ? undefined : (pull.additions ?? 0) + (pull.deletions ?? 0)
+    case "number":
+      return pull.number
+  }
+}
 
 const Pill = ({ tone, children, title }: { tone: string; children: React.ReactNode; title?: string }) => (
   <span className={`pill-s ${tone}`} title={title}>
     {children}
   </span>
 )
+
+const names = (list: string[]): string => (list.length ? list.join(", ") : "nobody")
+
+/**
+ * "1/2 approved · 1 changes · 2 asked": how far a pull is from the
+ * approvals its branch wants, who still has to answer. Nothing when the
+ * host gave no detail or nobody is involved yet.
+ */
+const Approvals = ({ pull, long }: { pull: PullSummary; long?: boolean }) => {
+  const a = pull.approvals
+  if (!a || (a.approved.length === 0 && a.changes.length === 0 && a.pending.length === 0 && a.required === undefined)) return null
+  const short = shortOfApprovals(pull)
+
+  const title = `approved by ${names(a.approved)}${a.required !== undefined ? ` (${a.required} needed)` : ""}\nchanges requested by ${names(a.changes)}\nwaiting for ${names(a.pending)}`
+  return (
+    <span className={`approvals ${long ? "long" : ""}`} title={title}>
+      <span className={a.required !== undefined ? (short ? "warn-text" : "ins-text") : a.approved.length ? "ins-text" : ""}>
+        {a.required !== undefined ? `${fmt(a.approved.length)}/${fmt(a.required)}` : fmt(a.approved.length)} approved{long && a.approved.length ? ` by ${names(a.approved)}` : ""}
+      </span>
+      {a.changes.length > 0 && <span className="bad-text">{long ? `changes requested by ${names(a.changes)}` : `${fmt(a.changes.length)} changes`}</span>}
+      {a.pending.length > 0 && <span className="muted">{long ? `waiting for ${names(a.pending)}` : `${fmt(a.pending.length)} asked`}</span>}
+    </span>
+  )
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Repositories                                                              */
@@ -339,16 +501,19 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
 
 interface HostPanelProps {
   host: PullsHost
+  words: HostWords
   overview: Overview
   base: string
   apiKey: string
   onChanged: () => Promise<void>
 }
 
-const HostPanel = ({ host, overview, base, apiKey, onChanged }: HostPanelProps) => {
+const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanelProps) => {
   const [appId, setAppId] = useState("")
   const [privateKey, setPrivateKey] = useState("")
   const [baseUrl, setBaseUrl] = useState(overview.host.baseUrl)
+  const [me, setMe] = useState(overview.me.name ?? "")
+  useEffect(() => setMe(overview.me.name ?? ""), [overview.me.name])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [notice, setNotice] = useState<string | undefined>()
@@ -451,6 +616,26 @@ const HostPanel = ({ host, overview, base, apiKey, onChanged }: HostPanelProps) 
           save host
         </button>
       </form>
+
+      <form
+        className="newkey inline-setting"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void run(() => api(`${base}/settings`, apiKey, { method: "PUT", body: { me: me.trim() } }), me.trim() ? `Pulls you have not approved are marked; you are ${me.trim().replace(/^@/, "")}.` : "Username cleared.")
+        }}
+      >
+        <label>
+          <span className="muted">
+            you on {HOST_NAMES[host]}
+            {overview.me.detected && <em> · the token belongs to {overview.me.detected}</em>}
+          </span>
+          <input value={me} onChange={(e) => setMe(e.target.value)} aria-label={`Your username on ${HOST_NAMES[host]}`} placeholder={overview.me.detected ?? "username"} disabled={busy} spellCheck={false} />
+        </label>
+        <button type="submit" className="ghost" disabled={busy || me.trim().replace(/^@/, "") === (overview.me.name ?? "")}>
+          save
+        </button>
+        <span className="muted">Marks the {words.nouns} waiting for your approval. Left blank, the name the token reports is used.</span>
+      </form>
     </section>
   )
 }
@@ -469,12 +654,13 @@ interface PullViewProps {
   words: HostWords
   host: PullsHost
   review: ReviewSetup
+  me?: string
   onBack: () => void
   onReview: () => Promise<void>
   onPost: (as: "comment" | "request-changes" | "approve") => Promise<void>
 }
 
-const PullView = ({ detail, words, review, host, onBack, onReview, onPost }: PullViewProps) => {
+const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost }: PullViewProps) => {
   const [postAs, setPostAs] = useState<"comment" | "request-changes" | "approve">("comment")
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState<string | undefined>()
@@ -525,7 +711,7 @@ const PullView = ({ detail, words, review, host, onBack, onReview, onPost }: Pul
         </span>
       </div>
       <h3 className="pull-title">
-        {pull.draft && <span className="tag">draft</span>} {pull.title}
+        {pull.draft && <span className="tag">draft</span>} {pull.title} <MyReviewTag pull={pull} me={me} />
       </h3>
       <div className="meta">
         <span>
@@ -540,6 +726,12 @@ const PullView = ({ detail, words, review, host, onBack, onReview, onPost }: Pul
           <span className="meta-k">updated</span>
           {timeAgo(pull.updatedAt)}
         </span>
+        {pull.approvals && (
+          <span>
+            <span className="meta-k">approvals</span>
+            <Approvals pull={pull} long />
+          </span>
+        )}
         {pull.changedFiles !== undefined && (
           <span>
             <span className="meta-k">changes</span>
@@ -737,21 +929,127 @@ const ReviewsPanel = ({ words, overview, base, apiKey, onChanged }: { words: Hos
 /* -------------------------------------------------------------------------- */
 
 const PRIORITY_TONE: Record<string, string> = { high: "bad", medium: "warn", low: "" }
+const PRIORITY_RANK: Record<TriagePriority, number> = { high: 0, medium: 1, low: 2 }
 
-const IssuesPanel = ({ overview, base, apiKey, review, onChanged }: { overview: Overview; base: string; apiKey: string; review: ReviewSetup; onChanged: () => Promise<void> }) => {
+type IssueView = "all" | "untriaged" | "high" | "duplicates" | "unanswered" | "failed"
+
+const ISSUE_VIEW_LABEL: Record<IssueView, string> = {
+  all: "all",
+  untriaged: "not triaged",
+  high: "high priority",
+  duplicates: "duplicates",
+  unanswered: "reply pending",
+  failed: "triage failed"
+}
+const ISSUE_VIEW_TITLE: Partial<Record<IssueView, string>> = {
+  unanswered: "Triaged with a suggested reply that nobody has posted yet"
+}
+const ISSUE_VIEWS = Object.keys(ISSUE_VIEW_LABEL) as IssueView[]
+
+const issueMatches = (brief: TriageBrief | undefined, view: IssueView): boolean => {
+  switch (view) {
+    case "all":
+      return true
+    case "untriaged":
+      return !brief
+    case "high":
+      return brief?.priority === "high"
+    case "duplicates":
+      return brief?.duplicateOf !== undefined
+    case "unanswered":
+      return brief?.status === "done" && !brief.replied
+    case "failed":
+      return brief?.status === "failed"
+  }
+}
+
+type IssueSortKey = "updated" | "created" | "number" | "title" | "author" | "comments" | "priority"
+
+const ISSUE_SORTS: Array<{ key: IssueSortKey; label: string; natural: "asc" | "desc" }> = [
+  { key: "updated", label: "last updated", natural: "desc" },
+  { key: "created", label: "opened", natural: "desc" },
+  { key: "number", label: "number", natural: "desc" },
+  { key: "title", label: "title", natural: "asc" },
+  { key: "author", label: "author", natural: "asc" },
+  { key: "comments", label: "comments", natural: "desc" },
+  { key: "priority", label: "priority", natural: "asc" }
+]
+
+interface IssueFilters {
+  view: IssueView
+  repo: string
+  author: string
+  label: string
+  age: Age
+  sort: Sort<IssueSortKey>
+}
+
+const DEFAULT_ISSUE_FILTERS: IssueFilters = { view: "all", repo: "", author: "", label: "", age: "", sort: { key: "updated", dir: "desc" } }
+
+const isIssueFilters = (value: unknown): value is IssueFilters => {
+  if (typeof value !== "object" || value === null) return false
+  const v = value as Record<string, unknown>
+  const sort = v.sort as Record<string, unknown> | undefined
+  return (
+    ISSUE_VIEWS.includes(v.view as IssueView) &&
+    ["repo", "author", "label", "age"].every((field) => typeof v[field] === "string") &&
+    sort !== undefined &&
+    ISSUE_SORTS.some((entry) => entry.key === sort.key) &&
+    (sort.dir === "asc" || sort.dir === "desc")
+  )
+}
+
+const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host: PullsHost; overview: Overview; base: string; apiKey: string; review: ReviewSetup; onChanged: () => Promise<void> }) => {
   const [open, setOpen] = useState<{ repoId: string; number: number } | null>(null)
   const [detail, setDetail] = useState<{ body: string; triage: TriageRecord | null } | null>(null)
   const [reply, setReply] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | undefined>()
+  const [filters, setFilters] = useStoredState<IssueFilters>(`twinny-server.issues.${host}`, DEFAULT_ISSUE_FILTERS, isIssueFilters)
+  const [search, setSearch] = useState("")
   const repos = overview.repos.filter((repo) => repo.issuesSupported)
+  const all = useMemo(() => repos.flatMap((repo) => repo.issues.map((issue) => ({ repo, issue, triage: repo.triage[issue.number] as TriageBrief | undefined }))), [repos])
+  const narrowed = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return all
+      .filter(({ repo }) => !filters.repo || repo.id === filters.repo)
+      .filter(({ issue }) => !filters.author || issue.author === filters.author)
+      .filter(({ issue }) => !filters.label || issue.labels.includes(filters.label))
+      .filter(({ issue }) => withinAge(issue.updatedAt, filters.age))
+      .filter(({ issue }) => !needle || issue.title.toLowerCase().includes(needle) || issue.author.toLowerCase().includes(needle) || String(issue.number) === needle || issue.labels.some((label) => label.toLowerCase().includes(needle)))
+  }, [all, filters.repo, filters.author, filters.label, filters.age, search])
   const rows = useMemo(
     () =>
-      repos
-        .flatMap((repo) => repo.issues.map((issue) => ({ repo, issue, triage: repo.triage[issue.number] })))
-        .sort((a, b) => Date.parse(b.issue.updatedAt) - Date.parse(a.issue.updatedAt)),
-    [repos]
+      sortRows(
+        narrowed.filter(({ triage }) => issueMatches(triage, filters.view)),
+        filters.sort.dir,
+        ({ issue, triage }) => {
+          switch (filters.sort.key) {
+            case "updated":
+              return Date.parse(issue.updatedAt)
+            case "created":
+              return Date.parse(issue.createdAt)
+            case "number":
+              return issue.number
+            case "title":
+              return issue.title
+            case "author":
+              return issue.author
+            case "comments":
+              return issue.comments
+            case "priority":
+              return triage?.priority ? PRIORITY_RANK[triage.priority] : undefined
+          }
+        }
+      ),
+    [narrowed, filters.view, filters.sort]
   )
+  const counts = useMemo(() => Object.fromEntries(ISSUE_VIEWS.map((view) => [view, narrowed.filter(({ triage }) => issueMatches(triage, view)).length])) as Record<IssueView, number>, [narrowed])
+  const authors = useMemo(() => distinct(all.map(({ issue }) => issue.author)), [all])
+  const labels = useMemo(() => distinct(all.flatMap(({ issue }) => issue.labels)), [all])
+  const filtering = filters.view !== "all" || Boolean(filters.repo || filters.author || filters.label || filters.age || search.trim())
+  const set = <K extends keyof IssueFilters>(key: K, value: IssueFilters[K]) => setFilters((current) => ({ ...current, [key]: value }))
+  const sortBy = (key: IssueSortKey) => setFilters((current) => ({ ...current, sort: toggleSort(current.sort, key, naturalOf(ISSUE_SORTS, key)) }))
 
   useEffect(() => {
     if (!open) {
@@ -799,8 +1097,8 @@ const IssuesPanel = ({ overview, base, apiKey, review, onChanged }: { overview: 
     })
 
   if (repos.length === 0) return null
-  const untriaged = rows.filter((row) => !row.triage).length
-  const high = rows.filter((row) => row.triage?.priority === "high").length
+  const untriaged = all.filter((row) => !row.triage).length
+  const high = all.filter((row) => row.triage?.priority === "high").length
   return (
     <section className="panel">
       <div className="section-heading">
@@ -814,17 +1112,75 @@ const IssuesPanel = ({ overview, base, apiKey, review, onChanged }: { overview: 
         </span>
       </div>
       {error && <div className="error">{error}</div>}
+      {all.length > 0 && (
+        <>
+          <div className="toolbar">
+            <span className="chips" role="group" aria-label="View">
+              {ISSUE_VIEWS.map((entry) => (
+                <button key={entry} type="button" className={filters.view === entry ? "on" : ""} onClick={() => set("view", entry)} title={ISSUE_VIEW_TITLE[entry]}>
+                  {ISSUE_VIEW_LABEL[entry]}
+                  <span className="chip-count">{fmt(counts[entry])}</span>
+                </button>
+              ))}
+            </span>
+            <input type="search" className="search" placeholder="title, author, label or number" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search issues" />
+          </div>
+          <div className="toolbar filters">
+            {repos.length > 1 && <FilterSelect label="repository" value={filters.repo} onChange={(value) => set("repo", value)} any="every repository" options={repos.map((repo) => ({ value: repo.id, label: repo.fullName }))} />}
+            <FilterSelect label="author" value={filters.author} onChange={(value) => set("author", value)} any="anyone" options={authors.map((author) => ({ value: author, label: author }))} />
+            {labels.length > 0 && <FilterSelect label="label" value={filters.label} onChange={(value) => set("label", value)} any="any label" options={labels.map((label) => ({ value: label, label }))} />}
+            <FilterSelect label="activity" value={filters.age} onChange={(value) => set("age", value as Age)} options={AGE_OPTIONS} />
+            {filtering && (
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  setFilters((current) => ({ ...DEFAULT_ISSUE_FILTERS, sort: current.sort }))
+                  setSearch("")
+                }}
+              >
+                clear filters
+              </button>
+            )}
+            <span className="spacer" />
+            <label className="filter sort">
+              <span>order by</span>
+              <select value={filters.sort.key} onChange={(e) => set("sort", { key: e.target.value as IssueSortKey, dir: naturalOf(ISSUE_SORTS, e.target.value as IssueSortKey) })} aria-label="Order issues by">
+                {ISSUE_SORTS.map((entry) => (
+                  <option key={entry.key} value={entry.key}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="ghost mini dir" onClick={() => set("sort", { ...filters.sort, dir: filters.sort.dir === "asc" ? "desc" : "asc" })} title={filters.sort.dir === "asc" ? "Ascending; click for descending" : "Descending; click for ascending"} aria-label={filters.sort.dir === "asc" ? "Ascending" : "Descending"}>
+                {filters.sort.dir === "asc" ? "↑" : "↓"}
+              </button>
+            </label>
+          </div>
+        </>
+      )}
       {rows.length === 0 ? (
-        <div className="empty">No open issues.</div>
+        <div className="empty">{all.length === 0 ? "No open issues." : "Nothing matches these filters."}</div>
       ) : (
         <div className="scroll">
           <table className="pulls">
             <thead>
               <tr>
-                <th>issue</th>
-                <th>author</th>
-                <th>triage</th>
-                <th>updated</th>
+                <SortHeader column="title" sort={filters.sort} onSort={sortBy}>
+                  issue
+                </SortHeader>
+                <SortHeader column="author" sort={filters.sort} onSort={sortBy}>
+                  author
+                </SortHeader>
+                <SortHeader column="priority" sort={filters.sort} onSort={sortBy}>
+                  triage
+                </SortHeader>
+                <SortHeader column="comments" sort={filters.sort} onSort={sortBy} className="num">
+                  comments
+                </SortHeader>
+                <SortHeader column="updated" sort={filters.sort} onSort={sortBy}>
+                  updated
+                </SortHeader>
                 <th />
               </tr>
             </thead>
@@ -844,7 +1200,6 @@ const IssuesPanel = ({ overview, base, apiKey, review, onChanged }: { overview: 
                               {label}
                             </span>
                           ))}
-                          {issue.comments > 0 && ` · ${plural(issue.comments, "comment")}`}
                         </div>
                       </td>
                       <td>{issue.author}</td>
@@ -866,7 +1221,8 @@ const IssuesPanel = ({ overview, base, apiKey, review, onChanged }: { overview: 
                           </>
                         )}
                       </td>
-                      <td className="muted" title={issue.updatedAt}>
+                      <td className={`num ${issue.comments ? "" : "muted"}`}>{fmt(issue.comments)}</td>
+                      <td className="muted" title={`updated ${issue.updatedAt}\nopened ${issue.createdAt}`}>
                         {timeAgo(issue.updatedAt)}
                       </td>
                       <td className="actions" onClick={(e) => e.stopPropagation()}>
@@ -877,7 +1233,7 @@ const IssuesPanel = ({ overview, base, apiKey, review, onChanged }: { overview: 
                     </tr>
                     {isOpen && (
                       <tr className="issue-detail">
-                        <td colSpan={5}>
+                        <td colSpan={6}>
                           {!detail ? (
                             <div className="skeleton-rows">
                               <span className="skeleton" style={{ width: "60%", height: 12 }} />
@@ -962,8 +1318,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
   const base = `/twinny/v1/admin/plugins/${host}/api`
   const [overview, setOverview] = useState<Overview | null>(null)
   const [error, setError] = useState<string | undefined>()
-  const [filter, setFilter] = useState<Filter>("all")
-  const [repoFilter, setRepoFilter] = useState("")
+  const [filters, setFilters] = useStoredState<PullFilters>(`twinny-server.pulls.${host}`, DEFAULT_PULL_FILTERS, isPullFilters)
   const [search, setSearch] = useState("")
   const [opened, setOpened] = useState<{ repoId: string; number: number } | null>(null)
   const [detail, setDetail] = useState<PullPage | null>(null)
@@ -1020,25 +1375,39 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
     }
   }
 
-  const pulls = useMemo(() => {
-    if (!overview) return []
-    const needle = search.trim().toLowerCase()
-    return overview.repos
-      .filter((repo) => !repoFilter || repo.id === repoFilter)
-      .flatMap((repo) => repo.pulls.map((pull) => ({ repo, pull })))
-      .filter(({ pull }) => matches(pull, filter))
-      .filter(({ pull }) => !needle || pull.title.toLowerCase().includes(needle) || pull.author.toLowerCase().includes(needle) || String(pull.number) === needle || pull.headRef.toLowerCase().includes(needle))
-      .sort((a, b) => Date.parse(b.pull.updatedAt) - Date.parse(a.pull.updatedAt))
-  }, [overview, filter, repoFilter, search])
+  const all = useMemo(() => overview?.repos.flatMap((repo) => repo.pulls.map((pull) => ({ repo, pull, brief: repo.reviews[pull.number] as ReviewBrief | undefined }))) ?? [], [overview])
 
-  const all = useMemo(() => overview?.repos.flatMap((repo) => repo.pulls) ?? [], [overview])
-  const counts: Record<Filter, number> = {
-    all: all.length,
-    failing: all.filter((pull) => matches(pull, "failing")).length,
-    conflicts: all.filter((pull) => matches(pull, "conflicts")).length,
-    review: all.filter((pull) => matches(pull, "review")).length,
-    drafts: all.filter((pull) => matches(pull, "drafts")).length
-  }
+  /** Everything but the quick view, so the chip counts say what each view would show. */
+  const narrowed = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return all
+      .filter(({ repo }) => !filters.repo || repo.id === filters.repo)
+      .filter(({ pull }) => !filters.author || pull.author === filters.author)
+      .filter(({ pull }) => !filters.label || pull.labels.includes(filters.label))
+      .filter(({ pull }) => !filters.base || pull.baseRef === filters.base)
+      .filter(({ pull }) => withinAge(pull.updatedAt, filters.age))
+      .filter(({ pull }) => !needle || pull.title.toLowerCase().includes(needle) || pull.author.toLowerCase().includes(needle) || String(pull.number) === needle || pull.headRef.toLowerCase().includes(needle) || pull.labels.some((label) => label.toLowerCase().includes(needle)))
+  }, [all, filters.repo, filters.author, filters.label, filters.base, filters.age, search])
+
+  const me = overview?.me.name
+  const pulls = useMemo(
+    () =>
+      sortRows(
+        narrowed.filter(({ pull, brief }) => matches(pull, filters.quick, brief, me)),
+        filters.sort.dir,
+        ({ pull }) => pullSortValue(pull, filters.sort.key)
+      ),
+    [narrowed, filters.quick, filters.sort, me]
+  )
+
+  const counts = useMemo(() => Object.fromEntries(QUICKS.map((quick) => [quick, narrowed.filter(({ pull, brief }) => matches(pull, quick, brief, me)).length])) as Record<Quick, number>, [narrowed, me])
+  const totals = useMemo(() => Object.fromEntries(QUICKS.map((quick) => [quick, all.filter(({ pull, brief }) => matches(pull, quick, brief, me)).length])) as Record<Quick, number>, [all, me])
+  const authors = useMemo(() => distinct(all.map(({ pull }) => pull.author)), [all])
+  const labels = useMemo(() => distinct(all.flatMap(({ pull }) => pull.labels)), [all])
+  const bases = useMemo(() => distinct(all.map(({ pull }) => pull.baseRef)), [all])
+  const filtering = filters.quick !== "all" || Boolean(filters.repo || filters.author || filters.label || filters.base || filters.age || search.trim())
+  const set = <K extends keyof PullFilters>(key: K, value: PullFilters[K]) => setFilters((current) => ({ ...current, [key]: value }))
+  const sortBy = (key: PullSortKey) => setFilters((current) => ({ ...current, sort: toggleSort(current.sort, key, naturalOf(PULL_SORTS, key)) }))
 
   if (!overview)
     return error ? (
@@ -1078,19 +1447,23 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
         </div>
         <div className="tile">
           <div className="label">open {words.nouns}</div>
-          <div className="value">{fmt(counts.all)}</div>
+          <div className="value">{fmt(totals.all)}</div>
         </div>
-        <div className={`tile ${counts.failing ? "bad" : ""}`}>
+        <div className={`tile ${totals.failing ? "bad" : ""}`}>
           <div className="label">failing checks</div>
-          <div className="value">{fmt(counts.failing)}</div>
+          <div className="value">{fmt(totals.failing)}</div>
         </div>
-        <div className={`tile ${counts.conflicts ? "bad" : ""}`}>
+        <div className={`tile ${totals.conflicts ? "bad" : ""}`}>
           <div className="label">conflicts</div>
-          <div className="value">{fmt(counts.conflicts)}</div>
+          <div className="value">{fmt(totals.conflicts)}</div>
         </div>
         <div className="tile">
           <div className="label">awaiting review</div>
-          <div className="value">{fmt(counts.review)}</div>
+          <div className="value">{fmt(totals.review)}</div>
+        </div>
+        <div className={`tile ${totals.ready ? "attention" : ""}`}>
+          <div className="label">ready to merge</div>
+          <div className="value">{fmt(totals.ready)}</div>
         </div>
       </div>
 
@@ -1101,6 +1474,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             words={words}
             host={host}
             review={overview.review}
+            me={me}
             onBack={() => setOpened(null)}
             onReview={async () => {
               const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review`, apiKey, { method: "POST" })
@@ -1139,66 +1513,118 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             </h2>
           </div>
           <div className="toolbar">
-            <span className="chips" role="group" aria-label="Filter">
-              {(["all", "failing", "conflicts", "review", "drafts"] as Filter[]).map((entry) => (
-                <button key={entry} type="button" className={filter === entry ? "on" : ""} onClick={() => setFilter(entry)}>
-                  {entry === "review" ? "needs review" : entry}
+            <span className="chips" role="group" aria-label="View">
+              {QUICKS.filter((entry) => entry !== "mine" || me !== undefined).map((entry) => (
+                <button key={entry} type="button" className={filters.quick === entry ? "on" : ""} onClick={() => set("quick", entry)} title={entry === "mine" ? `${QUICK_TITLE.mine} (you are ${me})` : QUICK_TITLE[entry]}>
+                  {QUICK_LABEL[entry]}
                   <span className="chip-count">{fmt(counts[entry])}</span>
                 </button>
               ))}
             </span>
-            {overview.repos.length > 1 && (
-              <select value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)} aria-label={`Filter by ${words.repoNoun}`}>
-                <option value="">every {words.repoNoun}</option>
-                {overview.repos.map((repo) => (
-                  <option key={repo.id} value={repo.id}>
-                    {repo.fullName}
+            <input type="search" className="search" placeholder="title, author, branch, label or number" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search" />
+          </div>
+          <div className="toolbar filters">
+            {overview.repos.length > 1 && <FilterSelect label={words.repoNoun} value={filters.repo} onChange={(value) => set("repo", value)} any={`every ${words.repoNoun}`} options={overview.repos.map((repo) => ({ value: repo.id, label: repo.fullName }))} />}
+            <FilterSelect label="author" value={filters.author} onChange={(value) => set("author", value)} any="anyone" options={authors.map((author) => ({ value: author, label: author }))} />
+            {labels.length > 0 && <FilterSelect label="label" value={filters.label} onChange={(value) => set("label", value)} any="any label" options={labels.map((label) => ({ value: label, label }))} />}
+            {bases.length > 1 && <FilterSelect label="into" value={filters.base} onChange={(value) => set("base", value)} any="any branch" options={bases.map((base) => ({ value: base, label: base }))} />}
+            <FilterSelect label="activity" value={filters.age} onChange={(value) => set("age", value as Age)} options={AGE_OPTIONS} />
+            {filtering && (
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  setFilters((current) => ({ ...DEFAULT_PULL_FILTERS, sort: current.sort }))
+                  setSearch("")
+                }}
+              >
+                clear filters
+              </button>
+            )}
+            <span className="spacer" />
+            <label className="filter sort">
+              <span>order by</span>
+              <select value={filters.sort.key} onChange={(e) => set("sort", { key: e.target.value as PullSortKey, dir: naturalOf(PULL_SORTS, e.target.value as PullSortKey) })} aria-label="Order by">
+                {PULL_SORTS.map((entry) => (
+                  <option key={entry.key} value={entry.key}>
+                    {entry.label}
                   </option>
                 ))}
               </select>
-            )}
-            <input type="search" className="search" placeholder="title, author, branch or number" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search" />
+              <button type="button" className="ghost mini dir" onClick={() => set("sort", { ...filters.sort, dir: filters.sort.dir === "asc" ? "desc" : "asc" })} title={filters.sort.dir === "asc" ? "Ascending; click for descending" : "Descending; click for ascending"} aria-label={filters.sort.dir === "asc" ? "Ascending" : "Descending"}>
+                {filters.sort.dir === "asc" ? "↑" : "↓"}
+              </button>
+            </label>
           </div>
           {pulls.length === 0 ? (
-            <div className="empty">{all.length === 0 ? `No open ${words.nouns}.` : "Nothing matches."}</div>
+            <div className="empty">{all.length === 0 ? `No open ${words.nouns}.` : "Nothing matches these filters."}</div>
           ) : (
             <div className="scroll">
               <table className="pulls">
                 <thead>
                   <tr>
-                    <th>{words.noun}</th>
-                    <th>author</th>
-                    <th>checks</th>
-                    <th>merge</th>
-                    <th>review</th>
-                    <th>updated</th>
+                    <SortHeader column="title" sort={filters.sort} onSort={sortBy}>
+                      {words.noun}
+                    </SortHeader>
+                    <SortHeader column="author" sort={filters.sort} onSort={sortBy}>
+                      author
+                    </SortHeader>
+                    <SortHeader column="size" sort={filters.sort} onSort={sortBy} className="num" title="Lines added and removed">
+                      size
+                    </SortHeader>
+                    <SortHeader column="checks" sort={filters.sort} onSort={sortBy}>
+                      checks
+                    </SortHeader>
+                    <SortHeader column="merge" sort={filters.sort} onSort={sortBy}>
+                      merge
+                    </SortHeader>
+                    <SortHeader column="review" sort={filters.sort} onSort={sortBy}>
+                      review
+                    </SortHeader>
+                    <SortHeader column="updated" sort={filters.sort} onSort={sortBy}>
+                      updated
+                    </SortHeader>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {pulls.map(({ repo, pull }) => (
-                    <tr key={`${repo.id}:${pull.number}`} className="pull-row" onClick={() => setOpened({ repoId: repo.id, number: pull.number })} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setOpened({ repoId: repo.id, number: pull.number })}>
+                    <tr key={`${repo.id}:${pull.number}`} className={`pull-row ${waitingForMe(pull, me) ? "needs-me" : ""}`} onClick={() => setOpened({ repoId: repo.id, number: pull.number })} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setOpened({ repoId: repo.id, number: pull.number })}>
                       <td>
                         <div className="entity-name">
                           {pull.draft && <span className="tag">draft</span>} {pull.title}
-                          {repo.reviews[pull.number] && (
-                            <span className={`tag ${repo.reviews[pull.number].status === "failed" ? "failed" : repo.reviews[pull.number].stale ? "stale" : "reviewed"}`} title={`Reviewed by ${repo.reviews[pull.number].alias} ${timeAgo(repo.reviews[pull.number].createdAt)}`}>
-                              {repo.reviews[pull.number].status === "failed" ? "review failed" : repo.reviews[pull.number].stale ? "review stale" : repo.reviews[pull.number].posted ? "review posted" : "reviewed"}
-                            </span>
-                          )}
                         </div>
-                        <div className="key-id muted">
-                          {overview.repos.length > 1 ? `${repo.fullName} ` : ""}
-                          {words.hash}
-                          {pull.number} · <code>{pull.headRef}</code>
-                          {pull.changedFiles !== undefined && (
-                            <>
-                              {" "}
-                              · {plural(pull.changedFiles, "file")} <span className="ins-text">+{fmt(pull.additions ?? 0)}</span> <span className="del-text">−{fmt(pull.deletions ?? 0)}</span>
-                            </>
-                          )}
+                        <div className="key-id muted pull-sub">
+                          <span className="pull-ref">
+                            {overview.repos.length > 1 ? `${repo.fullName} ` : ""}
+                            {words.hash}
+                            {pull.number}
+                          </span>
+                          <span className="pull-branches">
+                            <code>{pull.headRef}</code> → <code>{pull.baseRef}</code>
+                          </span>
                         </div>
+                        {(myStance(pull, me) !== undefined || pull.labels.length > 0) && (
+                          <div className="pull-tags">
+                            <MyReviewTag pull={pull} me={me} />
+                            {pull.labels.map((label) => (
+                              <span key={label} className="tag">
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td>{pull.author}</td>
+                      <td className="num size" title={pull.changedFiles !== undefined ? plural(pull.changedFiles, "file changed", "files changed") : undefined}>
+                        {pull.changedFiles === undefined ? (
+                          <span className="muted">–</span>
+                        ) : (
+                          <>
+                            <span className="ins-text">+{fmt(pull.additions ?? 0)}</span> <span className="del-text">−{fmt(pull.deletions ?? 0)}</span>
+                          </>
+                        )}
+                      </td>
                       <td>
                         <Pill tone={CHECK_TONE[pull.checks]} title={pull.checkRuns.map((check) => `${check.name}: ${check.state}`).join("\n")}>
                           {pull.checks === "none" ? "none" : `${fmt(pull.checkRuns.filter((check) => check.state === "success").length)}/${fmt(pull.checkRuns.length)}`}
@@ -1209,9 +1635,15 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
                       </td>
                       <td>
                         <Pill tone={REVIEW_TONE[pull.review]}>{REVIEW_LABEL[pull.review]}</Pill>
+                        <Approvals pull={pull} />
                       </td>
-                      <td className="muted" title={pull.updatedAt}>
+                      <td className="muted" title={`updated ${pull.updatedAt}\nopened ${pull.createdAt}`}>
                         {timeAgo(pull.updatedAt)}
+                      </td>
+                      <td className="actions" onClick={(e) => e.stopPropagation()}>
+                        <a href={pull.url} target="_blank" rel="noreferrer" className="open-link" title={`Open ${words.hash}${pull.number} on ${HOST_NAMES[host]}`} onKeyDown={(e) => e.stopPropagation()}>
+                          open ↗
+                        </a>
                       </td>
                     </tr>
                   ))}
@@ -1222,10 +1654,10 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
         </section>
       )}
 
-      <IssuesPanel overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />
+      <IssuesPanel host={host} overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />
       <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
       <ReviewsPanel words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
-      <HostPanel host={host} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+      <HostPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
     </>
   )
 }

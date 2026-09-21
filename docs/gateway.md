@@ -1377,6 +1377,30 @@ of checks, mergeability and review, and open one with its description and
 diffs. They sync every five minutes and on **sync now**; nothing is
 written back to the host unless a review is posted (see below).
 
+**Finding a pull.** The table has one-click views (*ready to merge*,
+*failing*, *conflicts*, *needs review*, *approved*, *drafts*, *no model
+review*) with live counts, selects for repository, author, label, target
+branch and activity (updated today, this week, this month, or quiet for
+30 days), a search over title, author, branch, label and number, and an
+**order by** (last updated, opened, number, title, author, size of
+change, checks, merge state, review state) that the column headers set
+too. The issues table has the same shape with its own views (not triaged,
+high priority, duplicates, reply pending, triage failed). Filters and
+ordering are remembered per host in the browser. Under the review state
+each pull shows its approvals as the host reports them: how many it has
+against how many the base branch requires (`1/2 approved`), how many
+reviewers asked for changes, and how many are still to answer; the
+opened pull names them. This detail is only ever asked for with the
+scopes a plain repository token has; a host that refuses it (an older
+GitHub Enterprise, say) is listed without it from then on.
+
+**Where you stand.** The page learns who you are on the host from the
+first token it syncs with (or from the *you on GitHub* field under the
+host settings, which wins) and tags every pull with your part in it:
+*yours*, *you approved*, *you asked for changes*, *your review asked* or
+*not reviewed by you*. Pulls by others that lack your approval carry an
+amber edge, and the *waiting for me* view lists just those.
+
 **Watching a repository.** Give it as `owner/name` (GitLab: the full
 `group/project` path) and an access token that can read it:
 

@@ -70,6 +70,21 @@ export interface PullCheck {
   url?: string
 }
 
+/**
+ * Who has said what on a pull: each reviewer's latest word counts once.
+ * `required` is what the base branch demands before a merge, when the
+ * host tells (branch protection, approval rules).
+ */
+export interface PullApprovals {
+  /** Reviewers whose latest review approves. */
+  approved: string[]
+  /** Reviewers whose latest review asks for changes. */
+  changes: string[]
+  /** Reviewers asked who have not answered yet. */
+  pending: string[]
+  required?: number
+}
+
 /** One open pull request, the same shape whichever host it came from. */
 export interface PullSummary {
   repo: string
@@ -90,6 +105,8 @@ export interface PullSummary {
   checkRuns: PullCheck[]
   mergeable: MergeState
   review: ReviewState
+  /** Missing when the host gives no per-reviewer detail. */
+  approvals?: PullApprovals
   labels: string[]
 }
 
@@ -185,6 +202,8 @@ export interface Forge {
    * can be seen, when the host says.
    */
   postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }>
+  /** The username the repository's token acts as; nothing for app credentials. */
+  whoAmI?(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined>
   /** Open issues, on hosts that have an issue tracker the plugin reads. */
   listIssues?(repo: RepoRecord, signal: AbortSignal): Promise<IssueSummary[]>
   issueBody?(repo: RepoRecord, number: number, signal: AbortSignal): Promise<string>
@@ -407,6 +426,8 @@ export class PullsPlugin implements PluginInstance {
   public readonly triage: TriageStore
   private readonly _triager: Triager
   private readonly _reviewer: Reviewer
+  /** The username a token said it was, when no name is set by hand. */
+  private _detectedMe?: string
   private readonly _state = new Map<string, SyncState>()
   private readonly _stopped = new AbortController()
   private _timer: NodeJS.Timeout | undefined
@@ -457,6 +478,12 @@ export class PullsPlugin implements PluginInstance {
   }
 
   /** The alias reviews use: the setting, else the first chat alias the gateway serves. */
+  /** Who the operator is on the host: the setting, else what a token said. */
+  public me(): { name?: string; detected?: string } {
+    const set = this.store.settings().me
+    return { ...(typeof set === "string" && set ? { name: set } : this._detectedMe ? { name: this._detectedMe } : {}), ...(this._detectedMe ? { detected: this._detectedMe } : {}) }
+  }
+
   public reviewAlias(): string | undefined {
     const set = this.store.settings().reviewAlias
     const aliases = this._reviewer.aliases()
@@ -675,6 +702,10 @@ export class PullsPlugin implements PluginInstance {
       state.syncedAt = new Date(this._context.now()).toISOString()
       delete state.error
       if (before) this.announce(repo, before, state.pulls)
+      if (!this._detectedMe && repo.auth === "token" && this._forge.whoAmI) {
+        // Best effort: a token that cannot say who it is changes nothing.
+        this._detectedMe = await this._forge.whoAmI(repo, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)).catch(() => undefined)
+      }
       if (this._forge.listIssues) {
         try {
           state.issues = (await this._forge.listIssues(repo, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)))
@@ -705,6 +736,7 @@ export class PullsPlugin implements PluginInstance {
         repos: this.views(),
         appAuth: this._forge.hasAppAuth(),
         host: this._forge.status(),
+        me: this.me(),
         review: {
           available: this._reviewer.available,
           aliases: this._reviewer.aliases(),
@@ -850,6 +882,12 @@ export class PullsPlugin implements PluginInstance {
         else delete settings.baseUrl
         hostChanged = true
       }
+      if ("me" in body) {
+        const me = typeof body.me === "string" ? body.me.trim().replace(/^@/, "") : ""
+        if (me.length > 100) throw new PluginError("That username is too long.", 400)
+        if (me) settings.me = me
+        else delete settings.me
+      }
       if ("reviewAlias" in body) {
         const alias = typeof body.reviewAlias === "string" ? body.reviewAlias.trim() : ""
         if (alias && !this._reviewer.aliases().includes(alias))
@@ -864,6 +902,7 @@ export class PullsPlugin implements PluginInstance {
       }
       return json({
         host: this._forge.status(),
+        me: this.me(),
         review: {
           available: this._reviewer.available,
           aliases: this._reviewer.aliases(),

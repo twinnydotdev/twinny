@@ -125,6 +125,10 @@ interface FakeGitHub {
   appId: string
   /** Every Authorization header seen, in order. */
   auths: string[]
+  /** GraphQL queries seen, in order. */
+  queries: string[]
+  /** When set, a query asking for reviewer detail is refused the way a token short of scopes is. */
+  refuseDetail: { on: boolean }
   close: () => void
 }
 
@@ -144,6 +148,9 @@ const PULL_NODE = {
   headRefName: "fetch-retries",
   baseRefName: "main",
   headRefOid: "abc123",
+  latestOpinionatedReviews: { nodes: [{ state: "APPROVED", author: { login: "bob" } }, { state: "CHANGES_REQUESTED", author: { login: "carol" } }] },
+  reviewRequests: { nodes: [{ requestedReviewer: { __typename: "User", login: "dave" } }, { requestedReviewer: { __typename: "Team", slug: "core" } }] },
+  baseRef: { branchProtectionRule: { requiredApprovingReviewCount: 2 } },
   labels: { nodes: [{ name: "bug" }] },
   commits: {
     nodes: [
@@ -173,6 +180,9 @@ const DRAFT_NODE = {
   updatedAt: "2026-09-17T12:00:00Z",
   mergeable: "CONFLICTING",
   reviewDecision: null,
+  latestOpinionatedReviews: { nodes: [] },
+  reviewRequests: { nodes: [] },
+  baseRef: { branchProtectionRule: null },
   labels: { nodes: [] },
   commits: { nodes: [{ commit: { statusCheckRollup: null } }] }
 }
@@ -182,6 +192,8 @@ const fakeGitHub = async (): Promise<FakeGitHub> => {
   const publicPem = publicKey.export({ type: "spki", format: "pem" }) as string
   const appId = "4242"
   const auths: string[] = []
+  const queries: string[] = []
+  const refuseDetail = { on: false }
   const verifyJwt = (auth: string): boolean => {
     const [, jwt] = auth.split(" ")
     const [header, payload, signature] = jwt.split(".")
@@ -215,11 +227,22 @@ const fakeGitHub = async (): Promise<FakeGitHub> => {
     const readable = auth === "Bearer ghp_secret" || auth === "Bearer ghs_installation"
     if (!readable) return answer(res, 401, { message: "Bad credentials" })
     if (route === "GET /api/v3/repos/acme/widgets") return answer(res, 200, { full_name: "acme/widgets" })
+    if (route === "GET /api/v3/user") return auth === "Bearer ghp_secret" ? answer(res, 200, { login: "alice" }) : answer(res, 403, { message: "Resource not accessible by integration" })
     if (route === "GET /api/v3/repos/acme/nothere") return answer(res, 404, { message: "Not Found" })
     if (route === "POST /api/graphql") {
-      const body = JSON.parse(await readBody(req)) as { variables: { owner: string; name: string } }
+      const body = JSON.parse(await readBody(req)) as { query: string; variables: { owner: string; name: string } }
+      queries.push(body.query)
+      if (refuseDetail.on && body.query.includes("latestOpinionatedReviews"))
+        return answer(res, 200, { data: null, errors: [{ type: "INSUFFICIENT_SCOPES", message: "Your token has not been granted the required scopes to execute this query." }] })
       if (body.variables.name !== "widgets") return answer(res, 200, { data: { repository: null }, errors: [{ message: "Could not resolve to a Repository" }] })
-      return answer(res, 200, { data: { repository: { nameWithOwner: "acme/widgets", pullRequests: { nodes: [PULL_NODE, DRAFT_NODE] } } } })
+      // Like GraphQL, answer only what was asked for.
+      const nodes = [PULL_NODE, DRAFT_NODE].map((node) => {
+        if (body.query.includes("latestOpinionatedReviews")) return node
+        const { latestOpinionatedReviews, reviewRequests, baseRef, ...plain } = node
+        void [latestOpinionatedReviews, reviewRequests, baseRef]
+        return plain
+      })
+      return answer(res, 200, { data: { repository: { nameWithOwner: "acme/widgets", pullRequests: { nodes } } } })
     }
     if (route === "GET /api/v3/repos/acme/widgets/pulls/7") return answer(res, 200, { body: "Retries **three** times.", changed_files: 2 })
     if (route === "GET /api/v3/repos/acme/widgets/pulls/7/files") {
@@ -231,7 +254,7 @@ const fakeGitHub = async (): Promise<FakeGitHub> => {
     answer(res, 404, { message: "Not Found" })
   })
   const url = await listen(server)
-  return { url, publicKey: publicPem, appId, auths, close: () => server.close(), ...{ privateKey: privateKey.export({ type: "pkcs1", format: "pem" }) as string } } as FakeGitHub & { privateKey: string }
+  return { url, publicKey: publicPem, appId, auths, queries, refuseDetail, close: () => server.close(), ...{ privateKey: privateKey.export({ type: "pkcs1", format: "pem" }) as string } } as FakeGitHub & { privateKey: string }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -492,6 +515,7 @@ suite("GitHub plugin", function () {
     )
     assert.strictEqual(first.mergeable, "mergeable")
     assert.strictEqual(first.review, "review-required")
+    assert.deepStrictEqual(first.approvals, { approved: ["bob"], changes: ["carol"], pending: ["dave", "a team"], required: 2 })
     assert.deepStrictEqual(first.labels, ["bug"])
     assert.strictEqual(first.headRef, "fetch-retries")
     assert.strictEqual(first.additions, 40)
@@ -500,6 +524,7 @@ suite("GitHub plugin", function () {
     assert.strictEqual(second.checks, "none")
     assert.strictEqual(second.mergeable, "conflicting")
     assert.strictEqual(second.review, "none")
+    assert.deepStrictEqual(second.approvals, { approved: [], changes: [], pending: [] })
 
     // The file keeps the token, for the owner only.
     const file = path.join(dir, "plugins", "github", "repos.json")
@@ -507,6 +532,41 @@ suite("GitHub plugin", function () {
     assert.strictEqual(fs.statSync(file).mode & 0o777, 0o600)
     // And a token request carried it.
     assert.ok(github.auths.includes("Bearer ghp_secret"))
+  })
+
+  test("the page knows who the operator is: the token's login, or a name set by hand", async () => {
+    const listing = await request(`${url}${api}/`, "GET", admin)
+    assert.deepStrictEqual(listing.body.me, { name: "alice", detected: "alice" }, "detected from the token at sync")
+
+    const set = await request(`${url}${api}/settings`, "PUT", admin, { me: "@Bob" })
+    assert.strictEqual(set.status, 200, message(set))
+    assert.deepStrictEqual(set.body.me, { name: "Bob", detected: "alice" }, "the hand-set name wins, without its @")
+
+    const cleared = await request(`${url}${api}/settings`, "PUT", admin, { me: "" })
+    assert.deepStrictEqual(cleared.body.me, { name: "alice", detected: "alice" })
+  })
+
+  test("a host that refuses the reviewer detail is listed plainly, once, and stays that way", async () => {
+    const listing = await request(`${url}${api}/`, "GET", admin)
+    const [watched] = listing.body.repos as Array<{ id: string }>
+    github.refuseDetail.on = true
+    try {
+      github.queries.length = 0
+      const synced = await request(`${url}${api}/repos/${watched.id}/sync`, "POST", admin)
+      assert.strictEqual(synced.status, 200, message(synced))
+      const repo = synced.body.repo as { error?: string; pulls: Array<Record<string, unknown>> }
+      assert.strictEqual(repo.error, undefined, "the listing survives the refusal")
+      assert.strictEqual(repo.pulls.length, 2)
+      assert.strictEqual(repo.pulls[0].review, "review-required", "what the plain query gives is still there")
+      assert.strictEqual(repo.pulls[0].approvals, undefined, "no detail, no approvals")
+      assert.deepStrictEqual(github.queries.map((query) => query.includes("latestOpinionatedReviews")), [true, false], "rich first, then plain")
+
+      github.queries.length = 0
+      await request(`${url}${api}/repos/${watched.id}/sync`, "POST", admin)
+      assert.deepStrictEqual(github.queries.map((query) => query.includes("latestOpinionatedReviews")), [false], "the rich query is not tried again")
+    } finally {
+      github.refuseDetail.on = false
+    }
   })
 
   test("one pull opens with its description and files", async () => {

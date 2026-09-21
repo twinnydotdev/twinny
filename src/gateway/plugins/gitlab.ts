@@ -24,6 +24,7 @@ import {
   MAX_PULLS_PER_REPO,
   MergeState,
   num,
+  PullApprovals,
   PullCheck,
   PullContent,
   PullFile,
@@ -48,7 +49,9 @@ const PULLS_QUERY = `query($path: ID!, $first: Int!) {
     mergeRequests(state: opened, first: $first, sort: UPDATED_DESC) {
       nodes {
         iid title webUrl draft createdAt updatedAt sourceBranch targetBranch diffHeadSha
-        conflicts detailedMergeStatus approved approvalsLeft
+        conflicts detailedMergeStatus approved approvalsLeft approvalsRequired
+        approvedBy { nodes { username } }
+        reviewers { nodes { username mergeRequestInteraction { reviewState } } }
         author { username }
         labels { nodes { title } }
         diffStatsSummary { additions deletions fileCount }
@@ -148,8 +151,26 @@ const toPull = (
     checkRuns,
     mergeable: mergeState(node),
     review: reviewState(node),
+    approvals: approvalsOf(node),
     labels: arr(rec(node.labels).nodes).map((label) => str(rec(label).title))
   }
+}
+
+/** Who approved, which reviewers asked for changes or have not answered, and the approval rule. */
+const approvalsOf = (node: Record<string, unknown>): PullApprovals => {
+  const approved = arr(rec(node.approvedBy).nodes).map((entry) => str(rec(entry).username)).filter(Boolean)
+  const changes: string[] = []
+  const pending: string[] = []
+  for (const entry of arr(rec(node.reviewers).nodes)) {
+    const reviewer = rec(entry)
+    const name = str(reviewer.username)
+    if (!name || approved.includes(name)) continue
+    const state = str(rec(reviewer.mergeRequestInteraction).reviewState)
+    if (state === "REQUESTED_CHANGES") changes.push(name)
+    else if (state !== "REVIEWED" && state !== "APPROVED") pending.push(name)
+  }
+  const required = num(node.approvalsRequired)
+  return { approved, changes, pending, ...(required !== undefined && required > 0 ? { required } : {}) }
 }
 
 /** Lines added and removed in a unified diff body. */
@@ -201,6 +222,11 @@ export class GitLabForge implements Forge {
 
   private project(repo: RepoRecord): string {
     return `${this.baseUrl}/api/v4/projects/${encodeURIComponent(repo.fullName)}`
+  }
+
+  public async whoAmI(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined> {
+    const response = await this._context.fetch(`${this.baseUrl}/api/v4/user`, { headers: this.headers(repo), signal })
+    return str((await readJson(response, "Asking GitLab who the token is")).username) || undefined
   }
 
   public async checkRepo(repo: RepoRecord, signal: AbortSignal): Promise<string> {

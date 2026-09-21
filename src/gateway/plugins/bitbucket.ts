@@ -80,6 +80,11 @@ export class BitbucketForge implements Forge {
     return readJson(await this._context.fetch(this.api(repo, route), { headers: this.headers(repo), signal }), what)
   }
 
+  public async whoAmI(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined> {
+    const answer = await readJson(await this._context.fetch(`${this.apiUrl}/user`, { headers: this.headers(repo), signal }), "Asking Bitbucket who the token is")
+    return str(answer.nickname, str(answer.display_name)) || undefined
+  }
+
   public async checkRepo(repo: RepoRecord, signal: AbortSignal): Promise<string> {
     const answer = await this.get(repo, "", signal, `Reading ${repo.fullName}`)
     return str(answer.full_name, repo.fullName)
@@ -89,7 +94,7 @@ export class BitbucketForge implements Forge {
     const what = `Listing pulls of ${repo.fullName}`
     const answer = await this.get(
       repo,
-      `/pullrequests?state=OPEN&pagelen=${MAX_PULLS_PER_REPO}&sort=-updated_on&fields=${encodeURIComponent("values.id,values.title,values.draft,values.created_on,values.updated_on,values.links.html.href,values.author.nickname,values.author.display_name,values.source.branch.name,values.source.commit.hash,values.destination.branch.name,values.participants.approved,values.participants.state")}`,
+      `/pullrequests?state=OPEN&pagelen=${MAX_PULLS_PER_REPO}&sort=-updated_on&fields=${encodeURIComponent("values.id,values.title,values.draft,values.created_on,values.updated_on,values.links.html.href,values.author.nickname,values.author.display_name,values.source.branch.name,values.source.commit.hash,values.destination.branch.name,values.participants.approved,values.participants.state,values.participants.role,values.participants.user.nickname,values.participants.user.display_name")}`,
       signal,
       what
     )
@@ -113,6 +118,13 @@ export class BitbucketForge implements Forge {
         : participants.some((p) => p.approved === true)
           ? "approved"
           : "none"
+      const reviewers = participants.filter((p) => p.role === "REVIEWER")
+      const nameOf = (p: Record<string, unknown>): string => str(rec(p.user).nickname, str(rec(p.user).display_name))
+      const approvals = {
+        approved: reviewers.filter((p) => p.approved === true).map(nameOf).filter(Boolean),
+        changes: reviewers.filter((p) => p.state === "changes_requested").map(nameOf).filter(Boolean),
+        pending: reviewers.filter((p) => p.approved !== true && p.state !== "changes_requested").map(nameOf).filter(Boolean)
+      }
       const author = rec(pull.author)
       out.push({
         repo: repo.fullName,
@@ -130,6 +142,7 @@ export class BitbucketForge implements Forge {
         checkRuns,
         mergeable: "unknown",
         review,
+        approvals,
         labels: []
       })
     }

@@ -87,10 +87,11 @@ suite("Gitea forge", function () {
       if (route === "GET /api/v1/repos/acme/tools") return json(res, 200, { full_name: "acme/tools" })
       if (route === "GET /api/v1/repos/acme/tools/pulls")
         return json(res, 200, [
-          { number: 4, title: "Faster index", html_url: "https://git.example/acme/tools/pulls/4", draft: false, created_at: "2026-09-18T00:00:00Z", updated_at: "2026-09-19T00:00:00Z", user: { login: "dana" }, head: { ref: "faster", sha: "f00" }, base: { ref: "main" }, mergeable: true, labels: [{ name: "perf" }] }
+          { number: 4, title: "Faster index", html_url: "https://git.example/acme/tools/pulls/4", draft: false, created_at: "2026-09-18T00:00:00Z", updated_at: "2026-09-19T00:00:00Z", user: { login: "dana" }, head: { ref: "faster", sha: "f00" }, base: { ref: "main" }, mergeable: true, labels: [{ name: "perf" }], requested_reviewers: [{ login: "eve" }, { login: "finn" }] }
         ])
       if (route === "GET /api/v1/repos/acme/tools/commits/f00/status") return json(res, 200, { state: "failure", statuses: [{ context: "ci/build", status: "success", target_url: "https://ci/1" }, { context: "ci/test", status: "failure", target_url: "https://ci/2" }] })
       if (route === "GET /api/v1/repos/acme/tools/pulls/4/reviews") return json(res, 200, [{ user: { login: "eve" }, state: "REQUEST_CHANGES" }, { user: { login: "eve" }, state: "APPROVED" }])
+      if (route === "GET /api/v1/repos/acme/tools/branch_protections/main") return json(res, 200, { branch_name: "main", required_approvals: 2 })
       if (route === "GET /api/v1/repos/acme/tools/pulls/4") return json(res, 200, { body: "Index in one pass." })
       if (route === "GET /api/v1/repos/acme/tools/pulls/4.diff") {
         res.writeHead(200, { "Content-Type": "text/plain" })
@@ -115,6 +116,7 @@ suite("Gitea forge", function () {
       assert.strictEqual(pull.checks, "failure")
       assert.deepStrictEqual((pull.checkRuns as Array<{ name: string; state: string }>).map((c) => `${c.name}=${c.state}`), ["ci/build=success", "ci/test=failure"])
       assert.strictEqual(pull.review, "approved", "the reviewer's latest word wins")
+      assert.deepStrictEqual(pull.approvals, { approved: ["eve"], changes: [], pending: ["finn"], required: 2 }, "who answered, who is still asked, what the branch wants")
       assert.strictEqual(pull.mergeable, "mergeable")
       assert.deepStrictEqual(pull.labels, ["perf"])
       const detail = await plugin.handle(req("GET", `repos/${repo.id}/pulls/4`))
@@ -140,7 +142,7 @@ suite("Bitbucket forge", function () {
       if (route === "GET /2.0/repositories/acme/widgets/pullrequests")
         return json(res, 200, {
           values: [
-            { id: 12, title: "Retry uploads", draft: true, created_on: "2026-09-18T00:00:00+00:00", updated_on: "2026-09-19T00:00:00+00:00", links: { html: { href: "https://bitbucket.org/acme/widgets/pull-requests/12" } }, author: { nickname: "sam", display_name: "Sam" }, source: { branch: { name: "retry" }, commit: { hash: "abc" } }, destination: { branch: { name: "main" } }, participants: [{ approved: true, state: "approved" }] }
+            { id: 12, title: "Retry uploads", draft: true, created_on: "2026-09-18T00:00:00+00:00", updated_on: "2026-09-19T00:00:00+00:00", links: { html: { href: "https://bitbucket.org/acme/widgets/pull-requests/12" } }, author: { nickname: "sam", display_name: "Sam" }, source: { branch: { name: "retry" }, commit: { hash: "abc" } }, destination: { branch: { name: "main" } }, participants: [{ approved: true, state: "approved", role: "REVIEWER", user: { nickname: "kim" } }, { approved: false, state: null, role: "REVIEWER", user: { nickname: "lee" } }, { approved: false, state: null, role: "PARTICIPANT", user: { nickname: "sam" } }] }
           ]
         })
       if (route === "GET /2.0/repositories/acme/widgets/commit/abc/statuses") return json(res, 200, { values: [{ name: "Pipeline", state: "INPROGRESS", url: "https://bitbucket.org/p/1" }] })
@@ -166,6 +168,7 @@ suite("Bitbucket forge", function () {
       assert.strictEqual(pull.draft, true)
       assert.strictEqual(pull.checks, "pending")
       assert.strictEqual(pull.review, "approved")
+      assert.deepStrictEqual(pull.approvals, { approved: ["kim"], changes: [], pending: ["lee"] }, "reviewers only; the author is a participant")
       assert.strictEqual(pull.headRef, "retry")
       const detail = await plugin.handle(req("GET", `repos/${repo.id}/pulls/12`))
       assert.strictEqual((detail.body as { body: string }).body, "Retries once.")

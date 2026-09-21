@@ -38,6 +38,7 @@ import {
   MAX_PULLS_PER_REPO,
   MergeState,
   num,
+  PullApprovals,
   PullCheck,
   PullContent,
   PullFile,
@@ -61,7 +62,13 @@ const JWT_TTL_S = 9 * 60
 /** Installation tokens live an hour; renew this long before the end. */
 const TOKEN_MARGIN_MS = 5 * 60_000
 
-const PULLS_QUERY = `query($owner: String!, $name: String!, $first: Int!) {
+/**
+ * The pulls query, with or without the reviewer detail. The detail asks
+ * only for fields a plain `repo` token can read (no team names: those
+ * need an org scope); should a host still refuse it, the plain query
+ * is used for that repository from then on.
+ */
+const pullsQuery = (detail: boolean): string => `query($owner: String!, $name: String!, $first: Int!) {
   repository(owner: $owner, name: $name) {
     nameWithOwner
     pullRequests(states: OPEN, first: $first, orderBy: { field: UPDATED_AT, direction: DESC }) {
@@ -69,6 +76,13 @@ const PULLS_QUERY = `query($owner: String!, $name: String!, $first: Int!) {
         number title url isDraft createdAt updatedAt additions deletions changedFiles mergeable reviewDecision
         author { login }
         headRefName baseRefName headRefOid
+        ${
+          detail
+            ? `latestOpinionatedReviews(first: 50) { nodes { state author { login } } }
+        reviewRequests(first: 30) { nodes { requestedReviewer { __typename ... on User { login } } } }
+        baseRef { branchProtectionRule { requiredApprovingReviewCount } }`
+            : ""
+        }
         labels(first: 20) { nodes { name } }
         commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
           __typename
@@ -209,8 +223,30 @@ const toPull = (repo: string, node: Record<string, unknown>): PullSummary => {
     checkRuns,
     mergeable: mergeState(str(node.mergeable)),
     review: reviewState(str(node.reviewDecision)),
+    ...(node.latestOpinionatedReviews !== undefined ? { approvals: approvalsOf(node) } : {}),
     labels: arr(rec(node.labels).nodes).map((label) => str(rec(label).name))
   }
+}
+
+/** Each reviewer's latest approve/request-changes, whoever is still asked, and the branch's rule. */
+const approvalsOf = (node: Record<string, unknown>): PullApprovals => {
+  const approved: string[] = []
+  const changes: string[] = []
+  for (const entry of arr(rec(node.latestOpinionatedReviews).nodes)) {
+    const review = rec(entry)
+    const login = str(rec(review.author).login)
+    if (!login) continue
+    if (review.state === "APPROVED") approved.push(login)
+    else if (review.state === "CHANGES_REQUESTED") changes.push(login)
+  }
+  const pending = arr(rec(node.reviewRequests).nodes)
+    .map((entry) => {
+      const who = rec(rec(entry).requestedReviewer)
+      return who.__typename === "Team" ? "a team" : str(who.login)
+    })
+    .filter(Boolean)
+  const required = num(rec(rec(node.baseRef).branchProtectionRule).requiredApprovingReviewCount)
+  return { approved, changes, pending, ...(required !== undefined && required > 0 ? { required } : {}) }
 }
 
 interface CachedToken {
@@ -221,6 +257,8 @@ interface CachedToken {
 export class GitHubForge implements Forge {
   private readonly _installations = new Map<string, number>()
   private readonly _tokens = new Map<number, CachedToken>()
+  /** Repositories whose host refused the reviewer detail; listed plainly from then on. */
+  private readonly _plainListing = new Set<string>()
 
   public readonly noun = "Pull request"
 
@@ -322,12 +360,16 @@ export class GitHubForge implements Forge {
     })
     const answer = await readJson(response, what)
     const errors = arr(answer.errors)
-    if (errors.length > 0)
+    const data = rec(answer.data)
+    // A field the token may not read (branch protection needs admin) comes
+    // back null beside an error; only a missing repository is a failure.
+    const empty = Object.values(data).every((value) => value === null || value === undefined)
+    if (errors.length > 0 && empty)
       throw new PluginError(
         `${what}: ${errors.map((error) => str(rec(error).message, "error")).join("; ")}.`,
         502
       )
-    return rec(answer.data)
+    return data
   }
 
   /** The token to read a repository with: its own, or the App's for its installation. */
@@ -390,6 +432,11 @@ export class GitHubForge implements Forge {
     return token
   }
 
+  public async whoAmI(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined> {
+    if (repo.auth !== "token" || !repo.token) return undefined
+    return str(rec(await this.rest("/user", repo.token, signal, "Asking GitHub who the token is")).login) || undefined
+  }
+
   public async checkRepo(repo: RepoRecord, signal: AbortSignal): Promise<string> {
     const token = await this.tokenFor(repo, signal)
     const answer = await this.rest(
@@ -407,13 +454,23 @@ export class GitHubForge implements Forge {
   ): Promise<PullSummary[]> {
     const [owner, ...rest] = repo.fullName.split("/")
     const token = await this.tokenFor(repo, signal)
-    const data = await this.graphql(
-      PULLS_QUERY,
-      { owner, name: rest.join("/"), first: MAX_PULLS_PER_REPO },
-      token,
-      signal,
-      `Listing pulls of ${repo.fullName}`
-    )
+    const what = `Listing pulls of ${repo.fullName}`
+    const variables = { owner, name: rest.join("/"), first: MAX_PULLS_PER_REPO }
+    let data: Record<string, unknown>
+    if (this._plainListing.has(repo.id)) {
+      data = await this.graphql(pullsQuery(false), variables, token, signal, what)
+    } else {
+      try {
+        data = await this.graphql(pullsQuery(true), variables, token, signal, what)
+      } catch (error) {
+        if (signal.aborted || !(error instanceof PluginError) || error.status !== 502) throw error
+        // The host would not answer the richer query (scopes, an older
+        // Enterprise); take what it gives and stop asking for more.
+        this._context.log.warn({ event: "plugin.github-plain-listing", reason: repo.fullName, message: error.message })
+        this._plainListing.add(repo.id)
+        data = await this.graphql(pullsQuery(false), variables, token, signal, what)
+      }
+    }
     const repository = rec(data.repository)
     if (!repository.nameWithOwner)
       throw new PluginError(
