@@ -37,7 +37,6 @@ import { createGatewayLog, GatewayLog, LogFormat } from "./log"
 import { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
 import { BUNDLED_PLUGINS, PluginHost, pluginsFileFor, PluginStore } from "./plugins"
-import { QuotaMeter } from "./quotas"
 import { buildRouteTable } from "./routes"
 import {
   ADMIN_PATH,
@@ -352,7 +351,6 @@ export const runServe = async (
     }
     const invites = InviteStore.open(invitesFileFor(config.auth.keysFile))
     const audit = AuditLog.open(path.join(path.dirname(config.auth.keysFile), "audit"))
-    const quotas = new QuotaMeter(config.policy?.quotas, Date.now, QuotaMeter.seedFrom(config.usage.dir))
     const metrics = new GatewayMetrics()
     plugins = new PluginHost({
       plugins: BUNDLED_PLUGINS,
@@ -403,7 +401,6 @@ export const runServe = async (
       plugins,
       audit,
       metrics,
-      quotas,
       version: SERVER_VERSION
     })
     plugins.events.on((event) => metrics.pluginEvent(event.type))

@@ -1,5 +1,5 @@
 /**
- * Quotas, routing rules and the prompt library: parsed from the
+ * Routing rules and the team system prompt: parsed from the
  * configuration, enforced by the gateway with the policy licence, sent
  * to extensions only where they belong.
  */
@@ -14,8 +14,8 @@ import { parseGatewayConfig, policyForExtensions, readGatewaySecrets } from "../
 import { KeyStore } from "../../gateway/keys"
 import { LicenseStore } from "../../gateway/license"
 import { createGatewayLog } from "../../gateway/log"
-import { globMatch, QuotaMeter, refuseByRouting } from "../../gateway/quotas"
 import { buildRouteTable } from "../../gateway/routes"
+import { globMatch, refuseByRouting } from "../../gateway/routing"
 import { GatewayServer } from "../../gateway/server"
 
 import { generateSigningKeys, issueLicense } from "./support/sign-license"
@@ -46,32 +46,7 @@ const request = (target: string, method: string, token: string | undefined, body
     req.end(body === undefined ? undefined : JSON.stringify(body))
   })
 
-suite("Quota meter", () => {
-  test("counts per key per UTC day, warns once, refuses at the cap, and rolls over at midnight", () => {
-    let clock = Date.parse("2026-09-20T23:59:00Z")
-    const meter = new QuotaMeter({ default: { requestsPerDay: 4 }, keys: { alice: { tokensPerDay: 1000 } }, warnAt: 0.5 }, () => clock, () => ({ bob: { requests: 2, tokens: 0 } }))
-    assert.strictEqual(meter.refuse("bob"), undefined)
-    // Seeded with two of four: the third crosses the 50% warning share.
-    const warned = meter.count("bob", 0)
-    assert.match(warned.warning ?? "", /bob has used 75% of today's quota/)
-    meter.count("bob", 0)
-    assert.match(meter.refuse("bob") ?? "", /Daily quota reached: 4 requests/)
-    assert.strictEqual(meter.count("bob", 0).warning, undefined, "warned once")
-    // alice has her own quota: tokens, not requests.
-    for (let i = 0; i < 10; i++) meter.count("alice", 90)
-    assert.strictEqual(meter.refuse("alice"), undefined)
-    meter.count("alice", 100)
-    assert.match(meter.refuse("alice") ?? "", /1,000 tokens/)
-    assert.strictEqual(meter.standing("alice").exhausted, "tokens")
-    assert.deepStrictEqual(Object.keys(meter.standings(["carol"])).sort(), ["alice", "bob", "carol"])
-    // Midnight: everything resets.
-    clock = Date.parse("2026-09-21T00:00:01Z")
-    assert.strictEqual(meter.refuse("bob"), undefined)
-    assert.strictEqual(meter.standing("alice").tokens, 0)
-    meter.update(undefined)
-    assert.strictEqual(meter.refuse("bob"), undefined)
-  })
-
+suite("Routing rules", () => {
   test("globs and routing rules", () => {
     assert.ok(globMatch("payments-*", "Payments-Api"))
     assert.ok(!globMatch("payments-*", "billing"))
@@ -98,28 +73,21 @@ suite("Policy configuration", () => {
     models: [{ alias: "coder", provider: "local", model: "x", capabilities: ["chat"] }]
   }
 
-  test("parses templates, quotas and routing, and keeps gateway-only parts from extensions", () => {
+  test("parses the system prompt and routing, and keeps routing from extensions", () => {
     const config = parseGatewayConfig(
       {
         ...base,
         policy: {
           teamOnly: true,
           systemPrompt: "Be terse.",
-          templates: [{ name: "sec-review", description: "Security pass", prompt: "Review {{code}} for security." }],
-          quotas: { default: { requestsPerDay: 500 }, keys: { alice: { tokensPerDay: 20000 } }, warnAt: 0.9 },
           routing: [{ workspace: "secret-*", localOnly: true }, { workspace: "docs", aliases: ["coder"] }]
         }
       },
       providerRegistry.providerIds()
     )
-    assert.deepStrictEqual(config.policy?.quotas, { default: { requestsPerDay: 500 }, keys: { alice: { tokensPerDay: 20000 } }, warnAt: 0.9 })
     assert.strictEqual(config.policy?.routing?.length, 2)
-    assert.deepStrictEqual(policyForExtensions(config.policy), {
-      teamOnly: true,
-      systemPrompt: "Be terse.",
-      templates: [{ name: "sec-review", description: "Security pass", prompt: "Review {{code}} for security." }]
-    })
-    assert.strictEqual(policyForExtensions({ quotas: { default: { requestsPerDay: 1 } } }), undefined)
+    assert.deepStrictEqual(policyForExtensions(config.policy), { teamOnly: true, systemPrompt: "Be terse." })
+    assert.strictEqual(policyForExtensions({ routing: [{ workspace: "x", localOnly: true }] }), undefined)
   })
 
   test("refuses what would do nothing or point nowhere", () => {
@@ -133,9 +101,7 @@ suite("Policy configuration", () => {
     }
     assert.ok(problems({ routing: [{ workspace: "x" }] }).some((p) => /must set localOnly or aliases/.test(p)))
     assert.ok(problems({ routing: [{ workspace: "x", aliases: ["nope"] }] }).some((p) => /not a configured alias/.test(p)))
-    assert.ok(problems({ quotas: { default: { requestsPerDay: 0 } } }).some((p) => /at least 1/.test(p)))
-    assert.ok(problems({ templates: [{ name: "bad name!", prompt: "x" }] }).some((p) => /may use letters/.test(p)))
-    assert.ok(problems({ templates: [{ name: "a", prompt: "x" }, { name: "A", prompt: "y" }] }).some((p) => /twice/.test(p)))
+    assert.ok(problems({ quotas: { default: { requestsPerDay: 1 } } }).some((p) => /quotas/.test(p)), "unknown key is named")
   })
 })
 
@@ -144,15 +110,12 @@ suite("Policy enforced by the gateway (in process)", function () {
   let server: GatewayServer
   let url: string
   let alice: string
-  let admin: string
   let backend: http.Server
   let backendUrl: string
-  let backendHits = 0
 
   suiteSetup(async () => {
-    // A stand-in OpenAI-compatible backend, so a request can complete and be counted.
+    // A stand-in OpenAI-compatible backend, so a request can complete.
     backend = http.createServer((req, res) => {
-      backendHits++
       if (req.url === "/v1/models" || req.url === "/api/tags") {
         res.writeHead(200, { "Content-Type": "application/json" })
         return res.end(JSON.stringify({ data: [{ id: "x" }], models: [{ name: "x" }] }))
@@ -182,7 +145,6 @@ suite("Policy enforced by the gateway (in process)", function () {
         ],
         policy: {
           systemPrompt: "Team says hi.",
-          quotas: { default: { requestsPerDay: 2 }, warnAt: 0.5 },
           routing: [{ workspace: "secret-*", localOnly: true }]
         }
       },
@@ -197,11 +159,9 @@ suite("Policy enforced by the gateway (in process)", function () {
       keys,
       license,
       routes: buildRouteTable(config, readGatewaySecrets(config, { CLOUD_KEY: "sk-test" }, 1), providerRegistry),
-      log,
-      quotas: new QuotaMeter(config.policy?.quotas)
+      log
     })
     alice = keys.create("alice").key
-    admin = keys.create("operator", { admin: true }).key
     url = (await server.start()).url
   })
 
@@ -215,7 +175,6 @@ suite("Policy enforced by the gateway (in process)", function () {
     assert.strictEqual(team.status, 200)
     const policy = team.body.policy as Record<string, unknown>
     assert.strictEqual(policy.systemPrompt, "Team says hi.")
-    assert.strictEqual(policy.quotas, undefined)
     assert.strictEqual(policy.routing, undefined)
 
     const refused = await request(`${url}/twinny/v1/chat`, "POST", alice, { model: "gpt", messages: [{ role: "user", content: "x" }] }, { "X-Twinny-Workspace": "secret-sauce" })
@@ -226,21 +185,5 @@ suite("Policy enforced by the gateway (in process)", function () {
     // Another workspace matches no rule and may use any alias; the local one answers here.
     const other = await request(`${url}/twinny/v1/chat`, "POST", alice, { model: "coder", messages: [{ role: "user", content: "x" }] }, { "X-Twinny-Workspace": "blog" })
     assert.strictEqual(other.status, 200, other.text)
-  })
-
-  test("quotas count finished requests, show standings, and refuse at the cap without touching a backend", async () => {
-    const before = backendHits
-    // Two requests already happened above for alice; the cap is 2.
-    const standings = await request(`${url}/twinny/v1/admin/quotas`, "GET", admin)
-    assert.strictEqual(standings.status, 200)
-    assert.strictEqual(standings.body.enforced, true)
-    const alices = (standings.body.standings as Record<string, { requests: number; tokens: number; exhausted?: string; share?: number }>).alice
-    assert.strictEqual(alices.requests, 2)
-    assert.strictEqual(alices.tokens, 200)
-    assert.strictEqual(alices.exhausted, "requests")
-    const refused = await request(`${url}/twinny/v1/chat`, "POST", alice, { model: "coder", messages: [{ role: "user", content: "x" }] })
-    assert.strictEqual(refused.status, 429)
-    assert.match(refused.text, /Daily quota reached: 2 requests/)
-    assert.strictEqual(backendHits, before, "refused before the backend saw it")
   })
 })

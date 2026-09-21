@@ -20,10 +20,10 @@ import { API_PROVIDERS, DEFAULT_GATEWAY_PORT } from "../common/constants"
 import { validateProvider } from "../common/provider-validation"
 import { TwinnyProvider } from "../common/types"
 import { InferenceCapability } from "../extension/inference/types"
-import type { TeamDefaults, TeamPolicy, TeamTemplate } from "../protocol/types"
+import type { TeamDefaults, TeamPolicy } from "../protocol/types"
 import { isInferenceCapability } from "../protocol/wire"
 
-import type { Quota, QuotasPolicy, RoutingRule } from "./quotas"
+import type { RoutingRule } from "./routing"
 
 export type GatewayConfigProblem =
   | "invalid-config"
@@ -182,62 +182,15 @@ export const DEFAULT_TOKEN_ENV = "TWINNY_GATEWAY_TOKEN"
 /** Where keys and usage live unless the configuration says otherwise. */
 /** What the configuration may say under `policy`: what extensions enforce, plus what only the gateway enforces. */
 export interface GatewayPolicy extends TeamPolicy {
-  quotas?: QuotasPolicy
   routing?: RoutingRule[]
 }
 
-/** The part of the policy connected extensions are told; quotas and routing stay on the gateway. */
+/** The part of the policy connected extensions are told; routing stays on the gateway. */
 export const policyForExtensions = (policy: GatewayPolicy | undefined): TeamPolicy | undefined => {
   if (!policy) return undefined
-  const { quotas: _quotas, routing: _routing, ...shared } = policy
-  void _quotas
+  const { routing: _routing, ...shared } = policy
   void _routing
   return Object.keys(shared).length ? shared : undefined
-}
-
-const parseQuota = (value: unknown, where: string, problems: { add(message: string): void; unknownKeys(where: string, value: Record<string, unknown>, keys: string[]): void }): Quota | undefined => {
-  if (!isRecord(value)) {
-    problems.add(`${where} must be an object with requestsPerDay and/or tokensPerDay.`)
-    return undefined
-  }
-  problems.unknownKeys(where, value, ["requestsPerDay", "tokensPerDay"])
-  const quota: Quota = {}
-  for (const field of ["requestsPerDay", "tokensPerDay"] as const) {
-    const n = value[field]
-    if (n === undefined) continue
-    if (typeof n !== "number" || !Number.isInteger(n) || n < 1) problems.add(`${where}.${field} must be a whole number of at least 1.`)
-    else quota[field] = n
-  }
-  return quota
-}
-
-const parseQuotas = (value: unknown, problems: { add(message: string): void; unknownKeys(where: string, value: Record<string, unknown>, keys: string[]): void }): QuotasPolicy | undefined => {
-  if (!isRecord(value)) {
-    problems.add("policy.quotas must be an object.")
-    return undefined
-  }
-  problems.unknownKeys("policy.quotas", value, ["default", "keys", "warnAt"])
-  const quotas: QuotasPolicy = {}
-  if (value.default !== undefined) {
-    const quota = parseQuota(value.default, "policy.quotas.default", problems)
-    if (quota && Object.keys(quota).length) quotas.default = quota
-  }
-  if (value.keys !== undefined) {
-    if (!isRecord(value.keys)) problems.add("policy.quotas.keys must map key names to quotas.")
-    else {
-      const keys: Record<string, Quota> = {}
-      for (const [name, entry] of Object.entries(value.keys)) {
-        const quota = parseQuota(entry, `policy.quotas.keys["${name}"]`, problems)
-        if (quota) keys[name] = quota
-      }
-      if (Object.keys(keys).length) quotas.keys = keys
-    }
-  }
-  if (value.warnAt !== undefined) {
-    if (typeof value.warnAt !== "number" || value.warnAt < 0.5 || value.warnAt > 0.99) problems.add("policy.quotas.warnAt is a share between 0.5 and 0.99.")
-    else quotas.warnAt = value.warnAt
-  }
-  return Object.keys(quotas).length ? quotas : undefined
 }
 
 export const DEFAULT_DATA_DIR = path.join(os.homedir(), ".twinny", "server")
@@ -632,7 +585,7 @@ export const parseGatewayConfig = (
     if (!isRecord(input.policy)) {
       problems.add("policy must be an object.")
     } else {
-      problems.unknownKeys("policy", input.policy, ["teamOnly", "lockDefaults", "systemPrompt", "templates", "quotas", "routing"])
+      problems.unknownKeys("policy", input.policy, ["teamOnly", "lockDefaults", "systemPrompt", "routing"])
       const policy: GatewayPolicy = {}
       if (input.policy.teamOnly !== undefined) {
         if (typeof input.policy.teamOnly !== "boolean") problems.add("policy.teamOnly must be true or false.")
@@ -646,32 +599,6 @@ export const parseGatewayConfig = (
         if (typeof input.policy.systemPrompt !== "string") problems.add("policy.systemPrompt must be a string.")
         else if (input.policy.systemPrompt.length > 20_000) problems.add("policy.systemPrompt is longer than 20,000 characters.")
         else if (input.policy.systemPrompt.trim()) policy.systemPrompt = input.policy.systemPrompt
-      }
-      if (input.policy.templates !== undefined) {
-        if (!Array.isArray(input.policy.templates)) problems.add("policy.templates must be a list.")
-        else {
-          const templates: TeamTemplate[] = []
-          const seen = new Set<string>()
-          input.policy.templates.forEach((entry, i) => {
-            if (!isRecord(entry) || typeof entry.name !== "string" || typeof entry.prompt !== "string") {
-              problems.add(`policy.templates[${i}] needs a name and a prompt.`)
-              return
-            }
-            if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$/.test(entry.name)) problems.add(`policy.templates[${i}].name "${entry.name}" may use letters, digits, - and _ (up to 40).`)
-            else if (seen.has(entry.name.toLowerCase())) problems.add(`policy.templates has "${entry.name}" twice.`)
-            else if (entry.prompt.length > 20_000) problems.add(`policy.templates "${entry.name}" is longer than 20,000 characters.`)
-            else {
-              seen.add(entry.name.toLowerCase())
-              templates.push({ name: entry.name, prompt: entry.prompt, ...(typeof entry.description === "string" && entry.description ? { description: entry.description.slice(0, 200) } : {}) })
-            }
-          })
-          if (templates.length > 100) problems.add("policy.templates holds at most 100 templates.")
-          else if (templates.length) policy.templates = templates
-        }
-      }
-      if (input.policy.quotas !== undefined) {
-        const quotas = parseQuotas(input.policy.quotas, problems)
-        if (quotas) policy.quotas = quotas
       }
       if (input.policy.routing !== undefined) {
         if (!Array.isArray(input.policy.routing)) problems.add("policy.routing must be a list of rules.")

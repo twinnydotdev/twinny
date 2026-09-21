@@ -489,6 +489,15 @@ export const parseTeam = (input: unknown): RemoteTeam => {
       }
       if (aliases.length) policy.peers = [...new Set(aliases as string[])]
     }
+    if (input.policy.systemPrompt !== undefined) {
+      if (typeof input.policy.systemPrompt !== "string") {
+        throw new InferenceError(
+          "inference-failure",
+          "The gateway published an invalid team policy. Ask your admin to check its configuration."
+        )
+      }
+      if (input.policy.systemPrompt.trim()) policy.systemPrompt = input.policy.systemPrompt.slice(0, 20_000)
+    }
     team.policy = policy
   }
   if (input.sharing !== undefined) {

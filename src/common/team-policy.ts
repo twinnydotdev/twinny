@@ -15,7 +15,7 @@ const JOB_LABEL: Record<ProviderType, string> = {
 
 /** Whether a policy asks or discloses anything at all. */
 export const policyIsEmpty = (policy: TeamPolicy | undefined): boolean =>
-  !policy || (!policy.teamOnly && !policy.lockDefaults && !policy.recording?.length && !policy.peers?.length)
+  !policy || (!policy.teamOnly && !policy.lockDefaults && !policy.recording?.length && !policy.peers?.length && !policy.systemPrompt?.trim())
 
 const RECORDING_LABEL: Record<string, string> = { chat: "chat conversations", fim: "autocomplete requests", embeddings: "embedding inputs" }
 
@@ -43,7 +43,6 @@ export const describePolicy = (policy: TeamPolicy): string[] => {
   const pooling = describePooling(policy.peers)
   if (pooling) lines.push(pooling)
   if (policy.systemPrompt) lines.push("The team's system prompt is put before every chat.")
-  if (policy.templates?.length) lines.push(`The team shares ${policy.templates.length} prompt template${policy.templates.length === 1 ? "" : "s"}: ${policy.templates.map((t) => t.name).join(", ")}.`)
   return lines
 }
 

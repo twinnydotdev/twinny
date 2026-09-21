@@ -61,16 +61,6 @@ export interface TeamPolicy {
   peers?: string[]
   /** Put before every chat's system prompt on connected extensions. */
   systemPrompt?: string
-  /** Prompt templates the team shares; shown beside the developer's own. */
-  templates?: TeamTemplate[]
-}
-
-/** A shared prompt template: Handlebars like the local ones, with `{{code}}`, `{{language}}` and `{{selection}}` available. */
-export interface TeamTemplate {
-  /** The name shown in the picker; letters, digits, `-` and `_`. */
-  name: string
-  description?: string
-  prompt: string
 }
 
 /** The gateway has a team pool: connected extensions may share their computer. */

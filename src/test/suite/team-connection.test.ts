@@ -5,7 +5,7 @@ import { AddressInfo } from "node:net"
 import { API_PROVIDERS } from "../../common/constants"
 import { ProviderType } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
-import { policyRefusal } from "../../extension/providers/policy"
+import { policyIsEmpty, policyRefusal } from "../../extension/providers/policy"
 import { memoryPolicyStorage, TeamConnection, teamUrl } from "../../extension/providers/team"
 import { RemoteTeam } from "../../protocol/types"
 import { parseTeam } from "../../protocol/wire"
@@ -502,6 +502,16 @@ suite("Connect to team", function () {
     assert.strictEqual(found?.providerIds.length, 3)
     assert.ok(found?.providerIds.every((id) => providers[id]))
     assert.deepStrictEqual(service.policy(), found)
+  })
+
+  test("a policy that only sets a system prompt is kept and reaches the chat", async () => {
+    delete team.policy
+    const preview = await service.preview(input())
+    await service.apply({ previewId: preview.id, replaceExisting: false })
+    team.policy = { systemPrompt: "We write Rust." }
+    const found = await service.refreshPolicy()
+    assert.deepStrictEqual(found?.policy, { systemPrompt: "We write Rust." })
+    assert.strictEqual(policyIsEmpty(found?.policy), false, "a prompt alone is a policy worth keeping")
   })
 
   test("a gateway without a policy clears one previously accepted for the same URL", async () => {

@@ -3,7 +3,6 @@ import * as Handlebars from "handlebars"
 import * as path from "path"
 
 import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from "../../common/constants"
-import { currentTeamPolicy } from "../../common/team-policy"
 
 import { defaultTemplates } from "./defaults"
 
@@ -75,14 +74,7 @@ export class TemplateProvider {
     }
   }
 
-  /** A template the team shares, by name: compiled from the policy, not from a file. */
-  private teamTemplate(templateName: string): string | undefined {
-    return currentTeamPolicy()?.templates?.find((template) => template.name === templateName)?.prompt
-  }
-
   public compileTemplateFromFile<T>(templateName: string) {
-    const shared = this.teamTemplate(templateName)
-    if (shared !== undefined) return Promise.resolve(Handlebars.compile<T>(shared))
     const path = `${this._basePath}/${templateName}.hbs`
     try {
       return new Promise<HandlebarsTemplateDelegate<T>>((resolve, reject) => {
@@ -129,15 +121,13 @@ export class TemplateProvider {
   }
 
   public listTemplates(): string[] {
-    const shared = (currentTeamPolicy()?.templates ?? []).map((template) => template.name)
-    if (!this._basePath) return shared
+    if (!this._basePath) return []
     const files = fs.readdirSync(this._basePath, "utf8")
     const templates = files.filter((fileName) => fileName.endsWith(".hbs"))
-    const templateNames = templates
+    return templates
       .map((fileName) => fileName.replace(".hbs", ""))
       .filter(this.filterSystemTemplates)
-    // The team's templates first, then the developer's own; a shared name wins.
-    return [...shared, ...templateNames.filter((name) => !shared.includes(name))].sort((a, b) => a.localeCompare(b))
+      .sort((a, b) => a.localeCompare(b))
   }
 
   public async readTemplate<T>(

@@ -88,7 +88,6 @@ export class GatewayMetrics {
   private readonly _backendUp = new Gauge("twinny_backend_up", "1 when the backend answered its last check, 0 when not.")
   private readonly _backendLatency = new Gauge("twinny_backend_check_seconds", "How long the backend's last check took.")
   private readonly _auth = new Counter("twinny_auth_rejected_total", "Requests refused for a bad or missing key.")
-  private readonly _quota = new Counter("twinny_quota_refused_total", "Requests refused because a key was over its quota, by key.")
   private readonly _keys = new Gauge("twinny_keys_active", "Active access keys.")
   private readonly _seats = new Gauge("twinny_seats", "Seats the plan allows.")
   private readonly _plugins = new Counter("twinny_plugin_events_total", "Events plugins reported, by type.")
@@ -121,10 +120,6 @@ export class GatewayMetrics {
     this._auth.inc()
   }
 
-  public quotaRefused(key: string): void {
-    this._quota.inc({ key })
-  }
-
   public plan(keys: number, seats: number): void {
     this._keys.set({}, keys)
     this._seats.set({}, seats)
@@ -147,7 +142,6 @@ export class GatewayMetrics {
       this._backendUp.render(),
       this._backendLatency.render(),
       this._auth.render(),
-      this._quota.render(),
       this._keys.render(),
       this._seats.render(),
       this._plugins.render(),

@@ -647,36 +647,12 @@ hash; a developer who lost one signs in again and the admin approves with
 Without the feature the policy is saved but not sent; the admin page says
 so next to the section.
 
-### Prompt library and team system prompt
+### Team system prompt
 
 With the `policy` licence feature, `policy.systemPrompt` is put before
-every chat's system prompt on connected extensions, and
-`policy.templates` (name, optional description, a Handlebars prompt
-with `{{code}}`, `{{language}}` and `{{selection}}` filled in) appear in
-every developer's template picker beside their own; a shared name wins
-over a local file of the same name. Both are shown on the consent card
-before connecting and re-read at every VS Code start. Edit them under
-**Policy → Prompt library**.
-
-### Quotas
-
-`policy.quotas` caps what a key may use per UTC day, in requests
-(`requestsPerDay`) and in tokens the backends reported
-(`tokensPerDay`): a `default` for every key and `keys` by name for
-exceptions. At `warnAt` (0.8 unless set) a `quota.warning` event goes
-out once per key per day (the Slack, Discord and Teams plugins can post
-it); at the cap the request is refused with 429 before it reaches a
-backend and a `quota.reached` event goes out. Counts are seeded from
-today's usage at start, so a restart resets nobody. Quotas need the
-`policy` licence feature and are never sent to extensions. `GET
-/twinny/v1/admin/quotas` shows every key's standing; the People page
-shows it as a bar.
-
-```json
-"policy": {
-  "quotas": { "default": { "requestsPerDay": 2000, "tokensPerDay": 2000000 }, "keys": { "ci": { "requestsPerDay": 20000 } }, "warnAt": 0.8 }
-}
-```
+every chat's system prompt on connected extensions. It is shown on the
+consent card before connecting and re-read at every VS Code start. Edit
+it under **Policy → Team system prompt**.
 
 ### Routing rules
 
@@ -1332,7 +1308,7 @@ to see usage, people and the audit log without being able to act.
 Prometheus text format: requests by route, alias and outcome; a latency
 histogram; tokens and chunks; requests in flight and waiting for a slot
 (`twinny_queued_requests`); each backend's last check (`twinny_backend_up`);
-refused authentications; quota refusals; active keys and seats; plugin
+refused authentications; active keys and seats; plugin
 events. Point a scrape job at it with a bearer token:
 
 ```yaml
