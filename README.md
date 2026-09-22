@@ -75,7 +75,7 @@ Issues and pull requests are welcome on [GitHub](https://github.com/twinnydotdev
 
 ## Support twinny
 
-twinny is free and open source, written and maintained by one person since 2023. If it earns its keep, a [team licence](https://twinny.dev/#pricing) is the best way to support it. Donations are appreciated too. Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
+twinny is free and open source, written and maintained by one person since 2023. If it earns its keep, a [team licence](https://twinny.dev/#pricing) is the best way to support it.
 
 ## License
 

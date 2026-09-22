@@ -903,10 +903,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px;
   border: 1px solid var(--vscode-widget-border);
   border-radius: 5px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 .teamEntry span {
   color: var(--vscode-descriptionForeground);
