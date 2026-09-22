@@ -1,6 +1,10 @@
 import { ContextItem } from "../types"
 
 export const EXTENSION_NAME = "@ext:rjmacarthy.twinny"
+/** The team gateway's page on the website: what it is, the quick start, pricing and the trial. */
+export const URL_TEAMS = "https://twinny.dev/#teams"
+export const URL_TEAM_TRIAL = "https://twinny.dev/#trial"
+export const TEAM_QUICKSTART_COMMAND = "npx twinny-server quickstart"
 export const ASSISTANT = "assistant"
 export const USER = "user"
 export const TWINNY = "twinny"

@@ -18,7 +18,9 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_NAME,
+  TEAM_NUDGE_STORAGE_KEY,
   TWINNY_COMMAND_NAME,
+  URL_TEAMS,
   WEBUI_TABS
 } from "./common/constants"
 import { formatMs, logger } from "./common/logger"
@@ -283,6 +285,9 @@ export async function activate(context: ExtensionContext) {
       }
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.showLogs, () => logger.show()),
+    commands.registerCommand(TWINNY_COMMAND_NAME.setUpTeam, () =>
+      vscode.env.openExternal(vscode.Uri.parse(URL_TEAMS))
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.terminalCommand, async () => {
       const chat = await requireChat()
       if (chat) await runDescribedCommand(chat, terminalHistory)
@@ -578,7 +583,32 @@ export async function activate(context: ExtensionContext) {
   void providerSetup.then(() => {
     statusBar.refresh()
     logStartup(context, startedAt)
+    void teamNudge(context)
   })
+}
+
+/**
+ * Once, after two weeks of use on a machine that is not connected to a team:
+ * one message saying the gateway exists. Either button ends it for good; so
+ * does dismissing it, since the date is recorded before it shows.
+ */
+const TEAM_NUDGE_AFTER_MS = 14 * 24 * 60 * 60 * 1000
+const teamNudge = async (context: ExtensionContext) => {
+  const store = context.globalState
+  const state = store.get<{ since: number; shown?: boolean }>(TEAM_NUDGE_STORAGE_KEY)
+  if (!state) {
+    await store.update(TEAM_NUDGE_STORAGE_KEY, { since: Date.now() })
+    return
+  }
+  if (state.shown || Date.now() - state.since < TEAM_NUDGE_AFTER_MS) return
+  if (new TeamPolicyStore(store).get()) return
+  await store.update(TEAM_NUDGE_STORAGE_KEY, { ...state, shown: true })
+  const choice = await window.showInformationMessage(
+    "Twinny has been on this machine for a couple of weeks. Using it with a team? One command sets up a gateway with a key per developer, usage and policy; free for five.",
+    "See how",
+    "No thanks"
+  )
+  if (choice === "See how") void vscode.env.openExternal(vscode.Uri.parse(URL_TEAMS))
 }
 
 export function deactivate() {

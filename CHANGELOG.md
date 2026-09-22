@@ -2,6 +2,14 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
+## 4.2.1 · 2026-09-22
+
+Small release: the extension tells the person who could run a gateway that one exists, and the listings say what the product costs.
+
+- **Set up for your team.** The Providers tab has a second team card for whoever has the models: the quick-start command and a link to the gateway page on twinny.dev. The same link is the command *Twinny - Set up for your team*.
+- **One notice, once.** Two weeks after first use on a machine that is not connected to a team, one information message says the gateway exists, with *See how* and *No thanks*. It is recorded as shown before it appears, so dismissing it is also the end of it. A machine connected to a team never sees it.
+- The Marketplace description and both READMEs name the team gateway, the price, and the free 30-day trial at twinny.dev. `twinny-server` is republished for its README only; the gateway itself is unchanged.
+
 ## 4.2.0 · 2026-09-21
 
 Everything in it is on the gateway side; the extension only learns to send the open workspace's name (for routing rules) and to search the shared context index.

@@ -903,10 +903,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px;
   border: 1px solid var(--vscode-widget-border);
   border-radius: 5px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 .teamEntry span {
   color: var(--vscode-descriptionForeground);
@@ -914,6 +913,25 @@
 }
 .teamEntry strong {
   color: var(--vscode-foreground);
+}
+.teamEntry code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  color: var(--vscode-foreground);
+}
+.teamSetUpLink {
+  flex: none;
+  padding: 4px 11px;
+  border: 1px solid var(--vscode-button-secondaryBackground);
+  border-radius: 2px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  font-size: 13px;
+  text-decoration: none;
+}
+.teamSetUpLink:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+  color: var(--vscode-button-secondaryForeground);
 }
 .teamConnect {
   max-width: 620px;

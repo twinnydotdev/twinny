@@ -7,7 +7,9 @@ import {
   DEFAULT_PROVIDER_FORM_VALUES,
   EVENT_NAME,
   FIM_TEMPLATE_FORMAT,
-  PROVIDER_EVENT_NAME
+  PROVIDER_EVENT_NAME,
+  TEAM_QUICKSTART_COMMAND,
+  URL_TEAMS
 } from "../../common/constants"
 import {
   P2pDeviceStatus,
@@ -21,7 +23,12 @@ import {
   ProviderType
 } from "../../common/provider-validation"
 import type { TeamOpen, TeamStatus } from "../../common/team"
-import { describePooling, describeRecording, policyIsEmpty, policyRefusal } from "../../common/team-policy"
+import {
+  describePooling,
+  describeRecording,
+  policyIsEmpty,
+  policyRefusal
+} from "../../common/team-policy"
 import { TwinnyProvider } from "../../common/types"
 import { useProviders } from "../hooks/useProviders"
 import { bridge, emit, useServerEvent } from "../messaging"
@@ -50,7 +57,10 @@ const SECTION_ICONS: Record<ProviderType, string> = {
 
 /** A blank draft for the custom form: any OpenAI-compatible server, on the usual local port. */
 const blankProvider = (type: ProviderType): TwinnyProvider => {
-  const defaults = getEndpointDefaults(DEFAULT_PROVIDER_FORM_VALUES.provider, type)
+  const defaults = getEndpointDefaults(
+    DEFAULT_PROVIDER_FORM_VALUES.provider,
+    type
+  )
   return {
     ...DEFAULT_PROVIDER_FORM_VALUES,
     ...defaults,
@@ -91,13 +101,20 @@ export const Providers = ({ onDone }: ProvidersProps) => {
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [results, setResults] = useState<Record<string, ProviderTestResult>>({})
   const [testing, setTesting] = useState<Set<string>>(new Set())
-  const [collapsed, setCollapsed] = useState<Partial<Record<ProviderType, boolean>>>({})
+  const [collapsed, setCollapsed] = useState<
+    Partial<Record<ProviderType, boolean>>
+  >({})
   const [policy, setPolicy] = useState<TeamStatus | null>(null)
   const [leaving, setLeaving] = useState(false)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
-  useServerEvent(PROVIDER_EVENT_NAME.getTeamPolicy, (state) => setPolicy(state ?? null))
+  useServerEvent(PROVIDER_EVENT_NAME.getTeamPolicy, (state) =>
+    setPolicy(state ?? null)
+  )
   useEffect(() => {
-    bridge.request(PROVIDER_EVENT_NAME.getTeamPolicy).then((state) => setPolicy(state ?? null)).catch(() => setPolicy(null))
+    bridge
+      .request(PROVIDER_EVENT_NAME.getTeamPolicy)
+      .then((state) => setPolicy(state ?? null))
+      .catch(() => setPolicy(null))
   }, [])
   // An invite link opened in VS Code: shown as it arrives, or collected on
   // mount when the link was opened before this tab existed.
@@ -110,7 +127,10 @@ export const Providers = ({ onDone }: ProvidersProps) => {
     bridge.request(PROVIDER_EVENT_NAME.takeTeamOpen).catch(() => undefined)
   })
   useEffect(() => {
-    bridge.request(PROVIDER_EVENT_NAME.takeTeamOpen).then(showTeamOpen).catch(() => undefined)
+    bridge
+      .request(PROVIDER_EVENT_NAME.takeTeamOpen)
+      .then(showTeamOpen)
+      .catch(() => undefined)
   }, [])
   const leaveTeam = async () => {
     setLeaving(true)
@@ -143,7 +163,8 @@ export const Providers = ({ onDone }: ProvidersProps) => {
 
   const deviceProviderFor = (device: P2pDeviceStatus, type: ProviderType) =>
     Object.values(providers).find(
-      (p) => isP2pProvider(p.provider) && p.deviceId === device.id && p.type === type
+      (p) =>
+        isP2pProvider(p.provider) && p.deviceId === device.id && p.type === type
     )
 
   const jobsFor = (device: P2pDeviceStatus): DeviceJobs => {
@@ -203,9 +224,9 @@ export const Providers = ({ onDone }: ProvidersProps) => {
     })
   }
 
-
   const openGallery = (type: ProviderType) => setView({ name: "gallery", type })
-  const openForm = (provider: TwinnyProvider) => setView({ name: "form", provider })
+  const openForm = (provider: TwinnyProvider) =>
+    setView({ name: "form", provider })
   const closeView = () => setView({ name: "list" })
 
   const finishSetup = () => {
@@ -226,7 +247,14 @@ export const Providers = ({ onDone }: ProvidersProps) => {
           onClose={closeView}
           onDone={finishSetup}
           {...(view.open ? { open: view.open } : {})}
-          {...(policy ? { connected: { url: policy.url, ...(policy.keyMissing ? { keyMissing: true } : {}) } } : {})}
+          {...(policy
+            ? {
+                connected: {
+                  url: policy.url,
+                  ...(policy.keyMissing ? { keyMissing: true } : {})
+                }
+              }
+            : {})}
         />
       </div>
     )
@@ -287,7 +315,9 @@ export const Providers = ({ onDone }: ProvidersProps) => {
             aria-expanded={open}
             onClick={() => setCollapsed((c) => ({ ...c, [type]: open }))}
           >
-            <i className={`codicon codicon-chevron-${open ? "down" : "right"}`} />
+            <i
+              className={`codicon codicon-chevron-${open ? "down" : "right"}`}
+            />
             <i className={`codicon codicon-${SECTION_ICONS[type]}`} />
             {t(`type-${type}`)}
             <span className={styles.sectionCount}>{list.length}</span>
@@ -312,7 +342,9 @@ export const Providers = ({ onDone }: ProvidersProps) => {
               <i className="codicon codicon-add" />
               <span className={styles.emptySectionText}>
                 <span>{t(`add-${type}-provider`)}</span>
-                <span className={styles.emptySectionBlurb}>{t(`type-${type}-blurb`)}</span>
+                <span className={styles.emptySectionBlurb}>
+                  {t(`type-${type}-blurb`)}
+                </span>
               </span>
             </button>
           ) : (
@@ -323,7 +355,12 @@ export const Providers = ({ onDone }: ProvidersProps) => {
                 active={active?.id === provider.id}
                 testResult={results[provider.id]}
                 testing={testing.has(provider.id)}
-                blocked={policyRefusal(policy ?? undefined, "activate", provider, type)}
+                blocked={policyRefusal(
+                  policy ?? undefined,
+                  "activate",
+                  provider,
+                  type
+                )}
                 onActivate={() => setActiveProvider(type, provider)}
                 onTest={() => runTest(provider)}
                 onEdit={() => openForm(provider)}
@@ -393,41 +430,6 @@ export const Providers = ({ onDone }: ProvidersProps) => {
         </div>
       )}
 
-      {policy ? (
-        <div className={styles.teamBanner}>
-          <span>
-            <strong>{policyIsEmpty(policy.policy) ? "Connected to your team" : "Managed by your team"}</strong> · {policy.url}
-            {policy.keyMissing ? (
-              <p className={styles.teamHint} role="alert">
-                Your team key is no longer in this machine&apos;s secret storage. Use Reconnect to sign in again.
-              </p>
-            ) : null}
-            <ul>
-              {policy.policy.teamOnly ? <li>Only the team gateway may be used: no other providers can be added or made active.</li> : null}
-              {policy.policy.lockDefaults ? <li>The team's default models stay active for chat, autocomplete and embeddings.</li> : null}
-              {policy.policy.recording?.length ? <li>{describeRecording(policy.policy.recording)}</li> : null}
-              {policy.policy.peers?.length ? <li>{describePooling(policy.policy.peers)}</li> : null}
-            </ul>
-          </span>
-          {confirmingLeave ? (
-            <span className={styles.teamActions}>
-              <VSCodeButton disabled={leaving} onClick={() => void leaveTeam()}>Leave team and remove its providers</VSCodeButton>
-              <VSCodeButton appearance="secondary" disabled={leaving} onClick={() => setConfirmingLeave(false)}>Keep</VSCodeButton>
-            </span>
-          ) : (
-            <span className={styles.teamActions}>
-              <VSCodeButton appearance="secondary" onClick={() => setView({ name: "team" })}>Reconnect</VSCodeButton>
-              <VSCodeButton appearance="secondary" onClick={() => setConfirmingLeave(true)}>Leave team</VSCodeButton>
-            </span>
-          )}
-        </div>
-      ) : (
-        <div className={styles.teamEntry}>
-          <span><strong>Using Twinny with your team?</strong><br />Open the invite link your admin sent, or connect here with the gateway address.</span>
-          <VSCodeButton appearance="secondary" onClick={() => setView({ name: "team" })}>Connect to team</VSCodeButton>
-        </div>
-      )}
-
       <ShareCard />
 
       {empty && (
@@ -440,10 +442,106 @@ export const Providers = ({ onDone }: ProvidersProps) => {
         />
       )}
 
+      {!empty && PROVIDER_TYPES.map(renderSection)}
 
       <DevicesSection onUse={assignDevice} jobsFor={jobsFor} />
 
-      {!empty && PROVIDER_TYPES.map(renderSection)}
+      {policy ? (
+        <div className={styles.teamBanner}>
+          <span>
+            <strong>
+              {policyIsEmpty(policy.policy)
+                ? "Connected to your team"
+                : "Managed by your team"}
+            </strong>{" "}
+            · {policy.url}
+            {policy.keyMissing ? (
+              <p className={styles.teamHint} role="alert">
+                Your team key is no longer in this machine&apos;s secret
+                storage. Use Reconnect to sign in again.
+              </p>
+            ) : null}
+            <ul>
+              {policy.policy.teamOnly ? (
+                <li>
+                  Only the team gateway may be used: no other providers can be
+                  added or made active.
+                </li>
+              ) : null}
+              {policy.policy.lockDefaults ? (
+                <li>
+                  The team's default models stay active for chat, autocomplete
+                  and embeddings.
+                </li>
+              ) : null}
+              {policy.policy.recording?.length ? (
+                <li>{describeRecording(policy.policy.recording)}</li>
+              ) : null}
+              {policy.policy.peers?.length ? (
+                <li>{describePooling(policy.policy.peers)}</li>
+              ) : null}
+            </ul>
+          </span>
+          {confirmingLeave ? (
+            <span className={styles.teamActions}>
+              <VSCodeButton disabled={leaving} onClick={() => void leaveTeam()}>
+                Leave team and remove its providers
+              </VSCodeButton>
+              <VSCodeButton
+                appearance="secondary"
+                disabled={leaving}
+                onClick={() => setConfirmingLeave(false)}
+              >
+                Keep
+              </VSCodeButton>
+            </span>
+          ) : (
+            <span className={styles.teamActions}>
+              <VSCodeButton
+                appearance="secondary"
+                onClick={() => setView({ name: "team" })}
+              >
+                Reconnect
+              </VSCodeButton>
+              <VSCodeButton
+                appearance="secondary"
+                onClick={() => setConfirmingLeave(true)}
+              >
+                Leave team
+              </VSCodeButton>
+            </span>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className={styles.teamEntry}>
+            <span>
+              <strong>Using Twinny with your team?</strong>
+              <br />
+              Open the invite link your admin sent, or connect here with the
+              gateway address.
+            </span>
+            <VSCodeButton
+              appearance="secondary"
+              onClick={() => setView({ name: "team" })}
+            >
+              Connect to team
+            </VSCodeButton>
+          </div>
+          <div className={styles.teamEntry}>
+            <span>
+              <strong>Running the models for a team?</strong>
+              <br />
+              <code>{TEAM_QUICKSTART_COMMAND}</code> on the machine with the
+              models: a key per developer, usage, policy and an admin page. Free
+              for five.
+            </span>
+            <a className={styles.teamSetUpLink} href={URL_TEAMS}>
+              Set up a gateway
+            </a>
+          </div>
+        </>
+      )}
     </div>
   )
 }
