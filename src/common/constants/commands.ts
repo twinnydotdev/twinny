@@ -22,6 +22,7 @@ export const TWINNY_COMMAND_NAME = {
   openChat: "twinny.openChat",
   refactor: "twinny.refactor",
   settings: "twinny.settings",
+  setUpTeam: "twinny.setUpTeam",
   statusBarMenu: "twinny.statusBarMenu",
   stopGeneration: "twinny.stopGeneration",
   templateCompletion: "twinny.templateCompletion",

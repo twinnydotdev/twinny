@@ -915,6 +915,25 @@
 .teamEntry strong {
   color: var(--vscode-foreground);
 }
+.teamEntry code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  color: var(--vscode-foreground);
+}
+.teamSetUpLink {
+  flex: none;
+  padding: 4px 11px;
+  border: 1px solid var(--vscode-button-secondaryBackground);
+  border-radius: 2px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  font-size: 13px;
+  text-decoration: none;
+}
+.teamSetUpLink:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
 .teamConnect {
   max-width: 620px;
   margin: 0 auto;

@@ -7,7 +7,9 @@ import {
   DEFAULT_PROVIDER_FORM_VALUES,
   EVENT_NAME,
   FIM_TEMPLATE_FORMAT,
-  PROVIDER_EVENT_NAME
+  PROVIDER_EVENT_NAME,
+  TEAM_QUICKSTART_COMMAND,
+  URL_TEAMS
 } from "../../common/constants"
 import {
   P2pDeviceStatus,
@@ -422,10 +424,19 @@ export const Providers = ({ onDone }: ProvidersProps) => {
           )}
         </div>
       ) : (
-        <div className={styles.teamEntry}>
-          <span><strong>Using Twinny with your team?</strong><br />Open the invite link your admin sent, or connect here with the gateway address.</span>
-          <VSCodeButton appearance="secondary" onClick={() => setView({ name: "team" })}>Connect to team</VSCodeButton>
-        </div>
+        <>
+          <div className={styles.teamEntry}>
+            <span><strong>Using Twinny with your team?</strong><br />Open the invite link your admin sent, or connect here with the gateway address.</span>
+            <VSCodeButton appearance="secondary" onClick={() => setView({ name: "team" })}>Connect to team</VSCodeButton>
+          </div>
+          <div className={styles.teamEntry}>
+            <span>
+              <strong>Running the models for a team?</strong><br />
+              <code>{TEAM_QUICKSTART_COMMAND}</code> on the machine with the models: a key per developer, usage, policy and an admin page. Free for five.
+            </span>
+            <a className={styles.teamSetUpLink} href={URL_TEAMS}>Set up a gateway</a>
+          </div>
+        </>
       )}
 
       <ShareCard />

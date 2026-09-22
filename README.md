@@ -4,6 +4,8 @@ The AI coding assistant for Visual Studio Code that stays inside your network. C
 
 [Install from the Marketplace](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) · [Documentation](https://twinnydotdev.github.io/twinny-docs/) · [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/) · [Changelog](CHANGELOG.md) · [Teams](https://twinnydotdev.github.io/twinny-docs/teams/overview/) · [中文](README.zh-CN.md) · [Português (BR)](README.pt-BR.md)
 
+**For teams:** one gateway on your network serves every developer's VS Code, with a key per person, usage, policy and an admin page. `npx twinny-server quickstart` sets it up. Free for five developers, $6 a seat a month after that, and a [30-day trial](https://twinny.dev/#trial) with no card. Details, prices and a live admin page at [twinny.dev](https://twinny.dev/#teams).
+
 ## Getting started
 
 1. Install twinny from the Marketplace (VS Code 1.93 or newer).
@@ -52,7 +54,7 @@ That finds your model server, writes a configuration, makes an admin key and ser
 - **Recording** (licence): keep prompts and replies on the gateway, disclosed to every developer, exported as training data.
 - **Operations**: a hash-chained audit log of every admin change, read-only admin keys, Prometheus metrics, costs per developer when a model has a price, a request queue for a shared GPU, Docker and a Helm chart.
 
-Free for five developers, forever. A licence bought by card adds seats and switches on policy, recording and plugins; it is checked locally and the gateway never phones home. See the [teams guide](https://twinnydotdev.github.io/twinny-docs/teams/overview/), [licensing and seats](https://twinnydotdev.github.io/twinny-docs/teams/licensing/), and the operator reference in [docs/gateway.md](docs/gateway.md).
+Free for five developers, forever. A licence bought by card at [twinny.dev](https://twinny.dev/#pricing) adds seats and switches on policy, recording and plugins; it is checked locally and the gateway never phones home. A [30-day trial](https://twinny.dev/#trial) token with every feature is issued by email, no card. See the [teams guide](https://twinnydotdev.github.io/twinny-docs/teams/overview/), [licensing and seats](https://twinnydotdev.github.io/twinny-docs/teams/licensing/), and the operator reference in [docs/gateway.md](docs/gateway.md).
 
 ## Repository layout
 
@@ -73,7 +75,7 @@ Issues and pull requests are welcome on [GitHub](https://github.com/twinnydotdev
 
 ## Support twinny
 
-twinny is free and open source. If it earns its keep, a team licence is the best way to support it. Donations are appreciated too. Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
+twinny is free and open source, written and maintained by one person since 2023. If it earns its keep, a [team licence](https://twinny.dev/#pricing) is the best way to support it. Donations are appreciated too. Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
 
 ## License
 
