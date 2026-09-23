@@ -231,12 +231,20 @@ export const isChatFimFormat = (modelName: string, format: string | undefined) =
 export const getFimChat = (
   modelName: string,
   format: string | undefined,
-  prompt: string
+  prompt: string,
+  wordFragment = ""
 ): ChatMessage[] | undefined =>
   isChatFimFormat(modelName, format)
     ? [
         { role: SYSTEM, content: "You are a code completion assistant." },
-        { role: USER, content: prompt }
+        {
+          role: USER,
+          // The unfinished word is left out of the prompt, since the model
+          // treats a fragment as a typo; named here, it is honoured.
+          content: wordFragment
+            ? `${prompt}\n\nThe completion must begin with \`${wordFragment}\`.`
+            : prompt
+        }
       ]
     : undefined
 

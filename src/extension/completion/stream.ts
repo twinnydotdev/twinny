@@ -23,6 +23,11 @@ export interface CompletionStreamOptions {
    * code block: drop an opening fence line and end at the closing one.
    */
   unwrapFences?: boolean
+  /**
+   * The unfinished word the prompt left out: the completion must begin with
+   * it and the copy is dropped. One that ignores it is discarded.
+   */
+  wordFragment?: string
 }
 
 export interface StreamDecision {
@@ -42,6 +47,7 @@ export type StopReason =
   | "closed block"
   | "max lines"
   | "closing fence"
+  | "ignored word"
   | "model stopped"
 
 const OPENING_FENCE = /^\s*```[\w+#.-]*\s*$/
@@ -100,6 +106,10 @@ export class CompletionStream {
   private finished = false
   /** Whether the first line has been checked for an opening fence. */
   private fenceChecked = false
+  /** Whether the text after an opening fence has been checked for a false start. */
+  private fenceLeadChecked = false
+  /** Whether the completion has been checked against `wordFragment`. */
+  private fragmentChecked = false
   /** Set once the completion ends; "model stopped" when the stream ran dry. */
   public stoppedBy: StopReason | "" = ""
   private readonly baseIndent: number
@@ -147,6 +157,19 @@ export class CompletionStream {
       return this.stop("", "only whitespace")
     }
 
+    if (this.options.unwrapFences && !this.fenceLeadChecked) {
+      if (this.text.trim().length === 0) return { done: false, text: this.text }
+      this.dropFenceLead()
+    }
+
+    if (this.options.wordFragment && !this.fragmentChecked) {
+      if (this.text.length < this.options.wordFragment.length) {
+        return { done: false, text: this.text }
+      }
+      const decision = this.dropWordFragment()
+      if (decision) return decision
+    }
+
     let newline = this.text.indexOf("\n", this.judgedUpTo)
     while (newline !== -1) {
       const decision = this.judgeLine(this.judgedUpTo, newline)
@@ -164,6 +187,11 @@ export class CompletionStream {
     const cut = this.cutAtStopWord()
     if (this.options.unwrapFences && !this.fenceChecked) {
       this.dropOpeningFence(this.text.length)
+    }
+    if (this.options.unwrapFences && !this.fenceLeadChecked) this.dropFenceLead()
+    if (this.options.wordFragment && !this.fragmentChecked) {
+      const decision = this.dropWordFragment()
+      if (decision) return decision.text
     }
     if (this.judgedUpTo < this.text.length) {
       const decision = this.judgeLine(this.judgedUpTo, this.text.length)
@@ -185,6 +213,36 @@ export class CompletionStream {
     if (OPENING_FENCE.test(this.text.slice(0, end))) {
       this.text = this.text.slice(Math.min(end + 1, this.text.length))
     }
+  }
+
+  /**
+   * A chat model starts its code block on a fresh line even when the fill
+   * continues the cursor line, and then repeats that line's indentation:
+   * `con` is completed with `\nsole.log()`. Drop the false start.
+   */
+  private dropFenceLead() {
+    this.fenceLeadChecked = true
+    // The cursor line as the prompt showed it, without the unfinished word.
+    const fragment = this.options.wordFragment ?? ""
+    const before = this.options.textBeforeCursor.slice(
+      0,
+      this.options.textBeforeCursor.length - fragment.length
+    )
+    if (before.length === 0) return
+    const lead = this.text.match(/^(\r?\n)+/)
+    if (lead) this.text = this.text.slice(lead[0].length)
+    if (before.trim().length === 0 && this.text.startsWith(before)) {
+      this.text = this.text.slice(before.length)
+    }
+  }
+
+  /** Strip the word fragment the completion must start with, or end with nothing. */
+  private dropWordFragment(): StreamDecision | undefined {
+    this.fragmentChecked = true
+    const fragment = this.options.wordFragment ?? ""
+    if (!this.text.startsWith(fragment)) return this.stop("", "ignored word")
+    this.text = this.text.slice(fragment.length)
+    return undefined
   }
 
   private cutAtStopWord(): boolean {

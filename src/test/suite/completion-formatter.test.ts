@@ -107,6 +107,18 @@ suite("Completion formatter", () => {
     assert.strictEqual(completionFormatter.format("a, b)"), "a, b")
   })
 
+  test("strips a short echoed identifier fragment the completion spells out", async () => {
+    const document = await vscode.workspace.openTextDocument({ content: "c" })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, 1)
+    editor.selection = new vscode.Selection(position, position)
+    const formatter = new CompletionFormatter(editor)
+    assert.strictEqual(formatter.format("const mul = 1"), "onst mul = 1")
+    assert.strictEqual(formatter.format("onst mul = 1"), "onst mul = 1")
+    // A one-letter name followed by an operator is not an echo.
+    assert.strictEqual(formatter.format("c + 1"), "c + 1")
+  })
+
   test("keeps completions that merely resemble the next line", async () => {
     const document = await vscode.workspace.openTextDocument({
       content: "\nassert.equal(add(2, 2), 4)\nassert.equal(add(3, 3), 6)",

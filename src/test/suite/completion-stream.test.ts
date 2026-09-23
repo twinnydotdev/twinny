@@ -280,6 +280,51 @@ suite("Completion stream fences", () => {
     assert.strictEqual(result.text, "1 + 2")
   })
 
+  test("a fresh line after the fence is dropped when the cursor line has text", () => {
+    const result = run(make({ textBeforeCursor: "con" }), [
+      "```javascript\n",
+      "\n",
+      "sole.log(1)\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "sole.log(1)")
+  })
+
+  test("the cursor line's indentation is not repeated after the fresh line", () => {
+    const result = run(make({ textBeforeCursor: "  " }), [
+      "```javascript\n\n  return 1\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "return 1")
+  })
+
+  test("indentation echoed before the missing word is dropped", () => {
+    const opts = { textBeforeCursor: "  ret", wordFragment: "ret" }
+    assert.strictEqual(run(make(opts), ["```js\n\n  return 1\n```\n"]).text, "urn 1")
+    assert.strictEqual(run(make(opts), ["```js\n  return 1\n```\n"]).text, "urn 1")
+  })
+
+  test("a fresh line is kept at the start of a line", () => {
+    const result = run(make({ textBeforeCursor: "" }), [
+      "```javascript\n\nfoo()\n```\n"
+    ])
+    assert.strictEqual(result.text, "\nfoo()")
+  })
+
+  test("the word left out of the prompt must come back and is dropped", () => {
+    const opts = { textBeforeCursor: "  con", wordFragment: "con" }
+    const result = run(make(opts), ["```javascript\n", "co", "nsole.log(1)\n```\n"])
+    assert.strictEqual(result.text, "sole.log(1)")
+
+    const ignored = make(opts)
+    assert.strictEqual(run(ignored, ["```javascript\n", "module.exports = {}\n```\n"]).text, "")
+    assert.strictEqual(ignored.stoppedBy, "ignored word")
+
+    // A fill shorter than the word is judged on finish.
+    assert.strictEqual(run(make(opts), ["c"]).text, "")
+    assert.strictEqual(run(make(opts), ["con"]).text, "")
+  })
+
   test("fences are kept for base models", () => {
     const result = run(makeStream(), ["```js\n", "code\n", "```\n"])
     assert.strictEqual(result.text, "```js\ncode\n```\n")

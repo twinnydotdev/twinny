@@ -235,6 +235,11 @@ suite("FIM templates", () => {
       "<|im_start|>system\nYou are a code completion assistant.<|im_end|>\n" +
         `<|im_start|>user\n${fim}<|im_end|>\n<|im_start|>assistant\n`
     )
+    // The unfinished word at the cursor is named after the prompt.
+    assert.strictEqual(
+      getFimChat("qwen3-coder", FIM_TEMPLATE_FORMAT.automatic, fim, "con")![1].content,
+      `${fim}\n\nThe completion must begin with \`con\`.`
+    )
     // Custom templates for Qwen3-Coder are wrapped too.
     assert.ok(getFimChat("qwen3-coder", FIM_TEMPLATE_FORMAT.custom, fim))
     assert.strictEqual(

@@ -74,6 +74,12 @@ interface CompletionRequest {
   lineBefore: string
   lineAfter: string
   /**
+   * The unfinished word at the cursor, for models that fill the hole as a
+   * chat turn: they cannot continue a fragment, so the prompt ends before
+   * it and the answer must begin with it. Empty otherwise.
+   */
+  wordFragment: string
+  /**
    * Set while the suggest widget is open: VS Code only shows a completion
    * that begins with the item it highlights, so the request is made as if
    * that item were already accepted and the result is returned with it.
@@ -220,6 +226,9 @@ export class CompletionProvider
       prefixSuffix,
       lineBefore,
       lineAfter,
+      wordFragment: isChatFimFormat(provider.modelName, provider.fimTemplate)
+        ? (lineBefore.match(/[\w$]+$/)?.[0] ?? "")
+        : "",
       selected,
       provider,
       token
@@ -290,7 +299,8 @@ export class CompletionProvider
       textBeforeCursor: request.lineBefore,
       textAfterCursor: request.lineAfter,
       suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix),
-      unwrapFences: isChatFimFormat(provider.modelName, provider.fimTemplate)
+      unwrapFences: isChatFimFormat(provider.modelName, provider.fimTemplate),
+      wordFragment: request.wordFragment
     })
 
     const inference = resolveInferenceProvider(provider)
@@ -320,7 +330,7 @@ export class CompletionProvider
     let streamEnded = false
     try {
       const chunks = inference.fim(
-        this.buildFimRequest(prompt, provider, stopWords, prefixSuffix),
+        this.buildFimRequest(prompt, provider, stopWords, prefixSuffix, request.wordFragment),
         { signal: controller.signal }
       )
       let stoppedEarly = false
@@ -449,9 +459,15 @@ export class CompletionProvider
     prompt: string,
     provider: TwinnyProvider,
     stopWords: string[],
-    prefixSuffix: PrefixSuffix
+    prefixSuffix: PrefixSuffix,
+    wordFragment = ""
   ): FimRequest {
-    const messages = getFimChat(provider.modelName, provider.fimTemplate, prompt)
+    const messages = getFimChat(
+      provider.modelName,
+      provider.fimTemplate,
+      prompt,
+      wordFragment
+    )
     return {
       model: provider.modelName,
       prompt: messages ? renderChatML(messages) : prompt,
@@ -535,7 +551,13 @@ export class CompletionProvider
   }
 
   private async getPrompt(request: CompletionRequest) {
-    const { document, prefixSuffix, provider } = request
+    const { document, provider } = request
+    const prefixSuffix = request.wordFragment
+      ? {
+          prefix: request.prefixSuffix.prefix.slice(0, -request.wordFragment.length),
+          suffix: request.prefixSuffix.suffix
+        }
+      : request.prefixSuffix
     const languageId = document.languageId
     const fileName = workspace.asRelativePath(document.uri)
 
