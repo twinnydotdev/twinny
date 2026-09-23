@@ -2,7 +2,7 @@ import * as assert from "assert"
 
 import { API_PROVIDERS } from "../../common/constants"
 import { ChatCompletionMessage } from "../../common/types"
-import { cleanMessageHtml, toApiMessage } from "../../extension/chat/messages"
+import { buildChatTurn } from "../../extension/chat/turn"
 import {
   buildBlockingRequest,
   buildStreamingRequest,
@@ -19,35 +19,6 @@ const provider = {
 }
 
 suite("Chat messages", () => {
-  test("strips composer markup down to the text the user meant", () => {
-    const html =
-      "<p>Look at <span data-type=\"mention\">src/a.ts</span> &amp; fix &lt;T&gt; @workspace</p><img src=\"x\">"
-    const text = cleanMessageHtml(html)
-    assert.ok(text.includes("src/a.ts"))
-    assert.ok(text.includes("& fix <T>"))
-    assert.ok(!text.includes("@workspace"))
-    assert.ok(!text.includes("<img"))
-  })
-
-  test("keeps a text-only message verbatim", () => {
-    const message = toApiMessage({ role: "user", content: "<b>hi</b>" })
-    assert.deepStrictEqual(message.content, [{ type: "text", text: "<b>hi</b>" }])
-  })
-
-  test("adds image parts and cleans the text when images are attached", () => {
-    const message = toApiMessage({
-      role: "user",
-      content: "<p>what is this</p>",
-      images: ["data:image/png;base64,AAA"]
-    })
-    const parts = message.content as unknown as { type: string; text?: string }[]
-    assert.strictEqual(parts.length, 2)
-    assert.strictEqual(parts[0].type, "text")
-    assert.strictEqual(parts[1].type, "image_url")
-    // Only images and mention spans are stripped; other markup is kept.
-    assert.strictEqual(parts[0].text, "<p>what is this</p>")
-  })
-
   test("routes local servers through the OpenAI-compatible client", () => {
     assert.strictEqual(getFluencyProvider(provider), "openai-compatible")
     assert.strictEqual(
@@ -72,8 +43,14 @@ suite("Chat messages", () => {
   })
 
   test("text-only parts go to the provider as a plain string; images keep their parts", () => {
-    const plain = toApiMessage({ role: "user", content: "Hi" })
-    const withImage = toApiMessage({ role: "user", content: "<p>look</p>", images: ["data:image/png;base64,AAAA"] })
+    const plain = { role: "user", content: [{ type: "text", text: "Hi" }] } as ChatCompletionMessage
+    const withImage = {
+      role: "user",
+      content: [
+        { type: "text", text: "look" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } }
+      ]
+    } as ChatCompletionMessage
     const request = buildStreamingRequest(provider, [plain, withImage])
     assert.strictEqual(request.messages[0].content, "Hi", "Mistral rejects a parts list for plain text")
     assert.ok(Array.isArray(request.messages[1].content))
@@ -82,11 +59,19 @@ suite("Chat messages", () => {
     assert.strictEqual(blocking.messages[0].content, "Hi")
   })
 
-  test("sends no twinny-only fields to the provider", () => {
-    const request = buildStreamingRequest(provider, [
-      toApiMessage({ role: "system", content: "s", id: "conv-1" })
-    ])
+  test("sends no twinny-only fields to the provider", async () => {
+    const turn = await buildChatTurn(
+      [
+        { role: "user", content: "Explain", id: "m-1", prompt: "Explain this code" },
+        { role: "assistant", content: "It adds.", id: "m-2", context: { stage: "done", query: "q", threshold: 0, hits: [], nearMisses: [] } },
+        { role: "user", content: "<p>and?</p>", id: "m-3" }
+      ] as ChatCompletionMessage[],
+      { systemPrompt: async () => "s", additionalContext: async () => "" }
+    )
+    const request = buildStreamingRequest(provider, turn)
     assert.ok(!("id" in request))
-    assert.ok(!("id" in request.messages[0]))
+    for (const message of request.messages) {
+      assert.deepStrictEqual(Object.keys(message).sort(), ["content", "role"])
+    }
   })
 })

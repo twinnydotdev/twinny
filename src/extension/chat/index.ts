@@ -1,6 +1,6 @@
 import { ExtensionContext } from "vscode"
 
-import { EVENT_NAME, SYSTEM, USER, WEBUI_TABS } from "../../common/constants"
+import { ASSISTANT, EVENT_NAME, SYSTEM, USER, WEBUI_TABS } from "../../common/constants"
 import { logger } from "../../common/logger"
 import { kebabToSentence } from "../../common/text"
 import {
@@ -20,7 +20,7 @@ import { getLanguage } from "../utils"
 import { ChatContextBuilder } from "./context"
 import { ContextEntry, formatContextEntries } from "./context-files"
 import { ChatGeneration } from "./generation"
-import { toApiMessages } from "./messages"
+import { buildChatTurn } from "./turn"
 
 /** Templates whose answer benefits from `@workspace`-style lookups. */
 const TEMPLATES_WITH_RAG = ["explain"]
@@ -28,10 +28,11 @@ const TEMPLATES_WITH_RAG = ["explain"]
 /**
  * The chat feature's front door.
  *
- * Takes what the webview or a command hands over, builds the full prompt
- * (`ChatContextBuilder`), converts it to plain messages (`messages.ts`) and
- * runs it (`ChatGeneration`) against whichever provider the inference layer
- * resolves. Holds the running conversation between turns.
+ * Takes what the webview or a command hands over, turns it into the
+ * messages the model is sent (`buildChatTurn`, with `ChatContextBuilder`
+ * for the context) and runs them (`ChatGeneration`) against whichever
+ * provider the inference layer resolves. Holds the running conversation,
+ * replies included, between turns.
  */
 export class Chat extends Base {
   private _conversation: ChatCompletionMessage[] = []
@@ -83,7 +84,11 @@ export class Chat extends Base {
   ): Promise<string | undefined> {
     const provider = this.start()
     if (!provider) return undefined
-    this._conversation = await this.buildConversation(messages, mentions)
+    this._conversation = await buildChatTurn(messages, {
+      systemPrompt: () => this._context.systemPrompt(),
+      additionalContext: (question, sources, history) =>
+        this._context.additionalContext(question, sources, mentions, history)
+    })
     return this.run(provider)
   }
 
@@ -107,13 +112,14 @@ export class Chat extends Base {
   ): Promise<string> {
     const provider = this.start()
     if (!provider) return ""
+    const code = formatContextEntries(attached)
+    const content = (code ? `${prompt}\n\nAttached code:\n\n${code}` : prompt).trim()
     this._bridge.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
     this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
       role: USER,
-      content: display
+      content: display,
+      prompt: content
     })
-    const code = formatContextEntries(attached)
-    const content = code ? `${prompt}\n\nAttached code:\n\n${code}` : prompt
     if (!this._conversation.length) {
       this._conversation = [
         { role: SYSTEM, content: await this._context.systemPrompt() }
@@ -121,7 +127,7 @@ export class Chat extends Base {
     }
     this._conversation = [
       ...this._conversation,
-      { role: USER, content: content.trim() }
+      { role: USER, content }
     ]
     return this.run(provider)
   }
@@ -177,34 +183,21 @@ export class Chat extends Base {
     return this.getProvider()
   }
 
-  private run(provider: TwinnyProvider, prefix = "") {
-    return this._generation.generate(
+  /** Send the conversation; the reply joins it, so the next turn follows on. */
+  private async run(provider: TwinnyProvider, prefix = "") {
+    const reply = await this._generation.generate(
       resolveInferenceProvider(provider),
       { model: provider.modelName, messages: this._conversation },
       provider,
       prefix
     )
-  }
-
-  private async buildConversation(
-    messages: ChatCompletionMessage[],
-    mentions: MentionType[] | undefined
-  ): Promise<ChatCompletionMessage[]> {
-    const last = messages[messages.length - 1]
-    const extra = await this._context.additionalContext(
-      last.content?.toString() || "",
-      mentions,
-      messages.slice(0, -1)
-    )
-    return toApiMessages([
-      { role: SYSTEM, content: await this._context.systemPrompt() },
-      ...messages.slice(0, -1),
-      {
-        role: USER,
-        content: `${last.content}\n\n${extra.trim()}`.trim(),
-        images: last.images
-      }
-    ])
+    if (reply) {
+      this._conversation = [
+        ...this._conversation,
+        { role: ASSISTANT, content: reply }
+      ]
+    }
+    return reply
   }
 
   private async buildTemplateConversation(
@@ -223,14 +216,18 @@ export class Chat extends Base {
       role: USER,
       content:
         `${kebabToSentence(template)}\n\n\n<pre><code>${selection}</code></pre>`.trim() ||
-        " "
+        " ",
+      // Like a typed turn, the conversation keeps the question; what the
+      // workspace search adds is for this reply only.
+      prompt: prompt.trim()
     })
 
     const rag = TEMPLATES_WITH_RAG.includes(template)
-      ? await this._context.ragContext(selection)
+      ? await this._context.ragContext(selection, new Set())
       : undefined
-    const content = rag ? `${prompt}\n\nAdditional Context:\n${rag}` : prompt
+    const content =
+      (rag ? `${prompt}\n\nAdditional Context:\n${rag}` : prompt).trim() || " "
 
-    return [...this._conversation, { role: USER, content: content.trim() || " " }]
+    return [...this._conversation, { role: USER, content }]
   }
 }

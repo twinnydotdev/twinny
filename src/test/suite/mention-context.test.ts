@@ -1,12 +1,12 @@
 import * as assert from "assert"
 
 import { formatGitSnapshot } from "../../extension/chat/git-context"
-import { cleanMessageHtml } from "../../extension/chat/messages"
 import {
   decodeSymbolRef,
   encodeSymbolRef,
   isSymbolRef
 } from "../../extension/chat/symbol-ref"
+import { composerText, withoutSources } from "../../extension/chat/turn"
 
 suite("@git context", () => {
   test("shows branch, status and a fenced diff", () => {
@@ -54,7 +54,7 @@ suite("Mention text clean-up", () => {
       "<p>why does <span data-type=\"mention\" data-id=\"git\">@git</span> " +
       "and <span data-type=\"mention\" data-id=\"terminal\">@terminal</span> " +
       "show <span data-type=\"mention\" data-id=\"/src/a.ts\">@a.ts</span> failing?</p>"
-    const text = cleanMessageHtml(html)
+    const text = withoutSources(composerText(html))
     assert.ok(!text.includes("@git"))
     assert.ok(!text.includes("@terminal"))
     assert.ok(text.includes("@a.ts"))

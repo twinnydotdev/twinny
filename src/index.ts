@@ -470,9 +470,7 @@ export async function activate(context: ExtensionContext) {
       }
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.newConversation, () => {
-      sidebarProvider.bridge?.emit(EVENT_NAME.twinnyNewConversation)
-      sidebarProvider.conversationHistory?.resetConversation()
-      sidebarProvider.chat?.resetConversation()
+      sidebarProvider.newConversation()
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {

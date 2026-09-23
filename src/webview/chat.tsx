@@ -229,7 +229,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
             .replace(/<p>/g, "")
             .replace(/<\/p>/g, "<br>")
             .replace(/<br>$/, ""),
-          images: images && images.length > 0 ? images : undefined
+          images: images && images.length > 0 ? images : undefined,
+          // The user rewrote it: what a feature recorded no longer applies.
+          prompt: undefined
         }
       ]
 

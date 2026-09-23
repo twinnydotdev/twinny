@@ -53,9 +53,16 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
   /**
    * The workspace chunks that were searched out for this reply, kept with
    * the message so a saved conversation still shows its sources. Never
-   * sent to the model: `toApiMessage` builds the API shape from scratch.
+   * sent to the model: `buildChatTurn` builds the API shape from scratch.
    */
   context?: WorkspaceSearchReport
+  /**
+   * What the model was sent for this turn, when a feature shows the user
+   * something shorter (a template's name and the selection, a command's
+   * question without the code it attached). Kept with the message so a
+   * follow-up sends the same conversation the model already answered.
+   */
+  prompt?: string
 }
 
 export interface Conversation {

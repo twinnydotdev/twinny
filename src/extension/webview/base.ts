@@ -356,8 +356,10 @@ export class BaseProvider {
 
   /* ---------------------------------------------------------------------- */
 
-  private newConversation = () => {
+  /** From the chat's button or the command: both sides start over. */
+  public newConversation = () => {
     this.conversationHistory?.resetConversation()
+    this.chat?.resetConversation()
     this.bridge?.emit(EVENT_NAME.twinnyNewConversation)
   }
 
