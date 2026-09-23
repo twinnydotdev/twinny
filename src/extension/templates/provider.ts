@@ -2,150 +2,177 @@ import * as fs from "fs"
 import * as Handlebars from "handlebars"
 import * as path from "path"
 
-import { DEFAULT_TEMPLATE_NAMES, SYSTEM } from "../../common/constants"
+import { SYSTEM } from "../../common/constants"
+import { logger } from "../../common/logger"
 
 import { defaultTemplates } from "./defaults"
 
+/**
+ * twinny's own Handlebars environment, so the helpers templates rely on are
+ * there however many providers exist and whichever of them was initialised.
+ */
+const handlebars = Handlebars.create()
+handlebars.registerHelper("eq", (a, b) => a == b)
+
+const EXTENSION = ".hbs"
+
+/**
+ * Compiled templates by source text. Completions render the FIM template on
+ * every keystroke; an edited file is simply a new key. Bounded so a long
+ * session of edits cannot grow it without end.
+ */
+const compiled = new Map<string, HandlebarsTemplateDelegate>()
+const MAX_COMPILED = 64
+
+const compile = (source: string): HandlebarsTemplateDelegate => {
+  let template = compiled.get(source)
+  if (!template) {
+    if (compiled.size >= MAX_COMPILED) compiled.clear()
+    // Prompts go to a model, not a browser: nothing should be HTML-escaped.
+    template = handlebars.compile(source, { noEscape: true })
+    compiled.set(source, template)
+  }
+  return template
+}
+
+const builtIn = (name: string): string | undefined =>
+  defaultTemplates.find((template) => template.name === name)?.template
+
+/** A system message: "system" itself, or the per-template "<name>-system". */
+const isSystemTemplate = (name: string) =>
+  name === SYSTEM || name.endsWith(`-${SYSTEM}`)
+
+/** Built-in templates the chat cannot offer as a button (see `interactive`). */
+const NON_INTERACTIVE = new Set(
+  defaultTemplates
+    .filter((template) => !template.interactive)
+    .map((template) => template.name)
+)
+
+/**
+ * The prompts twinny sends, as Handlebars templates. Each one is read from
+ * `<basePath>/<name>.hbs`, where the developer can edit it, and falls back
+ * to the built-in copy when the file is missing, empty or will not render.
+ * A template's `{{systemMessage}}` is `<name>-system.hbs` when there is
+ * one, otherwise `system.hbs`.
+ */
 export class TemplateProvider {
-  private _basePath: string | undefined
+  private readonly _basePath: string | undefined
 
   constructor(basePath: string | undefined) {
     this._basePath = basePath
   }
 
+  /** Creates the template folder and writes any built-in template missing from it. */
   public init() {
-    this.createTemplateDir()
-    this.registerHandlebarsHelpers()
-  }
-
-  public registerHandlebarsHelpers(): void {
-    Handlebars.registerHelper("eq", (a, b) => a == b)
-  }
-
-  public createTemplateDir() {
+    if (!this._basePath) return
     try {
-      if (!this._basePath) return
-      const exists = fs.existsSync(this._basePath)
-      if (!exists) {
-        fs.mkdirSync(this._basePath, { recursive: true })
-        console.log(`The folder ${this._basePath} has been created`)
-      }
-      this.copyDefaultTemplates()
-    } catch (err) {
-      console.error(`Failed to create the basePath ${this._basePath}`, err)
+      fs.mkdirSync(this._basePath, { recursive: true })
+    } catch (error) {
+      logger.error(`Could not create the template folder ${this._basePath}: ${error}`)
+      return
     }
-  }
-
-  public copyDefaultTemplates() {
-    try {
-      defaultTemplates.forEach(({ name, template }) => {
-        const destFile = path.join(this._basePath || "", name)
-        if (!fs.existsSync(`${destFile}.hbs`)) {
-          fs.writeFileSync(`${destFile}.hbs`, template, "utf8")
+    for (const { name, template } of defaultTemplates) {
+      try {
+        // "wx" never overwrites: the developer's edits are theirs.
+        fs.writeFileSync(this.fileFor(name) as string, template, { encoding: "utf8", flag: "wx" })
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+          logger.warn(`Could not write the default template "${name}": ${error}`)
         }
-      })
-    } catch {
-      console.log(`Problem creating default templates "${this._basePath}`)
+      }
     }
   }
 
-  public readSystemMessageTemplate(templateName?: string) {
-    const defaultPath = `${this._basePath}/system.hbs`
+  /** The system message for a template: its own, the shared one, or none. */
+  public async readSystemMessageTemplate(templateName?: string): Promise<string> {
+    const own =
+      templateName && !isSystemTemplate(templateName)
+        ? await this.readSource(`${templateName}-${SYSTEM}`)
+        : undefined
+    return own ?? (await this.readSource(SYSTEM)) ?? ""
+  }
 
-    /* allow custom system messages, per templated task */
-    const templatePrefix = templateName ? `${templateName}-` : ""
-    const templatePath = `${this._basePath}/${templatePrefix}system.hbs`
+  /**
+   * Renders a template with `data`, plus `systemMessage` unless the caller
+   * supplied one. Never throws: an unknown or broken template gives "" and a
+   * line in the log, and callers say so in their own terms.
+   */
+  public async readTemplate<T extends object>(
+    templateName: string,
+    data: T
+  ): Promise<string> {
+    const [source, systemMessage] = await Promise.all([
+      this.readSource(templateName),
+      this.readSystemMessageTemplate(templateName)
+    ])
+    if (source === undefined) {
+      logger.warn(`No template named "${templateName}"`)
+      return ""
+    }
 
-    const path = fs.existsSync(templatePath) ? templatePath : defaultPath
+    const context: Record<string, unknown> = { ...(data as Record<string, unknown>) }
+    if (context.systemMessage == null) context.systemMessage = systemMessage
     try {
-      return new Promise<string>((resolve, reject) => {
-        fs.readFile(
-          path,
-          { encoding: "utf-8" },
-          (err, templateString: string) => {
-            if (err) return reject(err)
-            resolve(templateString)
-          }
-        )
-      })
-    } catch {
-      console.log(`Problem reading template "${path}`)
-      return Promise.reject()
+      return compile(source)(context)
+    } catch (error) {
+      const fallback = builtIn(templateName)
+      logger.error(
+        `The template "${templateName}" did not render` +
+          (fallback !== undefined && fallback !== source ? "; using the built-in one" : "") +
+          `: ${error instanceof Error ? error.message : error}`
+      )
+      if (fallback === undefined || fallback === source) return ""
+      try {
+        return compile(fallback)(context)
+      } catch {
+        return ""
+      }
     }
   }
 
-  public compileTemplateFromFile<T>(templateName: string) {
-    const path = `${this._basePath}/${templateName}.hbs`
-    try {
-      return new Promise<HandlebarsTemplateDelegate<T>>((resolve, reject) => {
-        fs.readFile(path, { encoding: "utf-8" }, (err, templateString) => {
-          if (err && err.code !== "ENOENT") return reject(err)
-
-          if (
-            !templateString &&
-            DEFAULT_TEMPLATE_NAMES.includes(templateName)
-          ) {
-            templateString =
-              defaultTemplates.find(({ name }) => name === templateName)
-                ?.template || ""
-            if (!templateString) {
-              return reject(new Error(`Template "${templateName}" not found`))
-            }
-            return resolve(Handlebars.compile(templateString))
-          }
-
-          const template = Handlebars.compile(templateString)
-          resolve(template)
-        })
-      })
-    } catch (e) {
-      console.log(`Problem reading default template "${path}"`)
-      return Promise.reject(e)
-    }
-  }
-
-  /** Templates that need input the chat's selection buttons cannot supply. */
-  private static readonly NON_INTERACTIVE_TEMPLATES = [
-    "chat",
-    "commit-message",
-    "fim",
-    "relevant-code",
-    "review"
-  ]
-
-  private filterSystemTemplates = (filterName: string) => {
-    return (
-      !TemplateProvider.NON_INTERACTIVE_TEMPLATES.includes(filterName) &&
-      filterName.includes(SYSTEM) === false
-    )
-  }
-
+  /**
+   * The templates the chat offers as code actions: every file in the folder
+   * except system messages and the built-ins another feature fills in.
+   */
   public listTemplates(): string[] {
     if (!this._basePath) return []
-    const files = fs.readdirSync(this._basePath, "utf8")
-    const templates = files.filter((fileName) => fileName.endsWith(".hbs"))
-    return templates
-      .map((fileName) => fileName.replace(".hbs", ""))
-      .filter(this.filterSystemTemplates)
+    let files: string[]
+    try {
+      files = fs.readdirSync(this._basePath, "utf8")
+    } catch {
+      return []
+    }
+    return files
+      .filter((file) => file.endsWith(EXTENSION))
+      .map((file) => file.slice(0, -EXTENSION.length))
+      .filter((name) => !NON_INTERACTIVE.has(name) && !isSystemTemplate(name))
       .sort((a, b) => a.localeCompare(b))
   }
 
-  public async readTemplate<T>(
-    templateName: string,
-    data: T
-  ) {
-    try {
-      const template: HandlebarsTemplateDelegate<T> =
-        await this.compileTemplateFromFile(templateName)
+  /** Where a template lives on disk; undefined for names that are not plain file names. */
+  private fileFor(name: string): string | undefined {
+    if (!this._basePath || !name || path.basename(name) !== name) return undefined
+    return path.join(this._basePath, `${name}${EXTENSION}`)
+  }
 
-      const result = template({
-        ...data,
-        systemMessage: await this.readSystemMessageTemplate(templateName),
-      })
-      return result
-    } catch (error) {
-      console.error("Error rendering the template:", error)
-      return ""
+  /**
+   * A template's text: the developer's file, or the built-in copy when the
+   * file is missing or blank. Undefined when neither exists.
+   */
+  private async readSource(name: string): Promise<string | undefined> {
+    const file = this.fileFor(name)
+    let text: string | undefined
+    if (file) {
+      try {
+        text = await fs.promises.readFile(file, "utf8")
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          logger.warn(`Could not read the template ${file}: ${error}`)
+        }
+      }
     }
+    if (text?.trim()) return text
+    return builtIn(name) ?? text
   }
 }

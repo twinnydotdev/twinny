@@ -572,8 +572,6 @@ export class CompletionProvider
     }
 
     if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
-      const systemMessage =
-        await this._templateProvider.readSystemMessageTemplate("fim")
       const context = contextFiles
         .map((file) => `// File: ${file.name}\n${file.text}`)
         .join("\n\n")
@@ -582,7 +580,6 @@ export class CompletionProvider
         {
           prefix: prefixSuffix.prefix,
           suffix: prefixSuffix.suffix,
-          systemMessage,
           context,
           fileName: document.uri.fsPath,
           language: languageId
