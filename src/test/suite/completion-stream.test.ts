@@ -236,3 +236,52 @@ suite("Completion stream stop reasons", () => {
     assert.strictEqual(idle.stoppedBy, "")
   })
 })
+
+suite("Completion stream fences", () => {
+  const make = (overrides: Partial<CompletionStreamOptions> = {}) =>
+    makeStream({ unwrapFences: true, ...overrides })
+
+  test("drops the opening fence and ends at the closing one", () => {
+    const stream = make({ textBeforeCursor: "  return " })
+    const result = run(stream, [
+      "```java",
+      "script\n",
+      "n % 2 === 0\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "n % 2 === 0")
+    assert.strictEqual(result.done, true)
+    assert.strictEqual(stream.stoppedBy, "closing fence")
+  })
+
+  test("closing fence without a trailing newline is judged on finish", () => {
+    const stream = make()
+    const result = run(stream, ["```python\n", "return x\n```"])
+    assert.strictEqual(result.text, "return x")
+    assert.strictEqual(stream.stoppedBy, "closing fence")
+  })
+
+  test("a fence-free answer is left alone", () => {
+    const result = run(make({ multiline: false }), ["n % 2", " === 0\n"])
+    assert.strictEqual(result.text, "n % 2 === 0")
+  })
+
+  test("a lone opening fence yields nothing", () => {
+    assert.strictEqual(run(make(), ["```javascript"]).text, "")
+    assert.strictEqual(run(make(), ["```\n```"]).text, "")
+  })
+
+  test("single-line mode still takes the first code line, not the fence", () => {
+    const result = run(make({ multiline: false, textBeforeCursor: "x = " }), [
+      "```ts\n",
+      "1 + 2\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "1 + 2")
+  })
+
+  test("fences are kept for base models", () => {
+    const result = run(makeStream(), ["```js\n", "code\n", "```\n"])
+    assert.strictEqual(result.text, "```js\ncode\n```\n")
+  })
+})

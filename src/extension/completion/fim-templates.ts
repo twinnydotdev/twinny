@@ -218,7 +218,8 @@ export const getFimPrompt = (
 export const getStopWords = (modelName: string, format: string | undefined) =>
   stopWordsMap[resolveFimFormat(modelName, format)]
 
-const isChatFimFormat = (modelName: string, format: string | undefined) =>
+/** Whether the model only fills the hole as a chat turn (see `getFimChat`). */
+export const isChatFimFormat = (modelName: string, format: string | undefined) =>
   resolveFimFormat(modelName, format) === FIM_TEMPLATE_FORMAT.qwen3Coder
 
 /**

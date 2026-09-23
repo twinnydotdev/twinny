@@ -51,6 +51,7 @@ import {
   getFimPrompt,
   getFimTemplateRepositoryLevel,
   getStopWords,
+  isChatFimFormat,
   renderChatML
 } from "./fim-templates"
 import { CompletionFormatter } from "./formatter"
@@ -288,7 +289,8 @@ export class CompletionProvider
       maxLines: this.config.get<number>("maxLines", 40),
       textBeforeCursor: request.lineBefore,
       textAfterCursor: request.lineAfter,
-      suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix)
+      suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix),
+      unwrapFences: isChatFimFormat(provider.modelName, provider.fimTemplate)
     })
 
     const inference = resolveInferenceProvider(provider)
