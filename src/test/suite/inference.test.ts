@@ -20,6 +20,7 @@ import { Chat } from "../../extension/chat/index"
 import { FileInteractionCache } from "../../extension/completion/file-interaction"
 import { CompletionProvider } from "../../extension/completion/provider"
 import { Embedder } from "../../extension/embeddings/embedder"
+import { GenerationTracker } from "../../extension/generations"
 import {
   ChatRequest,
   InferenceCapability,
@@ -35,7 +36,6 @@ import {
 import { ExtensionBridge } from "../../extension/messaging/bridge"
 import { describeProviderError } from "../../extension/providers/errors"
 import { listProviderModels, testProvider } from "../../extension/providers/probe"
-import { TwinnyStatusBar } from "../../extension/status-bar"
 import { TemplateProvider } from "../../extension/templates/provider"
 
 /* -------------------------------------------------------------------------- */
@@ -172,7 +172,7 @@ const fakeChatConfig: TwinnyProvider = {
   type: "chat"
 }
 
-const stubStatusBar = { busy() {}, idle() {} } as unknown as TwinnyStatusBar
+const generations = new GenerationTracker()
 
 const stubBridge = () => {
   const emitted: { type: string; data: unknown }[] = []
@@ -333,7 +333,7 @@ suite("Inference layer", function () {
         const position = new vscode.Position(0, "function add(a, b) {".length)
         editor.selection = new vscode.Selection(position, position)
         const provider = new CompletionProvider(
-          stubStatusBar,
+          generations,
           new FileInteractionCache(),
           new TemplateProvider(undefined),
           contextWith({ [ACTIVE_FIM_PROVIDER_STORAGE_KEY]: config })
@@ -367,7 +367,7 @@ suite("Inference layer", function () {
       providerRegistry.register("fake-chat", { id: "fake", create: () => fake })
       const { bridge } = stubBridge()
       const chat = new Chat(
-        stubStatusBar,
+        generations,
         undefined,
         contextWith({ [ACTIVE_CHAT_PROVIDER_STORAGE_KEY]: fakeChatConfig }),
         bridge,
@@ -392,7 +392,7 @@ suite("Inference layer", function () {
           create: () => fake
         })
         const { bridge, emitted } = stubBridge()
-        const generation = new ChatGeneration(bridge, stubStatusBar)
+        const generation = new ChatGeneration(bridge, generations)
         const reply = await generation.generate(
           registry.resolve(fakeChatConfig),
           { model: "m", messages: [{ role: "user", content: "hi" }] },
@@ -651,7 +651,7 @@ suite("Inference layer", function () {
       })
       await vscode.window.showTextDocument(document)
       const provider = new CompletionProvider(
-        stubStatusBar,
+        generations,
         new FileInteractionCache(),
         new TemplateProvider(undefined),
         contextWith({ [ACTIVE_FIM_PROVIDER_STORAGE_KEY]: config })
@@ -687,7 +687,7 @@ suite("Inference layer", function () {
         })
       })
       const { bridge } = stubBridge()
-      const generation = new ChatGeneration(bridge, stubStatusBar)
+      const generation = new ChatGeneration(bridge, generations)
       const reply = generation.generate(
         registry.resolve(fakeChatConfig),
         { model: "m", messages: [] },

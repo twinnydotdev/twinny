@@ -9,11 +9,11 @@ import {
   TwinnyProvider
 } from "../../common/types"
 import { WorkspaceSearch } from "../embeddings/search"
+import { GenerationTracker } from "../generations"
 import { readText, resolveInferenceProvider } from "../inference"
 import { ExtensionBridge } from "../messaging/bridge"
 import { Base } from "../providers/base"
 import { describeProviderError, stripThinking } from "../providers/errors"
-import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../templates/provider"
 import { getLanguage } from "../utils"
 
@@ -40,7 +40,7 @@ export class Chat extends Base {
   private readonly _generation: ChatGeneration
 
   constructor(
-    statusBar: TwinnyStatusBar,
+    generations: GenerationTracker,
     templateDir: string | undefined,
     extensionContext: ExtensionContext,
     bridge: ExtensionBridge,
@@ -48,7 +48,7 @@ export class Chat extends Base {
   ) {
     super(extensionContext)
     this._bridge = bridge
-    this._generation = new ChatGeneration(bridge, statusBar)
+    this._generation = new ChatGeneration(bridge, generations)
     this._context = new ChatContextBuilder(
       extensionContext,
       bridge,
@@ -66,6 +66,11 @@ export class Chat extends Base {
   }
 
   public abort = () => this._generation.abort()
+
+  public dispose() {
+    super.dispose()
+    this._generation.dispose()
+  }
 
   public resetConversation() {
     this._conversation = []

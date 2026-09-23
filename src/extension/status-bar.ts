@@ -6,41 +6,40 @@ import {
 } from "../common/constants"
 import { TwinnyProvider } from "../common/types"
 
+import { GenerationTracker } from "./generations"
+
 const ICON_IDLE = "$(code)"
 const ICON_BUSY = "$(loading~spin)"
 
 /**
- * The one status bar item twinny owns. Every part of the extension that
- * starts or finishes a request goes through here so the spinner can never be
- * left running, and the idle state always reflects the current settings.
+ * The one status bar item twinny owns. It spins while the generation
+ * tracker has anything running, and otherwise reflects the current settings.
  */
 export class TwinnyStatusBar {
-  private _busy = 0
+  private readonly _subscription: { dispose(): void }
 
   constructor(
     private readonly _item: StatusBarItem,
-    private readonly _context: ExtensionContext
+    private readonly _context: ExtensionContext,
+    private readonly _generations: GenerationTracker
   ) {
     this._item.name = "Twinny"
+    this._subscription = _generations.onDidChange((state) => {
+      if (state.busy) this.showBusy()
+      else this.refresh()
+    })
   }
 
-  /** Show the spinner. Calls nest, so overlapping requests are safe. */
-  public busy() {
-    this._busy++
+  private showBusy() {
     this._item.text = ICON_BUSY
     this._item.tooltip = "Twinny is generating — click to stop"
     this._item.command = TWINNY_COMMAND_NAME.stopGeneration
     this._item.show()
   }
 
-  public idle() {
-    this._busy = Math.max(0, this._busy - 1)
-    if (this._busy === 0) this.refresh()
-  }
-
   /** Re-read settings and the active FIM provider; no-op while busy. */
   public refresh() {
-    if (this._busy > 0) return
+    if (this._generations.state.busy) return
 
     const config = workspace.getConfiguration("twinny")
     if (!config.get<boolean>("enabled", true)) {
@@ -70,6 +69,7 @@ export class TwinnyStatusBar {
   }
 
   public dispose() {
+    this._subscription.dispose()
     this._item.dispose()
   }
 }

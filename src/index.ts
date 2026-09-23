@@ -33,6 +33,7 @@ import { InlineEditCodeActionProvider } from "./extension/edit/code-actions"
 import { InlineEditCodeLensProvider } from "./extension/edit/code-lens"
 import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
 import { WorkspaceIndex } from "./extension/embeddings"
+import { GenerationTracker } from "./extension/generations"
 import { P2pRuntime } from "./extension/p2p/runtime"
 import { RemoteCredentials } from "./extension/providers/credentials"
 import { providerUrl } from "./extension/providers/errors"
@@ -155,9 +156,22 @@ const logStartup = (context: ExtensionContext, startedAt: number) => {
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
+  // Every model request runs on the tracker: the spinner, the stop
+  // keybinding and the stop command all read it.
+  const generations = new GenerationTracker()
+  context.subscriptions.push(
+    generations.onDidChange(({ stoppable }) => {
+      void commands.executeCommand(
+        "setContext",
+        EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
+        stoppable
+      )
+    })
+  )
   const statusBar = new TwinnyStatusBar(
     window.createStatusBarItem(StatusBarAlignment.Right),
-    context
+    context,
+    generations
   )
 
   const startedAt = Date.now()
@@ -193,7 +207,7 @@ export async function activate(context: ExtensionContext) {
   const fullScreenProvider = new FullScreenProvider(
     context,
     templateDir,
-    statusBar,
+    generations,
     p2p,
     teamShare
   )
@@ -202,7 +216,7 @@ export async function activate(context: ExtensionContext) {
   if (workspaceIndex) context.subscriptions.push(workspaceIndex)
 
   const sidebarProvider = new SidebarProvider(
-    statusBar,
+    generations,
     context,
     templateDir,
     workspaceIndex,
@@ -212,13 +226,13 @@ export async function activate(context: ExtensionContext) {
   )
 
   const completionProvider = new CompletionProvider(
-    statusBar,
+    generations,
     fileInteractionCache,
     templateProvider,
     context
   )
 
-  const inlineEdit = new InlineEditService(context, statusBar)
+  const inlineEdit = new InlineEditService(context, generations)
 
   templateProvider.init()
 
@@ -346,11 +360,9 @@ export async function activate(context: ExtensionContext) {
       TWINNY_COMMAND_NAME.templateCompletion,
       (template: string) => runTemplate(template)
     ),
-    commands.registerCommand(TWINNY_COMMAND_NAME.stopGeneration, () => {
-      completionProvider.onError()
-      sidebarProvider.destroyStream()
-      inlineEdit.abort()
-    }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.stopGeneration, () =>
+      generations.stopAll()
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageProviders, async () => {
       commands.executeCommand(
         "setContext",
