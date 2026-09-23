@@ -2,9 +2,9 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
-## Unreleased
+## 4.2.4 · 2026-09-23
 
-Chat.
+Chat release: replies carry their details, and the chat gains the controls it was missing. `twinny-server` carries the version number only; the gateway is unchanged.
 
 - **Replies say who wrote them.** Under each reply: the model, how long it took and, when the backend reports token counts, tokens per second. A reply you stopped says so. The details are saved with the conversation and never sent to the model; older conversations show nothing.
 - **Continue a stopped reply.** The last reply, if you stopped it, has a *Continue* button that asks the model to carry on without starting over.

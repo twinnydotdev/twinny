@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.2.3",
+  "version": "4.2.4",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
