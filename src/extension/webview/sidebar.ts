@@ -63,14 +63,9 @@ export class SidebarProvider extends BaseProvider {
     webviewView.webview.html = this.getHtmlForWebview(webviewView.webview)
     logger.info("Sidebar webview view resolved")
 
+    // The view is registered with retainContextWhenHidden, so hiding it
+    // does not reload the webview and it stays ready: nothing to reset.
     this.registerWebView(webviewView.webview)
-
-    // Reset sidebar ready promise when the Twinny sidebar is hidden (user navigates away)
-    webviewView.onDidChangeVisibility(() => {
-      if (!webviewView.visible) {
-        this.resetSidebarReadyPromise()
-      }
-    })
   }
 
   private getHtmlForWebview(webview: vscode.Webview) {
