@@ -11,7 +11,6 @@ import { randomBytes, timingSafeEqual } from "node:crypto"
 import http from "node:http"
 import { AddressInfo } from "node:net"
 
-import { isHostedProvider } from "../common/provider-validation"
 import { InferenceError } from "../extension/inference/errors"
 import { handleRemoteRequest } from "../protocol/handler"
 import { PEER_CLOSE, peerRoutePath } from "../protocol/peer"
@@ -44,7 +43,6 @@ import {
   GatewayConfig,
   hasTeamPool,
   isTeamProvider,
-  PerKeyLimits,
   policyForExtensions,
   pricingOf,
   teamPooledAliases,
@@ -52,7 +50,6 @@ import {
 } from "./config"
 import { ConfigurationConflict, GatewayConfiguration } from "./configuration"
 import {
-  capOutputTokens,
   clientAddress,
   DEMO_INVITE_PATH,
   DEMO_VISITOR,
@@ -62,6 +59,7 @@ import {
   InviteThrottle,
   isGuestName
 } from "./demo"
+import { InferenceGate, refusalError } from "./gate"
 import { InviteError, InviteStore } from "./invites"
 import { KeyRecord, KeyStore } from "./keys"
 import { LicenseStore } from "./license"
@@ -69,7 +67,6 @@ import { GatewayLog } from "./log"
 import type { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
 import { RouteTable } from "./routes"
-import { refuseByRouting } from "./routing"
 import { isUserCode, normalizeUserCode, SignInRequests } from "./signin"
 import { parseSince, summarizeUsage, UsageRecorder } from "./usage"
 
@@ -131,26 +128,6 @@ export class GatewayListenError extends Error {
   }
 }
 
-interface Inflight {
-  controller: AbortController
-  principal: string
-}
-
-/** A generation request waiting for a free slot. */
-interface Waiting {
-  route: "fim" | "chat"
-  principal: string
-  since: number
-  /** Called once: with a slot already reserved, or with `false` when the gateway stops. */
-  admit: (ok: boolean) => void
-}
-
-/** How a wait for a slot ended. */
-type Admission =
-  | { kind: "admitted"; waited: number }
-  | { kind: "refused"; reason: "gateway" | "queue"; message: string; waited: number }
-  | { kind: "gone"; waited: number }
-
 /** What `authenticate` decided: a principal, or why not. */
 type AuthResult =
   | {
@@ -165,60 +142,6 @@ type AuthResult =
   | { refused: string }
 
 const MINUTE_MS = 60_000
-
-/**
- * The per-key counters: requests running now, and the start times of the
- * last minute's requests, kept only while a limit needs them.
- */
-class KeyMeter {
-  private readonly _active = new Map<string, number>()
-  private readonly _starts = new Map<string, number[]>()
-
-  constructor(private readonly _limits: PerKeyLimits | undefined) {}
-
-  /** Why a key may not start another request now, or nothing. */
-  public refuse(principal: string, now = Date.now()): string | undefined {
-    const limits = this._limits
-    if (!limits) return undefined
-    if (limits.maxActiveRequests !== undefined) {
-      const active = this._active.get(principal) ?? 0
-      if (active >= limits.maxActiveRequests) {
-        return `Your key is at its limit of ${limits.maxActiveRequests} request(s) running at once.`
-      }
-    }
-    if (limits.requestsPerMinute !== undefined) {
-      const starts = this.recent(principal, now)
-      if (starts.length >= limits.requestsPerMinute) {
-        return `Your key has started ${starts.length} requests in the last minute (limit ${limits.requestsPerMinute}). Wait a moment.`
-      }
-    }
-    return undefined
-  }
-
-  public start(principal: string, now = Date.now()) {
-    if (!this._limits) return
-    this._active.set(principal, (this._active.get(principal) ?? 0) + 1)
-    if (this._limits.requestsPerMinute !== undefined) {
-      this._starts.set(principal, [...this.recent(principal, now), now])
-    }
-  }
-
-  public end(principal: string) {
-    if (!this._limits) return
-    const active = (this._active.get(principal) ?? 1) - 1
-    if (active <= 0) this._active.delete(principal)
-    else this._active.set(principal, active)
-  }
-
-  private recent(principal: string, now: number): number[] {
-    const starts = (this._starts.get(principal) ?? []).filter(
-      (at) => now - at < MINUTE_MS
-    )
-    if (starts.length) this._starts.set(principal, starts)
-    else this._starts.delete(principal)
-    return starts
-  }
-}
 
 /** Constant-time on the bytes; a length mismatch still compares something. */
 const tokenMatches = (
@@ -324,16 +247,10 @@ const readJsonBody = (
 
 export class GatewayServer {
   private readonly _server: http.Server
-  private readonly _inflight = new Set<Inflight>()
-  private readonly _meter: KeyMeter
+  private readonly _gate: InferenceGate
   private readonly _signIns: SignInRequests
   private readonly _guestInvites?: InviteThrottle
   private _guestSweep?: NodeJS.Timeout
-  private _active = 0
-  /** Generation requests (fim and chat) running now; what the caps count. */
-  private _generating = 0
-  /** Generation requests waiting for a slot, oldest first. */
-  private readonly _waiting: Waiting[] = []
   private _draining = false
   private _nextId = 1
   private _address?: GatewayAddress
@@ -343,7 +260,13 @@ export class GatewayServer {
     this._server.on("upgrade", (req, socket, head) =>
       this.handleUpgrade(req, socket as import("node:net").Socket, head)
     )
-    this._meter = new KeyMeter(_options.config.limits.perKey)
+    this._gate = new InferenceGate({
+      limits: _options.config.limits,
+      config: () => this.config,
+      policyLicensed: () =>
+        _options.license?.current().features.includes("policy") === true,
+      metrics: _options.metrics
+    })
     this._signIns = _options.signIns ?? new SignInRequests()
     if (_options.demo)
       this._guestInvites = new InviteThrottle(_options.demo.invitesPerHour)
@@ -358,8 +281,14 @@ export class GatewayServer {
     return this._address
   }
 
+  /** Requests at the models now, plugins' included. */
   public get active(): number {
-    return this._active
+    return this._gate.active
+  }
+
+  /** The way in to the models, for plugins as for developers. */
+  public get gate(): InferenceGate {
+    return this._gate
   }
 
   public get routes(): RouteTable {
@@ -416,25 +345,23 @@ export class GatewayServer {
     this._draining = true
     if (this._guestSweep) clearInterval(this._guestSweep)
     // Nothing waiting will get a slot now: each is answered before the drain.
-    for (const entry of [...this._waiting]) entry.admit(false)
+    this._gate.close()
     const { shutdownGraceMs } = this._options.config.limits
     const closed = new Promise<void>((resolve) =>
       this._server.close(() => resolve())
     )
 
     const deadline = Date.now() + shutdownGraceMs
-    while (this._active > 0 && Date.now() < deadline) {
+    while (this._gate.active > 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 25))
     }
-    for (const { controller } of this._inflight) {
-      controller.abort(new InferenceError("cancelled", reason))
-    }
+    this._gate.abortAll(new InferenceError("cancelled", reason))
     // Peers are closed once their jobs are gone; the jobs were just aborted.
     await this._options.peers?.stop(Math.max(0, deadline - Date.now()))
     // An aborted handler ends its stream with a terminal frame; give it a
     // moment to write that before the sockets are pulled.
     const settle = Date.now() + 1_000
-    while (this._active > 0 && Date.now() < settle) {
+    while (this._gate.active > 0 && Date.now() < settle) {
       await new Promise((resolve) => setTimeout(resolve, 10))
     }
     await new Promise((resolve) => setTimeout(resolve, 50))
@@ -2016,22 +1943,9 @@ export class GatewayServer {
     const { limits } = this._options.config
     // Each request keeps the routing table it started with, even across an admin save.
     const routes = this.routes
-    const { maxOutputTokens } = this.config.limits
     const policyLicensed = this._options.license?.current().features.includes("policy") === true
-    const policy = policyLicensed ? this.config.policy : undefined
     const workspaceHeader = req.headers["x-twinny-workspace"]
     const workspace = typeof workspaceHeader === "string" ? workspaceHeader.slice(0, 200) : undefined
-    const route: RouteTable["route"] = (alias, capability) => {
-      const target = routes.route(alias, capability)
-      // Routing rules: some workspaces may only use some aliases, or only local backends.
-      const providerName = routes.providerOf(alias)
-      const providerKind = providerName ? this.config.providers[providerName]?.provider : undefined
-      const routingRefusal = refuseByRouting(policy?.routing, workspace, alias, !!providerKind && isHostedProvider(providerKind))
-      if (routingRefusal) throw new InferenceError("authentication", routingRefusal)
-      return maxOutputTokens === undefined
-        ? target
-        : capOutputTokens(target, maxOutputTokens)
-    }
 
     if (!isInferenceCapability(match.route)) {
       const outcome = await handleRemoteRequest(match.route, req, res, {
@@ -2059,14 +1973,11 @@ export class GatewayServer {
         },
         team: () => {
           const configured = policyForExtensions(routes.policy())
-          const licensed =
-            this._options.license?.current().features.includes("policy") ===
-            true
           const recording = this._options.recorder?.active() ?? []
           const config = this.config
           const pooled = teamPooledAliases(config)
           const policy = {
-            ...(configured && licensed ? configured : {}),
+            ...(configured && policyLicensed ? configured : {}),
             ...(recording.length ? { recording } : {}),
             ...(pooled.length ? { peers: pooled } : {})
           }
@@ -2093,94 +2004,62 @@ export class GatewayServer {
       return
     }
 
-    // Embeddings are not counted against the caps: an index run is
-    // hundreds of small, quick requests, and a cap sized for generation
-    // would refuse most of them. They still hold a slot for draining and
-    // are bound by the deadline.
-    const metered = match.route !== "embeddings"
-    const refuse = (message: string, reason: "gateway" | "queue" | "key", waited = 0) => {
-      sendError(res, new InferenceError("rate-limited", message), {
-        "Retry-After": "1"
+    const capability = match.route
+    // The response closing before anything was written means the client left.
+    const left = new AbortController()
+    const onClose = () => left.abort()
+    res.on("close", onClose)
+    const admission = await this._gate.admit({
+      principal,
+      route: capability,
+      routes,
+      workspace,
+      signal: left.signal
+    })
+    res.removeListener("close", onClose)
+    if (admission.kind === "gone") {
+      this._options.log.info({
+        event: "request.abandoned",
+        id,
+        key: principal,
+        route: capability,
+        waited: admission.waited
       })
+      return
+    }
+    if (admission.kind === "refused") {
+      sendError(res, refusalError(admission), { "Retry-After": "1" })
       this._options.log.warn({
         event: "request.refused",
         id,
         key: principal,
-        route: match.route,
+        route: capability,
         kind: "rate-limited",
-        reason,
-        active: this._generating,
-        waiting: this._waiting.length,
-        ...(waited ? { waited } : {})
+        reason: admission.reason,
+        active: admission.generating,
+        waiting: admission.waiting,
+        ...(admission.waited ? { waited: admission.waited } : {})
       })
+      return
     }
-    let waited = 0
-    if (metered) {
-      // A key over its own limit is refused at once: waiting would not help it.
-      const keyRefusal = this._meter.refuse(principal)
-      if (keyRefusal) {
-        refuse(keyRefusal, "key")
-        return
-      }
-      if (this._generating < limits.maxActiveRequests) {
-        this._generating++
-      } else {
-        const admission = await this.waitForSlot(match.route as "fim" | "chat", principal, res)
-        if (admission.kind === "gone") {
-          this._options.log.info({
-            event: "request.abandoned",
-            id,
-            key: principal,
-            route: match.route,
-            waited: admission.waited
-          })
-          return
-        }
-        if (admission.kind === "refused") {
-          refuse(admission.message, admission.reason, admission.waited)
-          return
-        }
-        waited = admission.waited
-        // The key's other requests may have been admitted while this one waited.
-        const again = this._meter.refuse(principal)
-        if (again) {
-          this.releaseSlot()
-          refuse(again, "key", waited)
-          return
-        }
-      }
-      this._meter.start(principal)
-    }
-
-    const controller = new AbortController()
-    const entry: Inflight = { controller, principal }
-    this._inflight.add(entry)
-    this._active++
-    this._options.metrics?.active(this._active)
-    const timer = setTimeout(() => {
-      controller.abort(
-        new InferenceError(
-          "timeout",
-          `The request exceeded the gateway's deadline of ${Math.round(limits.requestDeadlineMs / 1000)}s.`
-        )
-      )
-    }, limits.requestDeadlineMs)
+    const { ticket } = admission
+    const { waited } = ticket
 
     const recorder = this._options.recorder
-    const capture = recorder?.enabled(match.route) === true
+    const capture = recorder?.enabled(capability) === true
     try {
-      const outcome = await handleRemoteRequest(match.route, req, res, {
+      const outcome = await handleRemoteRequest(capability, req, res, {
         models: routes.models,
-        route,
+        route: ticket.route,
         maxBodyBytes: limits.maxBodyBytes,
-        signal: controller.signal,
+        signal: ticket.signal,
         capture
       })
       const ms = Date.now() - started
       if (capture && recorder && outcome.captured && outcome.alias) {
         recorder.record({
           key: principal,
-          route: match.route,
+          route: capability,
           alias: outcome.alias,
           outcome: outcome.outcome,
           ms,
@@ -2204,7 +2083,7 @@ export class GatewayServer {
       })
       this._options.usage?.record({
         key: principal,
-        route: match.route as "fim" | "chat" | "embeddings",
+        route: capability,
         alias: outcome.alias,
         outcome: outcome.outcome,
         kind: outcome.kind,
@@ -2217,7 +2096,7 @@ export class GatewayServer {
       })
       this._options.metrics?.request({
         key: principal,
-        route: match.route as "fim" | "chat" | "embeddings",
+        route: capability,
         alias: outcome.alias,
         outcome: outcome.outcome,
         status: outcome.status,
@@ -2231,7 +2110,7 @@ export class GatewayServer {
       this._options.log.error({
         event: "request.crashed",
         id,
-        route: match.route
+        route: capability
       })
       if (!res.headersSent)
         sendError(
@@ -2240,96 +2119,10 @@ export class GatewayServer {
         )
       else res.destroy()
     } finally {
-      clearTimeout(timer)
-      this._inflight.delete(entry)
-      this._active--
-      this._options.metrics?.active(this._active)
-      if (metered) {
-        this._meter.end(principal)
-        this.releaseSlot()
-      }
-    }
-  }
-
-  /**
-   * Waits for a generation slot, up to the route's wait. Resolves with the
-   * slot already reserved, with why it was refused, or with `gone` when the
-   * client closed the connection meanwhile.
-   */
-  private waitForSlot(
-    route: "fim" | "chat",
-    principal: string,
-    res: http.ServerResponse
-  ): Promise<Admission> {
-    const { maxActiveRequests, queue } = this._options.config.limits
-    const waitMs = route === "fim" ? queue.fimWaitMs : queue.chatWaitMs
-    if (waitMs <= 0 || this._waiting.length >= queue.maxWaiting) {
-      const waiting = this._waiting.length
-      return Promise.resolve({
-        kind: "refused",
-        reason: "gateway",
-        waited: 0,
-        message:
-          `The gateway is busy: ${maxActiveRequests} request(s) already running` +
-          (waiting ? ` and ${waiting} waiting` : "") +
-          ". Try again shortly."
-      })
-    }
-    return new Promise((resolve) => {
-      const since = Date.now()
-      const leave = () => {
-        const index = this._waiting.indexOf(entry)
-        if (index >= 0) this._waiting.splice(index, 1)
-        clearTimeout(timer)
-        res.removeListener("close", onClose)
-        this._options.metrics?.queued(this._waiting.length)
-      }
-      // The response closing before anything was written means the client left.
-      const onClose = () => {
-        leave()
-        resolve({ kind: "gone", waited: Date.now() - since })
-      }
-      const timer = setTimeout(() => {
-        leave()
-        resolve({
-          kind: "refused",
-          reason: "queue",
-          waited: Date.now() - since,
-          message:
-            `The gateway is busy: ${maxActiveRequests} request(s) already running; ` +
-            `waited ${waitMs} ms for a free slot. Try again shortly.`
-        })
-      }, waitMs)
-      const entry: Waiting = {
-        route,
-        principal,
-        since,
-        admit: (ok) => {
-          leave()
-          resolve(
-            ok
-              ? { kind: "admitted", waited: Date.now() - since }
-              : { kind: "refused", reason: "gateway", waited: Date.now() - since, message: "The gateway is shutting down." }
-          )
-        }
-      }
-      res.on("close", onClose)
-      this._waiting.push(entry)
-      this._options.metrics?.queued(this._waiting.length)
-    })
-  }
-
-  /** Gives a slot back and hands it straight to the oldest request waiting, if any. */
-  private releaseSlot(): void {
-    this._generating--
-    const { maxActiveRequests } = this._options.config.limits
-    while (this._waiting.length && this._generating < maxActiveRequests) {
-      const next = this._waiting.shift()
-      if (!next) break
-      this._generating++
-      next.admit(true)
+      ticket.finish()
     }
   }
 }
+
 
 export const describeProtocol = () => `twinny/v${REMOTE_PROTOCOL_VERSION}`
