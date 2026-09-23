@@ -16,6 +16,7 @@ import { isOpenAICompatibleProvider } from "../../../common/provider-validation"
 import { TwinnyProvider } from "../../../common/types"
 import {
   ChatChunk,
+  ChatFinishReason,
   ChatMessage,
   ChatRequest,
   InferenceModel,
@@ -58,14 +59,20 @@ type ChatParameters = Pick<ChatRequest, "maxTokens" | "temperature" | "think">
 
 /**
  * Only real API parameters: OpenAI rejects unknown ones such as an `id`.
- * `think: false` goes to Ollama only, which takes it on its OpenAI-style
- * route too; other servers would refuse an unknown field.
+ * `think: false` is sent as OpenAI's own `reasoning_effort: "none"`, which
+ * Ollama's OpenAI-style route honours (it ignores a `think` field there,
+ * checked against 0.33). Only Ollama gets it for now: OpenAI refuses
+ * `none` for models that do not reason, and other servers vary.
  */
 const requestParameters = (provider: TwinnyProvider, request: ChatParameters) => ({
   ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
   ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-  ...(request.think === false && provider.provider === API_PROVIDERS.Ollama ? { think: false } : {})
+  ...(request.think === false && provider.provider === API_PROVIDERS.Ollama ? { reasoning_effort: "none" as const } : {})
 })
+
+/** The end of an answer, in the generic terms; a server that says nothing leaves it undefined. */
+const finishReasonOf = (reason: unknown): ChatFinishReason | undefined =>
+  reason === "length" ? "length" : typeof reason === "string" && reason ? "stop" : undefined
 
 /** The thinking a reasoning model streams beside its answer, under whichever name the server uses. */
 const reasoningOf = (delta: unknown): string | undefined => {
@@ -125,9 +132,11 @@ export async function* fluencyChat(
       const delta = part.choices[0]?.delta?.content
       const reasoning = reasoningOf(part.choices[0]?.delta)
       const usage = usageFromResponse(part as unknown as { usage?: StreamResponse["usage"] })
-      if (usage) yield { content: delta || "", usage, ...(reasoning ? { reasoning } : {}) }
-      else if (delta) yield { content: delta }
-      else if (reasoning) yield { content: "", reasoning }
+      const finishReason = finishReasonOf(part.choices[0]?.finish_reason)
+      const extras = { ...(reasoning ? { reasoning } : {}), ...(finishReason ? { finishReason } : {}) }
+      if (usage) yield { content: delta || "", usage, ...extras }
+      else if (delta) yield { content: delta, ...extras }
+      else if (reasoning || finishReason) yield { content: "", ...extras }
     }
     return
   }
@@ -136,8 +145,10 @@ export async function* fluencyChat(
   const result = await client.chat.completions.create(body)
   const content = result.choices[0]?.message?.content
   const usage = usageFromResponse(result as unknown as { usage?: StreamResponse["usage"] })
-  if (usage) yield { content: content || "", usage }
-  else if (content) yield { content }
+  const finishReason = finishReasonOf(result.choices[0]?.finish_reason)
+  const extras = finishReason ? { finishReason } : {}
+  if (usage) yield { content: content || "", usage, ...extras }
+  else if (content || finishReason) yield { content: content || "", ...extras }
 }
 
 /** What fluency.js knows a hosted API serves, for the model dropdown. */

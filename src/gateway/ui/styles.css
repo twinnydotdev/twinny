@@ -437,6 +437,14 @@ table.pulls td { vertical-align: top; }
 .review-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 0 0 10px; font-size: 12px; color: var(--ink-2); }
 .review-body { border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 6px; padding: 10px 12px; background: var(--bg); }
 .review-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 10px; }
+.tag.cut { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); margin-left: 6px; }
+.cut-short { font-size: 12px; color: var(--warn); margin: 0 0 8px; }
+.turn-body .cut-short { margin: 8px 0 0; }
+.review-thread { margin-top: 12px; }
+.review-thread .turn .question { margin: 0; white-space: pre-wrap; }
+.ask-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ask-form textarea { width: 100%; box-sizing: border-box; min-height: 52px; }
+.ask-form .review-actions { margin: 0; }
 .tag.reviewed { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); margin-left: 6px; }
 .tag.stale { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); margin-left: 6px; }
 .tag.failed { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); margin-left: 6px; }

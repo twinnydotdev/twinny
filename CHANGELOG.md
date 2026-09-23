@@ -2,6 +2,14 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
+## 4.2.5 · 2026-09-23
+
+Gateway release: pull-request reviews stop ending mid-sentence, say when they were cut, and can be asked about. The extension carries the version number only.
+
+- **Reviews no longer end mid-sentence.** Ollama's OpenAI-compatible route ignores `think: false` (checked against 0.33), so a reasoning model such as Qwen 3 thought its way through most of the 4,000-token budget and the review that followed was cut off. The request now says it the standard OpenAI way, `reasoning_effort: "none"`, which that route does honour; the extension's chat and developers' requests through the gateway are unchanged.
+- **A cut-off answer says so.** Backends now report why generation stopped, and a review or answer the output cap cut is kept but tagged **cut short**, with the reason (and how much went on thinking) above it.
+- **Ask about a review.** Under a finished review is a box for questions. Each goes to the review model with the pull, the review and the earlier questions, and the exchange is kept on the review as a thread until the pull is reviewed again. Nothing in it is posted to the host. Route: `POST …/pulls/<n>/review/ask { question }`.
+
 ## 4.2.4 · 2026-09-23
 
 Chat release: replies carry their details, and the chat gains the controls it was missing. `twinny-server` carries the version number only; the gateway is unchanged.

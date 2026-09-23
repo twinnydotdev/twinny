@@ -9,6 +9,9 @@
  *   POST   api/repos/<id>/sync
  *   POST   api/sync
  *   GET    api/repos/<id>/pulls/<n>    → one pull with its description and files
+ *   POST   api/repos/<id>/pulls/<n>/review        → review it with the gateway's model
+ *   POST   api/repos/<id>/pulls/<n>/review/post   { as }
+ *   POST   api/repos/<id>/pulls/<n>/review/ask    { question } → an answer kept on the review's thread
  *
  * A host ("forge") supplies what differs: how to talk to the API and what
  * a pull looks like there. Tokens are kept in the plugin's repos.json,
@@ -29,6 +32,7 @@ import {
   PluginResponse
 } from "./host"
 import {
+  ASK_TIMEOUT_MS,
   REVIEW_TIMEOUT_MS,
   ReviewBrief,
   Reviewer,
@@ -630,6 +634,40 @@ export class PullsPlugin implements PluginInstance {
     return review
   }
 
+  /** A question about the pull's latest review, answered by the model that reviews. */
+  private async askReview(repo: RepoRecord, pull: PullSummary, question: string, requestedBy: string): Promise<ReviewRecord> {
+    const alias = this.reviewAlias()
+    if (!alias)
+      throw new PluginError(
+        this._reviewer.available
+          ? "The gateway serves no chat model, so nothing can answer."
+          : "This gateway offers plugins no models, so reviews are unavailable.",
+        503
+      )
+    const signal = withTimeout(this._stopped.signal, ASK_TIMEOUT_MS)
+    const started = this._context.now()
+    const review = await this._reviewer.ask(
+      {
+        repoId: repo.id,
+        pull,
+        alias,
+        requestedBy,
+        noun: this._forge.noun,
+        detail: async () => ({ pull, ...(await this._forge.pullContent(repo, pull.number, signal)) })
+      },
+      question,
+      signal
+    )
+    this._context.log.info({
+      event: "plugin.review-asked",
+      key: requestedBy,
+      reason: `${repo.fullName}#${pull.number}`,
+      alias,
+      ms: this._context.now() - started
+    })
+    return review
+  }
+
   public views(): RepoView[] {
     return this.store.repos().map((repo) => this.view(repo))
   }
@@ -824,12 +862,13 @@ export class PullsPlugin implements PluginInstance {
         await this.syncOne(repo)
         return json({ repo: this.view(repo) })
       }
-      const pullMatch = /^pulls\/([1-9][0-9]{0,8})(\/review(?:\/post)?)?$/.exec(rest)
+      const pullMatch = /^pulls\/([1-9][0-9]{0,8})(\/review(?:\/post|\/ask)?)?$/.exec(rest)
       if (pullMatch) {
         const number = Number(pullMatch[1])
         const wantsReview = pullMatch[2] === "/review"
         const wantsPost = pullMatch[2] === "/review/post"
-        if (wantsReview || wantsPost ? method !== "POST" : method !== "GET") return notFound()
+        const wantsAsk = pullMatch[2] === "/review/ask"
+        if (wantsReview || wantsPost || wantsAsk ? method !== "POST" : method !== "GET") return notFound()
         let pull = this.pull(repo.id, number)
         if (!pull) {
           await this.syncOne(repo)
@@ -843,6 +882,12 @@ export class PullsPlugin implements PluginInstance {
           if (!review || review.status !== "done") throw new PluginError("There is no finished review to post.", 409)
           const posted = await this.postReview(repo, pull, review, as, request.principal)
           return json({ review: posted })
+        }
+        if (wantsAsk) {
+          const body = await request.body()
+          const question = typeof body.question === "string" ? body.question : ""
+          const review = await this.askReview(repo, pull, question, request.principal)
+          return json({ review })
         }
         if (wantsReview) {
           const alias = this.reviewAlias()

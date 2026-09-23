@@ -1049,6 +1049,73 @@ suite("Pull-request reviews", function () {
     assert.match(user, /huge\.ts \(\+9 −0\)\n\(diff left out: too large for this review\)/)
     assert.match(user, /\(2 more changed files not shown\)/)
   })
+
+  test("a review the output cap cut off says so, and a finished review can be asked about", async () => {
+    const calls: Array<{ messages: ChatMessage[]; options: { maxTokens?: number; think?: boolean } }> = []
+    let reply = "## Summary\nThis migrates the router and wraps the existing v5"
+    let finish: "stop" | "length" = "length"
+    const inference = {
+      chatAliases: () => ["chat"],
+      embeddingAliases: () => [],
+      embed: async () => [],
+      active: () => 0,
+      async *chat(_alias: string, messages: ChatMessage[], options: { maxTokens?: number; think?: boolean; onFinish?: (reason: "stop" | "length") => void }) {
+        calls.push({ messages, options })
+        yield reply
+        options.onFinish?.(finish)
+      }
+    }
+    const dir = path.join(scratch, "reviews-ask")
+    const p = plugin(dir, inference, { 1: "aaa" })
+    p.start()
+    const repo = ((await p.handle(req("POST", "repos", { fullName: "acme/ask" }))).body as { repo: { id: string } }).repo
+    const early = await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "why?" })).catch((e: PluginError) => e)
+    assert.ok(early instanceof PluginError && early.status === 409, "nothing to ask about before a review")
+
+    const reviewed = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))).body as { review: ReviewRecord }).review
+    assert.strictEqual(reviewed.status, "done")
+    assert.strictEqual(reviewed.text, reply)
+    assert.match(reviewed.cutShort ?? "", /limit of 4,000 output tokens before it finished\./)
+    assert.strictEqual(calls[0].options.maxTokens, 4000)
+
+    const blank = await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "  " })).catch((e: PluginError) => e)
+    assert.ok(blank instanceof PluginError && blank.status === 400)
+
+    reply = "Because the compat layer keeps v5 routes working."
+    finish = "stop"
+    const asked = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "Why wrap v5?" }))).body as { review: ReviewRecord }).review
+    const prompt = calls[1].messages
+    assert.strictEqual(prompt[0].role, "system")
+    assert.match(String(prompt[1].content), /Does a thing\./, "the pull is in front of the model")
+    assert.deepStrictEqual(prompt[2], { role: "assistant", content: reviewed.text }, "so is the review")
+    assert.deepStrictEqual(prompt[3], { role: "user", content: "Why wrap v5?" })
+    assert.strictEqual(calls[1].options.maxTokens, 2000)
+    assert.strictEqual(calls[1].options.think, false)
+    assert.strictEqual(asked.thread?.length, 2)
+    assert.strictEqual(asked.thread?.[0].by, "op")
+    assert.strictEqual(asked.thread?.[1].text, reply)
+    assert.strictEqual(asked.thread?.[1].cutShort, undefined)
+    assert.ok(asked.cutShort, "the review itself is still marked as cut")
+
+    reply = "Yes."
+    const again = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "Is it safe?" }))).body as { review: ReviewRecord }).review
+    assert.deepStrictEqual(calls[2].messages.slice(3), [
+      { role: "user", content: "Why wrap v5?" },
+      { role: "assistant", content: "Because the compat layer keeps v5 routes working." },
+      { role: "user", content: "Is it safe?" }
+    ])
+    assert.strictEqual(again.thread?.length, 4)
+    const page = (await p.handle(req("GET", `repos/${repo.id}/pulls/1`))).body as PullPage
+    assert.strictEqual(page.review?.thread?.length, 4)
+    assert.strictEqual(ReviewStore.open(path.join(dir, "reviews.json")).latest(repo.id, 1)?.thread?.length, 4, "the thread survives a restart")
+
+    reply = "## Summary\nAll of it.\n\n## Verdict\nApprove."
+    const fresh = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))).body as { review: ReviewRecord }).review
+    assert.strictEqual(fresh.thread, undefined, "a new review starts a new thread")
+    assert.strictEqual(fresh.cutShort, undefined)
+    await p.stop()
+  })
+
 })
 
 suite("Reviews and reasoning models", () => {

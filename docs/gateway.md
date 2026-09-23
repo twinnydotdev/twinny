@@ -1457,11 +1457,22 @@ wait for a person. An `issue.triaged` event goes out, marked as a
 warning when the priority is high, so a channel can hear about the
 serious ones.
 
+**Asking about a review.** Under a finished review is a box for
+questions. Each one goes to the review model with the pull, the review
+and the earlier questions in front of it, and the exchange is kept on
+the review as its thread, on the server, until the pull is reviewed
+again. Nothing in the thread is posted to the host.
+
 **Reasoning models.** A model that thinks before answering (Qwen 3 and
-the like) is asked not to (`think: false`, which Ollama honours); a model
-that thinks anyway gets a 4,000-token budget, inline `<think>` blocks are
-removed from the answer, and a review that came back as thinking only
-fails with that reason rather than "answered nothing".
+the like) is asked not to. Ollama's OpenAI-compatible route ignores
+`think: false` but honours OpenAI's `reasoning_effort: "none"`, so that
+is what is sent; other servers are not asked. A model that
+thinks anyway shares the review's 4,000-token budget between thinking
+and answering, and inline `<think>` blocks are removed from the answer.
+A review that came back as thinking only fails with that reason rather
+than "answered nothing", and one the budget cut off is kept but marked
+**cut short**, with the reason above it, instead of ending mid-sentence
+without a word.
 
 **Plugin routes** under `/twinny/v1/admin/plugins/<github|gitlab>/api/`:
 
@@ -1474,6 +1485,7 @@ fails with that reason rather than "answered nothing".
 | `GET /repos/<id>/pulls/<number>` | one pull with its description, files and latest review |
 | `POST /repos/<id>/pulls/<number>/review` | review it now with the review model; answers when the review is done |
 | `POST /repos/<id>/pulls/<number>/review/post` `{ as? }` | post the finished review to the host as `comment` (default), `request-changes` or `approve` |
+| `POST /repos/<id>/pulls/<number>/review/ask` `{ question }` | ask the review model about the finished review; answers with the review, its thread grown by the question and the answer |
 | `PUT /repos/<id>` `{ autoReview?, autoPost?, autoTriage? }` | review new and updated pulls in the background; post every finished review as a comment; triage new issues in the background |
 | `GET /repos/<id>/issues/<number>` | the issue with its body and latest triage |
 | `POST /repos/<id>/issues/<number>/triage` | triage it now with the review model |
