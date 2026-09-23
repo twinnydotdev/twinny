@@ -2,6 +2,12 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
+## 4.2.3 · 2026-09-23
+
+Small release: code completion works with Qwen3-Coder. `twinny-server` carries the version number only; the gateway is unchanged.
+
+- **Qwen3-Coder completes code.** Qwen3-Coder is released only as an instruct model, and it fills the hole when the FIM prompt arrives as the user turn of a chat ("You are a code completion assistant."). Twinny sent it the bare Qwen2.5-Coder markers, and plain text at the end of a file, so completions came back as garbage. Models whose name contains `qwen3-coder` now get a new `qwen3-coder` FIM template, which is also in the template list. Completion endpoints still get a completion request: the chat is written out as ChatML in the prompt, and Ollama is sent `raw: true` so it does not apply the model's template a second time. LiteLLM gets the chat as messages. Custom and repository-level templates are wrapped the same way.
+
 ## 4.2.2 · 2026-09-23
 
 Small release: prompt templates (`~/.twinny/templates`) are sturdier. `twinny-server` carries the version number only; the gateway is unchanged.
