@@ -5,10 +5,13 @@ import {
   STOP_DEEPSEEK,
   STOP_LLAMA,
   STOP_QWEN,
-  STOP_STARCODER
+  STOP_STARCODER,
+  SYSTEM,
+  USER
 } from "../../common/constants"
 import { supportedLanguages } from "../../common/languages"
 import { FimContextFile, FimPromptTemplate } from "../../common/types"
+import { ChatMessage } from "../inference/types"
 
 type FimFormat = Exclude<
   (typeof FIM_TEMPLATE_FORMAT)[keyof typeof FIM_TEMPLATE_FORMAT],
@@ -143,19 +146,10 @@ const qwen = (args: FimPromptTemplate) => {
 }
 
 /**
- * Qwen3-Coder ships only as an instruct model: it fills the hole when the
- * Qwen FIM prompt arrives as the user turn of a chat, and rambles when given
- * the bare markers. The markers stay even at the end of the file, since a
- * chat model does not continue plain text.
- * https://github.com/QwenLM/Qwen3-Coder (README, "Fill in the middle")
+ * Qwen3-Coder takes the Qwen FIM prompt, but only as a chat turn (see
+ * `getFimChat`). The markers stay even at the end of the file, since a chat
+ * model does not continue plain text.
  */
-const QWEN3_CODER_SYSTEM = "You are a code completion assistant."
-
-const asQwen3CoderTurn = (fim: string) =>
-  `<|im_start|>system\n${QWEN3_CODER_SYSTEM}<|im_end|>\n` +
-  `<|im_start|>user\n${fim}<|im_end|>\n` +
-  "<|im_start|>assistant\n"
-
 const qwen3Coder = (args: FimPromptTemplate) => {
   const { prefix, suffix } = args.prefixSuffix
   const context = renderSeparatedContext(
@@ -163,9 +157,7 @@ const qwen3Coder = (args: FimPromptTemplate) => {
     "<|file_sep|>",
     args.fileName
   )
-  return asQwen3CoderTurn(
-    `${context}<|fim_prefix|>${args.header}${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
-  )
+  return `${context}<|fim_prefix|>${args.header}${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
 }
 
 const codegemma = (args: FimPromptTemplate) => {
@@ -226,19 +218,36 @@ export const getFimPrompt = (
 export const getStopWords = (modelName: string, format: string | undefined) =>
   stopWordsMap[resolveFimFormat(modelName, format)]
 
+const isChatFimFormat = (modelName: string, format: string | undefined) =>
+  resolveFimFormat(modelName, format) === FIM_TEMPLATE_FORMAT.qwen3Coder
+
 /**
- * Whether the prompt is already a whole chat transcript, so a server that
- * applies the model's chat template (Ollama) must be told to leave it raw.
+ * Qwen3-Coder ships only as an instruct model: it fills the hole when the
+ * FIM prompt arrives as the user turn of a chat, and rambles when given the
+ * bare markers. Returns that chat for such models, undefined for the rest.
+ * https://github.com/QwenLM/Qwen3-Coder (README, "Fill in the middle")
  */
-export const isChatFimPrompt = (
+export const getFimChat = (
   modelName: string,
-  format: string | undefined
-) => resolveFimFormat(modelName, format) === FIM_TEMPLATE_FORMAT.qwen3Coder
+  format: string | undefined,
+  prompt: string
+): ChatMessage[] | undefined =>
+  isChatFimFormat(modelName, format)
+    ? [
+        { role: SYSTEM, content: "You are a code completion assistant." },
+        { role: USER, content: prompt }
+      ]
+    : undefined
+
+/** The chat as ChatML text, for completion endpoints. */
+export const renderChatML = (messages: ChatMessage[]) =>
+  messages
+    .map((message) => `<|im_start|>${message.role}\n${message.content}<|im_end|>\n`)
+    .join("") + "<|im_start|>assistant\n"
 
 /**
  * Qwen2.5-Coder style repository-level prompt: every context file, then the
- * current file with FIM markers, all under a repo header. Qwen3-Coder gets
- * the same prompt as its chat turn.
+ * current file with FIM markers, all under a repo header.
  */
 export const getFimTemplateRepositoryLevel = (
   args: FimPromptTemplate,
@@ -251,7 +260,7 @@ export const getFimTemplateRepositoryLevel = (
     prompt += `<|file_sep|>${file.name}\n${file.text.trimEnd()}\n`
   }
   prompt += `<|file_sep|>${args.fileName}\n`
-  const fim = `${prompt}<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
-  if (isChatFimPrompt(modelName, format)) return asQwen3CoderTurn(fim)
-  return hasSuffix(args) ? fim : `${prompt}${prefix}`
+  return hasSuffix(args) || isChatFimFormat(modelName, format)
+    ? `${prompt}<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+    : `${prompt}${prefix}`
 }

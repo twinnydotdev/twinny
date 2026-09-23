@@ -134,7 +134,7 @@ export class HttpInferenceProvider implements InferenceProvider {
       temperature: request.temperature,
       keepAlive: request.keepAlive,
       stop: request.stop,
-      raw: request.raw
+      messages: request.messages
     })
     const lines = streamJsonLines({
       url: this.url(),

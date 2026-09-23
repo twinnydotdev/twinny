@@ -47,10 +47,11 @@ import { cache, getSuggestionContinuation, LastSuggestion } from "./cache"
 import { DefinitionContext } from "./definitions"
 import { FileInteractionCache } from "./file-interaction"
 import {
+  getFimChat,
   getFimPrompt,
   getFimTemplateRepositoryLevel,
   getStopWords,
-  isChatFimPrompt
+  renderChatML
 } from "./fim-templates"
 import { CompletionFormatter } from "./formatter"
 import { getImportedFiles } from "./imports"
@@ -448,16 +449,17 @@ export class CompletionProvider
     stopWords: string[],
     prefixSuffix: PrefixSuffix
   ): FimRequest {
+    const messages = getFimChat(provider.modelName, provider.fimTemplate, prompt)
     return {
       model: provider.modelName,
-      prompt,
+      prompt: messages ? renderChatML(messages) : prompt,
+      messages,
       prefix: prefixSuffix.prefix,
       suffix: prefixSuffix.suffix,
       stop: stopWords,
       maxTokens: this.config.get<number>("numPredictFim", 512),
       temperature: this.config.get<number>("temperature", 0.2),
-      keepAlive: this.config.get<string>("keepAlive"),
-      raw: isChatFimPrompt(provider.modelName, provider.fimTemplate)
+      keepAlive: this.config.get<string>("keepAlive")
     }
   }
 

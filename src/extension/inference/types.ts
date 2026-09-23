@@ -60,10 +60,11 @@ export interface FimRequest {
   /** How long to keep the model loaded afterwards, on servers that ask. */
   keepAlive?: string | number
   /**
-   * The prompt already carries the model's chat template, so a server that
-   * would apply one itself (Ollama) must not.
+   * For models that only fill the hole as a chat turn: the chat `prompt` was
+   * rendered from. Chat endpoints send these; completion endpoints send
+   * `prompt`, which already carries the model's chat template.
    */
-  raw?: boolean
+  messages?: ChatMessage[]
 }
 
 /**

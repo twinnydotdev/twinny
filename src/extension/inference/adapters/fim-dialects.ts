@@ -105,7 +105,8 @@ export interface FimRequestOptions {
   model: string
   keepAlive?: string | number
   stop?: string[]
-  raw?: boolean
+  /** Set when `prompt` is this chat already rendered with its template. */
+  messages?: ChatMessage[]
 }
 
 export function createStreamRequestBodyFim(
@@ -127,7 +128,8 @@ export function createStreamRequestBodyFim(
         prompt,
         stream: true,
         keep_alive: options.keepAlive === "-1" ? -1 : options.keepAlive,
-        ...(options.raw ? { raw: true } : {}),
+        // The prompt is already a chat: Ollama must not template it again.
+        ...(options.messages ? { raw: true } : {}),
         options: {
           temperature: options.temperature,
           num_predict: options.numPredictFim,
@@ -167,7 +169,7 @@ export function createStreamRequestBodyFim(
       }
     case API_PROVIDERS.LiteLLM:
       return {
-        messages: [{ content: prompt, role: USER }],
+        messages: options.messages ?? [{ content: prompt, role: USER }],
         model: options.model,
         stream: true,
         max_tokens: maxTokens,

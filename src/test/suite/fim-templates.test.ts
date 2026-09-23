@@ -3,10 +3,11 @@ import * as assert from "assert"
 import { FIM_TEMPLATE_FORMAT } from "../../common/constants"
 import { FimPromptTemplate } from "../../common/types"
 import {
+  getFimChat,
   getFimPrompt,
   getFimTemplateRepositoryLevel,
   getStopWords,
-  isChatFimPrompt,
+  renderChatML,
   resolveFimFormat
 } from "../../extension/completion/fim-templates"
 import { createStreamRequestBodyFim } from "../../extension/inference/adapters/fim-dialects"
@@ -207,43 +208,54 @@ suite("FIM templates", () => {
   })
 
   test("sends Qwen3-Coder the FIM prompt as a chat turn", () => {
-    const turn = (fim: string) =>
-      "<|im_start|>system\nYou are a code completion assistant.<|im_end|>\n" +
-      `<|im_start|>user\n${fim}<|im_end|>\n<|im_start|>assistant\n`
+    const fim = "<|fim_prefix|>PRE<|fim_suffix|>SUF<|fim_middle|>"
     assert.strictEqual(
       getFimPrompt("qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic, args()),
-      turn("<|fim_prefix|>PRE<|fim_suffix|>SUF<|fim_middle|>")
+      fim
     )
     // A chat model does not continue plain text, so the markers stay.
+    const eof = args({ prefixSuffix: { prefix: "PRE", suffix: "" } })
     assert.strictEqual(
-      getFimPrompt("x", FIM_TEMPLATE_FORMAT.qwen3Coder, args({
-        prefixSuffix: { prefix: "PRE", suffix: "" }
-      })),
-      turn("<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>")
+      getFimPrompt("x", FIM_TEMPLATE_FORMAT.qwen3Coder, eof),
+      "<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>"
     )
     assert.strictEqual(
-      getFimTemplateRepositoryLevel(
-        args({ prefixSuffix: { prefix: "PRE", suffix: "" } }),
-        "qwen3-coder:30b",
-        FIM_TEMPLATE_FORMAT.automatic
-      ),
-      turn(
-        "<|repo_name|>repo\n<|file_sep|>src/a.ts\n" +
-          "<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>"
-      )
+      getFimTemplateRepositoryLevel(eof, "qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic),
+      "<|repo_name|>repo\n<|file_sep|>src/a.ts\n" +
+        "<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>"
+    )
+
+    const chat = getFimChat("qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic, fim)
+    assert.deepStrictEqual(chat, [
+      { role: "system", content: "You are a code completion assistant." },
+      { role: "user", content: fim }
+    ])
+    assert.strictEqual(
+      renderChatML(chat!),
+      "<|im_start|>system\nYou are a code completion assistant.<|im_end|>\n" +
+        `<|im_start|>user\n${fim}<|im_end|>\n<|im_start|>assistant\n`
+    )
+    // Custom templates for Qwen3-Coder are wrapped too.
+    assert.ok(getFimChat("qwen3-coder", FIM_TEMPLATE_FORMAT.custom, fim))
+    assert.strictEqual(
+      getFimChat("qwen2.5-coder:7b", FIM_TEMPLATE_FORMAT.automatic, fim),
+      undefined
     )
   })
 
-  test("asks Ollama not to template a prompt that is already a chat", () => {
-    assert.ok(isChatFimPrompt("qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic))
-    assert.ok(!isChatFimPrompt("qwen2.5-coder:7b", FIM_TEMPLATE_FORMAT.automatic))
-    const body = (raw: boolean) =>
-      createStreamRequestBodyFim("ollama", "p", {
+  test("sends a chat-only FIM model's chat as the chat, never templated twice", () => {
+    const messages = getFimChat("qwen3-coder", undefined, "FIM")!
+    const body = (provider: string, withChat: boolean) =>
+      createStreamRequestBodyFim(provider, "RENDERED", {
         model: "m",
         numPredictFim: 10,
-        raw
+        ...(withChat ? { messages } : {})
       }) as unknown as Record<string, unknown>
-    assert.strictEqual(body(true).raw, true)
-    assert.ok(!("raw" in body(false)))
+    assert.strictEqual(body("ollama", true).raw, true)
+    assert.ok(!("raw" in body("ollama", false)))
+    assert.deepStrictEqual(body("litellm", true).messages, messages)
+    assert.deepStrictEqual(body("litellm", false).messages, [
+      { content: "RENDERED", role: "user" }
+    ])
   })
 })
