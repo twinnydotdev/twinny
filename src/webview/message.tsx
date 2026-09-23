@@ -11,7 +11,7 @@ import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, ImageAttachment, MentionType } from "../common/types"
+import { ChatCompletionMessage, ImageAttachment, MentionType, ReplyMeta } from "../common/types"
 
 import { useSuggestion } from "./hooks/useSuggestion"
 import CodeBlock from "./code-block"
@@ -45,6 +45,8 @@ interface MessageProps {
   ) => void
   onHeightChange?: () => void
   onDeleteImage?: (id: string) => void
+  /** Ask for the rest of a reply the user stopped. Only the last reply offers it. */
+  onContinue?: () => void
 }
 
 const CustomKeyMap = Extension.create({
@@ -122,6 +124,89 @@ const ThinkingSection = React.memo(
   }
 )
 
+const formatDuration = (ms: number) =>
+  ms < 1000 ? `${ms}ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`
+
+/**
+ * One quiet line under a reply: which model wrote it, how long it took and,
+ * when the backend counted, how fast. Old conversations have no meta and
+ * show nothing.
+ */
+const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () => void }) => {
+  const { t } = useTranslation()
+  const parts: string[] = []
+  if (meta.durationMs !== undefined) parts.push(formatDuration(meta.durationMs))
+  if (meta.completionTokens && meta.durationMs) {
+    const perSecond = meta.completionTokens / (meta.durationMs / 1000)
+    parts.push(t("reply-tokens-per-second", { count: meta.completionTokens, rate: perSecond.toFixed(1) }))
+  }
+  const title = [meta.provider, meta.model].filter(Boolean).join(" · ")
+
+  return (
+    <div className={styles.replyFooter}>
+      {meta.model && (
+        <span className={styles.replyModel} title={title}>
+          {meta.model}
+        </span>
+      )}
+      {parts.map((part) => (
+        <span key={part}>{part}</span>
+      ))}
+      {meta.stopped && <span className={styles.replyStopped}>{t("reply-stopped")}</span>}
+      {onContinue && (
+        <button type="button" className={styles.replyContinue} onClick={onContinue} title={t("reply-continue-title")}>
+          <span className="codicon codicon-debug-continue" aria-hidden="true" />
+          {t("reply-continue")}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Taller than this, a user turn (usually pasted code) folds away. */
+const COLLAPSE_HEIGHT = 240
+
+/*
+ * A long question pushes its answer off screen. It shows its first lines and
+ * a toggle; the whole of it is still what was sent.
+ */
+const Collapsible = ({ children }: { children: React.ReactNode }) => {
+  const { t } = useTranslation()
+  const ref = useRef<HTMLDivElement>(null)
+  const [tall, setTall] = React.useState(false)
+  const [open, setOpen] = React.useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (el) setTall(el.scrollHeight > COLLAPSE_HEIGHT + 60)
+  }, [children])
+
+  return (
+    <>
+      <div
+        ref={ref}
+        className={tall && !open ? styles.folded : undefined}
+        style={tall && !open ? { maxHeight: COLLAPSE_HEIGHT } : undefined}
+      >
+        {children}
+      </div>
+      {tall && (
+        <button
+          type="button"
+          className={styles.expandToggle}
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          <span
+            className={`codicon codicon-chevron-${open ? "up" : "down"}`}
+            aria-hidden="true"
+          />
+          {open ? t("show-less") : t("show-more")}
+        </button>
+      )}
+    </>
+  )
+}
+
 export const Message: React.FC<MessageProps> = ({
   index = 0,
   isAssistant,
@@ -133,7 +218,8 @@ export const Message: React.FC<MessageProps> = ({
   onEdit,
   onHeightChange,
   messages,
-  onDeleteImage
+  onDeleteImage,
+  onContinue
 }) => {
   const { t } = useTranslation()
   const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
@@ -525,12 +611,13 @@ export const Message: React.FC<MessageProps> = ({
             {messageContent.trimStart()}
           </Markdown>
           {renderImageGallery()}
+          {message.meta && <ReplyFooter meta={message.meta} onContinue={onContinue} />}
         </>
       ) : (
-        <>
+        <Collapsible>
           {renderContent(messageContent.trimStart())}
           {renderImageGallery()}
-        </>
+        </Collapsible>
       )}
     </div>
   )

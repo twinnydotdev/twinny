@@ -473,6 +473,9 @@ export async function activate(context: ExtensionContext) {
       sidebarProvider.newConversation()
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
     }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.exportConversation, () =>
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnyExportConversation)
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")
       fullScreenProvider.createOrShowPanel()
@@ -577,7 +580,11 @@ export async function activate(context: ExtensionContext) {
       const currentCharacter = changes.range.start.character
       fileInteractionCache.incrementStrokes(currentLine, currentCharacter)
     }),
-    window.registerWebviewViewProvider("twinny.sidebar", sidebarProvider),
+    // Kept alive while hidden, so a draft, a reply still streaming and the
+    // scroll position survive switching to another view.
+    window.registerWebviewViewProvider("twinny.sidebar", sidebarProvider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    }),
     window.onDidChangeTextEditorSelection(() => {
       completionProvider.abortCompletion()
       delayExecution(() => {

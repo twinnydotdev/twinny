@@ -31,12 +31,24 @@ import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { emit, useServerEvent } from "./messaging"
 import { Suggestions } from "./suggestions"
+import { conversationMarkdown } from "./transcript"
 import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/chat.module.css"
 
 const COMPOSER_MIN_HEIGHT = 44
 const COMPOSER_HEIGHT_KEY = "twinny.composerHeight"
+const PROMPT_HISTORY_KEY = "twinny.promptHistory"
+const PROMPT_HISTORY_LIMIT = 50
+
+const loadPromptHistory = (): string[] => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PROMPT_HISTORY_KEY) || "[]")
+    return Array.isArray(stored) ? stored.filter((p) => typeof p === "string") : []
+  } catch {
+    return []
+  }
+}
 
 interface ChatProps {
   fullScreen?: boolean
@@ -73,6 +85,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const chatRef = useRef<HTMLTextAreaElement>(null)
   const editorWrapRef = useRef<HTMLDivElement>(null)
   const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  // Sent prompts, oldest first, recalled with the arrow keys. `recallIndex`
+  // counts back from the newest; -1 is the draft being typed.
+  const promptHistoryRef = useRef<string[]>(loadPromptHistory())
+  const recallIndexRef = useRef(-1)
+  const draftRef = useRef("")
   const [composerHeight, setComposerHeight] = useState<number | null>(() => {
     const stored = Number(localStorage.getItem(COMPOSER_HEIGHT_KEY))
     return stored > 0 ? stored : null
@@ -263,6 +280,44 @@ export const Chat = (props: ChatProps): JSX.Element => {
     return mentions
   }, [])
 
+  /* Images are left out: they are large and belong to the turn they were sent with. */
+  const rememberPrompt = (html: string) => {
+    const prompt = html.replace(/<img[^>]*>/g, "").trim()
+    recallIndexRef.current = -1
+    if (!prompt) return
+    const history = promptHistoryRef.current.filter((p) => p !== prompt)
+    history.push(prompt)
+    promptHistoryRef.current = history.slice(-PROMPT_HISTORY_LIMIT)
+    try {
+      localStorage.setItem(
+        PROMPT_HISTORY_KEY,
+        JSON.stringify(promptHistoryRef.current)
+      )
+    } catch {
+      // A full or blocked store only costs the history.
+    }
+  }
+
+  /** Step through sent prompts; false leaves the key to the editor. */
+  const recallPrompt = useCallback((step: -1 | 1, isEmpty: boolean) => {
+    const editor = editorRef.current
+    const history = promptHistoryRef.current
+    const index = recallIndexRef.current
+    if (!editor || !history.length) return false
+    if (index === -1 && (step === 1 || !isEmpty)) return false
+
+    if (index === -1) draftRef.current = editor.getHTML()
+    const next = Math.min(history.length - 1, index - step)
+    if (next === index) return true
+    recallIndexRef.current = next
+    editor.commands.setContent(
+      next === -1 ? draftRef.current : history[history.length - 1 - next],
+      false
+    )
+    editor.commands.focus("end")
+    return true
+  }, [])
+
   const clearEditor = useCallback(() => {
     editorRef.current?.commands.clearContent()
   }, [])
@@ -289,6 +344,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(true)
     clearSearchReport()
     clearEditor()
+
+    rememberPrompt(editorRef.current?.getHTML() || "")
 
     const conversationId = conversation?.id || uuidv4()
 
@@ -321,6 +378,47 @@ export const Chat = (props: ChatProps): JSX.Element => {
       return updatedMessages
     })
   }, [conversation?.id, t, chatDisabled, clearSearchReport])
+
+  /*
+   * A stopped reply is picked up by asking for the rest. The transcript
+   * shows a short "Continue"; the model is told not to start over.
+   */
+  const handleContinue = useCallback(() => {
+    if (generatingRef.current || chatDisabled) return
+    generatingRef.current = true
+    setIsLoading(true)
+    clearSearchReport()
+    setMessages((prev) => {
+      const updatedMessages: ChatCompletionMessage[] = [
+        ...(prev || []),
+        {
+          role: USER,
+          content: t("reply-continue"),
+          prompt:
+            "Continue exactly where your last reply stopped. " +
+            "Do not repeat anything you already wrote."
+        }
+      ]
+      saveLastConversation({ ...conversation, messages: updatedMessages })
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: [],
+        conversationId: conversation?.id
+      })
+      return updatedMessages
+    })
+  }, [conversation, chatDisabled, clearSearchReport, t])
+
+  const handleOpenAsMarkdown = useCallback(() => {
+    if (!messages.length) return
+    emit(EVENT_NAME.twinnyNewDocument, {
+      content: conversationMarkdown(conversation?.title, messages),
+      language: "markdown"
+    })
+  }, [conversation?.title, messages])
+
+  // The sidebar's title-bar menu asks; the panel has its own button.
+  useServerEvent(EVENT_NAME.twinnyExportConversation, handleOpenAsMarkdown)
 
   const handleNewConversation = useCallback(() => {
     setActiveConversation({
@@ -380,16 +478,26 @@ export const Chat = (props: ChatProps): JSX.Element => {
         }),
         CustomKeyMap.configure({
           handleSubmitForm,
-          clearEditor
+          clearEditor,
+          recallPrompt,
+          stopGeneration: () => {
+            if (!generatingRef.current) return false
+            emit(EVENT_NAME.twinnyStopGeneration)
+            return true
+          }
         }),
         Placeholder.configure({
           placeholder: t("placeholder"),
           // Still shown while the composer is off for want of a provider.
           showOnlyWhenEditable: false
         })
-      ]
+      ],
+      // Typing into a recalled prompt makes it the draft.
+      onUpdate: () => {
+        recallIndexRef.current = -1
+      }
     },
-    [memoizedSuggestion, handleSubmitForm, clearEditor, t, imagesRef]
+    [memoizedSuggestion, handleSubmitForm, clearEditor, recallPrompt, t, imagesRef]
   )
 
   useEffect(() => {
@@ -622,6 +730,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         handleDeleteMessage={handleDeleteMessage}
         handleEditMessage={handleEditMessage}
         handleRegenerateMessage={handleRegenerateMessage}
+        handleContinue={handleContinue}
         index={index}
         isLoading={isLoading}
         message={messages[index]}
@@ -632,6 +741,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       handleDeleteMessage,
       handleEditMessage,
       handleRegenerateMessage,
+      handleContinue,
       isLoading,
       messages,
       completion,
@@ -651,6 +761,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
               title={t("new-conversation")}
             >
               <i className="codicon codicon-comment-discussion" />
+            </VSCodeButton>
+            <VSCodeButton
+              onClick={handleOpenAsMarkdown}
+              appearance="icon"
+              disabled={!messages.length}
+              title={t("open-as-markdown")}
+            >
+              <i className="codicon codicon-markdown" />
             </VSCodeButton>
           </div>
         )}
@@ -761,7 +879,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                     role="button"
                     className={styles.stopButton}
                     onClick={handleStopGeneration}
-                    title={t("stop-generation")}
+                    title={t("stop-generation-esc")}
                     aria-label={t("stop-generation")}
                   >
                     <span className="codicon codicon-debug-stop"></span>

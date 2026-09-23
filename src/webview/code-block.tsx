@@ -112,6 +112,12 @@ export const CodeBlock = (props: CodeBlockProps) => {
 
   const handleTerminal = () => emit(EVENT_NAME.twinnyRunInTerminal, code)
 
+  const handleInsert = () => emit(EVENT_NAME.twinnyInsertAtCursor, code)
+
+  // A fence with nothing in it (a model's stray ``` pair, a stream cut
+  // mid-block) is an empty box with buttons that do nothing.
+  if (!code.trim()) return null
+
   return (
     <div className={styles.codeBlock}>
       <div className={styles.codeBar}>
@@ -131,6 +137,14 @@ export const CodeBlock = (props: CodeBlockProps) => {
               label={t("action-apply")}
               title={t("apply-code")}
               onClick={handleApply}
+            />
+          )}
+          {isAssistant && !isShell && (
+            <Action
+              icon="insert"
+              label={t("action-insert")}
+              title={t("insert-at-cursor")}
+              onClick={handleInsert}
             />
           )}
           <Action

@@ -2,6 +2,20 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
+## 4.2.4 · 2026-09-23
+
+Chat release: replies carry their details, and the chat gains the controls it was missing. `twinny-server` carries the version number only; the gateway is unchanged.
+
+- **Replies say who wrote them.** Under each reply: the model, how long it took and, when the backend reports token counts, tokens per second. A reply you stopped says so. The details are saved with the conversation and never sent to the model; older conversations show nothing.
+- **Continue a stopped reply.** The last reply, if you stopped it, has a *Continue* button that asks the model to carry on without starting over.
+- **Earlier prompts with ↑ and ↓.** From an empty composer, the arrow keys step through what you have sent, across conversations, as in a shell. Typing into a recalled prompt makes it your draft.
+- **Esc stops a reply** while the composer has focus.
+- **Insert at cursor.** Code blocks in replies have *insert* next to *apply*: the code goes straight into the editor at the cursor, replacing any selection. *Apply* still proposes a diff to review.
+- **Open conversation as Markdown**, from the sidebar's `…` menu or the panel's toolbar: the whole conversation in a new editor, without thinking or composer markup.
+- **Long questions fold.** A message of yours taller than about a dozen lines (an *Explain* over a big selection, pasted code) shows its first lines and *Show more*.
+- **Empty code blocks are not shown.** A fence with only whitespace in it no longer renders as an empty box with buttons.
+- **The sidebar keeps its state when hidden.** Switching to another view and back no longer reloads the chat, so a half-written prompt, a reply still streaming and the scroll position survive.
+
 ## 4.2.3 · 2026-09-23
 
 Small release: code completion works with Qwen3-Coder. `twinny-server` carries the version number only; the gateway is unchanged.

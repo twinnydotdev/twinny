@@ -1,6 +1,6 @@
 import { ASSISTANT, EVENT_NAME } from "../../common/constants"
 import { formatCount, logger } from "../../common/logger"
-import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
+import { ChatCompletionMessage, ReplyMeta, TwinnyProvider } from "../../common/types"
 import { GenerationRun, GenerationTracker } from "../generations"
 import { ChatRequest, InferenceClient, isCancelled } from "../inference"
 import { ExtensionBridge } from "../messaging/bridge"
@@ -76,11 +76,26 @@ export class ChatGeneration {
     this._run = run
     let text = prefix
     const elapsed = this.logRequest(request.messages, provider)
+    const started = Date.now()
+    const meta: ReplyMeta = { model: provider.modelName, provider: provider.label }
+    const finish = (): ReplyMeta => ({
+      ...meta,
+      durationMs: Date.now() - started,
+      ...(run.signal.aborted ? { stopped: true } : {})
+    })
 
     try {
-      const chunks = inference.chat(request, { signal: run.signal })
+      const chunks = inference.chat(request, {
+        signal: run.signal,
+        onBackend: (name) => {
+          meta.provider = name
+        }
+      })
       try {
         for await (const chunk of chunks) {
+          if (chunk.usage?.completionTokens) {
+            meta.completionTokens = chunk.usage.completionTokens
+          }
           text += chunk.content
           this._bridge.emit(EVENT_NAME.twinnyOnCompletion, {
             content: text.trimStart() || " ",
@@ -98,14 +113,14 @@ export class ChatGeneration {
           (run.signal.aborted ? " · stopped by the user" : "")
       )
       logger.block("Chat reply", reply)
-      if (reply) this.addMessage(reply)
+      if (reply) this.addMessage(reply, finish())
       return reply
     } catch (error) {
       run.abort()
       // Keep whatever streamed before the failure; it is still useful.
       // A bare heading is not.
       const partial = text.trim() === prefix.trim() ? "" : text.trim()
-      if (partial) this.addMessage(partial)
+      if (partial) this.addMessage(partial, finish())
       this.report(error, provider)
       return partial
     } finally {
@@ -115,8 +130,12 @@ export class ChatGeneration {
     }
   }
 
-  private addMessage(content: string) {
-    this._bridge.emit(EVENT_NAME.twinnyAddMessage, { content, role: ASSISTANT })
+  private addMessage(content: string, meta?: ReplyMeta) {
+    this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
+      content,
+      role: ASSISTANT,
+      ...(meta ? { meta } : {})
+    })
   }
 
   /**

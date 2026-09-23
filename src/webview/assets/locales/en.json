@@ -341,5 +341,15 @@
   "embeddings-model-changed": "The index was built with {{indexed}} but the active provider uses {{active}}. Vectors from different models do not mix: rebuild before searching.",
   "embeddings-usage": "When to use it",
   "embeddings-automatic": "Use the index for every message",
-  "embeddings-automatic-blurb": "Off: only messages that mention @workspace search the index. On: every message does, which suits large codebases and capable models; small local models can get distracted by extra context."
+  "embeddings-automatic-blurb": "Off: only messages that mention @workspace search the index. On: every message does, which suits large codebases and capable models; small local models can get distracted by extra context.",
+  "reply-stopped": "stopped",
+  "reply-continue": "Continue",
+  "reply-continue-title": "Ask the model to carry on where this reply stopped",
+  "reply-tokens-per-second": "{{count}} tokens · {{rate}} tok/s",
+  "open-as-markdown": "Open conversation as Markdown",
+  "action-insert": "insert",
+  "insert-at-cursor": "Insert at the cursor in the editor, replacing any selection",
+  "stop-generation-esc": "Stop generation (Esc)",
+  "show-more": "Show more",
+  "show-less": "Show less"
 }
