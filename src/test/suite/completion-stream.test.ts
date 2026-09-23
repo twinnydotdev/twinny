@@ -236,3 +236,97 @@ suite("Completion stream stop reasons", () => {
     assert.strictEqual(idle.stoppedBy, "")
   })
 })
+
+suite("Completion stream fences", () => {
+  const make = (overrides: Partial<CompletionStreamOptions> = {}) =>
+    makeStream({ unwrapFences: true, ...overrides })
+
+  test("drops the opening fence and ends at the closing one", () => {
+    const stream = make({ textBeforeCursor: "  return " })
+    const result = run(stream, [
+      "```java",
+      "script\n",
+      "n % 2 === 0\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "n % 2 === 0")
+    assert.strictEqual(result.done, true)
+    assert.strictEqual(stream.stoppedBy, "closing fence")
+  })
+
+  test("closing fence without a trailing newline is judged on finish", () => {
+    const stream = make()
+    const result = run(stream, ["```python\n", "return x\n```"])
+    assert.strictEqual(result.text, "return x")
+    assert.strictEqual(stream.stoppedBy, "closing fence")
+  })
+
+  test("a fence-free answer is left alone", () => {
+    const result = run(make({ multiline: false }), ["n % 2", " === 0\n"])
+    assert.strictEqual(result.text, "n % 2 === 0")
+  })
+
+  test("a lone opening fence yields nothing", () => {
+    assert.strictEqual(run(make(), ["```javascript"]).text, "")
+    assert.strictEqual(run(make(), ["```\n```"]).text, "")
+  })
+
+  test("single-line mode still takes the first code line, not the fence", () => {
+    const result = run(make({ multiline: false, textBeforeCursor: "x = " }), [
+      "```ts\n",
+      "1 + 2\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "1 + 2")
+  })
+
+  test("a fresh line after the fence is dropped when the cursor line has text", () => {
+    const result = run(make({ textBeforeCursor: "con" }), [
+      "```javascript\n",
+      "\n",
+      "sole.log(1)\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "sole.log(1)")
+  })
+
+  test("the cursor line's indentation is not repeated after the fresh line", () => {
+    const result = run(make({ textBeforeCursor: "  " }), [
+      "```javascript\n\n  return 1\n",
+      "```\n"
+    ])
+    assert.strictEqual(result.text, "return 1")
+  })
+
+  test("indentation echoed before the missing word is dropped", () => {
+    const opts = { textBeforeCursor: "  ret", wordFragment: "ret" }
+    assert.strictEqual(run(make(opts), ["```js\n\n  return 1\n```\n"]).text, "urn 1")
+    assert.strictEqual(run(make(opts), ["```js\n  return 1\n```\n"]).text, "urn 1")
+  })
+
+  test("a fresh line is kept at the start of a line", () => {
+    const result = run(make({ textBeforeCursor: "" }), [
+      "```javascript\n\nfoo()\n```\n"
+    ])
+    assert.strictEqual(result.text, "\nfoo()")
+  })
+
+  test("the word left out of the prompt must come back and is dropped", () => {
+    const opts = { textBeforeCursor: "  con", wordFragment: "con" }
+    const result = run(make(opts), ["```javascript\n", "co", "nsole.log(1)\n```\n"])
+    assert.strictEqual(result.text, "sole.log(1)")
+
+    const ignored = make(opts)
+    assert.strictEqual(run(ignored, ["```javascript\n", "module.exports = {}\n```\n"]).text, "")
+    assert.strictEqual(ignored.stoppedBy, "ignored word")
+
+    // A fill shorter than the word is judged on finish.
+    assert.strictEqual(run(make(opts), ["c"]).text, "")
+    assert.strictEqual(run(make(opts), ["con"]).text, "")
+  })
+
+  test("fences are kept for base models", () => {
+    const result = run(makeStream(), ["```js\n", "code\n", "```\n"])
+    assert.strictEqual(result.text, "```js\ncode\n```\n")
+  })
+})

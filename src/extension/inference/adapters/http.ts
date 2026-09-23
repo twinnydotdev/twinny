@@ -133,7 +133,8 @@ export class HttpInferenceProvider implements InferenceProvider {
       numPredictFim: request.maxTokens ?? -1,
       temperature: request.temperature,
       keepAlive: request.keepAlive,
-      stop: request.stop
+      stop: request.stop,
+      messages: request.messages
     })
     const lines = streamJsonLines({
       url: this.url(),

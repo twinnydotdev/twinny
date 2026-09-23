@@ -119,9 +119,15 @@ export class CompletionFormatter {
    */
   protected stripEchoedPrefix(completion: string): string {
     const before = this.textBeforeCursor.trimStart()
-    if (before.trim().length < 3) return completion
     const trimmed = completion.trimStart()
-    return trimmed.startsWith(before) ? trimmed.slice(before.length) : completion
+    if (!before || !trimmed.startsWith(before)) return completion
+    if (before.trim().length >= 3) return trimmed.slice(before.length)
+    // One or two characters are too little to trust, unless they are the
+    // start of an identifier the completion goes on to spell out: `c`
+    // completed with `const` is an echo, `x` completed with `x + 1` may not be.
+    const fragment = /^[\w$]+$/.test(before)
+    const extended = /[\w$]/.test(trimmed.charAt(before.length))
+    return fragment && extended ? trimmed.slice(before.length) : completion
   }
 
   /** Drop the part of the completion that repeats what follows the cursor. */

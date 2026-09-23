@@ -73,6 +73,9 @@ const MIN_ANCHOR_LENGTH = 30
  * newlines, so drop leading lines from the anchor until it fits.
  */
 const endsWithAnchor = (head: string, anchor: string): boolean => {
+  // A suggestion made at the very start of a file has nothing to anchor to:
+  // it applies only while the cursor is still there.
+  if (anchor.length === 0) return head.length === 0
   const minLength = Math.min(MIN_ANCHOR_LENGTH, anchor.length)
   let candidate = anchor
   while (candidate.length >= minLength) {

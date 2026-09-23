@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
+## 4.2.3 · 2026-09-23
+
+Small release: code completion works with Qwen3-Coder. `twinny-server` carries the version number only; the gateway is unchanged.
+
+- **Qwen3-Coder completes code.** Qwen3-Coder is released only as an instruct model, and it fills the hole when the FIM prompt arrives as the user turn of a chat ("You are a code completion assistant."). Twinny sent it the bare Qwen2.5-Coder markers, and plain text at the end of a file, so completions came back as garbage. Models whose name contains `qwen3-coder` now get a new `qwen3-coder` FIM template, which is also in the template list. Completion endpoints still get a completion request: the chat is written out as ChatML in the prompt, and Ollama is sent `raw: true` so it does not apply the model's template a second time. LiteLLM gets the chat as messages. Custom and repository-level templates are wrapped the same way. The model answers inside a markdown code block whatever the system prompt says, so for this template the opening fence is dropped and the closing one ends the completion. Given a half-typed word the model either repeats it (`c` completed with `const mul`, shown as `cconst`) or starts a fresh line after it, so for this template the prompt now ends before the unfinished word, the chat names what the completion must begin with, and an answer that ignores it is discarded. A short echoed word start is stripped for every model.
+- **A suggestion made in an empty file no longer follows what you type.** The last suggestion shown is kept so that typing its first characters serves the rest without a new request. At the start of a file it had nothing to anchor to and was re-served after any text at all, whether or not the completion cache was on.
+
 ## 4.2.2 · 2026-09-23
 
 Small release: prompt templates (`~/.twinny/templates`) are sturdier. `twinny-server` carries the version number only; the gateway is unchanged.

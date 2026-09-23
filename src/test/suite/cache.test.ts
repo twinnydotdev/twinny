@@ -61,6 +61,60 @@ suite("Completion cache", () => {
       assert.strictEqual(getSuggestionContinuation(scoped, last, "file-a/model-b"), undefined)
     })
 
+    test("a suggestion made in an empty file dies once anything else is typed", () => {
+      const empty: LastSuggestion = {
+        prefix: "",
+        suffix: "",
+        completion: "function add(a, b) { return a + b; }"
+      }
+      assert.strictEqual(
+        getSuggestionContinuation(empty, { prefix: "", suffix: "" }),
+        empty.completion
+      )
+      assert.strictEqual(
+        getSuggestionContinuation(empty, { prefix: "function ad", suffix: "" }),
+        "d(a, b) { return a + b; }"
+      )
+      assert.strictEqual(
+        getSuggestionContinuation(empty, { prefix: "const", suffix: "" }),
+        undefined
+      )
+      assert.strictEqual(
+        getSuggestionContinuation(empty, {
+          prefix: "i typed but its still there",
+          suffix: ""
+        }),
+        undefined
+      )
+    })
+
+    test("a suggestion made in an empty file dies once anything else is typed", () => {
+      const empty: LastSuggestion = {
+        prefix: "",
+        suffix: "",
+        completion: "function add(a, b) { return a + b; }"
+      }
+      assert.strictEqual(
+        getSuggestionContinuation(empty, { prefix: "", suffix: "" }),
+        empty.completion
+      )
+      assert.strictEqual(
+        getSuggestionContinuation(empty, { prefix: "function ad", suffix: "" }),
+        "d(a, b) { return a + b; }"
+      )
+      assert.strictEqual(
+        getSuggestionContinuation(empty, { prefix: "const", suffix: "" }),
+        undefined
+      )
+      assert.strictEqual(
+        getSuggestionContinuation(empty, {
+          prefix: "i typed but its still there",
+          suffix: ""
+        }),
+        undefined
+      )
+    })
+
     test("serves the remainder after the user types part of it", () => {
       assert.strictEqual(
         getSuggestionContinuation(last, {

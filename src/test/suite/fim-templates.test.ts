@@ -3,11 +3,14 @@ import * as assert from "assert"
 import { FIM_TEMPLATE_FORMAT } from "../../common/constants"
 import { FimPromptTemplate } from "../../common/types"
 import {
+  getFimChat,
   getFimPrompt,
   getFimTemplateRepositoryLevel,
   getStopWords,
+  renderChatML,
   resolveFimFormat
 } from "../../extension/completion/fim-templates"
+import { createStreamRequestBodyFim } from "../../extension/inference/adapters/fim-dialects"
 
 const args = (overrides: Partial<FimPromptTemplate> = {}): FimPromptTemplate => ({
   contextFiles: [],
@@ -26,6 +29,9 @@ suite("FIM templates", () => {
       ["qwen2.5-coder:1.5b-base", FIM_TEMPLATE_FORMAT.codeqwen],
       ["Qwen/Qwen2.5-Coder-7B", FIM_TEMPLATE_FORMAT.codeqwen],
       ["codeqwen:7b-code", FIM_TEMPLATE_FORMAT.codeqwen],
+      ["qwen3-coder:30b", FIM_TEMPLATE_FORMAT.qwen3Coder],
+      ["Qwen/Qwen3-Coder-30B-A3B-Instruct", FIM_TEMPLATE_FORMAT.qwen3Coder],
+      ["qwen/qwen3-coder-next", FIM_TEMPLATE_FORMAT.qwen3Coder],
       ["deepseek-coder:6.7b-base", FIM_TEMPLATE_FORMAT.deepseek],
       ["deepseek-coder-v2:16b", FIM_TEMPLATE_FORMAT.deepseek],
       ["codestral:22b", FIM_TEMPLATE_FORMAT.codestral],
@@ -180,6 +186,7 @@ suite("FIM templates", () => {
       FIM_TEMPLATE_FORMAT.deepseek,
       FIM_TEMPLATE_FORMAT.codestral,
       FIM_TEMPLATE_FORMAT.codeqwen,
+      FIM_TEMPLATE_FORMAT.qwen3Coder,
       FIM_TEMPLATE_FORMAT.codegemma,
       FIM_TEMPLATE_FORMAT.starcoder,
       FIM_TEMPLATE_FORMAT.stableCode
@@ -198,5 +205,62 @@ suite("FIM templates", () => {
         )
       }
     }
+  })
+
+  test("sends Qwen3-Coder the FIM prompt as a chat turn", () => {
+    const fim = "<|fim_prefix|>PRE<|fim_suffix|>SUF<|fim_middle|>"
+    assert.strictEqual(
+      getFimPrompt("qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic, args()),
+      fim
+    )
+    // A chat model does not continue plain text, so the markers stay.
+    const eof = args({ prefixSuffix: { prefix: "PRE", suffix: "" } })
+    assert.strictEqual(
+      getFimPrompt("x", FIM_TEMPLATE_FORMAT.qwen3Coder, eof),
+      "<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>"
+    )
+    assert.strictEqual(
+      getFimTemplateRepositoryLevel(eof, "qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic),
+      "<|repo_name|>repo\n<|file_sep|>src/a.ts\n" +
+        "<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>"
+    )
+
+    const chat = getFimChat("qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic, fim)
+    assert.deepStrictEqual(chat, [
+      { role: "system", content: "You are a code completion assistant." },
+      { role: "user", content: fim }
+    ])
+    assert.strictEqual(
+      renderChatML(chat!),
+      "<|im_start|>system\nYou are a code completion assistant.<|im_end|>\n" +
+        `<|im_start|>user\n${fim}<|im_end|>\n<|im_start|>assistant\n`
+    )
+    // The unfinished word at the cursor is named after the prompt.
+    assert.strictEqual(
+      getFimChat("qwen3-coder", FIM_TEMPLATE_FORMAT.automatic, fim, "con")![1].content,
+      `${fim}\n\nThe completion must begin with \`con\`.`
+    )
+    // Custom templates for Qwen3-Coder are wrapped too.
+    assert.ok(getFimChat("qwen3-coder", FIM_TEMPLATE_FORMAT.custom, fim))
+    assert.strictEqual(
+      getFimChat("qwen2.5-coder:7b", FIM_TEMPLATE_FORMAT.automatic, fim),
+      undefined
+    )
+  })
+
+  test("sends a chat-only FIM model's chat as the chat, never templated twice", () => {
+    const messages = getFimChat("qwen3-coder", undefined, "FIM")!
+    const body = (provider: string, withChat: boolean) =>
+      createStreamRequestBodyFim(provider, "RENDERED", {
+        model: "m",
+        numPredictFim: 10,
+        ...(withChat ? { messages } : {})
+      }) as unknown as Record<string, unknown>
+    assert.strictEqual(body("ollama", true).raw, true)
+    assert.ok(!("raw" in body("ollama", false)))
+    assert.deepStrictEqual(body("litellm", true).messages, messages)
+    assert.deepStrictEqual(body("litellm", false).messages, [
+      { content: "RENDERED", role: "user" }
+    ])
   })
 })

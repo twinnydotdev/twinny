@@ -3,6 +3,7 @@ export const FIM_TEMPLATE_FORMAT = {
   codegemma: "codegemma",
   codellama: "codellama",
   codeqwen: "codeqwen",
+  qwen3Coder: "qwen3-coder",
   codestral: "codestral",
   custom: "custom-template",
   deepseek: "deepseek",

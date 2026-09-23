@@ -59,6 +59,12 @@ export interface FimRequest {
   temperature?: number
   /** How long to keep the model loaded afterwards, on servers that ask. */
   keepAlive?: string | number
+  /**
+   * For models that only fill the hole as a chat turn: the chat `prompt` was
+   * rendered from. Chat endpoints send these; completion endpoints send
+   * `prompt`, which already carries the model's chat template.
+   */
+  messages?: ChatMessage[]
 }
 
 /**

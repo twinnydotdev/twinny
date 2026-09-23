@@ -5,10 +5,13 @@ import {
   STOP_DEEPSEEK,
   STOP_LLAMA,
   STOP_QWEN,
-  STOP_STARCODER
+  STOP_STARCODER,
+  SYSTEM,
+  USER
 } from "../../common/constants"
 import { supportedLanguages } from "../../common/languages"
 import { FimContextFile, FimPromptTemplate } from "../../common/types"
+import { ChatMessage } from "../inference/types"
 
 type FimFormat = Exclude<
   (typeof FIM_TEMPLATE_FORMAT)[keyof typeof FIM_TEMPLATE_FORMAT],
@@ -24,6 +27,7 @@ const MODEL_NAME_HINTS: [string, FimFormat][] = [
   ["code-llama", FIM_TEMPLATE_FORMAT.codellama],
   ["deepseek", FIM_TEMPLATE_FORMAT.deepseek],
   ["codestral", FIM_TEMPLATE_FORMAT.codestral],
+  ["qwen3-coder", FIM_TEMPLATE_FORMAT.qwen3Coder],
   ["qwen", FIM_TEMPLATE_FORMAT.codeqwen],
   ["codegemma", FIM_TEMPLATE_FORMAT.codegemma],
   ["stable-code", FIM_TEMPLATE_FORMAT.stableCode],
@@ -141,6 +145,21 @@ const qwen = (args: FimPromptTemplate) => {
     : `${context}${args.header}${prefix}`
 }
 
+/**
+ * Qwen3-Coder takes the Qwen FIM prompt, but only as a chat turn (see
+ * `getFimChat`). The markers stay even at the end of the file, since a chat
+ * model does not continue plain text.
+ */
+const qwen3Coder = (args: FimPromptTemplate) => {
+  const { prefix, suffix } = args.prefixSuffix
+  const context = renderSeparatedContext(
+    args.contextFiles,
+    "<|file_sep|>",
+    args.fileName
+  )
+  return `${context}<|fim_prefix|>${args.header}${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
+}
+
 const codegemma = (args: FimPromptTemplate) => {
   const { prefix, suffix } = args.prefixSuffix
   const context = renderSeparatedContext(
@@ -172,6 +191,7 @@ const templateMap: Record<FimFormat, (args: FimPromptTemplate) => string> = {
   [FIM_TEMPLATE_FORMAT.deepseek]: deepseek,
   [FIM_TEMPLATE_FORMAT.codestral]: codestral,
   [FIM_TEMPLATE_FORMAT.codeqwen]: qwen,
+  [FIM_TEMPLATE_FORMAT.qwen3Coder]: qwen3Coder,
   [FIM_TEMPLATE_FORMAT.codegemma]: codegemma,
   [FIM_TEMPLATE_FORMAT.stableCode]: starcoder,
   [FIM_TEMPLATE_FORMAT.starcoder]: starcoder
@@ -183,6 +203,7 @@ const stopWordsMap: Record<FimFormat, string[]> = {
   [FIM_TEMPLATE_FORMAT.deepseek]: STOP_DEEPSEEK,
   [FIM_TEMPLATE_FORMAT.codestral]: STOP_CODESTRAL,
   [FIM_TEMPLATE_FORMAT.codeqwen]: STOP_QWEN,
+  [FIM_TEMPLATE_FORMAT.qwen3Coder]: STOP_QWEN,
   [FIM_TEMPLATE_FORMAT.codegemma]: STOP_CODEGEMMA,
   [FIM_TEMPLATE_FORMAT.stableCode]: STOP_STARCODER,
   [FIM_TEMPLATE_FORMAT.starcoder]: STOP_STARCODER
@@ -197,18 +218,58 @@ export const getFimPrompt = (
 export const getStopWords = (modelName: string, format: string | undefined) =>
   stopWordsMap[resolveFimFormat(modelName, format)]
 
+/** Whether the model only fills the hole as a chat turn (see `getFimChat`). */
+export const isChatFimFormat = (modelName: string, format: string | undefined) =>
+  resolveFimFormat(modelName, format) === FIM_TEMPLATE_FORMAT.qwen3Coder
+
+/**
+ * Qwen3-Coder ships only as an instruct model: it fills the hole when the
+ * FIM prompt arrives as the user turn of a chat, and rambles when given the
+ * bare markers. Returns that chat for such models, undefined for the rest.
+ * https://github.com/QwenLM/Qwen3-Coder (README, "Fill in the middle")
+ */
+export const getFimChat = (
+  modelName: string,
+  format: string | undefined,
+  prompt: string,
+  wordFragment = ""
+): ChatMessage[] | undefined =>
+  isChatFimFormat(modelName, format)
+    ? [
+        { role: SYSTEM, content: "You are a code completion assistant." },
+        {
+          role: USER,
+          // The unfinished word is left out of the prompt, since the model
+          // treats a fragment as a typo; named here, it is honoured.
+          content: wordFragment
+            ? `${prompt}\n\nThe completion must begin with \`${wordFragment}\`.`
+            : prompt
+        }
+      ]
+    : undefined
+
+/** The chat as ChatML text, for completion endpoints. */
+export const renderChatML = (messages: ChatMessage[]) =>
+  messages
+    .map((message) => `<|im_start|>${message.role}\n${message.content}<|im_end|>\n`)
+    .join("") + "<|im_start|>assistant\n"
+
 /**
  * Qwen2.5-Coder style repository-level prompt: every context file, then the
  * current file with FIM markers, all under a repo header.
  */
-export const getFimTemplateRepositoryLevel = (args: FimPromptTemplate) => {
+export const getFimTemplateRepositoryLevel = (
+  args: FimPromptTemplate,
+  modelName = "",
+  format?: string
+) => {
   const { prefix, suffix } = args.prefixSuffix
   let prompt = `<|repo_name|>${args.repoName}\n`
   for (const file of args.contextFiles) {
     prompt += `<|file_sep|>${file.name}\n${file.text.trimEnd()}\n`
   }
   prompt += `<|file_sep|>${args.fileName}\n`
-  return hasSuffix(args)
+  return hasSuffix(args) || isChatFimFormat(modelName, format)
     ? `${prompt}<|fim_prefix|>${prefix}<|fim_suffix|>${suffix}<|fim_middle|>`
     : `${prompt}${prefix}`
 }
