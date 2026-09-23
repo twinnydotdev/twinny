@@ -2,9 +2,9 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
-## Unreleased
+## 4.2.2 · 2026-09-23
 
-Prompt templates (`~/.twinny/templates`) are sturdier.
+Small release: prompt templates (`~/.twinny/templates`) are sturdier. `twinny-server` carries the version number only; the gateway is unchanged.
 
 - **A missing or broken template no longer breaks the feature.** Deleting `system.hbs` used to make every template render empty, so Explain, Review and the commit message all failed. A template that is missing, blank or will not parse now falls back to the built-in copy, and the reason goes to the Twinny output channel. Asking for a template that does not exist returns nothing instead of throwing in the background.
 - **Prompts are no longer HTML-escaped.** A review of "Fix `<T>` & co" reached the model as `Fix &lt;T&gt; &amp; co`; values now go in as written.
