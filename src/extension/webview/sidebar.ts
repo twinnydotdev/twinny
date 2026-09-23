@@ -2,9 +2,9 @@ import * as vscode from "vscode"
 
 import { logger } from "../../common/logger"
 import { WorkspaceIndex } from "../embeddings"
+import { GenerationTracker } from "../generations"
 import { P2pRuntime } from "../p2p/runtime"
 import { SessionManager } from "../session-manager"
-import { TwinnyStatusBar } from "../status-bar"
 import { TeamShare } from "../team/share"
 import { getNonce } from "../utils"
 
@@ -15,7 +15,7 @@ export class SidebarProvider extends BaseProvider {
   private _sidebarReadyPromise: Promise<void> = Promise.resolve()
 
   constructor(
-    statusBarItem: TwinnyStatusBar,
+    generations: GenerationTracker,
     context: vscode.ExtensionContext,
     templateDir: string,
     index: WorkspaceIndex | undefined,
@@ -23,7 +23,7 @@ export class SidebarProvider extends BaseProvider {
     p2p?: P2pRuntime,
     teamShare?: TeamShare
   ) {
-    super(context, templateDir, statusBarItem, index, sessionManager, p2p, teamShare)
+    super(context, templateDir, generations, index, sessionManager, p2p, teamShare)
     this.context = context
     this.registerSidebarReadyHandler(this.handleSidebarReady)
   }

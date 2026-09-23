@@ -44,17 +44,14 @@ import { getProblemsContext } from "./problems"
 import { isSymbolRef } from "./symbol-ref"
 import { readSymbolEntry } from "./symbols"
 import { searchTeamContext } from "./team-context"
-
-/** A message without the words that name a context source. */
-const stripMentions = (text: string) =>
-  text.replace(/@(workspace|problems|git|terminal)\b/g, " ").trim()
+import { ContextSource, withoutSources } from "./turn"
 
 /** The user's question before this one, for a follow-up to lean on. */
 const previousQuestion = (history: ChatCompletionMessage[]): string | undefined => {
   for (let i = history.length - 1; i >= 0; i--) {
     const message = history[i]
     if (message.role === USER && typeof message.content === "string") {
-      return stripMentions(message.content)
+      return withoutSources(message.content)
     }
   }
   return undefined
@@ -127,32 +124,34 @@ export class ChatContextBuilder {
   }
 
   /**
-   * What `@workspace`, `@problems`, `@git` and `@terminal` pull in. The
-   * earlier messages let a follow-up be searched with its question.
+   * What `@workspace`, `@problems`, `@git` and `@terminal` pull in for a
+   * question. The earlier messages let a follow-up be searched with its
+   * question.
    */
   public async ragContext(
-    text?: string,
+    question: string,
+    sources: ReadonlySet<ContextSource>,
     history: ChatCompletionMessage[] = []
   ): Promise<string | null> {
     let combined = ""
 
-    if (text?.includes("@problems")) {
+    if (sources.has("problems")) {
       const problems = getProblemsContext()
       if (problems) combined += `${problems}\n\n`
     }
 
-    if (text?.includes("@git")) {
+    if (sources.has("git")) {
       const root = workspace.workspaceFolders?.[0]?.uri.fsPath
       const git = root ? await getGitContext(root) : undefined
       combined += `${git ?? "Git: the workspace is not a git repository."}\n\n`
     }
 
-    if (text?.includes("@terminal")) {
+    if (sources.has("terminal")) {
       const run = terminalHistory.last()
       combined += `${run ? formatTerminalRun(run) : `Terminal: ${NO_TERMINAL_OUTPUT}`}\n\n`
     }
 
-    const indexed = await this.workspaceContext(text, history)
+    const indexed = await this.workspaceContext(question, sources.has("workspace"), history)
     if (indexed) combined += `${indexed}\n\n`
 
     return combined.trim() || null
@@ -173,17 +172,17 @@ export class ChatContextBuilder {
    * the reply as it happens and keeps the sources with the message.
    */
   private async workspaceContext(
-    text: string | undefined,
+    question: string,
+    mentioned: boolean,
     history: ChatCompletionMessage[]
   ): Promise<string | null> {
-    if (!text) return null
-    const mentioned = text.includes("@workspace")
+    if (!question) return null
     const automatic = this.globalSetting<boolean>(
       EXTENSION_CONTEXT_NAME.twinnyWorkspaceAutoContext
     )
     if (!mentioned && !automatic) return null
 
-    const query = searchQuery(stripMentions(text), previousQuestion(history))
+    const query = searchQuery(question, previousQuestion(history))
     const root = workspace.workspaceFolders?.[0]?.uri.fsPath
     const focus = this.focusFiles(previousSourceFiles(history, root))
     const threshold =
@@ -294,7 +293,8 @@ export class ChatContextBuilder {
 
   /** The block appended to the user's last message. */
   public async additionalContext(
-    message: string,
+    question: string,
+    sources: ReadonlySet<ContextSource>,
     mentions: MentionType[] = [],
     history: ChatCompletionMessage[] = []
   ): Promise<string> {
@@ -303,7 +303,7 @@ export class ChatContextBuilder {
 
     let context = selection ? `Selected Code:\n${selection}\n\n` : ""
 
-    const rag = await this.ragContext(message, history)
+    const rag = await this.ragContext(question, sources, history)
     if (rag) context += `Additional Context:\n${rag}\n\n`
 
     const pinned =

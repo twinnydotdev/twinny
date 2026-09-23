@@ -8,7 +8,7 @@ import * as vscode from "vscode"
 import { ACTIVE_FIM_PROVIDER_STORAGE_KEY } from "../../common/constants"
 import { FileInteractionCache } from "../../extension/completion/file-interaction"
 import { CompletionProvider } from "../../extension/completion/provider"
-import { TwinnyStatusBar } from "../../extension/status-bar"
+import { GenerationTracker } from "../../extension/generations"
 import { TemplateProvider } from "../../extension/templates/provider"
 
 const LIVE = process.env.TWINNY_LIVE === "1"
@@ -53,12 +53,8 @@ suite("Live completion provider", function () {
     })
     const editor = await vscode.window.showTextDocument(document)
     editor.selection = new vscode.Selection(position, position)
-    const statusBar = new TwinnyStatusBar(
-      vscode.window.createStatusBarItem(),
-      fakeContext
-    )
     const provider = new CompletionProvider(
-      statusBar,
+      new GenerationTracker(),
       new FileInteractionCache(),
       new TemplateProvider(undefined),
       fakeContext

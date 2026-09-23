@@ -1,7 +1,7 @@
 import * as vscode from "vscode"
 
+import { GenerationTracker } from "../generations"
 import { P2pRuntime } from "../p2p/runtime"
-import { TwinnyStatusBar } from "../status-bar"
 import { TeamShare } from "../team/share"
 import { getNonce } from "../utils"
 
@@ -13,11 +13,11 @@ export class FullScreenProvider extends BaseProvider {
   constructor(
     context: vscode.ExtensionContext,
     templateDir: string,
-    statusBarItem: TwinnyStatusBar,
+    generations: GenerationTracker,
     p2p?: P2pRuntime,
     teamShare?: TeamShare
   ) {
-    super(context, templateDir, statusBarItem, undefined, undefined, p2p, teamShare)
+    super(context, templateDir, generations, undefined, undefined, p2p, teamShare)
     this.context = context
   }
 

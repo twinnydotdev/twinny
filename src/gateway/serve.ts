@@ -373,16 +373,15 @@ export const runServe = async (
         usageDir: config.usage.dir,
         recordingsDir: config.recording.dir
       },
-      // Plugins use the gateway's own models, routed as a developer's request
-      // is and recorded under the plugin's name; `server` exists before any
-      // plugin starts.
+      // Plugins use the gateway's own models through the same gate as a
+      // developer's request, recorded under the plugin's name; `server`
+      // exists before any plugin starts.
       inference: (id) =>
         gatewayInference({
           routes: () => server.routes,
-          active: () => server.active,
+          gate: () => server.gate,
           usage,
-          principal: `plugin:${id}`,
-          maxOutputTokens: () => configuration.current.limits.maxOutputTokens
+          principal: `plugin:${id}`
         })
     })
     server = new GatewayServer({

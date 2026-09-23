@@ -14,7 +14,7 @@ import path from "node:path"
 import type { ChatMessage } from "../../extension/inference/types"
 
 import { PluginError } from "./host"
-import type { PluginInference } from "./inference"
+import { type PluginInference, repoWorkspace } from "./inference"
 import type { PullDetail, PullSummary } from "./pulls"
 
 /** Characters of description and patches a prompt may carry, for small local contexts. */
@@ -358,7 +358,8 @@ export class Reviewer {
           maxTokens: REVIEW_MAX_TOKENS,
           temperature: 0.2,
           think: false,
-          onReasoning: (reasoning) => (thought += reasoning.length)
+          onReasoning: (reasoning) => (thought += reasoning.length),
+          workspace: repoWorkspace(job.pull.repo)
         }
       ))
         text += piece

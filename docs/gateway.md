@@ -675,6 +675,15 @@ only those named. A refused request fails with a message that says
 which rule. Rules need the `policy` licence feature and stay on the
 gateway. Edit them under **Policy → Routing rules**.
 
+Plugins go through the same rules. A pull-request review, an issue
+triage or a shared-context index of `acme/payments-api` is matched as
+the workspace `payments-api`, the folder a developer would clone it
+into, so `payments-*` above keeps its diffs off hosted models too.
+Plugin requests also count against `limits.maxActiveRequests`, wait in
+the same queue, get the same `limits.maxOutputTokens` and deadline, and
+are aborted when the gateway stops. `limits.perKey` applies to each
+plugin under its own name (`plugin:github`).
+
 ## Pooling teammates' computers
 
 A developer who is connected to the team can click **Share this computer

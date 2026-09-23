@@ -3,7 +3,7 @@ import * as vscode from "vscode"
 
 import { FileInteractionCache } from "../../extension/completion/file-interaction"
 import { CompletionProvider } from "../../extension/completion/provider"
-import { TwinnyStatusBar } from "../../extension/status-bar"
+import { GenerationTracker } from "../../extension/generations"
 import { TemplateProvider } from "../../extension/templates/provider"
 
 suite("Completion lifecycle", () => {
@@ -11,7 +11,7 @@ suite("Completion lifecycle", () => {
     test(`${stop} invalidates a request still waiting for debounce`, async () => {
       const context = { globalState: { get: () => ({ id: "test", modelName: "test" }) } } as unknown as vscode.ExtensionContext
       const provider = new CompletionProvider(
-        { idle() {}, busy() {} } as unknown as TwinnyStatusBar,
+        new GenerationTracker(),
         new FileInteractionCache(),
         {} as TemplateProvider,
         context

@@ -14,12 +14,13 @@ import {
   EVENT_NAME
 } from "../../common/constants"
 import { normalizeProvider } from "../../common/provider-validation"
-import { TwinnyProvider } from "../../common/types"
+import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
 import { ChatGeneration } from "../../extension/chat/generation"
 import { Chat } from "../../extension/chat/index"
 import { FileInteractionCache } from "../../extension/completion/file-interaction"
 import { CompletionProvider } from "../../extension/completion/provider"
 import { Embedder } from "../../extension/embeddings/embedder"
+import { GenerationTracker } from "../../extension/generations"
 import {
   ChatRequest,
   InferenceCapability,
@@ -35,7 +36,6 @@ import {
 import { ExtensionBridge } from "../../extension/messaging/bridge"
 import { describeProviderError } from "../../extension/providers/errors"
 import { listProviderModels, testProvider } from "../../extension/providers/probe"
-import { TwinnyStatusBar } from "../../extension/status-bar"
 import { TemplateProvider } from "../../extension/templates/provider"
 
 /* -------------------------------------------------------------------------- */
@@ -172,7 +172,7 @@ const fakeChatConfig: TwinnyProvider = {
   type: "chat"
 }
 
-const stubStatusBar = { busy() {}, idle() {} } as unknown as TwinnyStatusBar
+const generations = new GenerationTracker()
 
 const stubBridge = () => {
   const emitted: { type: string; data: unknown }[] = []
@@ -188,6 +188,17 @@ const contextWith = (active: Record<string, TwinnyProvider>) =>
       get: (key: string) => active[key],
       update: async () => undefined
     },
+    subscriptions: []
+  }) as unknown as vscode.ExtensionContext
+
+/** Enough of an extension context for the chat to build prompts. */
+const chatContext = () =>
+  ({
+    globalState: {
+      get: (key: string) => (key === ACTIVE_CHAT_PROVIDER_STORAGE_KEY ? fakeChatConfig : undefined),
+      update: async () => undefined
+    },
+    workspaceState: { get: () => undefined, update: async () => undefined },
     subscriptions: []
   }) as unknown as vscode.ExtensionContext
 
@@ -333,7 +344,7 @@ suite("Inference layer", function () {
         const position = new vscode.Position(0, "function add(a, b) {".length)
         editor.selection = new vscode.Selection(position, position)
         const provider = new CompletionProvider(
-          stubStatusBar,
+          generations,
           new FileInteractionCache(),
           new TemplateProvider(undefined),
           contextWith({ [ACTIVE_FIM_PROVIDER_STORAGE_KEY]: config })
@@ -367,7 +378,7 @@ suite("Inference layer", function () {
       providerRegistry.register("fake-chat", { id: "fake", create: () => fake })
       const { bridge } = stubBridge()
       const chat = new Chat(
-        stubStatusBar,
+        generations,
         undefined,
         contextWith({ [ACTIVE_CHAT_PROVIDER_STORAGE_KEY]: fakeChatConfig }),
         bridge,
@@ -384,6 +395,57 @@ suite("Inference layer", function () {
       }
     })
 
+    test("a command's attached code stays in the conversation for the follow-up", async () => {
+      const fake = new FakeChatProvider(["It throws."])
+      providerRegistry.register("fake-chat", { id: "fake", create: () => fake })
+      const { bridge, emitted } = stubBridge()
+      const chat = new Chat(generations, undefined, chatContext(), bridge, undefined)
+      try {
+        await chat.ask("Fix the failing command", "Why does it fail?", [
+          { path: "a.ts", content: "const first = <T>(xs: T[]) => xs[0]" }
+        ])
+        const shown = emitted.find(
+          (e) => e.type === EVENT_NAME.twinnyAddMessage && (e.data as ChatCompletionMessage).role === "user"
+        )?.data as ChatCompletionMessage
+        assert.strictEqual(shown.content, "Fix the failing command")
+        assert.ok(shown.prompt?.includes("const first = <T>"))
+
+        // The webview sends back what it shows, with the prompt recorded.
+        await chat.completion([
+          shown,
+          { role: "assistant", content: "It throws." },
+          { role: "user", content: "<p>and the fix?</p>" }
+        ])
+        const sent = fake.requests[1].messages.map((m) =>
+          typeof m.content === "string" ? m.content : (m.content as { text: string }[])[0].text
+        )
+        assert.ok(sent[1].includes("const first = <T>"), sent[1])
+        assert.strictEqual(sent[2], "It throws.")
+        assert.ok(sent[3].startsWith("and the fix?"), sent[3])
+      } finally {
+        chat.dispose()
+      }
+    })
+
+    test("a template after a new conversation carries none of the old one", async () => {
+      const fake = new FakeChatProvider(["Done."])
+      providerRegistry.register("fake-chat", { id: "fake", create: () => fake })
+      const chat = new Chat(generations, undefined, chatContext(), stubBridge().bridge, undefined)
+      try {
+        await chat.completion([{ role: "user", content: "<p>secret plan</p>" }])
+        await chat.templateCompletion("explain", "const a = 1")
+        const before = fake.requests[1].messages
+        assert.ok(before.some((m) => m.role === "assistant"), "the reply joins the conversation")
+        chat.resetConversation()
+        await chat.templateCompletion("explain", "const a = 1")
+        const after = fake.requests[2].messages
+        assert.strictEqual(after.length, 1)
+        assert.ok(!JSON.stringify(after).includes("secret plan"))
+      } finally {
+        chat.dispose()
+      }
+    })
+
     test("generation shows the reply as it streams, whole or in parts", async () => {
       for (const replies of [["Hel", "lo"], ["Hello"]]) {
         const fake = new FakeChatProvider(replies)
@@ -392,7 +454,7 @@ suite("Inference layer", function () {
           create: () => fake
         })
         const { bridge, emitted } = stubBridge()
-        const generation = new ChatGeneration(bridge, stubStatusBar)
+        const generation = new ChatGeneration(bridge, generations)
         const reply = await generation.generate(
           registry.resolve(fakeChatConfig),
           { model: "m", messages: [{ role: "user", content: "hi" }] },
@@ -651,7 +713,7 @@ suite("Inference layer", function () {
       })
       await vscode.window.showTextDocument(document)
       const provider = new CompletionProvider(
-        stubStatusBar,
+        generations,
         new FileInteractionCache(),
         new TemplateProvider(undefined),
         contextWith({ [ACTIVE_FIM_PROVIDER_STORAGE_KEY]: config })
@@ -687,7 +749,7 @@ suite("Inference layer", function () {
         })
       })
       const { bridge } = stubBridge()
-      const generation = new ChatGeneration(bridge, stubStatusBar)
+      const generation = new ChatGeneration(bridge, generations)
       const reply = generation.generate(
         registry.resolve(fakeChatConfig),
         { model: "m", messages: [] },

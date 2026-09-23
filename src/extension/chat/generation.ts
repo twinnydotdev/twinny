@@ -1,12 +1,10 @@
-import { commands } from "vscode"
-
-import { ASSISTANT, EVENT_NAME, EXTENSION_CONTEXT_NAME } from "../../common/constants"
+import { ASSISTANT, EVENT_NAME } from "../../common/constants"
 import { formatCount, logger } from "../../common/logger"
 import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
+import { GenerationRun, GenerationTracker } from "../generations"
 import { ChatRequest, InferenceClient, isCancelled } from "../inference"
 import { ExtensionBridge } from "../messaging/bridge"
 import { describeProviderError, describeProviderErrorPlain, isAbortError } from "../providers/errors"
-import { TwinnyStatusBar } from "../status-bar"
 
 /** Message content is a string, or text parts alongside images. */
 const contentText = (content: ChatCompletionMessage["content"]): string => {
@@ -23,21 +21,30 @@ const contentLength = (content: ChatCompletionMessage["content"]) =>
   contentText(content).length
 
 /**
- * One chat request from start to finish: the spinner, the stop keybinding's
- * context flag, streaming partial text to the webview, and turning a failure
- * into a message the user can act on.
+ * One chat request from start to finish: a run on the generation tracker
+ * (which owns the spinner and the stop keybinding), streaming partial text to
+ * the webview, and turning a failure into a message the user can act on.
  *
  * `prefix` is text shown (and saved) ahead of the model's reply, e.g. a part
  * heading in a multi-part review.
  */
 export class ChatGeneration {
-  private _controller?: AbortController
+  private _run?: GenerationRun
   private _cancelled = false
+  private readonly _stopSubscription: { dispose(): void }
 
   constructor(
     private readonly _bridge: ExtensionBridge,
-    private readonly _statusBar: TwinnyStatusBar
-  ) {}
+    private readonly _generations: GenerationTracker
+  ) {
+    // The stop command reaches every chat, the panel's as well as the
+    // sidebar's, and between the parts of a review as well as during one.
+    this._stopSubscription = _generations.onDidStop(() => this.abort())
+  }
+
+  public dispose() {
+    this._stopSubscription.dispose()
+  }
 
   /** True once the user has stopped generation, until the next request. */
   public get cancelled() {
@@ -50,8 +57,8 @@ export class ChatGeneration {
 
   public abort() {
     this._cancelled = true
-    this._controller?.abort()
-    this.end()
+    this._run?.abort()
+    this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
   }
 
   /**
@@ -65,12 +72,13 @@ export class ChatGeneration {
     prefix = ""
   ): Promise<string> {
     if (this._cancelled) return ""
-    this.begin()
+    const run = this._generations.start("chat")
+    this._run = run
     let text = prefix
     const elapsed = this.logRequest(request.messages, provider)
 
     try {
-      const chunks = inference.chat(request, { signal: this._controller?.signal })
+      const chunks = inference.chat(request, { signal: run.signal })
       try {
         for await (const chunk of chunks) {
           text += chunk.content
@@ -87,13 +95,13 @@ export class ChatGeneration {
       const reply = text.trim()
       logger.info(
         `Chat ← ${elapsed()} · ${formatCount(reply.length)} chars` +
-          (this._controller?.signal.aborted ? " · stopped by the user" : "")
+          (run.signal.aborted ? " · stopped by the user" : "")
       )
       logger.block("Chat reply", reply)
       if (reply) this.addMessage(reply)
       return reply
     } catch (error) {
-      this._controller?.abort()
+      run.abort()
       // Keep whatever streamed before the failure; it is still useful.
       // A bare heading is not.
       const partial = text.trim() === prefix.trim() ? "" : text.trim()
@@ -101,36 +109,14 @@ export class ChatGeneration {
       this.report(error, provider)
       return partial
     } finally {
-      this.end()
+      run.finish()
+      if (this._run === run) this._run = undefined
+      this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
     }
   }
 
   private addMessage(content: string) {
     this._bridge.emit(EVENT_NAME.twinnyAddMessage, { content, role: ASSISTANT })
-  }
-
-  /**
-   * Spinner on, and the `twinnyGeneratingText` context set so the
-   * stop-generation keybinding is live for as long as the request runs.
-   */
-  private begin() {
-    this._controller = new AbortController()
-    this._statusBar.busy()
-    void commands.executeCommand(
-      "setContext",
-      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
-      true
-    )
-  }
-
-  private end() {
-    this._statusBar.idle()
-    void commands.executeCommand(
-      "setContext",
-      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
-      false
-    )
-    this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
   }
 
   /**
