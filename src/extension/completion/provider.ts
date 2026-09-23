@@ -49,7 +49,8 @@ import { FileInteractionCache } from "./file-interaction"
 import {
   getFimPrompt,
   getFimTemplateRepositoryLevel,
-  getStopWords
+  getStopWords,
+  isChatFimPrompt
 } from "./fim-templates"
 import { CompletionFormatter } from "./formatter"
 import { getImportedFiles } from "./imports"
@@ -455,7 +456,8 @@ export class CompletionProvider
       stop: stopWords,
       maxTokens: this.config.get<number>("numPredictFim", 512),
       temperature: this.config.get<number>("temperature", 0.2),
-      keepAlive: this.config.get<string>("keepAlive")
+      keepAlive: this.config.get<string>("keepAlive"),
+      raw: isChatFimPrompt(provider.modelName, provider.fimTemplate)
     }
   }
 
@@ -598,7 +600,11 @@ export class CompletionProvider
     }
 
     if (provider.repositoryLevel) {
-      return getFimTemplateRepositoryLevel(templateArgs)
+      return getFimTemplateRepositoryLevel(
+        templateArgs,
+        provider.modelName,
+        provider.fimTemplate
+      )
     }
 
     return getFimPrompt(provider.modelName, provider.fimTemplate, templateArgs)

@@ -59,6 +59,11 @@ export interface FimRequest {
   temperature?: number
   /** How long to keep the model loaded afterwards, on servers that ask. */
   keepAlive?: string | number
+  /**
+   * The prompt already carries the model's chat template, so a server that
+   * would apply one itself (Ollama) must not.
+   */
+  raw?: boolean
 }
 
 /**

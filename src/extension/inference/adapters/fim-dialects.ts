@@ -20,6 +20,8 @@ export interface RequestOptionsOllama extends RequestBodyBase {
   model: string
   keep_alive?: string | number
   prompt?: string
+  /** Ollama: send the prompt as is, without the model's template. */
+  raw?: boolean
   input?: string
   options: Record<string, unknown>
 }
@@ -103,6 +105,7 @@ export interface FimRequestOptions {
   model: string
   keepAlive?: string | number
   stop?: string[]
+  raw?: boolean
 }
 
 export function createStreamRequestBodyFim(
@@ -124,6 +127,7 @@ export function createStreamRequestBodyFim(
         prompt,
         stream: true,
         keep_alive: options.keepAlive === "-1" ? -1 : options.keepAlive,
+        ...(options.raw ? { raw: true } : {}),
         options: {
           temperature: options.temperature,
           num_predict: options.numPredictFim,

@@ -6,8 +6,10 @@ import {
   getFimPrompt,
   getFimTemplateRepositoryLevel,
   getStopWords,
+  isChatFimPrompt,
   resolveFimFormat
 } from "../../extension/completion/fim-templates"
+import { createStreamRequestBodyFim } from "../../extension/inference/adapters/fim-dialects"
 
 const args = (overrides: Partial<FimPromptTemplate> = {}): FimPromptTemplate => ({
   contextFiles: [],
@@ -26,6 +28,9 @@ suite("FIM templates", () => {
       ["qwen2.5-coder:1.5b-base", FIM_TEMPLATE_FORMAT.codeqwen],
       ["Qwen/Qwen2.5-Coder-7B", FIM_TEMPLATE_FORMAT.codeqwen],
       ["codeqwen:7b-code", FIM_TEMPLATE_FORMAT.codeqwen],
+      ["qwen3-coder:30b", FIM_TEMPLATE_FORMAT.qwen3Coder],
+      ["Qwen/Qwen3-Coder-30B-A3B-Instruct", FIM_TEMPLATE_FORMAT.qwen3Coder],
+      ["qwen/qwen3-coder-next", FIM_TEMPLATE_FORMAT.qwen3Coder],
       ["deepseek-coder:6.7b-base", FIM_TEMPLATE_FORMAT.deepseek],
       ["deepseek-coder-v2:16b", FIM_TEMPLATE_FORMAT.deepseek],
       ["codestral:22b", FIM_TEMPLATE_FORMAT.codestral],
@@ -180,6 +185,7 @@ suite("FIM templates", () => {
       FIM_TEMPLATE_FORMAT.deepseek,
       FIM_TEMPLATE_FORMAT.codestral,
       FIM_TEMPLATE_FORMAT.codeqwen,
+      FIM_TEMPLATE_FORMAT.qwen3Coder,
       FIM_TEMPLATE_FORMAT.codegemma,
       FIM_TEMPLATE_FORMAT.starcoder,
       FIM_TEMPLATE_FORMAT.stableCode
@@ -198,5 +204,46 @@ suite("FIM templates", () => {
         )
       }
     }
+  })
+
+  test("sends Qwen3-Coder the FIM prompt as a chat turn", () => {
+    const turn = (fim: string) =>
+      "<|im_start|>system\nYou are a code completion assistant.<|im_end|>\n" +
+      `<|im_start|>user\n${fim}<|im_end|>\n<|im_start|>assistant\n`
+    assert.strictEqual(
+      getFimPrompt("qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic, args()),
+      turn("<|fim_prefix|>PRE<|fim_suffix|>SUF<|fim_middle|>")
+    )
+    // A chat model does not continue plain text, so the markers stay.
+    assert.strictEqual(
+      getFimPrompt("x", FIM_TEMPLATE_FORMAT.qwen3Coder, args({
+        prefixSuffix: { prefix: "PRE", suffix: "" }
+      })),
+      turn("<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>")
+    )
+    assert.strictEqual(
+      getFimTemplateRepositoryLevel(
+        args({ prefixSuffix: { prefix: "PRE", suffix: "" } }),
+        "qwen3-coder:30b",
+        FIM_TEMPLATE_FORMAT.automatic
+      ),
+      turn(
+        "<|repo_name|>repo\n<|file_sep|>src/a.ts\n" +
+          "<|fim_prefix|>PRE<|fim_suffix|><|fim_middle|>"
+      )
+    )
+  })
+
+  test("asks Ollama not to template a prompt that is already a chat", () => {
+    assert.ok(isChatFimPrompt("qwen3-coder:30b", FIM_TEMPLATE_FORMAT.automatic))
+    assert.ok(!isChatFimPrompt("qwen2.5-coder:7b", FIM_TEMPLATE_FORMAT.automatic))
+    const body = (raw: boolean) =>
+      createStreamRequestBodyFim("ollama", "p", {
+        model: "m",
+        numPredictFim: 10,
+        raw
+      }) as unknown as Record<string, unknown>
+    assert.strictEqual(body(true).raw, true)
+    assert.ok(!("raw" in body(false)))
   })
 })
