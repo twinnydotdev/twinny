@@ -463,7 +463,13 @@ suite("Inference layer", function () {
         assert.strictEqual(reply, "Hello")
         const partials = emitted.filter((e) => e.type === EVENT_NAME.twinnyOnCompletion)
         assert.strictEqual(partials.length, replies.length)
-        assert.ok(emitted.some((e) => e.type === EVENT_NAME.twinnyAddMessage))
+        const added = emitted.find((e) => e.type === EVENT_NAME.twinnyAddMessage)
+          ?.data as ChatCompletionMessage
+        assert.ok(added, "the finished reply is added")
+        // The reply records who wrote it and how long it took, for the footer.
+        assert.strictEqual(added.meta?.model, fakeChatConfig.modelName)
+        assert.ok((added.meta?.durationMs ?? -1) >= 0)
+        assert.ok(!added.meta?.stopped)
       }
     })
   })

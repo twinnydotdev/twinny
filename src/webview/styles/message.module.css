@@ -243,3 +243,73 @@
 .editor {
   outline: none;
 }
+
+/* Model, time and speed under a reply: there when wanted, never loud. */
+.replyFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 10px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}
+
+.replyModel {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family);
+}
+
+.replyStopped {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.replyContinue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--tw-rule);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.replyContinue:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.replyContinue .codicon {
+  font-size: 12px;
+}
+
+/* A folded user turn fades out at the bottom edge, so it reads as cut. */
+.folded {
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.expandToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font: inherit;
+  font-size: var(--tw-fs-xs);
+  cursor: pointer;
+}
+
+.expandToggle:hover {
+  text-decoration: underline;
+}

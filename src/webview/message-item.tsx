@@ -26,6 +26,7 @@ interface MessageListProps {
     mentions: MentionType[] | undefined
   ) => void
   handleDeleteImage?: (id: string) => void
+  handleContinue?: () => void
 }
 
 const MessageItem = memo(
@@ -40,11 +41,14 @@ const MessageItem = memo(
     handleEditMessage,
     handleRegenerateMessage,
     handleDeleteImage,
+    handleContinue
   }: MessageListProps) => {
     const isUserMessage = message?.role === "user"
     const isAgentMessage = message?.role === "assistant"
     const isLastMessage = index === messages?.length - 1
     const messageKey = `${message?.role}-0`
+    const canContinue =
+      isAgentMessage && isLastMessage && !isLoading && !!message.meta?.stopped
 
     return (
       <>
@@ -73,6 +77,7 @@ const MessageItem = memo(
             onRegenerate={handleRegenerateMessage}
             isAssistant
             onDeleteImage={handleDeleteImage}
+            onContinue={canContinue ? handleContinue : undefined}
           />
         )}
         {completion && isLastMessage && (

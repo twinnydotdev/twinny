@@ -217,6 +217,7 @@ export class BaseProvider {
       [EVENT_NAME.twinnyRemoveContextItem]: (id) => this.removeContextItem(id),
       [EVENT_NAME.twinnyRunInTerminal]: (command) =>
         this.sendToTerminal(command),
+      [EVENT_NAME.twinnyInsertAtCursor]: (code) => this.insertAtCursor(code),
       [EVENT_NAME.twinnySendLanguage]: () => getLanguage(),
       [EVENT_NAME.twinnySendTheme]: () => getTheme(),
       [EVENT_NAME.twinnySetConfigValue]: ({ key, value }) =>
@@ -379,6 +380,25 @@ export class BaseProvider {
    * presses Enter themselves. Models get commands wrong often enough that an
    * auto-run button would be a foot-gun.
    */
+  /*
+   * Straight into the last editor, as if typed: a selection is replaced,
+   * otherwise the code goes in at the cursor. Apply is for changes to
+   * review; this is for a snippet that only adds.
+   */
+  private insertAtCursor = async (code: string) => {
+    const editor = vscode.window.activeTextEditor
+    if (!editor) {
+      void vscode.window.showWarningMessage(
+        "Open a file to insert the code into."
+      )
+      return
+    }
+    await vscode.window.showTextDocument(editor.document, editor.viewColumn)
+    await editor.edit((builder) => {
+      for (const selection of editor.selections) builder.replace(selection, code)
+    })
+  }
+
   private sendToTerminal = async (command: string) => {
     const terminal = await getTerminal()
     if (!terminal) return

@@ -63,6 +63,20 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
    * follow-up sends the same conversation the model already answered.
    */
   prompt?: string
+  /** How a reply came about; shown under it, never sent to the model. */
+  meta?: ReplyMeta
+}
+
+/** What twinny knows about how one reply was produced. */
+export interface ReplyMeta {
+  model?: string
+  /** The provider's label, or the teammate's machine for a team pool. */
+  provider?: string
+  durationMs?: number
+  /** Only when the backend reported it; never estimated. */
+  completionTokens?: number
+  /** The user stopped it before the model finished. */
+  stopped?: boolean
 }
 
 export interface Conversation {

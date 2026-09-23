@@ -18,6 +18,7 @@ export const TWINNY_COMMAND_NAME = {
   manageProviders: "twinny.manageProviders",
   manageTemplates: "twinny.manageTemplates",
   newConversation: "twinny.newConversation",
+  exportConversation: "twinny.exportConversation",
   openPanelChat: "twinny.openPanelChat",
   openChat: "twinny.openChat",
   refactor: "twinny.refactor",

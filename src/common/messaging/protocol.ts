@@ -318,6 +318,7 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyOpenProviders]: Channel
   [EVENT_NAME.twinnyRemoveContextItem]: Channel<string>
   [EVENT_NAME.twinnyRunInTerminal]: Channel<string>
+  [EVENT_NAME.twinnyInsertAtCursor]: Channel<string>
   [EVENT_NAME.twinnySendLanguage]: Channel<void, LanguageType>
   [EVENT_NAME.twinnySendTheme]: Channel<void, ThemeType>
   [EVENT_NAME.twinnySessionContext]: Channel<{ key: string }, ContextValue>
@@ -417,6 +418,7 @@ export interface ServerEvents {
   [EVENT_NAME.twinnyGlobalContext]: ContextValue
   [EVENT_NAME.twinnyListTemplates]: string[]
   [EVENT_NAME.twinnyNewConversation]: void
+  [EVENT_NAME.twinnyExportConversation]: void
   [EVENT_NAME.twinnyOnCompletion]: ChatCompletionMessage
   [EVENT_NAME.twinnyOnLoading]: void
   [EVENT_NAME.twinnySendLanguage]: LanguageType

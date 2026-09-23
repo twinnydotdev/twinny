@@ -66,6 +66,24 @@ export const CustomKeyMap = Extension.create({
         editor.commands.insertContent("\n")
         return true
       },
+      // Stops a reply on its way, from where the user is already typing.
+      Escape: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.stopGeneration?.() ?? false
+      },
+      // Earlier prompts, as in a shell: from an empty composer, or while
+      // already stepping through them.
+      ArrowUp: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.recallPrompt?.(-1, editor.isEmpty) ?? false
+      },
+      ArrowDown: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.recallPrompt?.(1, editor.isEmpty) ?? false
+      },
     }
   },
 })
