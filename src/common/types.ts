@@ -94,7 +94,8 @@ export interface FimTemplateData extends Record<string, string | undefined> {
   fileName: string
   prefix: string
   suffix: string
-  systemMessage: string
+  /** Defaults to fim-system.hbs (or system.hbs) when left out. */
+  systemMessage?: string
 }
 
 export interface ChatTemplateData {

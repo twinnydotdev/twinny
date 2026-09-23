@@ -1,6 +1,19 @@
-export const defaultTemplates = [
+/** A prompt twinny ships with, copied to ~/.twinny/templates for editing. */
+export interface DefaultTemplate {
+  name: string
+  template: string
+  /**
+   * Offered as a code action in chat: it needs only the editor selection
+   * and its language. The others are filled in by a feature of their own
+   * (review, commit message, completions, workspace context).
+   */
+  interactive?: boolean
+}
+
+export const defaultTemplates: DefaultTemplate[] = [
   {
     name: "explain",
+    interactive: true,
     template: `
 Explain the following code concisely:
 {{{code}}}
@@ -9,6 +22,7 @@ Focus on key functionality and purpose. The language is:
   },
   {
     name: "refactor",
+    interactive: true,
     template: `
 Refactor the following code to improve efficiency or readability without altering its functionality:
 {{{code}}}
@@ -18,6 +32,7 @@ Do not explain the code in your response.`.trim()
   },
   {
     name: "add-types",
+    interactive: true,
     template: `
 Add types to the following code, keeping the logic unchanged:
 {{{code}}}
@@ -27,6 +42,7 @@ Do not explain the code in your response.`.trim()
   },
   {
     name: "add-tests",
+    interactive: true,
     template: `
 Write comprehensive unit tests for the following code block:
 {{{code}}}
@@ -35,6 +51,7 @@ Always format responses with Markdown for code blocks with the language prefix e
   },
   {
     name: "fix-code",
+    interactive: true,
     template: `
 Fix any errors in the following code without changing its core functionality:
 {{{code}}}
@@ -44,6 +61,7 @@ Do not explain the changes in your response.`.trim()
   },
   {
     name: "generate-docs",
+    interactive: true,
     template: `
 Generate comprehensive documentation for the following code block:
 {{{code}}}

@@ -1,5 +1,3 @@
-import { defaultTemplates } from "../../extension/templates/defaults"
-
 export const FIM_TEMPLATE_FORMAT = {
   automatic: "automatic",
   codegemma: "codegemma",
@@ -55,8 +53,6 @@ export const STOP_CODEGEMMA = [
 ]
 
 export const STOP_CODESTRAL = ["[PREFIX]", "[SUFFIX]", "</s>"]
-
-export const DEFAULT_TEMPLATE_NAMES = defaultTemplates.map(({ name }) => name)
 
 export const DEFAULT_ACTION_TEMPLATES = []
 

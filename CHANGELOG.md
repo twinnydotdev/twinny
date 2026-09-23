@@ -2,6 +2,15 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/).
 
+## Unreleased
+
+Prompt templates (`~/.twinny/templates`) are sturdier.
+
+- **A missing or broken template no longer breaks the feature.** Deleting `system.hbs` used to make every template render empty, so Explain, Review and the commit message all failed. A template that is missing, blank or will not parse now falls back to the built-in copy, and the reason goes to the Twinny output channel. Asking for a template that does not exist returns nothing instead of throwing in the background.
+- **Prompts are no longer HTML-escaped.** A review of "Fix `<T>` & co" reached the model as `Fix &lt;T&gt; &amp; co`; values now go in as written.
+- **The template buttons in chat** no longer offer *review-summary*, which needs a review to summarise, and a template of your own whose name merely starts with "system" is listed again.
+- Template names that are not plain file names are refused, and the `eq` helper is available to every template however the extension started.
+
 ## 4.2.1 · 2026-09-22
 
 Small release: the extension tells the person who could run a gateway that one exists, and the listings say what the product costs.
