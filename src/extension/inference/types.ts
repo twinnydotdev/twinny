@@ -100,12 +100,20 @@ export interface ChatRequest {
   think?: boolean
 }
 
+/**
+ * Why a chat ended, when the backend says: `stop` is the model's own end,
+ * `length` the output cap (`maxTokens` or the server's) cutting it off.
+ */
+export type ChatFinishReason = "stop" | "length"
+
 export interface ChatChunk {
   content: string
   /** Usually on the last chunk, from backends that count. */
   usage?: InferenceUsage
   /** A reasoning model's thinking, when the backend streams it apart from the answer. */
   reasoning?: string
+  /** On the last chunk, from backends that say why they stopped. */
+  finishReason?: ChatFinishReason
 }
 
 export interface EmbeddingRequest {

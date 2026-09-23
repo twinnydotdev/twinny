@@ -661,9 +661,89 @@ interface PullViewProps {
   onBack: () => void
   onReview: () => Promise<void>
   onPost: (as: "comment" | "request-changes" | "approve") => Promise<void>
+  onAsk: (question: string) => Promise<void>
 }
 
-const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost }: PullViewProps) => {
+/** Questions about a review and the model's answers, with a box for the next one. */
+const ReviewThread = ({ review, noun, canAsk, onAsk }: { review: ReviewRecord; noun: string; canAsk: boolean; onAsk: (question: string) => Promise<void> }) => {
+  const [question, setQuestion] = useState("")
+  const [asking, setAsking] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!asking) return
+    setElapsed(0)
+    const started = Date.now()
+    const timer = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [asking])
+  const send = async () => {
+    const asked = question.trim()
+    if (!asked || asking || !canAsk) return
+    setAsking(true)
+    setError(undefined)
+    try {
+      await onAsk(asked)
+      setQuestion("")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAsking(false)
+    }
+  }
+  const thread = review.thread ?? []
+  return (
+    <div className="review-thread">
+      {thread.length > 0 && (
+        <div className="turns">
+          {thread.map((turn, index) => (
+            <div key={`${turn.at}:${index}`} className={`turn ${turn.role}`}>
+              <div className="turn-head">
+                <span className="role">{turn.role === "user" ? `asked by ${turn.by ?? "you"}` : `${review.alias}${turn.ms ? ` in ${Math.round(turn.ms / 1000)} s` : ""}`}</span>
+                <span className="muted">{timeAgo(turn.at)}</span>
+              </div>
+              <div className="turn-body">
+                {turn.role === "user" ? <p className="question">{turn.text}</p> : <MarkdownView text={turn.text} />}
+                {turn.cutShort && <div className="cut-short">{turn.cutShort}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <form
+        className="ask-form"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault()
+          void send()
+        }}
+      >
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault()
+              void send()
+            }
+          }}
+          rows={2}
+          maxLength={4000}
+          placeholder={canAsk ? `Ask ${review.alias} about this review…` : "No model is serving reviews"}
+          aria-label="Ask about this review"
+          disabled={asking || !canAsk}
+        />
+        <div className="review-actions">
+          <button type="submit" className="primary" disabled={asking || !canAsk || !question.trim()}>
+            {asking ? `answering… ${elapsed} s` : "ask"}
+          </button>
+          {error ? <span className="bad-text">{error}</span> : <span className="muted">Ctrl+Enter sends. The model sees the {noun.toLowerCase()}, the review and this thread; nothing here is posted.</span>}
+        </div>
+      </form>
+    </div>
+  )
+}
+
+const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onAsk }: PullViewProps) => {
   const [postAs, setPostAs] = useState<"comment" | "request-changes" | "approve">("comment")
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState<string | undefined>()
@@ -806,6 +886,7 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost }:
             </span>
             {stale && <span className="tag stale">for an earlier commit {detail.review.headSha.slice(0, 7)}</span>}
             {detail.review.status === "failed" && <span className="tag failed">failed</span>}
+            {detail.review.cutShort && <span className="tag cut">cut short</span>}
             {detail.review.postedAt && (
               <span className="tag reviewed">
                 posted as {detail.review.postedAs?.replace("-", " ")} {timeAgo(detail.review.postedAt)}
@@ -844,7 +925,9 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost }:
               {postError && <span className="bad-text">{postError}</span>}
             </div>
           )}
+          {detail.review.cutShort && <div className="cut-short">{detail.review.cutShort}</div>}
           {detail.review.status === "failed" ? <div className="error">{detail.review.error}</div> : <MarkdownView text={detail.review.text} className="review-body" />}
+          {detail.review.status === "done" && !reviewing && <ReviewThread review={detail.review} noun={words.noun} canAsk={review.available && !!review.alias} onAsk={onAsk} />}
         </>
       ) : (
         !reviewing && <div className="empty">Not reviewed yet.</div>
@@ -1494,6 +1577,10 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
               const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review/post`, apiKey, { method: "POST", body: { as } })
               setDetail((current) => (current ? { ...current, review: answer.review } : current))
               void load()
+            }}
+            onAsk={async (question) => {
+              const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review/ask`, apiKey, { method: "POST", body: { question } })
+              setDetail((current) => (current ? { ...current, review: answer.review } : current))
             }}
           />
         ) : (

@@ -7,6 +7,10 @@
  * repositories with auto-review on: one at a time, only for pulls that
  * have no review of their current commit, and only while no developer
  * request is in flight, so completions and chats always come first.
+ *
+ * A finished review can be asked about: each question goes to the same
+ * model with the pull, the review and the earlier questions in front of
+ * it, and the exchange is kept on the review as its thread.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -23,6 +27,13 @@ const DESCRIPTION_BUDGET = 3_000
 /** Room for the answer, and for a reasoning model that thinks first despite being asked not to. */
 export const REVIEW_MAX_TOKENS = 4_000
 export const REVIEW_TIMEOUT_MS = 10 * 60_000
+/** A follow-up answer is shorter than a review. */
+export const ASK_MAX_TOKENS = 2_000
+export const ASK_TIMEOUT_MS = 5 * 60_000
+/** Characters a question may have. */
+const QUESTION_LIMIT = 4_000
+/** Earlier turns a question carries; older ones are kept on the record but left out of the prompt. */
+const THREAD_CONTEXT_TURNS = 20
 /** Reviews kept per plugin; the oldest go first. */
 const MAX_REVIEWS = 1_000
 
@@ -39,6 +50,10 @@ export interface ReviewRecord {
   status: "done" | "failed"
   text: string
   error?: string
+  /** Why the text ends early, when the model stopped before finishing. */
+  cutShort?: string
+  /** Questions asked about the review and the model's answers, oldest first. */
+  thread?: ReviewTurn[]
   /** When and how it was posted to the host, if it was. */
   postedAt?: string
   postedAs?: ReviewPostAs
@@ -47,6 +62,18 @@ export interface ReviewRecord {
 }
 
 export type ReviewPostAs = "comment" | "request-changes" | "approve"
+
+export interface ReviewTurn {
+  role: "user" | "assistant"
+  text: string
+  at: string
+  /** The admin key that asked, on a question. */
+  by?: string
+  /** How long the answer took, on an answer. */
+  ms?: number
+  /** Why the answer ends early, when it does. */
+  cutShort?: string
+}
 
 /** What a listing carries per pull, to mark it without the text. */
 export interface ReviewBrief {
@@ -64,6 +91,26 @@ interface ReviewsFile {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
+
+/** The turns that are whole; a damaged one is dropped rather than failing the file. */
+const parseThread = (entries: unknown[]): ReviewTurn[] =>
+  entries.flatMap((entry) =>
+    isRecord(entry) &&
+    (entry.role === "user" || entry.role === "assistant") &&
+    typeof entry.text === "string" &&
+    typeof entry.at === "string"
+      ? [
+          {
+            role: entry.role,
+            text: entry.text,
+            at: entry.at,
+            ...(typeof entry.by === "string" ? { by: entry.by } : {}),
+            ...(typeof entry.ms === "number" ? { ms: entry.ms } : {}),
+            ...(typeof entry.cutShort === "string" ? { cutShort: entry.cutShort } : {})
+          }
+        ]
+      : []
+  )
 
 const parseReviewsFile = (text: string, file: string): ReviewsFile => {
   let parsed: unknown
@@ -100,6 +147,8 @@ const parseReviewsFile = (text: string, file: string): ReviewsFile => {
       status: entry.status,
       text: entry.text,
       ...(typeof entry.error === "string" ? { error: entry.error } : {}),
+      ...(typeof entry.cutShort === "string" ? { cutShort: entry.cutShort } : {}),
+      ...(Array.isArray(entry.thread) ? { thread: parseThread(entry.thread) } : {}),
       ...(typeof entry.postedAt === "string" ? { postedAt: entry.postedAt } : {}),
       ...(entry.postedAs === "comment" || entry.postedAs === "request-changes" || entry.postedAs === "approve" ? { postedAs: entry.postedAs } : {}),
       ...(typeof entry.postedUrl === "string" ? { postedUrl: entry.postedUrl } : {}),
@@ -331,6 +380,11 @@ export class Reviewer {
         `${job.pull.repo}#${job.pull.number} is being reviewed already.`,
         409
       )
+    if (this._running.has(`${key}:ask`))
+      throw new PluginError(
+        `A question about ${job.pull.repo}#${job.pull.number}'s review is being answered; review again when it is.`,
+        409
+      )
     if (!inference.chatAliases().includes(job.alias))
       throw new PluginError(
         `No chat model is served as "${job.alias}". Pick a review model on the plugin's page.`,
@@ -348,21 +402,14 @@ export class Reviewer {
     }
     try {
       const detail = await job.detail()
-      let text = ""
-      let thought = 0
-      for await (const piece of inference.chat(
+      const { text, thought, cut } = await this.generate(
+        inference,
         job.alias,
         reviewMessages(detail, job.noun),
-        {
-          signal,
-          maxTokens: REVIEW_MAX_TOKENS,
-          temperature: 0.2,
-          think: false,
-          onReasoning: (reasoning) => (thought += reasoning.length),
-          workspace: repoWorkspace(job.pull.repo)
-        }
-      ))
-        text += piece
+        REVIEW_MAX_TOKENS,
+        signal,
+        repoWorkspace(job.pull.repo)
+      )
       const answer = stripThinking(text)
       const review: ReviewRecord = {
         ...base,
@@ -371,7 +418,9 @@ export class Reviewer {
         status: answer ? "done" : "failed",
         text: answer,
         ...(answer
-          ? {}
+          ? cut
+            ? { cutShort: cutShortNotice("review", REVIEW_MAX_TOKENS, thought) }
+            : {}
           : {
               error: thought
                 ? `The model spent its whole answer thinking (${thought.toLocaleString("en-US")} characters of reasoning) and never wrote the review. Pick a model that does not reason, or one that honours "think: false".`
@@ -398,4 +447,111 @@ export class Reviewer {
       this._busy = false
     }
   }
+
+  /**
+   * Answers a question about a pull's latest finished review, with the
+   * pull, the review and the thread so far in front of the model, and
+   * keeps the exchange on the review. Throws when the question cannot be
+   * taken; a model failure is an error too, and leaves the thread as it was.
+   */
+  public async ask(job: ReviewJob, question: string, signal: AbortSignal): Promise<ReviewRecord> {
+    const inference = this._inference
+    if (!inference)
+      throw new PluginError("This gateway offers plugins no models, so nothing can answer.", 503)
+    const asked = question.trim()
+    if (!asked) throw new PluginError("Ask something about the review.", 400)
+    if (asked.length > QUESTION_LIMIT)
+      throw new PluginError(`Keep a question under ${QUESTION_LIMIT.toLocaleString("en-US")} characters.`, 400)
+    const review = this._store.latest(job.repoId, job.pull.number)
+    if (!review || review.status !== "done")
+      throw new PluginError("There is no finished review to ask about.", 409)
+    const key = `${job.repoId}#${job.pull.number}`
+    if (this._running.has(key))
+      throw new PluginError(`${job.pull.repo}#${job.pull.number} is being reviewed right now; ask when it is done.`, 409)
+    if (this._running.has(`${key}:ask`))
+      throw new PluginError("An earlier question is still being answered.", 409)
+    if (!inference.chatAliases().includes(job.alias))
+      throw new PluginError(`No chat model is served as "${job.alias}". Pick a review model on the plugin's page.`, 409)
+    this._running.add(`${key}:ask`)
+    this._busy = true
+    const started = this._now()
+    try {
+      const detail = await job.detail()
+      const earlier = (review.thread ?? []).slice(-THREAD_CONTEXT_TURNS)
+      const messages: ChatMessage[] = [
+        ...reviewMessages(detail, job.noun),
+        { role: "assistant", content: review.text },
+        ...earlier.map((turn): ChatMessage => ({ role: turn.role, content: turn.text })),
+        { role: "user", content: asked }
+      ]
+      const { text, thought, cut } = await this.generate(
+        inference,
+        job.alias,
+        messages,
+        ASK_MAX_TOKENS,
+        signal,
+        repoWorkspace(job.pull.repo)
+      )
+      const answer = stripThinking(text)
+      if (!answer)
+        throw new PluginError(
+          thought
+            ? `The model spent its whole answer thinking (${thought.toLocaleString("en-US")} characters of reasoning) and never answered.`
+            : "The model answered nothing.",
+          502
+        )
+      const now = new Date(this._now()).toISOString()
+      const updated: ReviewRecord = {
+        ...review,
+        thread: [
+          ...(review.thread ?? []),
+          { role: "user", text: asked, at: now, by: job.requestedBy },
+          {
+            role: "assistant",
+            text: answer,
+            at: now,
+            ms: this._now() - started,
+            ...(cut ? { cutShort: cutShortNotice("answer", ASK_MAX_TOKENS, thought) } : {})
+          }
+        ]
+      }
+      this._store.put(updated)
+      return updated
+    } finally {
+      this._running.delete(`${key}:ask`)
+      this._busy = false
+    }
+  }
+
+  /** One answer, whole, with how much of it was thinking and whether the cap cut it. */
+  private async generate(
+    inference: PluginInference,
+    alias: string,
+    messages: ChatMessage[],
+    maxTokens: number,
+    signal: AbortSignal,
+    workspace: string
+  ): Promise<{ text: string; thought: number; cut: boolean }> {
+    let text = ""
+    let thought = 0
+    let cut = false
+    for await (const piece of inference.chat(alias, messages, {
+      signal,
+      maxTokens,
+      temperature: 0.2,
+      think: false,
+      onReasoning: (reasoning) => (thought += reasoning.length),
+      onFinish: (reason) => (cut = reason === "length"),
+      workspace
+    }))
+      text += piece
+    return { text, thought, cut }
+  }
 }
+
+/** Why an answer ends early, for the page and the record. */
+const cutShortNotice = (what: "review" | "answer", limit: number, thought: number): string =>
+  `The model reached the ${what}'s limit of ${limit.toLocaleString("en-US")} output tokens before it finished` +
+  (thought
+    ? `, after spending ${thought.toLocaleString("en-US")} characters of that on thinking. Pick a model that does not reason, or one that honours "think: false".`
+    : ". Try a model that writes more briefly, or ask about what is missing.")

@@ -22,6 +22,7 @@ import { CompletionProvider } from "../../extension/completion/provider"
 import { Embedder } from "../../extension/embeddings/embedder"
 import { GenerationTracker } from "../../extension/generations"
 import {
+  ChatChunk,
   ChatRequest,
   InferenceCapability,
   InferenceError,
@@ -95,6 +96,17 @@ const ollamaServer = (chunks: string[]) =>
       response.write(`${JSON.stringify({ response: chunk, done: false })}\n`)
     }
     response.end(`${JSON.stringify({ response: "", done: true })}\n`)
+  })
+
+/** OpenAI's `/v1/chat/completions`: server-sent events, text in `choices[0].delta.content`. */
+const openAiChatServer = (chunks: string[], finish = "stop") =>
+  startServer((_, response) => {
+    response.writeHead(200, { "Content-Type": "text/event-stream" })
+    for (const chunk of chunks) {
+      response.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }] })}\n\n`)
+    }
+    response.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: finish }] })}\n\n`)
+    response.end("data: [DONE]\n\n")
   })
 
 /** OpenAI's `/v1/completions`: server-sent events, text in `choices[0].text`. */
@@ -740,6 +752,38 @@ suite("Inference layer", function () {
         source.dispose()
         provider.dispose()
       }
+    })
+
+    test("Ollama chat with think:false asks for no reasoning the OpenAI way, and says why it stopped", async () => {
+      const server = await serve(openAiChatServer(["Fi", "ne"], "length"))
+      const config = { ...fimConfig(API_PROVIDERS.Ollama, server.port, "/v1"), type: "chat" as const }
+      const chunks: ChatChunk[] = []
+      const request: ChatRequest = { model: "qwen3", messages: [{ role: "user", content: "hi" }], think: false, maxTokens: 5 }
+      for await (const chunk of resolveInferenceProvider(config).chat(request)) chunks.push(chunk)
+      assert.strictEqual(server.received[0].path, "/v1/chat/completions")
+      assert.strictEqual(server.received[0].body.reasoning_effort, "none")
+      assert.strictEqual(server.received[0].body.think, undefined)
+      assert.strictEqual(server.received[0].body.max_tokens, 5)
+      assert.strictEqual(chunks.map((chunk) => chunk.content).join(""), "Fine")
+      assert.strictEqual(chunks[chunks.length - 1].finishReason, "length")
+    })
+
+    test("think:false is not sent to other OpenAI-compatible servers", async () => {
+      const server = await serve(openAiChatServer(["ok"]))
+      const config = { ...fimConfig(API_PROVIDERS.LlamaCpp, server.port, "/v1"), type: "chat" as const }
+      for await (const _ of resolveInferenceProvider(config).chat({ model: "m", messages: [{ role: "user", content: "hi" }], think: false })) void _
+      assert.strictEqual(server.received[0].body.reasoning_effort, undefined)
+    })
+
+    test("Ollama chat without think stays on the OpenAI route, and its finish reason comes through", async () => {
+      const server = await serve(openAiChatServer(["Fi", "ne"], "length"))
+      const config = { ...fimConfig(API_PROVIDERS.Ollama, server.port, "/v1"), type: "chat" as const }
+      const chunks: ChatChunk[] = []
+      for await (const chunk of resolveInferenceProvider(config).chat({ model: "m", messages: [{ role: "user", content: "hi" }] })) chunks.push(chunk)
+      assert.strictEqual(server.received[0].path, "/v1/chat/completions")
+      assert.strictEqual(server.received[0].body.reasoning_effort, undefined)
+      assert.strictEqual(chunks.map((chunk) => chunk.content).join(""), "Fine")
+      assert.strictEqual(chunks[chunks.length - 1].finishReason, "length")
     })
 
     test("the chat's stop keeps what had arrived", async () => {

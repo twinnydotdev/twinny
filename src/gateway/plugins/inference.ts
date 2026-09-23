@@ -8,7 +8,7 @@
  * cost.
  */
 import { InferenceError, toInferenceError } from "../../extension/inference/errors"
-import type { ChatMessage } from "../../extension/inference/types"
+import type { ChatFinishReason, ChatMessage } from "../../extension/inference/types"
 import { type GateRoute, type InferenceGate, refusalError, type Ticket } from "../gate"
 import type { RouteTable } from "../routes"
 import type { UsageRecorder } from "../usage"
@@ -23,6 +23,8 @@ export interface PluginChatOptions {
   onReasoning?: (text: string) => void
   /** What the team's routing rules match: the repository's name, as a developer's folder would be. */
   workspace?: string
+  /** Called once at the end with why the model stopped, when the backend says: `length` means the answer was cut. */
+  onFinish?: (reason: ChatFinishReason) => void
 }
 
 export interface PluginInference {
@@ -199,6 +201,7 @@ export const gatewayInference = (
         for await (const chunk of stream) {
           if (chunk.usage) usage = chunk.usage
           if (chunk.reasoning) chatOptions.onReasoning?.(chunk.reasoning)
+          if (chunk.finishReason) chatOptions.onFinish?.(chunk.finishReason)
           if (!chunk.content) continue
           chunks++
           yield chunk.content
