@@ -22,6 +22,7 @@ import { ConversationHistory } from "../chat/conversation-history"
 import { searchSymbols } from "../chat/symbols"
 import { WorkspaceIndex } from "../embeddings"
 import { EmbeddingService } from "../embeddings/service"
+import { GenerationTracker } from "../generations"
 import { ExtensionBridge } from "../messaging/bridge"
 import { P2pBridge } from "../p2p/bridge"
 import { P2pRuntime } from "../p2p/runtime"
@@ -29,7 +30,6 @@ import { resolveProviderEndpoint } from "../providers/endpoint"
 import { ProviderManager } from "../providers/manager"
 import { ReviewService } from "../review/service"
 import { SessionManager } from "../session-manager"
-import { TwinnyStatusBar } from "../status-bar"
 import { TeamShareBridge } from "../team/bridge"
 import { TeamShare } from "../team/share"
 import { TemplateProvider } from "../templates/provider"
@@ -51,7 +51,7 @@ export class BaseProvider {
   private _teamShare: TeamShare | undefined
   private _teamShareBridge: TeamShareBridge | undefined
   private _sessionManager: SessionManager | undefined
-  private _statusBarItem: TwinnyStatusBar
+  private _generations: GenerationTracker
   private _templateDir: string | undefined
   private _templateProvider: TemplateProvider
   private _disposables: vscode.Disposable[] = []
@@ -72,7 +72,7 @@ export class BaseProvider {
   constructor(
     context: vscode.ExtensionContext,
     templateDir: string,
-    statusBar: TwinnyStatusBar,
+    generations: GenerationTracker,
     index?: WorkspaceIndex,
     sessionManager?: SessionManager,
     p2p?: P2pRuntime,
@@ -84,7 +84,7 @@ export class BaseProvider {
     this._p2p = p2p
     this._teamShare = teamShare
     this._sessionManager = sessionManager
-    this._statusBarItem = statusBar
+    this._generations = generations
     this._templateDir = templateDir
     this._templateProvider = new TemplateProvider(templateDir)
   }
@@ -116,7 +116,7 @@ export class BaseProvider {
 
   private initializeServices(bridge: ExtensionBridge) {
     this.chat = new Chat(
-      this._statusBarItem,
+      this._generations,
       this._templateDir,
       this.context,
       bridge,
@@ -356,8 +356,10 @@ export class BaseProvider {
 
   /* ---------------------------------------------------------------------- */
 
-  private newConversation = () => {
+  /** From the chat's button or the command: both sides start over. */
+  public newConversation = () => {
     this.conversationHistory?.resetConversation()
+    this.chat?.resetConversation()
     this.bridge?.emit(EVENT_NAME.twinnyNewConversation)
   }
 

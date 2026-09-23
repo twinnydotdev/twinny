@@ -34,6 +34,7 @@ import {
   PluginResponse,
   PublicPluginRequest
 } from "./host"
+import { repoWorkspace } from "./inference"
 
 const CHUNK_LINES = 60
 const CHUNK_OVERLAP = 10
@@ -407,7 +408,7 @@ export class ContextPlugin implements PluginInstance {
         if (this._stopped.signal.aborted) throw new Error("The plugin stopped.")
         progress("embedding", i, toEmbed.length)
         const batch = toEmbed.slice(i, i + EMBED_BATCH)
-        const vectors = await inference.embed(alias, batch.map((index) => `${chunks[index].path}\n${chunks[index].text}`), this._stopped.signal)
+        const vectors = await inference.embed(alias, batch.map((index) => `${chunks[index].path}\n${chunks[index].text}`), this._stopped.signal, repoWorkspace(repo.name))
         batch.forEach((index, j) => {
           const vector = vectors[j] ?? []
           if (!dims) dims = vector.length

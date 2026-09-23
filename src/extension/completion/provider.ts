@@ -29,11 +29,11 @@ import {
   FimTemplateData,
   PrefixSuffix
 } from "../../common/types"
+import { GenerationRun, GenerationTracker } from "../generations"
 import { FimRequest, isCancelled, resolveInferenceProvider } from "../inference"
 import { Base } from "../providers/base"
 import { describeProviderErrorPlain } from "../providers/errors"
 import { TwinnyProvider } from "../providers/manager"
-import { TwinnyStatusBar } from "../status-bar"
 import { TemplateProvider } from "../templates/provider"
 import {
   getIsMiddleOfWord,
@@ -92,7 +92,7 @@ export class CompletionProvider
   extends Base
   implements InlineCompletionItemProvider
 {
-  private _abortController: AbortController | null = null
+  private _run: GenerationRun | null = null
   private _acceptedLastCompletion = false
   private _definitions = new DefinitionContext()
   private _fileInteractionCache: FileInteractionCache
@@ -100,18 +100,18 @@ export class CompletionProvider
   private _lspContext = new LspContext()
   private _recentEdits = new RecentEdits()
   private _requestId = 0
-  private _statusBar: TwinnyStatusBar
+  private _generations: GenerationTracker
   private _templateProvider: TemplateProvider
   public lastCompletionText = ""
 
   constructor(
-    statusBar: TwinnyStatusBar,
+    generations: GenerationTracker,
     fileInteractionCache: FileInteractionCache,
     templateProvider: TemplateProvider,
     context: ExtensionContext
   ) {
     super(context)
-    this._statusBar = statusBar
+    this._generations = generations
     this._fileInteractionCache = fileInteractionCache
     this._templateProvider = templateProvider
   }
@@ -247,12 +247,24 @@ export class CompletionProvider
       request.document.version !== request.version
   }
 
-  private async complete(
-    request: CompletionRequest
+  /** One request, as one run on the tracker: however it ends, the run ends. */
+  private async complete(request: CompletionRequest) {
+    const run = this._generations.start("completion")
+    this._run = run
+    try {
+      return await this.completeWith(request, run)
+    } finally {
+      run.finish()
+      if (this._run === run) this._run = null
+    }
+  }
+
+  private async completeWith(
+    request: CompletionRequest,
+    run: GenerationRun
   ): Promise<InlineCompletionItem[] | undefined> {
     const { document, position, prefixSuffix, provider, token } = request
 
-    this._statusBar.busy()
     const elapsed = logger.timer()
     const where = `${workspace.asRelativePath(document.uri)}:${position.line + 1}`
 
@@ -261,10 +273,7 @@ export class CompletionProvider
       this.getNodeAtCursor(document, position),
       this.getPrompt(request)
     ])
-    if (!prompt || this.isStale(request)) {
-      this.setIdle()
-      return
-    }
+    if (!prompt || this.isStale(request)) return
     logger.info(
       `FIM #${request.id} → ${provider.modelName} · ${where} · ` +
         `prompt ${formatCount(prompt.length)} chars`
@@ -290,8 +299,6 @@ export class CompletionProvider
     })
 
     const inference = resolveInferenceProvider(provider)
-    const controller = new AbortController()
-    this._abortController = controller
     // Why the request was stopped, when it was: a timeout keeps what has
     // arrived, the editor moving on wants nothing.
     let stoppedBy: "timeout" | "editor" | undefined
@@ -301,12 +308,12 @@ export class CompletionProvider
           `keeping the ${stream.value.length} chars received`
       )
       stoppedBy = "timeout"
-      controller.abort()
+      run.abort()
     }, FIM_STREAM_TIMEOUT_MS)
     const cancellation = token.onCancellationRequested(() => {
       logger.debug(`FIM #${request.id} cancelled by the editor after ${elapsed()}`)
       stoppedBy = "editor"
-      controller.abort()
+      run.abort()
     })
 
     let completion = ""
@@ -317,7 +324,7 @@ export class CompletionProvider
     try {
       const chunks = inference.fim(
         this.buildFimRequest(prompt, provider, stopWords, prefixSuffix),
-        { signal: controller.signal }
+        { signal: run.signal }
       )
       let stoppedEarly = false
       for await (const chunk of chunks) {
@@ -340,8 +347,7 @@ export class CompletionProvider
     } finally {
       clearTimeout(timeout)
       cancellation.dispose()
-      if (!streamEnded) controller.abort()
-      if (this._abortController === controller) this._abortController = null
+      if (!streamEnded) run.abort()
     }
 
     const outcome = (what: string) =>
@@ -350,19 +356,16 @@ export class CompletionProvider
 
     if (this.isStale(request)) {
       logger.debug(outcome("dropped, the document moved on"))
-      this.setIdle()
       return
     }
     if (!completion) {
       logger.info(outcome("nothing usable"))
-      this.setIdle()
       return
     }
 
     const editor = window.activeTextEditor
     if (!editor || editor.document !== document) {
       logger.debug(outcome("dropped, editor changed"))
-      this.setIdle()
       return
     }
 
@@ -383,10 +386,7 @@ export class CompletionProvider
       logger.block(`FIM #${request.id} formatted`, formatted)
     }
 
-    if (!formatted) {
-      this.setIdle()
-      return
-    }
+    if (!formatted) return
 
     if (this.config.get<boolean>("completionCacheEnabled")) {
       cache.setCache(prefixSuffix, formatted, request.cacheScope)
@@ -406,16 +406,11 @@ export class CompletionProvider
     position: Position,
     selected?: SelectedCompletionInfo
   ) {
-    this.setIdle()
     this.lastCompletionText = text
     if (selected) {
       return [new InlineCompletionItem(selected.text + text, selected.range)]
     }
     return [new InlineCompletionItem(text, new Range(position, position))]
-  }
-
-  private setIdle() {
-    this._statusBar.idle()
   }
 
   private getFirstNonBlankLine(text: string) {
@@ -610,18 +605,13 @@ export class CompletionProvider
     if (value) this._lastSuggestion = undefined
   }
 
-  public onError = () => {
-    this.abortCompletion()
-  }
-
   /** The editor moved on (cursor moved, stop pressed): drop whatever is in flight. */
   public abortCompletion() {
     this._requestId++
-    if (this._abortController) {
+    if (this._run) {
       logger.debug(`FIM #${this._requestId - 1} aborted: the cursor moved or generation was stopped`)
-      this._abortController.abort()
+      this._run.abort()
     }
-    this._abortController = null
-    this.setIdle()
+    this._run = null
   }
 }

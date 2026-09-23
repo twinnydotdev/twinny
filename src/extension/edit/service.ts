@@ -5,10 +5,10 @@ import * as vscode from "vscode"
 import { EXTENSION_CONTEXT_NAME } from "../../common/constants"
 import { logger } from "../../common/logger"
 import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
+import { GenerationRun, GenerationTracker } from "../generations"
 import { isCancelled, resolveInferenceProvider } from "../inference"
 import { Base } from "../providers/base"
 import { describeProviderErrorPlain, isAbortError } from "../providers/errors"
-import { TwinnyStatusBar } from "../status-bar"
 
 import { DiffLayout, layoutDiff, locateSnippet, Span } from "./diff"
 import {
@@ -81,8 +81,7 @@ const REVIEW_HINT = mac
  * way the whole thing is one undo step. Only one edit exists at a time.
  */
 export class InlineEditService extends Base {
-  private _controller?: AbortController
-  private _running = false
+  private _run?: GenerationRun
   private _pending?: DiffRegion
   private readonly _emitter = new vscode.EventEmitter<void>()
   public readonly onDidChangePending = this._emitter.event
@@ -94,7 +93,7 @@ export class InlineEditService extends Base {
 
   constructor(
     context: vscode.ExtensionContext,
-    private readonly _statusBar: TwinnyStatusBar
+    private readonly _generations: GenerationTracker
   ) {
     super(context)
     context.subscriptions.push(
@@ -107,11 +106,7 @@ export class InlineEditService extends Base {
   }
 
   public get running() {
-    return this._running
-  }
-
-  public abort() {
-    this._controller?.abort()
+    return this._run !== undefined
   }
 
   public dispose() {
@@ -129,14 +124,14 @@ export class InlineEditService extends Base {
     if (!pending || pending.document !== document) return undefined
     return {
       line: pending.range.start.line,
-      streaming: this._running,
+      streaming: this.running,
       hunks: pending.hunks.map((hunk) => hunk.line)
     }
   }
 
   /** The command's entry point: resolve the editor and range, ask, run. */
   public async run(args?: InlineEditArgs) {
-    if (this._running) {
+    if (this.running) {
       vscode.window.showInformationMessage(
         "Twinny is already editing; stop it first (Ctrl+Shift+/)."
       )
@@ -183,7 +178,7 @@ export class InlineEditService extends Base {
    * nothing is inserted at the cursor.
    */
   public async propose(code: string) {
-    if (this._running || this._pending) {
+    if (this.running || this._pending) {
       vscode.window.showInformationMessage(
         "Twinny has an edit in progress. Accept or reject it first."
       )
@@ -248,7 +243,7 @@ export class InlineEditService extends Base {
    * stream in as a diff to accept or reject, like an edit.
    */
   public async writeTests() {
-    if (this._running || this._pending) {
+    if (this.running || this._pending) {
       vscode.window.showInformationMessage(
         "Twinny has an edit in progress. Accept or reject it first."
       )
@@ -339,7 +334,7 @@ export class InlineEditService extends Base {
 
   private async resolve(verdict: "accept" | "reject", hunk?: number) {
     const pending = this._pending
-    if (!pending || this._running) return
+    if (!pending || this.running) return
     const editor = await this.editorFor(pending.document)
     const ok = await pending.settle(editor, verdict, hunk)
     if (!ok) {
@@ -579,7 +574,7 @@ export class InlineEditService extends Base {
     const inference = resolveInferenceProvider(provider)
 
     this._pending = region
-    this.begin()
+    const run = this.begin()
     let reply = ""
 
     try {
@@ -589,7 +584,7 @@ export class InlineEditService extends Base {
 
       const chunks = inference.chat(
         { model: provider.modelName, messages },
-        { signal: this._controller?.signal }
+        { signal: run.signal }
       )
       try {
         for await (const chunk of chunks) {
@@ -613,7 +608,7 @@ export class InlineEditService extends Base {
         return
       }
 
-      if (this._controller?.signal.aborted) {
+      if (run.signal.aborted) {
         await this.rewind(region, snapshot)
         vscode.window.setStatusBarMessage(`Twinny: ${what} cancelled`, 3000)
         return
@@ -647,7 +642,7 @@ export class InlineEditService extends Base {
         )
       }
     } finally {
-      if (this._running) this.end()
+      if (this._run === run) this.end()
     }
   }
 
@@ -712,7 +707,7 @@ export class InlineEditService extends Base {
       this._emitter.fire()
       return
     }
-    if (this._running) return // the stream loop reports it
+    if (this.running) return // the stream loop reports it
     this.clearPending()
     if (!undo) {
       vscode.window.setStatusBarMessage(
@@ -734,26 +729,15 @@ export class InlineEditService extends Base {
   }
 
   private begin() {
-    this._running = true
-    this._controller = new AbortController()
-    this._statusBar.busy()
-    void vscode.commands.executeCommand(
-      "setContext",
-      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
-      true
-    )
+    const run = this._generations.start("edit")
+    this._run = run
     this._emitter.fire()
+    return run
   }
 
   private end() {
-    this._running = false
-    this._controller = undefined
-    this._statusBar.idle()
-    void vscode.commands.executeCommand(
-      "setContext",
-      EXTENSION_CONTEXT_NAME.twinnyGeneratingText,
-      false
-    )
+    this._run?.finish()
+    this._run = undefined
     this._emitter.fire()
   }
 }

@@ -10,7 +10,7 @@ import path from "node:path"
 import type { ChatMessage } from "../../extension/inference/types"
 
 import { PluginError } from "./host"
-import type { PluginInference } from "./inference"
+import { type PluginInference, repoWorkspace } from "./inference"
 import { stripThinking } from "./reviews"
 
 export const TRIAGE_MAX_TOKENS = 1_200
@@ -238,7 +238,7 @@ export class Triager {
     try {
       const [body, labels] = await Promise.all([job.body(), job.labels()])
       let text = ""
-      for await (const piece of inference.chat(job.alias, triageMessages(job.issue, body, labels, job.others), { signal, maxTokens: TRIAGE_MAX_TOKENS, temperature: 0.1, think: false }))
+      for await (const piece of inference.chat(job.alias, triageMessages(job.issue, body, labels, job.others), { signal, maxTokens: TRIAGE_MAX_TOKENS, temperature: 0.1, think: false, workspace: repoWorkspace(job.issue.repo) }))
         text += piece
       const parsed = parseTriage(text, labels)
       const record: TriageRecord = { ...base, createdAt: new Date(this._now()).toISOString(), ms: this._now() - started, status: "done", ...parsed, text: text.trim() }
