@@ -700,6 +700,31 @@ export const ConfigurationPanel = ({
 
         <section className="panel">
           <div className="section-heading">
+            <h2>Secret shield</h2>
+            <span className="muted">Applied by the gateway to every request, whatever client sent it</span>
+          </div>
+          <fieldset className="policy-rule">
+            <legend>Shield prompts sent to</legend>
+            {([
+              ["offMachine", "Backends off this machine", "Keys, tokens and passwords in prompts become placeholders before a request reaches a hosted API, another host or a teammate's computer, and are put back in the reply."],
+              ["always", "Every backend", "Local backends get placeholders too."],
+              ["off", "Off", "Prompts are forwarded as they arrive."]
+            ] as const).map(([mode, title, detail]) => (
+              <label key={mode} className="policy-option">
+                <input type="radio" name="secret-shield" checked={(draft.policy?.secretShield ?? "offMachine") === mode} disabled={locked} onChange={() => {
+                  const policy: GatewayPolicy = { ...draft.policy }
+                  if (mode === "offMachine") delete policy.secretShield
+                  else policy.secretShield = mode
+                  setDraft({ ...draft, policy }); setNotice("")
+                }} />
+                <span><b>{title}</b><small>{detail}</small></span>
+              </label>
+            ))}
+          </fieldset>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
             <h2>Team system prompt</h2>
             <span className="muted">Sent to connected extensions and put before every chat's system prompt</span>
           </div>

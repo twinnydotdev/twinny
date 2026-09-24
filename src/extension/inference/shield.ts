@@ -25,7 +25,7 @@ import { ChatMessage, InferenceClient, InferenceOptions } from "./types"
  */
 export type SecretShieldMode = "offMachine" | "always" | "off"
 
-const LOOPBACK = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1|\[::1\])$/i
+export const LOOPBACK = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1|\[::1\])$/i
 
 /**
  * Whether a request to this provider leaves the machine. Hosted APIs, a

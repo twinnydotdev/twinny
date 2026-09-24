@@ -5,14 +5,16 @@
 import * as assert from "assert"
 
 import { providerRegistry } from "../../extension/inference"
+import { ProviderRegistry } from "../../extension/inference/registry"
 import {
   DEFAULT_LIMITS,
   GatewayConfigError,
   parseGatewayConfig,
+  policyForExtensions,
   providerForRoute,
   readGatewaySecrets
 } from "../../gateway/config"
-import { buildRouteTable } from "../../gateway/routes"
+import { buildRouteTable, shieldsBackend } from "../../gateway/routes"
 
 const KNOWN = providerRegistry.providerIds()
 
@@ -214,5 +216,76 @@ suite("Gateway config: team policy", () => {
     const routes = buildRouteTable(config, { providerKeys: {} }, providerRegistry)
     assert.deepStrictEqual(routes.policy(), { lockDefaults: true })
     assert.strictEqual(buildRouteTable(parseGatewayConfig(base, kinds), { providerKeys: {} }, providerRegistry).policy(), undefined)
+  })
+})
+
+suite("Gateway config: secret shield", () => {
+  const kinds = providerRegistry.providerIds()
+  const GITHUB = "ghp_" + "a1B2c3D4e5".repeat(4)
+  const configFor = (apiHostname: string, secretShield?: string) =>
+    parseGatewayConfig(
+      {
+        providers: { local: { provider: "ollama", apiHostname, apiPort: 11434 } },
+        models: [{ alias: "coder", provider: "local", model: "x", capabilities: ["chat"] }],
+        ...(secretShield ? { policy: { secretShield } } : {})
+      },
+      kinds
+    )
+
+  /**
+   * A route table over a backend that records the prompt it was sent and
+   * answers with it, so the test sees both what left and what came back.
+   */
+  const ask = async (apiHostname: string, secretShield?: string) => {
+    const sent: string[] = []
+    const registry = new ProviderRegistry().register("ollama", {
+      id: "fake",
+      create: () => ({
+        id: "fake",
+        capabilities: () => ["chat"],
+        models: async () => [],
+        chat: (request) =>
+          (async function* () {
+            const prompt = String(request.messages[0].content)
+            sent.push(prompt)
+            yield { content: `echo: ${prompt}` }
+          })()
+      })
+    })
+    const routes = buildRouteTable(configFor(apiHostname, secretShield), { providerKeys: {} }, registry)
+    let reply = ""
+    for await (const chunk of routes.route("coder", "chat").client.chat({
+      model: "x",
+      messages: [{ role: "user", content: `token = ${GITHUB}` }]
+    })) {
+      reply += chunk.content
+    }
+    return { sent: sent[0], reply }
+  }
+
+  test("backends on another host get placeholders; replies get the value back", async () => {
+    const { sent, reply } = await ask("10.0.0.5")
+    assert.ok(!sent.includes(GITHUB), sent)
+    assert.match(sent, /REDACTED_/)
+    assert.strictEqual(reply, `echo: token = ${GITHUB}`)
+  })
+
+  test("a backend on the gateway's host is sent the prompt as it is, unless set to always", async () => {
+    assert.ok((await ask("127.0.0.1")).sent.includes(GITHUB))
+    assert.ok(!(await ask("127.0.0.1", "always")).sent.includes(GITHUB))
+    assert.ok((await ask("10.0.0.5", "off")).sent.includes(GITHUB))
+  })
+
+  test("the mode is validated, the default is not stored, and extensions are not told", () => {
+    assert.strictEqual(configFor("h", "offMachine").policy, undefined)
+    assert.deepStrictEqual(configFor("h", "always").policy, { secretShield: "always" })
+    assert.throws(() => configFor("h", "sometimes"), /secretShield must be one of offMachine, always, off/)
+    assert.strictEqual(policyForExtensions({ secretShield: "always" }), undefined)
+  })
+
+  test("the team pool counts as off the machine", () => {
+    const team = { id: "t", label: "t", provider: "team", modelName: "x", type: "chat", apiHostname: "127.0.0.1" }
+    assert.ok(shieldsBackend(team, undefined))
+    assert.ok(!shieldsBackend(team, { secretShield: "off" }))
   })
 })
