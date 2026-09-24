@@ -19,6 +19,7 @@
  */
 import { createSign } from "node:crypto"
 
+import { noAnswer, timeoutSignal } from "../../common/deadline"
 import { messageOf } from "../../common/errors"
 
 import {
@@ -53,8 +54,7 @@ import {
   ReviewPostAs,
   ReviewState,
   rollup,
-  str,
-  timeoutSignal
+  str
 } from "./pulls"
 
 export const GITHUB_URL = "https://github.com"
@@ -629,7 +629,7 @@ export class GitHubForge implements Forge {
           "Paste the whole private key file (.pem), from BEGIN to END.",
           400
         )
-      const signal = timeoutSignal(20_000)
+      const signal = timeoutSignal(20_000, { reason: () => noAnswer(20_000) })
       const app = await this.rest(
         "/app",
         appJwt(appId, privateKey, this._context.now()),
@@ -667,7 +667,7 @@ export class GitHubForge implements Forge {
     if (path === "app/repositories" && method === "GET") {
       const app = this.app()
       if (!app) throw new PluginError("No GitHub App is set up.", 409)
-      const signal = timeoutSignal(20_000)
+      const signal = timeoutSignal(20_000, { reason: () => noAnswer(20_000) })
       const installations = arr(
         await this.rest(
           "/app/installations?per_page=100",
