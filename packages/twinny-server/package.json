@@ -1,6 +1,6 @@
 {
   "name": "twinny-server",
-  "version": "4.2.5",
+  "version": "4.2.6",
   "description": "Serve your local models to the Twinny VS Code extension on other machines.",
   "license": "MIT",
   "author": {

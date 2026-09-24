@@ -2,6 +2,12 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.2.6 · 2026-09-24
+
+Extension release: a secret shield keeps credentials out of prompts that leave the machine. `twinny-server` carries the version number only.
+
+- **Secret shield.** API keys, tokens, private keys and passwords in a prompt are replaced with placeholders such as `REDACTED_GITHUB_TOKEN_1` before the request leaves your machine, and put back wherever the reply uses them, so the model never sees the value and the code it writes still works. This covers chat, completions, inline edit and embeddings. It knows the GitHub, GitLab, AWS, Stripe, Slack, OpenAI, Anthropic, Google, Hugging Face and npm token formats, as well as PEM private keys, JWTs, passwords in URLs, and secret-named values in code and `.env` files. Values like `process.env.X` or `<your-key>` are left alone. A chat reply shows **N secrets withheld** and which kinds; completions log it to the Twinny output channel. The `twinny.secretShield` setting controls when it runs: `offMachine` (the default) covers hosted APIs, gateways, paired devices and servers elsewhere on the network, `always` adds local servers, and `off` turns it off.
+
 ## 4.2.5 · 2026-09-23
 
 Gateway release: pull-request reviews stop ending mid-sentence, say when they were cut, and can be asked about. The extension carries the version number only.

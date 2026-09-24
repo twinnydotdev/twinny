@@ -153,6 +153,7 @@ const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () =>
         <span key={part}>{part}</span>
       ))}
       {meta.stopped && <span className={styles.replyStopped}>{t("reply-stopped")}</span>}
+      {!!meta.withheld?.length && <WithheldBadge withheld={meta.withheld} />}
       {onContinue && (
         <button type="button" className={styles.replyContinue} onClick={onContinue} title={t("reply-continue-title")}>
           <span className="codicon codicon-debug-continue" aria-hidden="true" />
@@ -160,6 +161,19 @@ const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () =>
         </button>
       )}
     </div>
+  )
+}
+
+/** How many credentials the secret shield kept out of the request, and which kinds. */
+const WithheldBadge = ({ withheld }: { withheld: NonNullable<ReplyMeta["withheld"]> }) => {
+  const { t } = useTranslation()
+  const count = withheld.reduce((sum, { count }) => sum + count, 0)
+  const kinds = withheld.map(({ label, count }) => (count > 1 ? `${label} ×${count}` : label)).join(", ")
+  return (
+    <span className={styles.replyWithheld} title={t("reply-withheld-title", { kinds })}>
+      <span className="codicon codicon-shield" aria-hidden="true" />
+      {t("reply-withheld", { count })}
+    </span>
   )
 }
 

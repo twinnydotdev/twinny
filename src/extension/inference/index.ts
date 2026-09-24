@@ -18,6 +18,7 @@ export {
   remoteAdapter,
   resolveInferenceProvider
 } from "./registry"
+export { leavesMachine, type SecretShieldMode, shieldClient, shouldShield } from "./shield"
 export { abortable, readText } from "./stream"
 export type {
   ChatChunk,

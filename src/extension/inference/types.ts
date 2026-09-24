@@ -7,6 +7,7 @@
  * a request body or a response shape, so a new backend is a new adapter and
  * nothing else.
  */
+import type { ShieldReport } from "../../common/secret-shield"
 import { ChatCompletionMessage } from "../../common/types"
 
 export type InferenceCapability = "fim" | "chat" | "embeddings"
@@ -44,6 +45,11 @@ export interface InferenceOptions {
    * used, so the host can record it. Most providers never call it.
    */
   onBackend?(name: string): void
+  /**
+   * Called before sending when the secret shield replaced credentials in
+   * the request, with what kinds and how many (never the values).
+   */
+  onShield?(report: ShieldReport[]): void
 }
 
 export interface FimRequest {

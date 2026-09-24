@@ -89,6 +89,9 @@ export class ChatGeneration {
         signal: run.signal,
         onBackend: (name) => {
           meta.provider = name
+        },
+        onShield: (report) => {
+          meta.withheld = report
         }
       })
       try {
