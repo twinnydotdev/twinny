@@ -10,6 +10,8 @@ import * as path from "node:path"
 
 import { messageOf } from "../common/errors"
 
+import { writePrivateJson } from "./private-file"
+
 /** The layout this server reads and writes. Bump with a migration below. */
 export const DATA_FORMAT = 1
 
@@ -98,11 +100,8 @@ const readMarker = (file: string): DataFormatRecord | undefined => {
   }
 }
 
-const writeMarker = (file: string, record: DataFormatRecord) => {
-  const tmp = `${file}.tmp`
-  fs.writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 })
-  fs.renameSync(tmp, file)
-}
+const writeMarker = (file: string, record: DataFormatRecord) =>
+  writePrivateJson(file, record)
 
 const hasLegacyFiles = (dataDir: string): boolean =>
   LEGACY_ENTRIES.some((entry) => fs.existsSync(path.join(dataDir, entry)))

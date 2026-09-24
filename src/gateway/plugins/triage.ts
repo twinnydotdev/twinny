@@ -5,10 +5,11 @@
  * posts the reply or applies the labels, or auto-triage does both.
  */
 import fs from "node:fs"
-import path from "node:path"
 
 import { messageOf } from "../../common/errors"
+import { isRecord } from "../../common/guards"
 import type { ChatMessage } from "../../extension/inference/types"
+import { writePrivateJson } from "../private-file"
 
 import { PluginError } from "./host"
 import { type PluginInference, repoWorkspace } from "./inference"
@@ -67,9 +68,6 @@ interface TriageFile {
   version: 1
   triages: TriageRecord[]
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 export class TriageStore {
   private _triages: TriageRecord[] = []
@@ -133,11 +131,8 @@ export class TriageStore {
   }
 
   private save(): void {
-    fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 })
     const content: TriageFile = { version: 1, triages: this._triages }
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, { mode: 0o600 })
-    fs.renameSync(tmp, this.file)
+    writePrivateJson(this.file, content)
   }
 }
 

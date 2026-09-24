@@ -10,7 +10,6 @@
  * only does the I/O and joins the answer to the key store.
  */
 import fs from "node:fs"
-import path from "node:path"
 
 import { messageOf } from "../common/errors"
 import {
@@ -27,6 +26,7 @@ import {
 } from "../licensing"
 
 import type { KeyRecord } from "./keys"
+import { writePrivateFile } from "./private-file"
 
 /** What the admin API, the CLI and the banner all show. */
 export interface LicenseSummary extends Entitlements {
@@ -70,10 +70,7 @@ export class LicenseStore {
   /** Verifies a token against the trusted keys and, if it passes, keeps it. */
   public install(token: string): Entitlements {
     const verified = verifyLicenseToken(token, this._trustedKeys)
-    fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 })
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${verified.token}\n`, { mode: 0o600 })
-    fs.renameSync(tmp, this.file)
+    writePrivateFile(this.file, `${verified.token}\n`)
     this.reload()
     return this.current()
   }
