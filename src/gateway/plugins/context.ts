@@ -21,7 +21,9 @@ import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { isRecord } from "../../common/guards"
 import { isIndexablePath, looksBinary } from "../../extension/embeddings/indexable"
+import { writePrivateJson } from "../private-file"
 
 import {
   GatewayPlugin,
@@ -113,9 +115,6 @@ interface Manifest extends RepoIndexState {
   /** path → content hash. */
   fileHashes: Record<string, string>
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const sha1 = (data: Buffer | string): string => createHash("sha1").update(data as Uint8Array | string).digest("hex")
 
@@ -247,10 +246,7 @@ export class ContextPlugin implements PluginInstance {
   }
 
   private save(): void {
-    fs.mkdirSync(path.dirname(this._file), { recursive: true, mode: 0o700 })
-    const tmp = `${this._file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(this._settings, null, 2)}\n`, { mode: 0o600 })
-    fs.renameSync(tmp, this._file)
+    writePrivateJson(this._file, this._settings)
   }
 
   public start(): void {

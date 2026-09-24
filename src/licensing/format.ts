@@ -14,6 +14,8 @@
  */
 import { createPublicKey, KeyObject, verify as verifySignature } from "node:crypto"
 
+import { isRecord } from "../common/guards"
+
 export const LICENSE_TOKEN_PREFIX = "twl1"
 export const LICENSE_CLAIMS_VERSION = 1
 
@@ -62,9 +64,6 @@ export class LicenseError extends Error {
 export const ORG_PATTERN = /^[^\p{C}]{1,120}$/u
 export const LICENSE_ID_PATTERN = /^lic_[0-9a-f]{16}$/
 export const MAX_SEATS = 1_000_000
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const isInstant = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(value) && !Number.isNaN(Date.parse(value))

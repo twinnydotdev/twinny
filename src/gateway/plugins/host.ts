@@ -16,7 +16,9 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { isRecord } from "../../common/guards"
 import type { GatewayLog } from "../log"
+import { writePrivateJson } from "../private-file"
 
 import { PluginEventBus } from "./events"
 import type { PluginInference } from "./inference"
@@ -145,9 +147,6 @@ interface PluginsFile {
   enabled: string[]
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const parsePluginsFile = (text: string, file: string): PluginsFile => {
   let parsed: unknown
   try {
@@ -214,13 +213,8 @@ export class PluginStore {
   }
 
   private save(): void {
-    fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 })
     const content: PluginsFile = { version: 1, enabled: this._enabled }
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, {
-      mode: 0o600
-    })
-    fs.renameSync(tmp, this.file)
+    writePrivateJson(this.file, content)
   }
 }
 

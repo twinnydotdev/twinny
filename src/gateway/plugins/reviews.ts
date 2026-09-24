@@ -13,9 +13,10 @@
  * it, and the exchange is kept on the review as its thread.
  */
 import fs from "node:fs"
-import path from "node:path"
 
+import { isRecord } from "../../common/guards"
 import type { ChatMessage } from "../../extension/inference/types"
+import { writePrivateJson } from "../private-file"
 
 import { PluginError } from "./host"
 import { type PluginInference, repoWorkspace } from "./inference"
@@ -88,9 +89,6 @@ interface ReviewsFile {
   version: 1
   reviews: ReviewRecord[]
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 /** The turns that are whole; a damaged one is dropped rather than failing the file. */
 const parseThread = (entries: unknown[]): ReviewTurn[] =>
@@ -239,13 +237,8 @@ export class ReviewStore {
   }
 
   private save(): void {
-    fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 })
     const content: ReviewsFile = { version: 1, reviews: this._reviews }
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, {
-      mode: 0o600
-    })
-    fs.renameSync(tmp, this.file)
+    writePrivateJson(this.file, content)
   }
 }
 

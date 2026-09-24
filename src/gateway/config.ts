@@ -17,6 +17,7 @@ import path from "node:path"
 
 import { providerForBackend } from "../common/backend-route"
 import { API_PROVIDERS, DEFAULT_GATEWAY_PORT } from "../common/constants"
+import { isRecord } from "../common/guards"
 import { validateProvider } from "../common/provider-validation"
 import { TwinnyProvider } from "../common/types"
 import type { SecretShieldMode } from "../extension/inference/shield"
@@ -237,9 +238,6 @@ const ENDPOINT_FIELDS = ["apiHostname", "apiPort", "apiProtocol", "apiKeyEnv", "
 const ALIAS_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/
 const ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 const PROVIDER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 class Problems {
   public readonly list: string[] = []

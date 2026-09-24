@@ -15,6 +15,8 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { isRecord } from "../../../common/guards"
+import { writePrivateFile, writePrivateJson } from "../../private-file"
 import {
   GatewayPlugin,
   json,
@@ -89,9 +91,6 @@ export interface Destination {
   delete(name: string): Promise<void>
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const createdAtOf = (name: string): string => {
   const match = /^twinny-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/.exec(name)
   return match ? `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z` : ""
@@ -107,10 +106,7 @@ const toInfo = (name: string, size: number): ArchiveInfo => ({
 export const pathDestination = (dir: string): Destination => ({
   describe: () => dir,
   async put(name, data) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-    const tmp = path.join(dir, `${name}.${process.pid}.tmp`)
-    fs.writeFileSync(tmp, data as Uint8Array, { mode: 0o600 })
-    fs.renameSync(tmp, path.join(dir, name))
+    writePrivateFile(path.join(dir, name), data as Uint8Array)
   },
   async get(name) {
     return fs.readFileSync(path.join(dir, name))
@@ -189,10 +185,7 @@ export const readBackupSettings = (file: string): BackupSettings => {
 }
 
 export const writeBackupSettings = (file: string, settings: BackupSettings): void => {
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
-  const tmp = `${file}.${process.pid}.tmp`
-  fs.writeFileSync(tmp, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o600 })
-  fs.renameSync(tmp, file)
+  writePrivateJson(file, settings)
 }
 
 export const backupSettingsFile = (pluginDir: string): string => path.join(pluginDir, "settings.json")

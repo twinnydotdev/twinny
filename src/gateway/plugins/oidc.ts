@@ -17,7 +17,9 @@ import { createHash, createPublicKey, createVerify, randomBytes } from "node:cry
 import fs from "node:fs"
 import path from "node:path"
 
+import { isRecord } from "../../common/guards"
 import { inviteLink } from "../../protocol/types"
+import { writePrivateJson } from "../private-file"
 
 import {
   GatewayPlugin,
@@ -90,9 +92,6 @@ const DEFAULT_SETTINGS: OidcSettings = {
   publicUrl: "",
   nameClaim: "email"
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const b64url = (data: Buffer | string): string => Buffer.from(data as Uint8Array).toString("base64url")
 
@@ -377,10 +376,7 @@ export class OidcPlugin implements PluginInstance {
         if (next.publicUrl && !/^https?:\/\//.test(next.publicUrl)) throw new PluginError("The public URL starts with https://.", 400)
       }
       if (body.nameClaim !== undefined) next.nameClaim = text(body.nameClaim, "email") || "email"
-      fs.mkdirSync(path.dirname(this._file), { recursive: true, mode: 0o700 })
-      const tmp = `${this._file}.${process.pid}.tmp`
-      fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
-      fs.renameSync(tmp, this._file)
+      writePrivateJson(this._file, next)
       const issuerChanged = next.issuer !== this._settings.issuer
       this._settings = next
       if (issuerChanged) {
