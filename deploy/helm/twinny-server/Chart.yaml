@@ -4,7 +4,7 @@ description: The Twinny gateway - serve your team's models to the Twinny extensi
 type: application
 version: 0.1.0
 appVersion: "4.1.3"
-home: https://twinnydotdev.github.io/twinny-docs/teams/gateway/
+home: https://docs.twinny.dev/teams/gateway/
 sources:
   - https://github.com/twinnydotdev/twinny
 keywords: [twinny, llm, gateway, ollama, code-completion]

@@ -77,7 +77,7 @@ export const LICENSE_HELP = `Usage: twinny-server license [command] [--config <f
 
 Seats are active access keys. Without a licence a gateway may have up to
 ${FREE_SEATS} of them. A licence raises that for its term; see
-https://twinnydotdev.github.io/twinny-docs/teams/licensing/. The token is kept at auth.licenseFile
+https://docs.twinny.dev/teams/licensing/. The token is kept at auth.licenseFile
 (default ${DEFAULT_LICENSE_FILE}).
 `
 

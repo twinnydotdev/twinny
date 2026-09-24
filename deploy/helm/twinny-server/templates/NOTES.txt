@@ -13,4 +13,4 @@ twinny-server is starting.
 3. Invite developers from People, or:
    kubectl exec deploy/{{ include "twinny-server.fullname" . }} -- node /app/cli.js invites create alice --url https://{{ .Values.ingress.host }} --config /data/twinny.gateway.json
 
-Docs: https://twinnydotdev.github.io/twinny-docs/teams/gateway/
+Docs: https://docs.twinny.dev/teams/gateway/
