@@ -15,6 +15,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 
+import { messageOf } from "../common/errors"
 import { providerRegistry } from "../extension/inference/registry"
 
 import { AdminIo } from "./admin"
@@ -144,7 +145,7 @@ const wipe = (files: GatewayFiles, includeConfig: boolean, io: AdminIo): void =>
 const describeError = (error: unknown): string[] =>
   error instanceof GatewayConfigError
     ? [`Cannot read the configuration (${error.code}):`, ...error.problems.map((p) => `  - ${p}`)]
-    : [error instanceof Error ? error.message : String(error)]
+    : [messageOf(error)]
 
 /* -------------------------------------------------------------------------- */
 /*  reset                                                                     */
@@ -193,7 +194,7 @@ export const runReset = (argv: string[], io: AdminIo, cwd = process.cwd()): numb
     wipe(files, all, io)
     return EXIT_CODE.ok
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.failure
   }
 }
@@ -349,7 +350,7 @@ export const runQuickstart = async (argv: string[], io: ServeIo, cwd = process.c
   try {
     args = parseQuickstartArgs(argv, cwd)
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
   if (args === "help") {
@@ -428,7 +429,7 @@ export const runQuickstart = async (argv: string[], io: ServeIo, cwd = process.c
       for (const line of describeError(error)) io.err(line)
       return codeForConfigError(error)
     }
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
 

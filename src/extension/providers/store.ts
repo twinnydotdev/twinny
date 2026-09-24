@@ -10,6 +10,7 @@ import {
   INFERENCE_PROVIDERS_STORAGE_KEY,
   TWINNY_PROVIDERS_FILENAME
 } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { PROVIDER_TYPES, ProviderType } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
 
@@ -162,7 +163,7 @@ export class ProviderStore {
       console.error(e)
       window.showErrorMessage(
         `twinny could not write ${TWINNY_PROVIDERS_FILENAME}: ${
-          e instanceof Error ? e.message : String(e)
+          messageOf(e)
         }`
       )
       throw e

@@ -16,6 +16,8 @@ import { randomBytes, timingSafeEqual } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../common/errors"
+
 import { hashSecret, KEY_NAME_PATTERN } from "./keys"
 
 export const INVITE_PREFIX = "twi"
@@ -98,7 +100,7 @@ const parseInvitesFile = (text: string, file: string): InvitesFile => {
     parsed = JSON.parse(text)
   } catch (error) {
     throw new Error(
-      `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+      `${file} is not valid JSON: ${messageOf(error)}`
     )
   }
   if (

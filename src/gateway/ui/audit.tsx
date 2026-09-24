@@ -4,6 +4,7 @@
  */
 import React, { useCallback, useEffect, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { AuditEntry, AuditVerification } from "../audit"
 
 import { api } from "./api"
@@ -32,7 +33,7 @@ export const AuditPage = ({ apiKey }: { apiKey: string }) => {
       setAnswer(await api<Answer>(`/twinny/v1/admin/audit?${query.toString()}`, apiKey))
       setError(undefined)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     }
   }, [apiKey, action, actor, since])
 

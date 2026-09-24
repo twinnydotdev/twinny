@@ -14,6 +14,8 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../common/errors"
+
 export const KEY_PREFIX = "tsk"
 const ID_BYTES = 4
 const SECRET_BYTES = 32
@@ -50,7 +52,7 @@ const parseKeysFile = (text: string, file: string): KeysFile => {
   try {
     parsed = JSON.parse(text)
   } catch (error) {
-    throw new Error(`${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(`${file} is not valid JSON: ${messageOf(error)}`)
   }
   if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.keys)) {
     throw new Error(`${file} is not a twinny-server keys file.`)

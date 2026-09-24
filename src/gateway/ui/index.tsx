@@ -7,6 +7,7 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { createRoot } from "react-dom/client"
 
+import { messageOf } from "../../common/errors"
 import { inviteLink, RemoteIdentity, RemoteStatus } from "../../protocol/types"
 import type { PluginSummary } from "../plugins/host"
 import type { UsageSummary } from "../usage"
@@ -69,7 +70,7 @@ const DemoBar = () => {
       setError(undefined)
       window.location.href = inviteLink(window.location.origin, made.code)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(false)
     }
@@ -220,7 +221,7 @@ const App = () => {
       })
       .catch((e: unknown) => {
         if (cancelled) return
-        setSignInError(e instanceof Error ? e.message : String(e))
+        setSignInError(messageOf(e))
         signOut()
       })
     return () => {
@@ -248,7 +249,7 @@ const App = () => {
         signOut()
         return
       }
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setLoading(false)
     }

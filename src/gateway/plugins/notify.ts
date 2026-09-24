@@ -15,6 +15,8 @@ import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
+
 import { EVENT_KINDS, PluginEvent } from "./events"
 import {
   json,
@@ -297,7 +299,7 @@ export class NotifierPlugin implements PluginInstance {
         clearTimeout(timer)
       }
     } catch (error) {
-      delivery.error = error instanceof Error ? error.message : String(error)
+      delivery.error = messageOf(error)
       this._context.log.warn({ event: `plugin.${this._host.id}-failed`, reason: webhook.name, message: delivery.error })
     }
     delivery.ms = this._context.now() - started

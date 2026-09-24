@@ -15,6 +15,7 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
 import type { ChatMessage } from "../../extension/inference/types"
 
 import { PluginError } from "./host"
@@ -118,7 +119,7 @@ const parseReviewsFile = (text: string, file: string): ReviewsFile => {
     parsed = JSON.parse(text)
   } catch (error) {
     throw new Error(
-      `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+      `${file} is not valid JSON: ${messageOf(error)}`
     )
   }
   if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.reviews))
@@ -438,7 +439,7 @@ export class Reviewer {
         ms: this._now() - started,
         status: "failed",
         text: "",
-        error: error instanceof Error ? error.message : String(error)
+        error: messageOf(error)
       }
       this._store.put(review)
       return review

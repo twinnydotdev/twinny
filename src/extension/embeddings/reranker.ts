@@ -3,6 +3,7 @@ import os from "os"
 import * as path from "path"
 import { Worker } from "worker_threads"
 
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { assetPath } from "../context"
 
@@ -94,7 +95,7 @@ export class Reranker {
       )
       return results.flat()
     } catch (error) {
-      logger.error(`Reranking failed: ${error instanceof Error ? error.message : error}`)
+      logger.error(`Reranking failed: ${messageOf(error)}`)
       return undefined
     }
   }

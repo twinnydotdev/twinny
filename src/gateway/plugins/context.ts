@@ -21,6 +21,7 @@ import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
 import { isIndexablePath, looksBinary } from "../../extension/embeddings/indexable"
 
 import {
@@ -437,7 +438,7 @@ export class ContextPlugin implements PluginInstance {
       delete state.error
       this._context.log.info({ event: "plugin.context-indexed", reason: repo.name, message: `${files.length} files, ${chunks.length} chunks, ${toEmbed.length} embedded` })
     } catch (error) {
-      state.error = error instanceof Error ? error.message : String(error)
+      state.error = messageOf(error)
       state.lastSyncAt = new Date(this._context.now()).toISOString()
       this._context.log.warn({ event: "plugin.context-failed", reason: repo.name, message: state.error })
     } finally {

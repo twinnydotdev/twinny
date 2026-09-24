@@ -8,6 +8,8 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 
+import { messageOf } from "../common/errors"
+
 /** The layout this server reads and writes. Bump with a migration below. */
 export const DATA_FORMAT = 1
 
@@ -74,7 +76,7 @@ const readMarker = (file: string): DataFormatRecord | undefined => {
     text = fs.readFileSync(file, "utf8")
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
-    throw new DataFormatError(`${file} cannot be read: ${error instanceof Error ? error.message : String(error)}`, "unreadable")
+    throw new DataFormatError(`${file} cannot be read: ${messageOf(error)}`, "unreadable")
   }
   let parsed: unknown
   try {

@@ -9,6 +9,8 @@
  * Built by esbuild into `packages/twinny-server/cli.js` with no runtime
  * dependencies, so `npx twinny-server` needs nothing but Node.
  */
+import { messageOf } from "../common/errors"
+
 import { runInvites, runKeys, runLicense, runRecordings, runUsage } from "./admin"
 import { runBackup } from "./backup-cli"
 import { INIT_HELP, runInit } from "./init"
@@ -69,7 +71,7 @@ export const main = async (argv: string[]): Promise<number> => {
         for (const line of result.next) out(line)
         return EXIT_CODE.ok
       } catch (error) {
-        err(error instanceof Error ? error.message : String(error))
+        err(messageOf(error))
         return EXIT_CODE.config
       }
     }
@@ -111,7 +113,7 @@ if (require.main === module) {
   main(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (error) => {
-      err(error instanceof Error ? error.message : String(error))
+      err(messageOf(error))
       process.exit(EXIT_CODE.failure)
     }
   )

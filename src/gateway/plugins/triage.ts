@@ -7,6 +7,7 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
 import type { ChatMessage } from "../../extension/inference/types"
 
 import { PluginError } from "./host"
@@ -253,7 +254,7 @@ export class Triager {
         labels: [],
         reply: "",
         text: "",
-        error: error instanceof Error ? error.message : String(error)
+        error: messageOf(error)
       }
       this._store.put(record)
       return record

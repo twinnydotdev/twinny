@@ -19,6 +19,8 @@
  */
 import { createSign } from "node:crypto"
 
+import { messageOf } from "../../common/errors"
+
 import {
   GatewayPlugin,
   json,
@@ -136,7 +138,7 @@ export const appJwt = (
     signature = signer.sign(privateKey)
   } catch (error) {
     throw new PluginError(
-      `The private key cannot sign: ${error instanceof Error ? error.message : String(error)}`,
+      `The private key cannot sign: ${messageOf(error)}`,
       400
     )
   }

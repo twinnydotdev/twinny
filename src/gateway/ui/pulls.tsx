@@ -6,6 +6,7 @@
  */
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { GitHubStatus } from "../plugins/github"
 import type { PullPage, PullSummary, RepoView } from "../plugins/pulls"
 import type { ReviewBrief, ReviewRecord } from "../plugins/reviews"
@@ -328,7 +329,7 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
       await action()
       await onChanged()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(null)
     }
@@ -532,7 +533,7 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
       await onChanged()
       setNotice(done)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(false)
     }
@@ -686,7 +687,7 @@ const ReviewThread = ({ review, noun, canAsk, onAsk }: { review: ReviewRecord; n
       await onAsk(asked)
       setQuestion("")
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setAsking(false)
     }
@@ -765,7 +766,7 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
     try {
       await onReview()
     } catch (e) {
-      setReviewError(e instanceof Error ? e.message : String(e))
+      setReviewError(messageOf(e))
     } finally {
       setReviewing(false)
     }
@@ -916,7 +917,7 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
                   setPosting(true)
                   setPostError(undefined)
                   void onPost(postAs)
-                    .catch((e: unknown) => setPostError(e instanceof Error ? e.message : String(e)))
+                    .catch((e: unknown) => setPostError(messageOf(e)))
                     .finally(() => setPosting(false))
                 }}
               >
@@ -976,7 +977,7 @@ const ReviewsPanel = ({ words, overview, base, apiKey, onChanged }: { words: Hos
       await api(`${base}/settings`, apiKey, { method: "PUT", body: { reviewAlias: alias } })
       await onChanged()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(false)
     }
@@ -1150,7 +1151,7 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
         setDetail(answer)
         setReply(answer.triage?.reply ?? "")
       })
-      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => !cancelled && setError(messageOf(e)))
     return () => {
       cancelled = true
     }
@@ -1163,7 +1164,7 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
       await action()
       await onChanged()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(null)
     }
@@ -1417,7 +1418,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
       setError(undefined)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setError(e.message)
-      else setError(e instanceof Error ? e.message : String(e))
+      else setError(messageOf(e))
     }
   }, [base, apiKey])
 
@@ -1442,7 +1443,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
         if (!cancelled) setDetail(answer)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setDetailError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) setDetailError(messageOf(e))
       })
     return () => {
       cancelled = true
@@ -1455,7 +1456,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
       await api(`${base}/sync`, apiKey, { method: "POST" })
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setSyncing(false)
     }

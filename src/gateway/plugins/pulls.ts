@@ -22,6 +22,8 @@ import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
+
 import {
   json,
   notFound,
@@ -236,7 +238,7 @@ const parseReposFile = (text: string, file: string): ReposFile => {
     parsed = JSON.parse(text)
   } catch (error) {
     throw new Error(
-      `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+      `${file} is not valid JSON: ${messageOf(error)}`
     )
   }
   if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.repos))
@@ -751,11 +753,11 @@ export class PullsPlugin implements PluginInstance {
             .slice(0, MAX_PULLS_PER_REPO)
           delete state.issuesError
         } catch (error) {
-          state.issuesError = error instanceof Error ? error.message : String(error)
+          state.issuesError = messageOf(error)
         }
       }
     } catch (error) {
-      state.error = error instanceof Error ? error.message : String(error)
+      state.error = messageOf(error)
       this._context.log.warn({
         event: "plugin.sync-failed",
         reason: repo.fullName,
@@ -1012,7 +1014,7 @@ export class PullsPlugin implements PluginInstance {
       })
       return updated
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = messageOf(error)
       this._context.log.warn({ event: "plugin.review-post-failed", key: by, reason: `${repo.fullName}${hash}${pull.number}`, message })
       throw error instanceof PluginError ? error : new PluginError(`Posting to the host failed: ${message}`, 502)
     }

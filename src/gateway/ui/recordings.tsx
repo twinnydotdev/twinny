@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { ConfigurationSnapshot } from "../configuration"
 import type { RecorderSummary } from "../recording/recorder"
 import type { RecordingRecord, RecordingSummary } from "../recording/store"
@@ -143,7 +144,7 @@ const RecordingSettings = ({ apiKey, summary, licensed, onSaved }: { apiKey: str
       setEditing(false)
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(false)
     }
@@ -553,7 +554,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
       setMore([])
       setNow(Date.now())
     } catch (e) {
-      setError(e instanceof ApiError && e.status === 503 ? "This gateway was started without recording support." : e instanceof Error ? e.message : String(e))
+      setError(e instanceof ApiError && e.status === 503 ? "This gateway was started without recording support." : messageOf(e))
     } finally {
       setLoading(false)
     }
@@ -586,7 +587,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
       setMore((current) => [...current, ...page.records])
       setData((current) => (current ? { ...current, nextBefore: page.nextBefore } : current))
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setPaging(false)
     }
@@ -606,7 +607,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
       try {
         setOpen(await api<RecordingRecord>(`/twinny/v1/admin/recordings/${id}`, apiKey))
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
+        setError(messageOf(e))
       }
     },
     [apiKey]
@@ -656,7 +657,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
       a.click()
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setExporting(null)
     }

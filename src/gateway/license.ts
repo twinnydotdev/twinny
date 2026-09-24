@@ -12,6 +12,7 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../common/errors"
 import {
   Entitlements,
   entitlementsFor,
@@ -116,7 +117,7 @@ export class LicenseStore {
         this._mtimeMs = -1
         return
       }
-      this._license = { invalid: `cannot read ${this.file}: ${error instanceof Error ? error.message : String(error)}` }
+      this._license = { invalid: `cannot read ${this.file}: ${messageOf(error)}` }
       return
     }
     try {
@@ -124,7 +125,7 @@ export class LicenseStore {
       this._license = { claims: verified.claims }
     } catch (error) {
       this._license = {
-        invalid: error instanceof LicenseError ? `${error.message} [${error.code}]` : error instanceof Error ? error.message : String(error)
+        invalid: error instanceof LicenseError ? `${error.message} [${error.code}]` : messageOf(error)
       }
     }
   }

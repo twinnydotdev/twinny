@@ -13,6 +13,7 @@ import { Disposable, Event, EventEmitter, ExtensionContext, workspace } from "vs
 
 import { providerForBackend } from "../../common/backend-route"
 import { API_PROVIDERS, PROVIDER_DISPLAY_NAMES, TEAM_SHARE_STORAGE_KEY } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import type { TeamShareBackend, TeamShareStatus } from "../../common/team"
 import { RemoteInferenceProvider } from "../../protocol/client"
@@ -106,7 +107,7 @@ export class TeamShare implements Disposable {
   public async autoStart(): Promise<void> {
     if (!this.enabled) return
     await this.start().catch((error) =>
-      logger.error(`team share failed to start: ${error instanceof Error ? error.message : String(error)}`)
+      logger.error(`team share failed to start: ${messageOf(error)}`)
     )
   }
 

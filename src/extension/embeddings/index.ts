@@ -4,6 +4,7 @@ import path from "path"
 import * as vscode from "vscode"
 
 import { ACTIVE_EMBEDDINGS_PROVIDER_STORAGE_KEY } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { TwinnyProvider } from "../../common/types"
 import { resolveProviderEndpoint } from "../providers/endpoint"
@@ -92,7 +93,7 @@ export class WorkspaceIndex implements vscode.Disposable {
     } catch (error) {
       logger.error(
         `Embedding database unavailable: ${
-          error instanceof Error ? error.message : String(error)
+          messageOf(error)
         }`
       )
       return undefined

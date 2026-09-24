@@ -1,5 +1,6 @@
 import React, { FormEvent, useEffect, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { InferenceCapability } from "../../extension/inference/types"
 import type { RemoteStatus, TeamPolicy } from "../../protocol/types"
 import type { GatewayModelConfig, GatewayPolicy,GatewayProviderConfig  } from "../config"
@@ -20,9 +21,6 @@ const CAPABILITY_LABELS = {
   fim: "Autocomplete (FIM)",
   embeddings: "Embeddings"
 }
-const messageOf = (error: unknown) =>
-  error instanceof Error ? error.message : String(error)
-
 const Field = ({
   label,
   value,

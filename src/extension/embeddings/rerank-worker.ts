@@ -13,6 +13,8 @@ import * as ort from "onnxruntime-web"
 import { Toxe } from "toxe"
 import { parentPort, workerData } from "worker_threads"
 
+import { messageOf } from "../../common/errors"
+
 import { sigmoid } from "./rank"
 
 /**
@@ -89,7 +91,7 @@ const main = async () => {
     session = loaded
     post({ ready: true })
   } catch (error) {
-    post({ ready: false, error: error instanceof Error ? error.message : String(error) })
+    post({ ready: false, error: messageOf(error) })
     return
   }
 
@@ -97,7 +99,7 @@ const main = async () => {
     score(request.query, request.passages)
       .then((scores) => post({ id: request.id, scores }))
       .catch((error) =>
-        post({ id: request.id, error: error instanceof Error ? error.message : String(error) })
+        post({ id: request.id, error: messageOf(error) })
       )
   })
 }

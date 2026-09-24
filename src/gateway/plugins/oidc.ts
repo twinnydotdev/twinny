@@ -17,6 +17,7 @@ import { createHash, createPublicKey, createVerify, randomBytes } from "node:cry
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
 import { inviteLink } from "../../protocol/types"
 
 import {
@@ -180,7 +181,7 @@ export class OidcPlugin implements PluginInstance {
       this._discoveryError = undefined
       return this._discovery
     } catch (error) {
-      this._discoveryError = `Discovery at ${url} failed: ${error instanceof Error ? error.message : String(error)}`
+      this._discoveryError = `Discovery at ${url} failed: ${messageOf(error)}`
       throw new PluginError(this._discoveryError, 502)
     }
   }
@@ -302,13 +303,13 @@ export class OidcPlugin implements PluginInstance {
         tokens = (await response.json()) as Record<string, unknown>
         if (!response.ok) return fail(`The provider would not exchange the code: ${String(tokens.error ?? response.status)}${tokens.error_description ? ` (${String(tokens.error_description)})` : ""}.`)
       } catch (error) {
-        return fail(`The provider's token endpoint failed: ${error instanceof Error ? error.message : String(error)}.`)
+        return fail(`The provider's token endpoint failed: ${messageOf(error)}.`)
       }
       let claims: Record<string, unknown>
       try {
         claims = await this.verifyIdToken(String(tokens.id_token ?? ""), pending.nonce)
       } catch (error) {
-        return fail(error instanceof Error ? error.message : String(error))
+        return fail(messageOf(error))
       }
       const name = typeof claims[this._settings.nameClaim] === "string" ? (claims[this._settings.nameClaim] as string).trim().toLowerCase() : ""
       if (!name) return fail(`The provider sent no "${this._settings.nameClaim}" claim; add the scope that carries it, or change the name claim.`)
@@ -323,7 +324,7 @@ export class OidcPlugin implements PluginInstance {
       try {
         code_ = (await this._context.invites.create({ name, admin, replace: true, ttlMs: 10 * 60_000, createdBy: "oidc" })).code
       } catch (error) {
-        return fail(error instanceof Error ? error.message : String(error), name)
+        return fail(messageOf(error), name)
       }
       this.remember({ at: new Date(this._context.now()).toISOString(), name, admin, ok: true, from: request.address })
       this._context.log.info({ event: "plugin.oidc-signed-in", key: name, ...(admin ? { admin: true } : {}) })

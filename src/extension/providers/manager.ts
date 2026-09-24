@@ -7,6 +7,7 @@ import {
   PROVIDER_EVENT_NAME,
   WEBUI_TABS
 } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { ProviderSaveResult } from "../../common/messaging/protocol"
 import { DiscoveredServer } from "../../common/provider-discovery"
 import {
@@ -328,7 +329,7 @@ export class ProviderManager {
       } catch (error) {
         open = {
           url: input.url,
-          error: error instanceof Error ? error.message : String(error)
+          error: messageOf(error)
         }
       }
     }
@@ -571,7 +572,7 @@ export class ProviderManager {
     } catch (e) {
       window.showErrorMessage(
         `Could not read the provider file: ${
-          e instanceof Error ? e.message : String(e)
+          messageOf(e)
         }`
       )
       return
@@ -646,7 +647,7 @@ export class ProviderManager {
       )
     } catch (e) {
       window.showErrorMessage(
-        `Could not export providers: ${e instanceof Error ? e.message : String(e)}`
+        `Could not export providers: ${messageOf(e)}`
       )
     }
   }
