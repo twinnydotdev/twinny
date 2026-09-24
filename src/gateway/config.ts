@@ -19,6 +19,7 @@ import { providerForBackend } from "../common/backend-route"
 import { API_PROVIDERS, DEFAULT_GATEWAY_PORT } from "../common/constants"
 import { validateProvider } from "../common/provider-validation"
 import { TwinnyProvider } from "../common/types"
+import type { SecretShieldMode } from "../extension/inference/shield"
 import { InferenceCapability } from "../extension/inference/types"
 import type { TeamDefaults, TeamPolicy } from "../protocol/types"
 import { isInferenceCapability } from "../protocol/wire"
@@ -183,13 +184,23 @@ export const DEFAULT_TOKEN_ENV = "TWINNY_GATEWAY_TOKEN"
 /** What the configuration may say under `policy`: what extensions enforce, plus what only the gateway enforces. */
 export interface GatewayPolicy extends TeamPolicy {
   routing?: RoutingRule[]
+  /**
+   * Credentials in prompts are swapped for placeholders before a request
+   * reaches a backend, and put back in the reply. `offMachine` (the
+   * default) shields backends not on the gateway's host; `always` shields
+   * local ones too; `off` forwards prompts as they arrive.
+   */
+  secretShield?: SecretShieldMode
 }
+
+export const SECRET_SHIELD_MODES: SecretShieldMode[] = ["offMachine", "always", "off"]
 
 /** The part of the policy connected extensions are told; routing stays on the gateway. */
 export const policyForExtensions = (policy: GatewayPolicy | undefined): TeamPolicy | undefined => {
   if (!policy) return undefined
-  const { routing: _routing, ...shared } = policy
+  const { routing: _routing, secretShield: _secretShield, ...shared } = policy
   void _routing
+  void _secretShield
   return Object.keys(shared).length ? shared : undefined
 }
 
@@ -585,7 +596,7 @@ export const parseGatewayConfig = (
     if (!isRecord(input.policy)) {
       problems.add("policy must be an object.")
     } else {
-      problems.unknownKeys("policy", input.policy, ["teamOnly", "lockDefaults", "systemPrompt", "routing"])
+      problems.unknownKeys("policy", input.policy, ["teamOnly", "lockDefaults", "systemPrompt", "routing", "secretShield"])
       const policy: GatewayPolicy = {}
       if (input.policy.teamOnly !== undefined) {
         if (typeof input.policy.teamOnly !== "boolean") problems.add("policy.teamOnly must be true or false.")
@@ -599,6 +610,13 @@ export const parseGatewayConfig = (
         if (typeof input.policy.systemPrompt !== "string") problems.add("policy.systemPrompt must be a string.")
         else if (input.policy.systemPrompt.length > 20_000) problems.add("policy.systemPrompt is longer than 20,000 characters.")
         else if (input.policy.systemPrompt.trim()) policy.systemPrompt = input.policy.systemPrompt
+      }
+      if (input.policy.secretShield !== undefined) {
+        if (!SECRET_SHIELD_MODES.includes(input.policy.secretShield as SecretShieldMode)) {
+          problems.add(`policy.secretShield must be one of ${SECRET_SHIELD_MODES.join(", ")}.`)
+        } else if (input.policy.secretShield !== "offMachine") {
+          policy.secretShield = input.policy.secretShield as SecretShieldMode
+        }
       }
       if (input.policy.routing !== undefined) {
         if (!Array.isArray(input.policy.routing)) problems.add("policy.routing must be a list of rules.")

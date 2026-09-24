@@ -589,6 +589,12 @@
           "default": "5m",
           "markdownDescription": "Sets the duration to keep models in memory for Ollama API. Use formats like `5m` for 5 minutes or `1h` for 1 hour. Set to `-1` to keep models in memory indefinitely."
         },
+        "twinny.warmUpModel": {
+          "order": 17,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Load the completion model when VS Code starts or regains focus, so the first completion does not wait for a cold model. Only for local model servers (Ollama, LM Studio, llama.cpp); hosted APIs are never called."
+        },
         "twinny.ollamaUseTls": {
           "order": 18,
           "type": "boolean",

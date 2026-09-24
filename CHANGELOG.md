@@ -2,6 +2,11 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## Unreleased
+
+- **The completion model is loaded before you type.** When VS Code starts or regains focus, twinny asks a local model server (Ollama, LM Studio, llama.cpp, or an OpenAI-compatible server on this machine) to load the autocomplete model, so the first completion no longer waits for it. With CodeLlama 7B on Ollama, the first completion went from 11 to 17 seconds to 0.06. Nothing is sent when the model has been used in the last four minutes, and hosted APIs are never called. Turn it off with `twinny.warmUpModel`.
+- **The gateway shields secrets too.** `twinny-server` now swaps credentials in prompts for placeholders before a request reaches a backend, and puts them back in the reply, for every client (the extension, the TUI, Neovim). Set it with `policy.secretShield` or on the admin page's **Policy** tab: `offMachine` (the default) covers hosted APIs, backends on other hosts and the team pool; `always` adds backends on the gateway's own host; `off` forwards prompts as they arrive.
+
 ## 4.2.6 · 2026-09-24
 
 Extension release: a secret shield keeps credentials out of prompts that leave the machine. `twinny-server` carries the version number only.

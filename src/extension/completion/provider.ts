@@ -1,5 +1,6 @@
 import {
   CancellationToken,
+  Disposable,
   ExtensionContext,
   InlineCompletionContext,
   InlineCompletionItem,
@@ -60,6 +61,7 @@ import { LspContext } from "./lsp-context"
 import { getNodeAtPosition, getParser } from "./parser"
 import { RecentEdits } from "./recent-edits"
 import { CompletionStream } from "./stream"
+import { ModelWarmer } from "./warm-up"
 
 /** Everything one inline-completion request needs, kept off the instance. */
 interface CompletionRequest {
@@ -111,6 +113,11 @@ export class CompletionProvider
   private _requestId = 0
   private _generations: GenerationTracker
   private _templateProvider: TemplateProvider
+  private _warmer = new ModelWarmer(
+    () => this.getFimProvider(),
+    () => this.config.get<string>("keepAlive")
+  )
+  private _windowState: Disposable
   public lastCompletionText = ""
 
   constructor(
@@ -123,10 +130,21 @@ export class CompletionProvider
     this._generations = generations
     this._fileInteractionCache = fileInteractionCache
     this._templateProvider = templateProvider
+    this._windowState = window.onDidChangeWindowState((state) => {
+      if (state.focused) this.warmModel("window focused")
+    })
+  }
+
+  /** Loads the completion model ahead of the first keystroke, if it is set to. */
+  public warmModel(reason: string) {
+    if (!this.config.get<boolean>("enabled", true)) return
+    if (!this.config.get<boolean>("warmUpModel", true)) return
+    void this._warmer.warm(reason)
   }
 
   public dispose() {
     super.dispose()
+    this._windowState.dispose()
     this._recentEdits.dispose()
   }
 
@@ -313,6 +331,7 @@ export class CompletionProvider
     })
 
     const inference = resolveInferenceProvider(provider)
+    this._warmer.touch(provider)
     // Why the request was stopped, when it was: a timeout keeps what has
     // arrived, the editor moving on wants nothing.
     let stoppedBy: "timeout" | "editor" | undefined

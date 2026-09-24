@@ -3,8 +3,10 @@
  * one inference client from the registry pointed at one backend model.
  * Built once at startup so a request only ever looks an entry up.
  */
+import { TwinnyProvider } from "../common/types"
 import { InferenceError, toInferenceError } from "../extension/inference/errors"
 import { ProviderRegistry } from "../extension/inference/registry"
+import { shieldClient, shouldShield } from "../extension/inference/shield"
 import {
   InferenceCapability,
   InferenceClient,
@@ -19,7 +21,8 @@ import {
   GatewayConfigError,
   GatewayPolicy,
   GatewaySecrets,
-  providerForRoute
+  providerForRoute,
+  TEAM_PROVIDER_KIND
 } from "./config"
 
 export interface RouteTable {
@@ -65,6 +68,21 @@ const probe = async (
   }
 }
 
+/**
+ * Whether prompts to this backend go through the secret shield. The same
+ * rule as the extension's, from the gateway's side: a backend on another
+ * machine, a hosted API, or the team pool (a colleague's computer) is off
+ * this machine.
+ */
+export const shieldsBackend = (
+  provider: TwinnyProvider,
+  policy: GatewayPolicy | undefined
+): boolean => {
+  const mode = policy?.secretShield ?? "offMachine"
+  if (provider.provider === TEAM_PROVIDER_KIND) return mode !== "off"
+  return shouldShield(provider, mode)
+}
+
 const key = (alias: string, capability: InferenceCapability) =>
   `${alias.toLowerCase()}|${capability}`
 
@@ -93,6 +111,7 @@ export const buildRouteTable = (
       let client: InferenceClient
       try {
         client = registry.resolve(provider)
+        if (shieldsBackend(provider, config.policy)) client = shieldClient(client, provider)
       } catch (error) {
         problems.push(
           `models "${model.alias}": ${error instanceof Error ? error.message : String(error)}`
