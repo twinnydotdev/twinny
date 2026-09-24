@@ -5,28 +5,9 @@
  * head commit, approvals from the pull's participants, the diff from
  * the pull's own diff route.
  */
+import { arr, baseUrlOf, CheckState, Forge, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
-import {
-  arr,
-  baseUrlOf,
-  CheckState,
-  Forge,
-  MAX_PULLS_PER_REPO,
-  num,
-  PullCheck,
-  PullContent,
-  PullsPlugin,
-  PullSummary,
-  readJson,
-  rec,
-  RepoRecord,
-  RepoStore,
-  ReviewPostAs,
-  ReviewState,
-  rollup,
-  splitUnifiedDiff,
-  str
-} from "./pulls"
+import { PullsPlugin } from "./pulls"
 
 export const BITBUCKET_URL = "https://bitbucket.org"
 const USER_AGENT = "twinny-server"

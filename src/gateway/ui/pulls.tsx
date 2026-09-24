@@ -7,8 +7,8 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 
 import { messageOf } from "../../common/errors"
+import type { PullPage, PullSummary, RepoView } from "../plugins/forge"
 import type { GitHubStatus } from "../plugins/github"
-import type { PullPage, PullSummary, RepoView } from "../plugins/pulls"
 import type { ReviewBrief, ReviewRecord } from "../plugins/reviews"
 import type { TriageBrief, TriagePriority, TriageRecord } from "../plugins/triage"
 

@@ -4,29 +4,9 @@
  * read with an access token (scope: read on repository). Statuses and
  * reviews come from their own routes; a pull's changes from its `.diff`.
  */
+import { arr, baseUrlOf, CheckState, Forge, IssueSummary, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
-import {
-  arr,
-  baseUrlOf,
-  CheckState,
-  Forge,
-  IssueSummary,
-  MAX_PULLS_PER_REPO,
-  num,
-  PullCheck,
-  PullContent,
-  PullsPlugin,
-  PullSummary,
-  readJson,
-  rec,
-  RepoRecord,
-  RepoStore,
-  ReviewPostAs,
-  ReviewState,
-  rollup,
-  splitUnifiedDiff,
-  str
-} from "./pulls"
+import { PullsPlugin } from "./pulls"
 
 /** Codeberg runs Forgejo and is where most public Gitea-family repositories live. */
 export const GITEA_URL = "https://codeberg.org"

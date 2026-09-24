@@ -8,37 +8,13 @@
  * from the REST API. GitLab has no app install to lean on, so every
  * project brings a token; a group token pasted for each project works.
  */
+import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
 import {
   GatewayPlugin,
   PluginContext,
   PluginError
 } from "./host"
-import {
-  arr,
-  baseUrlOf,
-  CheckState,
-  cutPatch,
-  Forge,
-  IssueSummary,
-  MAX_FILES,
-  MAX_PULLS_PER_REPO,
-  MergeState,
-  num,
-  PullApprovals,
-  PullCheck,
-  PullContent,
-  PullFile,
-  PullsPlugin,
-  PullSummary,
-  readJson,
-  rec,
-  RepoRecord,
-  RepoStore,
-  ReviewPostAs,
-  ReviewState,
-  rollup,
-  str
-} from "./pulls"
+import { PullsPlugin } from "./pulls"
 
 export const GITLAB_URL = "https://gitlab.com"
 const USER_AGENT = "twinny-server"

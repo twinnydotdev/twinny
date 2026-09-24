@@ -13,11 +13,10 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import fs from "node:fs"
 
+import { messageOf } from "../common/errors"
 import { isRecord } from "../common/guards"
 
 import { writePrivateJson } from "./private-file"
-
-import { messageOf } from "../common/errors"
 
 export const KEY_PREFIX = "tsk"
 const ID_BYTES = 4

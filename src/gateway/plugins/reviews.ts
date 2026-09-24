@@ -19,9 +19,9 @@ import { isRecord } from "../../common/guards"
 import type { ChatMessage } from "../../extension/inference/types"
 import { writePrivateJson } from "../private-file"
 
+import type { PullDetail, PullSummary } from "./forge"
 import { PluginError } from "./host"
 import { type PluginInference, repoWorkspace } from "./inference"
-import type { PullDetail, PullSummary } from "./pulls"
 
 /** Characters of description and patches a prompt may carry, for small local contexts. */
 export const REVIEW_PROMPT_BUDGET = 24_000
