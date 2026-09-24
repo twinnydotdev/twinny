@@ -22,6 +22,8 @@ import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { noAnswer, timeoutSignal } from "../../common/deadline"
+
 import {
   json,
   notFound,
@@ -386,36 +388,8 @@ interface SyncState {
 }
 
 /** A signal that fires on a timeout or when the plugin stops, whichever first. */
-const withTimeout = (parent: AbortSignal, ms: number): AbortSignal => {
-  const controller = new AbortController()
-  const timer = setTimeout(
-    () => controller.abort(new Error(`No answer within ${ms / 1000} s.`)),
-    ms
-  )
-  timer.unref()
-  const onParent = () => controller.abort(parent.reason)
-  if (parent.aborted) onParent()
-  else parent.addEventListener("abort", onParent, { once: true })
-  controller.signal.addEventListener(
-    "abort",
-    () => {
-      clearTimeout(timer)
-      parent.removeEventListener("abort", onParent)
-    },
-    { once: true }
-  )
-  return controller.signal
-}
-
-/** A signal that fires after `ms`, for one-off requests outside the sync loop. */
-export const timeoutSignal = (ms: number): AbortSignal => {
-  const controller = new AbortController()
-  setTimeout(
-    () => controller.abort(new Error(`No answer within ${ms / 1000} s.`)),
-    ms
-  ).unref()
-  return controller.signal
-}
+const withTimeout = (parent: AbortSignal, ms: number): AbortSignal =>
+  timeoutSignal(ms, { parent, reason: () => noAnswer(ms) })
 
 export const cutPatch = (patch: string | undefined): Pick<PullFile, "patch" | "truncated"> => {
   if (patch === undefined) return {}
