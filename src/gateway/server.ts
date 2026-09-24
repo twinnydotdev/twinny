@@ -56,17 +56,17 @@ import {
   DEMO_VISITOR_TOKEN,
   DemoOptions,
   guestName,
-  InviteThrottle,
-  isGuestName
+  InviteThrottle
 } from "./demo"
 import { InferenceGate, refusalError } from "./gate"
 import { InviteError, InviteStore } from "./invites"
-import { KeyRecord, KeyStore } from "./keys"
+import { KeyStore } from "./keys"
 import { LicenseStore } from "./license"
 import { GatewayLog } from "./log"
 import type { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
 import { RouteTable } from "./routes"
+import { SeatBook } from "./seats"
 import { isUserCode, normalizeUserCode, SignInRequests } from "./signin"
 import { parseSince, summarizeUsage, UsageRecorder } from "./usage"
 
@@ -249,6 +249,7 @@ export class GatewayServer {
   private readonly _server: http.Server
   private readonly _gate: InferenceGate
   private readonly _signIns: SignInRequests
+  private readonly _seats: SeatBook
   private readonly _guestInvites?: InviteThrottle
   private _guestSweep?: NodeJS.Timeout
   private _draining = false
@@ -268,6 +269,12 @@ export class GatewayServer {
       metrics: _options.metrics
     })
     this._signIns = _options.signIns ?? new SignInRequests()
+    this._seats = new SeatBook({
+      keys: _options.keys,
+      license: _options.license,
+      demo: _options.demo,
+      log: _options.log
+    })
     if (_options.demo)
       this._guestInvites = new InviteThrottle(_options.demo.invitesPerHour)
     this._server.keepAliveTimeout = 65_000
@@ -289,6 +296,11 @@ export class GatewayServer {
   /** The way in to the models, for plugins as for developers. */
   public get gate(): InferenceGate {
     return this._gate
+  }
+
+  /** Who holds a seat on the plan; the demo's guests do not. */
+  public get seats(): SeatBook {
+    return this._seats
   }
 
   public get routes(): RouteTable {
@@ -326,8 +338,11 @@ export class GatewayServer {
           url: `http://${shownHost}:${bound.port}`
         }
         if (this._options.demo) {
-          this.sweepGuests()
-          this._guestSweep = setInterval(() => this.sweepGuests(), MINUTE_MS)
+          this._seats.sweepGuests()
+          this._guestSweep = setInterval(
+            () => this._seats.sweepGuests(),
+            MINUTE_MS
+          )
           this._guestSweep.unref()
         }
         resolve(this._address)
@@ -400,12 +415,8 @@ export class GatewayServer {
       keys.refresh()
       const record = keys.verify(presented)
       if (!record) return { refused: keys.explain(presented) }
-      const license = this._options.license
-      if (license && !this.isGuest(record.name)) {
-        license.refresh()
-        const unseated = license.seat(record, this.seatHolders())
-        if (unseated) return { refused: unseated }
-      }
+      const unseated = this._seats.seat(record)
+      if (unseated) return { refused: unseated }
       return {
         principal: record.name,
         shared: false,
@@ -664,7 +675,8 @@ export class GatewayServer {
         const name = typeof body.name === "string" ? body.name.trim() : ""
         const admin = body.admin === true
         const readOnly = admin && body.readOnly === true
-        const refusal = this.refuseNewKey()
+        this._options.keys.reload()
+        const refusal = this._seats.refuse(name)
         if (refusal) {
           sendJson(
             res,
@@ -779,13 +791,7 @@ export class GatewayServer {
           sendJson(res, 200, {
             keys,
             sharedToken: !!this._options.token,
-            ...(this._options.license
-              ? {
-                  plan: this._options.license.summary(
-                    this.seatHolders()
-                  )
-                }
-              : {})
+            ...(this._options.license ? { plan: this._seats.summary() } : {})
           })
           return
         }
@@ -1064,54 +1070,6 @@ export class GatewayServer {
     sendJson(res, 404, { error: { message: "Not found." } })
   }
 
-  /** Why a key cannot be made right now: the seat rule, or nothing. */
-  private refuseNewKey(): string | undefined {
-    this._options.keys.reload()
-    return this._options.license?.refuseNewKey(this.seatHolders())
-  }
-
-  private isGuest(name: string): boolean {
-    return !!this._options.demo && isGuestName(name)
-  }
-
-  /** The keys the plan counts. A demo's guests come and go without holding a seat. */
-  private seatHolders(): KeyRecord[] {
-    return this._options.keys.active().filter((key) => !this.isGuest(key.name))
-  }
-
-  /** Revokes guest keys past their hour and forgets the ones revoked long ago. */
-  private sweepGuests(now = Date.now()) {
-    const demo = this._options.demo
-    if (!demo) return
-    try {
-      const keys = this._options.keys
-      keys.reload()
-      const guests = keys.list().filter((key) => isGuestName(key.name))
-      for (const guest of guests) {
-        if (guest.revokedAt) continue
-        if (now - Date.parse(guest.createdAt) < demo.guestTtlMs) continue
-        keys.revoke(guest.id)
-        this._options.log.info({ event: "demo.guest-expired", key: guest.name })
-      }
-      keys.forget(
-        keys
-          .list()
-          .filter(
-            (key) =>
-              isGuestName(key.name) &&
-              key.revokedAt &&
-              now - Date.parse(key.revokedAt) >= demo.forgetGuestsAfterMs
-          )
-          .map((key) => key.id)
-      )
-    } catch (error) {
-      this._options.log.warn({
-        event: "demo.sweep-failed",
-        reason: error instanceof Error ? error.message : String(error)
-      })
-    }
-  }
-
   /**
    * A visitor asking to try the demo from VS Code: a guest invite, made
    * without a credential. Bounded per address and in total, since anyone
@@ -1159,11 +1117,7 @@ export class GatewayServer {
     }
     try {
       this._options.keys.reload()
-      const guests =
-        this._options.keys.active().filter((key) => isGuestName(key.name))
-          .length +
-        invites.pending().filter((invite) => isGuestName(invite.name)).length
-      if (guests >= demo.maxGuests) {
+      if (this._seats.guests(invites) >= demo.maxGuests) {
         sendJson(
           res,
           429,
@@ -1276,10 +1230,7 @@ export class GatewayServer {
           "That is the key you are signed in with. Pick another name or make the key by hand."
         )
       }
-      const seated = this.seatHolders().filter(
-        (key) => key.id !== existing?.id
-      )
-      const refusal = this._options.license?.refuseNewKey(seated)
+      const refusal = this._seats.refuse(name, { replace })
       if (refusal) {
         sendJson(res, 409, { error: { message: refusal } })
         this._options.log.warn({
@@ -1343,7 +1294,7 @@ export class GatewayServer {
           sendJson(res, 200, {
             invites: invites
               .pending()
-              .filter((invite) => !this.isGuest(invite.name))
+              .filter((invite) => !this._seats.isGuest(invite.name))
           })
           return
         }
@@ -1370,10 +1321,7 @@ export class GatewayServer {
         // Seats are checked now so an invite that cannot be opened is never
         // sent, and again when it is opened, since keys may have been made since.
         this._options.keys.reload()
-        const seated = this.seatHolders().filter(
-          (key) => !(replace && key.name === name)
-        )
-        const refusal = this._options.license?.refuseNewKey(seated)
+        const refusal = this._seats.refuse(name, { replace })
         if (refusal) {
           sendJson(res, 409, { error: { message: refusal } })
           this._options.log.warn({
@@ -1568,8 +1516,7 @@ export class GatewayServer {
     const invites = this._options.invites
     if (!invites) throw new PluginError("This gateway does not keep invites.", 503)
     this._options.keys.reload()
-    const seated = this.seatHolders().filter((key) => !(input.replace && key.name === input.name))
-    const refusal = this._options.license?.refuseNewKey(seated)
+    const refusal = this._seats.refuse(input.name, { replace: input.replace })
     if (refusal) throw new PluginError(refusal, 409)
     try {
       const made = invites.create(
@@ -1627,12 +1574,9 @@ export class GatewayServer {
             409
           )
         }
-        const seated = this.seatHolders().filter(
-          (key) => key.id !== existing?.id
-        )
-        const refusal = this.isGuest(invite.name)
-          ? undefined
-          : this._options.license?.refuseNewKey(seated)
+        const refusal = this._seats.refuse(invite.name, {
+          replace: invite.replace === true
+        })
         if (refusal) throw new InviteError(`${refusal} Ask your admin.`, 409)
         if (existing) this._options.keys.revoke(existing.id)
         const { key, record } = this._options.keys.create(invite.name, {
@@ -1733,7 +1677,7 @@ export class GatewayServer {
       })
       return
     }
-    const plan = () => license.summary(this.seatHolders())
+    const plan = () => license.summary(this._seats.holders())
     try {
       switch (req.method) {
         case "GET":
@@ -1836,8 +1780,8 @@ export class GatewayServer {
         return
       }
       this._options.keys.refresh()
-      const active = this.seatHolders().length
-      const seats = this._options.license?.summary(this.seatHolders()).seats ?? active
+      const active = this._seats.holders().length
+      const seats = this._seats.summary()?.seats ?? active
       metrics.plan(active, seats)
       const text = metrics.render(this._options.version ?? "dev")
       res.writeHead(200, {
