@@ -175,6 +175,29 @@ suite("Provider validation", () => {
       assert.ok(errors.provider)
     })
 
+    test("treats Requesty as a hosted, chat-only API that wants a key", () => {
+      const chat = validateProvider({
+        ...ollamaChat,
+        provider: API_PROVIDERS.Requesty,
+        modelName: "openai/gpt-4o-mini",
+        apiHostname: "",
+        apiPort: undefined,
+        apiPath: "",
+        apiKey: ""
+      })
+      assert.ok(chat.valid)
+      assert.ok(chat.warnings.some((w) => /API key/.test(w)))
+      assert.strictEqual(usesEndpoint(API_PROVIDERS.Requesty, "chat"), false)
+
+      const fim = validateProvider({
+        ...ollamaChat,
+        provider: API_PROVIDERS.Requesty,
+        type: "fim",
+        apiHostname: "router.requesty.ai"
+      })
+      assert.ok(fim.errors.provider)
+    })
+
     test("warns rather than fails when a hosted key is blank", () => {
       const { valid, warnings } = validateProvider({
         ...ollamaChat,

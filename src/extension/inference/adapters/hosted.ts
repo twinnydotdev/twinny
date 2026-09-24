@@ -5,6 +5,7 @@
  */
 import { TokenJS } from "fluency.js"
 
+import { API_PROVIDERS } from "../../../common/constants"
 import {
   getEndpointDefaults,
   supportsType,
@@ -21,6 +22,7 @@ import {
 
 import { fluencyChat, hostedModels } from "./fluency"
 import { HttpInferenceProvider } from "./http"
+import { requestyModels } from "./requesty"
 
 export class HostedInferenceProvider implements InferenceProvider {
   public readonly id: string
@@ -55,7 +57,12 @@ export class HostedInferenceProvider implements InferenceProvider {
 
   public async models(options?: InferenceOptions): Promise<InferenceModel[]> {
     const { provider, type } = this._config
-    if (!usesEndpoint(provider, type)) return hostedModels(provider)
+    if (!usesEndpoint(provider, type)) {
+      // Requesty's catalogue is open-ended, so it is asked live instead.
+      return provider === API_PROVIDERS.Requesty
+        ? requestyModels(this._config, options)
+        : hostedModels(provider)
+    }
     try {
       return await this._endpoint.models(options)
     } catch (error) {

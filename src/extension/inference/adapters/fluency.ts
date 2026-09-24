@@ -154,7 +154,7 @@ export async function* fluencyChat(
 /** What fluency.js knows a hosted API serves, for the model dropdown. */
 export const hostedModels = (providerId: string): InferenceModel[] => {
   // The catalogue types `models` as a tuple per provider, or `true` for the
-  // open-ended ones (OpenRouter); only the tuples are listable.
+  // open-ended ones (OpenRouter, Requesty); only the tuples are listable.
   const entry = (
     catalogue as unknown as Record<string, { models?: unknown }>
   )[providerId]

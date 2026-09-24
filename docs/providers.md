@@ -124,3 +124,26 @@ Chat functionality has not been successful on Linux with Oobabooga:
 - **Port:** `5000`
 - **Path:** `/v1/chat/completions`
 - **Model Name:** `CodeLlama-7B-GGUF`
+
+### Requesty
+
+Requesty is a hosted gateway with one OpenAI-compatible API in front of 700+ models. Pick the Requesty preset under Hosted APIs, paste a key from `https://app.requesty.ai/api-keys`, and choose a model from the list. Models are listed from `/v1/models/managed` (curated routing policies such as `claude-sonnet-4-5`) followed by the full `vendor/model` catalogue, for example `openai/gpt-4o-mini`.
+
+#### Chat Configuration
+
+- **Provider:** `Requesty`
+- **Model Name:** `openai/gpt-4o-mini` or any id from the list
+- **API Key:** from `https://app.requesty.ai/api-keys`
+
+Requesty has no raw completions endpoint, so it is chat-only in twinny; keep a local server or Codestral for FIM.
+
+To route through the EU region, add an `OpenAI-compatible server` chat provider instead of the preset:
+
+- **Hostname:** `router.eu.requesty.ai`
+- **Port:** `443`
+- **Protocol:** `https`
+- **Path:** `/v1`
+- **Model Name:** `openai/gpt-4o-mini`
+- **API Key:** the same Requesty key
+
+The `router.us.requesty.ai` and `router.ap.requesty.ai` hosts work the same way.

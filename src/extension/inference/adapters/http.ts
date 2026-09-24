@@ -76,7 +76,7 @@ const listRoutesFor = (provider: string): ListRoute[] => {
   }
 }
 
-const withTimeout = (ms: number, outer?: AbortSignal) => {
+export const withTimeout = (ms: number, outer?: AbortSignal) => {
   const controller = new AbortController()
   const forward = () => controller.abort(outer?.reason)
   if (outer?.aborted) forward()
