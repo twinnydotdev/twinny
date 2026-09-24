@@ -268,6 +268,17 @@
   color: var(--vscode-editorWarning-foreground);
 }
 
+.replyWithheld {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--vscode-charts-green, var(--vscode-descriptionForeground));
+}
+
+.replyWithheld .codicon {
+  font-size: 11px;
+}
+
 .replyContinue {
   display: inline-flex;
   align-items: center;

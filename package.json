@@ -595,6 +595,22 @@
           "default": false,
           "markdownDescription": "When `true`, Twinny will use TLS encryption for connections to the Ollama API. Ensure your Ollama instance is configured for TLS before enabling this option."
         },
+        "twinny.secretShield": {
+          "order": 18,
+          "type": "string",
+          "enum": [
+            "offMachine",
+            "always",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Redact credentials in prompts sent to anything that is not on this machine: hosted APIs, a Twinny gateway, a paired device, a server elsewhere on the network.",
+            "Redact credentials in every prompt, local servers included.",
+            "Send prompts as they are."
+          ],
+          "default": "offMachine",
+          "markdownDescription": "**Secret shield.** API keys, tokens, private keys and passwords in a prompt (your question, attached files, the code around the cursor) are replaced with placeholders like `REDACTED_GITHUB_TOKEN_1` before the request is sent, and put back wherever the reply repeats a placeholder. The model never sees the value; the chat shows how many were withheld. Detection covers well-known token formats, private key blocks, passwords in URLs, and secret-named values in code and `.env` files."
+        },
         "twinny.enableLogging": {
           "order": 19,
           "type": "boolean",

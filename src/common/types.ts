@@ -77,6 +77,11 @@ export interface ReplyMeta {
   completionTokens?: number
   /** The user stopped it before the model finished. */
   stopped?: boolean
+  /**
+   * Credentials the secret shield replaced with placeholders before the
+   * request left the machine: kinds and counts, never the values.
+   */
+  withheld?: { kind: string; label: string; count: number }[]
 }
 
 export interface Conversation {

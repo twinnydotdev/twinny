@@ -15,6 +15,7 @@ import { RemoteInferenceProvider } from "../../protocol/client"
 import { HostedInferenceProvider } from "./adapters/hosted"
 import { HttpInferenceProvider } from "./adapters/http"
 import { InferenceError, toInferenceError, unsupportedCapability } from "./errors"
+import { SecretShieldMode, shieldClient, shouldShield } from "./shield"
 import { abortable } from "./stream"
 import {
   InferenceCapability,
@@ -164,5 +165,25 @@ export const providerRegistry = new ProviderRegistry()
   .register(HOSTED_PROVIDERS, hostedAdapter)
   .register(API_PROVIDERS.TwinnyRemote, remoteAdapter)
 
-export const resolveInferenceProvider = (config: TwinnyProvider): InferenceClient =>
-  providerRegistry.resolve(config)
+/** The `twinny.secretShield` setting, when VS Code is around. */
+const secretShieldMode = (): SecretShieldMode => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const vscode = require("vscode") as typeof import("vscode")
+    return vscode.workspace
+      .getConfiguration("twinny")
+      .get<SecretShieldMode>("secretShield", "offMachine")
+  } catch {
+    return "offMachine"
+  }
+}
+
+/**
+ * The client a feature calls. Requests that would leave the machine go
+ * through the secret shield; the gateway resolves through the registry
+ * directly and is not affected.
+ */
+export const resolveInferenceProvider = (config: TwinnyProvider): InferenceClient => {
+  const client = providerRegistry.resolve(config)
+  return shouldShield(config, secretShieldMode()) ? shieldClient(client, config) : client
+}
