@@ -12,10 +12,13 @@ import * as path from "path"
 
 import { providerRegistry } from "../../extension/inference/registry"
 import { parseGatewayConfig, readGatewaySecrets } from "../../gateway/config"
+import { DEFAULT_DEMO, guestName } from "../../gateway/demo"
+import { invitesFileFor, InviteStore } from "../../gateway/invites"
 import { KeyStore } from "../../gateway/keys"
 import { describePlan, LicenseStore, LicenseSummary } from "../../gateway/license"
 import { createGatewayLog } from "../../gateway/log"
 import { buildRouteTable } from "../../gateway/routes"
+import { SeatBook } from "../../gateway/seats"
 import { GatewayServer } from "../../gateway/server"
 import {
   decodeLicenseToken,
@@ -248,6 +251,57 @@ suite("Licence file", () => {
     assert.match(store.seat(made[6], active) ?? "", /no seat/)
     assert.match(describePlan(summary), /^Acme, 7 of 6 seats used, licence until \d{4}-\d{2}-\d{2}$/)
     assert.match(store.refuseNewKey(active) ?? "", /licence for Acme allows 6/)
+  })
+
+  test("the seat book counts keys but not a demo's guests", () => {
+    const keysFile = path.join(scratch, "seats", "keys.json")
+    const keys = KeyStore.open(keysFile)
+    const store = LicenseStore.open(path.join(scratch, "seats", "license"), trusted, 0)
+    // Six seats, the smallest a licence adds over the free plan's five.
+    store.install(issueLicense({ org: "Acme", seats: 6, validDays: 400 }, signing.privateKeyPem).token)
+    const log = { info() {}, warn() {}, error() {} }
+    const seats = new SeatBook({ keys, license: store, demo: DEFAULT_DEMO, log })
+
+    const people = ["ann", "ben", "cat", "dan", "eve", "fay"]
+    for (const name of people) keys.create(name)
+    const guest = keys.create(guestName("abc123")).record
+    assert.deepStrictEqual(seats.holders().map((key) => key.name), people)
+    assert.strictEqual(seats.summary()?.used, 6)
+    assert.match(seats.refuse("gus") ?? "", /allows 6/)
+    assert.strictEqual(seats.refuse("fay", { replace: true }), undefined, "replacing a seated key frees its seat")
+    assert.match(seats.refuse("gus", { replace: true }) ?? "", /allows 6/, "replacing a name nobody holds frees nothing")
+    assert.strictEqual(seats.refuse(guestName("zzz")), undefined, "a guest needs no seat")
+    assert.strictEqual(seats.seat(guest), undefined)
+    assert.strictEqual(seats.seat(keys.active()[0]), undefined)
+
+    // Open guest invites count towards the demo's cap alongside guest keys.
+    const invites = InviteStore.open(invitesFileFor(keysFile))
+    invites.create({ name: guestName("def456"), createdBy: "demo-visitor", ttlMs: 60_000 }, () => false)
+    invites.create({ name: "gus", createdBy: "ann", ttlMs: 60_000 }, () => false)
+    assert.strictEqual(seats.guests(invites), 2)
+
+    // The sweep revokes a guest after its hour and forgets it a day later.
+    seats.sweepGuests(Date.now() + DEFAULT_DEMO.guestTtlMs - 1_000)
+    assert.ok(keys.active().some((key) => key.id === guest.id))
+    seats.sweepGuests(Date.now() + DEFAULT_DEMO.guestTtlMs + 1_000)
+    assert.ok(!keys.active().some((key) => key.id === guest.id))
+    assert.ok(keys.list().some((key) => key.id === guest.id))
+    seats.sweepGuests(Date.now() + DEFAULT_DEMO.guestTtlMs + DEFAULT_DEMO.forgetGuestsAfterMs)
+    assert.ok(!keys.list().some((key) => key.id === guest.id))
+
+    // Without a demo, a guest-shaped name is an ordinary key and holds a seat.
+    const plain = new SeatBook({ keys, license: store, log })
+    const seventh = keys.create(guestName("plain")).record
+    assert.strictEqual(plain.holders().length, 7)
+    assert.match(plain.seat(seventh) ?? "", /no seat/)
+    assert.strictEqual(seats.holders().length, 6)
+    plain.sweepGuests(Date.now() + DEFAULT_DEMO.guestTtlMs + 1_000)
+    assert.ok(keys.active().some((key) => key.id === seventh.id), "no demo, no sweep")
+
+    // No licence: nothing is ever refused.
+    const free = new SeatBook({ keys, log })
+    assert.strictEqual(free.refuse("gus"), undefined)
+    assert.strictEqual(free.summary(), undefined)
   })
 })
 

@@ -190,7 +190,7 @@ suite("Gateway demo mode (in process)", function () {
   test("a guest key stops after its hour", async () => {
     const guest = keys.active().find((key) => isGuestName(key.name))
     assert.ok(guest)
-    const sweep = (server as unknown as { sweepGuests(now: number): void }).sweepGuests.bind(server)
+    const sweep = (now: number) => server.seats.sweepGuests(now)
     sweep(Date.now() + DEFAULT_DEMO.guestTtlMs - 60_000)
     keys.reload()
     assert.ok(keys.active().some((key) => key.id === guest.id))
