@@ -7,7 +7,7 @@ import React, { useState } from "react"
 import { fmt, plural } from "./format"
 import type { PlanSummary } from "./people"
 
-const DOCS_LICENSING = "https://twinnydotdev.github.io/twinny-docs/teams/licensing/"
+const DOCS_LICENSING = "https://docs.twinny.dev/teams/licensing/"
 /** Stripe Payment Link for the Team plan: yearly, quantity is seats. */
 const BUY_SEATS = "https://buy.stripe.com/eVq00igUndD80qW6AR7Zu00"
 

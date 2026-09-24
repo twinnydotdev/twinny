@@ -21,7 +21,7 @@ What you get:
 Free for up to 5 developers (active keys), for good. Larger teams install a
 licence token, $6 a seat a month from [twinny.dev](https://twinny.dev/#pricing),
 or a free [30-day trial](https://twinny.dev/#trial) first; see
-[Licensing and seats](https://twinnydotdev.github.io/twinny-docs/teams/licensing/).
+[Licensing and seats](https://docs.twinny.dev/teams/licensing/).
 The server never contacts Twinny. What changed in each version is in the
 [changelog](https://github.com/twinnydotdev/twinny/blob/main/CHANGELOG.md).
 

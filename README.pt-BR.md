@@ -2,7 +2,7 @@
 
 O assistente de programação com IA para o Visual Studio Code que fica dentro da sua rede. Autocompletar, edição inline, chat, revisão de código e mais, com o servidor de modelos que você escolher: na sua máquina, em outro dispositivo seu, em uma API hospedada, ou em um gateway compartilhado por toda a equipe. Gratuito, código aberto, licença MIT, sem telemetria, sem login.
 
-[Instalar pelo Marketplace](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) · [Documentação](https://twinnydotdev.github.io/twinny-docs/) · [Novidades](https://twinnydotdev.github.io/twinny-docs/reference/whats-new/) · [Changelog](CHANGELOG.md) · [Equipes](https://twinnydotdev.github.io/twinny-docs/teams/overview/) · [English](README.md) · [中文](README.zh-CN.md)
+[Instalar pelo Marketplace](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) · [Documentação](https://docs.twinny.dev/) · [Novidades](https://docs.twinny.dev/reference/whats-new/) · [Changelog](CHANGELOG.md) · [Equipes](https://docs.twinny.dev/teams/overview/) · [English](README.md) · [中文](README.zh-CN.md)
 
 A documentação está em inglês e chinês; os links abaixo levam à versão em inglês.
 
@@ -12,30 +12,30 @@ A documentação está em inglês e chinês; os links abaixo levam à versão em
 2. Rode um servidor de modelos. Ollama, LM Studio e llama.cpp são encontrados nas portas habituais na primeira inicialização; o twinny pergunta quais modelos usar.
 3. Digite. As sugestões aparecem como texto fantasma; a barra lateral tem o chat.
 
-O [guia rápido](https://twinnydotdev.github.io/twinny-docs/getting-started/quick-start/) explica como escolher servidor e modelos para o seu hardware, e a [solução de problemas](https://twinnydotdev.github.io/twinny-docs/getting-started/troubleshooting/) explica cada mensagem de erro.
+O [guia rápido](https://docs.twinny.dev/getting-started/quick-start/) explica como escolher servidor e modelos para o seu hardware, e a [solução de problemas](https://docs.twinny.dev/getting-started/troubleshooting/) explica cada mensagem de erro.
 
 ## O que ele faz
 
-- **[Autocompletar código](https://twinnydotdev.github.io/twinny-docs/features/code-completion/).** Sugestões de preenchimento no meio do código enquanto você digita, transmitidas como texto fantasma e encerradas em um ponto sensato. O contexto vem dos arquivos abertos, dos imports, do servidor de linguagem e das suas edições recentes. Ajustado para funcionar bem com um modelo de 7B.
-- **[Edição inline](https://twinnydotdev.github.io/twinny-docs/features/inline-edit/).** Ctrl+I, descreva a mudança e revise como um diff no editor. Aceite ou rejeite por trecho. *Corrigir com o twinny* em qualquer diagnóstico.
-- **[Chat](https://twinnydotdev.github.io/twinny-docs/features/chat/)** sobre o seu código. Digite `@` para anexar arquivos, símbolos, o painel de problemas, o diff do git, o terminal ou uma busca no índice do workspace. As conversas são preservadas.
-- **[Índice do workspace](https://twinnydotdev.github.io/twinny-docs/features/workspace-index/).** Busca híbrida por palavras-chave e vetores no workspace, reordenada antes de chegar ao prompt e atualizada ao salvar. As fontes aparecem sob as respostas.
-- **[Revisão de código](https://twinnydotdev.github.io/twinny-docs/features/code-review/)** da árvore de trabalho, de um branch em relação à sua base ou de um pull request do GitHub, e **[mensagens de commit](https://twinnydotdev.github.io/twinny-docs/features/commit-messages/)** a partir do diff preparado.
-- **[Terminal](https://twinnydotdev.github.io/twinny-docs/features/terminal/).** Escreva um comando a partir de uma descrição, mostrado antes de rodar. Quando um falha, o twinny encontra o arquivo e a linha e oferece a correção.
-- **[Modelos de prompt](https://twinnydotdev.github.io/twinny-docs/features/templates/)** editáveis, e cada recurso é um comando comum do VS Code que você pode reatribuir.
+- **[Autocompletar código](https://docs.twinny.dev/features/code-completion/).** Sugestões de preenchimento no meio do código enquanto você digita, transmitidas como texto fantasma e encerradas em um ponto sensato. O contexto vem dos arquivos abertos, dos imports, do servidor de linguagem e das suas edições recentes. Ajustado para funcionar bem com um modelo de 7B.
+- **[Edição inline](https://docs.twinny.dev/features/inline-edit/).** Ctrl+I, descreva a mudança e revise como um diff no editor. Aceite ou rejeite por trecho. *Corrigir com o twinny* em qualquer diagnóstico.
+- **[Chat](https://docs.twinny.dev/features/chat/)** sobre o seu código. Digite `@` para anexar arquivos, símbolos, o painel de problemas, o diff do git, o terminal ou uma busca no índice do workspace. As conversas são preservadas.
+- **[Índice do workspace](https://docs.twinny.dev/features/workspace-index/).** Busca híbrida por palavras-chave e vetores no workspace, reordenada antes de chegar ao prompt e atualizada ao salvar. As fontes aparecem sob as respostas.
+- **[Revisão de código](https://docs.twinny.dev/features/code-review/)** da árvore de trabalho, de um branch em relação à sua base ou de um pull request do GitHub, e **[mensagens de commit](https://docs.twinny.dev/features/commit-messages/)** a partir do diff preparado.
+- **[Terminal](https://docs.twinny.dev/features/terminal/).** Escreva um comando a partir de uma descrição, mostrado antes de rodar. Quando um falha, o twinny encontra o arquivo e a linha e oferece a correção.
+- **[Modelos de prompt](https://docs.twinny.dev/features/templates/)** editáveis, e cada recurso é um comando comum do VS Code que você pode reatribuir.
 
-Tudo roda contra um servidor que você controla. Sem telemetria, sem conta. Veja [Barra de status, logs e privacidade](https://twinnydotdev.github.io/twinny-docs/features/status-and-logs/).
+Tudo roda contra um servidor que você controla. Sem telemetria, sem conta. Veja [Barra de status, logs e privacidade](https://docs.twinny.dev/features/status-and-logs/).
 
 ## Servidores de modelos e provedores
 
 | Onde o modelo roda | Como |
 | --- | --- |
-| **Na sua máquina** | [Ollama](https://twinnydotdev.github.io/twinny-docs/providers/ollama/), [LM Studio](https://twinnydotdev.github.io/twinny-docs/providers/lm-studio/), [llama.cpp](https://twinnydotdev.github.io/twinny-docs/providers/llama-cpp/), QVAC, Oobabooga, LiteLLM, Open WebUI ou [qualquer servidor compatível com a OpenAI](https://twinnydotdev.github.io/twinny-docs/providers/other-local-servers/). |
-| **Em outro computador seu** | [Dispositivos](https://twinnydotdev.github.io/twinny-docs/providers/devices/): pareie com um código e use a GPU daquela máquina por um link ponto a ponto criptografado. Sem conta, sem relay. |
-| **Em uma API hospedada** | [OpenAI, Anthropic, Mistral (Codestral para autocompletar), DeepSeek, OpenRouter, Gemini, Groq, Cohere, Perplexity](https://twinnydotdev.github.io/twinny-docs/providers/hosted-apis/). |
+| **Na sua máquina** | [Ollama](https://docs.twinny.dev/providers/ollama/), [LM Studio](https://docs.twinny.dev/providers/lm-studio/), [llama.cpp](https://docs.twinny.dev/providers/llama-cpp/), QVAC, Oobabooga, LiteLLM, Open WebUI ou [qualquer servidor compatível com a OpenAI](https://docs.twinny.dev/providers/other-local-servers/). |
+| **Em outro computador seu** | [Dispositivos](https://docs.twinny.dev/providers/devices/): pareie com um código e use a GPU daquela máquina por um link ponto a ponto criptografado. Sem conta, sem relay. |
+| **Em uma API hospedada** | [OpenAI, Anthropic, Mistral (Codestral para autocompletar), DeepSeek, OpenRouter, Gemini, Groq, Cohere, Perplexity](https://docs.twinny.dev/providers/hosted-apis/). |
 | **No gateway da sua equipe** | Conecte-se a um `twinny-server` e use os modelos que a equipe configurou. Veja abaixo. |
 
-Misture: um modelo local para autocompletar, um hospedado para o chat. A página de [modelos compatíveis](https://twinnydotdev.github.io/twinny-docs/providers/supported-models/) diz quais modelos servem para qual tarefa em qual hardware.
+Misture: um modelo local para autocompletar, um hospedado para o chat. A página de [modelos compatíveis](https://docs.twinny.dev/providers/supported-models/) diz quais modelos servem para qual tarefa em qual hardware.
 
 ## Equipes: um gateway para todos
 
@@ -54,7 +54,7 @@ Isso encontra o seu servidor de modelos, escreve uma configuração, cria uma ch
 - **Gravação** (licença): mantenha prompts e respostas no gateway, com aviso a cada desenvolvedor, exportados como dados de treinamento.
 - **Operação**: um log de auditoria encadeado por hash de cada mudança administrativa, chaves de administrador somente leitura, métricas para o Prometheus, custos por desenvolvedor quando um modelo tem preço, uma fila de requisições para uma GPU compartilhada, Docker e um chart Helm.
 
-Gratuito para cinco desenvolvedores, para sempre. Uma licença comprada com cartão adiciona assentos e ativa política, gravação e plugins; é verificada localmente e o gateway nunca liga para casa. Veja o [guia de equipes](https://twinnydotdev.github.io/twinny-docs/teams/overview/), [licenciamento e assentos](https://twinnydotdev.github.io/twinny-docs/teams/licensing/) e a referência do operador em [docs/gateway.md](docs/gateway.md).
+Gratuito para cinco desenvolvedores, para sempre. Uma licença comprada com cartão adiciona assentos e ativa política, gravação e plugins; é verificada localmente e o gateway nunca liga para casa. Veja o [guia de equipes](https://docs.twinny.dev/teams/overview/), [licenciamento e assentos](https://docs.twinny.dev/teams/licensing/) e a referência do operador em [docs/gateway.md](docs/gateway.md).
 
 ## Estrutura do repositório
 

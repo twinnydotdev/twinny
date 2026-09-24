@@ -887,7 +887,7 @@ gateway has a plan:
 | Plan | Seats | How |
 | --- | --- | --- |
 | Free | 5 | Nothing to do. Permanent. |
-| Team | as bought | A licence token from Twinny, installed once. See [Teams and licensing](https://twinnydotdev.github.io/twinny-docs/teams/licensing/). |
+| Team | as bought | A licence token from Twinny, installed once. See [Teams and licensing](https://docs.twinny.dev/teams/licensing/). |
 
 The gateway never contacts Twinny. A licence is a signed token
 (`twl1.…`) whose signature is checked against a public key built into
