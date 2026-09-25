@@ -1,5 +1,6 @@
 import { Disposable, Webview } from "vscode"
 
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { Envelope, isEnvelope } from "../../common/messaging/envelope"
 import {
@@ -103,7 +104,7 @@ export class ExtensionBridge implements Disposable {
         id ? { type, id, data: result } : { type, data: result }
       )
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
+      const reason = messageOf(error)
       logger.error(new Error(`Handler for "${type}" failed: ${reason}`))
       if (id) void this._webview.postMessage({ type, id, error: reason })
     }

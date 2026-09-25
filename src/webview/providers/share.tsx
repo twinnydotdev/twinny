@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
 import { TEAM_SHARE_EVENT_NAME } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import type { TeamShareBackend, TeamShareStatus } from "../../common/team"
 import { bridge, useServerState } from "../messaging"
 
@@ -46,7 +47,7 @@ export const ShareCard = () => {
     try {
       await action()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(messageOf(err))
     } finally {
       setBusy(false)
     }

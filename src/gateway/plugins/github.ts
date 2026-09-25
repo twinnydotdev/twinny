@@ -20,7 +20,9 @@
 import { createSign } from "node:crypto"
 
 import { noAnswer, timeoutSignal } from "../../common/deadline"
+import { messageOf } from "../../common/errors"
 
+import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
 import {
   GatewayPlugin,
   json,
@@ -29,32 +31,7 @@ import {
   PluginRequest,
   PluginResponse
 } from "./host"
-import {
-  arr,
-  baseUrlOf,
-  CheckState,
-  cutPatch,
-  Forge,
-  IssueSummary,
-  MAX_FILES,
-  MAX_PULLS_PER_REPO,
-  MergeState,
-  num,
-  PullApprovals,
-  PullCheck,
-  PullContent,
-  PullFile,
-  PullsPlugin,
-  PullSummary,
-  readJson,
-  rec,
-  RepoRecord,
-  RepoStore,
-  ReviewPostAs,
-  ReviewState,
-  rollup,
-  str
-} from "./pulls"
+import { PullsPlugin } from "./pulls"
 
 export const GITHUB_URL = "https://github.com"
 const USER_AGENT = "twinny-server"
@@ -137,7 +114,7 @@ export const appJwt = (
     signature = signer.sign(privateKey)
   } catch (error) {
     throw new PluginError(
-      `The private key cannot sign: ${error instanceof Error ? error.message : String(error)}`,
+      `The private key cannot sign: ${messageOf(error)}`,
       400
     )
   }

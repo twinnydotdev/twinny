@@ -11,6 +11,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto"
 import http from "node:http"
 import { AddressInfo } from "node:net"
 
+import { messageOf } from "../common/errors"
 import { InferenceError } from "../extension/inference/errors"
 import { handleRemoteRequest } from "../protocol/handler"
 import { PEER_CLOSE, peerRoutePath } from "../protocol/peer"
@@ -373,7 +374,7 @@ export class GatewayServer {
     } catch (error) {
       this._options.log.error({
         event: "audit.failed",
-        message: error instanceof Error ? error.message : String(error)
+        message: messageOf(error)
       })
     }
   }
@@ -468,7 +469,7 @@ export class GatewayServer {
         sendMessage(
           res,
           400,
-          error instanceof Error ? error.message : String(error)
+          messageOf(error)
         )
       }
       return
@@ -532,7 +533,7 @@ export class GatewayServer {
       } catch (error) {
         sendJson(res, error instanceof ConfigurationConflict ? 409 : 400, {
           error: {
-            message: error instanceof Error ? error.message : String(error)
+            message: messageOf(error)
           }
         })
       }
@@ -708,7 +709,7 @@ export class GatewayServer {
         res,
         400,
         "inference-failure",
-        error instanceof Error ? error.message : String(error)
+        messageOf(error)
       )
     }
   }
@@ -1020,7 +1021,7 @@ export class GatewayServer {
     } catch (error) {
       sendJson(res, error instanceof InviteError ? error.status : 400, {
         error: {
-          message: error instanceof Error ? error.message : String(error)
+          message: messageOf(error)
         }
       })
     }
@@ -1126,7 +1127,7 @@ export class GatewayServer {
       sendMessage(
         res,
         400,
-        error instanceof Error ? error.message : String(error)
+        messageOf(error)
       )
     }
   }
@@ -1230,7 +1231,7 @@ export class GatewayServer {
       const status = error instanceof InviteError ? error.status : 400
       sendJson(res, status, {
         error: {
-          message: error instanceof Error ? error.message : String(error)
+          message: messageOf(error)
         }
       })
     }
@@ -1308,7 +1309,7 @@ export class GatewayServer {
       const status = error instanceof PluginError ? error.status : 400
       sendJson(res, status, {
         error: {
-          message: error instanceof Error ? error.message : String(error)
+          message: messageOf(error)
         }
       })
     }
@@ -1344,7 +1345,7 @@ export class GatewayServer {
       sendPlugin(res, answer)
     } catch (error) {
       const status = error instanceof PluginError ? error.status : 400
-      sendMessage(res, status, error instanceof Error ? error.message : String(error))
+      sendMessage(res, status, messageOf(error))
     }
   }
 
@@ -1429,7 +1430,7 @@ export class GatewayServer {
         this._options.log.warn({ event: "invite.refused", reason: "no-seat" })
       sendJson(res, status, {
         error: {
-          message: error instanceof Error ? error.message : String(error)
+          message: messageOf(error)
         }
       })
     }
@@ -1480,7 +1481,7 @@ export class GatewayServer {
       sendMessage(
         res,
         400,
-        error instanceof Error ? error.message : String(error)
+        messageOf(error)
       )
     }
   }
@@ -1544,7 +1545,7 @@ export class GatewayServer {
       sendMessage(
         res,
         400,
-        error instanceof Error ? error.message : String(error)
+        messageOf(error)
       )
     }
   }

@@ -17,6 +17,8 @@ import path from "node:path"
 
 import { providerForBackend } from "../common/backend-route"
 import { API_PROVIDERS, DEFAULT_GATEWAY_PORT } from "../common/constants"
+import { messageOf } from "../common/errors"
+import { isRecord } from "../common/guards"
 import { validateProvider } from "../common/provider-validation"
 import { TwinnyProvider } from "../common/types"
 import type { SecretShieldMode } from "../extension/inference/shield"
@@ -237,9 +239,6 @@ const ENDPOINT_FIELDS = ["apiHostname", "apiPort", "apiProtocol", "apiKeyEnv", "
 const ALIAS_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/
 const ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/
 const PROVIDER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 class Problems {
   public readonly list: string[] = []
@@ -751,7 +750,7 @@ export const loadGatewayConfig = (
     text = fs.readFileSync(file, "utf8")
   } catch (error) {
     throw new GatewayConfigError("invalid-config", [
-      `Could not read ${file}: ${error instanceof Error ? error.message : String(error)}`
+      `Could not read ${file}: ${messageOf(error)}`
     ])
   }
   let parsed: unknown
@@ -759,7 +758,7 @@ export const loadGatewayConfig = (
     parsed = JSON.parse(text)
   } catch (error) {
     throw new GatewayConfigError("invalid-config", [
-      `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+      `${file} is not valid JSON: ${messageOf(error)}`
     ])
   }
   return parseGatewayConfig(parsed, knownProviders)

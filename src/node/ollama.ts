@@ -6,6 +6,7 @@
  * There is no way to name a different path or host from the outside.
  */
 
+import { messageOf } from "../common/errors"
 import {
   INFERENCE_ROUTES,
   InferenceBody,
@@ -115,7 +116,7 @@ export class OllamaProxy {
         sink.error(
           "upstream",
           `The node could not reach Ollama at ${this.baseUrl}: ${
-            error instanceof Error ? error.message : String(error)
+            messageOf(error)
           }`
         )
       }
@@ -150,7 +151,7 @@ export class OllamaProxy {
         sink.error(
           "upstream",
           `Ollama stopped answering: ${
-            error instanceof Error ? error.message : String(error)
+            messageOf(error)
           }`
         )
       }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 
 import { PROVIDER_EVENT_NAME } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import {
   ProviderModelList,
   ProviderSaveResult,
@@ -13,7 +14,7 @@ import { bridge, emit, useServerEvent } from "../messaging"
 
 const failed = (error: unknown): ProviderTestResult => ({
   success: false,
-  error: error instanceof Error ? error.message : String(error)
+  error: messageOf(error)
 })
 
 export const useProviders = () => {

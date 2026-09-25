@@ -3,6 +3,7 @@ import * as Handlebars from "handlebars"
 import * as path from "path"
 
 import { SYSTEM } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 
 import { defaultTemplates } from "./defaults"
@@ -120,7 +121,7 @@ export class TemplateProvider {
       logger.error(
         `The template "${templateName}" did not render` +
           (fallback !== undefined && fallback !== source ? "; using the built-in one" : "") +
-          `: ${error instanceof Error ? error.message : error}`
+          `: ${messageOf(error)}`
       )
       if (fallback === undefined || fallback === source) return ""
       try {

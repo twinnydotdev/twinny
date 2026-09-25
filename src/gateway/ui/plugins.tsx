@@ -5,6 +5,7 @@
  */
 import React, { useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { PluginSummary } from "../plugins/host"
 
 import { BackupsPanel } from "./backups"
@@ -101,7 +102,7 @@ export const PluginsPage = ({ plugins, licensed, onToggle, onOpen, onNavigate }:
     try {
       await onToggle(plugin.id, !plugin.enabled)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(null)
     }

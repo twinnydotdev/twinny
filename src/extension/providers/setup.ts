@@ -8,6 +8,7 @@
 import { commands, ExtensionContext, window } from "vscode"
 
 import { TWINNY_COMMAND_NAME } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { describeServer } from "../../common/provider-discovery"
 import { TwinnyProvider } from "../../common/types"
@@ -48,7 +49,7 @@ export const setUpProvidersOnFirstRun = (
   setupDone = run(context, store).catch((error) => {
     logger.error(
       `Provider setup failed: ${
-        error instanceof Error ? error.message : String(error)
+        messageOf(error)
       }`
     )
   })

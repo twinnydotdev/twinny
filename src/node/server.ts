@@ -10,6 +10,7 @@
 import DHT from "hyperdht"
 import { EventEmitter } from "node:events"
 
+import { messageOf } from "../common/errors"
 import { keyPairFromSeed, toHex } from "../p2p/identity"
 import { encodePairingCode, PAIRING_CODE_TTL_MS, PairingWindow } from "../p2p/pairing"
 import {
@@ -376,7 +377,7 @@ export class TwinnyNode extends EventEmitter {
       id,
       type: "error",
       code,
-      message: error instanceof Error ? error.message : String(error)
+      message: messageOf(error)
     })
   }
 

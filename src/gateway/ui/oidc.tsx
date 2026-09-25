@@ -5,6 +5,7 @@
  */
 import React, { FormEvent, useCallback, useEffect, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { OidcSettingsView, OidcSignIn } from "../plugins/oidc"
 
 import { api } from "./api"
@@ -51,7 +52,7 @@ export const OidcPanel = ({ apiKey }: { apiKey: string }) => {
       setError(undefined)
       return answer
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
       return null
     }
   }, [apiKey])
@@ -70,7 +71,7 @@ export const OidcPanel = ({ apiKey }: { apiKey: string }) => {
       if (answer && what === "save") fill(answer.settings)
       if (done) setNotice(done)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(null)
     }

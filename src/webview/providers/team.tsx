@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useState } from "react"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
 import { PROVIDER_EVENT_NAME } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import type { TeamOpen, TeamPolicy, TeamPreview, TeamSignInStart } from "../../common/team"
 import { describePooling, describeRecording } from "../../common/team-policy"
 import { bridge, emit } from "../messaging"
@@ -92,7 +93,7 @@ export const ConnectTeam = ({ onClose, onDone, connected, open }: ConnectTeamPro
         }
       } catch (error) {
         if (stopped) return
-        setError(error instanceof Error ? error.message : String(error))
+        setError(messageOf(error))
         setSignIn(null)
       }
     }
@@ -110,7 +111,7 @@ export const ConnectTeam = ({ onClose, onDone, connected, open }: ConnectTeamPro
     try {
       setSignIn(await bridge.request(PROVIDER_EVENT_NAME.startTeamSignIn, { url }))
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error))
+      setError(messageOf(error))
     } finally {
       setBusy(false)
     }
@@ -128,7 +129,7 @@ export const ConnectTeam = ({ onClose, onDone, connected, open }: ConnectTeamPro
       setHeldKeyUrl(checked.url)
     } catch (error) {
       setPreview(null)
-      setError(error instanceof Error ? error.message : String(error))
+      setError(messageOf(error))
     } finally {
       setBusy(false)
     }
@@ -149,7 +150,7 @@ export const ConnectTeam = ({ onClose, onDone, connected, open }: ConnectTeamPro
       else onClose()
       return
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error))
+      setError(messageOf(error))
     } finally {
       setBusy(false)
     }

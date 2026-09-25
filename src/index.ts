@@ -23,6 +23,7 @@ import {
   URL_TEAMS,
   WEBUI_TABS
 } from "./common/constants"
+import { messageOf } from "./common/errors"
 import { formatMs, logger } from "./common/logger"
 import { getLineBreakCount } from "./common/text"
 import { ContextItem, SelectionContextItem } from "./common/types"
@@ -296,7 +297,7 @@ export async function activate(context: ExtensionContext) {
     window.registerUriHandler({
       handleUri: (uri) => {
         if (uri.path === "/join" || uri.path === "/team") {
-          openTeamLink(uri).catch((error) => logger.error(`Team link failed: ${error instanceof Error ? error.message : String(error)}`))
+          openTeamLink(uri).catch((error) => logger.error(`Team link failed: ${messageOf(error)}`))
         }
       }
     }),
@@ -466,7 +467,7 @@ export async function activate(context: ExtensionContext) {
       } catch (error) {
         window.showErrorMessage(
           `Twinny could not start sharing: ${
-            error instanceof Error ? error.message : String(error)
+            messageOf(error)
           }`
         )
       }

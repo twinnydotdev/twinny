@@ -13,6 +13,7 @@
  *
  * Pure: no vscode, no networking. Shared by the extension and the node.
  */
+import { isRecord } from "../common/guards"
 
 export const P2P_PROTOCOL_VERSION = 1
 
@@ -168,9 +169,6 @@ export type NodeFrame =
 /* -------------------------------------------------------------------------- */
 /*  Parsing                                                                   */
 /* -------------------------------------------------------------------------- */
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const isId = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0 && value.length <= 64

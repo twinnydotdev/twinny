@@ -11,9 +11,10 @@ import * as path from "path"
 import { createGatewayLog } from "../../gateway/log"
 import { BitbucketForge } from "../../gateway/plugins/bitbucket"
 import { discordPayload } from "../../gateway/plugins/discord"
+import { splitUnifiedDiff } from "../../gateway/plugins/forge"
 import { GiteaForge } from "../../gateway/plugins/gitea"
 import type { PluginContext } from "../../gateway/plugins/host"
-import { PullsPlugin, splitUnifiedDiff } from "../../gateway/plugins/pulls"
+import { PullsPlugin } from "../../gateway/plugins/pulls"
 import { teamsPayload } from "../../gateway/plugins/teams"
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-forges-test-"))

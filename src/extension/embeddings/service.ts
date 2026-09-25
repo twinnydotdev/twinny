@@ -8,6 +8,7 @@ import {
 } from "vscode"
 
 import { EMBEDDING_EVENT_NAME } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import {
   EmbeddingProgress,
@@ -154,7 +155,7 @@ export class EmbeddingService implements Disposable {
       this.report({ running: false, currentFiles: [] })
       window.showInformationMessage(this.describe(result, Date.now() - startedAt))
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = messageOf(error)
       logger.error(`Indexing failed: ${message}`)
       this.report({ running: false, error: message, currentFiles: [] })
       window.showErrorMessage(`Indexing stopped: ${message}`)

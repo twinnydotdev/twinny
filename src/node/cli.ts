@@ -6,6 +6,7 @@
 import path from "node:path"
 import readline from "node:readline"
 
+import { messageOf } from "../common/errors"
 import { shortKey } from "../p2p/identity"
 
 import { HELP, loadOrCreateSeed, parseArgs, TRUSTED_PEERS_FILE } from "./config"
@@ -28,7 +29,7 @@ async function main() {
   try {
     parsed = parseArgs(argv)
   } catch (error) {
-    out(error instanceof Error ? error.message : String(error))
+    out(messageOf(error))
     process.exit(2)
   }
   if (parsed === "help") {

@@ -7,6 +7,8 @@
  * the server asks "may another key be made?" or "how many seats are
  * taken?" asks here, so the guest rule lives in one place.
  */
+import { messageOf } from "../common/errors"
+
 import type { DemoOptions } from "./demo"
 import { isGuestName } from "./demo"
 import type { InviteStore } from "./invites"
@@ -106,7 +108,7 @@ export class SeatBook {
     } catch (error) {
       log.warn({
         event: "demo.sweep-failed",
-        reason: error instanceof Error ? error.message : String(error)
+        reason: messageOf(error)
       })
     }
   }

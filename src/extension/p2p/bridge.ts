@@ -8,6 +8,7 @@
 import { Disposable } from "vscode"
 
 import { P2P_EVENT_NAME } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { P2pPairResult } from "../../common/messaging/protocol"
 import { ExtensionBridge } from "../messaging/bridge"
 import { ProviderManager } from "../providers/manager"
@@ -58,7 +59,7 @@ export class P2pBridge implements Disposable {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: messageOf(error)
       }
     }
   }

@@ -11,6 +11,7 @@
  * Settings can change while the gateway runs (the admin page saves them);
  * the store does not, since it is a file or a database opened at start.
  */
+import { messageOf } from "../../common/errors"
 import type { InferenceCapability } from "../../extension/inference/types"
 
 import { newRecordingId, RecordingRecord, RecordingStore, RecordingUsage } from "./store"
@@ -115,7 +116,7 @@ export class Recorder {
     try {
       this._options.store.append(record)
     } catch (error) {
-      this._options.log?.("recording.failed", { route: input.route, reason: error instanceof Error ? error.message : String(error) })
+      this._options.log?.("recording.failed", { route: input.route, reason: messageOf(error) })
       return undefined
     }
     return record
@@ -150,7 +151,7 @@ export class Recorder {
       if (removed) this._options.log?.("recording.pruned", { removed })
       return removed
     } catch (error) {
-      this._options.log?.("recording.prune-failed", { reason: error instanceof Error ? error.message : String(error) })
+      this._options.log?.("recording.prune-failed", { reason: messageOf(error) })
       return 0
     }
   }

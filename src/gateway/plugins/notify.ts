@@ -15,6 +15,10 @@ import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
+import { isRecord } from "../../common/guards"
+import { writePrivateJson } from "../private-file"
+
 import { EVENT_KINDS, PluginEvent } from "./events"
 import {
   json,
@@ -79,9 +83,6 @@ interface WebhooksFile {
   version: 1
   webhooks: WebhookRecord[]
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const KNOWN_EVENTS = new Set(EVENT_KINDS.map((kind) => kind.type))
 
@@ -179,11 +180,8 @@ export class WebhookStore {
   }
 
   private save(): void {
-    fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 })
     const content: WebhooksFile = { version: 1, webhooks: this._webhooks }
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, { mode: 0o600 })
-    fs.renameSync(tmp, this.file)
+    writePrivateJson(this.file, content)
   }
 }
 
@@ -297,7 +295,7 @@ export class NotifierPlugin implements PluginInstance {
         clearTimeout(timer)
       }
     } catch (error) {
-      delivery.error = error instanceof Error ? error.message : String(error)
+      delivery.error = messageOf(error)
       this._context.log.warn({ event: `plugin.${this._host.id}-failed`, reason: webhook.name, message: delivery.error })
     }
     delivery.ms = this._context.now() - started

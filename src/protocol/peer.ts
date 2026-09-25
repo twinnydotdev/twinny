@@ -14,6 +14,8 @@
  *
  * Pure: no vscode, shared by the extension and the gateway.
  */
+import { messageOf } from "../common/errors"
+import { isRecord } from "../common/guards"
 import { InferenceError } from "../extension/inference/errors"
 import type {
   ChatChunk,
@@ -178,9 +180,6 @@ const MAX_MODEL_CHARS = 128
 const MAX_MODELS = 500
 const MAX_ID_CHARS = 64
 const MAX_ERROR_MESSAGE_CHARS = 400
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const parseJson = (text: string): Record<string, unknown> => {
   let parsed: unknown
@@ -397,7 +396,7 @@ export const parseGatewayFrame = (text: string): GatewayToPeerFrame => {
         request = parseRequest(frame.capability, frame.request)
       } catch (error) {
         throw new PeerProtocolError(
-          error instanceof Error ? error.message : String(error)
+          messageOf(error)
         )
       }
       return { type: "job", id, capability: frame.capability, request }

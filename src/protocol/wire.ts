@@ -3,6 +3,7 @@
  * HTTP status carries which error kind, what a valid request body is, and
  * how a stream line is read.
  */
+import { isRecord } from "../common/guards"
 import {
   InferenceError,
   InferenceErrorKind,
@@ -27,7 +28,8 @@ import {
   RemoteIdentity,
   RemoteRoute,
   RemoteStatus,
-  TeamPolicy} from "./types"
+  TeamPolicy
+} from "./types"
 
 const KINDS: InferenceErrorKind[] = [
   "provider-unavailable",
@@ -81,9 +83,6 @@ export const toErrorBody = (error: InferenceError): RemoteErrorBody => ({
     )
   }
 })
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
 
 export const isErrorBody = (value: unknown): value is RemoteErrorBody =>
   isRecord(value) &&

@@ -16,7 +16,11 @@ import { randomBytes, timingSafeEqual } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../common/errors"
+import { isRecord } from "../common/guards"
+
 import { hashSecret, KEY_NAME_PATTERN } from "./keys"
+import { writePrivateJson } from "./private-file"
 
 export const INVITE_PREFIX = "twi"
 const ID_BYTES = 4
@@ -86,9 +90,6 @@ export class InviteError extends Error {
   }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const str = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined
 
@@ -98,7 +99,7 @@ const parseInvitesFile = (text: string, file: string): InvitesFile => {
     parsed = JSON.parse(text)
   } catch (error) {
     throw new Error(
-      `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+      `${file} is not valid JSON: ${messageOf(error)}`
     )
   }
   if (
@@ -344,13 +345,7 @@ export class InviteStore {
       )
       return now - done < KEEP_DONE_MS
     })
-    const dir = path.dirname(this.file)
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
     const content: InvitesFile = { version: 1, invites: this._invites }
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, {
-      mode: 0o600
-    })
-    fs.renameSync(tmp, this.file)
+    writePrivateJson(this.file, content)
   }
 }

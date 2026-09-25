@@ -13,13 +13,15 @@
  * it, and the exchange is kept on the review as its thread.
  */
 import fs from "node:fs"
-import path from "node:path"
 
+import { messageOf } from "../../common/errors"
+import { isRecord } from "../../common/guards"
 import type { ChatMessage } from "../../extension/inference/types"
+import { writePrivateJson } from "../private-file"
 
+import type { PullDetail, PullSummary } from "./forge"
 import { PluginError } from "./host"
 import { type PluginInference, repoWorkspace } from "./inference"
-import type { PullDetail, PullSummary } from "./pulls"
 
 /** Characters of description and patches a prompt may carry, for small local contexts. */
 export const REVIEW_PROMPT_BUDGET = 24_000
@@ -89,9 +91,6 @@ interface ReviewsFile {
   reviews: ReviewRecord[]
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 /** The turns that are whole; a damaged one is dropped rather than failing the file. */
 const parseThread = (entries: unknown[]): ReviewTurn[] =>
   entries.flatMap((entry) =>
@@ -118,7 +117,7 @@ const parseReviewsFile = (text: string, file: string): ReviewsFile => {
     parsed = JSON.parse(text)
   } catch (error) {
     throw new Error(
-      `${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+      `${file} is not valid JSON: ${messageOf(error)}`
     )
   }
   if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.reviews))
@@ -239,13 +238,8 @@ export class ReviewStore {
   }
 
   private save(): void {
-    fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 })
     const content: ReviewsFile = { version: 1, reviews: this._reviews }
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, {
-      mode: 0o600
-    })
-    fs.renameSync(tmp, this.file)
+    writePrivateJson(this.file, content)
   }
 }
 
@@ -438,7 +432,7 @@ export class Reviewer {
         ms: this._now() - started,
         status: "failed",
         text: "",
-        error: error instanceof Error ? error.message : String(error)
+        error: messageOf(error)
       }
       this._store.put(review)
       return review

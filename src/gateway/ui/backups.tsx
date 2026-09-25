@@ -5,6 +5,7 @@
  */
 import React, { FormEvent, useCallback, useEffect, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { ArchiveInfo, BackupRun, BackupSettingsView } from "../plugins/backups"
 
 import { api } from "./api"
@@ -75,7 +76,7 @@ export const BackupsPanel = ({ apiKey }: { apiKey: string }) => {
       setError(undefined)
       return answer
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
       return null
     }
   }, [apiKey])
@@ -97,7 +98,7 @@ export const BackupsPanel = ({ apiKey }: { apiKey: string }) => {
       await load()
       if (done) setNotice(done)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(null)
     }

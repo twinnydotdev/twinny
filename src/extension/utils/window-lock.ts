@@ -7,6 +7,8 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../../common/errors"
+
 export interface WindowLockOptions {
   /** Where the lock file lives; usually the extension's global storage. */
   dir: string
@@ -51,7 +53,7 @@ export class WindowLock {
       }
     } catch (error) {
       this._options.warn?.(
-        `${this._options.name} lock unavailable, continuing without it: ${error instanceof Error ? error.message : String(error)}`
+        `${this._options.name} lock unavailable, continuing without it: ${messageOf(error)}`
       )
     }
     this._held = true

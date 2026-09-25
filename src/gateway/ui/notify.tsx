@@ -5,6 +5,7 @@
  */
 import React, { FormEvent, useCallback, useEffect, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { PluginEventKind } from "../plugins/events"
 import type { Delivery, WebhookView } from "../plugins/notify"
 
@@ -67,7 +68,7 @@ export const NotifyPanel = ({ host, apiKey }: { host: NotifyHostId; apiKey: stri
       setError(undefined)
       return answer
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
       return null
     }
   }, [apiKey])
@@ -91,7 +92,7 @@ export const NotifyPanel = ({ host, apiKey }: { host: NotifyHostId; apiKey: stri
       await load()
       if (done) setNotice(done)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(null)
     }
