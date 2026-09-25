@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.2.8 · 2026-09-25
+
+Extension and `twinny-server` release: internal tidy-up, no new features.
+
+- **Timeouts no longer keep a process alive.** The clocks that cancel a slow request (listing models, probing a provider, connecting to a gateway, and the forge requests behind pull request review) are now one shared implementation, and none of them holds Node open while it waits. What a timeout does and what it reports are unchanged.
+- **Smaller, clearer modules underneath.** The gateway's HTTP replies, its private-file writes, the forge contract behind pull request review, and the inline edit's diff region each have a module of their own, and error messages are read one way everywhere. Nothing on the wire or on disk changes.
+
 ## 4.2.7 · 2026-09-24
 
 Extension and `twinny-server` release: the completion model is loaded before you type, and the gateway shields secrets for every client.
