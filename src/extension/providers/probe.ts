@@ -7,6 +7,7 @@
  * back as a result, never as a rejection — because the caller is a UI that
  * wants to show the reason, not a stack trace.
  */
+import { deadline } from "../../common/deadline"
 import {
   ProviderModelList,
   ProviderTestResult
@@ -22,12 +23,6 @@ const PROBE_TIMEOUT_MS = 20_000
 
 const FIM_PROBE_PROMPT = "def add(a, b):\n    return"
 const EMBED_PROBE_INPUT = "hello"
-
-const withTimeout = (ms: number) => {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), ms)
-  return { signal: controller.signal, done: () => clearTimeout(timer) }
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Testing                                                                   */
@@ -88,7 +83,7 @@ export const testProvider = async (
   timeoutMs = PROBE_TIMEOUT_MS
 ): Promise<ProviderTestResult> => {
   const started = Date.now()
-  const { signal, done } = withTimeout(timeoutMs)
+  const { signal, done } = deadline(timeoutMs)
   try {
     const client = resolveInferenceProvider(provider)
     let sample: string
