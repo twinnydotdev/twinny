@@ -7,6 +7,7 @@
 import { TokenJS } from "fluency.js"
 
 import { API_PROVIDERS } from "../../../common/constants"
+import { deadline } from "../../../common/deadline"
 import { getProviderOrigin } from "../../../common/provider-validation"
 import { TwinnyProvider } from "../../../common/types"
 import { p2pListingBase } from "../../p2p/endpoint"
@@ -73,21 +74,6 @@ const listRoutesFor = (provider: string): ListRoute[] => {
       return [OPENWEBUI_MODELS, OPENWEBUI_OLLAMA_TAGS, OPENAI_MODELS]
     default:
       return [OPENAI_MODELS, OLLAMA_TAGS]
-  }
-}
-
-const withTimeout = (ms: number, outer?: AbortSignal) => {
-  const controller = new AbortController()
-  const forward = () => controller.abort(outer?.reason)
-  if (outer?.aborted) forward()
-  else outer?.addEventListener("abort", forward, { once: true })
-  const timer = setTimeout(() => controller.abort(), ms)
-  return {
-    signal: controller.signal,
-    done: () => {
-      clearTimeout(timer)
-      outer?.removeEventListener("abort", forward)
-    }
   }
 }
 
@@ -214,7 +200,7 @@ export class HttpInferenceProvider implements InferenceProvider {
     route: ListRoute,
     outer?: AbortSignal
   ): Promise<string[]> {
-    const { signal, done } = withTimeout(LIST_TIMEOUT_MS, outer)
+    const { signal, done } = deadline(LIST_TIMEOUT_MS, { parent: outer })
     try {
       const response = await fetch(url, { headers: this.headers(), signal })
       if (!response.ok) throw await responseError(response)
