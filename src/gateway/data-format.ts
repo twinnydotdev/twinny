@@ -8,6 +8,10 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 
+import { messageOf } from "../common/errors"
+
+import { writePrivateJson } from "./private-file"
+
 /** The layout this server reads and writes. Bump with a migration below. */
 export const DATA_FORMAT = 1
 
@@ -74,7 +78,7 @@ const readMarker = (file: string): DataFormatRecord | undefined => {
     text = fs.readFileSync(file, "utf8")
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
-    throw new DataFormatError(`${file} cannot be read: ${error instanceof Error ? error.message : String(error)}`, "unreadable")
+    throw new DataFormatError(`${file} cannot be read: ${messageOf(error)}`, "unreadable")
   }
   let parsed: unknown
   try {
@@ -96,11 +100,8 @@ const readMarker = (file: string): DataFormatRecord | undefined => {
   }
 }
 
-const writeMarker = (file: string, record: DataFormatRecord) => {
-  const tmp = `${file}.tmp`
-  fs.writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 })
-  fs.renameSync(tmp, file)
-}
+const writeMarker = (file: string, record: DataFormatRecord) =>
+  writePrivateJson(file, record)
 
 const hasLegacyFiles = (dataDir: string): boolean =>
   LEGACY_ENTRIES.some((entry) => fs.existsSync(path.join(dataDir, entry)))

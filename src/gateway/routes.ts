@@ -3,6 +3,7 @@
  * one inference client from the registry pointed at one backend model.
  * Built once at startup so a request only ever looks an entry up.
  */
+import { messageOf } from "../common/errors"
 import { TwinnyProvider } from "../common/types"
 import { InferenceError, toInferenceError } from "../extension/inference/errors"
 import { ProviderRegistry } from "../extension/inference/registry"
@@ -114,7 +115,7 @@ export const buildRouteTable = (
         if (shieldsBackend(provider, config.policy)) client = shieldClient(client, provider)
       } catch (error) {
         problems.push(
-          `models "${model.alias}": ${error instanceof Error ? error.message : String(error)}`
+          `models "${model.alias}": ${messageOf(error)}`
         )
         continue
       }

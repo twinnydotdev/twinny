@@ -12,6 +12,7 @@
  */
 import fs from "node:fs"
 
+import { messageOf } from "../common/errors"
 import { providerRegistry } from "../extension/inference/registry"
 import { FREE_SEATS, LicenseError } from "../licensing"
 import { inviteLink } from "../protocol/types"
@@ -134,7 +135,7 @@ const takeConfig = (argv: string[]): { rest: string[]; paths: Paths } => {
 const describeError = (error: unknown): string[] =>
   error instanceof GatewayConfigError
     ? [`Cannot read the configuration (${error.code}):`, ...error.problems.map((p) => `  - ${p}`)]
-    : [error instanceof Error ? error.message : String(error)]
+    : [messageOf(error)]
 
 /* -------------------------------------------------------------------------- */
 /*  Tables                                                                    */
@@ -175,7 +176,7 @@ export const runKeys = (argv: string[], io: AdminIo): number => {
   try {
     store = KeyStore.open(paths.keysFile)
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
 
@@ -227,7 +228,7 @@ export const runKeys = (argv: string[], io: AdminIo): number => {
         throw new Error(`Unknown keys command "${command}". Try: twinny-server keys --help`)
     }
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
 }
@@ -314,7 +315,7 @@ export const runInvites = (argv: string[], io: AdminIo): number => {
         throw new Error(`Unknown invites command "${command}". Try: twinny-server invites --help`)
     }
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
 }
@@ -378,7 +379,7 @@ export const runLicense = (argv: string[], io: AdminIo, now = new Date()): numbe
         throw new Error(`Unknown license command "${command}". Try: twinny-server license --help`)
     }
   } catch (error) {
-    io.err(error instanceof LicenseError ? `Not installed: ${error.message}` : error instanceof Error ? error.message : String(error))
+    io.err(error instanceof LicenseError ? `Not installed: ${error.message}` : messageOf(error))
     return EXIT_CODE.config
   }
 }
@@ -462,7 +463,7 @@ export const runRecordings = (argv: string[], io: AdminIo, now = new Date()): nu
       store.close()
     }
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
 }
@@ -558,7 +559,7 @@ export const runUsage = (argv: string[], io: AdminIo, now = new Date()): number 
     for (const line of table(header, rows, right)) io.out(line)
     return EXIT_CODE.ok
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
 }

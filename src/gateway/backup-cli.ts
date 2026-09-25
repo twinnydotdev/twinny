@@ -15,6 +15,7 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { messageOf } from "../common/errors"
 import { providerRegistry } from "../extension/inference/registry"
 
 import {
@@ -107,7 +108,7 @@ export const runBackup = async (argv: string[], io: BackupIo): Promise<number> =
   try {
     options = takeOptions(argv)
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
   const [command, ...args] = options.rest
@@ -122,7 +123,7 @@ export const runBackup = async (argv: string[], io: BackupIo): Promise<number> =
     if (error instanceof GatewayConfigError) {
       io.err(`Cannot read the configuration (${error.code}):`)
       for (const problem of error.problems) io.err(`  - ${problem}`)
-    } else io.err(error instanceof Error ? error.message : String(error))
+    } else io.err(messageOf(error))
     return EXIT_CODE.config
   }
   const settings = settingsFor(paths)
@@ -178,7 +179,7 @@ export const runBackup = async (argv: string[], io: BackupIo): Promise<number> =
         return EXIT_CODE.config
     }
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.failure
   }
 }

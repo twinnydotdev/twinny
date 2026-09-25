@@ -4,6 +4,7 @@
  */
 import React, { FormEvent, useCallback, useEffect, useState } from "react"
 
+import { messageOf } from "../../common/errors"
 import type { ContextHit, ContextRepoView } from "../plugins/context"
 
 import { api } from "./api"
@@ -38,7 +39,7 @@ export const ContextPanel = ({ apiKey }: { apiKey: string }) => {
       setOverview(await api<Overview>(`${base}/`, apiKey))
       setError(undefined)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     }
   }, [apiKey])
 
@@ -61,7 +62,7 @@ export const ContextPanel = ({ apiKey }: { apiKey: string }) => {
       await load()
       if (done) setNotice(done)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(messageOf(e))
     } finally {
       setBusy(null)
     }

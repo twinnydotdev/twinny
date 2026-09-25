@@ -1,6 +1,7 @@
 import * as fs from "fs/promises"
 import { workspace } from "vscode"
 
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { getParser } from "../completion/parser"
 
@@ -283,7 +284,7 @@ export class WorkspaceSearch {
       return await this._parse(file, text)
     } catch (error) {
       // One missing grammar fails every file of that language; say it once.
-      const message = error instanceof Error ? error.message : String(error)
+      const message = messageOf(error)
       if (!this._reportedParseErrors.has(message)) {
         this._reportedParseErrors.add(message)
         logger.warn(`Could not parse ${file} to widen hits (hits stay as chunks): ${message}`)

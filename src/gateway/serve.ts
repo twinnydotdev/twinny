@@ -8,6 +8,7 @@
  */
 import path from "node:path"
 
+import { messageOf } from "../common/errors"
 import { providerRegistry } from "../extension/inference/registry"
 import { REMOTE_PROTOCOL_BASE } from "../protocol/types"
 
@@ -246,7 +247,7 @@ export const runServe = async (
   try {
     args = parseServeArgs(argv)
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
   if (args === "help") {
@@ -265,7 +266,7 @@ export const runServe = async (
       host: args.host ?? (io.env.TWINNY_HOST?.trim() || undefined)
     }
   } catch (error) {
-    io.err(error instanceof Error ? error.message : String(error))
+    io.err(messageOf(error))
     return EXIT_CODE.config
   }
   const demo = args.demo ? DEFAULT_DEMO : undefined
@@ -345,7 +346,7 @@ export const runServe = async (
       recorder.start()
     } catch (error) {
       io.err(
-        `Recording is unavailable: ${error instanceof Error ? error.message : String(error)}`
+        `Recording is unavailable: ${messageOf(error)}`
       )
       recorder = undefined
     }
@@ -414,7 +415,7 @@ export const runServe = async (
       return EXIT_CODE.data
     }
     io.err(
-      `Cannot start the gateway: ${error instanceof Error ? error.message : String(error)}`
+      `Cannot start the gateway: ${messageOf(error)}`
     )
     return EXIT_CODE.failure
   }
@@ -425,7 +426,7 @@ export const runServe = async (
     plugins.start()
   } catch (error) {
     io.err(
-      `Cannot start the gateway: ${error instanceof Error ? error.message : String(error)}`
+      `Cannot start the gateway: ${messageOf(error)}`
     )
     return error instanceof GatewayListenError
       ? EXIT_CODE.listen

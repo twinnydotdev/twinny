@@ -5,6 +5,7 @@
  * the same `InferenceError` kinds they were sent as.
  */
 import { API_PROVIDERS } from "../common/constants"
+import { deadline } from "../common/deadline"
 import { getProviderOrigin } from "../common/provider-validation"
 import { TwinnyProvider } from "../common/types"
 import { InferenceError, toInferenceError } from "../extension/inference/errors"
@@ -67,32 +68,6 @@ export const endpointFromProvider = (config: TwinnyProvider): RemoteEndpoint => 
   })
   const base = (config.apiPath || "").replace(/\/+$/, "")
   return { baseUrl: `${origin}${base}`, token: config.apiKey || undefined }
-}
-
-/**
- * A signal that fires when the consumer's does, or when the gateway has
- * not answered in time. `answered()` stops the clock once the first byte
- * is in; `done()` also stops following the consumer's signal, for when
- * the request is over.
- */
-const withTimeout = (ms: number, outer?: AbortSignal) => {
-  const controller = new AbortController()
-  const forward = () => controller.abort(outer?.reason)
-  if (outer?.aborted) forward()
-  else outer?.addEventListener("abort", forward, { once: true })
-  const timer = setTimeout(() => {
-    controller.abort(
-      new InferenceError("timeout", `The gateway did not answer within ${ms / 1000}s.`)
-    )
-  }, ms)
-  return {
-    signal: controller.signal,
-    answered: () => clearTimeout(timer),
-    done: () => {
-      clearTimeout(timer)
-      outer?.removeEventListener("abort", forward)
-    }
-  }
 }
 
 export class RemoteInferenceProvider implements InferenceProvider {
@@ -245,7 +220,14 @@ export class RemoteInferenceProvider implements InferenceProvider {
     signal: AbortSignal | undefined,
     keepOpen?: (answered: () => void, done: () => void) => void
   ): Promise<Response> {
-    const timer = withTimeout(CONNECT_TIMEOUT_MS, signal)
+    const timer = deadline(CONNECT_TIMEOUT_MS, {
+      parent: signal,
+      reason: () =>
+        new InferenceError(
+          "timeout",
+          `The gateway did not answer within ${CONNECT_TIMEOUT_MS / 1000}s.`
+        )
+    })
     let response: Response
     try {
       response = await this._fetch(this.url(route), {

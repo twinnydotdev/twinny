@@ -18,6 +18,7 @@ import { randomBytes } from "node:crypto"
 import http from "node:http"
 import { AddressInfo } from "node:net"
 
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import {
   InferenceBody,
@@ -322,7 +323,7 @@ export class P2pGateway {
   }
 
   private describe(error: unknown): string {
-    return error instanceof Error ? error.message : String(error)
+    return messageOf(error)
   }
 
   private json(res: http.ServerResponse, status: number, value: unknown) {

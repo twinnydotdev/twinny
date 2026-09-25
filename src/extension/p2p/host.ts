@@ -28,6 +28,7 @@ import {
   P2P_HOST_SECRET_KEY,
   P2P_TRUSTED_PEERS_STORAGE_KEY
 } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { P2pHostStatus } from "../../common/messaging/protocol"
 import { DEFAULT_NODE_PORT } from "../../node/config"
@@ -106,7 +107,7 @@ export class P2pHost implements Disposable {
       await this.start()
     } catch (error) {
       logger.error(
-        `p2p host failed to start: ${error instanceof Error ? error.message : String(error)}`
+        `p2p host failed to start: ${messageOf(error)}`
       )
     }
   }
@@ -183,7 +184,7 @@ export class P2pHost implements Disposable {
       void this.checkOllama()
       logger.info(`p2p host sharing as ${node.publicKeyHex}`)
     } catch (error) {
-      this._error = error instanceof Error ? error.message : String(error)
+      this._error = messageOf(error)
       this.releaseLock()
       throw error
     } finally {

@@ -19,6 +19,10 @@
  */
 import { createSign } from "node:crypto"
 
+import { noAnswer, timeoutSignal } from "../../common/deadline"
+import { messageOf } from "../../common/errors"
+
+import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
 import {
   GatewayPlugin,
   json,
@@ -27,33 +31,7 @@ import {
   PluginRequest,
   PluginResponse
 } from "./host"
-import {
-  arr,
-  baseUrlOf,
-  CheckState,
-  cutPatch,
-  Forge,
-  IssueSummary,
-  MAX_FILES,
-  MAX_PULLS_PER_REPO,
-  MergeState,
-  num,
-  PullApprovals,
-  PullCheck,
-  PullContent,
-  PullFile,
-  PullsPlugin,
-  PullSummary,
-  readJson,
-  rec,
-  RepoRecord,
-  RepoStore,
-  ReviewPostAs,
-  ReviewState,
-  rollup,
-  str,
-  timeoutSignal
-} from "./pulls"
+import { PullsPlugin } from "./pulls"
 
 export const GITHUB_URL = "https://github.com"
 const USER_AGENT = "twinny-server"
@@ -136,7 +114,7 @@ export const appJwt = (
     signature = signer.sign(privateKey)
   } catch (error) {
     throw new PluginError(
-      `The private key cannot sign: ${error instanceof Error ? error.message : String(error)}`,
+      `The private key cannot sign: ${messageOf(error)}`,
       400
     )
   }
@@ -627,7 +605,7 @@ export class GitHubForge implements Forge {
           "Paste the whole private key file (.pem), from BEGIN to END.",
           400
         )
-      const signal = timeoutSignal(20_000)
+      const signal = timeoutSignal(20_000, { reason: () => noAnswer(20_000) })
       const app = await this.rest(
         "/app",
         appJwt(appId, privateKey, this._context.now()),
@@ -665,7 +643,7 @@ export class GitHubForge implements Forge {
     if (path === "app/repositories" && method === "GET") {
       const app = this.app()
       if (!app) throw new PluginError("No GitHub App is set up.", 409)
-      const signal = timeoutSignal(20_000)
+      const signal = timeoutSignal(20_000, { reason: () => noAnswer(20_000) })
       const installations = arr(
         await this.rest(
           "/app/installations?per_page=100",

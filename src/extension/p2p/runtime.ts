@@ -19,6 +19,7 @@ import {
   P2P_DEVICES_STORAGE_KEY,
   P2P_IDENTITY_SECRET_KEY
 } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { P2pDeviceStatus } from "../../common/messaging/protocol"
 import {
@@ -91,7 +92,7 @@ export class P2pRuntime implements Disposable {
       setP2pGateway(this.gateway)
     } catch (error) {
       logger.error(
-        `p2p gateway failed to start: ${error instanceof Error ? error.message : String(error)}`
+        `p2p gateway failed to start: ${messageOf(error)}`
       )
     }
     if (this.devices().length) {
@@ -220,7 +221,7 @@ export class P2pRuntime implements Disposable {
     } catch (error) {
       this.setLive(id, {
         state: "disconnected",
-        error: error instanceof Error ? error.message : String(error)
+        error: messageOf(error)
       })
     }
     return this.statusOf(device)
@@ -296,7 +297,7 @@ export class P2pRuntime implements Disposable {
         void client.connect().catch((error) => {
           this.setLive(device.id, {
             state: "disconnected",
-            error: error instanceof Error ? error.message : String(error)
+            error: messageOf(error)
           })
         })
       } catch {
@@ -328,7 +329,7 @@ export class P2pRuntime implements Disposable {
     } catch (error) {
       this.setLive(id, {
         state: client.connected ? "connected" : "disconnected",
-        error: error instanceof Error ? error.message : String(error)
+        error: messageOf(error)
       })
     }
   }

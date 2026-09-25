@@ -12,7 +12,11 @@
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import fs from "node:fs"
-import path from "node:path"
+
+import { messageOf } from "../common/errors"
+import { isRecord } from "../common/guards"
+
+import { writePrivateJson } from "./private-file"
 
 export const KEY_PREFIX = "tsk"
 const ID_BYTES = 4
@@ -42,15 +46,12 @@ interface KeysFile {
 export const hashSecret = (secret: string): string =>
   createHash("sha256").update(secret, "utf8").digest("hex")
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
 const parseKeysFile = (text: string, file: string): KeysFile => {
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
   } catch (error) {
-    throw new Error(`${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`)
+    throw new Error(`${file} is not valid JSON: ${messageOf(error)}`)
   }
   if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.keys)) {
     throw new Error(`${file} is not a twinny-server keys file.`)
@@ -216,12 +217,8 @@ export class KeyStore {
   }
 
   private save(): void {
-    const dir = path.dirname(this.file)
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
     const content: KeysFile = { version: 1, keys: this._keys }
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, `${JSON.stringify(content, null, 2)}\n`, { mode: 0o600 })
-    fs.renameSync(tmp, this.file)
+    writePrivateJson(this.file, content)
     this._mtimeMs = fs.statSync(this.file).mtimeMs
   }
 }

@@ -1,4 +1,5 @@
 import { P2P_EVENT_NAME } from "../../common/constants"
+import { messageOf } from "../../common/errors"
 import {
   P2pDeviceStatus,
   P2pHostStatus,
@@ -24,7 +25,7 @@ export const useDevices = () => {
         .request(P2P_EVENT_NAME.pairDevice, { code, name })
         .catch((error: unknown) => ({
           success: false,
-          error: error instanceof Error ? error.message : String(error)
+          error: messageOf(error)
         })),
     refreshDevice: (id: string): Promise<P2pDeviceStatus | undefined> =>
       bridge.request(P2P_EVENT_NAME.refreshDevice, id).catch(() => undefined),
