@@ -2,7 +2,7 @@ import * as assert from "assert"
 import * as vscode from "vscode"
 
 import { layoutDiff } from "../../extension/edit/diff"
-import { DiffRegion } from "../../extension/edit/service"
+import { DiffRegion } from "../../extension/edit/region"
 
 /** An editor on an untitled document, plus a region that follows its changes. */
 const open = async (content: string, from: number, to: number) => {

@@ -30,7 +30,6 @@ import {
 import {
   isInferenceCapability,
   matchRemoteRoute,
-  statusForKind,
   toErrorBody
 } from "../protocol/wire"
 
@@ -66,6 +65,15 @@ import { LicenseStore } from "./license"
 import { GatewayLog } from "./log"
 import type { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
+import {
+  readJsonBody,
+  sendError,
+  sendJson,
+  sendMessage,
+  sendMethodNotAllowed,
+  sendPlugin,
+  sendRefusal
+} from "./reply"
 import { RouteTable } from "./routes"
 import { SeatBook } from "./seats"
 import { isUserCode, normalizeUserCode, SignInRequests } from "./signin"
@@ -163,88 +171,6 @@ const bearerOf = (header: string | undefined): string | undefined => {
   const match = /^Bearer\s+(\S+)\s*$/i.exec(header || "")
   return match ? match[1] : undefined
 }
-
-const sendJson = (
-  res: http.ServerResponse,
-  status: number,
-  value: unknown,
-  headers: Record<string, string> = {}
-) => {
-  const text = JSON.stringify(value)
-  res.writeHead(status, {
-    "Content-Type": "application/json",
-    "Content-Length": Buffer.byteLength(text),
-    "Cache-Control": "no-store",
-    ...headers
-  })
-  res.end(text)
-}
-
-/** A plugin's answer: JSON, a page, or a redirect. */
-const sendPlugin = (res: http.ServerResponse, answer: { status: number; body?: unknown; headers?: Record<string, string>; html?: string }) => {
-  if (answer.html !== undefined) {
-    res.writeHead(answer.status, {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Length": Buffer.byteLength(answer.html),
-      "Cache-Control": "no-store",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
-      ...(answer.headers ?? {})
-    })
-    res.end(answer.html)
-    return
-  }
-  if (answer.body === null && answer.status >= 300 && answer.status < 400) {
-    res.writeHead(answer.status, { "Cache-Control": "no-store", ...(answer.headers ?? {}) })
-    res.end()
-    return
-  }
-  sendJson(res, answer.status, answer.body, answer.headers)
-}
-
-const sendError = (
-  res: http.ServerResponse,
-  error: InferenceError,
-  headers?: Record<string, string>
-) => sendJson(res, statusForKind(error.kind), toErrorBody(error), headers)
-
-const MAX_ADMIN_BODY_BYTES = 16 * 1024
-
-/** A small JSON body, or an error the caller can show. */
-const readJsonBody = (
-  req: http.IncomingMessage,
-  maxBytes = MAX_ADMIN_BODY_BYTES
-): Promise<Record<string, unknown>> =>
-  new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    let size = 0
-    req.on("data", (chunk: Buffer) => {
-      size += chunk.length
-      if (size <= maxBytes) chunks.push(chunk)
-    })
-    req.on("end", () => {
-      if (size > maxBytes) {
-        reject(new Error("The request body is too large."))
-        return
-      }
-      try {
-        const parsed: unknown = JSON.parse(
-          Buffer.concat(chunks as Uint8Array[]).toString("utf8") || "{}"
-        )
-        if (
-          typeof parsed !== "object" ||
-          parsed === null ||
-          Array.isArray(parsed)
-        ) {
-          reject(new Error("The request body must be a JSON object."))
-          return
-        }
-        resolve(parsed as Record<string, unknown>)
-      } catch {
-        reject(new Error("The request body is not JSON."))
-      }
-    })
-    req.on("error", (error) => reject(error))
-  })
 
 export class GatewayServer {
   private readonly _server: http.Server
@@ -457,11 +383,11 @@ export class GatewayServer {
   private handleAudit(route: string, url: URL, req: http.IncomingMessage, res: http.ServerResponse) {
     const audit = this._options.audit
     if (!audit) {
-      sendJson(res, 404, { error: { message: "This gateway keeps no audit log." } })
+      sendMessage(res, 404, "This gateway keeps no audit log.")
       return
     }
     if (req.method !== "GET") {
-      sendJson(res, 405, { error: { message: "The audit log is read with GET." } }, { Allow: "GET" })
+      sendMethodNotAllowed(res, ["GET"], "The audit log is read with GET.")
       return
     }
     if (route === "audit/export") {
@@ -500,15 +426,11 @@ export class GatewayServer {
     auth: { principal: string; admin: boolean }
   ) {
     if (!auth.admin) {
-      sendJson(
+      sendRefusal(
         res,
         403,
-        toErrorBody(
-          new InferenceError(
-            "authentication",
-            "This gateway key is not an admin key."
-          )
-        )
+        "authentication",
+        "This gateway key is not an admin key."
       )
       this._options.log.warn({ event: "admin.refused", key: auth.principal })
       return
@@ -518,20 +440,19 @@ export class GatewayServer {
       .replace(/\/+$/, "")
     if (route === "provider-models") {
       if (req.method !== "POST") {
-        sendJson(
+        sendMethodNotAllowed(
           res,
-          405,
-          { error: { message: "Use POST to list a provider's models." } },
-          { Allow: "POST" }
+          ["POST"],
+          "Use POST to list a provider's models."
         )
         return
       }
       if (!this._options.configuration || this._draining) {
-        sendJson(res, 503, {
-          error: {
-            message: "Provider model discovery is currently unavailable."
-          }
-        })
+        sendMessage(
+          res,
+          503,
+          "Provider model discovery is currently unavailable."
+        )
         return
       }
       try {
@@ -545,38 +466,34 @@ export class GatewayServer {
           )
         )
       } catch (error) {
-        sendJson(res, 400, {
-          error: {
-            message: messageOf(error)
-          }
-        })
+        sendMessage(
+          res,
+          400,
+          messageOf(error)
+        )
       }
       return
     }
     if (route === "config") {
       if (req.method !== "GET" && req.method !== "PUT") {
-        sendJson(
+        sendMethodNotAllowed(
           res,
-          405,
-          { error: { message: "Use GET or PUT for configuration." } },
-          { Allow: "GET, PUT" }
+          ["GET", "PUT"],
+          "Use GET or PUT for configuration."
         )
         return
       }
       if (this._draining) {
-        sendJson(res, 503, {
-          error: { message: "The gateway is shutting down." }
-        })
+        sendMessage(res, 503, "The gateway is shutting down.")
         return
       }
       const configuration = this._options.configuration
       if (!configuration) {
-        sendJson(res, 503, {
-          error: {
-            message:
-              "Configuration editing requires a gateway started with --config."
-          }
-        })
+        sendMessage(
+          res,
+          503,
+          "Configuration editing requires a gateway started with --config."
+        )
         return
       }
       try {
@@ -587,11 +504,11 @@ export class GatewayServer {
         const body = await readJsonBody(req, 256 * 1024)
         const current = this.authenticate(req.headers.authorization)
         if ("refused" in current || !current.admin) {
-          sendJson(res, 403, {
-            error: {
-              message: "An active admin key is required to save changes."
-            }
-          })
+          sendMessage(
+            res,
+            403,
+            "An active admin key is required to save changes."
+          )
           return
         }
         const saved = configuration.save(
@@ -679,11 +596,7 @@ export class GatewayServer {
         this._options.keys.reload()
         const refusal = this._seats.refuse(name)
         if (refusal) {
-          sendJson(
-            res,
-            409,
-            toErrorBody(new InferenceError("inference-failure", refusal))
-          )
+          sendRefusal(res, 409, "inference-failure", refusal)
           this._options.log.warn({
             event: "admin.key-refused",
             key: auth.principal,
@@ -717,28 +630,20 @@ export class GatewayServer {
           .list()
           .find((k) => k.id === id && !k.revokedAt)
         if (!target) {
-          sendJson(
+          sendRefusal(
             res,
             404,
-            toErrorBody(
-              new InferenceError(
-                "inference-failure",
-                "No active key with that id."
-              )
-            )
+            "inference-failure",
+            "No active key with that id."
           )
           return
         }
         if (target.name === auth.principal) {
-          sendJson(
+          sendRefusal(
             res,
             400,
-            toErrorBody(
-              new InferenceError(
-                "inference-failure",
-                "That is the key you are signed in with. Revoke it from the CLI if you mean it."
-              )
-            )
+            "inference-failure",
+            "That is the key you are signed in with. Revoke it from the CLI if you mean it."
           )
           return
         }
@@ -800,15 +705,11 @@ export class GatewayServer {
           sendError(res, new InferenceError("inference-failure", "Not found."))
       }
     } catch (error) {
-      sendJson(
+      sendRefusal(
         res,
         400,
-        toErrorBody(
-          new InferenceError(
-            "inference-failure",
-            messageOf(error)
-          )
-        )
+        "inference-failure",
+        messageOf(error)
       )
     }
   }
@@ -822,19 +723,12 @@ export class GatewayServer {
   ) {
     const peers = this._options.peers
     if (!peers) {
-      sendJson(res, 503, {
-        error: { message: "This gateway was started without peer support." }
-      })
+      sendMessage(res, 503, "This gateway was started without peer support.")
       return
     }
     if (route === "peers") {
       if (req.method !== "GET") {
-        sendJson(
-          res,
-          405,
-          { error: { message: "Use GET to list peers." } },
-          { Allow: "GET" }
-        )
+        sendMethodNotAllowed(res, ["GET"], "Use GET to list peers.")
         return
       }
       sendJson(res, 200, {
@@ -846,23 +740,16 @@ export class GatewayServer {
     }
     const match = /^peers\/(p[0-9]+)\/disconnect$/.exec(route)
     if (!match) {
-      sendJson(res, 404, { error: { message: "Not found." } })
+      sendMessage(res, 404, "Not found.")
       return
     }
     if (req.method !== "POST") {
-      sendJson(
-        res,
-        405,
-        { error: { message: "Disconnecting is POST only." } },
-        { Allow: "POST" }
-      )
+      sendMethodNotAllowed(res, ["POST"], "Disconnecting is POST only.")
       return
     }
     const target = peers.snapshot().find((peer) => peer.id === match[1])
     if (!target || !peers.disconnect(match[1])) {
-      sendJson(res, 404, {
-        error: { message: "No connected peer with that id." }
-      })
+      sendMessage(res, 404, "No connected peer with that id.")
       return
     }
     this._options.log.info({
@@ -981,29 +868,22 @@ export class GatewayServer {
   ) {
     const recorder = this._options.recorder
     if (!recorder) {
-      sendJson(res, 503, {
-        error: {
-          message: "This gateway was started without recording support."
-        }
-      })
+      sendMessage(
+        res,
+        503,
+        "This gateway was started without recording support."
+      )
       return
     }
     if (req.method !== "GET") {
-      sendJson(
-        res,
-        405,
-        { error: { message: "Recordings are read-only here." } },
-        { Allow: "GET" }
-      )
+      sendMethodNotAllowed(res, ["GET"], "Recordings are read-only here.")
       return
     }
     const query: RecordingQuery = {}
     const routeParam = url.searchParams.get("route")
     if (routeParam) {
       if (!isInferenceCapability(routeParam)) {
-        sendJson(res, 400, {
-          error: { message: "route must be chat, fim or embeddings." }
-        })
+        sendMessage(res, 400, "route must be chat, fim or embeddings.")
         return
       }
       query.route = routeParam as RecordingRoute
@@ -1013,9 +893,7 @@ export class GatewayServer {
     const outcome = url.searchParams.get("outcome")
     if (outcome) {
       if (outcome !== "ok" && outcome !== "error" && outcome !== "cancelled") {
-        sendJson(res, 400, {
-          error: { message: "outcome must be ok, error or cancelled." }
-        })
+        sendMessage(res, 400, "outcome must be ok, error or cancelled.")
         return
       }
       query.outcome = outcome
@@ -1064,11 +942,11 @@ export class GatewayServer {
     if (one) {
       const record = recorder.store.get(one[1])
       if (!record)
-        sendJson(res, 404, { error: { message: "No such recording." } })
+        sendMessage(res, 404, "No such recording.")
       else sendJson(res, 200, record)
       return
     }
-    sendJson(res, 404, { error: { message: "Not found." } })
+    sendMessage(res, 404, "Not found.")
   }
 
   /**
@@ -1083,34 +961,27 @@ export class GatewayServer {
     const demo = this._options.demo
     const invites = this._options.invites
     if (!demo || !invites) {
-      sendJson(res, 404, { error: { message: "Not found." } })
+      sendMessage(res, 404, "Not found.")
       return
     }
     if (req.method !== "POST") {
-      sendJson(
+      sendMethodNotAllowed(
         res,
-        405,
-        { error: { message: "Asking for a guest invite is POST only." } },
-        { Allow: "POST" }
+        ["POST"],
+        "Asking for a guest invite is POST only."
       )
       return
     }
     if (this._draining) {
-      sendJson(res, 503, {
-        error: { message: "The gateway is shutting down." }
-      })
+      sendMessage(res, 503, "The gateway is shutting down.")
       return
     }
     req.resume()
     if (!this._guestInvites?.admit(clientAddress(req))) {
-      sendJson(
+      sendMessage(
         res,
         429,
-        {
-          error: {
-            message: `That is ${demo.invitesPerHour} guest invites from your address in an hour. Try again later.`
-          }
-        },
+        `That is ${demo.invitesPerHour} guest invites from your address in an hour. Try again later.`,
         { "Retry-After": "600" }
       )
       this._options.log.warn({ event: "demo.invite-refused", reason: "address" })
@@ -1119,15 +990,10 @@ export class GatewayServer {
     try {
       this._options.keys.reload()
       if (this._seats.guests(invites) >= demo.maxGuests) {
-        sendJson(
+        sendMessage(
           res,
           429,
-          {
-            error: {
-              message:
-                "The demo has as many guests as it takes right now. Try again in a few minutes."
-            }
-          },
+          "The demo has as many guests as it takes right now. Try again in a few minutes.",
           { "Retry-After": "300" }
         )
         this._options.log.warn({ event: "demo.invite-refused", reason: "full" })
@@ -1173,12 +1039,7 @@ export class GatewayServer {
   ) {
     if (route === "signin") {
       if (req.method !== "GET") {
-        sendJson(
-          res,
-          405,
-          { error: { message: "Use GET to list sign-in requests." } },
-          { Allow: "GET" }
-        )
+        sendMethodNotAllowed(res, ["GET"], "Use GET to list sign-in requests.")
         return
       }
       sendJson(res, 200, { requests: this._signIns.pending() })
@@ -1186,12 +1047,12 @@ export class GatewayServer {
     }
     const match = /^signin\/([A-Za-z0-9-]{9})\/(approve|deny)$/.exec(route)
     if (!match || req.method !== "POST") {
-      sendJson(res, 404, { error: { message: "Not found." } })
+      sendMessage(res, 404, "Not found.")
       return
     }
     const [, rawCode, action] = match
     if (!isUserCode(rawCode)) {
-      sendJson(res, 400, { error: { message: "That is not a sign-in code." } })
+      sendMessage(res, 400, "That is not a sign-in code.")
       return
     }
     const userCode = normalizeUserCode(rawCode)
@@ -1233,7 +1094,7 @@ export class GatewayServer {
       }
       const refusal = this._seats.refuse(name, { replace })
       if (refusal) {
-        sendJson(res, 409, { error: { message: refusal } })
+        sendMessage(res, 409, refusal)
         this._options.log.warn({
           event: "signin.refused",
           key: auth.principal,
@@ -1263,11 +1124,11 @@ export class GatewayServer {
         ...(existing ? { replaced: existing.id } : {})
       })
     } catch (error) {
-      sendJson(res, 400, {
-        error: {
-          message: messageOf(error)
-        }
-      })
+      sendMessage(
+        res,
+        400,
+        messageOf(error)
+      )
     }
   }
 
@@ -1283,9 +1144,7 @@ export class GatewayServer {
   ) {
     const invites = this._options.invites
     if (!invites) {
-      sendJson(res, 404, {
-        error: { message: "This gateway does not keep invites." }
-      })
+      sendMessage(res, 404, "This gateway does not keep invites.")
       return
     }
     try {
@@ -1300,13 +1159,10 @@ export class GatewayServer {
           return
         }
         if (req.method !== "POST") {
-          sendJson(
+          sendMethodNotAllowed(
             res,
-            405,
-            {
-              error: { message: "Use GET to list invites or POST to make one." }
-            },
-            { Allow: "GET, POST" }
+            ["GET", "POST"],
+            "Use GET to list invites or POST to make one."
           )
           return
         }
@@ -1324,7 +1180,7 @@ export class GatewayServer {
         this._options.keys.reload()
         const refusal = this._seats.refuse(name, { replace })
         if (refusal) {
-          sendJson(res, 409, { error: { message: refusal } })
+          sendMessage(res, 409, refusal)
           this._options.log.warn({
             event: "invite.refused",
             key: auth.principal,
@@ -1349,22 +1205,19 @@ export class GatewayServer {
       }
       const match = /^invites\/([0-9a-f]{8})$/.exec(route)
       if (!match) {
-        sendJson(res, 404, { error: { message: "Not found." } })
+        sendMessage(res, 404, "Not found.")
         return
       }
       if (req.method !== "DELETE") {
-        sendJson(
+        sendMethodNotAllowed(
           res,
-          405,
-          { error: { message: "Withdrawing an invite is DELETE." } },
-          { Allow: "DELETE" }
+          ["DELETE"],
+          "Withdrawing an invite is DELETE."
         )
         return
       }
       if (!invites.revoke(match[1])) {
-        sendJson(res, 404, {
-          error: { message: "No open invite with that id." }
-        })
+        sendMessage(res, 404, "No open invite with that id.")
         return
       }
       this._options.log.info({
@@ -1398,20 +1251,13 @@ export class GatewayServer {
   ) {
     const plugins = this._options.plugins
     if (!plugins) {
-      sendJson(res, 404, {
-        error: { message: "This gateway has no plugins." }
-      })
+      sendMessage(res, 404, "This gateway has no plugins.")
       return
     }
     try {
       if (route === "plugins") {
         if (req.method !== "GET") {
-          sendJson(
-            res,
-            405,
-            { error: { message: "Use GET to list plugins." } },
-            { Allow: "GET" }
-          )
+          sendMethodNotAllowed(res, ["GET"], "Use GET to list plugins.")
           return
         }
         sendJson(res, 200, {
@@ -1424,18 +1270,13 @@ export class GatewayServer {
         route
       )
       if (!match || !plugins.has(match[1])) {
-        sendJson(res, 404, { error: { message: "No such plugin." } })
+        sendMessage(res, 404, "No such plugin.")
         return
       }
       const [, id, action, rest] = match
       if (action === "enable" || action === "disable") {
         if (req.method !== "POST") {
-          sendJson(
-            res,
-            405,
-            { error: { message: "Switching a plugin is POST." } },
-            { Allow: "POST" }
-          )
+          sendMethodNotAllowed(res, ["POST"], "Switching a plugin is POST.")
           return
         }
         const summary =
@@ -1450,7 +1291,7 @@ export class GatewayServer {
         return
       }
       if (action !== "api") {
-        sendJson(res, 404, { error: { message: "Not found." } })
+        sendMessage(res, 404, "Not found.")
         return
       }
       const answer = await plugins.handle(id, {
@@ -1478,7 +1319,7 @@ export class GatewayServer {
   private async handlePublicPlugin(id: string, rest: string, url: URL, req: http.IncomingMessage, res: http.ServerResponse) {
     const plugins = this._options.plugins
     if (!plugins || !plugins.has(id)) {
-      sendJson(res, 404, { error: { message: "Not found." } })
+      sendMessage(res, 404, "Not found.")
       return
     }
     try {
@@ -1504,7 +1345,7 @@ export class GatewayServer {
       sendPlugin(res, answer)
     } catch (error) {
       const status = error instanceof PluginError ? error.status : 400
-      sendJson(res, status, { error: { message: messageOf(error) } })
+      sendMessage(res, status, messageOf(error))
     }
   }
 
@@ -1541,25 +1382,16 @@ export class GatewayServer {
     res: http.ServerResponse
   ) {
     if (req.method !== "POST") {
-      sendJson(
-        res,
-        405,
-        { error: { message: "Join is POST only." } },
-        { Allow: "POST" }
-      )
+      sendMethodNotAllowed(res, ["POST"], "Join is POST only.")
       return
     }
     if (this._draining) {
-      sendJson(res, 503, {
-        error: { message: "The gateway is shutting down." }
-      })
+      sendMessage(res, 503, "The gateway is shutting down.")
       return
     }
     const invites = this._options.invites
     if (!invites) {
-      sendJson(res, 404, {
-        error: { message: "This gateway does not accept invites." }
-      })
+      sendMessage(res, 404, "This gateway does not accept invites.")
       return
     }
     try {
@@ -1614,18 +1446,11 @@ export class GatewayServer {
     res: http.ServerResponse
   ) {
     if (req.method !== "POST") {
-      sendJson(
-        res,
-        405,
-        { error: { message: "Sign-in routes are POST only." } },
-        { Allow: "POST" }
-      )
+      sendMethodNotAllowed(res, ["POST"], "Sign-in routes are POST only.")
       return
     }
     if (this._draining) {
-      sendJson(res, 503, {
-        error: { message: "The gateway is shutting down." }
-      })
+      sendMessage(res, 503, "The gateway is shutting down.")
       return
     }
     try {
@@ -1653,11 +1478,11 @@ export class GatewayServer {
       })
       sendJson(res, 201, started)
     } catch (error) {
-      sendJson(res, 400, {
-        error: {
-          message: messageOf(error)
-        }
-      })
+      sendMessage(
+        res,
+        400,
+        messageOf(error)
+      )
     }
   }
 
@@ -1673,9 +1498,7 @@ export class GatewayServer {
   ) {
     const license = this._options.license
     if (!license) {
-      sendJson(res, 503, {
-        error: { message: "This gateway was started without licence support." }
-      })
+      sendMessage(res, 503, "This gateway was started without licence support.")
       return
     }
     const plan = () => license.summary(this._seats.holders())
@@ -1712,19 +1535,18 @@ export class GatewayServer {
           sendJson(res, 200, plan())
           return
         default:
-          sendJson(
+          sendMethodNotAllowed(
             res,
-            405,
-            { error: { message: "Use GET, PUT or DELETE for the licence." } },
-            { Allow: "GET, PUT, DELETE" }
+            ["GET", "PUT", "DELETE"],
+            "Use GET, PUT or DELETE for the licence."
           )
       }
     } catch (error) {
-      sendJson(res, 400, {
-        error: {
-          message: messageOf(error)
-        }
-      })
+      sendMessage(
+        res,
+        400,
+        messageOf(error)
+      )
     }
   }
 
@@ -1733,7 +1555,7 @@ export class GatewayServer {
     try {
       url = new URL(req.url || "/", "http://gateway")
     } catch {
-      sendJson(res, 400, { error: { message: "Invalid request URL." } })
+      sendMessage(res, 400, "Invalid request URL.")
       return
     }
 
@@ -1770,7 +1592,7 @@ export class GatewayServer {
     if (url.pathname === METRICS_PATH) {
       const metrics = this._options.metrics
       if (!metrics) {
-        sendJson(res, 404, { error: { message: "Metrics are off on this gateway." } })
+        sendMessage(res, 404, "Metrics are off on this gateway.")
         return
       }
       const auth = this.authenticate(req.headers.authorization)
@@ -1840,7 +1662,12 @@ export class GatewayServer {
     // A read-only admin sees everything on the page and changes nothing.
     if (auth.readOnly && adminApi && req.method !== "GET") {
       req.resume()
-      sendJson(res, 403, toErrorBody(new InferenceError("authentication", "This admin key is read-only: it can look at everything and change nothing.")))
+      sendRefusal(
+        res,
+        403,
+        "authentication",
+        "This admin key is read-only: it can look at everything and change nothing."
+      )
       return
     }
 
@@ -1858,11 +1685,7 @@ export class GatewayServer {
           : undefined
       if (refusal) {
         req.resume()
-        sendJson(
-          res,
-          403,
-          toErrorBody(new InferenceError("authentication", refusal))
-        )
+        sendRefusal(res, 403, "authentication", refusal)
         return
       }
     }
