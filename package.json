@@ -254,6 +254,12 @@
         "icon": "$(organization)"
       },
       {
+        "command": "twinny.openTeamPlugins",
+        "shortTitle": "Team plugins",
+        "title": "Twinny - Open your team's plugins (pull requests, reviews)",
+        "icon": "$(link-external)"
+      },
+      {
         "command": "twinny.review",
         "shortTitle": "twinny code reviewer",
         "title": "Code reviewer",

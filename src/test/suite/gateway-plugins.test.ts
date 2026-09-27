@@ -13,7 +13,9 @@ import * as path from "path"
 
 import { providerRegistry } from "../../extension/inference/registry"
 import type { ChatMessage } from "../../extension/inference/types"
+import { AuditLog } from "../../gateway/audit"
 import { parseGatewayConfig, readGatewaySecrets } from "../../gateway/config"
+import { DEFAULT_DEMO, guestName } from "../../gateway/demo"
 import { KeyStore } from "../../gateway/keys"
 import { LicenseStore } from "../../gateway/license"
 import { createGatewayLog } from "../../gateway/log"
@@ -91,7 +93,8 @@ const listen = (server: http.Server): Promise<string> =>
     })
   })
 
-const build = (dir: string) => {
+/** A gateway with every bundled plugin; `audit` keeps an audit log, `token` accepts a shared token too, `demo` runs it as a demo. */
+const build = (dir: string, options: { audit?: boolean; token?: string; demo?: boolean } = {}) => {
   const config = parseGatewayConfig(
     {
       listen: { host: "127.0.0.1", port: 0 },
@@ -112,8 +115,9 @@ const build = (dir: string) => {
     dataDir: dir,
     log
   })
-  const server = new GatewayServer({ config, keys, license, routes, log, plugins })
-  return { server, keys, plugins, dir }
+  const audit = options.audit ? AuditLog.open(path.join(dir, "audit")) : undefined
+  const server = new GatewayServer({ config, keys, license, routes, log, plugins, ...(audit ? { audit } : {}), ...(options.token ? { token: options.token } : {}), ...(options.demo ? { demo: DEFAULT_DEMO } : {}) })
+  return { server, keys, plugins, dir, audit }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -329,12 +333,17 @@ suite("Plugin store", function () {
     await server.stop()
   })
 
-  test("the bundled plugins are listed, off, and only for admins", async () => {
+  test("the bundled plugins are listed, off; a developer sees only what is shared with them", async () => {
     const listed = await request(`${url}/twinny/v1/admin/plugins`, "GET", admin)
     assert.strictEqual(listed.status, 200)
     const ids = (listed.body.plugins as Array<{ id: string; enabled: boolean }>).map((plugin) => `${plugin.id}:${plugin.enabled}`)
     assert.deepStrictEqual(ids, ["github:false", "gitlab:false", "gitea:false", "bitbucket:false", "slack:false", "discord:false", "teams:false", "oidc:false", "context:false", "backups:false"])
-    assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins`, "GET", dev)).status, 403)
+    const shareable = (listed.body.plugins as Array<{ id: string; shareable: boolean }>).filter((plugin) => plugin.shareable).map((plugin) => plugin.id)
+    assert.deepStrictEqual(shareable, ["github", "gitlab", "gitea", "bitbucket"], "the forges can be shared; notifiers, sign-in, context and backups cannot")
+    const mine = await request(`${url}/twinny/v1/admin/plugins`, "GET", dev)
+    assert.strictEqual(mine.status, 200)
+    assert.deepStrictEqual(mine.body.plugins, [])
+    assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/github/enable`, "POST", dev)).status, 403)
   })
 
   test("a plugin's routes answer 409 while it is off, and its store entry survives a restart", async () => {
@@ -638,6 +647,206 @@ suite("GitHub plugin", function () {
     const synced = await request(`${url}${api}/repos/${repo.id}/sync`, "POST", admin)
     assert.strictEqual(synced.status, 200)
     assert.match((synced.body.repo as { error: string }).error, /no longer set up/)
+  })
+})
+
+suite("Sharing a plugin with developers", function () {
+  this.timeout(30_000)
+  let server: GatewayServer
+  let plugins: PluginHost
+  let keys: KeyStore
+  let audit: AuditLog
+  let url: string
+  let admin: string
+  let viewer: string
+  let alice: string
+  let bob: string
+  let shared: string
+  let dir: string
+  let github: FakeGitHub
+  let repoId: string
+  const base = "/twinny/v1/admin/plugins"
+  const api = `${base}/github/api`
+  const share = (body: unknown, key = admin) => request(`${url}${base}/github/access`, "PUT", key, body)
+
+  suiteSetup(async () => {
+    dir = path.join(scratch, "sharing")
+    shared = "shared-token-for-the-team"
+    const built = build(dir, { audit: true, token: shared })
+    server = built.server
+    plugins = built.plugins
+    keys = built.keys
+    audit = built.audit as AuditLog
+    admin = keys.create("operator", { admin: true }).key
+    viewer = keys.create("auditor", { admin: true, readOnly: true }).key
+    alice = keys.create("alice").key
+    bob = keys.create("bob").key
+    url = (await server.start()).url
+    github = await fakeGitHub()
+    await request(`${url}${base}/github/enable`, "POST", admin)
+    await request(`${url}${api}/settings`, "PUT", admin, { baseUrl: github.url })
+    const added = await request(`${url}${api}/repos`, "POST", admin, { fullName: "acme/widgets", token: "ghp_secret" })
+    assert.strictEqual(added.status, 201, message(added))
+    repoId = (added.body.repo as { id: string }).id
+  })
+
+  suiteTeardown(async () => {
+    await plugins.stop()
+    await server.stop()
+    github.close()
+  })
+
+  test("a plugin nobody shared is closed to developers, and says who can open it", async () => {
+    const access = await request(`${url}${base}/github/access`, "GET", admin)
+    assert.deepStrictEqual(access.body.access, { everyone: false, people: [] })
+    assert.deepStrictEqual((await request(`${url}${base}`, "GET", alice)).body.plugins, [])
+    const refused = await request(`${url}${api}/`, "GET", alice)
+    assert.strictEqual(refused.status, 403)
+    assert.match(message(refused), /not shared with alice/)
+  })
+
+  test("shared with one person, it opens for them alone, with no word of who else may use it", async () => {
+    const saved = await share({ people: [" alice ", "alice"] })
+    assert.strictEqual(saved.status, 200, message(saved))
+    assert.deepStrictEqual(saved.body.access, { everyone: false, people: ["alice"] })
+
+    const listed = await request(`${url}${base}`, "GET", alice)
+    assert.deepStrictEqual(listed.body.plugins, [{ id: "github", name: "GitHub", description: (listed.body.plugins as Array<{ description: string }>)[0].description, enabled: true, shareable: true }])
+    const page = await request(`${url}${api}/`, "GET", alice)
+    assert.strictEqual(page.status, 200, message(page))
+    assert.strictEqual((page.body.repos as unknown[]).length, 1)
+    assert.ok(!page.text.includes("ghp_secret"), "no token reaches a developer either")
+    assert.deepStrictEqual(page.body.me, {}, "the token's owner is not alice")
+
+    const pull = await request(`${url}${api}/repos/${repoId}/pulls/7`, "GET", alice)
+    assert.strictEqual(pull.status, 200, message(pull))
+    assert.strictEqual((pull.body.pull as { number: number }).number, 7)
+    assert.strictEqual((await request(`${url}${api}/repos/${repoId}/sync`, "POST", alice)).status, 200)
+    assert.strictEqual((await request(`${url}${api}/sync`, "POST", alice)).status, 200)
+    // Past the gate and into the plugin: this gateway offers plugins no models.
+    const review = await request(`${url}${api}/repos/${repoId}/pulls/7/review`, "POST", alice)
+    assert.strictEqual(review.status, 503)
+    assert.match(message(review), /no models/)
+
+    assert.strictEqual((await request(`${url}${api}/`, "GET", bob)).status, 403)
+    assert.deepStrictEqual((await request(`${url}${base}`, "GET", bob)).body.plugins, [])
+  })
+
+  test("a developer does what the plugin names as theirs and nothing an admin does", async () => {
+    const adminOnly: Array<[string, string, unknown?]> = [
+      ["POST", `${api}/repos`, { fullName: "acme/gadgets", token: "ghp_secret" }],
+      ["PUT", `${api}/repos/${repoId}`, { autoReview: true }],
+      ["DELETE", `${api}/repos/${repoId}`],
+      ["PUT", `${api}/settings`, { baseUrl: "https://evil.example" }],
+      ["PUT", `${api}/app`, { appId: "1", privateKey: "x" }],
+      ["DELETE", `${api}/app`],
+      ["GET", `${api}/app/repositories`],
+      ["POST", `${base}/github/disable`],
+      ["PUT", `${base}/github/access`, { everyone: true }],
+      ["GET", `${base}/github/access`]
+    ]
+    for (const [method, route, body] of adminOnly) {
+      const refused = await request(`${url}${route}`, method, alice, body)
+      assert.strictEqual(refused.status, 403, `${method} ${route}`)
+    }
+    assert.match(message(await request(`${url}${api}/repos`, "POST", alice, {})), /Only an admin/)
+    assert.strictEqual(plugins.isEnabled("github"), true)
+    assert.strictEqual((await request(`${url}${api}/`, "GET", admin)).body.repos instanceof Array, true)
+    // The rest of the admin API stays shut.
+    for (const route of ["usage", "keys", "audit", "license", "config", "plugins/github", "plugins/nope/api/"]) {
+      assert.notStrictEqual((await request(`${url}/twinny/v1/admin/${route}`, "GET", alice)).status, 200, route)
+    }
+    assert.strictEqual((await request(`${url}/twinny/v1/admin/keys`, "GET", alice)).status, 403)
+    assert.strictEqual((await request(`${url}${base}/nope/api/`, "GET", alice)).status, 404)
+  })
+
+  test("everyone lets every developer in; the shared token is never a developer", async () => {
+    assert.strictEqual((await share({ everyone: true })).status, 200)
+    assert.strictEqual((await request(`${url}${api}/`, "GET", bob)).status, 200)
+    assert.strictEqual((await request(`${url}${base}`, "GET", shared)).status, 403)
+    assert.strictEqual((await request(`${url}${api}/`, "GET", shared)).status, 403)
+  })
+
+  test("each developer says who they are on the host, and nobody else's page changes", async () => {
+    const set = await request(`${url}${api}/me`, "PUT", alice, { me: "@alice-gh" })
+    assert.strictEqual(set.status, 200, message(set))
+    assert.deepStrictEqual(set.body.me, { name: "alice-gh" })
+    assert.deepStrictEqual((await request(`${url}${api}/`, "GET", alice)).body.me, { name: "alice-gh" })
+    assert.deepStrictEqual((await request(`${url}${api}/`, "GET", bob)).body.me, {})
+    assert.deepStrictEqual((await request(`${url}${api}/`, "GET", admin)).body.me, { name: "alice", detected: "alice" }, "the admin keeps the token's login")
+    const adminMe = await request(`${url}${api}/me`, "PUT", admin, { me: "op-gh" })
+    assert.strictEqual(adminMe.status, 400, "admins share the one name under settings")
+    assert.match(message(adminMe), /PUT settings/)
+    assert.strictEqual((await request(`${url}${api}/me`, "PUT", alice, { me: "x".repeat(101) })).status, 400)
+    assert.deepStrictEqual((await request(`${url}${api}/me`, "PUT", alice, { me: "" })).body.me, {})
+  })
+
+  test("what a developer changes is audited as theirs, as is every change of who may use a plugin", async () => {
+    await request(`${url}${api}/sync`, "POST", bob)
+    const writes = audit.query({ action: "plugin.write", actor: "bob" })
+    assert.ok(writes.some((entry) => entry.target === "github" && entry.details?.member === true && entry.details?.path === "sync"))
+    const changes = audit.query({ action: "plugin.access-changed" })
+    assert.ok(changes.length >= 2)
+    assert.deepStrictEqual(changes[0].details, { everyone: true, people: 0 }, "newest first: a PUT replaces the whole record")
+    assert.deepStrictEqual(changes[1].details, { everyone: false, people: 1 })
+  })
+
+  test("sharing is for admins who may write, for shareable plugins, with names that could be keys", async () => {
+    assert.strictEqual((await share({ everyone: false }, viewer)).status, 403, "a read-only admin cannot share")
+    assert.strictEqual((await request(`${url}${base}/github/access`, "GET", viewer)).status, 200)
+    const backups = await request(`${url}${base}/backups/access`, "PUT", admin, { everyone: true })
+    assert.strictEqual(backups.status, 400)
+    assert.match(message(backups), /admins only/)
+    assert.strictEqual((await request(`${url}${base}/backups/access`, "GET", admin)).status, 404)
+    assert.strictEqual((await share({ people: ["not a name"] })).status, 400)
+    assert.strictEqual((await share({ everyone: "yes" })).status, 400)
+    assert.strictEqual((await share([])).status, 400)
+    assert.strictEqual((await request(`${url}${base}/github/access`, "POST", admin, {})).status, 405)
+    assert.strictEqual((await request(`${url}${base}/github/access/extra`, "GET", admin)).status, 404)
+  })
+
+  test("the grant follows the name: a revoked key is out, a new key for the same person is in, and a restart keeps it", async () => {
+    assert.strictEqual((await share({ people: ["alice"] })).status, 200)
+    keys.revoke("alice")
+    assert.strictEqual((await request(`${url}${api}/`, "GET", alice)).status, 401)
+    const again = keys.create("alice").key
+    assert.strictEqual((await request(`${url}${api}/`, "GET", again)).status, 200)
+    assert.deepStrictEqual(PluginStore.open(pluginsFileFor(path.join(dir, "keys.json"))).access("github"), { everyone: false, people: ["alice"] })
+    alice = again
+  })
+
+  test("a plugin switched off is gone from a developer's list and its routes say so", async () => {
+    await request(`${url}${base}/github/disable`, "POST", admin)
+    assert.deepStrictEqual((await request(`${url}${base}`, "GET", alice)).body.plugins, [])
+    assert.strictEqual((await request(`${url}${api}/`, "GET", alice)).status, 409)
+    await request(`${url}${base}/github/enable`, "POST", admin)
+    assert.strictEqual((await request(`${url}${api}/`, "GET", alice)).status, 200)
+    // Shared with nobody again, the file keeps no entry for it.
+    assert.strictEqual((await share({ everyone: false, people: [] })).status, 200)
+    assert.ok(!fs.readFileSync(pluginsFileFor(path.join(dir, "keys.json")), "utf8").includes("access"))
+    assert.strictEqual((await request(`${url}${api}/`, "GET", alice)).status, 403)
+  })
+})
+
+suite("Sharing on a demo gateway", function () {
+  this.timeout(20_000)
+
+  test("a demo's guests are never developers, even when a plugin is shared with everyone", async () => {
+    const built = build(path.join(scratch, "sharing-demo"), { demo: true })
+    const admin = built.keys.create("operator", { admin: true }).key
+    const member = built.keys.create("alice").key
+    const guest = built.keys.create(guestName("abc123")).key
+    const url = (await built.server.start()).url
+    try {
+      await request(`${url}/twinny/v1/admin/plugins/github/enable`, "POST", admin)
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/github/access`, "PUT", admin, { everyone: true })).status, 200)
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/github/api/`, "GET", member)).status, 200)
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins`, "GET", guest)).status, 403)
+      assert.strictEqual((await request(`${url}/twinny/v1/admin/plugins/github/api/`, "GET", guest)).status, 403)
+    } finally {
+      await built.plugins.stop()
+      await built.server.stop()
+    }
   })
 })
 
@@ -1026,6 +1235,57 @@ suite("Pull-request reviews", function () {
     assert.strictEqual(comments.length, 1)
     await p.autoReview()
     assert.strictEqual(calls.length, 2, "nothing left to triage")
+    await p.stop()
+  })
+
+  test("a developer posts a review as a comment, once, and applies only the labels the model suggested", async () => {
+    const { inference } = scripted("{\"labels\": [\"bug\"], \"reply\": \"Which version?\"}")
+    const posts: string[] = []
+    const labelled: string[][] = []
+    const dir = path.join(scratch, "member-posting")
+    fs.mkdirSync(dir, { recursive: true })
+    const p = new PullsPlugin(
+      { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference },
+      () => ({
+        ...forge({ 1: "aaa" })(),
+        postReview: async (_repo: unknown, pull: { number: number }, _body: string, as: string) => {
+          posts.push(`${pull.number}:${as}`)
+          return {}
+        },
+        listIssues: async () => [{ repo: "acme/m", number: 4, title: "Broken", author: "dana", url: "x://4", createdAt: "", updatedAt: "2026-09-19T00:00:00Z", labels: [], comments: 0 }],
+        issueBody: async () => "It broke.",
+        listLabels: async () => ["bug", "release-blocker"],
+        commentIssue: async () => ({}),
+        labelIssue: async (_repo: unknown, _number: number, labels: string[]) => {
+          labelled.push(labels)
+        }
+      }),
+      0
+    )
+    p.start()
+    const dev = (method: string, route: string, body: Record<string, unknown> = {}) => p.handle({ ...req(method, route, body), principal: "alice", member: true })
+    const repo = ((await p.handle(req("POST", "repos", { fullName: "acme/m" }))).body as { repo: { id: string } }).repo
+    await dev("POST", `repos/${repo.id}/pulls/1/review`)
+
+    for (const as of ["approve", "request-changes"]) {
+      const refused = await dev("POST", `repos/${repo.id}/pulls/1/review/post`, { as }).catch((e: PluginError) => e)
+      assert.ok(refused instanceof PluginError && refused.status === 403, as)
+    }
+    const posted = await dev("POST", `repos/${repo.id}/pulls/1/review/post`, { as: "comment" })
+    assert.strictEqual((posted.body as { review: ReviewRecord }).review.postedBy, "alice")
+    const again = await dev("POST", `repos/${repo.id}/pulls/1/review/post`).catch((e: PluginError) => e)
+    assert.ok(again instanceof PluginError && again.status === 409, "posted once")
+    assert.deepStrictEqual(posts, ["1:comment"])
+    // An admin may still post it again, as anything.
+    await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/post`, { as: "approve" }))
+    assert.deepStrictEqual(posts, ["1:comment", "1:approve"])
+
+    await dev("POST", `repos/${repo.id}/issues/4/triage`)
+    const triaged = await dev("POST", `repos/${repo.id}/issues/4/triage/post`, { reply: false, labelNames: ["bug", "release-blocker"] })
+    assert.deepStrictEqual(labelled, [["bug"]], "a label the model did not suggest is dropped")
+    const record = (triaged.body as { triage: TriageRecord }).triage
+    assert.deepStrictEqual(record.labels, ["bug"])
+    assert.strictEqual(record.postedBy, "alice")
     await p.stop()
   })
 

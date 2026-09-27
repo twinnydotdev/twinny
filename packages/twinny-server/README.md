@@ -14,7 +14,7 @@ What you get:
 - **Keys and usage.** A key per developer, stored as a hash, revoked live; requests, failures and token counts per person and per model, never the content.
 - **An admin page** at `/admin`: backends, usage charts, people and invite links, providers and models edited live, policy, plan.
 - **Team pooling.** Developers can share their own computer's models with the team through the gateway; no port to open on their side.
-- **Plugins** (licence): pull requests and issues from GitHub, GitLab, Gitea and Bitbucket reviewed by your own models and posted back; Slack, Discord and Teams notifications; SSO sign-in (OIDC); a shared context index; nightly backups.
+- **Plugins** (licence): pull requests and issues from GitHub, GitLab, Gitea and Bitbucket reviewed by your own models and posted back, shared with the developers you choose; Slack, Discord and Teams notifications; SSO sign-in (OIDC); a shared context index; nightly backups.
 - **Policy and recording** (licence): rules the extension enforces, routing rules, a team system prompt; recorded request content for review and training data.
 - **Operations.** A hash-chained audit log, read-only admin keys, Prometheus at `/metrics`, costs when a model has a price, a bounded queue for a busy GPU, Docker and Helm.
 
@@ -179,7 +179,10 @@ tailnet with `"listen": { "host": "0.0.0.0" }` in the configuration.
 - **Plugins:** `/admin` → **Plugins → Store** lists what this build carries;
   switch one on and it gets its own page. Reviews and triage run on the
   gateway's own chat aliases, in the background only while no developer
-  request is running, and appear in usage under `plugin:<id>`.
+  request is running, and appear in usage under `plugin:<id>`. **share** on
+  a pull-request plugin's card lets every developer, or the ones you tick,
+  sign in to `/admin` with their own key and review, post and triage
+  there; repositories, tokens and settings stay yours.
 - **Audit log:** every admin change, hash-chained, under **Team → Audit log**;
   filter, verify and export. `/metrics` answers Prometheus scrapes with an
   admin key (a read-only one will do).

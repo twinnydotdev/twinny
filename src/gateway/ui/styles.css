@@ -395,6 +395,11 @@ table.usage td .dot { display: inline-block; width: 8px; height: 8px; border-rad
 .plugin-description { color: var(--ink-2); margin: 0 0 12px; min-height: 3em; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .row-actions .muted { flex: 1 1 260px; font-size: 12px; }
+.access-line, .access-editor { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.access-editor { display: flex; flex-direction: column; gap: 10px; }
+.access-people { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.access-people label { display: inline-flex; gap: 6px; align-items: center; }
+.access-people input[type="checkbox"] { accent-color: var(--accent); }
 .bad-text { color: var(--bad); }
 .ins-text { color: var(--accent); }
 .del-text { color: var(--bad); }

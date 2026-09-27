@@ -14,7 +14,7 @@ import {
   PluginContext,
   PluginError
 } from "./host"
-import { PullsPlugin } from "./pulls"
+import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
 export const GITLAB_URL = "https://gitlab.com"
 const USER_AGENT = "twinny-server"
@@ -370,6 +370,7 @@ export const gitlabPlugin: GatewayPlugin = {
   name: "GitLab",
   description:
     "Watch projects on gitlab.com or a self-managed GitLab and see their open merge requests, pipelines and approvals. Reads with an access token per project.",
+  memberRoutes: MEMBER_ROUTES,
   create: (context) =>
     new PullsPlugin(context, (store, ctx) => new GitLabForge(store, ctx), undefined, "gitlab")
 }

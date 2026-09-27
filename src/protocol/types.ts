@@ -133,6 +133,18 @@ export const teamLink = (gatewayUrl: string, scheme = "vscode"): string => {
   return `${scheme}://${TWINNY_EXTENSION_ID}/team?${query.toString()}`
 }
 
+/** A personal gateway key starts `tsk_`; anything else is the shared token. */
+export const PERSONAL_KEY_PREFIX = "tsk"
+
+/** Whether a credential is shaped like a personal key, not the shared token. */
+export const isPersonalKey = (credential: string | undefined): boolean => !!credential && credential.startsWith(`${PERSONAL_KEY_PREFIX}_`)
+
+/** Where a gateway serves its page: everything for an admin, the plugins shared with a developer. */
+export const GATEWAY_PAGE_PATH = "/admin"
+
+/** The gateway's page, from its base URL. */
+export const gatewayPageLink = (gatewayUrl: string): string => `${gatewayUrl.replace(/\/+$/, "")}${GATEWAY_PAGE_PATH}`
+
 export const REMOTE_STREAM_CONTENT_TYPE = "application/x-ndjson"
 
 export interface RemoteModelsResponse {

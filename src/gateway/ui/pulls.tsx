@@ -645,6 +645,59 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
 }
 
 /* -------------------------------------------------------------------------- */
+/*  A developer's own name on the host                                        */
+/* -------------------------------------------------------------------------- */
+
+/** For a developer the plugin is shared with: who they are on the host, for their eyes only. */
+const MePanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanelProps) => {
+  const [me, setMe] = useState(overview.me.name ?? "")
+  useEffect(() => setMe(overview.me.name ?? ""), [overview.me.name])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const [notice, setNotice] = useState<string | undefined>()
+  const name = me.trim().replace(/^@/, "")
+  const save = async () => {
+    setBusy(true)
+    setError(undefined)
+    setNotice(undefined)
+    try {
+      await api(`${base}/me`, apiKey, { method: "PUT", body: { me: name } })
+      await onChanged()
+      setNotice(name ? `The ${words.nouns} waiting for your approval are marked; you are ${name}.` : "Username cleared.")
+    } catch (e) {
+      setError(messageOf(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>You on {HOST_NAMES[host]}</h2>
+      </div>
+      {notice && <div className="success-bar">{notice}</div>}
+      {error && <div className="error">{error}</div>}
+      <form
+        className="newkey inline-setting"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save()
+        }}
+      >
+        <label>
+          <span className="muted">username</span>
+          <input value={me} onChange={(e) => setMe(e.target.value)} aria-label={`Your username on ${HOST_NAMES[host]}`} placeholder="username" disabled={busy} spellCheck={false} />
+        </label>
+        <button type="submit" className="ghost" disabled={busy || name === (overview.me.name ?? "")}>
+          save
+        </button>
+        <span className="muted">Marks the {words.nouns} waiting for your approval, on your page only. Repositories and settings are the admin&apos;s.</span>
+      </form>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
 /*  One pull                                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -662,6 +715,8 @@ interface PullViewProps {
   onBack: () => void
   onReview: () => Promise<void>
   onPost: (as: "comment" | "request-changes" | "approve") => Promise<void>
+  /** A developer the plugin is shared with: posts a comment, once. */
+  member?: boolean
   onAsk: (question: string) => Promise<void>
 }
 
@@ -744,7 +799,7 @@ const ReviewThread = ({ review, noun, canAsk, onAsk }: { review: ReviewRecord; n
   )
 }
 
-const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onAsk }: PullViewProps) => {
+const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onAsk, member = false }: PullViewProps) => {
   const [postAs, setPostAs] = useState<"comment" | "request-changes" | "approve">("comment")
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState<string | undefined>()
@@ -902,13 +957,17 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
               </span>
             )}
           </div>
-          {detail.review.status === "done" && (
+          {detail.review.status === "done" && !(member && detail.review.postedAt) && (
             <div className="review-actions">
-              <select value={postAs} onChange={(e) => setPostAs(e.target.value as typeof postAs)} disabled={posting} aria-label="Post as">
-                <option value="comment">as a comment</option>
-                <option value="request-changes">requesting changes</option>
-                <option value="approve">approving</option>
-              </select>
+              {member ? (
+                <span className="muted">as a comment</span>
+              ) : (
+                <select value={postAs} onChange={(e) => setPostAs(e.target.value as typeof postAs)} disabled={posting} aria-label="Post as">
+                  <option value="comment">as a comment</option>
+                  <option value="request-changes">requesting changes</option>
+                  <option value="approve">approving</option>
+                </select>
+              )}
               <button
                 type="button"
                 className={detail.review.postedAt ? "ghost" : "primary"}
@@ -1400,7 +1459,12 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
 /*  The page                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }) => {
+/**
+ * A pull-request plugin's page. `member` is a developer the plugin is
+ * shared with: the same pulls, reviews and issues, without the panels that
+ * set up repositories, the host or the review model.
+ */
+export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; apiKey: string; member?: boolean }) => {
   const words = WORDS[host]
   const base = `/twinny/v1/admin/plugins/${host}/api`
   const [overview, setOverview] = useState<Overview | null>(null)
@@ -1566,6 +1630,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             detail={detail}
             words={words}
             host={host}
+            member={member}
             review={overview.review}
             me={me}
             onBack={() => setOpened(null)}
@@ -1755,9 +1820,15 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
       )}
 
       <IssuesPanel host={host} overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />
-      <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
-      <ReviewsPanel words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
-      <HostPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+      {member ? (
+        <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+      ) : (
+        <>
+          <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+          <ReviewsPanel words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+          <HostPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+        </>
+      )}
     </>
   )
 }

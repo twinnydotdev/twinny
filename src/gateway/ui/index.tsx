@@ -3,12 +3,16 @@
  * with an admin key (kept in this tab only), then shows whether the
  * backends answer, how much each developer and model has been used over a
  * period, and which keys exist. Reads the gateway's own API; nothing else.
+ *
+ * A developer's key opens it too, as member.tsx: only the plugins an
+ * admin shared with them.
  */
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { createRoot } from "react-dom/client"
 
 import { messageOf } from "../../common/errors"
 import { inviteLink, RemoteIdentity, RemoteStatus } from "../../protocol/types"
+import type { PluginAccess } from "../plugins/access"
 import type { PluginSummary } from "../plugins/host"
 import type { UsageSummary } from "../usage"
 
@@ -16,6 +20,7 @@ import { api, ApiError } from "./api"
 import { AuditPage } from "./audit"
 import { ConfigurationPanel } from "./configuration"
 import { fmt } from "./format"
+import { MemberApp } from "./member"
 import { OTHER, OverviewPage, Series } from "./overview"
 import { CreatedKey, KeysResponse, PeoplePage } from "./people"
 import { PlanPage } from "./plan"
@@ -107,16 +112,16 @@ const SignIn = ({ onKey, error }: { onKey: (key: string) => void; error?: string
         <h1>
           twinny<span>-server</span>
         </h1>
-        <p>Sign in with an admin key.</p>
+        <p>Sign in with your gateway key.</p>
         <form onSubmit={submit}>
-          <input type="password" autoFocus placeholder="tsk_…" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Admin key" />
+          <input type="password" autoFocus placeholder="tsk_…" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Gateway key" />
           <button type="submit" className="primary">
             Open
           </button>
         </form>
         {error && <div className="error">{error}</div>}
         <div className="hint">
-          Make one on the server: <code>twinny-server keys create you --admin</code>. The key stays in this tab.
+          An admin key opens everything; make one on the server with <code>twinny-server keys create you --admin</code>. A developer&apos;s key opens the plugins an admin shared with them. The key stays in this tab.
         </div>
         {DEMO && (
           <div className="hint">
@@ -199,15 +204,15 @@ const App = () => {
     setData(null)
   }, [])
 
-  // Who the key belongs to, and whether it may see this page at all.
+  // Who the key belongs to: an admin sees everything, a developer what is shared with them.
   useEffect(() => {
     if (!key) return
     let cancelled = false
     api<RemoteIdentity>("/twinny/v1/whoami", key)
       .then((identity) => {
         if (cancelled) return
-        if (!identity.admin) {
-          setSignInError(`"${identity.key}" is not an admin key. Create one with --admin.`)
+        if (identity.shared) {
+          setSignInError("The shared token does not open this page. Sign in with a key of your own.")
           signOut()
           return
         }
@@ -230,7 +235,7 @@ const App = () => {
   }, [key, signOut])
 
   const load = useCallback(async () => {
-    if (!key || !who) return
+    if (!key || !who?.admin) return
     setLoading(true)
     try {
       const [status, usage, keys, store] = await Promise.all([
@@ -305,6 +310,23 @@ const App = () => {
     [key, load]
   )
 
+  const sharePlugin = useCallback(
+    async (id: string, access: PluginAccess) => {
+      if (!key) throw new Error("Not signed in.")
+      await api(`/twinny/v1/admin/plugins/${id}/access`, key, { method: "PUT", body: access })
+      await load()
+    },
+    [key, load]
+  )
+
+  const signOutWith = useCallback(
+    (reason?: string) => {
+      setSignInError(reason)
+      signOut()
+    },
+    [signOut]
+  )
+
   const removeLicense = useCallback(async () => {
     if (!key) throw new Error("Not signed in.")
     await api("/twinny/v1/admin/license", key, { method: "DELETE" })
@@ -323,6 +345,7 @@ const App = () => {
   const colorOf = (name: string) => series.find((s) => s.name === name)?.color ?? OTHER
 
   if (!key || !who) return <SignIn onKey={setKey} error={signInError} />
+  if (!who.admin) return <MemberApp apiKey={key} who={who} onSignOut={signOutWith} />
 
   const down = data?.status.backends.filter((b) => !b.ok) ?? []
   const plan = data?.keys.plan
@@ -447,7 +470,15 @@ const App = () => {
               <div hidden={view !== "plan"}>{plan && <PlanPage plan={plan} onInstall={installLicense} onRemove={removeLicense} onNavigate={setView} />}</div>
 
               <div hidden={view !== "plugins"}>
-                <PluginsPage plugins={data.plugins} licensed={data.pluginsLicensed} onToggle={togglePlugin} onOpen={(id) => setView(`plugin:${id}`)} onNavigate={setView} />
+                <PluginsPage
+                  plugins={data.plugins}
+                  licensed={data.pluginsLicensed}
+                  onToggle={togglePlugin}
+                  people={data.keys.keys.filter((row) => !row.revokedAt && !row.admin).map((row) => row.name)}
+                  onShare={sharePlugin}
+                  onOpen={(id) => setView(`plugin:${id}`)}
+                  onNavigate={setView}
+                />
               </div>
 
               {openPlugin && (

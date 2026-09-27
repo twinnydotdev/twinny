@@ -2,6 +2,11 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## Unreleased
+
+- **Share plugins with developers.** An admin can share a plugin with every developer or with the people they tick, from the plugin's card under **Plugins → Store** or `PUT /twinny/v1/admin/plugins/<id>/access`. A developer then signs in to the gateway's page with their own key and sees only the plugins shared with them, without their settings. On GitHub, GitLab, Gitea and Bitbucket they read pulls and issues, review, ask about a review, post it as a comment, triage and apply the suggested labels, and set their own username on the host; approving or requesting changes through the token stays with admins, as do repositories, tokens, the GitHub App and the review model. The notifiers, SSO sign-in, shared context and backups are for admins only. Grants are kept by key name in `plugins.json`, every change is audited (`plugin.access-changed`), and a developer's writes are audited under their name, marked `member`. The shared token and a demo's guests never open a plugin.
+- **Open your team's plugins from VS Code.** The new **Twinny - Open your team's plugins** command puts your team key on the clipboard and opens the gateway's page to paste it into, for developers who joined by invite and never saw their key.
+
 ## 4.2.7 · 2026-09-24
 
 Extension and `twinny-server` release: the completion model is loaded before you type, and the gateway shields secrets for every client.

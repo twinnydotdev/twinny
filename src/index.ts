@@ -46,6 +46,7 @@ import { teamSession } from "./extension/providers/team"
 import { generateCommitMessage } from "./extension/review/commit-message"
 import { SessionManager } from "./extension/session-manager"
 import { TwinnyStatusBar } from "./extension/status-bar"
+import { openTeamPluginsPage } from "./extension/team/plugins-page"
 import { TeamShare } from "./extension/team/share"
 import { TemplateProvider } from "./extension/templates/provider"
 import { terminalHistory } from "./extension/terminal"
@@ -200,9 +201,8 @@ export async function activate(context: ExtensionContext) {
 
   // This computer as part of the team's pool, when the developer switched
   // it on. Resumes after the team connection's key is loaded.
-  const teamShare = new TeamShare(context, () =>
-    teamSession(new ProviderStore(context), credentials, new TeamPolicyStore(context.globalState))
-  )
+  const currentTeam = () => teamSession(new ProviderStore(context), credentials, new TeamPolicyStore(context.globalState))
+  const teamShare = new TeamShare(context, currentTeam)
   void teamShare.autoStart()
 
   const fullScreenProvider = new FullScreenProvider(
@@ -305,6 +305,7 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.setUpTeam, () =>
       vscode.env.openExternal(vscode.Uri.parse(URL_TEAMS))
     ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.openTeamPlugins, () => openTeamPluginsPage(currentTeam)),
     commands.registerCommand(TWINNY_COMMAND_NAME.terminalCommand, async () => {
       const chat = await requireChat()
       if (chat) await runDescribedCommand(chat, terminalHistory)

@@ -15,10 +15,11 @@ import fs from "node:fs"
 
 import { messageOf } from "../common/errors"
 import { isRecord } from "../common/guards"
+import { isPersonalKey, PERSONAL_KEY_PREFIX } from "../protocol/types"
 
 import { writePrivateJson } from "./private-file"
 
-export const KEY_PREFIX = "tsk"
+export const KEY_PREFIX = PERSONAL_KEY_PREFIX
 const ID_BYTES = 4
 const SECRET_BYTES = 32
 const KEY_PATTERN = /^tsk_([0-9a-f]{8})_([0-9a-f]{64})$/
@@ -185,7 +186,7 @@ export class KeyStore {
 
   /** Whether a string is shaped like one of these keys at all. */
   public static looksLikeKey(presented: string | undefined): boolean {
-    return !!presented && presented.startsWith(`${KEY_PREFIX}_`)
+    return isPersonalKey(presented)
   }
 
   /** Rereads the file when it changed on disk, at most every `minRefreshMs`. */

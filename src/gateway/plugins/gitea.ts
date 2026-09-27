@@ -6,7 +6,7 @@
  */
 import { arr, baseUrlOf, CheckState, Forge, IssueSummary, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
-import { PullsPlugin } from "./pulls"
+import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
 /** Codeberg runs Forgejo and is where most public Gitea-family repositories live. */
 export const GITEA_URL = "https://codeberg.org"
@@ -220,5 +220,6 @@ export const giteaPlugin: GatewayPlugin = {
   name: "Gitea / Forgejo",
   description:
     "Watch repositories on your own Gitea or Forgejo (or Codeberg) and see their open pull requests, statuses and reviews. Reads with an access token per repository.",
+  memberRoutes: MEMBER_ROUTES,
   create: (context) => new PullsPlugin(context, (store, ctx) => new GiteaForge(store, ctx), undefined, "gitea")
 }
