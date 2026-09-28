@@ -184,7 +184,12 @@ export class GatewayServer {
   private _address?: GatewayAddress
 
   constructor(private readonly _options: GatewayServerOptions) {
-    this._server = http.createServer((req, res) => void this.handle(req, res))
+    this._server = http.createServer(
+      (req, res) =>
+        void this.handle(req, res).catch((error) =>
+          this.crashed(req, res, error)
+        )
+    )
     this._server.on("upgrade", (req, socket, head) =>
       this.handleUpgrade(req, socket as import("node:net").Socket, head)
     )
@@ -1547,6 +1552,31 @@ export class GatewayServer {
         400,
         messageOf(error)
       )
+    }
+  }
+
+  /**
+   * The last resort for a request whose handler threw: the reason goes to
+   * the log for the operator, the caller gets a 500 that says nothing of
+   * it, and the process carries on. Without this the rejection is
+   * unhandled, which ends a Node process.
+   */
+  private crashed(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    error: unknown
+  ) {
+    try {
+      this._options.log.error({
+        event: "request.crashed",
+        route: (req.url || "/").split("?")[0],
+        reason: messageOf(error)
+      })
+      req.resume()
+      if (res.headersSent || res.writableEnded) res.destroy()
+      else sendRefusal(res, 500, "inference-failure", "The gateway failed.")
+    } catch {
+      res.destroy()
     }
   }
 
