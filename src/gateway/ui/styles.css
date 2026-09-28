@@ -424,7 +424,7 @@ table.pulls td { vertical-align: top; }
 .app-form input { max-width: 200px; }
 .app-form textarea, textarea { font: 12px/1.4 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; resize: vertical; }
 .app-form textarea:focus, textarea:focus { outline: 1px solid var(--accent); outline-offset: 1px; }
-.inline-setting { margin: 0; }
+.inline-setting { margin: 0; align-items: flex-end; }
 .inline-setting label { display: flex; flex-direction: column; align-items: stretch; gap: 4px; flex: 1 1 260px; }
 .inline-setting label input { background: var(--bg); }
 
@@ -559,3 +559,9 @@ table.pulls .open-link:hover, table.pulls .open-link:focus-visible { color: var(
   .filter.sort { flex-basis: 100%; }
   .filter.sort select { flex: 1; max-width: none; }
 }
+
+/* A developer with no name on the host yet: asked at the top of the plugin's page. */
+.panel.ask-me { border-color: var(--accent); }
+.ask-me-lead { margin: 0 0 12px; color: var(--ink-2); line-height: 1.5; }
+.success-bar.with-close { display: flex; align-items: flex-start; gap: 12px; }
+.success-bar.with-close > span { flex: 1; }

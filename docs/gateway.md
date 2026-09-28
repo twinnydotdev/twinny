@@ -426,12 +426,19 @@ Things worth knowing:
   content.
 
 **Plugins shared with you.** When an admin shares a plugin with you (the
-GitHub pull requests with the gateway's reviews, say), run **Twinny - Open
-your team's plugins** from the command palette. It puts your key on the
-clipboard and opens the gateway's page; paste the key to sign in. Or open
-`http://<gateway>/admin` yourself and sign in with your key. You see only
-the plugins shared with you, without their settings; see [Sharing a plugin
-with developers](#sharing-a-plugin-with-developers).
+GitHub pull requests with the gateway's reviews, say), VS Code tells you
+once, with an **Open** button, and lists it at the top of the Providers tab
+under **Your team's plugins**. Click the plugin, or **Open**, and the
+gateway's page opens in your browser already signed in: you never see,
+copy or paste your key. **Twinny - Open your team's plugins** in the
+command palette does the same. You see only the plugins shared with you,
+without their settings; see [Sharing a plugin
+with developers](#sharing-a-plugin-with-developers). An admin gets the same
+card, **Your gateway's page**, which opens the whole admin page signed in.
+
+Away from VS Code, open `http://<gateway>/admin` and sign in with a key
+your admin gives you. A connection that uses the shared token opens no
+page: ask for an invite, which gives you a key of your own.
 
 ## Building and publishing the package
 
@@ -537,6 +544,8 @@ balancing, no fallback chain and no automatic download.
 | `/twinny/v1/admin/recordings/export` | GET | admin key | JSON lines: `format=training` (default) or `raw`; same filters. |
 | `/twinny/v1/signin` | POST | no | Starts a sign-in: `{"name","machine"}` (both optional suggestions) → `{"deviceCode","userCode","expiresAt","interval"}`. Bounded to 5 waiting per client address and 100 in total; ten-minute expiry. |
 | `/twinny/v1/signin/poll` | POST | no | `{"deviceCode"}` → `{"status"}`: `pending`, `slow-down` (polled faster than `interval`), `denied`, `expired`, or `approved` with `key` and `name`, returned once. |
+| `/twinny/v1/page-link` | POST | personal key | A one-time code that signs this key in to the page: `{}` → `{"code","expiresAt"}`. Valid for one minute; at most 5 outstanding per key name. Refused for the shared token and a demo's guests. |
+| `/twinny/v1/page-link/open` | POST | no | `{"code"}` → `{"key","name"}`, once: the page trades the code for the key that asked for it. 410 for a code that is used, expired or unknown; the key's own refusal if it was revoked meanwhile. Audited as `page.signed-in`. |
 | `/twinny/v1/admin/signin` | GET | admin key | Waiting sign-in requests: code, suggested name and machine, timestamps. Never the device code. |
 | `/twinny/v1/admin/signin/<code>/approve` | POST | admin key | `{"name","admin","replace"}` mints the key under that name (seat rules apply) and releases it to the poller. A name that already holds an active key is refused unless `replace` is true, which revokes that key in the same step and needs no free seat. |
 | `/twinny/v1/admin/signin/<code>/deny` | POST | admin key | Refuses the request; the poller sees `denied`. |
@@ -1394,11 +1403,18 @@ Store** says who it is shared with; **share** chooses one of:
 - **every developer**: anyone with a gateway key of their own;
 - **these people**: the developers ticked, by key name.
 
-The developer signs in to `http://<gateway>/admin` with their own key, or
-runs **Twinny - Open your team's plugins** in VS Code, which puts the key
-on the clipboard and opens the page. They see the plugins shared with them
-and nothing else of the admin page. Each plugin shows its own page without
-its settings.
+There is nothing to send anyone. The next time a developer's VS Code looks
+(at start, when the window regains focus, and every half hour), it tells
+them the plugin was shared, with an **Open** button, and lists it at the
+top of the Providers tab. Opening it asks the gateway for a one-time code
+with the developer's key and opens `http://<gateway>/admin` with the code
+in the URL fragment, which browsers never send to the server; the page
+trades it for the key, once, within a minute, and wipes it from the address
+bar. They see the plugins shared with them and nothing else of the admin
+page. Each plugin shows its own page without its settings.
+
+Someone not using VS Code signs in to `http://<gateway>/admin` with their
+own key: an admin makes one under **People**.
 
 What a developer may do is decided by the plugin, not the grant. The
 pull-request plugins (GitHub, GitLab, Gitea, Bitbucket) let them do what a

@@ -28,6 +28,7 @@ import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore, stripT
 import { parseTriage, TriageRecord } from "../../gateway/plugins/triage"
 import { buildRouteTable } from "../../gateway/routes"
 import { GatewayServer } from "../../gateway/server"
+import { RemoteInferenceProvider } from "../../protocol/client"
 
 import { generateSigningKeys, issueLicense } from "./support/sign-license"
 
@@ -730,6 +731,14 @@ suite("Sharing a plugin with developers", function () {
 
     assert.strictEqual((await request(`${url}${api}/`, "GET", bob)).status, 403)
     assert.deepStrictEqual((await request(`${url}${base}`, "GET", bob)).body.plugins, [])
+  })
+
+  test("VS Code lists what is shared with its developer, and every running plugin for an admin", async () => {
+    const client = (key: string) => new RemoteInferenceProvider({ baseUrl: url, token: key })
+    assert.deepStrictEqual((await client(alice).sharedPlugins()).map((plugin) => plugin.id), ["github"])
+    assert.deepStrictEqual(await client(bob).sharedPlugins(), [])
+    assert.deepStrictEqual((await client(admin).sharedPlugins()).map((plugin) => plugin.id), ["github"], "switched-off plugins are left out")
+    await assert.rejects(client(shared).sharedPlugins(), (error: unknown) => (error as { status?: number }).status === 403)
   })
 
   test("a developer does what the plugin names as theirs and nothing an admin does", async () => {

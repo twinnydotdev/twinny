@@ -5,9 +5,10 @@
  */
 import { Disposable } from "vscode"
 
-import { TEAM_SHARE_EVENT_NAME } from "../../common/constants"
+import { TEAM_PLUGINS_EVENT_NAME, TEAM_SHARE_EVENT_NAME } from "../../common/constants"
 import { ExtensionBridge } from "../messaging/bridge"
 
+import { TeamPlugins } from "./plugins-page"
 import { TeamShare } from "./share"
 
 export class TeamShareBridge implements Disposable {
@@ -25,6 +26,26 @@ export class TeamShareBridge implements Disposable {
       [TEAM_SHARE_EVENT_NAME.discover]: () => share.discover()
     })
     this._subscription = share.onDidChange((status) => bridge.emit(TEAM_SHARE_EVENT_NAME.get, status))
+  }
+
+  public dispose() {
+    this._subscription.dispose()
+  }
+}
+
+/** The team plugins card's channels, registered per webview. */
+export class TeamPluginsBridge implements Disposable {
+  private readonly _subscription: Disposable
+
+  constructor(plugins: TeamPlugins, bridge: ExtensionBridge) {
+    bridge.handleAll({
+      [TEAM_PLUGINS_EVENT_NAME.get]: () => {
+        void plugins.refresh()
+        return plugins.status()
+      },
+      [TEAM_PLUGINS_EVENT_NAME.open]: (pluginId) => plugins.open(pluginId ?? undefined)
+    })
+    this._subscription = plugins.onDidChange((status) => bridge.emit(TEAM_PLUGINS_EVENT_NAME.get, status))
   }
 
   public dispose() {

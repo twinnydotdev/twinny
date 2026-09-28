@@ -2,6 +2,7 @@ import * as vscode from "vscode"
 
 import { GenerationTracker } from "../generations"
 import { P2pRuntime } from "../p2p/runtime"
+import type { TeamPlugins } from "../team/plugins-page"
 import { TeamShare } from "../team/share"
 import { getNonce } from "../utils"
 
@@ -15,9 +16,10 @@ export class FullScreenProvider extends BaseProvider {
     templateDir: string,
     generations: GenerationTracker,
     p2p?: P2pRuntime,
-    teamShare?: TeamShare
+    teamShare?: TeamShare,
+    teamPlugins?: TeamPlugins
   ) {
-    super(context, templateDir, generations, undefined, undefined, p2p, teamShare)
+    super(context, templateDir, generations, undefined, undefined, p2p, teamShare, teamPlugins)
     this.context = context
   }
 

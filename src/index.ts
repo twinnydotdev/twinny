@@ -46,7 +46,7 @@ import { teamSession } from "./extension/providers/team"
 import { generateCommitMessage } from "./extension/review/commit-message"
 import { SessionManager } from "./extension/session-manager"
 import { TwinnyStatusBar } from "./extension/status-bar"
-import { openTeamPluginsPage } from "./extension/team/plugins-page"
+import { TeamPlugins } from "./extension/team/plugins-page"
 import { TeamShare } from "./extension/team/share"
 import { TemplateProvider } from "./extension/templates/provider"
 import { terminalHistory } from "./extension/terminal"
@@ -204,13 +204,17 @@ export async function activate(context: ExtensionContext) {
   const currentTeam = () => teamSession(new ProviderStore(context), credentials, new TeamPolicyStore(context.globalState))
   const teamShare = new TeamShare(context, currentTeam)
   void teamShare.autoStart()
+  // What the team's gateway page holds for this developer, and a way in without their key.
+  const teamPlugins = new TeamPlugins(context, currentTeam)
+  context.subscriptions.push(teamPlugins)
 
   const fullScreenProvider = new FullScreenProvider(
     context,
     templateDir,
     generations,
     p2p,
-    teamShare
+    teamShare,
+    teamPlugins
   )
 
   const workspaceIndex = await WorkspaceIndex.open(context)
@@ -223,7 +227,8 @@ export async function activate(context: ExtensionContext) {
     workspaceIndex,
     sessionManager,
     p2p,
-    teamShare
+    teamShare,
+    teamPlugins
   )
 
   const completionProvider = new CompletionProvider(
@@ -305,7 +310,7 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.setUpTeam, () =>
       vscode.env.openExternal(vscode.Uri.parse(URL_TEAMS))
     ),
-    commands.registerCommand(TWINNY_COMMAND_NAME.openTeamPlugins, () => openTeamPluginsPage(currentTeam)),
+    commands.registerCommand(TWINNY_COMMAND_NAME.openTeamPlugins, () => teamPlugins.open()),
     commands.registerCommand(TWINNY_COMMAND_NAME.terminalCommand, async () => {
       const chat = await requireChat()
       if (chat) await runDescribedCommand(chat, terminalHistory)

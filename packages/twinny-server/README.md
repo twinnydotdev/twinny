@@ -181,8 +181,9 @@ tailnet with `"listen": { "host": "0.0.0.0" }` in the configuration.
   gateway's own chat aliases, in the background only while no developer
   request is running, and appear in usage under `plugin:<id>`. **share** on
   a pull-request plugin's card lets every developer, or the ones you tick,
-  sign in to `/admin` with their own key and review, post and triage
-  there; repositories, tokens and settings stay yours.
+  review, post and triage there. VS Code tells them and opens it signed in,
+  so there is no key to hand out; repositories, tokens and settings stay
+  yours.
 - **Audit log:** every admin change, hash-chained, under **Team → Audit log**;
   filter, verify and export. `/metrics` answers Prometheus scrapes with an
   admin key (a read-only one will do).

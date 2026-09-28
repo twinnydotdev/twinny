@@ -18,6 +18,8 @@ import { PEER_CLOSE, peerRoutePath } from "../protocol/peer"
 import {
   GATEWAY_PAGE_PATH,
   REMOTE_JOIN_PATH,
+  REMOTE_PAGE_LINK_OPEN_PATH,
+  REMOTE_PAGE_LINK_PATH,
   REMOTE_PROTOCOL_BASE,
   REMOTE_PROTOCOL_VERSION,
   REMOTE_SIGNIN_PATH,
@@ -65,6 +67,7 @@ import { KeyStore } from "./keys"
 import { LicenseStore } from "./license"
 import { GatewayLog } from "./log"
 import type { GatewayMetrics } from "./metrics"
+import { PageLinks } from "./page-links"
 import { PeerRegistry } from "./peers"
 import {
   readJsonBody,
@@ -190,6 +193,7 @@ export class GatewayServer {
   private readonly _server: http.Server
   private readonly _gate: InferenceGate
   private readonly _signIns: SignInRequests
+  private readonly _pageLinks = new PageLinks()
   private readonly _seats: SeatBook
   private readonly _guestInvites?: InviteThrottle
   private _guestSweep?: NodeJS.Timeout
@@ -1588,6 +1592,71 @@ export class GatewayServer {
   }
 
   /**
+   * Page links, both sides. Asking takes the developer's own key: the
+   * shared token and a demo's guests have no page to open. Opening takes
+   * no credential, since the code is one, and hands back the key that
+   * asked, once, if it still works.
+   */
+  private async handlePageLink(
+    pathname: string,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ) {
+    if (req.method !== "POST") {
+      req.resume()
+      sendMethodNotAllowed(res, ["POST"], "Page links are POST only.")
+      return
+    }
+    if (this._draining) {
+      req.resume()
+      sendMessage(res, 503, "The gateway is shutting down.")
+      return
+    }
+    if (pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_PAGE_LINK_PATH}`) {
+      req.resume()
+      const auth = this.authenticate(req.headers.authorization)
+      if ("refused" in auth) {
+        sendError(res, new InferenceError("authentication", auth.refused), { "WWW-Authenticate": "Bearer" })
+        return
+      }
+      if (auth.shared || auth.visitor || this._seats.isGuest(auth.principal)) {
+        sendRefusal(
+          res,
+          403,
+          "authentication",
+          auth.shared
+            ? "The shared token does not open the gateway's page. Ask your admin for a key of your own."
+            : "A demo's guests have no page to open."
+        )
+        return
+      }
+      const link = this._pageLinks.mint(bearerOf(req.headers.authorization) as string, auth.principal)
+      this._options.log.info({ event: "page-link.made", key: auth.principal })
+      sendJson(res, 201, link)
+      return
+    }
+    try {
+      const body = await readJsonBody(req, 4 * 1024)
+      const opened = this._pageLinks.open(body.code)
+      if (!opened) {
+        sendMessage(res, 410, "This sign-in link was used already or has expired. Open the page from VS Code again.")
+        return
+      }
+      // Revoked or unseated in the minute since: say why, as the key would.
+      const auth = this.authenticate(`Bearer ${opened.key}`)
+      if ("refused" in auth) {
+        sendError(res, new InferenceError("authentication", auth.refused))
+        return
+      }
+      this._options.log.info({ event: "page-link.opened", key: opened.name })
+      this.audit(req, opened.name, "page.signed-in", opened.name, { link: true, ...(auth.admin ? { admin: true } : {}) })
+      sendJson(res, 200, { key: opened.key, name: opened.name })
+    } catch (error) {
+      sendMessage(res, 400, messageOf(error))
+    }
+  }
+
+  /**
    * The licence: read the plan, install a token, or remove it. Installing
    * verifies the signature first; a bad token changes nothing. The token
    * is logged by id and org only.
@@ -1726,6 +1795,13 @@ export class GatewayServer {
     }
     if (url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_JOIN_PATH}`) {
       await this.handleJoin(req, res)
+      return
+    }
+    if (
+      url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_PAGE_LINK_PATH}` ||
+      url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_PAGE_LINK_OPEN_PATH}`
+    ) {
+      await this.handlePageLink(url.pathname, req, res)
       return
     }
     if (url.pathname === `${REMOTE_PROTOCOL_BASE}${DEMO_INVITE_PATH}`) {

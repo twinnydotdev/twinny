@@ -2,7 +2,8 @@
  * Who a plugin is shared with, on its card in the store: nobody (admins
  * only), every developer with a key, or the people ticked. A developer a
  * plugin is shared with signs in to this page with their own key and sees
- * that plugin's page, without its settings.
+ * that plugin's page, without its settings; VS Code announces the share
+ * and opens the page signed in, so there is no key to hand out.
  */
 import React, { useEffect, useState } from "react"
 
@@ -93,7 +94,9 @@ export const AccessEditor = ({ access, people, onSave }: AccessEditorProps) => {
         ))}
       {error && <div className="error">{error}</div>}
       <div className="row-actions">
-        <span className="muted">Developers sign in to this page with their own key and see the plugin&apos;s page, without its settings.</span>
+        <span className="muted">
+          Nothing to send them: VS Code tells each developer it was shared, and <b>Providers → Your team&apos;s plugins</b> opens it signed in. They see the plugin&apos;s page, without its settings.
+        </span>
         <button type="button" className="primary" disabled={busy || (mode === "people" && chosen.length === 0)} onClick={() => void save()}>
           {busy ? "…" : "save"}
         </button>

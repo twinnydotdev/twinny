@@ -1111,3 +1111,54 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The team gateway's plugins, each opening signed in */
+.pluginList {
+  margin: 0;
+  padding: 0 0 4px;
+  list-style: none;
+  border-top: 1px solid var(--tw-rule);
+}
+.pluginList button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 10px 5px 36px;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pluginList button:hover:not(:disabled),
+.pluginList button:focus-visible {
+  background: var(--vscode-list-hoverBackground, var(--tw-surface));
+  outline: none;
+}
+.pluginList button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.pluginList .codicon {
+  margin-left: auto;
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--tw-fg-faint);
+}
+.pluginList button:hover .codicon {
+  color: var(--tw-accent);
+}
+.pluginName {
+  flex-shrink: 0;
+}
+.pluginDescription {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}

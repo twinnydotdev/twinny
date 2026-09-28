@@ -6,6 +6,7 @@ import {
   P2P_EVENT_NAME,
   PROVIDER_EVENT_NAME,
   REVIEW_EVENT_NAME,
+  TEAM_PLUGINS_EVENT_NAME,
   TEAM_SHARE_EVENT_NAME
 } from "../constants"
 import type { DiscoveredServer } from "../provider-discovery"
@@ -14,6 +15,7 @@ import type {
   TeamApplyResult,
   TeamConnectionRequest,
   TeamOpen,
+  TeamPluginsStatus,
   TeamPreview,
   TeamShareBackend,
   TeamShareStatus,
@@ -404,6 +406,10 @@ export interface ClientEvents {
   [TEAM_SHARE_EVENT_NAME.stop]: Channel<void, TeamShareStatus>
   [TEAM_SHARE_EVENT_NAME.setBackend]: Channel<TeamShareBackend, TeamShareStatus>
   [TEAM_SHARE_EVENT_NAME.discover]: Channel<void, TeamShareBackend[]>
+
+  [TEAM_PLUGINS_EVENT_NAME.get]: Channel<void, TeamPluginsStatus>
+  /** Opens the gateway's page signed in, on a plugin's page when given its id; whether it opened. */
+  [TEAM_PLUGINS_EVENT_NAME.open]: Channel<string | undefined, boolean>
 }
 
 /* -------------------------------------------------------------------------- */
@@ -452,6 +458,7 @@ export interface ServerEvents {
   [P2P_EVENT_NAME.getHost]: P2pHostStatus
 
   [TEAM_SHARE_EVENT_NAME.get]: TeamShareStatus
+  [TEAM_PLUGINS_EVENT_NAME.get]: TeamPluginsStatus
 }
 
 /* -------------------------------------------------------------------------- */
@@ -488,6 +495,7 @@ type EveryName =
   | (typeof P2P_EVENT_NAME)[keyof typeof P2P_EVENT_NAME]
   | (typeof REVIEW_EVENT_NAME)[keyof typeof REVIEW_EVENT_NAME]
   | (typeof TEAM_SHARE_EVENT_NAME)[keyof typeof TEAM_SHARE_EVENT_NAME]
+  | (typeof TEAM_PLUGINS_EVENT_NAME)[keyof typeof TEAM_PLUGINS_EVENT_NAME]
 
 /**
  * Every declared name must be used by at least one direction, and no channel

@@ -14,6 +14,7 @@ import type { TriageBrief, TriagePriority, TriageRecord } from "../plugins/triag
 
 import { api, ApiError } from "./api"
 import { fmt, plural, timeAgo } from "./format"
+import { forgetHostName, hostNameHint, isGitHubDotCom } from "./host-names"
 import { Age, AGE_OPTIONS, distinct, FilterSelect, Sort, SortHeader, sortRows, toggleSort, useStoredState, withinAge } from "./listing"
 import { DiffBlock, MarkdownView } from "./markdown"
 import { PageSkeleton, PluginIcon } from "./plugins"
@@ -648,34 +649,60 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
 /*  A developer's own name on the host                                        */
 /* -------------------------------------------------------------------------- */
 
+interface MePanelProps extends HostPanelProps {
+  /** No name yet: the panel asks at the top of the page instead of waiting at the bottom. */
+  asking?: boolean
+  /** Said once a name is saved, where the panel was, since the panel itself then moves. */
+  onSaved: (message: string) => void
+}
+
 /** For a developer the plugin is shared with: who they are on the host, for their eyes only. */
-const MePanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanelProps) => {
+const MePanel = ({ host, words, overview, base, apiKey, onChanged, asking = false, onSaved }: MePanelProps) => {
   const [me, setMe] = useState(overview.me.name ?? "")
   useEffect(() => setMe(overview.me.name ?? ""), [overview.me.name])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
-  const [notice, setNotice] = useState<string | undefined>()
   const name = me.trim().replace(/^@/, "")
-  const save = async () => {
+  const view = `\u201c${QUICK_LABEL.mine}\u201d`
+  const save = async (value = name, from?: string) => {
     setBusy(true)
     setError(undefined)
-    setNotice(undefined)
     try {
-      await api(`${base}/me`, apiKey, { method: "PUT", body: { me: name } })
+      await api(`${base}/me`, apiKey, { method: "PUT", body: { me: value } })
+      onSaved(
+        value
+          ? `You are ${value} on ${HOST_NAMES[host]}${from ? `, ${from}` : ""}. The ${words.nouns} waiting for your approval are under ${view}, and marked in the list.${from ? " Not you? Change it under You on " + HOST_NAMES[host] + " at the bottom of the page." : ""}`
+          : `Username cleared: ${view} is hidden until you set one.`
+      )
       await onChanged()
-      setNotice(name ? `The ${words.nouns} waiting for your approval are marked; you are ${name}.` : "Username cleared.")
     } catch (e) {
       setError(messageOf(e))
     } finally {
       setBusy(false)
     }
   }
+
+  // Opened from VS Code signed in to GitHub: no name yet, so use that one, once.
+  // Never on an Enterprise server, where a github.com login would be someone else's.
+  const hint = hostNameHint(host)
+  useEffect(() => {
+    if (!hint || overview.me.name) return
+    forgetHostName(host)
+    if (host === "github" && !isGitHubDotCom(overview.host.baseUrl)) return
+    void save(hint, "taken from your GitHub sign-in in VS Code")
+    // Once per page load, on the first overview that has no name.
+  }, [hint, overview.me.name])
+
   return (
-    <section className="panel">
+    <section className={`panel ${asking ? "ask-me" : ""}`} id="you-on-host">
       <div className="section-heading">
-        <h2>You on {HOST_NAMES[host]}</h2>
+        <h2>{asking ? `Who are you on ${HOST_NAMES[host]}?` : `You on ${HOST_NAMES[host]}`}</h2>
       </div>
-      {notice && <div className="success-bar">{notice}</div>}
+      {asking && (
+        <p className="ask-me-lead">
+          Your username gives the {words.nouns} waiting for your approval a view of their own, {view}, and marks them in the list. Only you see it; nothing is posted.
+        </p>
+      )}
       {error && <div className="error">{error}</div>}
       <form
         className="newkey inline-setting"
@@ -686,12 +713,12 @@ const MePanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanelPr
       >
         <label>
           <span className="muted">username</span>
-          <input value={me} onChange={(e) => setMe(e.target.value)} aria-label={`Your username on ${HOST_NAMES[host]}`} placeholder="username" disabled={busy} spellCheck={false} />
+          <input id="you-on-host-name" value={me} onChange={(e) => setMe(e.target.value)} aria-label={`Your username on ${HOST_NAMES[host]}`} placeholder={`your ${HOST_NAMES[host]} username`} disabled={busy} spellCheck={false} autoFocus={asking} />
         </label>
-        <button type="submit" className="ghost" disabled={busy || name === (overview.me.name ?? "")}>
-          save
+        <button type="submit" className={asking ? "primary" : "ghost"} disabled={busy || !name || name === (overview.me.name ?? "")}>
+          {busy ? "…" : "save"}
         </button>
-        <span className="muted">Marks the {words.nouns} waiting for your approval, on your page only. Repositories and settings are the admin&apos;s.</span>
+        {!asking && <span className="muted">Marks the {words.nouns} waiting for your approval, on your page only. Repositories and settings are the admin&apos;s.</span>}
       </form>
     </section>
   )
@@ -1542,6 +1569,7 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
   const narrowed = useMemo(() => (filters.drafts ? narrowedWithDrafts : narrowedWithDrafts.filter(({ pull }) => !pull.draft)), [narrowedWithDrafts, filters.drafts])
 
   const me = overview?.me.name
+  const [meNotice, setMeNotice] = useState<string | undefined>()
   // The "drafts" view ignores the switch; every other view honours it.
   const pulls = useMemo(
     () =>
@@ -1596,6 +1624,15 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
         </p>
       </div>
       {error && <div className="error-bar">{error}</div>}
+      {meNotice && (
+        <div className="success-bar with-close">
+          <span>{meNotice}</span>
+          <button type="button" className="link" onClick={() => setMeNotice(undefined)} aria-label="Dismiss">
+            ok
+          </button>
+        </div>
+      )}
+      {member && !overview.me.name && <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} asking onSaved={setMeNotice} />}
 
       <div className="tiles">
         <div className="tile">
@@ -1821,7 +1858,7 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
 
       <IssuesPanel host={host} overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />
       {member ? (
-        <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+        overview.me.name ? <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} onSaved={setMeNotice} /> : null
       ) : (
         <>
           <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
