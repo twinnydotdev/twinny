@@ -1191,6 +1191,11 @@ the queue taken), `queue` (waited the route's wait and no slot came) or
 `key` (a `limits.perKey` limit). `request.abandoned` is a client that closed
 the connection while waiting. `data.format` and `data.migrate` report the
 [data directory](#data-directory) being marked or migrated at startup.
+`request.crashed` is a request the gateway itself failed on: the caller got
+a 500 that says only "The gateway failed.", `route=` is the path and
+`reason=` is what went wrong (for example a `keys.json` that is no longer
+valid JSON). The gateway keeps serving; fix the cause and the next request
+goes through without a restart.
 
 `key=` names the access key (or `shared`). Prompts, completions, chat
 messages, embeddings, authorization headers, backend response bodies and
@@ -1269,6 +1274,7 @@ In VS Code:
 | Requests refused with `rate-limited` for one person only | That key hit `limits.perKey`. | Wait a minute, or raise the limit and restart. Refusals are logged with `reason=key`. |
 | The share card says "did not accept the sharing connection (HTTP 400)" | A reverse proxy in front of the gateway does not pass WebSocket upgrades. | Enable upgrades for `/twinny/v1/peers` at the proxy; see [Reverse proxies](#reverse-proxies). |
 | "No teammate is sharing …" although someone is | Their local server does not have that exact model name, or their VS Code is closed. | The admin page's People tab shows who is online and which models; `ollama pull <model>` on the sharer's machine. |
+| Every request with a key answers 500 "The gateway failed." | The keys file was edited by hand or damaged and can no longer be read; the log says `event=request.crashed` with the reason. | Repair `keys.json` or restore it from a backup. The gateway rereads it on the next request; no restart is needed. |
 | Usage report is empty | Wrong `--config` (different `usage.dir`), or the period is too short. | Pass `--config`, try `--since 30d`. |
 | VS Code shows "cancelled" after a restart of the gateway | Requests in flight were aborted at shutdown. | Nothing to do; the next request goes through. |
 | Most `route=fim` lines say `outcome=cancelled status=499` after a few ms | VS Code cancelled the completion request: the next keystroke arrived, or IntelliSense opened and VS Code re-asked with the suggest widget open (twinny declines that re-ask mid-word). The gateway is the first place this became visible; direct providers behave the same. | Normal while typing. Completions arrive when you pause outside a word (after a space, bracket or new line). `status=200 chunks=N` with `cancelled` means the client had enough and stopped reading, also normal. Set the Twinny log to Debug (`Developer: Set Log Level…`) to see the client side. |
