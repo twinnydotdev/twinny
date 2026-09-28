@@ -31,7 +31,7 @@ import {
   PluginRequest,
   PluginResponse
 } from "./host"
-import { PullsPlugin } from "./pulls"
+import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
 export const GITHUB_URL = "https://github.com"
 const USER_AGENT = "twinny-server"
@@ -696,6 +696,7 @@ export const githubPlugin: GatewayPlugin = {
   name: "GitHub",
   description:
     "Watch repositories on GitHub (or GitHub Enterprise) and see their open pull requests, checks and review state. Reads with a GitHub App or a token.",
+  memberRoutes: MEMBER_ROUTES,
   create: (context) =>
     new PullsPlugin(context, (store, ctx) => new GitHubForge(store, ctx), undefined, "github")
 }

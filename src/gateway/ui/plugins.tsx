@@ -6,12 +6,14 @@
 import React, { useState } from "react"
 
 import { messageOf } from "../../common/errors"
+import type { PluginAccess } from "../plugins/access"
 import type { PluginSummary } from "../plugins/host"
 
 import { BackupsPanel } from "./backups"
 import { ContextPanel } from "./context"
 import { NotifyPanel } from "./notify"
 import { OidcPanel } from "./oidc"
+import { AccessEditor } from "./plugin-access"
 import { PullsPanel } from "./pulls"
 
 /** Brand marks, inline so the page's content-security policy allows them. */
@@ -89,11 +91,14 @@ interface PluginsPageProps {
   /** Whether the plan carries the plugins feature; switches are off otherwise. */
   licensed: boolean
   onToggle: (id: string, enabled: boolean) => Promise<void>
+  /** Developers' key names, for sharing a plugin with some of them. */
+  people: string[]
+  onShare: (id: string, access: PluginAccess) => Promise<void>
   onOpen: (id: string) => void
   onNavigate: (view: "plan") => void
 }
 
-export const PluginsPage = ({ plugins, licensed, onToggle, onOpen, onNavigate }: PluginsPageProps) => {
+export const PluginsPage = ({ plugins, licensed, onToggle, people, onShare, onOpen, onNavigate }: PluginsPageProps) => {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | undefined>()
   const toggle = async (plugin: PluginSummary) => {
@@ -148,6 +153,7 @@ export const PluginsPage = ({ plugins, licensed, onToggle, onOpen, onNavigate }:
                 </button>
               )}
             </div>
+            {plugin.shareable && plugin.access && <AccessEditor access={plugin.access} people={people} onSave={(access) => onShare(plugin.id, access)} />}
           </section>
         ))}
       </div>
@@ -211,8 +217,10 @@ export const PageSkeleton = ({ tiles = 4, rows = 5, title }: { tiles?: number; r
 )
 
 /** The page an enabled plugin shows; plugins without one say so. */
-export const PluginPage = ({ id, apiKey }: { id: string; apiKey: string }) => {
-  if (id === "github" || id === "gitlab" || id === "gitea" || id === "bitbucket") return <PullsPanel host={id} apiKey={apiKey} />
+/** A plugin's own page; `member` for a developer it is shared with, who sees only what they may use. */
+export const PluginPage = ({ id, apiKey, member = false }: { id: string; apiKey: string; member?: boolean }) => {
+  if (id === "github" || id === "gitlab" || id === "gitea" || id === "bitbucket") return <PullsPanel host={id} apiKey={apiKey} member={member} />
+  if (member) return <div className="empty">This plugin has no page for developers.</div>
   if (id === "backups") return <BackupsPanel apiKey={apiKey} />
   if (id === "oidc") return <OidcPanel apiKey={apiKey} />
   if (id === "context") return <ContextPanel apiKey={apiKey} />

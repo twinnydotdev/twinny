@@ -39,6 +39,7 @@ import { ProviderCard } from "./provider-card"
 import { ProviderForm } from "./provider-form"
 import { ShareCard } from "./share"
 import { ConnectTeam } from "./team"
+import { TeamPluginsCard } from "./team-plugins"
 import { Welcome } from "./welcome"
 
 import styles from "../styles/providers.module.css"
@@ -430,6 +431,7 @@ export const Providers = ({ onDone }: ProvidersProps) => {
         </div>
       )}
 
+      <TeamPluginsCard />
       <ShareCard />
 
       {empty && (

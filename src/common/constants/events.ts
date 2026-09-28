@@ -107,6 +107,11 @@ export const TEAM_SHARE_EVENT_NAME = {
   discover: "twinny.discover-team-share-backends"
 } as const
 
+export const TEAM_PLUGINS_EVENT_NAME = {
+  get: "twinny.get-team-plugins",
+  open: "twinny.open-team-plugins"
+} as const
+
 export const P2P_EVENT_NAME = {
   getDevices: "p2p.getDevices",
   pairDevice: "p2p.pairDevice",

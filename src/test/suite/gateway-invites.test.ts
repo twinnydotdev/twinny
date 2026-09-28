@@ -19,7 +19,7 @@ import { createGatewayLog } from "../../gateway/log"
 import { buildRouteTable } from "../../gateway/routes"
 import { GatewayServer } from "../../gateway/server"
 import { RemoteInferenceProvider } from "../../protocol/client"
-import { inviteLink, teamLink } from "../../protocol/types"
+import { gatewayPageLink, inviteLink, teamLink } from "../../protocol/types"
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-invites-test-"))
 
@@ -93,6 +93,8 @@ suite("Invite store", () => {
     assert.strictEqual(parsed.searchParams.get("code"), "twi_00000000_" + "a".repeat(64))
     assert.ok(inviteLink("http://10.0.0.5:8765", "twi_x", "cursor").startsWith("cursor://rjmacarthy.twinny/join?"))
     assert.strictEqual(new URL(teamLink("https://ai.example.com")).pathname, "/team")
+    assert.strictEqual(gatewayPageLink("https://ai.example.com/"), "https://ai.example.com/admin")
+    assert.strictEqual(gatewayPageLink("http://10.0.0.5:8765"), "http://10.0.0.5:8765/admin")
     assert.strictEqual(invitesFileFor("/srv/twinny/keys.json"), "/srv/twinny/invites.json")
   })
 })

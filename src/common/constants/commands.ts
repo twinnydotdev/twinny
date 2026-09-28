@@ -21,6 +21,7 @@ export const TWINNY_COMMAND_NAME = {
   exportConversation: "twinny.exportConversation",
   openPanelChat: "twinny.openPanelChat",
   openChat: "twinny.openChat",
+  openTeamPlugins: "twinny.openTeamPlugins",
   refactor: "twinny.refactor",
   settings: "twinny.settings",
   setUpTeam: "twinny.setUpTeam",

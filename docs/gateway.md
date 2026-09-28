@@ -30,7 +30,7 @@ Node 18 or newer and nothing else.
 - [Access keys and the shared token](#access-keys-and-the-shared-token)
 - [Team policy](#team-policy) — what connected extensions enforce; a licence feature
 - [Recording](#recording) — keeping request content for review and training; a licence feature
-- [Plugins](#plugins) — GitHub and GitLab pull requests, reviewed by your own models; a licence feature
+- [Plugins](#plugins) — GitHub and GitLab pull requests, reviewed by your own models, shared with the developers you choose; a licence feature
 - [Running in Docker](#running-in-docker)
 - [Plans, seats and the licence](#plans-seats-and-the-licence)
 - [Usage records](#usage-records)
@@ -107,7 +107,7 @@ to change there. To wipe a gateway and start again, stop it and run
      models:   2 aliases (coder: fim/chat, embed: embeddings)
      limits:   2 active, 8 waiting (fim 500ms, chat 15s), 120s deadline, 5s grace
      health:   http://127.0.0.1:8765/healthz
-     admin:    http://127.0.0.1:8765/admin (sign in with an admin key)
+     admin:    http://127.0.0.1:8765/admin (admin keys; a developer's key opens the plugins shared with them)
      access:   1 active key
      data:     /home/you/.twinny/server (format 1)
      usage:    /home/you/.twinny/server/usage (kept 30 days)
@@ -191,7 +191,7 @@ pass it whenever your configuration sets `auth.keysFile` or `usage.dir`.
 | Licence | `~/.twinny/server/license` | the signed licence token, when the team has one | no, but it names your organisation |
 | Recordings | `~/.twinny/server/recordings/` | the content of requests, only for routes switched on under `recording` with a licence that allows it | yes: prompts, code and replies |
 | Audit log | `~/.twinny/server/audit/YYYY-MM.jsonl` | who changed what, hash-chained | no, but it names people |
-| Plugins | `~/.twinny/server/plugins.json` | which bundled plugins are switched on | no |
+| Plugins | `~/.twinny/server/plugins.json` | which bundled plugins are switched on, and which developers each is shared with | no, but it names people |
 | Plugin data | `~/.twinny/server/plugins/<id>/` | each plugin's own files; the GitHub and GitLab plugins keep `repos.json` and `reviews.json` there | yes: repository tokens and the GitHub App key (mode 600); reviews quote the code |
 | Shared token | the environment variable named by `auth.tokenEnv` | the token itself | yes |
 | Backend API keys | the environment variables named by `providers.*.apiKeyEnv` | the keys themselves | yes |
@@ -297,6 +297,11 @@ Their next request fails with "This gateway key was revoked on <date>",
 within a second, no restart. Their usage history stays in the records
 under their name until retention removes it. A revoked name can be reused
 for a new key.
+
+Plugins shared with them by name stay shared with that name, so a new key
+for the same person picks them up again. If someone else will get the
+name, take it off the plugin first: **Plugins → Store → share** on the
+plugin's card.
 
 ### Rotating a key
 
@@ -420,6 +425,21 @@ Things worth knowing:
   and stores request metadata (which model, how long, token counts), never
   content.
 
+**Plugins shared with you.** When an admin shares a plugin with you (the
+GitHub pull requests with the gateway's reviews, say), VS Code tells you
+once, with an **Open** button, and lists it at the top of the Providers tab
+under **Your team's plugins**. Click the plugin, or **Open**, and the
+gateway's page opens in your browser already signed in: you never see,
+copy or paste your key. **Twinny - Open your team's plugins** in the
+command palette does the same. You see only the plugins shared with you,
+without their settings; see [Sharing a plugin
+with developers](#sharing-a-plugin-with-developers). An admin gets the same
+card, **Your gateway's page**, which opens the whole admin page signed in.
+
+Away from VS Code, open `http://<gateway>/admin` and sign in with a key
+your admin gives you. A connection that uses the shared token opens no
+page: ask for an invite, which gives you a key of your own.
+
 ## Building and publishing the package
 
 The package lives in `packages/twinny-server/` and is built by the root
@@ -513,7 +533,7 @@ balancing, no fallback chain and no automatic download.
 | `/twinny/v1/peers` | GET + `Upgrade: websocket` | personal key | A developer's extension sharing its computer with the team. The shared token is refused. See [Pooling teammates' computers](#pooling-teammates-computers). |
 | `/twinny/v1/admin/peers` | GET | admin key | The computers sharing right now: key, machine, models, jobs in flight, served and failed counts. |
 | `/twinny/v1/admin/peers/<id>/disconnect` | POST | admin key | Closes that sharing connection (code 4003). The extension reconnects unless its owner switches sharing off. |
-| `/admin` | GET | no | The admin page (see below). The page itself signs in with an admin key. |
+| `/admin` | GET | no | The admin page (see below). The page itself signs in: an admin key opens everything, a developer's key the plugins shared with them. |
 | `/twinny/v1/admin/usage`, `/twinny/v1/admin/keys` | GET | admin key | The page's data: usage for everyone and the key list. |
 | `/twinny/v1/admin/keys` | POST | admin key | `{"name","admin"}` → a new key, returned once. |
 | `/twinny/v1/admin/keys/<id>/revoke` | POST | admin key | Revokes a key; not the one making the call. |
@@ -524,10 +544,15 @@ balancing, no fallback chain and no automatic download.
 | `/twinny/v1/admin/recordings/export` | GET | admin key | JSON lines: `format=training` (default) or `raw`; same filters. |
 | `/twinny/v1/signin` | POST | no | Starts a sign-in: `{"name","machine"}` (both optional suggestions) → `{"deviceCode","userCode","expiresAt","interval"}`. Bounded to 5 waiting per client address and 100 in total; ten-minute expiry. |
 | `/twinny/v1/signin/poll` | POST | no | `{"deviceCode"}` → `{"status"}`: `pending`, `slow-down` (polled faster than `interval`), `denied`, `expired`, or `approved` with `key` and `name`, returned once. |
+| `/twinny/v1/page-link` | POST | personal key | A one-time code that signs this key in to the page: `{}` → `{"code","expiresAt"}`. Valid for one minute; at most 5 outstanding per key name. Refused for the shared token and a demo's guests. |
+| `/twinny/v1/page-link/open` | POST | no | `{"code"}` → `{"key","name"}`, once: the page trades the code for the key that asked for it. 410 for a code that is used, expired or unknown; the key's own refusal if it was revoked meanwhile. Audited as `page.signed-in`. |
 | `/twinny/v1/admin/signin` | GET | admin key | Waiting sign-in requests: code, suggested name and machine, timestamps. Never the device code. |
 | `/twinny/v1/admin/signin/<code>/approve` | POST | admin key | `{"name","admin","replace"}` mints the key under that name (seat rules apply) and releases it to the poller. A name that already holds an active key is refused unless `replace` is true, which revokes that key in the same step and needs no free seat. |
 | `/twinny/v1/admin/signin/<code>/deny` | POST | admin key | Refuses the request; the poller sees `denied`. |
 | `/twinny/v1/admin/provider-models` | POST | admin key | Lists models using the supplied provider configuration, including an unsaved draft. |
+| `/twinny/v1/admin/plugins` | GET | personal key | For an admin, every bundled plugin with `shareable` and, when shareable, `access`. For a developer, only the running plugins shared with them, without `access`. See [Plugins](#plugins). |
+| `/twinny/v1/admin/plugins/<id>/access` | GET / PUT | admin key | Who besides the admins may use the plugin: `{"everyone","people"}`. |
+| `/twinny/v1/admin/plugins/<id>/api/<route>` | any | admin key, or a developer's key the plugin is shared with | The plugin's own routes. A developer reaches only the routes the plugin names as theirs. |
 | `/twinny/v1/fim` | POST | yes | Streams completion chunks as JSON lines. |
 | `/twinny/v1/chat` | POST | yes | Streams chat chunks as JSON lines. |
 | `/twinny/v1/embeddings` | POST | yes | Returns vectors. |
@@ -1044,7 +1069,10 @@ twinny-server keys create you --admin
 ```
 
 The key stays in that browser tab (session storage); nothing is set as a
-cookie. The page shows, for the last 24 h, 7 d or 30 d:
+cookie. A developer's key opens the page too, but only on the plugins an
+admin shared with them (see [Sharing a plugin with
+developers](#sharing-a-plugin-with-developers)). For an admin, the page
+shows, for the last 24 h, 7 d or 30 d:
 
 - whether every backend answers, and which aliases a down one affects;
 - requests, success rate, failures, cancellations and reported token counts;
@@ -1054,9 +1082,10 @@ cookie. The page shows, for the last 24 h, 7 d or 30 d:
 Keys can be made and revoked on the page as well as with the CLI: a new
 key is shown once with a copy button, and revoking asks for a click of
 confirmation. The key you are signed in with cannot be revoked from the
-page (use the CLI). A developer key is refused with 403 on the admin
-routes, and the shared token is never an admin. Both actions are logged
-with the admin's key name and the affected key's name.
+page (use the CLI). A developer key is refused with 403 on every admin
+route except the plugins shared with it, and the shared token is never
+an admin or a developer. Both actions are logged with the admin's key
+name and the affected key's name.
 
 ### Providers and models
 
@@ -1204,7 +1233,12 @@ telemetry, conversation storage or analytics.
   and every API call carry the key as a bearer header) and consider
   restricting `/admin` to your network at the proxy.
 - **Admin keys make keys.** Give `--admin` only to operators. A developer key
-  gets 403 on the admin API and sees nothing on the page.
+  gets 403 on the admin API, except on the plugins an admin shared with it,
+  and then only on the routes each plugin names as a developer's (reading,
+  reviewing, posting a review as a comment, triage). Repositories, tokens,
+  the GitHub App and plugin settings stay with admins. A review a developer
+  posts goes to the host with the repository's token, as the token's owner,
+  so share a plugin with the people you would let comment under it.
 - **Sign-in codes create nothing by themselves.** A code lets an admin
   approve or deny; the key is minted at approval under the name the admin
   types and released only to the holder of the 64-hex device code, once.
@@ -1290,8 +1324,10 @@ packaging.
 Every change made through the admin API or CLI-equivalent routes is
 written to `audit/YYYY-MM.jsonl` under the data directory: keys made and
 revoked, invites made, opened and withdrawn, sign-ins approved,
-configuration saves, licence changes, plugins switched on or off, and
-every write to a plugin's routes (method and path, never the body).
+configuration saves, licence changes, plugins switched on or off, who
+a plugin is shared with (`plugin.access-changed`), and every write to a
+plugin's routes (method and path, never the body; a developer's writes
+are marked `member`).
 Each line carries the SHA-256 of the line before it, so an edited or
 removed line breaks the chain, and **Team → Audit log** on the admin
 page says whether the chain is intact and where it breaks. Filter by
@@ -1345,14 +1381,85 @@ switched on, and plugins that were on stop until a licence is installed;
 their switch is kept, so a renewed licence brings them straight back.
 The 14-day grace after expiry applies as it does to policy and recording.
 
-The API behind the page, admin keys only:
+The API behind the page, admin keys only except where a plugin is shared
+(below):
 
 | Route | Does |
 | --- | --- |
-| `GET /twinny/v1/admin/plugins` | what is bundled and what is on |
+| `GET /twinny/v1/admin/plugins` | what is bundled and what is on; for a developer, what is shared with them |
 | `POST /twinny/v1/admin/plugins/<id>/enable` | switch on |
 | `POST /twinny/v1/admin/plugins/<id>/disable` | switch off |
+| `GET /twinny/v1/admin/plugins/<id>/access` | who the plugin is shared with |
+| `PUT /twinny/v1/admin/plugins/<id>/access` `{ everyone, people }` | share it, or stop sharing it |
 | `… /twinny/v1/admin/plugins/<id>/api/<route>` | the plugin's own routes, answered by the plugin |
+
+### Sharing a plugin with developers
+
+Admins use every plugin that is on. A developer uses one only when an
+admin shares it with them. Each shareable plugin's card under **Plugins →
+Store** says who it is shared with; **share** chooses one of:
+
+- **admins only**, the default;
+- **every developer**: anyone with a gateway key of their own;
+- **these people**: the developers ticked, by key name.
+
+There is nothing to send anyone. The next time a developer's VS Code looks
+(at start, when the window regains focus, and every half hour), it tells
+them the plugin was shared, with an **Open** button, and lists it at the
+top of the Providers tab. Opening it asks the gateway for a one-time code
+with the developer's key and opens `http://<gateway>/admin` with the code
+in the URL fragment, which browsers never send to the server; the page
+trades it for the key, once, within a minute, and wipes it from the address
+bar. They see the plugins shared with them and nothing else of the admin
+page. Each plugin shows its own page without its settings.
+
+Someone not using VS Code signs in to `http://<gateway>/admin` with their
+own key: an admin makes one under **People**.
+
+What a developer may do is decided by the plugin, not the grant. The
+pull-request plugins (GitHub, GitLab, Gitea, Bitbucket) let them do what a
+reviewer does:
+
+- read the pulls and issues, and sync;
+- review a pull now, ask about the review, and post it to the host as a
+  comment, once;
+- triage an issue and post the reply and the labels the model suggested;
+- set who they are on the host (**You on GitHub**), which marks the pulls
+  waiting for their approval on their page alone.
+
+Adding or removing repositories, tokens, auto-review and auto-post, the
+GitHub App, the host URL and the review model stay with admins. The
+notifiers (Slack, Discord, Teams), SSO sign-in, shared context and backups
+are for admins only and cannot be shared. A plugin that is off, or a plan
+without the plugins feature, closes it to developers as it does to admins.
+
+Things to know:
+
+- **Posting speaks as the token.** A review or reply a developer posts
+  goes to the host with the repository's token or the GitHub App, so it
+  appears under that account, with a footer naming the model. That is why
+  a developer posts reviews as comments only, never as an approval or a
+  change request (which may count towards branch protection), posts each
+  review once, and applies only the labels the model suggested (labels
+  can drive the host's automation). The review and the triage record who
+  posted them, and the audit log has every write under the developer's
+  name, marked `member`.
+- **Model time and the host's rate limit are shared.** Reviews, questions
+  and syncs a developer asks for run on the gateway's models and the
+  repository's token, like an admin's, and count in usage under
+  `plugin:<id>`.
+- **Grants follow the name.** People are key names, so a replaced key, an
+  invite or an SSO sign-in under the same name keeps access, and a revoked
+  key loses it at once. A name ticked with no active key is shown greyed
+  until it is unticked.
+- **The shared token is nobody.** It never opens a plugin, even one shared
+  with every developer, and neither does a demo's guest key.
+- **Readers stay readers.** A read-only admin sees who each plugin is
+  shared with but cannot change it.
+- **Stored with the switches.** Grants are kept in `plugins.json`
+  (`"access": {"github": {"everyone": false, "people": ["alice"]}}`); a
+  plugin shared with nobody has no entry. An older gateway reads the file
+  but drops the grants the next time it saves it.
 
 ### GitHub and GitLab
 
@@ -1381,7 +1488,9 @@ GitHub Enterprise, say) is listed without it from then on.
 
 **Where you stand.** The page learns who you are on the host from the
 first token it syncs with (or from the *you on GitHub* field under the
-host settings, which wins) and tags every pull with your part in it:
+host settings, which wins; a developer the plugin is shared with sets
+their own under **You on GitHub**, and never gets the token's name) and
+tags every pull with your part in it:
 *yours*, *you approved*, *you asked for changes*, *your review asked* or
 *not reviewed by you*. Pulls by others that lack your approval carry an
 amber edge, and the *waiting for me* view lists just those.
@@ -1490,8 +1599,18 @@ without a word.
 | `GET /repos/<id>/issues/<number>` | the issue with its body and latest triage |
 | `POST /repos/<id>/issues/<number>/triage` | triage it now with the review model |
 | `POST /repos/<id>/issues/<number>/triage/post` `{ reply?, replyText?, labels?, labelNames? }` | post the reply and/or apply the labels |
-| `PUT /settings` `{ baseUrl?, reviewAlias? }` | the host URL; the chat alias reviews use |
+| `PUT /settings` `{ baseUrl?, me?, reviewAlias? }` | the host URL; who the admins are on the host; the chat alias reviews use |
+| `PUT /me` `{ me }` | who the caller is on the host, for their own page; blank clears it |
 | `PUT /app` `{ appId, privateKey }`, `DELETE /app`, `GET /app/repositories` | the GitHub App (GitHub only) |
+
+A developer the plugin is shared with reaches `GET /`, `POST /sync`,
+`POST /repos/<id>/sync`, `GET /repos/<id>/pulls/<number>`, the three
+`…/review` routes, `GET /repos/<id>/issues/<number>`, the two `…/triage`
+routes and `PUT /me` (developers only; admins set `me` under `/settings`).
+Anything else on a plugin shared with them answers 403 "Only an admin can
+do that"; `…/review/post` refuses them anything but `as: "comment"` and a
+review already posted, and `…/triage/post` drops labels the model did not
+suggest.
 
 ### Gitea, Forgejo and Bitbucket
 

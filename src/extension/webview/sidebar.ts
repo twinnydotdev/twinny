@@ -5,6 +5,7 @@ import { WorkspaceIndex } from "../embeddings"
 import { GenerationTracker } from "../generations"
 import { P2pRuntime } from "../p2p/runtime"
 import { SessionManager } from "../session-manager"
+import type { TeamPlugins } from "../team/plugins-page"
 import { TeamShare } from "../team/share"
 import { getNonce } from "../utils"
 
@@ -21,9 +22,10 @@ export class SidebarProvider extends BaseProvider {
     index: WorkspaceIndex | undefined,
     sessionManager: SessionManager,
     p2p?: P2pRuntime,
-    teamShare?: TeamShare
+    teamShare?: TeamShare,
+    teamPlugins?: TeamPlugins
   ) {
-    super(context, templateDir, generations, index, sessionManager, p2p, teamShare)
+    super(context, templateDir, generations, index, sessionManager, p2p, teamShare, teamPlugins)
     this.context = context
     this.registerSidebarReadyHandler(this.handleSidebarReady)
   }

@@ -12,6 +12,16 @@
  *   POST   api/repos/<id>/pulls/<n>/review        → review it with the gateway's model
  *   POST   api/repos/<id>/pulls/<n>/review/post   { as }
  *   POST   api/repos/<id>/pulls/<n>/review/ask    { question } → an answer kept on the review's thread
+ *   GET    api/repos/<id>/issues/<n>              → one issue with its body and triage
+ *   POST   api/repos/<id>/issues/<n>/triage[/post]
+ *   PUT    api/settings { baseUrl?, me?, reviewAlias? }
+ *   PUT    api/me { me }                          → who the caller is on the host, for them alone
+ *
+ * Shared with a developer, the plugin answers them on MEMBER_ROUTES: they
+ * read, sync, review, ask and triage like an admin, and set who they are
+ * on the host. What they post speaks as the repository's token, so they
+ * post a review as a comment, once, and apply only the labels the model
+ * suggested; repositories, tokens and settings stay the admin's.
  *
  * A host ("forge") supplies what differs: how to talk to the API and what
  * a pull looks like there; that contract and the shapes it fills are in
@@ -24,6 +34,7 @@ import path from "node:path"
 import { noAnswer, timeoutSignal } from "../../common/deadline"
 import { messageOf } from "../../common/errors"
 
+import type { MemberRoute } from "./access"
 import {
   cleanBaseUrl,
   Forge,
@@ -58,6 +69,31 @@ export const SYNC_INTERVAL_MS = 5 * 60_000
 /** How often a pending background review is retried while developers are busy. */
 export const REVIEW_TICK_MS = 60_000
 const REQUEST_TIMEOUT_MS = 30_000
+
+const REPO = "repos/[0-9a-f]{8}"
+const NUMBER = "[1-9][0-9]{0,8}"
+
+/** What a developer may do on a pull-request plugin shared with them; see the header. */
+export const MEMBER_ROUTES: readonly MemberRoute[] = [
+  { method: "GET", path: /^$/ },
+  { method: "POST", path: /^sync$/ },
+  { method: "PUT", path: /^me$/ },
+  { method: "POST", path: new RegExp(`^${REPO}/sync$`) },
+  { method: "GET", path: new RegExp(`^${REPO}/pulls/${NUMBER}$`) },
+  { method: "POST", path: new RegExp(`^${REPO}/pulls/${NUMBER}/review(?:/post|/ask)?$`) },
+  { method: "GET", path: new RegExp(`^${REPO}/issues/${NUMBER}$`) },
+  { method: "POST", path: new RegExp(`^${REPO}/issues/${NUMBER}/triage(?:/post)?$`) }
+]
+
+/** How long a username on a host may be; longer is a mistake. */
+const MAX_USERNAME = 100
+
+/** A username as typed: trimmed, without the @; refused when too long. */
+const cleanUsername = (value: unknown): string => {
+  const name = typeof value === "string" ? value.trim().replace(/^@/, "") : ""
+  if (name.length > MAX_USERNAME) throw new PluginError("That username is too long.", 400)
+  return name
+}
 
 interface SyncState {
   syncing: boolean
@@ -130,13 +166,30 @@ export class PullsPlugin implements PluginInstance {
     await this._autoReviewing?.catch(() => undefined)
   }
 
-  /** The alias reviews use: the setting, else the first chat alias the gateway serves. */
-  /** Who the operator is on the host: the setting, else what a token said. */
-  public me(): { name?: string; detected?: string } {
+  /**
+   * Who the caller is on the host. Admins share one name: the setting,
+   * else what a token said. A developer's name is only ever their own,
+   * set with `PUT me`: the token belongs to whoever set the repository
+   * up, not to them.
+   */
+  public me(caller?: { principal: string; member?: boolean }): { name?: string; detected?: string } {
+    if (caller?.member) {
+      const own = this.people()[caller.principal]
+      return own ? { name: own } : {}
+    }
     const set = this.store.settings().me
-    return { ...(typeof set === "string" && set ? { name: set } : this._detectedMe ? { name: this._detectedMe } : {}), ...(this._detectedMe ? { detected: this._detectedMe } : {}) }
+    const name = typeof set === "string" && set ? set : this._detectedMe
+    return { ...(name ? { name } : {}), ...(this._detectedMe ? { detected: this._detectedMe } : {}) }
   }
 
+  /** Each person's own name on the host, by key name. */
+  private people(): Record<string, string> {
+    const people = this.store.settings().people
+    if (typeof people !== "object" || people === null || Array.isArray(people)) return {}
+    return Object.fromEntries(Object.entries(people).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
+  }
+
+  /** The alias reviews use: the setting, else the first chat alias the gateway serves. */
   public reviewAlias(): string | undefined {
     const set = this.store.settings().reviewAlias
     const aliases = this._reviewer.aliases()
@@ -423,7 +476,7 @@ export class PullsPlugin implements PluginInstance {
         repos: this.views(),
         appAuth: this._forge.hasAppAuth(),
         host: this._forge.status(),
-        me: this.me(),
+        me: this.me(request),
         review: {
           available: this._reviewer.available,
           aliases: this._reviewer.aliases(),
@@ -435,6 +488,13 @@ export class PullsPlugin implements PluginInstance {
     if (route === "sync" && method === "POST") {
       await this.syncAll()
       return json({ repos: this.views() })
+    }
+    if (route === "me" && method === "PUT") {
+      if (!request.member) throw new PluginError("Admins share one name on the host: set it with PUT settings { me }.", 400)
+      const name = cleanUsername((await request.body()).me)
+      const others = Object.fromEntries(Object.entries(this.people()).filter(([person]) => person !== request.principal))
+      this.store.setSettings({ ...this.store.settings(), people: name ? { ...others, [request.principal]: name } : others })
+      return json({ me: this.me(request) })
     }
     if (route === "repos" && method === "POST") return this.addRepo(request)
     const repoMatch = /^repos\/([0-9a-f]{8})(?:\/(.*))?$/.exec(route)
@@ -485,10 +545,13 @@ export class PullsPlugin implements PluginInstance {
             updated = { ...updated, reply: text, repliedAt: new Date(this._context.now()).toISOString() }
           }
           if (body.labels !== false && record.labels.length && this._forge.labelIssue) {
-            const labels = Array.isArray(body.labelNames) ? body.labelNames.filter((l): l is string => typeof l === "string") : record.labels
+            const chosen = Array.isArray(body.labelNames) ? body.labelNames.filter((l): l is string => typeof l === "string") : record.labels
+            // A developer applies the model's suggestions, not labels of their own that may drive the host's automation.
+            const labels = request.member ? chosen.filter((label) => record.labels.includes(label)) : chosen
             if (labels.length) await this._forge.labelIssue(repo, number, labels, signal)
             updated = { ...updated, labels, labeledAt: new Date(this._context.now()).toISOString() }
           }
+          if (updated.repliedAt !== record.repliedAt || updated.labeledAt !== record.labeledAt) updated = { ...updated, postedBy: request.principal }
           this.triage.put(updated)
           this._context.log.info({ event: "plugin.triage-posted", key: request.principal, reason: `${repo.fullName}#${number}` })
           return json({ triage: updated })
@@ -530,6 +593,9 @@ export class PullsPlugin implements PluginInstance {
           const as: ReviewPostAs = body.as === "request-changes" || body.as === "approve" ? body.as : "comment"
           const review = this.reviews.latest(repo.id, number)
           if (!review || review.status !== "done") throw new PluginError("There is no finished review to post.", 409)
+          // The token's account may count towards branch protection: a developer posts comments, once.
+          if (request.member && as !== "comment") throw new PluginError("Only an admin can post a review as an approval or a change request.", 403)
+          if (request.member && review.postedAt) throw new PluginError("This review is already on the host.", 409)
           const posted = await this.postReview(repo, pull, review, as, request.principal)
           return json({ review: posted })
         }
@@ -583,8 +649,7 @@ export class PullsPlugin implements PluginInstance {
         hostChanged = true
       }
       if ("me" in body) {
-        const me = typeof body.me === "string" ? body.me.trim().replace(/^@/, "") : ""
-        if (me.length > 100) throw new PluginError("That username is too long.", 400)
+        const me = cleanUsername(body.me)
         if (me) settings.me = me
         else delete settings.me
       }
@@ -602,7 +667,7 @@ export class PullsPlugin implements PluginInstance {
       }
       return json({
         host: this._forge.status(),
-        me: this.me(),
+        me: this.me(request),
         review: {
           available: this._reviewer.available,
           aliases: this._reviewer.aliases(),

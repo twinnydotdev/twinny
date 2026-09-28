@@ -17,6 +17,8 @@ export const P2P_HOST_ENABLED_STORAGE_KEY = "twinny.p2p.host-enabled"
 export const P2P_TRUSTED_PEERS_STORAGE_KEY = "twinny.p2p.trusted-peers"
 /** Whether this machine shares its local server with the team, and which one. */
 export const TEAM_SHARE_STORAGE_KEY = "twinny.teamShare"
+/** Plugin ids already announced, per gateway, so a share is announced once. */
+export const TEAM_PLUGINS_SEEN_STORAGE_KEY = "twinny.teamPluginsSeen"
 /** When this installation first ran and whether the one-time team notice has been shown. */
 export const TEAM_NUDGE_STORAGE_KEY = "twinny.teamNudge"
 

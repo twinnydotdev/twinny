@@ -24,12 +24,15 @@ import {
 
 import {
   REMOTE_JOIN_PATH,
+  REMOTE_PAGE_LINK_PATH,
   REMOTE_PROTOCOL_BASE,
   REMOTE_SIGNIN_PATH,
   REMOTE_SIGNIN_POLL_PATH,
   RemoteIdentity,
   RemoteJoinResult,
+  RemotePageLink,
   RemoteRoute,
+  RemoteSharedPlugin,
   RemoteSignInPoll,
   RemoteSignInStart,
   RemoteStatus,
@@ -165,6 +168,31 @@ export class RemoteInferenceProvider implements InferenceProvider {
       default:
         throw new InferenceError("inference-failure", "The gateway sent an unexpected sign-in status.")
     }
+  }
+
+  /** A one-time code that signs this key in to the gateway's page. Personal keys only. */
+  public async pageLink(options?: InferenceOptions): Promise<RemotePageLink> {
+    const response = await this.send(REMOTE_PAGE_LINK_PATH, {}, options?.signal)
+    const body = (await response.json()) as Record<string, unknown>
+    if (typeof body?.code !== "string" || typeof body?.expiresAt !== "string") {
+      throw new InferenceError("inference-failure", "The gateway sent no sign-in link.")
+    }
+    return { code: body.code, expiresAt: body.expiresAt }
+  }
+
+  /**
+   * The plugins this key opens on the gateway's page: what an admin shared
+   * with a developer, or every running plugin for an admin.
+   */
+  public async sharedPlugins(options?: InferenceOptions): Promise<RemoteSharedPlugin[]> {
+    const response = await this.send("/admin/plugins", undefined, options?.signal)
+    const body = (await response.json()) as { plugins?: unknown }
+    if (!Array.isArray(body?.plugins)) return []
+    return body.plugins.flatMap((entry: unknown) => {
+      const plugin = entry as Record<string, unknown>
+      if (typeof plugin?.id !== "string" || typeof plugin.name !== "string" || plugin.enabled === false) return []
+      return [{ id: plugin.id, name: plugin.name, ...(typeof plugin.description === "string" ? { description: plugin.description } : {}) }]
+    })
   }
 
   public fim(request: FimRequest, options?: InferenceOptions) {
