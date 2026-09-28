@@ -223,6 +223,20 @@ suite("Remote protocol: wire", () => {
     assert.deepStrictEqual(parsed.stop, ["x"])
     assert.strictEqual(parsed.maxTokens, 3)
   })
+
+  test("a chat-only FIM model's prompt carries its chat", () => {
+    const messages = [
+      { role: "system", content: "You are a code completion assistant." },
+      { role: "user", content: "<|fim_prefix|>a<|fim_suffix|>b<|fim_middle|>" }
+    ]
+    const parsed = parseFimRequest({ model: "m", prompt: "p", messages })
+    assert.deepStrictEqual(parsed.messages, messages)
+    assert.strictEqual(parseFimRequest({ model: "m", prompt: "p" }).messages, undefined)
+    assert.throws(
+      () => parseFimRequest({ model: "m", prompt: "p", messages: [{ role: "tool", content: "x" }] }),
+      /no valid role/
+    )
+  })
 })
 
 suite("Remote protocol: round trip", () => {

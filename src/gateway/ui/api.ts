@@ -32,3 +32,17 @@ export const api = async <T,>(path: string, key: string, init: { method?: string
   return body as T
 }
 
+
+/** Trades a page link's code for the key that asked for it. The code is the credential, once. */
+export const openPageLink = async (code: string): Promise<{ key: string; name: string }> => {
+  const response = await fetch("/twinny/v1/page-link/open", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code })
+  })
+  const body = (await response.json().catch(() => undefined)) as { key?: string; name?: string; error?: { message?: string } } | undefined
+  if (!response.ok || typeof body?.key !== "string") {
+    throw new ApiError(body?.error?.message || `The gateway answered ${response.status}.`, response.status)
+  }
+  return { key: body.key, name: body.name ?? "" }
+}

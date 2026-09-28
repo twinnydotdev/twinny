@@ -133,6 +133,63 @@ export const teamLink = (gatewayUrl: string, scheme = "vscode"): string => {
   return `${scheme}://${TWINNY_EXTENSION_ID}/team?${query.toString()}`
 }
 
+/** A personal gateway key starts `tsk_`; anything else is the shared token. */
+export const PERSONAL_KEY_PREFIX = "tsk"
+
+/** Whether a credential is shaped like a personal key, not the shared token. */
+export const isPersonalKey = (credential: string | undefined): boolean => !!credential && credential.startsWith(`${PERSONAL_KEY_PREFIX}_`)
+
+/** Where a gateway serves its page: everything for an admin, the plugins shared with a developer. */
+export const GATEWAY_PAGE_PATH = "/admin"
+
+/** The gateway's page, from its base URL. */
+export const gatewayPageLink = (gatewayUrl: string): string => `${gatewayUrl.replace(/\/+$/, "")}${GATEWAY_PAGE_PATH}`
+
+/**
+ * Page links: VS Code signs its developer in to the gateway's page in one
+ * click. It asks for a code with its key, then opens the page with the
+ * code in the fragment; the page trades the code for the key, once.
+ */
+export const REMOTE_PAGE_LINK_PATH = "/page-link"
+export const REMOTE_PAGE_LINK_OPEN_PATH = "/page-link/open"
+
+export interface RemotePageLink {
+  code: string
+  expiresAt: string
+}
+
+/** A page view the link can land on: a plugin's page is `plugin:<id>`. */
+export const PAGE_LINK_VIEW_PATTERN = /^(?:[a-z]+|plugin:[a-z][a-z0-9-]{1,31})$/
+
+/** A GitHub login: letters, digits and single hyphens, at most 39 characters. */
+export const GITHUB_LOGIN_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/
+
+/** Who the developer is on the hosts VS Code knows about, for the page to fill in once. */
+export interface PageLinkNames {
+  github?: string
+}
+
+/**
+ * The page, signed in, on `view` when given, with the developer's names on
+ * the hosts VS Code knows. The code sits in the fragment, which browsers
+ * never send, so no proxy or access log sees it.
+ */
+export const signedInPageLink = (gatewayUrl: string, code: string, view?: string, names: PageLinkNames = {}): string => {
+  const fragment = new URLSearchParams({
+    link: code,
+    ...(view && PAGE_LINK_VIEW_PATTERN.test(view) ? { view } : {}),
+    ...(names.github && GITHUB_LOGIN_PATTERN.test(names.github) ? { github: names.github } : {})
+  })
+  return `${gatewayPageLink(gatewayUrl)}#${fragment.toString()}`
+}
+
+/** A plugin as a developer sees it in VS Code: what an admin shared with them. */
+export interface RemoteSharedPlugin {
+  id: string
+  name: string
+  description?: string
+}
+
 export const REMOTE_STREAM_CONTENT_TYPE = "application/x-ndjson"
 
 export interface RemoteModelsResponse {

@@ -14,6 +14,7 @@ import type { TriageBrief, TriagePriority, TriageRecord } from "../plugins/triag
 
 import { api, ApiError } from "./api"
 import { fmt, plural, timeAgo } from "./format"
+import { forgetHostName, hostNameHint, isGitHubDotCom } from "./host-names"
 import { Age, AGE_OPTIONS, distinct, FilterSelect, Sort, SortHeader, sortRows, toggleSort, useStoredState, withinAge } from "./listing"
 import { DiffBlock, MarkdownView } from "./markdown"
 import { PageSkeleton, PluginIcon } from "./plugins"
@@ -645,6 +646,85 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
 }
 
 /* -------------------------------------------------------------------------- */
+/*  A developer's own name on the host                                        */
+/* -------------------------------------------------------------------------- */
+
+interface MePanelProps extends HostPanelProps {
+  /** No name yet: the panel asks at the top of the page instead of waiting at the bottom. */
+  asking?: boolean
+  /** Said once a name is saved, where the panel was, since the panel itself then moves. */
+  onSaved: (message: string) => void
+}
+
+/** For a developer the plugin is shared with: who they are on the host, for their eyes only. */
+const MePanel = ({ host, words, overview, base, apiKey, onChanged, asking = false, onSaved }: MePanelProps) => {
+  const [me, setMe] = useState(overview.me.name ?? "")
+  useEffect(() => setMe(overview.me.name ?? ""), [overview.me.name])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const name = me.trim().replace(/^@/, "")
+  const view = `\u201c${QUICK_LABEL.mine}\u201d`
+  const save = async (value = name, from?: string) => {
+    setBusy(true)
+    setError(undefined)
+    try {
+      await api(`${base}/me`, apiKey, { method: "PUT", body: { me: value } })
+      onSaved(
+        value
+          ? `You are ${value} on ${HOST_NAMES[host]}${from ? `, ${from}` : ""}. The ${words.nouns} waiting for your approval are under ${view}, and marked in the list.${from ? " Not you? Change it under You on " + HOST_NAMES[host] + " at the bottom of the page." : ""}`
+          : `Username cleared: ${view} is hidden until you set one.`
+      )
+      await onChanged()
+    } catch (e) {
+      setError(messageOf(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Opened from VS Code signed in to GitHub: no name yet, so use that one, once.
+  // Never on an Enterprise server, where a github.com login would be someone else's.
+  const hint = hostNameHint(host)
+  useEffect(() => {
+    if (!hint || overview.me.name) return
+    forgetHostName(host)
+    if (host === "github" && !isGitHubDotCom(overview.host.baseUrl)) return
+    void save(hint, "taken from your GitHub sign-in in VS Code")
+    // Once per page load, on the first overview that has no name.
+  }, [hint, overview.me.name])
+
+  return (
+    <section className={`panel ${asking ? "ask-me" : ""}`} id="you-on-host">
+      <div className="section-heading">
+        <h2>{asking ? `Who are you on ${HOST_NAMES[host]}?` : `You on ${HOST_NAMES[host]}`}</h2>
+      </div>
+      {asking && (
+        <p className="ask-me-lead">
+          Your username gives the {words.nouns} waiting for your approval a view of their own, {view}, and marks them in the list. Only you see it; nothing is posted.
+        </p>
+      )}
+      {error && <div className="error">{error}</div>}
+      <form
+        className="newkey inline-setting"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save()
+        }}
+      >
+        <label>
+          <span className="muted">username</span>
+          <input id="you-on-host-name" value={me} onChange={(e) => setMe(e.target.value)} aria-label={`Your username on ${HOST_NAMES[host]}`} placeholder={`your ${HOST_NAMES[host]} username`} disabled={busy} spellCheck={false} autoFocus={asking} />
+        </label>
+        <button type="submit" className={asking ? "primary" : "ghost"} disabled={busy || !name || name === (overview.me.name ?? "")}>
+          {busy ? "…" : "save"}
+        </button>
+        {!asking && <span className="muted">Marks the {words.nouns} waiting for your approval, on your page only. Repositories and settings are the admin&apos;s.</span>}
+      </form>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
 /*  One pull                                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -662,6 +742,9 @@ interface PullViewProps {
   onBack: () => void
   onReview: () => Promise<void>
   onPost: (as: "comment" | "request-changes" | "approve") => Promise<void>
+  onApprove: () => Promise<void>
+  /** A developer the plugin is shared with: posts a comment, once, and never approves as the token. */
+  member?: boolean
   onAsk: (question: string) => Promise<void>
 }
 
@@ -744,7 +827,9 @@ const ReviewThread = ({ review, noun, canAsk, onAsk }: { review: ReviewRecord; n
   )
 }
 
-const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onAsk }: PullViewProps) => {
+const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onApprove, onAsk, member = false }: PullViewProps) => {
+  const [approving, setApproving] = useState(false)
+  const [approveError, setApproveError] = useState<string | undefined>()
   const [postAs, setPostAs] = useState<"comment" | "request-changes" | "approve">("comment")
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState<string | undefined>()
@@ -772,6 +857,14 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
     }
   }
   const stale = detail.review && detail.review.headSha !== pull.headSha
+  const stance = myStance(pull, me)
+  const approve = () => {
+    setApproving(true)
+    setApproveError(undefined)
+    void onApprove()
+      .catch((e: unknown) => setApproveError(messageOf(e)))
+      .finally(() => setApproving(false))
+  }
   return (
     <section className="panel record">
       <div className="section-heading">
@@ -792,8 +885,14 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
           <Pill tone={CHECK_TONE[pull.checks]}>{CHECK_LABEL[pull.checks]}</Pill>
           <Pill tone={MERGE_TONE[pull.mergeable]}>{MERGE_LABEL[pull.mergeable]}</Pill>
           <Pill tone={REVIEW_TONE[pull.review]}>{REVIEW_LABEL[pull.review]}</Pill>
+          {!member && stance !== "yours" && stance !== "approved" && (
+            <button type="button" className="primary mini" disabled={approving} onClick={approve} title={`Approve on ${HOST_NAMES[host]} as the repository's token`}>
+              {approving ? "approving…" : "approve"}
+            </button>
+          )}
         </span>
       </div>
+      {approveError && <div className="error">{approveError}</div>}
       <h3 className="pull-title">
         {pull.draft && <span className="tag">draft</span>} {pull.title} <MyReviewTag pull={pull} me={me} />
       </h3>
@@ -902,13 +1001,17 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
               </span>
             )}
           </div>
-          {detail.review.status === "done" && (
+          {detail.review.status === "done" && !(member && detail.review.postedAt) && (
             <div className="review-actions">
-              <select value={postAs} onChange={(e) => setPostAs(e.target.value as typeof postAs)} disabled={posting} aria-label="Post as">
-                <option value="comment">as a comment</option>
-                <option value="request-changes">requesting changes</option>
-                <option value="approve">approving</option>
-              </select>
+              {member ? (
+                <span className="muted">as a comment</span>
+              ) : (
+                <select value={postAs} onChange={(e) => setPostAs(e.target.value as typeof postAs)} disabled={posting} aria-label="Post as">
+                  <option value="comment">as a comment</option>
+                  <option value="request-changes">requesting changes</option>
+                  <option value="approve">approving</option>
+                </select>
+              )}
               <button
                 type="button"
                 className={detail.review.postedAt ? "ghost" : "primary"}
@@ -1400,7 +1503,12 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
 /*  The page                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }) => {
+/**
+ * A pull-request plugin's page. `member` is a developer the plugin is
+ * shared with: the same pulls, reviews and issues, without the panels that
+ * set up repositories, the host or the review model.
+ */
+export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; apiKey: string; member?: boolean }) => {
   const words = WORDS[host]
   const base = `/twinny/v1/admin/plugins/${host}/api`
   const [overview, setOverview] = useState<Overview | null>(null)
@@ -1478,6 +1586,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
   const narrowed = useMemo(() => (filters.drafts ? narrowedWithDrafts : narrowedWithDrafts.filter(({ pull }) => !pull.draft)), [narrowedWithDrafts, filters.drafts])
 
   const me = overview?.me.name
+  const [meNotice, setMeNotice] = useState<string | undefined>()
   // The "drafts" view ignores the switch; every other view honours it.
   const pulls = useMemo(
     () =>
@@ -1532,6 +1641,15 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
         </p>
       </div>
       {error && <div className="error-bar">{error}</div>}
+      {meNotice && (
+        <div className="success-bar with-close">
+          <span>{meNotice}</span>
+          <button type="button" className="link" onClick={() => setMeNotice(undefined)} aria-label="Dismiss">
+            ok
+          </button>
+        </div>
+      )}
+      {member && !overview.me.name && <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} asking onSaved={setMeNotice} />}
 
       <div className="tiles">
         <div className="tile">
@@ -1566,6 +1684,7 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             detail={detail}
             words={words}
             host={host}
+            member={member}
             review={overview.review}
             me={me}
             onBack={() => setOpened(null)}
@@ -1577,6 +1696,11 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             onPost={async (as) => {
               const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review/post`, apiKey, { method: "POST", body: { as } })
               setDetail((current) => (current ? { ...current, review: answer.review } : current))
+              void load()
+            }}
+            onApprove={async () => {
+              const answer = await api<{ pull: PullSummary }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/approve`, apiKey, { method: "POST" })
+              setDetail((current) => (current ? { ...current, pull: answer.pull } : current))
               void load()
             }}
             onAsk={async (question) => {
@@ -1755,9 +1879,15 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
       )}
 
       <IssuesPanel host={host} overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />
-      <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
-      <ReviewsPanel words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
-      <HostPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+      {member ? (
+        overview.me.name ? <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} onSaved={setMeNotice} /> : null
+      ) : (
+        <>
+          <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+          <ReviewsPanel words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+          <HostPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+        </>
+      )}
     </>
   )
 }

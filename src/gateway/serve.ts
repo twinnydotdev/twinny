@@ -439,7 +439,7 @@ export const runServe = async (
   io.out(
     demo
       ? `  admin:    ${address.url}${ADMIN_PATH} (DEMO: opens read-only without a key; admin keys still sign in)`
-      : `  admin:    ${address.url}${ADMIN_PATH} (sign in with an admin key)`
+      : `  admin:    ${address.url}${ADMIN_PATH} (admin keys; a developer's key opens the plugins shared with them)`
   )
   if (demo) {
     io.out(

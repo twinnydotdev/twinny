@@ -16,7 +16,10 @@ import { InferenceError } from "../extension/inference/errors"
 import { handleRemoteRequest } from "../protocol/handler"
 import { PEER_CLOSE, peerRoutePath } from "../protocol/peer"
 import {
+  GATEWAY_PAGE_PATH,
   REMOTE_JOIN_PATH,
+  REMOTE_PAGE_LINK_OPEN_PATH,
+  REMOTE_PAGE_LINK_PATH,
   REMOTE_PROTOCOL_BASE,
   REMOTE_PROTOCOL_VERSION,
   REMOTE_SIGNIN_PATH,
@@ -64,6 +67,7 @@ import { KeyStore } from "./keys"
 import { LicenseStore } from "./license"
 import { GatewayLog } from "./log"
 import type { GatewayMetrics } from "./metrics"
+import { PageLinks } from "./page-links"
 import { PeerRegistry } from "./peers"
 import {
   readJsonBody,
@@ -83,7 +87,7 @@ export const HEALTH_PATH = "/healthz"
 /** Prometheus metrics, for admin keys. */
 export const METRICS_PATH = "/metrics"
 /** The admin page; the app on it signs in with an admin key. */
-export const ADMIN_PATH = "/admin"
+export const ADMIN_PATH = GATEWAY_PAGE_PATH
 const ADMIN_API_PREFIX = "/twinny/v1/admin/"
 
 export interface GatewayServerOptions {
@@ -152,6 +156,19 @@ type AuthResult =
 
 const MINUTE_MS = 60_000
 
+/** `plugins/<id>[/<action>[/<rest>]]` on the admin API, taken apart. */
+const matchPluginRoute = (route: string): { id: string; action?: string; rest?: string } | undefined => {
+  const match = /^plugins\/([a-z][a-z0-9-]{1,31})(?:\/(enable|disable|access|api)(?:\/(.*))?)?$/.exec(route)
+  return match ? { id: match[1], ...(match[2] ? { action: match[2] } : {}), ...(match[3] !== undefined ? { rest: match[3] } : {}) } : undefined
+}
+
+/** A plugin's path as the plugin sees it: no trailing slash. */
+const normalPluginPath = (rest: string | undefined): string => (rest ?? "").replace(/\/+$/, "")
+
+/** A plugin route that threw: its own status when it gave one, else a bad request. */
+const sendPluginFailure = (res: http.ServerResponse, error: unknown): void =>
+  sendJson(res, error instanceof PluginError ? error.status : 400, { error: { message: messageOf(error) } })
+
 /** Constant-time on the bytes; a length mismatch still compares something. */
 const tokenMatches = (
   presented: string | undefined,
@@ -176,6 +193,7 @@ export class GatewayServer {
   private readonly _server: http.Server
   private readonly _gate: InferenceGate
   private readonly _signIns: SignInRequests
+  private readonly _pageLinks = new PageLinks()
   private readonly _seats: SeatBook
   private readonly _guestInvites?: InviteThrottle
   private _guestSweep?: NodeJS.Timeout
@@ -422,15 +440,25 @@ export class GatewayServer {
   /**
    * The admin API behind the page: usage for everyone, the key list and
    * nothing a developer's own key could not already learn about itself.
-   * Admin keys only; the shared token is never an admin.
+   * Admin keys only, but for the plugins an admin shared with a developer;
+   * the shared token is never an admin and never a developer.
    */
   private async handleAdmin(
     url: URL,
     req: http.IncomingMessage,
     res: http.ServerResponse,
-    auth: { principal: string; admin: boolean }
+    auth: { principal: string; admin: boolean; shared: boolean }
   ) {
+    const route = url.pathname
+      .slice(ADMIN_API_PREFIX.length)
+      .replace(/\/+$/, "")
     if (!auth.admin) {
+      // A demo's guests are strangers, not developers: sharing with everyone does not reach them.
+      if (!auth.shared && !this._seats.isGuest(auth.principal) && (route === "plugins" || route.startsWith("plugins/"))) {
+        await this.handleMemberPlugins(route, url, req, res, auth.principal)
+        return
+      }
+      req.resume()
       sendRefusal(
         res,
         403,
@@ -440,9 +468,6 @@ export class GatewayServer {
       this._options.log.warn({ event: "admin.refused", key: auth.principal })
       return
     }
-    const route = url.pathname
-      .slice(ADMIN_API_PREFIX.length)
-      .replace(/\/+$/, "")
     if (route === "provider-models") {
       if (req.method !== "POST") {
         sendMethodNotAllowed(
@@ -1271,14 +1296,31 @@ export class GatewayServer {
         })
         return
       }
-      const match = /^plugins\/([a-z][a-z0-9-]{1,31})(?:\/(enable|disable|api)(?:\/(.*))?)?$/.exec(
-        route
-      )
-      if (!match || !plugins.has(match[1])) {
+      const match = matchPluginRoute(route)
+      if (!match || !plugins.has(match.id)) {
         sendMessage(res, 404, "No such plugin.")
         return
       }
-      const [, id, action, rest] = match
+      const { id, action, rest } = match
+      if (action === "access") {
+        if (rest !== undefined) {
+          sendMessage(res, 404, "Not found.")
+          return
+        }
+        if (req.method === "GET") {
+          sendJson(res, 200, { access: plugins.access(id) })
+          return
+        }
+        if (req.method !== "PUT") {
+          sendMethodNotAllowed(res, ["GET", "PUT"], "Use GET or PUT for who a plugin is shared with.")
+          return
+        }
+        const access = plugins.setAccess(id, await readJsonBody(req))
+        this._options.log.info({ event: "plugin.access-changed", key: auth.principal, reason: id })
+        this.audit(req, auth.principal, "plugin.access-changed", id, { everyone: access.everyone, people: access.people.length })
+        sendJson(res, 200, { access })
+        return
+      }
       if (action === "enable" || action === "disable") {
         if (req.method !== "POST") {
           sendMethodNotAllowed(res, ["POST"], "Switching a plugin is POST.")
@@ -1299,25 +1341,88 @@ export class GatewayServer {
         sendMessage(res, 404, "Not found.")
         return
       }
-      const answer = await plugins.handle(id, {
-        method: req.method ?? "GET",
-        path: (rest ?? "").replace(/\/+$/, ""),
-        query: url.searchParams,
-        body: () => readJsonBody(req, 256 * 1024),
-        principal: auth.principal
-      })
-      req.resume()
-      if (req.method !== "GET" && answer.status < 400)
-        this.audit(req, auth.principal, "plugin.write", id, { method: req.method ?? "", path: (rest ?? "").replace(/\/+$/, "") })
-      sendPlugin(res, answer)
+      await this.forwardToPlugin(plugins, id, rest ?? "", url, req, res, auth.principal, false)
     } catch (error) {
-      const status = error instanceof PluginError ? error.status : 400
-      sendJson(res, status, {
-        error: {
-          message: messageOf(error)
-        }
-      })
+      req.resume()
+      sendPluginFailure(res, error)
     }
+  }
+
+  /**
+   * A developer on the admin API: the plugins shared with them and, of
+   * those, the routes each plugin names as a developer's. Switching,
+   * sharing and every other admin route stay refused.
+   */
+  private async handleMemberPlugins(
+    route: string,
+    url: URL,
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    principal: string
+  ) {
+    const plugins = this._options.plugins
+    if (!plugins) {
+      req.resume()
+      sendMessage(res, 404, "This gateway has no plugins.")
+      return
+    }
+    try {
+      if (route === "plugins") {
+        if (req.method !== "GET") {
+          req.resume()
+          sendMethodNotAllowed(res, ["GET"], "Use GET to list plugins.")
+          return
+        }
+        sendJson(res, 200, { plugins: plugins.listFor(principal), licensed: plugins.licensed })
+        return
+      }
+      const match = matchPluginRoute(route)
+      if (!match || !match.action || !plugins.has(match.id)) {
+        req.resume()
+        sendMessage(res, 404, "No such plugin.")
+        return
+      }
+      const refusal =
+        match.action === "api"
+          ? plugins.refuseMember(match.id, principal, req.method ?? "GET", normalPluginPath(match.rest))
+          : "Only an admin can switch or share a plugin."
+      if (refusal) {
+        req.resume()
+        sendRefusal(res, 403, "authentication", refusal)
+        this._options.log.warn({ event: "plugin.member-refused", key: principal, reason: match.id })
+        return
+      }
+      await this.forwardToPlugin(plugins, match.id, match.rest ?? "", url, req, res, principal, true)
+    } catch (error) {
+      req.resume()
+      sendPluginFailure(res, error)
+    }
+  }
+
+  /** Hands one request to a plugin's own routes and audits what it changed. */
+  private async forwardToPlugin(
+    plugins: PluginHost,
+    id: string,
+    rest: string,
+    url: URL,
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    principal: string,
+    member: boolean
+  ) {
+    const path = normalPluginPath(rest)
+    const answer = await plugins.handle(id, {
+      method: req.method ?? "GET",
+      path,
+      query: url.searchParams,
+      body: () => readJsonBody(req, 256 * 1024),
+      principal,
+      ...(member ? { member: true } : {})
+    })
+    req.resume()
+    if (req.method !== "GET" && answer.status < 400)
+      this.audit(req, principal, "plugin.write", id, { method: req.method ?? "", path, ...(member ? { member: true } : {}) })
+    sendPlugin(res, answer)
   }
 
   /** A plugin's browser-facing routes: no credential; the plugin decides what to show. */
@@ -1492,6 +1597,71 @@ export class GatewayServer {
   }
 
   /**
+   * Page links, both sides. Asking takes the developer's own key: the
+   * shared token and a demo's guests have no page to open. Opening takes
+   * no credential, since the code is one, and hands back the key that
+   * asked, once, if it still works.
+   */
+  private async handlePageLink(
+    pathname: string,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ) {
+    if (req.method !== "POST") {
+      req.resume()
+      sendMethodNotAllowed(res, ["POST"], "Page links are POST only.")
+      return
+    }
+    if (this._draining) {
+      req.resume()
+      sendMessage(res, 503, "The gateway is shutting down.")
+      return
+    }
+    if (pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_PAGE_LINK_PATH}`) {
+      req.resume()
+      const auth = this.authenticate(req.headers.authorization)
+      if ("refused" in auth) {
+        sendError(res, new InferenceError("authentication", auth.refused), { "WWW-Authenticate": "Bearer" })
+        return
+      }
+      if (auth.shared || auth.visitor || this._seats.isGuest(auth.principal)) {
+        sendRefusal(
+          res,
+          403,
+          "authentication",
+          auth.shared
+            ? "The shared token does not open the gateway's page. Ask your admin for a key of your own."
+            : "A demo's guests have no page to open."
+        )
+        return
+      }
+      const link = this._pageLinks.mint(bearerOf(req.headers.authorization) as string, auth.principal)
+      this._options.log.info({ event: "page-link.made", key: auth.principal })
+      sendJson(res, 201, link)
+      return
+    }
+    try {
+      const body = await readJsonBody(req, 4 * 1024)
+      const opened = this._pageLinks.open(body.code)
+      if (!opened) {
+        sendMessage(res, 410, "This sign-in link was used already or has expired. Open the page from VS Code again.")
+        return
+      }
+      // Revoked or unseated in the minute since: say why, as the key would.
+      const auth = this.authenticate(`Bearer ${opened.key}`)
+      if ("refused" in auth) {
+        sendError(res, new InferenceError("authentication", auth.refused))
+        return
+      }
+      this._options.log.info({ event: "page-link.opened", key: opened.name })
+      this.audit(req, opened.name, "page.signed-in", opened.name, { link: true, ...(auth.admin ? { admin: true } : {}) })
+      sendJson(res, 200, { key: opened.key, name: opened.name })
+    } catch (error) {
+      sendMessage(res, 400, messageOf(error))
+    }
+  }
+
+  /**
    * The licence: read the plan, install a token, or remove it. Installing
    * verifies the signature first; a bad token changes nothing. The token
    * is logged by id and org only.
@@ -1655,6 +1825,13 @@ export class GatewayServer {
     }
     if (url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_JOIN_PATH}`) {
       await this.handleJoin(req, res)
+      return
+    }
+    if (
+      url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_PAGE_LINK_PATH}` ||
+      url.pathname === `${REMOTE_PROTOCOL_BASE}${REMOTE_PAGE_LINK_OPEN_PATH}`
+    ) {
+      await this.handlePageLink(url.pathname, req, res)
       return
     }
     if (url.pathname === `${REMOTE_PROTOCOL_BASE}${DEMO_INVITE_PATH}`) {

@@ -6,7 +6,7 @@
  */
 import { arr, baseUrlOf, CheckState, Forge, IssueSummary, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
-import { PullsPlugin } from "./pulls"
+import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
 /** Codeberg runs Forgejo and is where most public Gitea-family repositories live. */
 export const GITEA_URL = "https://codeberg.org"
@@ -202,6 +202,18 @@ export class GiteaForge implements Forge {
     return { url: str(answer.html_url, pull.url) }
   }
 
+  public async approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void> {
+    await readJson(
+      await this._context.fetch(this.api(repo, `/pulls/${pull.number}/reviews`), {
+        method: "POST",
+        headers: { ...this.headers(repo), "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "", event: "APPROVED", commit_id: pull.headSha }),
+        signal
+      }),
+      `Approving ${repo.fullName}#${pull.number}`
+    )
+  }
+
   public async pullContent(repo: RepoRecord, number: number, signal: AbortSignal): Promise<PullContent> {
     const what = `Reading ${repo.fullName}#${number}`
     const pull = await this.get(repo, `/pulls/${number}`, signal, what)
@@ -220,5 +232,6 @@ export const giteaPlugin: GatewayPlugin = {
   name: "Gitea / Forgejo",
   description:
     "Watch repositories on your own Gitea or Forgejo (or Codeberg) and see their open pull requests, statuses and reviews. Reads with an access token per repository.",
+  memberRoutes: MEMBER_ROUTES,
   create: (context) => new PullsPlugin(context, (store, ctx) => new GiteaForge(store, ctx), undefined, "gitea")
 }

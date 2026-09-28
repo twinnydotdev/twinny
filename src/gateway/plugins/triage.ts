@@ -52,6 +52,8 @@ export interface TriageRecord {
   error?: string
   repliedAt?: string
   labeledAt?: string
+  /** Whose key posted the reply or labels to the host. */
+  postedBy?: string
 }
 
 export interface TriageBrief {

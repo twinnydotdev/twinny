@@ -7,7 +7,7 @@
  */
 import { arr, baseUrlOf, CheckState, Forge, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
-import { PullsPlugin } from "./pulls"
+import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
 export const BITBUCKET_URL = "https://bitbucket.org"
 const USER_AGENT = "twinny-server"
@@ -148,6 +148,11 @@ export class BitbucketForge implements Forge {
     return { url: str(rec(rec(comment.links).html).href, pull.url) }
   }
 
+  public async approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void> {
+    const response = await this._context.fetch(this.api(repo, `/pullrequests/${pull.number}/approve`), { method: "POST", headers: this.headers(repo), signal })
+    if (!response.ok) await readJson(response, `Approving ${repo.fullName}#${pull.number}`)
+  }
+
   public async pullContent(repo: RepoRecord, number: number, signal: AbortSignal): Promise<PullContent> {
     const what = `Reading ${repo.fullName}#${number}`
     const pull = await this.get(repo, `/pullrequests/${number}`, signal, what)
@@ -166,5 +171,6 @@ export const bitbucketPlugin: GatewayPlugin = {
   name: "Bitbucket",
   description:
     "Watch repositories on Bitbucket Cloud and see their open pull requests, build statuses and approvals. Reads with an app password or API token per repository.",
+  memberRoutes: MEMBER_ROUTES,
   create: (context) => new PullsPlugin(context, (store, ctx) => new BitbucketForge(store, ctx), undefined, "bitbucket")
 }

@@ -225,6 +225,28 @@ const optionalStringList = (
   return value as string[]
 }
 
+const ROLES = ["system", "user", "assistant"]
+
+const parseMessages = (messages: unknown): ChatRequest["messages"] => {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new RemoteRequestError("\"messages\" must be a non-empty list.")
+  }
+  return messages.map((message, index) => {
+    if (!isRecord(message)) {
+      throw new RemoteRequestError(`message ${index} must be an object.`)
+    }
+    rejectUnknownFields(message, ["role", "content"])
+    const { role, content } = message
+    if (typeof role !== "string" || !ROLES.includes(role)) {
+      throw new RemoteRequestError(`message ${index} has no valid role.`)
+    }
+    if (typeof content !== "string" && !Array.isArray(content)) {
+      throw new RemoteRequestError(`message ${index} has no content.`)
+    }
+    return { role, content } as ChatRequest["messages"][number]
+  })
+}
+
 export const parseFimRequest = (input: unknown): FimRequest => {
   const body = requireRecord(input)
   rejectUnknownFields(body, [
@@ -235,7 +257,8 @@ export const parseFimRequest = (input: unknown): FimRequest => {
     "stop",
     "maxTokens",
     "temperature",
-    "keepAlive"
+    "keepAlive",
+    "messages"
   ])
   const prompt = body.prompt
   if (typeof prompt !== "string")
@@ -260,36 +283,22 @@ export const parseFimRequest = (input: unknown): FimRequest => {
     keepAlive:
       keepAlive === null
         ? undefined
-        : (keepAlive as string | number | undefined)
+        : (keepAlive as string | number | undefined),
+    // A chat-only FIM model's prompt, as the chat it was rendered from
+    // (see `getFimChat`), so the backend does not template it again.
+    messages:
+      body.messages === undefined || body.messages === null
+        ? undefined
+        : parseMessages(body.messages)
   }
 }
-
-const ROLES = ["system", "user", "assistant"]
 
 export const parseChatRequest = (input: unknown): ChatRequest => {
   const body = requireRecord(input)
   rejectUnknownFields(body, ["model", "messages", "maxTokens", "temperature"])
-  const messages = body.messages
-  if (!Array.isArray(messages) || messages.length === 0) {
-    throw new RemoteRequestError("\"messages\" must be a non-empty list.")
-  }
-  const parsed = messages.map((message, index) => {
-    if (!isRecord(message)) {
-      throw new RemoteRequestError(`message ${index} must be an object.`)
-    }
-    rejectUnknownFields(message, ["role", "content"])
-    const { role, content } = message
-    if (typeof role !== "string" || !ROLES.includes(role)) {
-      throw new RemoteRequestError(`message ${index} has no valid role.`)
-    }
-    if (typeof content !== "string" && !Array.isArray(content)) {
-      throw new RemoteRequestError(`message ${index} has no content.`)
-    }
-    return { role, content } as ChatRequest["messages"][number]
-  })
   return {
     model: requireModel(body),
-    messages: parsed,
+    messages: parseMessages(body.messages),
     maxTokens: optionalNumber(body, "maxTokens"),
     temperature: optionalNumber(body, "temperature")
   }

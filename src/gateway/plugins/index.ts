@@ -27,5 +27,6 @@ export const BUNDLED_PLUGINS: GatewayPlugin[] = [
   backupsPlugin
 ]
 
+export * from "./access"
 export * from "./events"
 export * from "./host"

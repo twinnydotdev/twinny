@@ -8,10 +8,16 @@
  *   POST /twinny/v1/admin/plugins/<id>/enable     → switch on (started at once)
  *   POST /twinny/v1/admin/plugins/<id>/disable    → switch off (stopped at once)
  *   *    /twinny/v1/admin/plugins/<id>/api/<rest> → the plugin's own routes
+ *   GET  /twinny/v1/admin/plugins/<id>/access     → who besides the admins may use it
+ *   PUT  /twinny/v1/admin/plugins/<id>/access     { everyone, people }
  *
- * Which plugins are on is kept in plugins.json next to keys.json, so the
- * choice survives a restart. Plugins are bundled, not loaded from disk:
- * the "store" is the list of what this build carries.
+ * A developer's key reaches the listing (only what is shared with them)
+ * and the routes a shared plugin names in `memberRoutes`; see access.ts.
+ *
+ * Which plugins are on, and who they are shared with, is kept in
+ * plugins.json next to keys.json, so both survive a restart. Plugins are
+ * bundled, not loaded from disk: the "store" is the list of what this
+ * build carries.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -21,6 +27,7 @@ import { isRecord } from "../../common/guards"
 import type { GatewayLog } from "../log"
 import { writePrivateJson } from "../private-file"
 
+import { grants, isShared, memberMay, MemberRoute, NO_ACCESS, parseAccess, PluginAccess } from "./access"
 import { PluginEventBus } from "./events"
 import type { PluginInference } from "./inference"
 
@@ -57,7 +64,11 @@ export interface PluginContext {
   invites?: PluginInvites
 }
 
-/** One admin request handed to a plugin: already authenticated as an admin. */
+/**
+ * One request handed to a plugin: already authenticated, as an admin or,
+ * with `member`, as a developer the plugin is shared with on one of its
+ * `memberRoutes`.
+ */
 export interface PluginRequest {
   method: string
   /** The part after `/api/`, without a leading slash; `""` for the root. */
@@ -65,8 +76,10 @@ export interface PluginRequest {
   query: URLSearchParams
   /** The JSON body, read on demand; `{}` when there is none. */
   body: () => Promise<Record<string, unknown>>
-  /** The admin key's name, for the log. */
+  /** The key's name, for the log and for whatever the plugin keeps per person. */
   principal: string
+  /** A developer rather than an admin; absent for an admin. */
+  member?: boolean
 }
 
 export interface PluginResponse {
@@ -111,6 +124,11 @@ export interface GatewayPlugin {
   name: string
   description: string
   create(context: PluginContext): PluginInstance
+  /**
+   * The routes a developer may call once an admin shares the plugin with
+   * them. Absent, the plugin is for admins only and cannot be shared.
+   */
+  memberRoutes?: readonly MemberRoute[]
 }
 
 /** What the admin page lists. */
@@ -119,6 +137,10 @@ export interface PluginSummary {
   name: string
   description: string
   enabled: boolean
+  /** Whether an admin may share it with developers. */
+  shareable: boolean
+  /** Who it is shared with; in the admin listing of a shareable plugin only. */
+  access?: PluginAccess
 }
 
 export class PluginError extends Error {
@@ -146,6 +168,8 @@ export const json = (body: unknown, status = 200): PluginResponse => ({
 interface PluginsFile {
   version: 1
   enabled: string[]
+  /** Per plugin id; a plugin shared with nobody has no entry. */
+  access?: Record<string, PluginAccess>
 }
 
 const parsePluginsFile = (text: string, file: string): PluginsFile => {
@@ -165,16 +189,28 @@ const parsePluginsFile = (text: string, file: string): PluginsFile => {
   ) {
     throw new Error(`${file} is not a twinny-server plugins file.`)
   }
-  return { version: 1, enabled: parsed.enabled as string[] }
+  const access: Record<string, PluginAccess> = {}
+  if (parsed.access !== undefined) {
+    if (!isRecord(parsed.access)) throw new Error(`${file} has a malformed access section.`)
+    for (const [id, entry] of Object.entries(parsed.access)) {
+      try {
+        access[id] = parseAccess(entry)
+      } catch (error) {
+        throw new Error(`${file} has a malformed access entry for "${id}": ${messageOf(error)}`)
+      }
+    }
+  }
+  return { version: 1, enabled: parsed.enabled as string[], access }
 }
 
 /** The file that goes with a keys file. */
 export const pluginsFileFor = (keysFile: string): string =>
   path.join(path.dirname(keysFile), "plugins.json")
 
-/** Which plugins are on; a small file, rewritten atomically. */
+/** Which plugins are on and who they are shared with; a small file, rewritten atomically. */
 export class PluginStore {
   private _enabled: string[] = []
+  private _access: Record<string, PluginAccess> = {}
 
   constructor(public readonly file: string) {}
 
@@ -198,15 +234,26 @@ export class PluginStore {
     this.save()
   }
 
+  /** Who a plugin is shared with; nobody unless an admin said otherwise. */
+  public access(id: string): PluginAccess {
+    return this._access[id] ?? NO_ACCESS
+  }
+
+  public setAccess(id: string, access: PluginAccess): void {
+    const others = Object.fromEntries(Object.entries(this._access).filter(([entry]) => entry !== id))
+    this._access = isShared(access) ? { ...others, [id]: access } : others
+    this.save()
+  }
+
   public reload(): void {
     try {
-      this._enabled = parsePluginsFile(
-        fs.readFileSync(this.file, "utf8"),
-        this.file
-      ).enabled
+      const file = parsePluginsFile(fs.readFileSync(this.file, "utf8"), this.file)
+      this._enabled = file.enabled
+      this._access = file.access ?? {}
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         this._enabled = []
+        this._access = {}
         return
       }
       throw error
@@ -214,7 +261,11 @@ export class PluginStore {
   }
 
   private save(): void {
-    const content: PluginsFile = { version: 1, enabled: this._enabled }
+    const content: PluginsFile = {
+      version: 1,
+      enabled: this._enabled,
+      ...(Object.keys(this._access).length ? { access: this._access } : {})
+    }
     writePrivateJson(this.file, content)
   }
 }
@@ -295,13 +346,51 @@ export class PluginHost {
     for (const id of [...this._running.keys()]) await this.halt(id)
   }
 
+  /** Everything bundled, with who each shareable plugin is shared with: the admin's view. */
   public list(): PluginSummary[] {
     return [...this._byId.values()].map((plugin) => ({
-      id: plugin.id,
-      name: plugin.name,
-      description: plugin.description,
-      enabled: this._running.has(plugin.id)
+      ...this.summary(plugin),
+      ...(plugin.memberRoutes ? { access: this._options.store.access(plugin.id) } : {})
     }))
+  }
+
+  /** What a developer may open: running, shareable plugins shared with them. Nothing about who else. */
+  public listFor(principal: string): PluginSummary[] {
+    return [...this._byId.values()]
+      .filter((plugin) => this._running.has(plugin.id) && this.shares(plugin, principal))
+      .map((plugin) => this.summary(plugin))
+  }
+
+  public access(id: string): PluginAccess {
+    const plugin = this.plugin(id)
+    if (!plugin.memberRoutes) throw new PluginError(`The ${plugin.name} plugin is for admins only.`, 404)
+    return this._options.store.access(id)
+  }
+
+  /** Shares a plugin, or stops sharing it; takes effect with the next request. */
+  public setAccess(id: string, input: unknown): PluginAccess {
+    const plugin = this.plugin(id)
+    if (!plugin.memberRoutes)
+      throw new PluginError(`The ${plugin.name} plugin is for admins only and cannot be shared.`, 400)
+    let access: PluginAccess
+    try {
+      access = parseAccess(input)
+    } catch (error) {
+      throw new PluginError(messageOf(error), 400)
+    }
+    this._options.store.setAccess(id, access)
+    return this._options.store.access(id)
+  }
+
+  /**
+   * Why a developer may not make this request, or nothing when they may:
+   * the plugin must be shared with them and name the route as theirs.
+   */
+  public refuseMember(id: string, principal: string, method: string, path: string): string | undefined {
+    const plugin = this.plugin(id)
+    if (!this.shares(plugin, principal)) return `The ${plugin.name} plugin is not shared with ${principal}. An admin can share it on the Plugins page.`
+    if (!memberMay(plugin.memberRoutes ?? [], method, path)) return `Only an admin can do that in the ${plugin.name} plugin.`
+    return undefined
   }
 
   public has(id: string): boolean {
@@ -390,8 +479,13 @@ export class PluginHost {
       id: plugin.id,
       name: plugin.name,
       description: plugin.description,
-      enabled: this._running.has(plugin.id)
+      enabled: this._running.has(plugin.id),
+      shareable: !!plugin.memberRoutes
     }
+  }
+
+  private shares(plugin: GatewayPlugin, principal: string): boolean {
+    return !!plugin.memberRoutes && grants(this._options.store.access(plugin.id), principal)
   }
 
   private run(id: string): void {

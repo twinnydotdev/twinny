@@ -31,7 +31,7 @@ import {
   PluginRequest,
   PluginResponse
 } from "./host"
-import { PullsPlugin } from "./pulls"
+import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
 export const GITHUB_URL = "https://github.com"
 const USER_AGENT = "twinny-server"
@@ -590,6 +590,17 @@ export class GitHubForge implements Forge {
     return { url: str(answer.html_url, pull.url) }
   }
 
+  public async approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void> {
+    const token = await this.tokenFor(repo, signal)
+    const response = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/pulls/${pull.number}/reviews`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT, "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "APPROVE", commit_id: pull.headSha }),
+      signal
+    })
+    await readJson(response, `Approving ${repo.fullName}#${pull.number}`)
+  }
+
   public async handle(
     request: PluginRequest
   ): Promise<PluginResponse | undefined> {
@@ -685,6 +696,7 @@ export const githubPlugin: GatewayPlugin = {
   name: "GitHub",
   description:
     "Watch repositories on GitHub (or GitHub Enterprise) and see their open pull requests, checks and review state. Reads with a GitHub App or a token.",
+  memberRoutes: MEMBER_ROUTES,
   create: (context) =>
     new PullsPlugin(context, (store, ctx) => new GitHubForge(store, ctx), undefined, "github")
 }

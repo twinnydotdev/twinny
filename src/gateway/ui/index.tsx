@@ -3,19 +3,25 @@
  * with an admin key (kept in this tab only), then shows whether the
  * backends answer, how much each developer and model has been used over a
  * period, and which keys exist. Reads the gateway's own API; nothing else.
+ *
+ * A developer's key opens it too, as member.tsx: only the plugins an
+ * admin shared with them.
  */
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { createRoot } from "react-dom/client"
 
 import { messageOf } from "../../common/errors"
 import { inviteLink, RemoteIdentity, RemoteStatus } from "../../protocol/types"
+import type { PluginAccess } from "../plugins/access"
 import type { PluginSummary } from "../plugins/host"
 import type { UsageSummary } from "../usage"
 
-import { api, ApiError } from "./api"
+import { api, ApiError, openPageLink } from "./api"
 import { AuditPage } from "./audit"
 import { ConfigurationPanel } from "./configuration"
 import { fmt } from "./format"
+import { rememberHostNames } from "./host-names"
+import { MemberApp } from "./member"
 import { OTHER, OverviewPage, Series } from "./overview"
 import { CreatedKey, KeysResponse, PeoplePage } from "./people"
 import { PlanPage } from "./plan"
@@ -45,6 +51,26 @@ const isView = (value: unknown): value is AdminView =>
 /* -------------------------------------------------------------------------- */
 /*  Sign-in                                                                   */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * A sign-in link from VS Code: `#link=<code>`, and `&view=<view>` to land
+ * on one. Read once and wiped from the address bar before anything renders,
+ * so the code is in neither the history nor a copied URL.
+ */
+const takeLink = (): string | undefined => {
+  try {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""))
+    const code = params.get("link")
+    if (!code) return undefined
+    rememberHostNames(params)
+    const view = params.get("view")
+    history.replaceState(null, "", view && isView(view) ? `#${view}` : location.pathname + location.search)
+    return code
+  } catch {
+    return undefined
+  }
+}
+const LINK = takeLink()
 
 /* -------------------------------------------------------------------------- */
 /*  Demo                                                                      */
@@ -95,6 +121,18 @@ const DemoBar = () => {
   )
 }
 
+/** Between opening a link and knowing who it signed in: no form to flash. */
+const SigningIn = () => (
+  <main className="signin">
+    <section className="card">
+      <h1>
+        twinny<span>-server</span>
+      </h1>
+      <p className="muted">Signing you in…</p>
+    </section>
+  </main>
+)
+
 const SignIn = ({ onKey, error }: { onKey: (key: string) => void; error?: string }) => {
   const [value, setValue] = useState("")
   const submit = (e: FormEvent) => {
@@ -107,16 +145,19 @@ const SignIn = ({ onKey, error }: { onKey: (key: string) => void; error?: string
         <h1>
           twinny<span>-server</span>
         </h1>
-        <p>Sign in with an admin key.</p>
+        <p>Sign in with your gateway key.</p>
         <form onSubmit={submit}>
-          <input type="password" autoFocus placeholder="tsk_…" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Admin key" />
+          <input type="password" autoFocus placeholder="tsk_…" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Gateway key" />
           <button type="submit" className="primary">
             Open
           </button>
         </form>
         {error && <div className="error">{error}</div>}
         <div className="hint">
-          Make one on the server: <code>twinny-server keys create you --admin</code>. The key stays in this tab.
+          Connected to this gateway in VS Code? Open it from there and you are signed in without a key: <b>Providers → Your team&apos;s plugins → Open</b>, or <b>Twinny - Open your team&apos;s plugins</b> from the command palette.
+        </div>
+        <div className="hint">
+          An admin key opens everything; make one on the server with <code>twinny-server keys create you --admin</code>. A developer&apos;s key opens the plugins an admin shared with them. The key stays in this tab.
         </div>
         {DEMO && (
           <div className="hint">
@@ -144,12 +185,15 @@ interface Data {
 
 const App = () => {
   const [key, setKey] = useState<string | null>(() => {
+    // A link names who is signing in; whoever this tab was signed in as gives way.
+    if (LINK) return null
     try {
       return sessionStorage.getItem(STORAGE_KEY) ?? (DEMO ? DEMO_KEY : null)
     } catch {
       return DEMO ? DEMO_KEY : null
     }
   })
+  const [linking, setLinking] = useState(!!LINK)
   const [who, setWho] = useState<RemoteIdentity | null>(null)
   const [period, setPeriod] = useState<Period>("7d")
   const [data, setData] = useState<Data | null>(null)
@@ -199,15 +243,43 @@ const App = () => {
     setData(null)
   }, [])
 
-  // Who the key belongs to, and whether it may see this page at all.
+  // Opened from VS Code: the link's code becomes the key, once.
+  useEffect(() => {
+    if (!LINK) return
+    let cancelled = false
+    openPageLink(LINK)
+      .then((opened) => {
+        if (!cancelled) setKey(opened.key)
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        // A stale link (a reload, say) in a tab already signed in stays signed in.
+        let stored: string | null = null
+        try {
+          stored = sessionStorage.getItem(STORAGE_KEY)
+        } catch {
+          // Nothing kept.
+        }
+        if (stored) setKey(stored)
+        else setSignInError(messageOf(e))
+      })
+      .finally(() => {
+        if (!cancelled) setLinking(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Who the key belongs to: an admin sees everything, a developer what is shared with them.
   useEffect(() => {
     if (!key) return
     let cancelled = false
     api<RemoteIdentity>("/twinny/v1/whoami", key)
       .then((identity) => {
         if (cancelled) return
-        if (!identity.admin) {
-          setSignInError(`"${identity.key}" is not an admin key. Create one with --admin.`)
+        if (identity.shared) {
+          setSignInError("The shared token does not open this page. Sign in with a key of your own.")
           signOut()
           return
         }
@@ -230,7 +302,7 @@ const App = () => {
   }, [key, signOut])
 
   const load = useCallback(async () => {
-    if (!key || !who) return
+    if (!key || !who?.admin) return
     setLoading(true)
     try {
       const [status, usage, keys, store] = await Promise.all([
@@ -305,6 +377,23 @@ const App = () => {
     [key, load]
   )
 
+  const sharePlugin = useCallback(
+    async (id: string, access: PluginAccess) => {
+      if (!key) throw new Error("Not signed in.")
+      await api(`/twinny/v1/admin/plugins/${id}/access`, key, { method: "PUT", body: access })
+      await load()
+    },
+    [key, load]
+  )
+
+  const signOutWith = useCallback(
+    (reason?: string) => {
+      setSignInError(reason)
+      signOut()
+    },
+    [signOut]
+  )
+
   const removeLicense = useCallback(async () => {
     if (!key) throw new Error("Not signed in.")
     await api("/twinny/v1/admin/license", key, { method: "DELETE" })
@@ -322,7 +411,9 @@ const App = () => {
   }, [data])
   const colorOf = (name: string) => series.find((s) => s.name === name)?.color ?? OTHER
 
+  if (linking || (key && !who && !signInError)) return <SigningIn />
   if (!key || !who) return <SignIn onKey={setKey} error={signInError} />
+  if (!who.admin) return <MemberApp apiKey={key} who={who} onSignOut={signOutWith} />
 
   const down = data?.status.backends.filter((b) => !b.ok) ?? []
   const plan = data?.keys.plan
@@ -447,7 +538,15 @@ const App = () => {
               <div hidden={view !== "plan"}>{plan && <PlanPage plan={plan} onInstall={installLicense} onRemove={removeLicense} onNavigate={setView} />}</div>
 
               <div hidden={view !== "plugins"}>
-                <PluginsPage plugins={data.plugins} licensed={data.pluginsLicensed} onToggle={togglePlugin} onOpen={(id) => setView(`plugin:${id}`)} onNavigate={setView} />
+                <PluginsPage
+                  plugins={data.plugins}
+                  licensed={data.pluginsLicensed}
+                  onToggle={togglePlugin}
+                  people={data.keys.keys.filter((row) => !row.revokedAt && !row.admin).map((row) => row.name)}
+                  onShare={sharePlugin}
+                  onOpen={(id) => setView(`plugin:${id}`)}
+                  onNavigate={setView}
+                />
               </div>
 
               {openPlugin && (

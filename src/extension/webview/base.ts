@@ -30,7 +30,8 @@ import { resolveProviderEndpoint } from "../providers/endpoint"
 import { ProviderManager } from "../providers/manager"
 import { ReviewService } from "../review/service"
 import { SessionManager } from "../session-manager"
-import { TeamShareBridge } from "../team/bridge"
+import { TeamPluginsBridge, TeamShareBridge } from "../team/bridge"
+import type { TeamPlugins } from "../team/plugins-page"
 import { TeamShare } from "../team/share"
 import { TemplateProvider } from "../templates/provider"
 import { getLanguage, getTerminal, getTextSelection, getTheme } from "../utils"
@@ -50,6 +51,8 @@ export class BaseProvider {
   private _p2pBridge: P2pBridge | undefined
   private _teamShare: TeamShare | undefined
   private _teamShareBridge: TeamShareBridge | undefined
+  private _teamPlugins: TeamPlugins | undefined
+  private _teamPluginsBridge: TeamPluginsBridge | undefined
   private _sessionManager: SessionManager | undefined
   private _generations: GenerationTracker
   private _templateDir: string | undefined
@@ -76,13 +79,15 @@ export class BaseProvider {
     index?: WorkspaceIndex,
     sessionManager?: SessionManager,
     p2p?: P2pRuntime,
-    teamShare?: TeamShare
+    teamShare?: TeamShare,
+    teamPlugins?: TeamPlugins
   ) {
     this.context = context
     this._fileTreeProvider = new FileTreeProvider()
     this._workspaceIndex = index
     this._p2p = p2p
     this._teamShare = teamShare
+    this._teamPlugins = teamPlugins
     this._sessionManager = sessionManager
     this._generations = generations
     this._templateDir = templateDir
@@ -106,6 +111,8 @@ export class BaseProvider {
     this._p2pBridge = undefined
     this._teamShareBridge?.dispose()
     this._teamShareBridge = undefined
+    this._teamPluginsBridge?.dispose()
+    this._teamPluginsBridge = undefined
     this.chat?.dispose()
     this._embeddingService?.dispose()
     this._embeddingService = undefined
@@ -138,8 +145,11 @@ export class BaseProvider {
     )
 
     const teamShare = this._teamShare
+    const teamPlugins = this._teamPlugins
     const providerManager = new ProviderManager(this.context, bridge, {
-      teamChanged: () => teamShare?.teamChanged()
+      teamChanged: async () => {
+        await Promise.all([teamShare?.teamChanged(), teamPlugins?.teamChanged()])
+      }
     })
     this.providers = providerManager
     if (this._p2p) {
@@ -147,6 +157,9 @@ export class BaseProvider {
     }
     if (teamShare) {
       this._teamShareBridge = new TeamShareBridge(teamShare, bridge)
+    }
+    if (teamPlugins) {
+      this._teamPluginsBridge = new TeamPluginsBridge(teamPlugins, bridge)
     }
     this._embeddingService = new EmbeddingService(
       this.context,

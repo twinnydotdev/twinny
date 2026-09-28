@@ -122,3 +122,19 @@ export interface TeamShareStatus {
   backendOk?: boolean
   error?: string
 }
+
+/** The team gateway's page as the plugins card shows it: what this developer can open there. */
+export interface TeamPluginsStatus {
+  /** Connected to a team with a key of one's own, so the page opens. */
+  available: boolean
+  /** Connected with the shared token, which never opens the page. */
+  sharedToken: boolean
+  /** An admin key: the page opens on everything. */
+  admin: boolean
+  /** The gateway's base URL. */
+  gateway?: string
+  /** The plugins shared with this key; for an admin, every running plugin. */
+  plugins: Array<{ id: string; name: string; description?: string }>
+  /** Why the list could not be read, such as the gateway not answering. */
+  error?: string
+}

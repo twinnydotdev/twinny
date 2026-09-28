@@ -14,7 +14,7 @@ import {
   PluginContext,
   PluginError
 } from "./host"
-import { PullsPlugin } from "./pulls"
+import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
 export const GITLAB_URL = "https://gitlab.com"
 const USER_AGENT = "twinny-server"
@@ -311,6 +311,18 @@ export class GitLabForge implements Forge {
     return { url: id !== undefined ? `${pull.url}#note_${id}` : pull.url }
   }
 
+  public async approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void> {
+    await readJson(
+      await this._context.fetch(`${this.project(repo)}/merge_requests/${pull.number}/approve`, {
+        method: "POST",
+        headers: { ...this.headers(repo), "Content-Type": "application/json" },
+        body: JSON.stringify({ sha: pull.headSha }),
+        signal
+      }),
+      `Approving ${repo.fullName}!${pull.number}`
+    )
+  }
+
   public async pullContent(
     repo: RepoRecord,
     number: number,
@@ -370,6 +382,7 @@ export const gitlabPlugin: GatewayPlugin = {
   name: "GitLab",
   description:
     "Watch projects on gitlab.com or a self-managed GitLab and see their open merge requests, pipelines and approvals. Reads with an access token per project.",
+  memberRoutes: MEMBER_ROUTES,
   create: (context) =>
     new PullsPlugin(context, (store, ctx) => new GitLabForge(store, ctx), undefined, "gitlab")
 }

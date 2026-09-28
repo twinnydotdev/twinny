@@ -49,7 +49,7 @@ That finds your model server, writes a configuration, makes an admin key and ser
 
 - **A key per developer**, stored as a hash, revoked live. Usage, failures and tokens per person and per model; never the content.
 - **Pool the team's own computers.** A developer flips *Share this computer* and their local server serves the team through the gateway. No port to open.
-- **Plugins** (licence): pull requests and issues from GitHub, GitLab, Gitea and Bitbucket listed on the admin page and reviewed by your own models, with the review posted back to the host; Slack, Discord and Teams notifications; SSO sign-in with any OpenID Connect provider; one shared context index for every developer's chat; nightly backups.
+- **Plugins** (licence): pull requests and issues from GitHub, GitLab, Gitea and Bitbucket listed on the admin page and reviewed by your own models, with the review posted back to the host, and shared with the developers you choose; Slack, Discord and Teams notifications; SSO sign-in with any OpenID Connect provider; one shared context index for every developer's chat; nightly backups.
 - **Team policy** (licence): team-only providers, locked defaults, routing rules that keep a workspace on local backends, a team system prompt. Shown for consent before connecting.
 - **Recording** (licence): keep prompts and replies on the gateway, disclosed to every developer, exported as training data.
 - **Operations**: a hash-chained audit log of every admin change, read-only admin keys, Prometheus metrics, costs per developer when a model has a price, a request queue for a shared GPU, Docker and a Helm chart.
