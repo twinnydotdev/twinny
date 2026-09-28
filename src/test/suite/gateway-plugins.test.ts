@@ -953,6 +953,7 @@ suite("Pull-request plugin core", () => {
         },
         pullContent: async () => ({ body: "", files: [], moreFiles: 0 }),
         postReview: async () => ({}),
+        approvePull: async () => undefined,
         status: () => ({ baseUrl: "x://" })
       }),
       0
@@ -1012,6 +1013,7 @@ suite("Pull-request reviews", function () {
       })),
     pullContent: async () => ({ body: "Does a thing.", files: [{ path: "a.ts", status: "modified" as const, additions: 1, deletions: 1, patch: "@@ -1 +1 @@\n-old\n+new" }], moreFiles: 0 }),
     postReview: async () => ({}),
+    approvePull: async () => undefined,
     status: () => ({ baseUrl: "x://" })
   })
   const req = (method: string, path: string, body: Record<string, unknown> = {}) => ({ method, path, query: new URLSearchParams(), body: async () => body, principal: "op" })
@@ -1175,6 +1177,37 @@ suite("Pull-request reviews", function () {
     await p.stop()
   })
 
+
+  test("a pull can be approved on the host without a review, and host failures come back as 502", async () => {
+    const approved: number[] = []
+    const dir = path.join(scratch, "approve")
+    fs.mkdirSync(dir, { recursive: true })
+    const bus = new PluginEventBus()
+    const seen: string[] = []
+    bus.on((event) => seen.push(event.type))
+    const p = new PullsPlugin(
+      { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, events: bus },
+      () => ({
+        ...forge({ 1: "aaa", 2: "bbb" })(),
+        approvePull: async (_repo: { fullName: string }, pull: { number: number }) => {
+          if (pull.number === 2) throw new Error("Can not approve your own pull request")
+          approved.push(pull.number)
+        }
+      }),
+      0
+    )
+    p.start()
+    const repo = ((await p.handle(req("POST", "repos", { fullName: "acme/approve" }))).body as { repo: { id: string } }).repo
+    const answer = await p.handle(req("POST", `repos/${repo.id}/pulls/1/approve`))
+    assert.strictEqual((answer.body as { pull: { number: number } }).pull.number, 1)
+    assert.deepStrictEqual(approved, [1])
+    assert.ok(seen.includes("pull.approved"))
+    const failed = await p.handle(req("POST", `repos/${repo.id}/pulls/2/approve`)).catch((e: PluginError) => e)
+    assert.ok(failed instanceof PluginError && failed.status === 502 && /own pull request/.test(failed.message))
+    const wrongMethod = await p.handle(req("GET", `repos/${repo.id}/pulls/1/approve`))
+    assert.strictEqual(wrongMethod.status, 404)
+    await p.stop()
+  })
 
   test("the model's JSON is read leniently and labels are matched to the project's own", () => {
     const parsed = parseTriage("Sure! ```json\n{\"labels\": [\"BUG\", \"nope\"], \"duplicateOf\": 12, \"priority\": \"high\", \"reply\": \"Thanks.\"}\n```", ["bug", "docs"])
@@ -1418,6 +1451,7 @@ suite("Reviews and reasoning models", () => {
       listPulls: async (repo: { fullName: string }) => [{ repo: repo.fullName, number: 1, title: "t", author: "a", url: "", draft: false, createdAt: "", updatedAt: "2026-09-19T00:00:00Z", headRef: "h", baseRef: "m", headSha: "s", checks: "none" as const, checkRuns: [], mergeable: "unknown" as const, review: "none" as const, labels: [] }],
       pullContent: async () => ({ body: "", files: [], moreFiles: 0 }),
       postReview: async () => ({}),
+      approvePull: async () => undefined,
       status: () => ({ baseUrl: "x://" })
     })
     const p = new PullsPlugin({ dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference }, forge, 0)

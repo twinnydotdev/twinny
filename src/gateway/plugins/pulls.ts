@@ -574,13 +574,14 @@ export class PullsPlugin implements PluginInstance {
         await this.syncOne(repo)
         return json({ repo: this.view(repo) })
       }
-      const pullMatch = /^pulls\/([1-9][0-9]{0,8})(\/review(?:\/post|\/ask)?)?$/.exec(rest)
+      const pullMatch = /^pulls\/([1-9][0-9]{0,8})(\/review(?:\/post|\/ask)?|\/approve)?$/.exec(rest)
       if (pullMatch) {
         const number = Number(pullMatch[1])
         const wantsReview = pullMatch[2] === "/review"
         const wantsPost = pullMatch[2] === "/review/post"
         const wantsAsk = pullMatch[2] === "/review/ask"
-        if (wantsReview || wantsPost || wantsAsk ? method !== "POST" : method !== "GET") return notFound()
+        const wantsApprove = pullMatch[2] === "/approve"
+        if (wantsReview || wantsPost || wantsAsk || wantsApprove ? method !== "POST" : method !== "GET") return notFound()
         let pull = this.pull(repo.id, number)
         if (!pull) {
           await this.syncOne(repo)
@@ -597,6 +598,11 @@ export class PullsPlugin implements PluginInstance {
           if (request.member && review.postedAt) throw new PluginError("This review is already on the host.", 409)
           const posted = await this.postReview(repo, pull, review, as, request.principal)
           return json({ review: posted })
+        }
+        if (wantsApprove) {
+          await this.approvePull(repo, pull, request.principal)
+          await this.syncOne(repo)
+          return json({ pull: this.pull(repo.id, number) ?? pull })
         }
         if (wantsAsk) {
           const body = await request.body()
@@ -730,6 +736,28 @@ export class PullsPlugin implements PluginInstance {
       this._context.log.warn({ event: "plugin.review-post-failed", key: by, reason: `${repo.fullName}${hash}${pull.number}`, message })
       throw error instanceof PluginError ? error : new PluginError(`Posting to the host failed: ${message}`, 502)
     }
+  }
+
+  /** Approves the pull on the host, with no review text. */
+  private async approvePull(repo: RepoRecord, pull: PullSummary, by: string): Promise<void> {
+    const label = `${repo.fullName}${this._forge.noun === "Merge request" ? "!" : "#"}${pull.number}`
+    try {
+      await this._forge.approvePull(repo, pull, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS))
+    } catch (error) {
+      const message = messageOf(error)
+      this._context.log.warn({ event: "plugin.approve-failed", key: by, reason: label, message })
+      throw error instanceof PluginError ? error : new PluginError(`Approving on the host failed: ${message}`, 502)
+    }
+    this._context.log.info({ event: "plugin.approved", key: by, reason: label })
+    this._context.events?.emit({
+      type: "pull.approved",
+      source: this._pluginId,
+      level: "info",
+      title: `${label} approved by ${by}`,
+      text: `${pull.title} by ${pull.author}.`,
+      url: pull.url,
+      data: { repo: repo.fullName, number: pull.number }
+    })
   }
 
   private pull(repoId: string, number: number): PullSummary | undefined {

@@ -178,6 +178,8 @@ export interface Forge {
    * can be seen, when the host says.
    */
   postReview(repo: RepoRecord, pull: PullSummary, body: string, as: ReviewPostAs, signal: AbortSignal): Promise<{ url?: string }>
+  /** Approves the pull as the repository's token, with no review text. */
+  approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void>
   /** The username the repository's token acts as; nothing for app credentials. */
   whoAmI?(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined>
   /** Open issues, on hosts that have an issue tracker the plugin reads. */

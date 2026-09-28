@@ -311,6 +311,18 @@ export class GitLabForge implements Forge {
     return { url: id !== undefined ? `${pull.url}#note_${id}` : pull.url }
   }
 
+  public async approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void> {
+    await readJson(
+      await this._context.fetch(`${this.project(repo)}/merge_requests/${pull.number}/approve`, {
+        method: "POST",
+        headers: { ...this.headers(repo), "Content-Type": "application/json" },
+        body: JSON.stringify({ sha: pull.headSha }),
+        signal
+      }),
+      `Approving ${repo.fullName}!${pull.number}`
+    )
+  }
+
   public async pullContent(
     repo: RepoRecord,
     number: number,

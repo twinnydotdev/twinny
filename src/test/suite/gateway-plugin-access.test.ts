@@ -188,9 +188,10 @@ suite("Pull-request routes a developer reaches", () => {
     }
   })
 
-  test("never the repositories, their tokens, the host, the App or the review model", () => {
+  test("never the repositories, their tokens, the host, the App, the review model or an approval", () => {
     for (const [method, route] of [
       ["POST", "repos"],
+      ["POST", `${repo}/pulls/7/approve`],
       ["PUT", repo],
       ["DELETE", repo],
       ["PUT", "settings"],
