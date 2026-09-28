@@ -2,10 +2,15 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
-## Unreleased
+## 4.2.8 · 2026-09-28
+
+Extension and `twinny-server` release: plugins shared with developers, opened from VS Code already signed in, an approve button on the pull page, and Qwen3-Coder completions through a gateway.
 
 - **Share plugins with developers.** An admin can share a plugin with every developer or with the people they tick, from the plugin's card under **Plugins → Store** or `PUT /twinny/v1/admin/plugins/<id>/access`. A developer then signs in to the gateway's page with their own key and sees only the plugins shared with them, without their settings. On GitHub, GitLab, Gitea and Bitbucket they read pulls and issues, review, ask about a review, post it as a comment, triage and apply the suggested labels, and set their own username on the host; approving or requesting changes through the token stays with admins, as do repositories, tokens, the GitHub App and the review model. The notifiers, SSO sign-in, shared context and backups are for admins only. Grants are kept by key name in `plugins.json`, every change is audited (`plugin.access-changed`), and a developer's writes are audited under their name, marked `member`. The shared token and a demo's guests never open a plugin.
 - **Your team's plugins, one click from VS Code, signed in.** When an admin shares a plugin with you, VS Code says so once with an **Open** button, and the Providers tab lists it under **Your team's plugins**; admins get **Your gateway's page**. Opening asks the gateway for a one-time code with your key (`POST /twinny/v1/page-link`) and opens the page with the code in the URL fragment; the page trades it for the key once, within a minute (`POST /twinny/v1/page-link/open`), and wipes it from the address bar. Nobody sees, copies or pastes a key, and a developer who joined by invite needs nothing from the admin. **Twinny - Open your team's plugins** in the command palette does the same; against an older gateway it falls back to putting the key on the clipboard.
+- **The page knows who you are on GitHub.** Opened from VS Code, the page fills in your GitHub username from the account VS Code is signed in with, once, so pull requests waiting for your approval appear under **waiting for me**; it never replaces a name you set and is skipped on GitHub Enterprise. Without one, the plugin's page asks **Who are you on GitHub?** at the top until you answer.
+- **Approve from the pull page.** An admin approves a pull request with one button next to its checks, as the repository's token, with no review text posted. GitHub, Gitea and GitLab pin the approval to the commit the page showed. Developers a plugin is shared with do not get the button.
+- **Qwen3-Coder completions through a gateway.** A chat-only FIM model's prompt now reaches `twinny-server` as the chat it was rendered from, instead of being refused, so the backend no longer templates it twice.
 
 ## 4.2.7 · 2026-09-24
 
