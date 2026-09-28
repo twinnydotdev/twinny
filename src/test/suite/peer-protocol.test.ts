@@ -94,7 +94,7 @@ suite("Peer protocol", () => {
       type: "job",
       id: "j1",
       capability: "fim",
-      request: { model: "m", prompt: "p", prefix: undefined, suffix: undefined, stop: undefined, maxTokens: 4, temperature: undefined, keepAlive: undefined }
+      request: { model: "m", prompt: "p", prefix: undefined, suffix: undefined, stop: undefined, maxTokens: 4, temperature: undefined, keepAlive: undefined, messages: undefined }
     })
     assert.throws(
       () => parseGatewayFrame(JSON.stringify({ type: "job", id: "j1", capability: "fim", request: { model: "m", prompt: "p", apiHostname: "evil" } })),
