@@ -38,6 +38,7 @@ export const EVENT_KINDS: PluginEventKind[] = [
   { type: "issue.triaged", label: "Issue triaged", description: "A model suggested labels, a priority and a first reply for an issue." },
   { type: "pull.opened", label: "Pull opened", description: "A new pull request appeared on a watched repository." },
   { type: "pull.checks-failed", label: "Checks failed", description: "A watched pull's checks went from passing or pending to failing." },
+  { type: "pull.approved", label: "Pull approved", description: "Someone approved a pull from the admin page." },
   { type: "backup.ok", label: "Backup made", description: "A backup was written to its destination." },
   { type: "backup.failed", label: "Backup failed", description: "A backup could not be made or stored." },
   { type: "backend.down", label: "Backend down", description: "A configured backend stopped answering." },

@@ -202,6 +202,18 @@ export class GiteaForge implements Forge {
     return { url: str(answer.html_url, pull.url) }
   }
 
+  public async approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void> {
+    await readJson(
+      await this._context.fetch(this.api(repo, `/pulls/${pull.number}/reviews`), {
+        method: "POST",
+        headers: { ...this.headers(repo), "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "", event: "APPROVED", commit_id: pull.headSha }),
+        signal
+      }),
+      `Approving ${repo.fullName}#${pull.number}`
+    )
+  }
+
   public async pullContent(repo: RepoRecord, number: number, signal: AbortSignal): Promise<PullContent> {
     const what = `Reading ${repo.fullName}#${number}`
     const pull = await this.get(repo, `/pulls/${number}`, signal, what)

@@ -662,6 +662,7 @@ interface PullViewProps {
   onBack: () => void
   onReview: () => Promise<void>
   onPost: (as: "comment" | "request-changes" | "approve") => Promise<void>
+  onApprove: () => Promise<void>
   onAsk: (question: string) => Promise<void>
 }
 
@@ -744,7 +745,9 @@ const ReviewThread = ({ review, noun, canAsk, onAsk }: { review: ReviewRecord; n
   )
 }
 
-const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onAsk }: PullViewProps) => {
+const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onApprove, onAsk }: PullViewProps) => {
+  const [approving, setApproving] = useState(false)
+  const [approveError, setApproveError] = useState<string | undefined>()
   const [postAs, setPostAs] = useState<"comment" | "request-changes" | "approve">("comment")
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState<string | undefined>()
@@ -772,6 +775,14 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
     }
   }
   const stale = detail.review && detail.review.headSha !== pull.headSha
+  const stance = myStance(pull, me)
+  const approve = () => {
+    setApproving(true)
+    setApproveError(undefined)
+    void onApprove()
+      .catch((e: unknown) => setApproveError(messageOf(e)))
+      .finally(() => setApproving(false))
+  }
   return (
     <section className="panel record">
       <div className="section-heading">
@@ -792,8 +803,14 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
           <Pill tone={CHECK_TONE[pull.checks]}>{CHECK_LABEL[pull.checks]}</Pill>
           <Pill tone={MERGE_TONE[pull.mergeable]}>{MERGE_LABEL[pull.mergeable]}</Pill>
           <Pill tone={REVIEW_TONE[pull.review]}>{REVIEW_LABEL[pull.review]}</Pill>
+          {stance !== "yours" && stance !== "approved" && (
+            <button type="button" className="primary mini" disabled={approving} onClick={approve} title={`Approve on ${HOST_NAMES[host]} as the repository's token`}>
+              {approving ? "approving…" : "approve"}
+            </button>
+          )}
         </span>
       </div>
+      {approveError && <div className="error">{approveError}</div>}
       <h3 className="pull-title">
         {pull.draft && <span className="tag">draft</span>} {pull.title} <MyReviewTag pull={pull} me={me} />
       </h3>
@@ -1577,6 +1594,11 @@ export const PullsPanel = ({ host, apiKey }: { host: PullsHost; apiKey: string }
             onPost={async (as) => {
               const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review/post`, apiKey, { method: "POST", body: { as } })
               setDetail((current) => (current ? { ...current, review: answer.review } : current))
+              void load()
+            }}
+            onApprove={async () => {
+              const answer = await api<{ pull: PullSummary }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/approve`, apiKey, { method: "POST" })
+              setDetail((current) => (current ? { ...current, pull: answer.pull } : current))
               void load()
             }}
             onAsk={async (question) => {

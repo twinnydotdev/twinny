@@ -148,6 +148,11 @@ export class BitbucketForge implements Forge {
     return { url: str(rec(rec(comment.links).html).href, pull.url) }
   }
 
+  public async approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void> {
+    const response = await this._context.fetch(this.api(repo, `/pullrequests/${pull.number}/approve`), { method: "POST", headers: this.headers(repo), signal })
+    if (!response.ok) await readJson(response, `Approving ${repo.fullName}#${pull.number}`)
+  }
+
   public async pullContent(repo: RepoRecord, number: number, signal: AbortSignal): Promise<PullContent> {
     const what = `Reading ${repo.fullName}#${number}`
     const pull = await this.get(repo, `/pullrequests/${number}`, signal, what)
