@@ -2,6 +2,10 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.2.9 · 2026-09-29
+
+`twinny-server` release: `twinny-server --version` and the gateway's `/twinny/v1` responses report the right version. The 4.2.8 package was published with a bundle built before the version bump, so it called itself 4.2.7. Publishing now refuses a `cli.js` that was not built for the package's version.
+
 ## 4.2.8 · 2026-09-28
 
 Extension and `twinny-server` release: plugins shared with developers, opened from VS Code already signed in, an approve button on the pull page, and Qwen3-Coder completions through a gateway.

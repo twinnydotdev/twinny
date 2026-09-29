@@ -1,6 +1,6 @@
 {
   "name": "twinny-server",
-  "version": "4.2.8",
+  "version": "4.2.9",
   "description": "Serve your local models to the Twinny VS Code extension on other machines.",
   "license": "MIT",
   "author": {
@@ -36,6 +36,6 @@
     "node": ">=18"
   },
   "scripts": {
-    "prepublishOnly": "node -e \"require('fs').accessSync('cli.js')\" || (echo 'Run npm run build in the repository root first' && exit 1)"
+    "prepublishOnly": "node -e \"const fs=require('fs');const v=require('./package.json').version;if(!fs.existsSync('cli.js')){console.error('Run npm run build in the repository root first');process.exit(1)}if(!fs.readFileSync('cli.js','utf8').includes('\\\"'+v+'\\\" : \\\"dev\\\"')){console.error('cli.js was not built for '+v+': run npm run build in the repository root first');process.exit(1)}\""
   }
 }
