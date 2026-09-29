@@ -1,10 +1,9 @@
-import { defaultTemplates } from "../../extension/templates"
-
 export const FIM_TEMPLATE_FORMAT = {
   automatic: "automatic",
   codegemma: "codegemma",
   codellama: "codellama",
   codeqwen: "codeqwen",
+  qwen3Coder: "qwen3-coder",
   codestral: "codestral",
   custom: "custom-template",
   deepseek: "deepseek",
@@ -13,21 +12,22 @@ export const FIM_TEMPLATE_FORMAT = {
   starcoder: "starcoder"
 }
 
-export const STOP_LLAMA = ["<EOT>"]
+export const STOP_LLAMA = ["<EOT>", "<PRE>", "<SUF>", "<MID>"]
 
 export const STOP_DEEPSEEK = [
-  "<｜fim begin｜>",
-  "<｜fim hole｜>",
-  "<｜fim end｜>",
-  "<END>",
-  "<｜end of sentence｜>"
+  "<｜fim▁begin｜>",
+  "<｜fim▁hole｜>",
+  "<｜fim▁end｜>",
+  "<｜end▁of▁sentence｜>",
+  "<END>"
 ]
 
 export const STOP_STARCODER = [
   "<|endoftext|>",
   "<file_sep>",
-  "<file_sep>",
   "<fim_prefix>",
+  "<fim_suffix>",
+  "<fim_middle>",
   "<repo_name>"
 ]
 
@@ -35,18 +35,25 @@ export const STOP_QWEN = [
   "<|endoftext|>",
   "<|file_sep|>",
   "<|fim_prefix|>",
+  "<|fim_suffix|>",
+  "<|fim_middle|>",
+  "<|fim_pad|>",
+  "<|repo_name|>",
   "<|im_end|>",
   "<|im_start|>",
-  "<|repo_name|>",
-  "<|fim_pad|>",
   "<|cursor|>"
 ]
 
-export const STOP_CODEGEMMA = ["<|file_separator|>", "<|end_of_turn|>", "<eos>"]
+export const STOP_CODEGEMMA = [
+  "<|file_separator|>",
+  "<|fim_prefix|>",
+  "<|fim_suffix|>",
+  "<|fim_middle|>",
+  "<|end_of_turn|>",
+  "<eos>"
+]
 
-export const STOP_CODESTRAL = ["[PREFIX]", "[SUFFIX]"]
-
-export const DEFAULT_TEMPLATE_NAMES = defaultTemplates.map(({ name }) => name)
+export const STOP_CODESTRAL = ["[PREFIX]", "[SUFFIX]", "</s>"]
 
 export const DEFAULT_ACTION_TEMPLATES = []
 

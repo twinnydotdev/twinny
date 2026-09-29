@@ -1,11 +1,21 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import { PROVIDER_EVENT_NAME } from "../../common/constants"
-import { ClientMessage, ServerMessage } from "../../common/types"
-import { TwinnyProvider } from "../../extension/provider-manager"
+import { messageOf } from "../../common/errors"
+import {
+  ProviderModelList,
+  ProviderSaveResult,
+  ProviderTestResult
+} from "../../common/messaging/protocol"
+import { DiscoveredServer } from "../../common/provider-discovery"
+import { ProviderType } from "../../common/provider-validation"
+import { TwinnyProvider } from "../../common/types"
+import { bridge, emit, useServerEvent } from "../messaging"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
+const failed = (error: unknown): ProviderTestResult => ({
+  success: false,
+  error: messageOf(error)
+})
 
 export const useProviders = () => {
   const [providers, setProviders] = useState<Record<string, TwinnyProvider>>({})
@@ -13,138 +23,96 @@ export const useProviders = () => {
   const [fimProvider, setFimProvider] = useState<TwinnyProvider | null>(null)
   const [embeddingProvider, setEmbeddingProvider] =
     useState<TwinnyProvider | null>(null)
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<
-      Record<string, TwinnyProvider> | TwinnyProvider
-    > = event.data
-    if (message?.type === PROVIDER_EVENT_NAME.getAllProviders) {
-      const providers = message.data as Record<string, TwinnyProvider>
-      setProviders(providers || {})
-    }
-    if (message?.type === PROVIDER_EVENT_NAME.getActiveChatProvider) {
-      const provider = message.data as TwinnyProvider
-      setChatProvider(provider || null)
-    }
-    if (message?.type === PROVIDER_EVENT_NAME.getActiveFimProvider) {
-      if (message.data) {
-        const provider = message.data as TwinnyProvider
-        setFimProvider(provider)
-      }
-    }
-    if (message?.type === PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider) {
-      if (message.data) {
-        const provider = message.data as TwinnyProvider
-        setEmbeddingProvider(provider)
-      }
-    }
-    return () => window.removeEventListener("message", handler)
-  }
+  /** False until the extension has answered once; the list is unknown before. */
+  const [ready, setReady] = useState(false)
 
-  const saveProvider = (provider: TwinnyProvider) => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.addProvider,
-      data: provider
-    } as ClientMessage<TwinnyProvider>)
-  }
-
-  const copyProvider = (provider: TwinnyProvider) => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.copyProvider,
-      data: provider
-    } as ClientMessage<TwinnyProvider>)
-  }
-
-  const updateProvider = (provider: TwinnyProvider) => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.updateProvider,
-      data: provider
-    } as ClientMessage<TwinnyProvider>)
-  }
-
-  const removeProvider = (provider: TwinnyProvider) => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.removeProvider,
-      data: provider
-    } as ClientMessage<TwinnyProvider>)
-  }
-
-  const setActiveFimProvider = (provider: TwinnyProvider) => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.setActiveFimProvider,
-      data: provider
-    } as ClientMessage<TwinnyProvider>)
-  }
-
-  const setActiveEmbeddingsProvider = (provider: TwinnyProvider) => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider,
-      data: provider
-    } as ClientMessage<TwinnyProvider>)
-  }
-
-  const setActiveChatProvider = (provider: TwinnyProvider) => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.setActiveChatProvider,
-      data: provider
-    } as ClientMessage<TwinnyProvider>)
-  }
-
-  const getProvidersByType = (type: string) => {
-    return Object.values(providers).filter(
-      (provider) => provider.type === type
-    ) as TwinnyProvider[]
-  }
-
-  const resetProviders = () => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.resetProvidersToDefaults
-    } as ClientMessage<TwinnyProvider>)
-  }
+  useServerEvent(PROVIDER_EVENT_NAME.getAllProviders, (all) => {
+    setProviders(all || {})
+    setReady(true)
+  })
+  useServerEvent(PROVIDER_EVENT_NAME.getActiveChatProvider, (provider) =>
+    setChatProvider(provider || null)
+  )
+  useServerEvent(PROVIDER_EVENT_NAME.getActiveFimProvider, (provider) =>
+    setFimProvider(provider || null)
+  )
+  useServerEvent(PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider, (provider) =>
+    setEmbeddingProvider(provider || null)
+  )
 
   useEffect(() => {
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getAllProviders
-    })
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveChatProvider
-    })
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveFimProvider
-    })
-    global.vscode.postMessage({
-      type: PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider
-    })
-    window.addEventListener("message", handler)
-    return () => window.removeEventListener("message", handler)
+    emit(PROVIDER_EVENT_NAME.getAllProviders)
+    emit(PROVIDER_EVENT_NAME.getActiveChatProvider)
+    emit(PROVIDER_EVENT_NAME.getActiveFimProvider)
+    emit(PROVIDER_EVENT_NAME.getActiveEmbeddingsProvider)
   }, [])
 
+  const getProvidersByType = useCallback(
+    (type: string) =>
+      Object.values(providers).filter((provider) => provider.type === type),
+    [providers]
+  )
+
+  const activeProviders: Record<ProviderType, TwinnyProvider | null> = {
+    chat: chatProvider,
+    fim: fimProvider,
+    embedding: embeddingProvider
+  }
+
+  const setActiveProvider = useCallback(
+    (type: ProviderType, provider: TwinnyProvider) => {
+      const channel = {
+        chat: PROVIDER_EVENT_NAME.setActiveChatProvider,
+        fim: PROVIDER_EVENT_NAME.setActiveFimProvider,
+        embedding: PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider
+      }[type]
+      emit(channel, provider)
+    },
+    []
+  )
+
   return {
+    activeProviders,
     chatProvider,
-    copyProvider,
+    ready,
     embeddingProvider,
     fimProvider,
     getProvidersByType,
     providers,
-    removeProvider,
-    resetProviders,
-    saveProvider,
-    setActiveChatProvider,
-    setActiveEmbeddingsProvider,
-    setActiveFimProvider,
-    updateProvider,
-    triggerExportProviders,
-    triggerImportProviders
+    setActiveProvider,
+    copyProvider: (p: TwinnyProvider) =>
+      emit(PROVIDER_EVENT_NAME.copyProvider, p),
+    removeProvider: (p: TwinnyProvider) =>
+      emit(PROVIDER_EVENT_NAME.removeProvider, p),
+    resetProviders: () => emit(PROVIDER_EVENT_NAME.resetProvidersToDefaults),
+    /** Adds a provider; the reply says whether it was accepted. */
+    saveProvider: (p: TwinnyProvider): Promise<ProviderSaveResult> =>
+      bridge.request(PROVIDER_EVENT_NAME.addProvider, p),
+    updateProvider: (p: TwinnyProvider): Promise<ProviderSaveResult> =>
+      bridge.request(PROVIDER_EVENT_NAME.updateProvider, p),
+    /** Sends one real request to the provider and reports what happened. */
+    testProvider: (p: TwinnyProvider): Promise<ProviderTestResult> =>
+      bridge.request(PROVIDER_EVENT_NAME.testProvider, p).catch(failed),
+    /** Asks the provider's own endpoint which models it serves. */
+    listModels: (p: TwinnyProvider): Promise<ProviderModelList> =>
+      bridge
+        .request(PROVIDER_EVENT_NAME.listProviderModels, p)
+        .catch((error) => ({ models: [], error: failed(error).error })),
+    /** Asks the usual local ports which model servers are running. */
+    discoverServers: (): Promise<DiscoveredServer[]> =>
+      bridge.request(PROVIDER_EVENT_NAME.discoverProviders).catch(() => []),
+    /** Creates providers for a found server and makes them active. */
+    useDiscoveredServer: (server: DiscoveredServer): Promise<TwinnyProvider[]> =>
+      bridge
+        .request(PROVIDER_EVENT_NAME.useDiscoveredServer, server)
+        .catch(() => []),
+    setActiveChatProvider: (p: TwinnyProvider) =>
+      emit(PROVIDER_EVENT_NAME.setActiveChatProvider, p),
+    setActiveEmbeddingsProvider: (p: TwinnyProvider) =>
+      emit(PROVIDER_EVENT_NAME.setActiveEmbeddingsProvider, p),
+    setActiveFimProvider: (p: TwinnyProvider) =>
+      emit(PROVIDER_EVENT_NAME.setActiveFimProvider, p),
+    triggerExportProviders: () => emit(PROVIDER_EVENT_NAME.exportProviders),
+    triggerImportProviders: () => emit(PROVIDER_EVENT_NAME.importProviders)
   }
-}
-
-const triggerExportProviders = () => {
-  global.vscode.postMessage({
-    type: PROVIDER_EVENT_NAME.exportProviders
-  } as ClientMessage<unknown>)
-}
-
-const triggerImportProviders = () => {
-  global.vscode.postMessage({
-    type: PROVIDER_EVENT_NAME.importProviders
-  } as ClientMessage<unknown>)
 }

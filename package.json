@@ -1,8 +1,8 @@
 {
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
-  "description": "Locally hosted AI code completion plugin for vscode",
-  "version": "3.23.31",
+  "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
+  "version": "4.2.9",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -32,7 +32,7 @@
   "license": "MIT",
   "publisher": "rjmacarthy",
   "engines": {
-    "vscode": "^1.84.0"
+    "vscode": "^1.93.0"
   },
   "bugs": {
     "url": "https://github.com/twinnydotdev/twinny/issues"
@@ -50,13 +50,17 @@
     "Linters"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onUri"
   ],
   "author": {
     "name": "rjmacarthy"
   },
   "main": "./out/index.js",
   "browser": "./out/index.js",
+  "bin": {
+    "twinny-node": "./out/node/cli.js"
+  },
   "contributes": {
     "menus": {
       "editor/context": [
@@ -67,6 +71,10 @@
         {
           "when": "editorTextFocus",
           "command": "twinny.refactor"
+        },
+        {
+          "when": "editorTextFocus && !editorReadonly",
+          "command": "twinny.edit"
         },
         {
           "when": "editorTextFocus",
@@ -93,16 +101,11 @@
         {
           "command": "twinny.openChat",
           "group": "navigation@0",
-          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab || view == twinny.sidebar && twinnySymmetryTab"
+          "when": "view == twinny.sidebar && twinnyManageTemplates || view == twinny.sidebar && twinnyManageProviders || view == twinny.sidebar && twinnyConversationHistory || view == twinny.sidebar && twinnyReviewTab || view == twinny.sidebar && twinnyEmbeddingsTab"
         },
         {
           "command": "twinny.review",
           "group": "navigation@1",
-          "when": "view == twinny.sidebar"
-        },
-        {
-          "command": "twinny.symmetry",
-          "group": "navigation@2",
           "when": "view == twinny.sidebar"
         },
         {
@@ -140,6 +143,49 @@
           "command": "twinny.settings",
           "when": "view == twinny.sidebar",
           "group": "navigation@9"
+        },
+        {
+          "command": "twinny.exportConversation",
+          "when": "view == twinny.sidebar",
+          "group": "conversation@1"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "twinny.generateCommitMessage",
+          "group": "navigation",
+          "when": "scmProvider == git"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "twinny.statusBarMenu",
+          "when": "false"
+        },
+        {
+          "command": "twinny.acceptEdit",
+          "when": "twinnyInlineEditPending"
+        },
+        {
+          "command": "twinny.rejectEdit",
+          "when": "twinnyInlineEditPending"
+        }
+      ],
+      "terminal/context": [
+        {
+          "command": "twinny.fixTerminalError",
+          "group": "twinny@1"
+        },
+        {
+          "command": "twinny.terminalCommand",
+          "group": "twinny@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "twinny.addFileToContext",
+          "group": "twinny@1",
+          "when": "!explorerResourceIsFolder"
         }
       ]
     },
@@ -151,6 +197,18 @@
       {
         "command": "twinny.refactor",
         "title": "Twinny - Refactor"
+      },
+      {
+        "command": "twinny.edit",
+        "title": "Twinny - Edit with instruction..."
+      },
+      {
+        "command": "twinny.acceptEdit",
+        "title": "Twinny - Accept edit"
+      },
+      {
+        "command": "twinny.rejectEdit",
+        "title": "Twinny - Reject edit"
       },
       {
         "command": "twinny.addTypes",
@@ -190,16 +248,22 @@
         "icon": "$(gear)"
       },
       {
+        "command": "twinny.setUpTeam",
+        "shortTitle": "Set up for your team",
+        "title": "Twinny - Set up for your team (gateway, keys, usage)",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "twinny.openTeamPlugins",
+        "shortTitle": "Team plugins",
+        "title": "Twinny - Open your team's plugins (pull requests, reviews)",
+        "icon": "$(link-external)"
+      },
+      {
         "command": "twinny.review",
         "shortTitle": "twinny code reviewer",
         "title": "Code reviewer",
         "icon": "$(git-pull-request)"
-      },
-      {
-        "command": "twinny.symmetry",
-        "shortTitle": "twinny symmetry network",
-        "title": "Symmetry network settings",
-        "icon": "$(mirror-public)"
       },
       {
         "command": "twinny.conversationHistory",
@@ -212,6 +276,11 @@
         "shortTitle": "Open twinny panel chat",
         "title": "Open twinny panel chat",
         "icon": "$(screen-full)"
+      },
+      {
+        "command": "twinny.exportConversation",
+        "title": "Twinny - Open conversation as Markdown",
+        "icon": "$(markdown)"
       },
       {
         "command": "twinny.newConversation",
@@ -238,6 +307,10 @@
         "icon": "$(robot)"
       },
       {
+        "command": "twinny.showLogs",
+        "title": "Twinny - Show logs"
+      },
+      {
         "command": "twinny.openChat",
         "shortTitle": "Back to chat view",
         "title": "Back to chat view",
@@ -256,6 +329,27 @@
       {
         "command": "twinny.addSelectionToContext",
         "title": "Twinny: Add Selection to Context"
+      },
+      {
+        "command": "twinny.generateCommitMessage",
+        "title": "Twinny - Generate commit message",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "twinny.statusBarMenu",
+        "title": "Twinny - Status bar options"
+      },
+      {
+        "command": "twinny.shareOllama",
+        "title": "Twinny - Share this computer's Ollama with my other devices (P2P)"
+      },
+      {
+        "command": "twinny.terminalCommand",
+        "title": "Twinny - Write a terminal command from a description"
+      },
+      {
+        "command": "twinny.fixTerminalError",
+        "title": "Twinny - Fix the last terminal error"
       }
     ],
     "keybindings": [
@@ -265,9 +359,27 @@
         "when": "editorTextFocus && !editorReadonly"
       },
       {
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "command": "twinny.edit",
+        "when": "editorTextFocus && !editorReadonly"
+      },
+      {
         "key": "CTRL+SHIFT+/",
         "command": "twinny.stopGeneration",
         "when": "twinnyGeneratingText"
+      },
+      {
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "command": "twinny.acceptEdit",
+        "when": "twinnyInlineEditPending && editorTextFocus"
+      },
+      {
+        "key": "ctrl+shift+backspace",
+        "mac": "cmd+shift+backspace",
+        "command": "twinny.rejectEdit",
+        "when": "twinnyInlineEditPending && editorTextFocus"
       }
     ],
     "viewsContainers": {
@@ -394,6 +506,18 @@
           "default": false,
           "markdownDescription": "When `true`, Twinny will scan neighboring documents to provide more context for completions. This is an experimental feature and may impact performance."
         },
+        "twinny.recentEditsEnabled": {
+          "order": 9,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Shows the model the last few changes you made, in any open file, as short diffs. A half-done rename or a pattern being applied across a file then carries into completions. Up to 6 changes and 2,500 characters."
+        },
+        "twinny.lspContextEnabled": {
+          "order": 9,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Includes matching IntelliSense symbols and available type signatures in FIM context. Uses installed completion providers, with up to 20 suggestions, 2,000 characters and a 150 ms wait limit. Works independently of file context."
+        },
         "twinny.completionCacheEnabled": {
           "order": 10,
           "type": "boolean",
@@ -424,7 +548,13 @@
           "order": 14,
           "type": "array",
           "default": [],
-          "markdownDescription": "Specifies file patterns to ignore when calculating embeddings, such as `**/*.md`, `**/node_modules/**`."
+          "markdownDescription": "Extra file patterns to skip when building embeddings, such as `**/*.md` or `**/fixtures/**`. Only source, config and documentation files are indexed to begin with; binaries such as fonts and images are always skipped."
+        },
+        "twinny.embeddingUpdateOnSave": {
+          "order": 14,
+          "type": "boolean",
+          "default": true,
+          "description": "Keep the workspace index current: re-embed a file when it is saved and forget it when it is deleted. Only applies once the workspace has been indexed."
         },
         "twinny.ollamaHostname": {
           "order": 15,
@@ -443,11 +573,33 @@
           "markdownDescription": "Sets the port number for the Ollama API. The default is `11434`, but you can change it if your Ollama instance uses a different port.",
           "required": false
         },
+        "twinny.p2pPort": {
+          "order": 16,
+          "type": "number",
+          "default": 49737,
+          "minimum": 1,
+          "maximum": 65535,
+          "markdownDescription": "UDP port this computer listens on when sharing its Ollama with paired devices (Providers → Devices → Share). Devices on your network connect to this port, so a firewall on this computer must allow it, e.g. `sudo ufw allow 49737/udp`. Takes effect the next time sharing starts."
+        },
+        "twinny.teamShareSlots": {
+          "order": 16,
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "markdownDescription": "How many teammates' requests this computer runs at once while sharing it with the team (Providers → Share this computer). Takes effect the next time sharing starts."
+        },
         "twinny.keepAlive": {
           "order": 17,
           "type": "string",
           "default": "5m",
           "markdownDescription": "Sets the duration to keep models in memory for Ollama API. Use formats like `5m` for 5 minutes or `1h` for 1 hour. Set to `-1` to keep models in memory indefinitely."
+        },
+        "twinny.warmUpModel": {
+          "order": 17,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Load the completion model when VS Code starts or regains focus, so the first completion does not wait for a cold model. Only for local model servers (Ollama, LM Studio, llama.cpp); hosted APIs are never called."
         },
         "twinny.ollamaUseTls": {
           "order": 18,
@@ -455,17 +607,27 @@
           "default": false,
           "markdownDescription": "When `true`, Twinny will use TLS encryption for connections to the Ollama API. Ensure your Ollama instance is configured for TLS before enabling this option."
         },
+        "twinny.secretShield": {
+          "order": 18,
+          "type": "string",
+          "enum": [
+            "offMachine",
+            "always",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Redact credentials in prompts sent to anything that is not on this machine: hosted APIs, a Twinny gateway, a paired device, a server elsewhere on the network.",
+            "Redact credentials in every prompt, local servers included.",
+            "Send prompts as they are."
+          ],
+          "default": "offMachine",
+          "markdownDescription": "**Secret shield.** API keys, tokens, private keys and passwords in a prompt (your question, attached files, the code around the cursor) are replaced with placeholders like `REDACTED_GITHUB_TOKEN_1` before the request is sent, and put back wherever the reply repeats a placeholder. The model never sees the value; the chat shows how many were withheld. Detection covers well-known token formats, private key blocks, passwords in URLs, and secret-named values in code and `.env` files."
+        },
         "twinny.enableLogging": {
           "order": 19,
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Activates debug logging for Twinny. When `true`, Twinny will output detailed logs, which can be helpful for troubleshooting."
-        },
-        "twinny.symmetryServerKey": {
-          "order": 20,
-          "type": "string",
-          "markdownDescription": "Sets the symmetry master server key. Default value is provided for twinny's Symmetry server.",
-          "default": "4b4a9cc325d134dee6679e9407420023531fd7e96c563f6c5d00fd5549b77435"
+          "markdownDescription": "Writes what Twinny is doing to the **Twinny** output channel: one line per completion or chat request with model, timing, size and why it stopped. Set the channel's log level to *Debug* (the dropdown in the Output panel) to also see the prompts and replies. Warnings and errors are written even when this is off."
         },
         "twinny.githubToken": {
           "order": 21,
@@ -482,6 +644,13 @@
           ],
           "default": "globalState",
           "markdownDescription": "Specifies where to store Twinny provider configurations. 'globalState' uses VS Code's global state (persists per domain, may be lost if domain changes frequently). 'file' stores configurations in a file within the extension's global storage directory (more resilient to domain changes)."
+        },
+        "twinny.reviewMaxDiffChars": {
+          "order": 30,
+          "type": "number",
+          "default": 16000,
+          "minimum": 2000,
+          "description": "Characters of diff sent to the model per code-review request. Larger reviews are split into parts. Lower this for models with small context windows; raise it for large-context models to get fewer parts."
         }
       }
     }
@@ -489,11 +658,14 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build-tests": "tsc -p . --outDir out",
+    "clean": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\"",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
+    "node": "node ./out/node/cli.js",
     "package": "node scripts/build.mjs",
-    "pretest": "npm run build-tests && npm run build && npm run lint",
+    "pretest": "npm run clean && npm run build-tests && npm run build && npm run lint",
     "test": "node ./out/test/runTest.js",
+    "test:sqlite": "node --test out/test/standalone/*.standalone.js",
     "vscode:package": "npm exec vsce package",
     "vscode:prepublish": "npm run package",
     "vscode:publish": "npm exec vsce publish",
@@ -502,18 +674,14 @@
   },
   "devDependencies": {
     "@hyrious/esbuild-plugin-commonjs": "^0.2.4",
-    "@types/async-lock": "^1.4.2",
     "@types/cheerio": "^0.22.35",
-    "@types/js-yaml": "^4.0.9",
     "@types/minimatch": "^5.1.2",
     "@types/mocha": "^10.0.6",
     "@types/node": "^16.18.68",
     "@types/react-dom": "^18.2.18",
     "@types/react-syntax-highlighter": "^15.5.11",
-    "@types/string_score": "^0.1.31",
     "@types/uuid": "^9.0.8",
-    "@types/vscode": "^1.70.0",
-    "@types/ws": "^8.5.12",
+    "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.21.0",
     "@typescript-eslint/parser": "^8.21.0",
     "@vscode/test-cli": "^0.0.6",
@@ -547,22 +715,18 @@
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
-    "async-lock": "^1.4.1",
-    "b4a": "^1.6.6",
     "cheerio": "^1.0.0",
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",
-    "fluency.js": "^1.0.23",
+    "fluency.js": "^1.0.29",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",
-    "hypercore-crypto": "^3.4.2",
-    "hyperswarm": "^4.7.15",
+    "hyperdht": "^6.34.0",
     "i18next": "^23.16.5",
     "i18next-http-backend": "^2.6.2",
     "ignore": "^6.0.2",
-    "js-yaml": "^4.1.0",
     "lucide-react": "^0.473.0",
     "node-polyfill-webpack-plugin": "^3.0.0",
     "onnxruntime-web": "^1.18.0",
@@ -575,13 +739,10 @@
     "react-virtuoso": "^4.12.3",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
-    "string_score": "^0.1.22",
-    "symmetry-core": "^1.0.45",
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.8.10",
     "toxe": "^1.1.0",
-    "uuid": "^9.0.1",
-    "ws": "^8.18.0"
+    "uuid": "^9.0.1"
   },
   "os": [
     "darwin",

@@ -1,7 +1,7 @@
 import React, { memo } from "react"
-import cn from "classnames"
 
-import { ChatCompletionMessage, MentionType, ThemeType } from "../common/types"
+import { WorkspaceSearchReport } from "../common/messaging/protocol"
+import { ChatCompletionMessage, MentionType, } from "../common/types"
 
 import Message from "./message"
 import TypingIndicator from "./typing-indicator"
@@ -10,10 +10,11 @@ interface MessageListProps {
   message: ChatCompletionMessage
   messages: ChatCompletionMessage[]
   completion?: ChatCompletionMessage | null
+  /** The workspace search for the reply in progress, shown under it. */
+  context?: WorkspaceSearchReport
   isLoading: boolean
   index: number
   generatingRef: React.RefObject<boolean>
-  theme: ThemeType
   handleDeleteMessage: (index: number) => void
   handleEditMessage: (
     message: string,
@@ -25,6 +26,7 @@ interface MessageListProps {
     mentions: MentionType[] | undefined
   ) => void
   handleDeleteImage?: (id: string) => void
+  handleContinue?: () => void
 }
 
 const MessageItem = memo(
@@ -32,18 +34,21 @@ const MessageItem = memo(
     message,
     messages,
     completion,
+    context,
     isLoading,
-    theme,
     index,
     handleDeleteMessage,
     handleEditMessage,
     handleRegenerateMessage,
     handleDeleteImage,
+    handleContinue
   }: MessageListProps) => {
     const isUserMessage = message?.role === "user"
     const isAgentMessage = message?.role === "assistant"
     const isLastMessage = index === messages?.length - 1
     const messageKey = `${message?.role}-0`
+    const canContinue =
+      isAgentMessage && isLastMessage && !isLoading && !!message.meta?.stopped
 
     return (
       <>
@@ -51,7 +56,6 @@ const MessageItem = memo(
           <Message
             key={messageKey}
             message={message}
-            theme={theme}
             index={index}
             isLoading={isLoading}
             messages={messages}
@@ -65,7 +69,6 @@ const MessageItem = memo(
           <Message
             key={messageKey}
             message={message}
-            theme={theme}
             index={index}
             isLoading={isLoading}
             messages={messages}
@@ -74,6 +77,7 @@ const MessageItem = memo(
             onRegenerate={handleRegenerateMessage}
             isAssistant
             onDeleteImage={handleDeleteImage}
+            onContinue={canContinue ? handleContinue : undefined}
           />
         )}
         {completion && isLastMessage && (
@@ -81,7 +85,7 @@ const MessageItem = memo(
             key={`completion-${messageKey}`}
             isAssistant={true}
             message={completion}
-            theme={theme}
+            context={context}
             index={index}
             isLoading={isLoading}
             messages={messages}
@@ -92,9 +96,7 @@ const MessageItem = memo(
           />
         )}
         {isLoading && !completion && isLastMessage && (
-          <div className={cn("message", "assistantMessage")}>
-            <TypingIndicator />
-          </div>
+          <TypingIndicator context={context} />
         )}
       </>
     )

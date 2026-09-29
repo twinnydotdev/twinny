@@ -2,7 +2,7 @@
 import * as assert from "assert"
 import * as vscode from "vscode"
 
-import { CompletionFormatter } from "../../extension/completion-formatter"
+import { CompletionFormatter } from "../../extension/completion/formatter"
 
 suite("Completion formatter", () => {
   let editor: vscode.TextEditor
@@ -94,6 +94,46 @@ suite("Completion formatter", () => {
     assert.strictEqual(completionFormatter.format("line2"), "")
   })
 
+  test("strips an echoed copy of the text before the cursor", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "const x = foo(",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, document.lineAt(0).text.length)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor)
+    // The unmatched `)` is cut either way, as the editor auto-closes it.
+    assert.strictEqual(completionFormatter.format("const x = foo(a, b)"), "a, b")
+    assert.strictEqual(completionFormatter.format("a, b)"), "a, b")
+  })
+
+  test("strips a short echoed identifier fragment the completion spells out", async () => {
+    const document = await vscode.workspace.openTextDocument({ content: "c" })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, 1)
+    editor.selection = new vscode.Selection(position, position)
+    const formatter = new CompletionFormatter(editor)
+    assert.strictEqual(formatter.format("const mul = 1"), "onst mul = 1")
+    assert.strictEqual(formatter.format("onst mul = 1"), "onst mul = 1")
+    // A one-letter name followed by an operator is not an echo.
+    assert.strictEqual(formatter.format("c + 1"), "c + 1")
+  })
+
+  test("keeps completions that merely resemble the next line", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "\nassert.equal(add(2, 2), 4)\nassert.equal(add(3, 3), 6)",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, 0)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor)
+    assert.strictEqual(
+      completionFormatter.format("assert.equal(add(1, 2), 3)"),
+      "assert.equal(add(1, 2), 3)"
+    )
+    assert.strictEqual(completionFormatter.format("assert.equal(add(2, 2), 4)"), "")
+  })
+
   test("calculates string similarity correctly", async () => {
     const document = await vscode.workspace.openTextDocument()
     editor = await vscode.window.showTextDocument(document)
@@ -141,7 +181,8 @@ suite("Completion formatter", () => {
 
     // Test with text after cursor
     testFormatter.textAfterCursor = "}"
-    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("\n  return true;\n  \n"), "\n  return true;")
+    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("\n  return true;\n  \n"), "")
+    assert.strictEqual(testFormatter.testRemoveInvalidLineBreaks("return true;\n  \n"), "return true;")
 
     // Test with no text after cursor
     testFormatter.textAfterCursor = ""
@@ -209,6 +250,38 @@ suite("Completion formatter", () => {
       testFormatter.testRemoveDuplicateText("const x = 1;", "return true;"),
       "const x = 1;"
     )
+  })
+
+  test("drops a completion that rewrites the text after the cursor", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "  hasVotedMany: (args: SerializedHeimdallLink[]) =>",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, "  hasVotedMany".length)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor, position)
+    assert.strictEqual(
+      completionFormatter.format(": (args: SerializedProposal) =>"),
+      ""
+    )
+    // Repeating the suffix and carrying on past it is the same mistake.
+    assert.strictEqual(
+      completionFormatter.format(": (args: SerializedHeimdallLink[]) => boolean;"),
+      ""
+    )
+  })
+
+  test("keeps a completion that fills the hole before the suffix", async () => {
+    const document = await vscode.workspace.openTextDocument({
+      content: "const x = foo(bar)",
+    })
+    editor = await vscode.window.showTextDocument(document)
+    const position = new vscode.Position(0, "const x = foo(".length)
+    editor.selection = new vscode.Selection(position, position)
+    const completionFormatter = new CompletionFormatter(editor, position)
+    assert.strictEqual(completionFormatter.format("baz, "), "baz,")
+    // Only a short shared opener, e.g. a closing bracket, is not a rewrite.
+    assert.strictEqual(completionFormatter.format("b, bar)"), "b, ")
   })
 
   test("prevents quotation completions", async () => {

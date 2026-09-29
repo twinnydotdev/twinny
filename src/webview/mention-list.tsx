@@ -24,6 +24,12 @@ const getCategoryIcon = (category: CategoryType): string => {
       return "root-folder"
     case "problems":
       return "warning"
+    case "git":
+      return "git-commit"
+    case "terminal":
+      return "terminal"
+    case "symbols":
+      return "symbol-method"
     default:
       return ""
   }
@@ -51,7 +57,10 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       const orderedCategories: CategoryType[] = [
         "workspace",
         "problems",
-        "files"
+        "git",
+        "terminal",
+        "files",
+        "symbols"
       ]
       const availableCategories = new Set(
         props.items.map((item) => item.category)

@@ -1,81 +1,14 @@
+import { ReactNode } from "react"
 import { ChatCompletionMessageParam } from "fluency.js"
-import { CompletionNonStreaming, CompletionStreaming, LLMProvider } from "fluency.js/dist/chat"
-import { serverMessageKeys } from "symmetry-core"
-import { InlineCompletionItem, InlineCompletionList, Uri } from "vscode"
+import { InlineCompletionItem, InlineCompletionList } from "vscode"
 
-import { ALL_BRACKETS, API_PROVIDERS } from "./constants"
+import type { WorkspaceSearchReport } from "./messaging/protocol"
+import { ALL_BRACKETS } from "./constants"
 import { CodeLanguageDetails } from "./languages"
-
-export interface RequestBodyBase {
-  stream: boolean
-  n_predict?: number
-  temperature?: number
-  messages?: ChatCompletionMessageParam[]
-}
-
-export interface RequestOptionsOllama extends RequestBodyBase {
-  model: string
-  keep_alive?: string | number
-  prompt?: string
-  input?: string
-  options: Record<string, unknown>
-}
-
-export interface StreamBodyOpenAI extends RequestBodyBase {
-  max_tokens: number
-}
 
 export interface PrefixSuffix {
   prefix: string
   suffix: string
-}
-
-export interface RepositoryLevelData {
-  uri: Uri
-  text: string
-  name: string
-  isOpen: boolean
-  relevanceScore: number
-}
-
-export interface StreamResponse {
-  model: string
-  created_at: string
-  response: string
-  content: string
-  message: {
-    content: string
-    role: "assistant"
-  }
-  done: boolean
-  context: number[]
-  total_duration: number
-  load_duration: number
-  prompt_eval_count: number
-  prompt_eval_duration: number
-  eval_count: number
-  eval_duration: number
-  type?: string
-  system_fingerprint: string
-  choices: [
-    {
-      text: string
-      delta: {
-        content: string
-      }
-      index: number
-      message: {
-        role: "assistant"
-        content: string
-      }
-      finish_reason: "stop"
-    }
-  ]
-  usage: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-  }
 }
 
 export interface LanguageType {
@@ -117,20 +50,48 @@ export interface ImageAttachment {
 export type ChatCompletionMessage = ChatCompletionMessageParam & {
   id?: string
   images?: ImageAttachment[] | string[]
+  /**
+   * The workspace chunks that were searched out for this reply, kept with
+   * the message so a saved conversation still shows its sources. Never
+   * sent to the model: `buildChatTurn` builds the API shape from scratch.
+   */
+  context?: WorkspaceSearchReport
+  /**
+   * What the model was sent for this turn, when a feature shows the user
+   * something shorter (a template's name and the selection, a command's
+   * question without the code it attached). Kept with the message so a
+   * follow-up sends the same conversation the model already answered.
+   */
+  prompt?: string
+  /** How a reply came about; shown under it, never sent to the model. */
+  meta?: ReplyMeta
 }
 
-export type CompletionStreamingWithId = CompletionStreaming<LLMProvider> & {
-  id?: string
-}
-
-export type CompletionNonStreamingWithId = CompletionNonStreaming<LLMProvider> & {
-  id?: string
+/** What twinny knows about how one reply was produced. */
+export interface ReplyMeta {
+  model?: string
+  /** The provider's label, or the teammate's machine for a team pool. */
+  provider?: string
+  durationMs?: number
+  /** Only when the backend reported it; never estimated. */
+  completionTokens?: number
+  /** The user stopped it before the model finished. */
+  stopped?: boolean
+  /**
+   * Credentials the secret shield replaced with placeholders before the
+   * request left the machine: kinds and counts, never the values.
+   */
+  withheld?: { kind: string; label: string; count: number }[]
 }
 
 export interface Conversation {
   id?: string
   title?: string
   messages: ChatCompletionMessage[]
+  /** Set by features that name the conversation themselves (reviews). */
+  pinnedTitle?: boolean
+  /** Unix ms of the last save; absent on conversations from older builds. */
+  updatedAt?: number
 }
 
 export const Theme = {
@@ -159,7 +120,8 @@ export interface FimTemplateData extends Record<string, string | undefined> {
   fileName: string
   prefix: string
   suffix: string
-  systemMessage: string
+  /** Defaults to fim-system.hbs (or system.hbs) when left out. */
+  systemMessage?: string
 }
 
 export interface ChatTemplateData {
@@ -172,12 +134,24 @@ export interface ChatTemplateData {
 
 export type ThemeType = (typeof Theme)[keyof typeof Theme]
 
+/** A neighbouring file (or a window of one) included in a FIM prompt. */
+export interface FimContextFile {
+  /** Workspace-relative path, used as the label in the prompt. */
+  name: string
+  text: string
+}
+
 export interface FimPromptTemplate {
-  context: string
+  /** Other files to show the model before the current one. */
+  contextFiles: FimContextFile[]
+  /** Comment line(s) naming the language and file, placed just before the prefix. */
   header: string
   prefixSuffix: PrefixSuffix
-  fileContextEnabled: boolean
   language?: string
+  /** Workspace-relative path of the file being completed. */
+  fileName: string
+  /** Workspace name, used by repository-level templates. */
+  repoName: string
 }
 
 export interface ApiProviders {
@@ -185,24 +159,6 @@ export interface ApiProviders {
 }
 
 export type Bracket = (typeof ALL_BRACKETS)[number]
-
-export interface StreamRequestOptions {
-  hostname: string
-  path: string
-  port?: string | number
-  protocol: string
-  method: string
-  headers: Record<string, string>
-}
-
-export interface StreamRequest {
-  body: RequestBodyBase | StreamBodyOpenAI
-  options: StreamRequestOptions
-  onEnd?: (response?: StreamResponse) => void
-  onStart?: (controller: AbortController) => void
-  onError?: (error: Error) => void
-  onData: (streamResponse: StreamResponse) => void
-}
 
 export interface UiTabs {
   [key: string]: JSX.Element
@@ -223,6 +179,15 @@ export interface ApiModel {
 export interface ApiModels {
   models: ApiModel[]
 }
+
+/** What one provider in the bundled model catalogue advertises. */
+export interface ModelCatalogueEntry {
+  models: string[]
+  supportsStreaming?: boolean | string[]
+}
+
+/** The bundled catalogue, keyed by provider id. */
+export type ModelCatalogue = Record<string, ModelCatalogueEntry>
 
 export type ResolvedInlineCompletion =
   | InlineCompletionItem[]
@@ -247,60 +212,23 @@ export interface InteractionItem {
   }[]
 }
 
-export interface InferenceProvider {
-  apiBaseUrl?: string
+export interface TwinnyProvider {
   apiHostname?: string
   apiKey?: string
   apiPath?: string
   apiPort?: number
   apiProtocol?: string
-  modelName?: string
-  name: string
-  type: (typeof API_PROVIDERS)[keyof typeof API_PROVIDERS]
-}
-
-export interface Peer {
-  publicKey: Buffer
-  write: (value: string) => boolean
-  on: (key: string, cb: (data: Buffer) => void) => void
-  once: (key: string, cb: (data: Buffer) => void) => void
-  writable: boolean
-  key: string
-  discovery_key: string
-}
-
-export interface SymmetryMessage<T> {
-  key: string
-  data: T
-}
-
-export type ServerMessageKey = keyof typeof serverMessageKeys
-
-export interface SymmetryConnection {
-  sessionToken?: string
-  discoveryKey?: string
-  modelName?: string
-  name: string
-  provider: string
+  /** For `twinny-p2p` providers: the public key of the paired device. */
+  deviceId?: string
+  features?: string[]
+  fimTemplate?: string
   id: string
-}
-
-export interface SymmetryModelProvider {
-  connections: number | null
-  data_collection_enabled: number
-  id: number
-  last_seen: string
-  max_connections: number
-  model_name: string
-  name: string
-  online: number
+  label: string
+  logo?: ReactNode
+  modelName: string
   provider: string
-  public: number
-}
-
-export interface InferenceRequest {
-  key: string
-  messages: ChatCompletionMessage[]
+  repositoryLevel?: boolean
+  type: string
 }
 
 export interface ChunkOptions {
@@ -319,7 +247,14 @@ export type EmbeddedDocument = {
   file: string
 }
 
-export type CategoryType = "files" | "workspace" | "problems" | "selection"
+export type CategoryType =
+  | "files"
+  | "workspace"
+  | "problems"
+  | "git"
+  | "terminal"
+  | "symbols"
+  | "selection"
 
 export interface ContextItem {
   id: string;
@@ -338,7 +273,11 @@ export interface SelectionContextItem extends ContextItem {
   };
 }
 
-export type AnyContextItem = SelectionContextItem;
+/**
+ * Anything that can sit in the workspace context list: a whole file, or a
+ * selected range within one.
+ */
+export type AnyContextItem = ContextItem | SelectionContextItem;
 
 export interface MentionType {
   name: string
@@ -349,6 +288,10 @@ export interface GitHubPr {
   number: number
   title: string
   html_url: string
+  draft?: boolean
+  updated_at?: string
+  user?: { login: string }
+  head?: { ref: string }
 }
 
 export interface LMSEmbeddingItem {

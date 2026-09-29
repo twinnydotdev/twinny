@@ -1,26 +1,11 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import { EVENT_NAME } from "../../common/constants"
-import { ServerMessage } from "../../common/types"
+import { useServerEvent } from "../messaging"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
-
+/** The extension's current "what am I busy with" label, if any. */
 export const useLoading = () => {
   const [loader, setLoader] = useState<string | undefined>()
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<string> = event.data
-    if (message?.type === EVENT_NAME.twinnySendLoader) {
-      setLoader(message?.data)
-    }
-    return () => window.removeEventListener("message", handler)
-  }
-  useEffect(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnySendLoader
-    })
-    window.addEventListener("message", handler)
-    return () => window.removeEventListener("message", handler)
-  }, [])
+  useServerEvent(EVENT_NAME.twinnySendLoader, setLoader)
   return loader
 }

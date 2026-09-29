@@ -1,0 +1,117 @@
+import * as vscode from "vscode"
+
+import { logger } from "../../common/logger"
+import { WorkspaceIndex } from "../embeddings"
+import { GenerationTracker } from "../generations"
+import { P2pRuntime } from "../p2p/runtime"
+import { SessionManager } from "../session-manager"
+import type { TeamPlugins } from "../team/plugins-page"
+import { TeamShare } from "../team/share"
+import { getNonce } from "../utils"
+
+import { BaseProvider } from "./base"
+
+export class SidebarProvider extends BaseProvider {
+  private _sidebarReadyResolver: (() => void) | null = null
+  private _sidebarReadyPromise: Promise<void> = Promise.resolve()
+
+  constructor(
+    generations: GenerationTracker,
+    context: vscode.ExtensionContext,
+    templateDir: string,
+    index: WorkspaceIndex | undefined,
+    sessionManager: SessionManager,
+    p2p?: P2pRuntime,
+    teamShare?: TeamShare,
+    teamPlugins?: TeamPlugins
+  ) {
+    super(context, templateDir, generations, index, sessionManager, p2p, teamShare, teamPlugins)
+    this.context = context
+    this.registerSidebarReadyHandler(this.handleSidebarReady)
+  }
+
+  private resetSidebarReadyPromise() {
+    this._sidebarReadyPromise = new Promise<void>((resolve) => {
+      this._sidebarReadyResolver = resolve
+    })
+  }
+
+  public handleSidebarReady = () => {
+    if (this._sidebarReadyResolver) {
+      this._sidebarReadyResolver()
+      this._sidebarReadyResolver = null
+    }
+  }
+
+  public waitForSidebarReady(): Promise<void> {
+    return this._sidebarReadyPromise
+  }
+
+  public override registerWebView(webView: vscode.Webview) {
+    this.resetSidebarReadyPromise()
+    super.registerWebView(webView)
+  }
+
+  public resolveWebviewView(webviewView: vscode.WebviewView) {
+    if (!this.context) return
+
+    this.resetSidebarReadyPromise()
+
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this.context?.extensionUri],
+    }
+
+    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview)
+    logger.info("Sidebar webview view resolved")
+
+    // The view is registered with retainContextWhenHidden, so hiding it
+    // does not reload the webview and it stays ready: nothing to reset.
+    this.registerWebView(webviewView.webview)
+  }
+
+  private getHtmlForWebview(webview: vscode.Webview) {
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "sidebar.js")
+    )
+
+    const codiconCssUri = vscode.Uri.joinPath(
+      this.context.extensionUri,
+      "assets",
+      "codicon.css"
+    )
+
+    const css = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, "out", "sidebar.css")
+    )
+
+    const codiconCssWebviewUri = webview.asWebviewUri(codiconCssUri)
+
+    const nonce = getNonce()
+
+    return `<!DOCTYPE html>
+    <html lang="en">
+      <head>
+          <link href="${codiconCssWebviewUri}" rel="stylesheet">
+          <link href="${css}" rel="stylesheet">
+          <meta charset="UTF-8">
+          <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self' http://localhost:11434;
+            img-src vscode-resource: https: data:;
+            font-src vscode-webview-resource:;
+            script-src 'nonce-${nonce}';style-src vscode-resource: 'unsafe-inline' http: https: data:;"
+          >
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>twinny</title>
+          <style>
+            body { padding: 0 }
+          </style>
+      </head>
+      <body>
+          <div id="root"></div>
+          <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
+      </body>
+    </html>`
+  }
+}

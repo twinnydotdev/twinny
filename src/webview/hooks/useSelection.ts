@@ -1,29 +1,32 @@
 import { useEffect, useState } from "react"
 
 import { EVENT_NAME } from "../../common/constants"
-import { ServerMessage } from "../../common/types"
+import { bridge, useServerEvent } from "../messaging"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
-
+/**
+ * The editor's current selection.
+ *
+ * Read once on mount, then kept live by the selection-change events the
+ * extension pushes. `onSelect` fires on every push, which is what the chat
+ * composer uses to pull focus when the user highlights code.
+ */
 export const useSelection = (onSelect?: () => void) => {
   const [selection, setSelection] = useState("")
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<string> = event.data
-    if (message?.type === EVENT_NAME.twinnyTextSelection) {
-      const selection = message?.data?.trim()
-      setSelection(selection || "")
-      onSelect?.()
-    }
-  }
 
   useEffect(() => {
-    window.addEventListener("message", handler)
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyTextSelection
+    let cancelled = false
+    bridge.request(EVENT_NAME.twinnyTextSelection).then((text) => {
+      if (!cancelled) setSelection(text?.trim() || "")
     })
-    return () => window.removeEventListener("message", handler)
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  useServerEvent(EVENT_NAME.twinnyTextSelection, (text) => {
+    setSelection(text?.trim() || "")
+    onSelect?.()
+  })
 
   return selection
 }

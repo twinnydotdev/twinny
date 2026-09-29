@@ -1,280 +1,1164 @@
-.providerHeader {
-  align-items: center;
+/*
+ * Providers tab.
+ *
+ * Three views share this sheet: the list (setup check + one section per job),
+ * the preset gallery, and the form. Everything sits on the theme tokens from
+ * theme.css — hairlines, square corners, the editor's monospace.
+ */
+
+.page {
   display: flex;
-  flex-grow: 1;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
 }
 
-.providerHeader h4 {
-  font-size: 13px;
-  font-weight: 600;
+.viewHeader,
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.viewHeader {
+  justify-content: flex-start;
+}
+
+.viewHeader h4,
+.sectionHeader h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
 }
 
-.providerHeader svg {
-  height: 16px;
-  width: 16px;
+.sectionHeader h4 .codicon {
+  opacity: 0.7;
 }
 
-.providerHeader vscode-dropdown {
-  flex-grow: 1;
-  margin-right: 12px;
-}
-
-.fimSelector {
-  margin: 8px 0;
-  width: 100%;
-}
-
-.fimSelector vscode-dropdown {
-  width: 100%;
-}
-
-.providerSelector {
+.toolbar {
   display: flex;
-  gap: 8px;
-  justify-content: space-between;
-  margin-top: 8px;
-  width: 100%;
-}
-
-.providerSelector>div {
-  width: 48%;
-}
-
-.providerSelector vscode-dropdown {
-  background: transparent;
-  border: none;
-  width: 100%;
-}
-
-.providerSelector vscode-dropdown::part(control),
-.providerSelector vscode-text-field::part(root) {
-  background: transparent;
-  border: none;
-}
-
-.providersButtons {
   align-items: center;
+  gap: 2px;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Sections and cards                                                       */
+/* ------------------------------------------------------------------------ */
+
+.section {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionCount {
+  padding: 0 6px;
+  border: 1px solid var(--tw-rule);
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  font-weight: 400;
+}
+
+.sectionBlurb {
+  margin: -2px 0 4px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}
+
+.emptySection,
+.presetCard,
+.linkButton {
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  color: var(--tw-fg);
+  background: transparent;
+  cursor: pointer;
+}
+
+.emptySection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--tw-rule);
+  color: var(--tw-fg-dim);
+  transition: color 0.12s ease, border-color 0.12s ease;
 }
 
-.provider {
-  background: var(--vscode-inputOption-hoverBackground);
-  border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 4px;
-  margin: 3px 0;
-  padding: 5px;
-  transition: background 0.2s ease;
+.emptySection:hover,
+.emptySection:focus-visible {
+  color: var(--tw-fg);
+  border-color: var(--tw-fg-faint);
+  outline: none;
 }
 
-.provider:hover {
-  background: var(--vscode-inputOption-activeBackground);
+.card {
+  border: 1px solid var(--tw-rule);
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-.providerDetails {
-  display: grid;
+.card:hover {
+  background: var(--tw-surface);
+}
+
+.cardActive {
+  border-color: var(--tw-accent-soft, var(--tw-accent));
+}
+
+.cardMain {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, auto);
-  margin-top: 8px;
+  padding: 6px 6px 6px 4px;
+  min-width: 0;
+}
+
+.cardSelect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg-faint);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.cardSelect:hover,
+.cardSelect:focus-visible {
+  color: var(--tw-fg);
+  outline: none;
+}
+
+.cardSelect[aria-pressed="true"] {
+  color: var(--tw-accent);
+}
+
+.cardText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cardLabel {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  /* A provider label is a proper noun — "OpenAI", not "openai". */
+  letter-spacing: 0;
+  text-transform: none;
 }
 
-.providerDetails>div {
-  text-overflow: ellipsis;
-  text-wrap: nowrap;
+.cardBadge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border: 1px solid var(--tw-accent-soft, var(--tw-accent));
+  color: var(--tw-accent);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
 }
+
+.cardSummary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.confirmRow,
+.confirmBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--tw-rule);
+  font-size: var(--tw-fs-sm);
+}
+
+.confirmRow > span,
+.confirmBanner > span {
+  flex: 1;
+  min-width: 140px;
+}
+
+.confirmBanner {
+  border: 1px solid var(--vscode-editorWarning-foreground, var(--tw-rule));
+}
+
+/* Test outcome, under a card or the form. */
+.testResult {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--tw-rule);
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.testResult .codicon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.testOk {
+  color: var(--vscode-testing-iconPassed, var(--vscode-terminal-ansiGreen));
+}
+
+.testFailed {
+  color: var(--vscode-testing-iconFailed, var(--vscode-errorForeground));
+}
+
+.testPending {
+  color: var(--tw-fg-dim);
+}
+
+.providerForm .testResult {
+  border: 1px solid currentColor;
+  border-top-width: 1px;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Preset gallery                                                           */
+/* ------------------------------------------------------------------------ */
+
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.galleryIntro {
+  margin: 0 0 4px;
+  color: var(--tw-fg-dim);
+}
+
+.galleryGroup {
+  margin: 8px 0 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.presetList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.presetCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--tw-rule);
+  text-align: left;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.presetCard:hover,
+.presetCard:focus-visible {
+  background: var(--tw-surface);
+  border-color: var(--tw-fg-faint);
+  outline: none;
+}
+
+.presetLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  opacity: 0.85;
+}
+
+.presetLogo svg {
+  width: 20px;
+  height: 20px;
+}
+
+.presetLogo .codicon {
+  font-size: 18px !important;
+}
+
+.presetBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.presetName {
+  font-weight: 600;
+}
+
+.presetDescription {
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  line-height: 1.45;
+}
+
+.presetChevron {
+  flex-shrink: 0;
+  opacity: 0.4;
+}
+
+.galleryFooter {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tw-rule-soft);
+}
+
+.linkButton {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--tw-rule);
+  color: var(--tw-fg);
+  font-size: var(--tw-fs-sm);
+}
+
+.linkButton:hover,
+.linkButton:focus-visible {
+  color: var(--tw-link);
+  border-bottom-color: var(--tw-link-soft, var(--tw-link));
+  outline: none;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Welcome (no providers yet)                                               */
+/* ------------------------------------------------------------------------ */
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 16px;
+  border: 1px solid var(--tw-rule);
+}
+
+.welcome h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  text-transform: none;
+}
+
+.welcomeIntro {
+  margin: 0;
+  color: var(--tw-fg-dim);
+  line-height: 1.5;
+}
+
+.welcomeSearch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.welcomeStatus {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--tw-surface);
+  color: var(--tw-fg-dim);
+  line-height: 1.5;
+}
+
+.welcomeStatus .codicon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.welcomeServers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.welcomeServer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--tw-rule);
+}
+
+.welcomeServer > .codicon:first-child {
+  flex-shrink: 0;
+  font-size: 18px !important;
+  opacity: 0.85;
+}
+
+.welcomeServerText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.welcomeActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tw-rule-soft);
+}
+
+.welcomeActions vscode-button .codicon {
+  margin-right: 4px;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Form                                                                     */
+/* ------------------------------------------------------------------------ */
 
 .providerForm {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 8px 0;
+  gap: 12px;
   width: 100%;
 }
 
-.providerForm div {
+.field {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 0;
+  min-width: 0;
 }
 
-.providerForm label {
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 4px;
+.field label {
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
 }
 
-.providerFormButtons {
-  align-self: flex-end;
-  display: flex !important;
-  flex-direction: row !important;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 8px;
+.field vscode-text-field,
+.field vscode-dropdown {
+  width: 100%;
 }
 
-.providerActions {
-  align-items: center;
+.fieldInvalid vscode-text-field::part(root),
+.fieldInvalid vscode-dropdown::part(control) {
+  border-color: var(
+    --vscode-inputValidation-errorBorder,
+    var(--vscode-errorForeground)
+  );
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fieldHint,
+.fieldError {
+  font-size: var(--tw-fs-sm);
+  line-height: 1.45;
+}
+
+.fieldHint {
+  color: var(--tw-fg-faint);
+}
+
+.fieldError {
+  margin: 0;
+  color: var(
+    --vscode-inputValidation-errorForeground,
+    var(--vscode-errorForeground)
+  );
+}
+
+.inlineControl {
   display: flex;
+  align-items: center;
   gap: 4px;
 }
 
-.providerName {
-  align-items: center;
-  color: var(--vscode-foreground);
+.inlineControl > vscode-text-field,
+.inlineControl > vscode-dropdown {
+  flex: 1;
+  min-width: 0;
+}
+
+.checkbox {
+  margin-top: -4px;
+}
+
+.endpointPreview {
   display: flex;
-  font-size: 13px;
-  font-weight: 500;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--tw-rule);
+  background: var(--tw-surface);
+  font-size: var(--tw-fs-sm);
+}
+
+.endpointLabel {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.endpointPreview code {
+  color: var(--tw-code);
+  word-break: break-all;
+}
+
+.warnings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.warnings li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--vscode-editorWarning-foreground, var(--tw-fg-dim));
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
+}
+
+.warnings .codicon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.formActionsSpacer {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Composer footer selector (chat tab)                                      */
+/* ------------------------------------------------------------------------ */
+
+/* Sits under the composer as a status line: two quiet, borderless selects. */
+.providerSelector {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.providerSelector > div {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+
+.providerSelector > div + div {
+  border-left: 1px solid var(--tw-rule-soft);
+}
+
+.providerSelectorProvider {
+  display: flex;
+  align-items: center;
+}
+
+.providerSelectorProvider > .codicon {
+  flex-shrink: 0;
+  padding-left: 10px;
+  font-size: 13px !important;
+  color: var(--tw-fg-faint);
+}
+
+.providerSelectorProvider vscode-dropdown::part(control) {
+  padding-left: 6px;
+}
+
+.providerSelector vscode-dropdown,
+.providerSelector vscode-text-field {
+  width: 100%;
+  background: transparent;
+  border: none;
+}
+
+.providerSelector vscode-dropdown::part(control),
+.providerSelector vscode-text-field::part(root),
+.providerSelector vscode-text-field::part(control) {
+  height: 24px;
+  min-height: 24px;
+  padding-left: 10px;
+  background: transparent;
+  border: none;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}
+
+.providerSelector vscode-dropdown:hover::part(control),
+.providerSelector vscode-text-field:hover::part(root) {
+  color: var(--tw-fg);
+}
+
+/* A nudge in the composer footer when nothing is configured for chat. */
+.noProviderNotice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 10px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}
+
+.noProviderNotice .linkButton {
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Devices                                                                  */
+/* ------------------------------------------------------------------------ */
+
+.deviceState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--tw-fg-faint);
+}
+
+.deviceState-online {
+  color: var(--vscode-testing-iconPassed, var(--tw-accent));
+}
+
+.deviceState-connecting {
+  color: var(--tw-fg-dim);
+}
+
+.pairForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--tw-rule);
+  background: var(--tw-surface);
+}
+
+.pairForm .sectionBlurb {
   margin: 0;
 }
 
-.providerName i {
-  font-size: 14px;
-  margin-right: 8px;
-  opacity: 0.8;
-}
-
-.testStatus {
-  margin-top: var(--container-padding);
-  padding: var(--container-padding);
-  border-radius: var(--input-radius);
-  border: 1px solid var(--vscode-settings-textInputBorder, var(--vscode-input-border));
-}
-
-.defaultsHeader {
-  align-items: center;
+.staticValue {
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  min-height: 26px;
+  padding: 0 2px;
 }
 
-.defaults {
-  background-color: var(--vscode-editor-background);
-  border: 1px solid var(--vscode-editor-lineHighlightBorder);
-  border-radius: 4px;
-  margin-top: 16px;
-  padding: 16px;
+.staticValue .codicon {
+  color: var(--tw-fg-faint);
 }
 
-.defaultsTitle {
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0 0 12px 0;
-}
-
-.defaultsGrid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  margin-bottom: 16px;
-}
-
-.defaultItem {
+.pairingCode {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--tw-rule);
 }
 
-.defaultLabel {
+.pairingCodeHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--tw-fs-sm);
+  letter-spacing: var(--tw-track);
+  text-transform: uppercase;
+}
+
+.pairingCodeHead > span:first-child {
+  font-weight: 600;
+}
+
+.pairingCodeHead > .fieldHint {
+  flex: 1;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pairingCode code {
+  display: block;
+  padding: 6px 8px;
+  border: 1px dashed var(--tw-rule);
+  background: var(--tw-surface);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  color: var(--tw-code);
+  word-break: break-all;
+  user-select: all;
+}
+
+.pairingCode p {
+  margin: 0;
+}
+
+.peerList {
+  list-style: none;
+  margin: 0;
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--tw-rule);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.peerList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.peerList li > .codicon {
+  color: var(--tw-fg-faint);
+}
+
+.peerName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Compact list: collapsible sections, two-line empty states               */
+/* ---------------------------------------------------------------------- */
+
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sectionToggle .codicon {
+  opacity: 0.7;
+}
+
+.sectionToggle .codicon:first-child {
+  opacity: 0.5;
+}
+
+.sectionToggle:hover .codicon,
+.sectionToggle:focus-visible .codicon {
+  opacity: 1;
+}
+
+.emptySectionText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.emptySectionBlurb {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-sm);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.emptySection {
+  justify-content: flex-start;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Device job chips                                                        */
+/* ---------------------------------------------------------------------- */
+
+.jobChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 6px 6px 28px;
+}
+
+.jobChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 8px;
+  border: 1px dashed var(--tw-rule);
+  background: transparent;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-sm);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.jobChip:hover,
+.jobChip:focus-visible {
+  color: var(--tw-fg);
+  border-color: var(--tw-fg-faint);
+}
+
+.jobChip-set {
+  border-style: solid;
+  color: var(--tw-fg);
+}
+
+.jobChip-active {
+  border-style: solid;
+  border-color: var(--tw-accent-soft, var(--tw-accent));
+  color: var(--tw-accent);
+}
+
+.jobChipModel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+}
+
+.jobChip-active .jobChipModel {
+  color: inherit;
+  opacity: 0.8;
+}
+/* Team onboarding shares the host editor's theme and works in narrow sidebars. */
+.teamEntry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+.teamEntry span {
   color: var(--vscode-descriptionForeground);
   font-size: 12px;
 }
-
-.useDefaultsButton {
-  width: 100%;
+.teamEntry strong {
+  color: var(--vscode-foreground);
 }
-
-.divider {
-  border-top: 1px solid var(--vscode-editorWidget-border);
-  margin: 16px 0;
+.teamEntry code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  color: var(--vscode-foreground);
 }
-
-.checkBox {
-  align-items: center;
-  display: flex;
-  gap: 8px;
+.teamSetUpLink {
+  flex: none;
+  padding: 4px 11px;
+  border: 1px solid var(--vscode-button-secondaryBackground);
+  border-radius: 2px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  font-size: 13px;
+  text-decoration: none;
 }
-
-.enableTools {
-  margin-top: 8px;
+.teamSetUpLink:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+  color: var(--vscode-button-secondaryForeground);
 }
-
-.container {
+.teamConnect {
+  max-width: 620px;
+  margin: 0 auto;
+}
+.teamConnect h3 {
+  margin: 20px 0 6px;
+  font-size: 19px;
+  font-weight: 500;
+}
+.teamConnect > p {
+  line-height: 1.5;
+}
+.teamField {
   display: flex;
   flex-direction: column;
-  max-width: 800px;
+  gap: 7px;
+  margin: 18px 0;
+}
+.teamField input {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
+  padding: 8px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  font: inherit;
 }
-
-.title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 16px;
+.teamField input:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
 }
-
-.providersList {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr;
+.teamHint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  line-height: 1.5;
 }
-
-.providerCard {
-  align-items: flex-start;
-  border: 1px solid var(--vscode-editor-lineHighlightBorder);
-  border-radius: 4px;
-  cursor: pointer;
+.teamIdentity {
   display: flex;
-  padding: 16px;
-  transition: all 0.2s ease-in-out;
-}
-
-.providerCard:hover {
-  border-color: var(--vscode-button-background);
-}
-
-.logo {
-  border-radius: 4px;
-  height: 32px;
-  margin-right: 12px;
-  width: 32px;
-}
-
-.logo svg {
-  height: 32px;
-  width: 32px;
-}
-
-.content {
-  flex-grow: 1;
-}
-
-.header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-
-.actions {
-  display: flex;
+  flex-direction: column;
   gap: 4px;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
 }
-
-.modelLoader {
-  align-items: center;
+.teamIdentity span {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.teamRoles {
+  padding: 0;
+  margin: 12px 0;
+  list-style: none;
+}
+.teamRoles li {
+  border: 1px solid var(--vscode-widget-border);
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+.teamRoles p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+.teamRoleHeading {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
   gap: 8px;
-  height: 20px;
-  padding: 4px 8px;
+  margin-bottom: 6px;
+}
+.teamRoleHeading span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+.teamConsent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 18px 0;
+  line-height: 1.5;
+}
+.teamConsent input {
+  flex-shrink: 0;
+  accent-color: var(--vscode-button-background);
+}
+.teamActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.teamError {
+  color: var(--vscode-errorForeground);
+  overflow-wrap: anywhere;
+}
+.teamSignIn {
+  margin: 18px 0;
+}
+.teamPolicy {
+  border: 1px solid var(--vscode-widget-border);
+  border-left: 3px solid var(--vscode-button-background);
+  border-radius: 5px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.teamPolicy ul {
+  margin: 8px 0;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+.cardBlocked {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+.teamBanner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--vscode-widget-border);
+  border-left: 3px solid var(--vscode-button-background);
+  border-radius: 5px;
+  padding: 10px 12px;
+  margin: 12px 0;
+}
+.teamBanner ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.teamSignIn p {
+  margin: 0 0 8px;
+}
+.teamCode {
+  display: inline-block;
+  margin: 6px 0 14px;
+  padding: 10px 16px;
+  font-size: 28px;
+  letter-spacing: 0.12em;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 6px;
+  user-select: all;
 }
 
-.loaderText {
-  color: var(--vscode-foreground);
-  font-size: 13px;
-  opacity: 0.8;
+/* Share this computer with the team */
+.shareHint,
+.shareError {
+  margin: 0;
+  padding: 6px 10px 8px;
+  font-size: var(--tw-fs-sm);
+  color: var(--tw-fg-dim);
+  line-height: 1.5;
+}
+.shareHint code {
+  font-family: var(--vscode-editor-font-family);
+  user-select: all;
+}
+.shareError {
+  color: var(--vscode-errorForeground);
+}
+.shareFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 6px 10px;
+  border-top: 1px solid var(--tw-rule);
+}
+.shareFooter > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The team gateway's plugins, each opening signed in */
+.pluginList {
+  margin: 0;
+  padding: 0 0 4px;
+  list-style: none;
+  border-top: 1px solid var(--tw-rule);
+}
+.pluginList button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 10px 5px 36px;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pluginList button:hover:not(:disabled),
+.pluginList button:focus-visible {
+  background: var(--vscode-list-hoverBackground, var(--tw-surface));
+  outline: none;
+}
+.pluginList button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.pluginList .codicon {
+  margin-left: auto;
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--tw-fg-faint);
+}
+.pluginList button:hover .codicon {
+  color: var(--tw-accent);
+}
+.pluginName {
+  flex-shrink: 0;
+}
+.pluginDescription {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
 }

@@ -1,98 +1,135 @@
+/**
+ * Channel names for the extension <-> webview protocol.
+ *
+ * These are just the *names*. The payload each name carries is declared once,
+ * for both sides, in `src/common/messaging/protocol.ts` — and a compile-time
+ * assertion there guarantees every name below is accounted for.
+ */
 export const EVENT_NAME = {
   twinntGetLocale: "twinnt-get-locale",
   twinnyAcceptSolution: "twinny-accept-solution",
   twinnyAddMessage: "twinny-add-message",
-  twinnyChat: "twinny-chat",
   twinnyChatMessage: "twinny-chat-message",
   twinnyClickSuggestion: "twinny-click-suggestion",
-  twinnyConnectedToSymmetry: "twinny-connected-to-symmetry",
-  twinnyConnectSymmetry: "twinny-connect-symmetry",
-  twinnyDisconnectedFromSymmetry: "twinny-disconnected-from-symmetry",
-  twinnyDisconnectSymmetry: "twinny-disconnect-symmetry",
   twinnyEditDefaultTemplates: "twinny-edit-default-templates",
-  twinnyEmbedDocuments: "twinny-embed-documents",
-  twinnyEnableModelDownload: "twinny-enable-model-download",
-  twinnyFetchOllamaModels: "twinny-fetch-ollama-models",
   twinnyFileListRequest: "twinny-file-list-request",
-  twinnyFileListResponse: "twinny-file-list-response",
   twinnyGetConfigValue: "twinny-get-config-value",
+  twinnyGetContextItems: "twinny-get-context-items",
   twinnyGetGitChanges: "twinny-get-git-changes",
+  twinnyGetModels: "twinny-get-models",
   twinnyGetWorkspaceContext: "twinny-workspace-context",
-  twinnyGithhubReview: "twinny-githhub-review",
   twinnyGlobalContext: "twinny-global-context",
   twinnyHideBackButton: "twinny-hide-back-button",
   twinnyListTemplates: "twinny-list-templates",
-  twinnyManageTemplates: "twinny-manage-templates",
   twinnyNewConversation: "twinny-new-conversation",
   twinnyNewDocument: "twinny-new-document",
   twinnyNotification: "twinny-notification",
   twinnyOnCompletion: "twinny-on-completion",
   twinnyOnLoading: "twinny-on-loading",
-  twinnyOpenDiff: "twinny-open-diff",
   twinnyOpenFile: "twinny-open-file",
-  twinnyRerankThresholdChanged: "twinny-rerank-threshold-changed",
+  twinnyOpenProviders: "twinny-open-providers",
+  twinnyRemoveContextItem: "twinny-remove-context-item",
+  twinnyRunInTerminal: "twinny-run-in-terminal",
+  twinnyInsertAtCursor: "twinny-insert-at-cursor",
+  twinnyExportConversation: "twinny-export-conversation",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
-  twinnySendRequestBody: "twinny-send-request-body",
-  twinnySendSymmetryMessage: "twinny-send-symmetry-message",
-  twinnySendSystemMessage: "twinny-send-system-message",
   twinnySendTheme: "twinny-send-theme",
   twinnySessionContext: "twinny-session-context",
   twinnySetConfigValue: "twinny-set-config-value",
-  twinnySidebarReady: "twinny-sidebar-ready",
   twinnySetGlobalContext: "twinny-set-global-context",
   twinnySetLocale: "twinny-set-locale",
-  twinnySetOllamaModel: "twinny-set-ollama-model",
   twinnySetSessionContext: "twinny-set-session-context",
   twinnySetTab: "twinny-set-tab",
   twinnySetWorkspaceContext: "twinny-set-workspace-context",
-  twinnyStartSymmetryProvider: "twinny-start-symmetry-provider",
+  twinnySidebarReady: "twinny-sidebar-ready",
   twinnyStopGeneration: "twinny-stop-generation",
-  twinnyStopSymmetryProvider: "twinny-stop-symmetry-provider",
-  twinnySymmetryModels: "twinny-symmetry-models",
-  twinnyGetSymmetryModels: "twinny-get-symmetry-models",
+  twinnySymbolSearch: "twinny-symbol-search",
   twinnyTextSelection: "twinny-text-selection",
-  twinnyGetModels: "twinny-get-models",
   twinnyUpdateContextItems: "twinny-update-context-items",
-  twinnyGetContextItems: "twinny-get-context-items",
-  twinnyRemoveContextItem: "twinny-remove-context-item"
-}
+  twinnyWorkspaceSearch: "twinny-workspace-search"
+} as const
 
 export const CONVERSATION_EVENT_NAME = {
   clearAllConversations: "twinny.clear-all-conversations",
   getActiveConversation: "twinny.get-active-conversation",
   getConversations: "twinny.get-conversations",
   removeConversation: "twinny.remove-conversation",
+  renameConversation: "twinny.rename-conversation",
   saveConversation: "twinny.save-conversation",
-  saveLastConversation: "twinny.save-last-conversation",
   setActiveConversation: "twinny.set-active-conversation"
-}
+} as const
+
+export const EMBEDDING_EVENT_NAME = {
+  cancel: "embeddings.cancel",
+  embed: "embeddings.embed",
+  getStatus: "embeddings.getStatus",
+  progress: "embeddings.progress",
+  rebuild: "embeddings.rebuild"
+} as const
 
 export const PROVIDER_EVENT_NAME = {
   addProvider: "twinny.add-provider",
+  previewTeam: "twinny.preview-team",
+  applyTeam: "twinny.apply-team",
+  cancelTeam: "twinny.cancel-team",
+  getTeamPolicy: "twinny.get-team-policy",
+  leaveTeam: "twinny.leave-team",
+  startTeamSignIn: "twinny.start-team-sign-in",
+  pollTeamSignIn: "twinny.poll-team-sign-in",
+  openTeam: "twinny.open-team",
+  takeTeamOpen: "twinny.take-team-open",
   copyProvider: "twinny.copy-provider",
+  discoverProviders: "twinny.discover-providers",
+  exportProviders: "twinny.export-providers",
   focusProviderTab: "twinny.focus-provider-tab",
   getActiveChatProvider: "twinny.get-active-provider",
   getActiveEmbeddingsProvider: "twinny.get-active-embeddings-provider",
   getActiveFimProvider: "twinny.get-active-fim-provider",
   getAllProviders: "twinny.get-providers",
+  importProviders: "twinny.import-providers",
+  listProviderModels: "twinny.list-provider-models",
   removeProvider: "twinny.remove-provider",
   resetProvidersToDefaults: "twinny.reset-providers-to-defaults",
-  exportProviders: "twinny.export-providers",
-  importProviders: "twinny.import-providers",
   setActiveChatProvider: "twinny.set-active-chat-provider",
   setActiveEmbeddingsProvider: "twinny.set-active-embeddings-provider",
   setActiveFimProvider: "twinny.set-active-fim-provider",
-  updateProvider: "twinny.update-provider",
   testProvider: "twinny.test-provider",
-  testProviderResult: "twinny.test-provider-result"
-}
+  updateProvider: "twinny.update-provider",
+  useDiscoveredServer: "twinny.use-discovered-server"
+} as const
+
+export const TEAM_SHARE_EVENT_NAME = {
+  get: "twinny.get-team-share",
+  start: "twinny.start-team-share",
+  stop: "twinny.stop-team-share",
+  setBackend: "twinny.set-team-share-backend",
+  discover: "twinny.discover-team-share-backends"
+} as const
+
+export const TEAM_PLUGINS_EVENT_NAME = {
+  get: "twinny.get-team-plugins",
+  open: "twinny.open-team-plugins"
+} as const
+
+export const P2P_EVENT_NAME = {
+  getDevices: "p2p.getDevices",
+  pairDevice: "p2p.pairDevice",
+  refreshDevice: "p2p.refreshDevice",
+  removeDevice: "p2p.removeDevice",
+  getHost: "p2p.getHost",
+  startHost: "p2p.startHost",
+  stopHost: "p2p.stopHost",
+  newPairingCode: "p2p.newPairingCode",
+  removeTrustedPeer: "p2p.removeTrustedPeer"
+} as const
 
 export const GITHUB_EVENT_NAME = {
   getPullRequests: "github.getPullRequests",
   getPullRequestReview: "github.getPullRequestReview"
-}
+} as const
 
-export const SYMMETRY_EMITTER_KEY = {
-  inference: "inference"
-}
+export const REVIEW_EVENT_NAME = {
+  getLocalStatus: "review.getLocalStatus",
+  reviewLocal: "review.reviewLocal"
+} as const

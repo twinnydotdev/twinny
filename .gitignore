@@ -3,3 +3,11 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+
+# built by `npm run build`; published from packages/twinny-server, never committed
+packages/twinny-server/cli.js
+packages/twinny-server/*.tgz
+
+# local Claude Code settings and worktrees
+.claude/
+twinny.gateway.json

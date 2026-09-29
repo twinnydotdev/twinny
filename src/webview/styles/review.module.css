@@ -5,15 +5,13 @@
   --font-size-base: 0.85rem;
 }
 
-.reviewContainer h4,
-.reviewContainer p {
-  font-size: var(--font-size-base);
-  color: var(--vscode-foreground);
+.reviewContainer :global(.tw-page-header) {
+  margin-bottom: 12px;
 }
 
-.reviewContainer h4 {
-  font-weight: 600;
-  margin: var(--spacing-md) 0 var(--spacing-sm);
+.reviewContainer p {
+  font-size: var(--tw-fs);
+  color: var(--vscode-foreground);
 }
 
 .reviewContainer p {
@@ -57,7 +55,7 @@
   gap: var(--spacing-md);
   padding: calc(var(--spacing-xs) + var(--spacing-sm)) var(--spacing-sm);
   margin-bottom: var(--spacing-xs);
-  border-radius: 3px;
+  border-radius: 0;
   transition: background 0.2s ease;
 }
 
@@ -85,4 +83,80 @@
 
 .prItem>vscode-button:hover {
   background: var(--vscode-toolbar-hoverBackground);
+}
+
+.localActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin: var(--spacing-sm) 0;
+}
+
+.localAction {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.localAction vscode-button .codicon {
+  margin-right: var(--spacing-xs);
+}
+
+.branchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.branchRow > vscode-text-field {
+  width: 180px;
+}
+
+.actionDetail {
+  font-size: var(--font-size-base);
+  opacity: 0.75;
+}
+
+.hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.prMeta {
+  display: block;
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.detected {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin: 0 0 var(--spacing-sm);
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  font-size: inherit;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.prBadge {
+  display: inline-block;
+  margin-left: var(--spacing-xs);
+  padding: 0 var(--spacing-xs);
+  border-radius: 3px;
+  font-size: 0.72rem;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  vertical-align: middle;
 }

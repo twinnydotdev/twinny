@@ -1,24 +1,23 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import "./i18n"
 
-import { EVENT_NAME, WEBUI_TABS } from "../common/constants"
-import { ServerMessage } from "../common/types"
+import { EVENT_NAME, PROVIDER_EVENT_NAME, WEBUI_TABS } from "../common/constants"
 
 import { useLocale } from "./hooks/useLocale"
 import { Chat } from "./chat"
-import { ConversationHistory } from "./conversation-history"
-import { EmbeddingOptions } from "./embedding-options"
+import { EmbeddingOptions } from "./embeddings"
+import { ConversationHistory } from "./history"
+import { useServerEvent } from "./messaging"
 import { Providers } from "./providers"
 import { Review } from "./review"
 import { Settings } from "./settings"
-import { Symmetry } from "./symmetry"
+
+import styles from "./styles/main.module.css"
 
 const tabs: Record<string, JSX.Element> = {
   [WEBUI_TABS.settings]: <Settings />,
-  [WEBUI_TABS.providers]: <Providers />,
   [WEBUI_TABS.review]: <Review />,
-  [WEBUI_TABS.symmetry]: <Symmetry />,
   [WEBUI_TABS.embeddings]: <EmbeddingOptions />
 }
 
@@ -30,26 +29,24 @@ export const Main = ({ fullScreen }: MainProps) => {
   const [tab, setTab] = useState<string | undefined>(WEBUI_TABS.chat)
   const { locale, renderKey } = useLocale()
   const tabsWithProps = {
-    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />
+    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />,
+    // Setting up the first chat provider lands back in the chat, ready to go.
+    [WEBUI_TABS.providers]: <Providers onDone={() => setTab(WEBUI_TABS.chat)} />
   }
 
-  const handler = (event: MessageEvent) => {
-    const message: ServerMessage<string | undefined> = event.data
-    if (message?.type === EVENT_NAME.twinnySetTab) {
-      setTab(message?.data)
-    }
-    return () => window.removeEventListener("message", handler)
-  }
-  useEffect(() => {
-    window.addEventListener("message", handler)
-  }, [])
+  useServerEvent(EVENT_NAME.twinnySetTab, setTab)
+  useServerEvent(PROVIDER_EVENT_NAME.focusProviderTab, setTab)
 
   if (!tab) {
     return null
   }
 
   if (tab === WEBUI_TABS.history) {
-    return <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
+    return (
+      <div className={styles.page}>
+        <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
+      </div>
+    )
   }
 
   const allTabs = { ...tabs, ...tabsWithProps }
@@ -57,7 +54,11 @@ export const Main = ({ fullScreen }: MainProps) => {
   const element: JSX.Element = allTabs[tab]
 
   return (
-    <div key={renderKey} data-locale={locale}>
+    <div
+      key={renderKey}
+      data-locale={locale}
+      className={tab === WEBUI_TABS.chat ? undefined : styles.page}
+    >
       {element}
     </div>
   )

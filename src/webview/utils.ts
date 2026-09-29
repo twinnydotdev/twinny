@@ -1,8 +1,12 @@
-import { MentionPluginKey } from "@tiptap/extension-mention"
+import { PluginKey } from "@tiptap/pm/state" // or 'prosemirror-state'
 import { Extension } from "@tiptap/react"
 
 import { CodeLanguage, supportedLanguages } from "../common/languages"
 import { LanguageType } from "../common/types"
+
+export { getLineBreakCount, kebabToSentence } from "../common/text"
+
+const MentionPluginKey = new PluginKey("mention")
 
 export const getLanguageMatch = (
   language: LanguageType | undefined,
@@ -30,23 +34,7 @@ export const getLanguageMatch = (
   return "auto"
 }
 
-export const kebabToSentence = (kebabStr: string) => {
-  if (!kebabStr) {
-    return ""
-  }
 
-  const words = kebabStr.split("-")
-
-  if (!words.length) {
-    return kebabStr
-  }
-
-  words[0] = words[0].charAt(0).toUpperCase() + words[0].slice(1)
-
-  return words.join(" ")
-}
-
-export const getLineBreakCount = (str: string) => str.split("\n").length
 
 export const getModelShortName = (name: string) => {
   if (name.length > 40) {
@@ -77,6 +65,24 @@ export const CustomKeyMap = Extension.create({
       "Shift-Enter": ({ editor }) => {
         editor.commands.insertContent("\n")
         return true
+      },
+      // Stops a reply on its way, from where the user is already typing.
+      Escape: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.stopGeneration?.() ?? false
+      },
+      // Earlier prompts, as in a shell: from an empty composer, or while
+      // already stepping through them.
+      ArrowUp: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.recallPrompt?.(-1, editor.isEmpty) ?? false
+      },
+      ArrowDown: ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.recallPrompt?.(1, editor.isEmpty) ?? false
       },
     }
   },

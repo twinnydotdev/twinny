@@ -243,34 +243,6 @@ export const SvgGroq = () => {
   )
 }
 
-export const SvgSymmetry = () => {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-      <circle cx="32" cy="32" r="6" fill="white"></circle>
-      <path d="M32 26L18 18" stroke="white" stroke-width="2"></path>
-      <path d="M32 26L46 18" stroke="white" stroke-width="2"></path>
-      <path d="M32 38L18 46" stroke="white" stroke-width="2"></path>
-      <path d="M32 38L46 46" stroke="white" stroke-width="2"></path>
-      <circle cx="18" cy="18" r="4" fill="white"></circle>
-      <circle cx="46" cy="18" r="4" fill="white"></circle>
-      <circle cx="18" cy="46" r="4" fill="white"></circle>
-      <circle cx="46" cy="46" r="4" fill="white"></circle>
-      <path
-        d="M18 22C18 36 46 36 46 22"
-        stroke="white"
-        stroke-width="2"
-        fill="none"
-      ></path>
-      <path
-        d="M18 42C18 28 46 28 46 42"
-        stroke="white"
-        stroke-width="2"
-        fill="none"
-      ></path>
-    </svg>
-  )
-}
-
 export const SvgTwinny = () => (
   <svg
     width="157.3401mm"

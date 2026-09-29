@@ -5,46 +5,54 @@ import Mention from "@tiptap/extension-mention"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Editor, EditorContent, JSONContent, useEditor } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
-import {
-  VSCodeBadge,
-  VSCodeButton,
-  VSCodePanelView
-} from "@vscode/webview-ui-toolkit/react"
+import { VSCodeButton, VSCodePanelView } from "@vscode/webview-ui-toolkit/react"
 import * as cheerio from "cheerio"
 import cx from "classnames"
 import { v4 as uuidv4 } from "uuid"
 
-import { EVENT_NAME, USER } from "../common/constants"
+import { ASSISTANT, EVENT_NAME, USER } from "../common/constants"
 import {
+  AnyContextItem,
   ChatCompletionMessage,
-  ClientMessage,
-  ContextItem,
   ImageAttachment,
-  MentionType,
-  ServerMessage
+  MentionType
 } from "../common/types"
 
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useConversationHistory } from "./hooks/useConversationHistory"
+import { useProviders } from "./hooks/useProviders"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
-import { useSymmetryConnection } from "./hooks/useSymmetryConnection"
-import { useTheme } from "./hooks/useTheme"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
+import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch"
+import { ProviderSelect } from "./providers/provider-select"
+import { EmptyChat } from "./empty-chat"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
-import { ProviderSelect } from "./provider-select"
+import { emit, useServerEvent } from "./messaging"
 import { Suggestions } from "./suggestions"
+import { conversationMarkdown } from "./transcript"
 import { CustomKeyMap } from "./utils"
 
 import styles from "./styles/chat.module.css"
 
+const COMPOSER_MIN_HEIGHT = 44
+const COMPOSER_HEIGHT_KEY = "twinny.composerHeight"
+const PROMPT_HISTORY_KEY = "twinny.promptHistory"
+const PROMPT_HISTORY_LIMIT = 50
+
+const loadPromptHistory = (): string[] => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PROMPT_HISTORY_KEY) || "[]")
+    return Array.isArray(stored) ? stored.filter((p) => typeof p === "string") : []
+  } catch {
+    return []
+  }
+}
+
 interface ChatProps {
   fullScreen?: boolean
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const global = globalThis as any
 
 export const Chat = (props: ChatProps): JSX.Element => {
   const { fullScreen } = props
@@ -52,38 +60,66 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const editorRef = useRef<Editor | null>(null)
   const imagesRef = useRef<ImageAttachment[]>([])
   const stopRef = useRef(false)
-  const theme = useTheme()
   const selection = useSelection()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [messages, setMessages] = useState<ChatCompletionMessage[]>([])
+  // Nothing can answer without a chat provider, so the composer is off
+  // until one is set; the empty transcript says where to set it.
+  const { chatProvider, ready: providersReady } = useProviders()
+  const chatDisabled = providersReady && !chatProvider
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const { symmetryConnection } = useSymmetryConnection()
   const { contextItems, removeContextItem } = useWorkspaceContext()
+  const {
+    report: searchReport,
+    clear: clearSearchReport,
+    take: takeSearchReport
+  } = useWorkspaceSearch()
   const [isBottom, setIsBottom] = useState(false)
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
 
   const chatRef = useRef<HTMLTextAreaElement>(null)
+  const editorWrapRef = useRef<HTMLDivElement>(null)
+  const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
+  // Sent prompts, oldest first, recalled with the arrow keys. `recallIndex`
+  // counts back from the newest; -1 is the draft being typed.
+  const promptHistoryRef = useRef<string[]>(loadPromptHistory())
+  const recallIndexRef = useRef(-1)
+  const draftRef = useRef("")
+  const [composerHeight, setComposerHeight] = useState<number | null>(() => {
+    const stored = Number(localStorage.getItem(COMPOSER_HEIGHT_KEY))
+    return stored > 0 ? stored : null
+  })
 
-  const handleAddMessage = (message: ServerMessage<ChatCompletionMessage>) => {
-    if (!message.data) {
+  const handleAddMessage = (added: ChatCompletionMessage | undefined) => {
+    if (!added) {
       setCompletion(null)
       setIsLoading(false)
       generatingRef.current = false
       return
     }
 
+    // A reply keeps the workspace search that fed it, so the sources stay
+    // with the message once it is saved. A new user turn starts afresh.
+    let incoming = added
+    if (added.role === ASSISTANT) {
+      const context = takeSearchReport()
+      if (context) incoming = { ...added, context }
+    } else {
+      clearSearchReport()
+    }
+
     setMessages((prev) => {
-      if (message.data.id) {
-        const existingIndex = prev?.findIndex((m) => m.id === message.data.id)
+      if (incoming.id) {
+        const existingIndex = prev?.findIndex((m) => m.id === incoming.id)
 
         if (existingIndex !== -1) {
           const updatedMessages = [...(prev || [])]
-          updatedMessages[existingIndex || 0] = message.data
+          updatedMessages[existingIndex || 0] = incoming
 
           saveLastConversation({
             ...conversation,
@@ -93,7 +129,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         }
       }
 
-      const messages = [...(prev || []), message.data]
+      const messages = [...(prev || []), incoming]
       saveLastConversation({
         ...conversation,
         messages: messages
@@ -110,64 +146,44 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setIsLoading(false)
   }
 
-  const handleCompletionMessage = (
-    message: ServerMessage<ChatCompletionMessage>
-  ) => {
-    setCompletion(message.data)
-  }
+  useServerEvent(EVENT_NAME.twinnyAddMessage, (incoming) => {
+    generatingRef.current = true
+    handleAddMessage(incoming)
+  })
 
-  const handleLoadingMessage = () => {
-    setIsLoading(true)
-  }
+  useServerEvent(EVENT_NAME.twinnyOnCompletion, setCompletion)
 
-  const messageEventHandler = (event: MessageEvent) => {
-    const message: ServerMessage = event.data
-    switch (message.type) {
-      case EVENT_NAME.twinnyAddMessage: {
-        generatingRef.current = true
-        handleAddMessage(message as ServerMessage<ChatCompletionMessage>)
-        break
-      }
-      case EVENT_NAME.twinnyOnCompletion: {
-        handleCompletionMessage(message as ServerMessage<ChatCompletionMessage>)
-        break
-      }
-      case EVENT_NAME.twinnyOnLoading: {
-        handleLoadingMessage()
-        break
-      }
-      case EVENT_NAME.twinnyNewConversation: {
-        setMessages([])
-        setCompletion(null)
-        setActiveConversation({
-          id: uuidv4(),
-          title: t("chat-new-conversation-title"),
-          messages: []
-        })
-        generatingRef.current = false
-        setIsLoading(false)
-        chatRef.current?.focus()
-        setTimeout(() => {
-          stopRef.current = false
-        }, 1000)
-        break
-      }
-      case EVENT_NAME.twinnyStopGeneration: {
-        setIsLoading(false)
-        setCompletion(null)
-        stopRef.current = false
-        generatingRef.current = false
-        setTimeout(() => {
-          chatRef.current?.focus()
-        }, 200)
-      }
-    }
-  }
+  useServerEvent(EVENT_NAME.twinnyOnLoading, () => setIsLoading(true))
+
+  useServerEvent(EVENT_NAME.twinnyNewConversation, () => {
+    setMessages([])
+    setCompletion(null)
+    clearSearchReport()
+    setActiveConversation({
+      id: uuidv4(),
+      title: t("chat-new-conversation-title"),
+      messages: []
+    })
+    generatingRef.current = false
+    setIsLoading(false)
+    chatRef.current?.focus()
+    setTimeout(() => {
+      stopRef.current = false
+    }, 1000)
+  })
+
+  useServerEvent(EVENT_NAME.twinnyStopGeneration, () => {
+    setIsLoading(false)
+    setCompletion(null)
+    stopRef.current = false
+    generatingRef.current = false
+    setTimeout(() => {
+      chatRef.current?.focus()
+    }, 200)
+  })
 
   const handleStopGeneration = useCallback(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyStopGeneration
-    } as ClientMessage)
+    emit(EVENT_NAME.twinnyStopGeneration)
   }, [])
 
   const handleRegenerateMessage = (
@@ -176,16 +192,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
   ): void => {
     generatingRef.current = true
     setIsLoading(true)
+    clearSearchReport()
     setMessages((prev) => {
       if (!prev) return prev
       const updatedMessages = prev.slice(0, index)
 
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversation?.id
-      } as ClientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: mentions || [],
+        conversationId: conversation?.id
+      })
 
       return updatedMessages
     })
@@ -218,6 +234,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   ): void => {
     generatingRef.current = true
     setIsLoading(true)
+    clearSearchReport()
     setMessages((prev) => {
       if (!prev) return prev
 
@@ -229,16 +246,17 @@ export const Chat = (props: ChatProps): JSX.Element => {
             .replace(/<p>/g, "")
             .replace(/<\/p>/g, "<br>")
             .replace(/<br>$/, ""),
-          images: images && images.length > 0 ? images : undefined
+          images: images && images.length > 0 ? images : undefined,
+          // The user rewrote it: what a feature recorded no longer applies.
+          prompt: undefined
         }
       ]
 
-      global.vscode.postMessage({
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversation?.id
-      } as ClientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: mentions || [],
+        conversationId: conversation?.id
+      })
 
       return updatedMessages
     })
@@ -262,6 +280,44 @@ export const Chat = (props: ChatProps): JSX.Element => {
     return mentions
   }, [])
 
+  /* Images are left out: they are large and belong to the turn they were sent with. */
+  const rememberPrompt = (html: string) => {
+    const prompt = html.replace(/<img[^>]*>/g, "").trim()
+    recallIndexRef.current = -1
+    if (!prompt) return
+    const history = promptHistoryRef.current.filter((p) => p !== prompt)
+    history.push(prompt)
+    promptHistoryRef.current = history.slice(-PROMPT_HISTORY_LIMIT)
+    try {
+      localStorage.setItem(
+        PROMPT_HISTORY_KEY,
+        JSON.stringify(promptHistoryRef.current)
+      )
+    } catch {
+      // A full or blocked store only costs the history.
+    }
+  }
+
+  /** Step through sent prompts; false leaves the key to the editor. */
+  const recallPrompt = useCallback((step: -1 | 1, isEmpty: boolean) => {
+    const editor = editorRef.current
+    const history = promptHistoryRef.current
+    const index = recallIndexRef.current
+    if (!editor || !history.length) return false
+    if (index === -1 && (step === 1 || !isEmpty)) return false
+
+    if (index === -1) draftRef.current = editor.getHTML()
+    const next = Math.min(history.length - 1, index - step)
+    if (next === index) return true
+    recallIndexRef.current = next
+    editor.commands.setContent(
+      next === -1 ? draftRef.current : history[history.length - 1 - next],
+      false
+    )
+    editor.commands.focus("end")
+    return true
+  }, [])
+
   const clearEditor = useCallback(() => {
     editorRef.current?.commands.clearContent()
   }, [])
@@ -279,16 +335,19 @@ export const Chat = (props: ChatProps): JSX.Element => {
       .text()
       .trim()
 
-    if (!text || generatingRef.current || !input) return
+    if (!text || generatingRef.current || !input || chatDisabled) return
 
     generatingRef.current = true
 
     const mentions = getMentions()
 
     setIsLoading(true)
+    clearSearchReport()
     clearEditor()
 
-    const conversationId = conversation?.id || uuidv4();
+    rememberPrompt(editorRef.current?.getHTML() || "")
+
+    const conversationId = conversation?.id || uuidv4()
 
     setMessages((prevMessages) => {
       const updatedMessages: ChatCompletionMessage[] = [
@@ -304,74 +363,90 @@ export const Chat = (props: ChatProps): JSX.Element => {
         id: conversationId,
         messages: updatedMessages,
         title: conversation?.title || t("chat-new-conversation-title")
-      };
-
-      const clientMessage: ClientMessage<
-        ChatCompletionMessage[],
-        MentionType[]
-      > = {
-        type: EVENT_NAME.twinnyChatMessage,
-        data: updatedMessages,
-        meta: mentions,
-        key: conversationId,
       }
 
       imagesRef.current = []
       saveLastConversation(currentConversation)
       setActiveConversation(currentConversation)
 
-      global.vscode.postMessage(clientMessage)
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions,
+        conversationId
+      })
 
       return updatedMessages
     })
-  }, [
-    conversation?.id,
-    t
-  ])
+  }, [conversation?.id, t, chatDisabled, clearSearchReport])
+
+  /*
+   * A stopped reply is picked up by asking for the rest. The transcript
+   * shows a short "Continue"; the model is told not to start over.
+   */
+  const handleContinue = useCallback(() => {
+    if (generatingRef.current || chatDisabled) return
+    generatingRef.current = true
+    setIsLoading(true)
+    clearSearchReport()
+    setMessages((prev) => {
+      const updatedMessages: ChatCompletionMessage[] = [
+        ...(prev || []),
+        {
+          role: USER,
+          content: t("reply-continue"),
+          prompt:
+            "Continue exactly where your last reply stopped. " +
+            "Do not repeat anything you already wrote."
+        }
+      ]
+      saveLastConversation({ ...conversation, messages: updatedMessages })
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: [],
+        conversationId: conversation?.id
+      })
+      return updatedMessages
+    })
+  }, [conversation, chatDisabled, clearSearchReport, t])
+
+  const handleOpenAsMarkdown = useCallback(() => {
+    if (!messages.length) return
+    emit(EVENT_NAME.twinnyNewDocument, {
+      content: conversationMarkdown(conversation?.title, messages),
+      language: "markdown"
+    })
+  }, [conversation?.title, messages])
+
+  // The sidebar's title-bar menu asks; the panel has its own button.
+  useServerEvent(EVENT_NAME.twinnyExportConversation, handleOpenAsMarkdown)
 
   const handleNewConversation = useCallback(() => {
     setActiveConversation({
       id: uuidv4(),
       title: t("chat-new-conversation-title"),
       messages: []
-    });
-
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyNewConversation
     })
+
+    emit(EVENT_NAME.twinnyNewConversation)
   }, [setActiveConversation, t])
 
   const handleOpenFile = useCallback((filePath: string) => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyOpenFile,
-      data: filePath
-    })
+    emit(EVENT_NAME.twinnyOpenFile, filePath)
   }, [])
 
-  useEffect(() => {
-    global.vscode.postMessage({
-      type: EVENT_NAME.twinnyHideBackButton
-    })
-  }, [])
+  useEffect(() => emit(EVENT_NAME.twinnyHideBackButton), [])
 
   useEffect(() => {
-    if (editorRef.current) {
-      global.vscode.postMessage({ type: EVENT_NAME.twinnySidebarReady })
-    }
+    if (editorRef.current) emit(EVENT_NAME.twinnySidebarReady)
   }, [editorRef.current])
 
   useEffect(() => {
-    window.addEventListener("message", messageEventHandler)
     editorRef.current?.commands.focus()
-    return () => {
-      window.removeEventListener("message", messageEventHandler)
-    }
   }, [])
 
+  // Switching conversation shows its messages, including none for a new one.
   useEffect(() => {
-    if (conversation?.messages?.length) {
-      setMessages(conversation.messages)
-    }
+    if (conversation?.id) setMessages(conversation.messages || [])
   }, [conversation?.id])
 
   const { suggestion, filePaths } = useSuggestion()
@@ -381,9 +456,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [JSON.stringify(filePaths)]
   )
 
-
   const CustomImageExtension = createCustomImageExtension((id: string) => {
-    imagesRef.current = imagesRef.current.filter(img => img.id !== id)
+    imagesRef.current = imagesRef.current.filter((img) => img.id !== id)
   })
 
   const editor = useEditor(
@@ -400,84 +474,128 @@ export const Chat = (props: ChatProps): JSX.Element => {
           }
         }),
         CustomImageExtension.configure({
-          allowBase64: true,
+          allowBase64: true
         }),
         CustomKeyMap.configure({
           handleSubmitForm,
-          clearEditor
+          clearEditor,
+          recallPrompt,
+          stopGeneration: () => {
+            if (!generatingRef.current) return false
+            emit(EVENT_NAME.twinnyStopGeneration)
+            return true
+          }
         }),
         Placeholder.configure({
-          placeholder: t("placeholder")
+          placeholder: t("placeholder"),
+          // Still shown while the composer is off for want of a provider.
+          showOnlyWhenEditable: false
         })
-      ]
+      ],
+      // Typing into a recalled prompt makes it the draft.
+      onUpdate: () => {
+        recallIndexRef.current = -1
+      }
     },
-    [memoizedSuggestion, handleSubmitForm, clearEditor, t, imagesRef]
+    [memoizedSuggestion, handleSubmitForm, clearEditor, recallPrompt, t, imagesRef]
   )
 
-  const handleImageUpload = useCallback((file: File) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string
-      const imageData = base64.startsWith("data:") ? base64 : `data:${file.type};base64,${base64.split(",").pop()}`
-      const id = crypto.randomUUID()
-      const newImage = { id, data: imageData, type: file.type }
+  useEffect(() => {
+    editor?.setEditable(!chatDisabled)
+  }, [editor, chatDisabled])
 
-      imagesRef.current = [...imagesRef.current, newImage]
+  const handleImageUpload = useCallback(
+    (file: File) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string
+        const imageData = base64.startsWith("data:")
+          ? base64
+          : `data:${file.type};base64,${base64.split(",").pop()}`
+        const id = crypto.randomUUID()
+        const newImage = { id, data: imageData, type: file.type }
 
-      const { state } = editor?.view || {}
+        imagesRef.current = [...imagesRef.current, newImage]
 
-      if (state) {
-        if (state.selection.empty && state.selection.$head.pos === state.doc.content.size) {
+        const { state } = editor?.view || {}
+
+        if (state) {
+          if (
+            state.selection.empty &&
+            state.selection.$head.pos === state.doc.content.size
+          ) {
+            editor?.chain().focus().createParagraphNear().run()
+          }
+
+          editor
+            ?.chain()
+            .focus()
+            .insertContent({
+              type: "image",
+              attrs: { src: imageData, id }
+            })
+            .run()
+
           editor?.chain().focus().createParagraphNear().run()
+        } else {
+          editor
+            ?.chain()
+            .focus()
+            .insertContent({
+              type: "image",
+              attrs: { src: imageData, id }
+            })
+            .run()
         }
-
-        editor?.chain().focus().insertContent({
-          type: "image",
-          attrs: { src: imageData, id }
-        }).run()
-
-        editor?.chain().focus().createParagraphNear().run()
-      } else {
-        editor?.chain().focus().insertContent({
-          type: "image",
-          attrs: { src: imageData, id }
-        }).run()
       }
-    }
-    reader.readAsDataURL(file)
-  }, [editor])
+      reader.readAsDataURL(file)
+    },
+    [editor]
+  )
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith("image/"))
-    files.forEach(handleImageUpload)
-  }, [handleImageUpload])
-
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLFormElement>) => {
-    const items = Array.from(e.clipboardData?.items || [])
-    const imageItem = items.find(item => item.type.startsWith("image/"))
-
-    if (imageItem) {
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
       e.preventDefault()
-      const file = imageItem.getAsFile()
-      if (file) handleImageUpload(file)
-      return
-    }
+      const files = Array.from(e.dataTransfer.files).filter((file) =>
+        file.type.startsWith("image/")
+      )
+      files.forEach(handleImageUpload)
+    },
+    [handleImageUpload]
+  )
 
-  }, [handleImageUpload])
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLFormElement>) => {
+      const items = Array.from(e.clipboardData?.items || [])
+      const imageItem = items.find((item) => item.type.startsWith("image/"))
+
+      if (imageItem) {
+        e.preventDefault()
+        const file = imageItem.getAsFile()
+        if (file) handleImageUpload(file)
+        return
+      }
+    },
+    [handleImageUpload]
+  )
 
   const handleFileSelect = useCallback(() => {
     fileInputRef.current?.click()
   }, [])
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(file => file.type.startsWith("image/"))
-    files.forEach(handleImageUpload)
-    e.target.value = ""
-  }, [handleImageUpload])
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []).filter((file) =>
+        file.type.startsWith("image/")
+      )
+      files.forEach(handleImageUpload)
+      e.target.value = ""
+    },
+    [handleImageUpload]
+  )
 
   const handleDeleteImage = (id: string) => {
-    imagesRef.current = imagesRef.current.filter(img => img.id !== id)
+    imagesRef.current = imagesRef.current.filter((img) => img.id !== id)
   }
 
   useAutosizeTextArea(chatRef, editorRef.current?.getText() || "")
@@ -497,6 +615,63 @@ export const Chat = (props: ChatProps): JSX.Element => {
     }
   }, [memoizedSuggestion])
 
+  useEffect(() => {
+    if (composerHeight === null) {
+      localStorage.removeItem(COMPOSER_HEIGHT_KEY)
+      return
+    }
+    localStorage.setItem(COMPOSER_HEIGHT_KEY, String(composerHeight))
+  }, [composerHeight])
+
+  /*
+   * Dragging the strip above the composer grows the typing area upwards,
+   * so a long prompt can be written without the transcript being in the way.
+   */
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const wrap = editorWrapRef.current
+      if (!wrap) return
+      e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      resizeRef.current = {
+        startY: e.clientY,
+        startHeight: wrap.getBoundingClientRect().height
+      }
+    },
+    []
+  )
+
+  const handleResizeMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const resize = resizeRef.current
+      if (!resize) return
+      const max = Math.max(COMPOSER_MIN_HEIGHT, window.innerHeight - 140)
+      const height = resize.startHeight + (resize.startY - e.clientY)
+      setComposerHeight(Math.min(max, Math.max(COMPOSER_MIN_HEIGHT, height)))
+    },
+    []
+  )
+
+  /* Anywhere in the box is fair game for a click: focus the editor at the end. */
+  const handleComposerMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+      if (target.closest("button, input, a, .ProseMirror")) return
+      e.preventDefault()
+      editorRef.current?.commands.focus("end")
+    },
+    []
+  )
+
+  const handleResizeEnd = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!resizeRef.current) return
+      resizeRef.current = null
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    },
+    []
+  )
+
   const scrollToBottom = useCallback(() => {
     virtuosoRef.current?.scrollTo({
       top: Infinity,
@@ -505,9 +680,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   const renderContextItem = useCallback(
-    (item: ContextItem) => {
+    (item: AnyContextItem) => {
       let codicon = ""
       const displayName = item.name
+      const title =
+        "selectionRange" in item
+          ? `${item.path} (lines ${item.selectionRange.startLine + 1}-${
+              item.selectionRange.endLine + 1
+            })`
+          : item.path
 
       if (item.category === "files") {
         codicon = "codicon codicon-file-code"
@@ -518,7 +699,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       return (
         <div
           key={item.id}
-          title={item.path}
+          title={title}
           className={styles.contextItem}
           onClick={() => handleOpenFile(item.path)}
         >
@@ -538,32 +719,33 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [handleOpenFile, removeContextItem]
   )
 
-
   const itemContent = useCallback(
     (index: number) => (
       <MessageItem
         key={`message-list-${index}`}
         completion={completion}
+        context={searchReport}
         generatingRef={generatingRef}
         handleDeleteImage={handleDeleteImage}
         handleDeleteMessage={handleDeleteMessage}
         handleEditMessage={handleEditMessage}
         handleRegenerateMessage={handleRegenerateMessage}
+        handleContinue={handleContinue}
         index={index}
         isLoading={isLoading}
         message={messages[index]}
         messages={messages}
-        theme={theme}
       />
     ),
     [
       handleDeleteMessage,
       handleEditMessage,
       handleRegenerateMessage,
+      handleContinue,
       isLoading,
       messages,
       completion,
-      theme,
+      searchReport,
       generatingRef
     ]
   )
@@ -580,99 +762,146 @@ export const Chat = (props: ChatProps): JSX.Element => {
             >
               <i className="codicon codicon-comment-discussion" />
             </VSCodeButton>
+            <VSCodeButton
+              onClick={handleOpenAsMarkdown}
+              appearance="icon"
+              disabled={!messages.length}
+              title={t("open-as-markdown")}
+            >
+              <i className="codicon codicon-markdown" />
+            </VSCodeButton>
           </div>
         )}
         {!!contextItems.length && (
-          <div className={styles.contextItems}>{contextItems.map(renderContextItem)}</div>
+          <div className={styles.contextItems}>
+            {contextItems.map(renderContextItem)}
+          </div>
         )}
-        <Virtuoso
-          followOutput
-          ref={virtuosoRef}
-          data={messages}
-          initialTopMostItemIndex={messages?.length}
-          defaultItemHeight={800}
-          itemContent={itemContent}
-          atBottomThreshold={20}
-          atBottomStateChange={(bottom) => setIsBottom(bottom)}
-          alignToBottom
-        />
+        <div className={styles.transcript}>
+          {messages.length === 0 ? (
+            <EmptyChat />
+          ) : (
+            <Virtuoso
+              followOutput
+              style={{ height: "100%" }}
+              ref={virtuosoRef}
+              data={messages}
+              initialTopMostItemIndex={messages?.length}
+              defaultItemHeight={800}
+              itemContent={itemContent}
+              atBottomThreshold={20}
+              atBottomStateChange={(bottom) => setIsBottom(bottom)}
+              alignToBottom
+            />
+          )}
+        </div>
         {!!selection.length && (
-          <Suggestions isDisabled={!!generatingRef.current} />
+          <Suggestions isDisabled={!!generatingRef.current || chatDisabled} />
         )}
         <div className={styles.chatOptions}>
           <div>
-            {!isBottom && (
-              <div className={styles.scrollToBottom}>
+            {!isBottom && messages.length > 0 && (
+              <VSCodeButton
+                appearance="icon"
+                onClick={scrollToBottom}
+                title={t("scroll-to-bottom")}
+              >
+                <i className="codicon codicon-arrow-down" />
+              </VSCodeButton>
+            )}
+          </div>
+          {!!selection.length && (
+            <span className={styles.selectionCount}>
+              {t("selection-chars", { chars: selection.length })}
+            </span>
+          )}
+        </div>
+        <div className={styles.composer}>
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            title={t("resize-composer")}
+            className={styles.resizeHandle}
+            onPointerDown={handleResizeStart}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+            onPointerCancel={handleResizeEnd}
+            onDoubleClick={() => setComposerHeight(null)}
+          >
+            <span className={styles.resizeGrip} />
+          </div>
+          <form onDrop={handleDrop} onPaste={handlePaste}>
+            <div
+              className={cx(styles.chatBox, {
+                [styles.chatBoxDisabled]: chatDisabled
+              })}
+              title={chatDisabled ? t("chat-disabled-no-provider") : undefined}
+              onMouseDown={handleComposerMouseDown}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                multiple
+                style={{ display: "none" }}
+              />
+              <span className={styles.prompt} aria-hidden="true">
+                &#10095;
+              </span>
+              <div
+                ref={editorWrapRef}
+                className={styles.editorWrap}
+                style={
+                  composerHeight === null
+                    ? undefined
+                    : { height: composerHeight, maxHeight: composerHeight }
+                }
+              >
+                <EditorContent
+                  className={styles.tiptap}
+                  editor={editorRef.current}
+                />
+              </div>
+              <div className={styles.chatButtons}>
                 <VSCodeButton
                   appearance="icon"
-                  onClick={scrollToBottom}
-                  title={t("scroll-to-bottom")}
+                  role="button"
+                  disabled={chatDisabled}
+                  onClick={handleFileSelect}
+                  title={t("upload-image")}
                 >
-                  <i className="codicon codicon-arrow-down" />
+                  <span className="codicon codicon-device-camera" />
                 </VSCodeButton>
+                {generatingRef.current ? (
+                  <VSCodeButton
+                    appearance="icon"
+                    role="button"
+                    className={styles.stopButton}
+                    onClick={handleStopGeneration}
+                    title={t("stop-generation-esc")}
+                    aria-label={t("stop-generation")}
+                  >
+                    <span className="codicon codicon-debug-stop"></span>
+                  </VSCodeButton>
+                ) : (
+                  <VSCodeButton
+                    appearance="icon"
+                    role="button"
+                    disabled={chatDisabled}
+                    onClick={handleSubmitForm}
+                    title={t("send")}
+                  >
+                    <span className="codicon codicon-send"></span>
+                  </VSCodeButton>
+                )}
               </div>
-            )}
-            {generatingRef.current && !symmetryConnection && (
-              <VSCodeButton
-                type="button"
-                appearance="icon"
-                onClick={handleStopGeneration}
-                aria-label={t("stop-generation")}
-              >
-                <span className="codicon codicon-debug-stop"></span>
-              </VSCodeButton>
-            )}
-          </div>
-          <div>
-            <VSCodeBadge>{selection?.length}</VSCodeBadge>
-            {!!symmetryConnection && (
-              <VSCodeBadge
-                title={t("chat-connected-to-provider", {
-                  providerName: symmetryConnection?.name,
-                  modelName: symmetryConnection?.modelName,
-                  providerId: symmetryConnection?.provider
-                })}
-              >
-                ⚡️ {symmetryConnection?.name}
-              </VSCodeBadge>
-            )}
+            </div>
+          </form>
+          <div className={styles.footer}>
+            <ProviderSelect />
           </div>
         </div>
-        <form onDrop={handleDrop} onPaste={handlePaste}>
-          <div className={styles.chatBox}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*"
-              multiple
-              style={{ display: "none" }}
-            />
-            <EditorContent
-              className={styles.tiptap}
-              editor={editorRef.current}
-            />
-            <div className={styles.chatButtons}>
-              <VSCodeButton
-                appearance="icon"
-                role="button"
-                onClick={handleFileSelect}
-                title={t("upload-image")}
-              >
-                <span className="codicon codicon-device-camera" />
-              </VSCodeButton>
-              <VSCodeButton
-                appearance="icon"
-                role="button"
-                onClick={handleSubmitForm}
-                title={t("send")}
-              >
-                <span className="codicon codicon-send"></span>
-              </VSCodeButton>
-            </div>
-          </div>
-        </form>
-        {!symmetryConnection && <ProviderSelect />}
       </div>
     </VSCodePanelView>
   )
