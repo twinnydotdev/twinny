@@ -1,4 +1,4 @@
-import * as lancedb from "@lancedb/lancedb"
+import type * as lancedb from "@lancedb/lancedb"
 import fs from "fs"
 import path from "path"
 
@@ -68,6 +68,15 @@ const emptyManifest = (model = "", dimensions = 0): IndexManifest => ({
 const fileFilter = (files: string[]) =>
   `file IN (${files.map(sqlString).join(", ")})`
 
+/**
+ * LanceDB is a native module, loaded on first connect rather than at
+ * import: if its binding fails to load (it threw while sniffing glibc in
+ * the WSL remote host), embeddings are unavailable but the extension
+ * still activates.
+ */
+let lanceModule: Promise<typeof lancedb> | undefined
+const loadLance = () => (lanceModule ??= import("@lancedb/lancedb"))
+
 export class EmbeddingDatabase {
   private _db: lancedb.Connection | null = null
   private _manifest: IndexManifest | null = null
@@ -75,7 +84,8 @@ export class EmbeddingDatabase {
   constructor(private readonly _dbPath: string) {}
 
   public async connect() {
-    this._db = await lancedb.connect(this._dbPath)
+    const lance = await loadLance()
+    this._db = await lance.connect(this._dbPath)
     // Indexes from before the manifest existed are one table per workspace
     // name; they cannot be updated incrementally, so start over.
     if (!fs.existsSync(this.manifestPath)) {
@@ -182,7 +192,7 @@ export class EmbeddingDatabase {
     // stemming makes "chunks" find "chunk", and positions are not needed
     // since nothing runs phrase queries.
     await table.createIndex(KEYWORD_COLUMN, {
-      config: lancedb.Index.fts({
+      config: (await loadLance()).Index.fts({
         withPosition: false,
         lowercase: true,
         stem: true,

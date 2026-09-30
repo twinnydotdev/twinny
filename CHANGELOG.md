@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.2.10 · 2026-09-30
+
+Extension release: twinny starts in WSL again, and the Embeddings tab holds still while indexing.
+
+- **Works in WSL remotes.** Opening a folder through WSL failed activation with `Cannot read properties of undefined (reading 'header')`, so chat never loaded and completions did nothing. LanceDB's native loader read the Node process report to tell glibc from musl, and the VS Code server under WSL returns none. The check now falls back to glibc, and LanceDB loads when the index is first opened rather than at startup, so a native module that fails to load turns embeddings off instead of stopping the extension.
+- **No flicker while indexing.** The line naming the files being embedded came and went between files, making the page below it jump many times a second. It now keeps its place for the whole run.
+
 ## 4.2.9 · 2026-09-29
 
 `twinny-server` release: `twinny-server --version` and the gateway's `/twinny/v1` responses report the right version. The 4.2.8 package was published with a bundle built before the version bump, so it called itself 4.2.7. Publishing now refuses a `cli.js` that was not built for the package's version.
