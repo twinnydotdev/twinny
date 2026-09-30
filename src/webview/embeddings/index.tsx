@@ -163,11 +163,11 @@ export const EmbeddingOptions = () => {
               style={{ width: progress.phase === "embedding" ? `${percent}%` : "100%" }}
             />
           </div>
-          {progress.currentFiles.length > 0 && (
-            <div className={styles.progressFiles}>
-              {progress.currentFiles.join(", ")}
-            </div>
-          )}
+          {/* Always rendered: the in-flight set empties between files, and
+              a row that came and went made the page below it jump. */}
+          <div className={styles.progressFiles}>
+            {progress.currentFiles.join(", ")}
+          </div>
         </>
       )
     }
