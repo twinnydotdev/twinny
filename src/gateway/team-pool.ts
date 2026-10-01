@@ -41,6 +41,14 @@ const noPeer = (
         `No teammate is sharing ${model} right now.`
       )
 
+/** A chat that offers tools or carries tool turns: only a sharer that knows them can parse it. */
+const usesTools = (request: FimRequest | ChatRequest): boolean =>
+  "tools" in request && !!request.tools?.length
+    ? true
+    : (request.messages ?? []).some(
+        (message) => (message.role as string) === "tool" || !!(message as { tool_calls?: unknown[] }).tool_calls?.length
+      )
+
 export class TeamPoolProvider implements InferenceProvider {
   public readonly id = TEAM_PROVIDER_KIND
 
@@ -82,7 +90,7 @@ export class TeamPoolProvider implements InferenceProvider {
     options?: InferenceOptions
   ): Promise<EmbeddingResponse> {
     const tried: string[] = []
-    let chosen = this.choose(request.model, tried)
+    let chosen = this.choose(request.model, tried, false)
     for (;;) {
       tried.push(chosen.id)
       options?.onBackend?.(chosen.label)
@@ -93,6 +101,7 @@ export class TeamPoolProvider implements InferenceProvider {
           error,
           request.model,
           tried,
+          false,
           options
         )
         if (!replacement) throw error
@@ -103,10 +112,18 @@ export class TeamPoolProvider implements InferenceProvider {
 
   /* ------------------------------------------------------------------------ */
 
-  private choose(model: string, exclude: string[]) {
-    const { peer, offered, busy } = this._peers.pick(model, exclude)
-    if (!peer) throw noPeer(model, offered, busy)
-    return peer
+  private choose(model: string, exclude: string[], needsTools: boolean) {
+    const { peer, offered, busy } = this._peers.pick(model, exclude, needsTools)
+    if (peer) return peer
+    // Someone shares the model, on a Twinny from before tool calls. Said
+    // by name, so the requester's tool loop carries on in text instead.
+    if (needsTools && !offered && this._peers.pick(model, exclude).offered) {
+      throw new InferenceError(
+        "inference-failure",
+        `The teammates sharing ${model} run a Twinny from before tool calls, so it cannot take tools yet. They need to update.`
+      )
+    }
+    throw noPeer(model, offered, busy)
   }
 
   /**
@@ -118,6 +135,7 @@ export class TeamPoolProvider implements InferenceProvider {
     error: unknown,
     model: string,
     tried: string[],
+    needsTools: boolean,
     options?: InferenceOptions
   ) {
     if (
@@ -126,7 +144,7 @@ export class TeamPoolProvider implements InferenceProvider {
       options?.signal?.aborted
     )
       return undefined
-    return this._peers.pick(model, tried).peer
+    return this._peers.pick(model, tried, needsTools).peer
   }
 
   /**
@@ -143,7 +161,8 @@ export class TeamPoolProvider implements InferenceProvider {
     return {
       [Symbol.asyncIterator]: async function* () {
         const tried: string[] = []
-        let chosen = pool.choose(request.model, tried)
+        const needsTools = usesTools(request)
+        let chosen = pool.choose(request.model, tried, needsTools)
         for (;;) {
           tried.push(chosen.id)
           options?.onBackend?.(chosen.label)
@@ -162,7 +181,7 @@ export class TeamPoolProvider implements InferenceProvider {
           } catch (error) {
             const replacement =
               yielded === 0
-                ? pool.replacement(error, request.model, tried, options)
+                ? pool.replacement(error, request.model, tried, needsTools, options)
                 : undefined
             if (!replacement) throw error
             chosen = replacement

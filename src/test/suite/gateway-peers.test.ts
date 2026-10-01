@@ -269,6 +269,40 @@ suite("Gateway: teammates' computers as a backend", function () {
     assert.strictEqual(status.backends.find((b) => b.provider === "pool")?.peers, 1)
   })
 
+  test("a tool conversation runs on a sharer: tools go out, the model's calls come back", async () => {
+    const alice = sharerFor(harness, "alice", backend.port)
+    sharers.push(alice)
+    await online(alice)
+    const tools = [{ name: "read_file", description: "Reads a file.", parameters: { type: "object", properties: { path: { type: "string" } } } }]
+    const calls: unknown[] = []
+    for await (const chunk of requester(harness, "bob", "chat").chat({ model: "coder", messages: [{ role: "user", content: "read it" }], tools })) {
+      calls.push(...(chunk.toolCalls ?? []))
+    }
+    assert.deepStrictEqual(calls, [{ id: "call_a", name: "read_file", arguments: "{\"path\":\"src/a.ts\"}" }])
+    const sent = backend.requests[backend.requests.length - 1].body?.tools as Array<{ function: { name: string } }>
+    assert.strictEqual(sent[0].function.name, "read_file", "the sharer's own server was offered the tools")
+  })
+
+  test("a sharer from before tool calls is not sent one: the refusal names tools, and plain chat still reaches it", async () => {
+    const raw = await dialWebSocket(`${harness.url}/twinny/v1/peers`, { Authorization: `Bearer ${harness.key.alice}` })
+    const frames: string[] = []
+    raw.on("message", (text) => frames.push(text))
+    // No `tools` in its hello: the extension as it was.
+    await raw.send(encodePeerFrame({ type: "hello", protocol: 1, name: "old", backend: { kind: "ollama" }, models: [{ id: "backend-coder:7b", name: "x" }], slots: 1 }))
+    await until(() => frames.some((f) => f.includes("\"welcome\"")))
+    const tools = [{ name: "read_file", description: "Reads a file.", parameters: { type: "object" } }]
+    const refused = await expectKind(
+      () => readText(requester(harness, "bob", "chat").chat({ model: "coder", messages: [{ role: "user", content: "read it" }], tools })),
+      "inference-failure"
+    )
+    assert.match(refused.message, /before tool calls.*cannot take tools/)
+    assert.ok(!frames.some((f) => f.includes("\"job\"")), "the old sharer never saw the job it would have choked on")
+    const plain = readText(requester(harness, "bob", "chat").chat({ model: "coder", messages: [{ role: "user", content: "hi" }] })).catch(() => "")
+    await until(() => frames.some((f) => f.includes("\"job\"")))
+    raw.close(1000, "done")
+    await plain
+  })
+
   test("the least-loaded peer is chosen; every slot busy is rate-limited, not queued", async () => {
     const alice = sharerFor(harness, "alice", backend.port, { slots: 1 })
     const bob = sharerFor(harness, "bob", backend.port, { slots: 1 })

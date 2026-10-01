@@ -33,6 +33,7 @@ import type {
   MentionType,
   ModelCatalogue,
   ThemeType,
+  ToolStepView,
   TwinnyProvider
 } from "../types"
 
@@ -332,6 +333,8 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyStopGeneration]: Channel
   [EVENT_NAME.twinnySymbolSearch]: Channel<{ query: string }, ContextItem[]>
   [EVENT_NAME.twinnyTextSelection]: Channel<void, string>
+  /** The user's answer to a command waiting in the tool steps. */
+  [EVENT_NAME.twinnyToolApproval]: Channel<{ id: string; run: boolean }>
 
   [CONVERSATION_EVENT_NAME.clearAllConversations]: Channel
   [CONVERSATION_EVENT_NAME.getActiveConversation]: Channel
@@ -425,6 +428,7 @@ export interface ServerEvents {
   [EVENT_NAME.twinnyListTemplates]: string[]
   [EVENT_NAME.twinnyNewConversation]: void
   [EVENT_NAME.twinnyExportConversation]: void
+  [EVENT_NAME.twinnyShowShortcuts]: void
   [EVENT_NAME.twinnyOnCompletion]: ChatCompletionMessage
   [EVENT_NAME.twinnyOnLoading]: void
   [EVENT_NAME.twinnySendLanguage]: LanguageType
@@ -437,6 +441,8 @@ export interface ServerEvents {
   [EVENT_NAME.twinnyTextSelection]: string
   [EVENT_NAME.twinnyUpdateContextItems]: AnyContextItem[]
   [EVENT_NAME.twinnyWorkspaceSearch]: WorkspaceSearchReport
+  /** The tool steps of the reply being written, whole, each time one changes. */
+  [EVENT_NAME.twinnyToolSteps]: ToolStepView[]
 
   [CONVERSATION_EVENT_NAME.getConversations]: Record<string, Conversation>
   [CONVERSATION_EVENT_NAME.setActiveConversation]: Conversation | undefined

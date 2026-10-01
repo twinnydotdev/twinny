@@ -224,9 +224,50 @@ const RecordingSettings = ({ apiKey, summary, licensed, onSaved }: { apiKey: str
 /*  One record                                                                */
 /* -------------------------------------------------------------------------- */
 
-type ChatMessage = { role?: string; content?: unknown }
+type ChatMessage = { role?: string; content?: unknown; tool_calls?: unknown; tool_call_id?: unknown }
 
-const contentText = (content: unknown): string => (typeof content === "string" ? content : JSON.stringify(content, null, 2))
+/** A tool call, from a message (`function: { name, arguments }`) or from a reply (`name`, `arguments`). */
+interface ToolCall {
+  id: string
+  name: string
+  arguments: string
+}
+
+const toolCallsOf = (value: unknown): ToolCall[] =>
+  Array.isArray(value)
+    ? value.flatMap((entry) => {
+        const call = (entry ?? {}) as { id?: unknown; name?: unknown; arguments?: unknown; function?: { name?: unknown; arguments?: unknown } }
+        const name = call.function?.name ?? call.name
+        const args = call.function?.arguments ?? call.arguments
+        if (typeof name !== "string") return []
+        return [{ id: typeof call.id === "string" ? call.id : "", name, arguments: typeof args === "string" ? args : JSON.stringify(args ?? {}) }]
+      })
+    : []
+
+/** A call's arguments laid out to read, or as written when they are not JSON. */
+const prettyArguments = (text: string): { code: string; language: string } => {
+  try {
+    return { code: JSON.stringify(JSON.parse(text), null, 2), language: "json" }
+  } catch {
+    return { code: text, language: "text" }
+  }
+}
+
+/** A call on one line: `read_file path=src/a.ts`. */
+const callLine = (call: ToolCall, max = 90): string => {
+  let line = call.name
+  try {
+    const args = JSON.parse(call.arguments) as Record<string, unknown>
+    const parts = Object.entries(args).map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`)
+    if (parts.length) line += ` ${parts.join(" ").replace(/\s+/g, " ")}`
+  } catch {
+    if (call.arguments.trim()) line += ` ${call.arguments.replace(/\s+/g, " ")}`
+  }
+  return line.length > max ? `${line.slice(0, max)}…` : line
+}
+
+const contentText = (content: unknown): string =>
+  typeof content === "string" ? content : content === null || content === undefined ? "" : JSON.stringify(content, null, 2)
 
 const firstLine = (text: string, max = 110): string => {
   const line = text.trim().split("\n")[0] ?? ""
@@ -236,17 +277,106 @@ const firstLine = (text: string, max = 110): string => {
 const Body = ({ text, raw, language }: { text: string; raw: boolean; language?: string }) =>
   raw || language ? <CodeBlock code={text} language={language ?? "markdown"} bare wrap /> : <MarkdownView text={text} />
 
-/** A chat as its turns; system prompts folded, since they are long and the same every time. */
+/** Arguments holding text of several lines (an edit's find and replace, a new file), or nothing when JSON reads fine. */
+const longArguments = (text: string): Array<[string, unknown]> | undefined => {
+  try {
+    const args = JSON.parse(text) as unknown
+    if (!args || typeof args !== "object" || Array.isArray(args)) return undefined
+    const entries = Object.entries(args as Record<string, unknown>)
+    return entries.some(([, value]) => typeof value === "string" && value.includes("\n")) ? entries : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The calls a turn made: the tool's name, then its arguments. JSON as
+ * written, unless an argument is text of several lines: then each
+ * argument is shown on its own, the text as it is rather than escaped.
+ */
+const ToolCalls = ({ calls, raw }: { calls: ToolCall[]; raw: boolean }) => (
+  <div className="tool-calls">
+    {calls.map((call, i) => {
+      const args = prettyArguments(call.arguments)
+      const long = raw ? undefined : longArguments(call.arguments)
+      return (
+        <div key={call.id || i} className="tool-call">
+          <div className="tool-call-head">
+            <span className="tool-name">{call.name}</span>
+            {call.id && <span className="muted tool-id">{call.id}</span>}
+          </div>
+          {long ? (
+            <dl className="tool-args">
+              {long.map(([name, value]) => (
+                <React.Fragment key={name}>
+                  <dt>{name}</dt>
+                  <dd>
+                    {typeof value === "string" && value.includes("\n") ? (
+                      <CodeBlock code={value.replace(/\n$/, "")} language={guessLanguage(value)} bare wrap />
+                    ) : (
+                      <code>{typeof value === "string" ? value : JSON.stringify(value)}</code>
+                    )}
+                  </dd>
+                </React.Fragment>
+              ))}
+            </dl>
+          ) : (
+            args.code !== "{}" && <CodeBlock code={args.code} language={args.language} bare wrap />
+          )}
+        </div>
+      )
+    })}
+  </div>
+)
+
+type OfferedTool = { name?: unknown; description?: unknown; parameters?: unknown }
+
+/** The tools the request offered, folded: they are the same on every step of a run. */
+const OfferedTools = ({ tools, raw }: { tools: OfferedTool[]; raw: boolean }) => (
+  <details className="turn system tools">
+    <summary>
+      <span className="role">tools</span>
+      <span className="muted summary-text">{tools.map((tool) => String(tool.name ?? "?")).join(", ")}</span>
+      <span className="muted summary-len">{fmt(tools.length)} offered</span>
+    </summary>
+    <div className="turn-body">
+      {raw ? (
+        <CodeBlock code={JSON.stringify(tools, null, 2)} language="json" bare wrap />
+      ) : (
+        <dl className="tool-list">
+          {tools.map((tool, i) => (
+            <React.Fragment key={i}>
+              <dt>{String(tool.name ?? "?")}</dt>
+              <dd>{typeof tool.description === "string" ? tool.description : ""}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      )}
+    </div>
+  </details>
+)
+
+/**
+ * A chat as its turns. System prompts and the tools offered are folded,
+ * since they are long and the same every time; so is each tool result,
+ * under the call it answers.
+ */
 const ChatView = ({ record, raw }: { record: RecordingRecord; raw: boolean }) => {
   const request = (record.request ?? {}) as Record<string, unknown>
   const response = (record.response ?? {}) as Record<string, unknown>
   const messages = Array.isArray(request.messages) ? (request.messages as ChatMessage[]) : []
+  const tools = Array.isArray(request.tools) ? (request.tools as OfferedTool[]) : []
   const reply = typeof response.content === "string" ? response.content : ""
+  const replyCalls = toolCallsOf(response.toolCalls)
+  // Which call each result answers, by the id the model gave it.
+  const called = new Map<string, ToolCall>()
+  for (const m of messages) for (const call of toolCallsOf(m.tool_calls)) if (call.id) called.set(call.id, call)
   return (
     <div className="turns">
+      {tools.length > 0 && <OfferedTools tools={tools} raw={raw} />}
       {messages.map((m, i) => {
         const text = contentText(m.content)
-        const isJson = typeof m.content !== "string"
+        const isJson = typeof m.content !== "string" && m.content !== null && m.content !== undefined
         if (m.role === "system") {
           return (
             <details key={i} className="turn system">
@@ -261,14 +391,38 @@ const ChatView = ({ record, raw }: { record: RecordingRecord; raw: boolean }) =>
             </details>
           )
         }
+        if (m.role === "tool") {
+          const call = typeof m.tool_call_id === "string" ? called.get(m.tool_call_id) : undefined
+          return (
+            <details key={i} className="turn system tool">
+              <summary>
+                <span className="role">tool result</span>
+                <span className="muted summary-text">
+                  {call && <span className="tool-name">{callLine(call, 60)}</span>}
+                  {call && " → "}
+                  {firstLine(text)}
+                </span>
+                <span className="muted summary-len">{compact(text.length)} chars</span>
+              </summary>
+              <div className="turn-body">
+                <CodeBlock code={text} language="text" bare wrap />
+              </div>
+            </details>
+          )
+        }
+        const calls = toolCallsOf(m.tool_calls)
         return (
           <div key={i} className={`turn ${m.role ?? ""}`}>
             <div className="turn-head">
-              <span className="role">{m.role ?? "?"}</span>
-              <CopyButton text={text} />
+              <span className="role">
+                {m.role ?? "?"}
+                {calls.length > 0 && <span className="muted"> · {plural(calls.length, "tool call")}</span>}
+              </span>
+              {text && <CopyButton text={text} />}
             </div>
             <div className="turn-body">
-              <Body text={text} raw={raw} language={isJson ? "json" : undefined} />
+              {text && <Body text={text} raw={raw} language={isJson ? "json" : undefined} />}
+              {calls.length > 0 && <ToolCalls calls={calls} raw={raw} />}
             </div>
           </div>
         )
@@ -277,11 +431,15 @@ const ChatView = ({ record, raw }: { record: RecordingRecord; raw: boolean }) =>
         <div className="turn-head">
           <span className="role">
             assistant · <OutcomePill record={record} />
+            {replyCalls.length > 0 && <span className="muted"> · {plural(replyCalls.length, "tool call")}</span>}
+            {response.finishReason === "length" && <span className="muted"> · cut off at the output cap</span>}
           </span>
           {reply && <CopyButton text={reply} />}
         </div>
         <div className="turn-body">
-          {reply ? <Body text={reply} raw={raw} /> : <div className="muted">{record.outcome === "ok" ? "The reply was empty." : "No reply was produced."}</div>}
+          {reply && <Body text={reply} raw={raw} />}
+          {replyCalls.length > 0 && <ToolCalls calls={replyCalls} raw={raw} />}
+          {!reply && !replyCalls.length && <div className="muted">{record.outcome === "ok" ? "The reply was empty." : "No reply was produced."}</div>}
         </div>
       </div>
     </div>

@@ -16,6 +16,8 @@ import {
 } from "../extension/inference/errors"
 import type {
   ChatChunk,
+  ChatFinishReason,
+  ChatToolCall,
   EmbeddingResponse,
   FimChunk,
   InferenceCapability,
@@ -30,7 +32,11 @@ import { parseRequest } from "./wire"
 export interface JobCapture {
   /** The parsed request, without the alias. */
   request: unknown
-  /** `{ content }` for chat, `{ text }` for fim, `{ count, dimensions }` for embeddings. */
+  /**
+   * `{ content }` for chat (with `toolCalls` when the model called tools,
+   * and `finishReason` when the backend gave one), `{ text }` for fim,
+   * `{ count, dimensions }` for embeddings.
+   */
   response: unknown
   model?: string
   provider?: string
@@ -129,6 +135,8 @@ export const runInferenceJob = async (options: JobOptions): Promise<JobResult> =
   let backend: string | undefined
   let inputs: number | undefined
   const replyParts: string[] = []
+  const replyCalls: ChatToolCall[] = []
+  let replyEnd: ChatFinishReason | undefined
   const noteUsage = (reported?: InferenceUsage) => {
     if (reported) usage = { ...usage, ...reported }
   }
@@ -144,7 +152,14 @@ export const runInferenceJob = async (options: JobOptions): Promise<JobResult> =
   const finish = (result: Pick<JobResult, "outcome" | "error" | "kind" | "response">): JobResult => {
     outer?.removeEventListener("abort", forward)
     if (captured && capability !== "embeddings") {
-      captured.response = capability === "fim" ? { text: replyParts.join("") } : { content: replyParts.join("") }
+      captured.response =
+        capability === "fim"
+          ? { text: replyParts.join("") }
+          : {
+              content: replyParts.join(""),
+              ...(replyCalls.length ? { toolCalls: replyCalls } : {}),
+              ...(replyEnd ? { finishReason: replyEnd } : {})
+            }
     }
     return {
       ...result,
@@ -212,9 +227,20 @@ export const runInferenceJob = async (options: JobOptions): Promise<JobResult> =
       if (controller.signal.aborted) break
       noteUsage(chunk.usage)
       // Some backends end with an empty chunk; it says nothing worth a line
-      // unless it carries the token counts.
-      if (!("text" in chunk ? chunk.text : chunk.content) && !chunk.usage) continue
-      if (captured) replyParts.push(("text" in chunk ? chunk.text : chunk.content) ?? "")
+      // unless it carries the token counts, the model's tool calls, why
+      // the reply ended or its thinking.
+      const says =
+        ("text" in chunk ? chunk.text : chunk.content) ||
+        chunk.usage ||
+        ("content" in chunk && (chunk.toolCalls?.length || chunk.finishReason || chunk.reasoning))
+      if (!says) continue
+      if (captured) {
+        replyParts.push(("text" in chunk ? chunk.text : chunk.content) ?? "")
+        if ("content" in chunk) {
+          if (chunk.toolCalls) replyCalls.push(...chunk.toolCalls)
+          if (chunk.finishReason) replyEnd = chunk.finishReason
+        }
+      }
       await options.chunk?.(chunk)
       chunks++
     }

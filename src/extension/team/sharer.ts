@@ -242,6 +242,7 @@ export class Sharer extends EventEmitter {
       name: this._options.machine,
       backend: { kind: this._options.backendKind },
       models: this._models,
+      tools: true,
       slots: Math.min(
         MAX_PEER_SLOTS,
         Math.max(1, this._options.slots?.() ?? DEFAULT_PEER_SLOTS)

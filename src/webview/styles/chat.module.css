@@ -249,7 +249,93 @@
 }
 
 .composer {
+  position: relative;
   border-top: 1px solid var(--tw-rule);
+}
+
+/*
+ * The chat's keys, opened with "?" and laid over the foot of the
+ * transcript so the composer does not move.
+ */
+.shortcuts {
+  position: absolute;
+  right: var(--tw-pad);
+  bottom: calc(100% + 6px);
+  left: var(--tw-pad);
+  z-index: 5;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 8px 10px 10px;
+  background: var(--tw-bg);
+  border: 1px solid var(--tw-rule);
+  font-size: var(--tw-fs-sm);
+}
+
+.shortcutsHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--tw-fg-dim);
+}
+
+.shortcutsClose {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  white-space: nowrap;
+}
+
+.shortcutsList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.shortcutsRow {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.shortcutsRow dt {
+  display: flex;
+  gap: 3px;
+}
+
+.shortcutsRow dd {
+  margin: 0;
+  color: var(--tw-fg-dim);
+}
+
+.shortcuts kbd {
+  padding: 0 4px;
+  border: 1px solid var(--tw-rule);
+  border-radius: 3px;
+  color: var(--tw-fg);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.shortcutsHint {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 var(--tw-pad);
+  background: none;
+  border: 0;
+  color: var(--tw-fg-faint);
+  font-family: inherit;
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.shortcutsHint:hover {
+  color: var(--tw-fg-dim);
 }
 
 /*
@@ -363,4 +449,146 @@
   display: flex;
   align-items: center;
   border-top: 1px solid var(--tw-rule-soft);
+}
+
+/*
+ * Agent mode. The prompt doubles and brightens, and pulses while the
+ * model works. The switch says which mode the next message goes out in.
+ */
+/* Greyscale like the rest of the chat: the foreground at full strength is the "lit" colour. */
+.composer {
+  --tw-agent: var(--tw-fg);
+}
+
+.agent .prompt,
+.agent:focus-within .prompt {
+  color: var(--tw-agent);
+  letter-spacing: -0.12em;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--tw-agent) 60%, transparent);
+}
+
+.agentBusy .prompt {
+  animation: agent-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes agent-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Bottom left of the composer, across from the send button. */
+.agentToggle {
+  position: absolute;
+  bottom: 7px;
+  left: var(--tw-pad);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 6px 1px 4px;
+  border-radius: 3px;
+  background: none;
+  border: 0;
+  color: var(--tw-fg-faint);
+  font-family: inherit;
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.agentToggle:hover {
+  color: var(--tw-fg-dim);
+}
+
+.agentDot {
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.agentToggle:disabled {
+  cursor: not-allowed;
+}
+
+.agentToggleOn,
+.agentToggleOn:hover {
+  color: var(--tw-agent);
+  background: color-mix(in srgb, var(--tw-agent) 12%, transparent);
+}
+
+.agentToggleOn .agentDot {
+  background: var(--tw-agent);
+  border-color: var(--tw-agent);
+  box-shadow: 0 0 6px var(--tw-agent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agentBusy .prompt {
+    animation: none;
+  }
+}
+
+/*
+ * Messages typed while a reply runs, waiting their turn. Dim and one line
+ * each: they are not in the conversation yet.
+ */
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 6px var(--tw-pad) 4px;
+  list-style: none;
+}
+
+.queued {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+}
+
+.queuedLabel {
+  flex-shrink: 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  animation: agent-pulse 1.6s ease-in-out infinite;
+}
+
+.queuedText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queuedRemove {
+  flex-shrink: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--tw-fg-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.queued:hover .queuedRemove,
+.queuedRemove:focus-visible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queuedLabel {
+    animation: none;
+  }
 }

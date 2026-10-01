@@ -23,7 +23,9 @@ export const TEAM_PLUGINS_SEEN_STORAGE_KEY = "twinny.teamPluginsSeen"
 export const TEAM_NUDGE_STORAGE_KEY = "twinny.teamNudge"
 
 export const GLOBAL_STORAGE_KEY = {
-  selectedModel: "twinny.selectedModel"
+  selectedModel: "twinny.selectedModel",
+  /** Whether the chat runs as an agent; switched from the composer, kept for every window. */
+  agentMode: "agentMode"
 }
 
 export const WORKSPACE_STORAGE_KEY = {

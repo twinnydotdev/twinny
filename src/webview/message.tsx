@@ -11,7 +11,7 @@ import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, ImageAttachment, MentionType, ReplyMeta } from "../common/types"
+import { ChatCompletionMessage, ImageAttachment, MentionType, ReplyMeta, ToolStepView } from "../common/types"
 
 import { useSuggestion } from "./hooks/useSuggestion"
 import CodeBlock from "./code-block"
@@ -19,6 +19,7 @@ import { createCustomImageExtension } from "./image-extension"
 import { MentionExtension } from "./mention-extention"
 import { emit } from "./messaging"
 import { useToast } from "./toast"
+import ToolSteps from "./tool-steps"
 import { getThinkingMessage } from "./utils"
 import WorkspaceContext from "./workspace-context"
 
@@ -32,6 +33,8 @@ interface MessageProps {
    * carries its own in `message.context`.
    */
   context?: WorkspaceSearchReport
+  /** Tool steps behind a reply still streaming; a finished reply carries its own. */
+  steps?: ToolStepView[]
   isLoading?: boolean
   message?: ChatCompletionMessage
   messages?: ChatCompletionMessage[]
@@ -127,9 +130,17 @@ const ThinkingSection = React.memo(
 const formatDuration = (ms: number) =>
   ms < 1000 ? `${ms}ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`
 
+/** 12412 as "12.4k": enough to see how full a context is. */
+const compactCount = (count: number) =>
+  count < 1000 ? String(count) : count < 10_000 ? `${(count / 1000).toFixed(1)}k` : `${Math.round(count / 1000)}k`
+
+/** From here a context is close enough to full to say so. */
+const CONTEXT_NEARLY_FULL = 0.8
+
 /**
- * One quiet line under a reply: which model wrote it, how long it took and,
- * when the backend counted, how fast. Old conversations have no meta and
+ * One quiet line under a reply: which model wrote it, how long it took,
+ * and, when the backend counted, how fast and how much of the model's
+ * context the conversation now takes. Old conversations have no meta and
  * show nothing.
  */
 const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () => void }) => {
@@ -141,6 +152,8 @@ const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () =>
     parts.push(t("reply-tokens-per-second", { count: meta.completionTokens, rate: perSecond.toFixed(1) }))
   }
   const title = [meta.provider, meta.model].filter(Boolean).join(" · ")
+  const used = meta.promptTokens
+  const holds = meta.contextWindow
 
   return (
     <div className={styles.replyFooter}>
@@ -152,6 +165,20 @@ const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () =>
       {parts.map((part) => (
         <span key={part}>{part}</span>
       ))}
+      {!!used && (
+        <span
+          className={holds && used / holds >= CONTEXT_NEARLY_FULL ? styles.replyContextFull : undefined}
+          title={
+            holds
+              ? t("reply-context-of-title", { used: used.toLocaleString(), window: holds.toLocaleString() })
+              : t("reply-context-title", { used: used.toLocaleString() })
+          }
+        >
+          {holds
+            ? t("reply-context-of", { used: compactCount(used), window: compactCount(holds) })
+            : t("reply-context", { used: compactCount(used) })}
+        </span>
+      )}
       {meta.stopped && <span className={styles.replyStopped}>{t("reply-stopped")}</span>}
       {!!meta.withheld?.length && <WithheldBadge withheld={meta.withheld} />}
       {onContinue && (
@@ -225,6 +252,7 @@ export const Message: React.FC<MessageProps> = ({
   index = 0,
   isAssistant,
   context,
+  steps,
   isLoading,
   message,
   onDelete,
@@ -513,7 +541,9 @@ export const Message: React.FC<MessageProps> = ({
     [renderCodeBlock, renderContent, message?.images]
   )
 
-  if (!message?.content) return null
+  // A reply can be all steps and no text: its tools ran, then it was stopped.
+  if (!message) return null
+  if (!message.content && !message.toolSteps?.length && !steps?.length) return null
 
   const { thinking, message: messageContent } = getThinkingMessage(
     message.content as string
@@ -615,7 +645,10 @@ export const Message: React.FC<MessageProps> = ({
         </div>
       </div>
       {message.role === ASSISTANT && (
-        <WorkspaceContext report={message.context ?? context} />
+        <>
+          <WorkspaceContext report={message.context ?? context} />
+          <ToolSteps steps={message.toolSteps ?? steps} />
+        </>
       )}
       {editing ? (
         <EditorContent className={styles.tiptap} editor={editor} />
