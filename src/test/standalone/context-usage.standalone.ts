@@ -11,7 +11,7 @@ import { test } from "node:test"
 
 import { ChatCompletionMessage, TwinnyProvider } from "../../common/types"
 import { ToolSteps } from "../../extension/chat/tool-steps"
-import { buildStreamingRequest, fluencyChat } from "../../extension/inference/adapters/fluency"
+import { buildStreamingRequest, fluencyChat, parsableToolArguments } from "../../extension/inference/adapters/fluency"
 import {
   assumedContextWindow,
   contextWindowOf,
@@ -188,4 +188,20 @@ test("a step cut off by a stop says so, and what is kept of a step is held to a 
   assert.deepStrictEqual(sent.at(-1), ["0.0:done", "1.0:stopped", "1.1:stopped"])
   assert.strictEqual(steps.steps[2].command, undefined, "nothing is left asking for an answer")
   return answer.then((run) => assert.strictEqual(run, false))
+})
+
+test("a tool call with no arguments goes back as {} so the SDKs can parse it", () => {
+  // Anthropic streams nothing for a tool without parameters; fluency's
+  // conversion then ran JSON.parse("") and the next step failed.
+  const call = (args: string) =>
+    ({ role: "assistant", content: null, tool_calls: [{ id: "t", type: "function", function: { name: "editor_context", arguments: args } }] }) as unknown as ChatCompletionMessage
+  const argsOf = (message: ChatCompletionMessage) =>
+    (message as unknown as { tool_calls: Array<{ function: { arguments: string } }> }).tool_calls[0].function.arguments
+  const [empty, spaces, json, text] = parsableToolArguments([call(""), call("  "), call("{\"path\":\"a\"}"), call("src/a.ts")])
+  assert.strictEqual(argsOf(empty), "{}")
+  assert.strictEqual(argsOf(spaces), "{}")
+  assert.strictEqual(argsOf(json), "{\"path\":\"a\"}")
+  assert.deepStrictEqual(JSON.parse(argsOf(text)), { input: "src/a.ts" })
+  const sent = buildStreamingRequest(provider("anthropic"), [...conversation, call("")], { tools: [tool] })
+  assert.strictEqual(argsOf(sent.messages[2] as ChatCompletionMessage), "{}")
 })

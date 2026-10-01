@@ -56,6 +56,36 @@ export const flattenTextContent = (messages: ChatMessage[]): ChatMessage[] =>
     return { ...message, content: parts.map((part) => part.text).join("\n") } as ChatMessage
   })
 
+/**
+ * Tool calls with arguments every SDK can read back. fluency turns each
+ * call into its provider's shape with `JSON.parse(arguments)` (Anthropic,
+ * Bedrock, Gemini, Cohere), and a call to a tool without parameters can
+ * arrive with no arguments at all: `JSON.parse("")` throws, and the next
+ * step of the tool loop fails before it is sent. Text that is not JSON
+ * would fail the same way, so it is wrapped rather than dropped.
+ */
+export const parsableToolArguments = (messages: ChatMessage[]): ChatMessage[] =>
+  messages.map((message) => {
+    const calls = (message as { tool_calls?: Array<{ function?: { arguments?: unknown } }> }).tool_calls
+    if (!Array.isArray(calls) || !calls.length) return message
+    return {
+      ...message,
+      tool_calls: calls.map((call) => {
+        const raw = typeof call.function?.arguments === "string" ? call.function.arguments.trim() : ""
+        let args = "{}"
+        if (raw) {
+          try {
+            JSON.parse(raw)
+            args = raw
+          } catch {
+            args = JSON.stringify({ input: raw })
+          }
+        }
+        return { ...call, function: { ...call.function, arguments: args } }
+      })
+    } as ChatMessage
+  })
+
 type ChatParameters = Pick<ChatRequest, "maxTokens" | "temperature" | "think" | "tools" | "reasoningEffort">
 
 /**
@@ -182,7 +212,7 @@ export const buildStreamingRequest = (
   messages: ChatMessage[],
   parameters: ChatParameters = {}
 ): CompletionStreaming<LLMProvider> => {
-  const flat = flattenTextContent(messages)
+  const flat = parsableToolArguments(flattenTextContent(messages))
   return {
     messages:
       provider.provider === API_PROVIDERS.Anthropic && usesTools(messages, parameters)
@@ -202,7 +232,7 @@ export const buildBlockingRequest = (
   messages: ChatMessage[],
   parameters: ChatParameters = {}
 ): CompletionNonStreaming<LLMProvider> => ({
-  messages: flattenTextContent(messages.filter((m) => m.role !== "system")),
+  messages: parsableToolArguments(flattenTextContent(messages.filter((m) => m.role !== "system"))),
   model: provider.modelName,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   provider: getFluencyProvider(provider) as any,
