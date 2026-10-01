@@ -2,6 +2,10 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## Unreleased
+
+- **Chat keys, as in a terminal.** `Ctrl+C` stops a reply, or clears the draft when nothing is streaming; with text selected it still copies. `Esc` twice clears the draft, and `↑` brings a cleared draft back. `Ctrl+L` starts a new conversation, `PgUp` and `PgDn` scroll the transcript from the composer, and typing with the focus on the transcript goes to the composer. `Esc` and `Ctrl+C` stop a reply from anywhere in the chat, not only the composer. Press `?` on an empty composer for the list, or run **Twinny - Chat keyboard shortcuts** from the view's `…` menu.
+
 ## 4.2.10 · 2026-09-30
 
 Extension release: twinny starts in WSL again, and the Embeddings tab holds still while indexing.

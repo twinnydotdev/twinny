@@ -428,6 +428,7 @@ export interface ServerEvents {
   [EVENT_NAME.twinnyListTemplates]: string[]
   [EVENT_NAME.twinnyNewConversation]: void
   [EVENT_NAME.twinnyExportConversation]: void
+  [EVENT_NAME.twinnyShowShortcuts]: void
   [EVENT_NAME.twinnyOnCompletion]: ChatCompletionMessage
   [EVENT_NAME.twinnyOnLoading]: void
   [EVENT_NAME.twinnySendLanguage]: LanguageType

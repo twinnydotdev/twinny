@@ -498,6 +498,11 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.exportConversation, () =>
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnyExportConversation)
     ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.showShortcuts, async () => {
+      await commands.executeCommand("twinny.sidebar.focus")
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnyShowShortcuts)
+    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")
       fullScreenProvider.createOrShowPanel()

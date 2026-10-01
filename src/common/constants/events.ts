@@ -32,6 +32,7 @@ export const EVENT_NAME = {
   twinnyRunInTerminal: "twinny-run-in-terminal",
   twinnyInsertAtCursor: "twinny-insert-at-cursor",
   twinnyExportConversation: "twinny-export-conversation",
+  twinnyShowShortcuts: "twinny-show-shortcuts",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
   twinnySendTheme: "twinny-send-theme",

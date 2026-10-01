@@ -31,6 +31,7 @@ import { EmptyChat } from "./empty-chat"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { emit, useServerEvent } from "./messaging"
+import { Shortcuts } from "./shortcuts"
 import { Suggestions } from "./suggestions"
 import { conversationMarkdown } from "./transcript"
 import { CustomKeyMap } from "./utils"
@@ -41,6 +42,12 @@ const COMPOSER_MIN_HEIGHT = 44
 const COMPOSER_HEIGHT_KEY = "twinny.composerHeight"
 const PROMPT_HISTORY_KEY = "twinny.promptHistory"
 const PROMPT_HISTORY_LIMIT = 50
+/** Two presses of Esc this close together clear the draft. */
+const DOUBLE_ESCAPE_MS = 800
+/** Where a key belongs to whatever has focus, not to the chat. */
+const KEY_OWNERS =
+  "input, textarea, select, .ProseMirror, [contenteditable='true'], " +
+  "vscode-text-field, vscode-text-area, vscode-dropdown"
 
 const loadPromptHistory = (): string[] => {
   try {
@@ -93,6 +100,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const promptHistoryRef = useRef<string[]>(loadPromptHistory())
   const recallIndexRef = useRef(-1)
   const draftRef = useRef("")
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const showShortcutsRef = useRef(false)
+  const lastEscapeRef = useRef(0)
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const [hint, setHint] = useState<string | null>(null)
   const [composerHeight, setComposerHeight] = useState<number | null>(() => {
     const stored = Number(localStorage.getItem(COMPOSER_HEIGHT_KEY))
     return stored > 0 ? stored : null
@@ -330,6 +342,72 @@ export const Chat = (props: ChatProps): JSX.Element => {
     editorRef.current?.commands.clearContent()
   }, [])
 
+  const setShortcuts = useCallback((open: boolean) => {
+    showShortcutsRef.current = open
+    setShowShortcuts(open)
+  }, [])
+
+  /* The draft goes into the prompt history, so the up arrow brings it back. */
+  const clearDraft = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor || editor.isEmpty) return false
+    rememberPrompt(editor.getHTML())
+    imagesRef.current = []
+    editor.commands.clearContent()
+    return true
+  }, [])
+
+  const stopIfGenerating = useCallback(() => {
+    if (!generatingRef.current) return false
+    emit(EVENT_NAME.twinnyStopGeneration)
+    return true
+  }, [])
+
+  /*
+   * Esc closes the shortcuts, else stops a reply, else clears the draft on
+   * the second press. False leaves the key to the editor.
+   */
+  const handleEscape = useCallback(() => {
+    if (showShortcutsRef.current) {
+      setShortcuts(false)
+      return true
+    }
+    if (stopIfGenerating()) return true
+    const editor = editorRef.current
+    if (!editor || editor.isEmpty) return false
+
+    clearTimeout(hintTimerRef.current)
+    if (Date.now() - lastEscapeRef.current < DOUBLE_ESCAPE_MS) {
+      lastEscapeRef.current = 0
+      setHint(null)
+      return clearDraft()
+    }
+    lastEscapeRef.current = Date.now()
+    setHint(t("shortcuts-esc-again"))
+    hintTimerRef.current = setTimeout(() => setHint(null), DOUBLE_ESCAPE_MS)
+    return true
+  }, [clearDraft, setShortcuts, stopIfGenerating, t])
+
+  /* Ctrl+C with nothing selected; with a selection it is still a copy. */
+  const handleInterrupt = useCallback(() => {
+    if (!window.getSelection()?.isCollapsed) return false
+    return stopIfGenerating() || clearDraft()
+  }, [clearDraft, stopIfGenerating])
+
+  const toggleShortcuts = useCallback(() => {
+    setShortcuts(!showShortcutsRef.current)
+    return true
+  }, [setShortcuts])
+
+  const scrollTranscript = useCallback((direction: -1 | 1) => {
+    virtuosoRef.current?.scrollBy({
+      top: direction * window.innerHeight * 0.6
+    })
+    return true
+  }, [])
+
+  useEffect(() => () => clearTimeout(hintTimerRef.current), [])
+
   const handleSubmitForm = useCallback(() => {
     const input = editorRef.current
       ?.getHTML()
@@ -440,6 +518,60 @@ export const Chat = (props: ChatProps): JSX.Element => {
     emit(EVENT_NAME.twinnyNewConversation)
   }, [setActiveConversation, t])
 
+  // The composer's key map outlives a render, so it calls through a ref.
+  const newConversationRef = useRef(handleNewConversation)
+  newConversationRef.current = handleNewConversation
+
+  const startNewConversation = useCallback(() => {
+    stopIfGenerating()
+    newConversationRef.current()
+    return true
+  }, [stopIfGenerating])
+
+  useServerEvent(EVENT_NAME.twinnyShowShortcuts, () => setShortcuts(true))
+
+  /*
+   * The same keys with the focus on the transcript rather than the composer.
+   * Anything typed there goes to the composer.
+   */
+  useEffect(() => {
+    if (!active) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.altKey) return
+      const target = e.target instanceof Element ? e.target : null
+      if (target?.closest(KEY_OWNERS)) return
+
+      let handled = false
+      if (e.ctrlKey) {
+        if (e.shiftKey) return
+        if (e.key === "c") {
+          handled = handleInterrupt()
+        } else if (e.key === "l") {
+          handled = startNewConversation()
+        }
+      } else if (e.key === "Escape") {
+        handled = handleEscape()
+      } else if (e.key === "?") {
+        handled = toggleShortcuts()
+      } else if (e.key.length === 1 && e.key !== " " && !chatDisabled) {
+        // Not handled: the key itself lands in the composer.
+        if (!target?.closest("button, vscode-button, a, summary")) {
+          editorRef.current?.commands.focus("end")
+        }
+      }
+      if (handled) e.preventDefault()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [
+    active,
+    chatDisabled,
+    handleEscape,
+    handleInterrupt,
+    startNewConversation,
+    toggleShortcuts
+  ])
+
   const handleOpenFile = useCallback((filePath: string) => {
     emit(EVENT_NAME.twinnyOpenFile, filePath)
   }, [])
@@ -496,11 +628,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
           handleSubmitForm,
           clearEditor,
           recallPrompt,
-          stopGeneration: () => {
-            if (!generatingRef.current) return false
-            emit(EVENT_NAME.twinnyStopGeneration)
-            return true
-          }
+          escape: handleEscape,
+          interrupt: handleInterrupt,
+          newConversation: startNewConversation,
+          toggleShortcuts,
+          scrollTranscript
         }),
         Placeholder.configure({
           placeholder: t("placeholder"),
@@ -511,9 +643,21 @@ export const Chat = (props: ChatProps): JSX.Element => {
       // Typing into a recalled prompt makes it the draft.
       onUpdate: () => {
         recallIndexRef.current = -1
+        lastEscapeRef.current = 0
+        if (showShortcutsRef.current) setShortcuts(false)
       }
     },
-    [memoizedSuggestion, handleSubmitForm, clearEditor, recallPrompt, t, imagesRef]
+    [
+      memoizedSuggestion,
+      handleSubmitForm,
+      clearEditor,
+      recallPrompt,
+      handleEscape,
+      handleInterrupt,
+      startNewConversation,
+      t,
+      imagesRef
+    ]
   )
 
   useEffect(() => {
@@ -828,13 +972,18 @@ export const Chat = (props: ChatProps): JSX.Element => {
               </VSCodeButton>
             )}
           </div>
-          {!!selection.length && (
-            <span className={styles.selectionCount}>
-              {t("selection-chars", { chars: selection.length })}
-            </span>
+          {hint ? (
+            <span className={styles.selectionCount}>{hint}</span>
+          ) : (
+            !!selection.length && (
+              <span className={styles.selectionCount}>
+                {t("selection-chars", { chars: selection.length })}
+              </span>
+            )
           )}
         </div>
         <div className={styles.composer}>
+          {showShortcuts && <Shortcuts />}
           <div
             role="separator"
             aria-orientation="horizontal"
@@ -918,6 +1067,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
           </form>
           <div className={styles.footer}>
             <ProviderSelect />
+            <button
+              type="button"
+              className={styles.shortcutsHint}
+              onClick={toggleShortcuts}
+              aria-expanded={showShortcuts}
+            >
+              {t("shortcuts-hint")}
+            </button>
           </div>
         </div>
       </div>

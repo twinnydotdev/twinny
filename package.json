@@ -148,6 +148,11 @@
           "command": "twinny.exportConversation",
           "when": "view == twinny.sidebar",
           "group": "conversation@1"
+        },
+        {
+          "command": "twinny.showShortcuts",
+          "when": "view == twinny.sidebar",
+          "group": "conversation@2"
         }
       ],
       "scm/title": [
@@ -281,6 +286,11 @@
         "command": "twinny.exportConversation",
         "title": "Twinny - Open conversation as Markdown",
         "icon": "$(markdown)"
+      },
+      {
+        "command": "twinny.showShortcuts",
+        "title": "Twinny - Chat keyboard shortcuts",
+        "icon": "$(keyboard)"
       },
       {
         "command": "twinny.newConversation",
