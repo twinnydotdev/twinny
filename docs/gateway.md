@@ -1196,6 +1196,13 @@ the gateway.
   end. On expiry the backend call is aborted and the client sees `timeout`.
 - **Backpressure.** Chunks are written at the pace the client reads them;
   nothing is buffered whole. Request bodies are capped by `maxBodyBytes`.
+- **Slow bodies.** The small JSON bodies of the other routes (sign-in,
+  join, page links, admin and plugin calls) must arrive within 30 seconds.
+  A caller that sends headers and then stalls is answered `400` with "The
+  request body did not arrive in time." and its connection is closed a
+  second later, so an open port cannot be held by connections that never
+  finish asking. A body over its route's size limit is refused as soon as
+  it is over. Inference bodies are bound by `requestDeadlineMs` instead.
 - **Shutdown.** On SIGINT or SIGTERM the gateway stops accepting requests
   (health answers `503 stopping`), waits up to `shutdownGraceMs` for active
   requests, aborts whatever remains with `cancelled`, closes every

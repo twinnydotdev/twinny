@@ -99,23 +99,63 @@ export const sendPlugin = (
 
 export const MAX_JSON_BODY_BYTES = 16 * 1024
 
-/** A small JSON object body, or an error whose message the caller can show. */
+/**
+ * How long a small JSON body may take to arrive. The server's own request
+ * timeout is off (a stream may be quiet for minutes), and the routes that
+ * read these bodies include ones that take no credential (sign-in, join),
+ * so without a clock here a caller that sends headers and then nothing
+ * would hold a connection for as long as it liked.
+ */
+export const JSON_BODY_TIMEOUT_MS = 30_000
+
+/** After a body ran out of time: how long the answer gets before the socket goes. */
+const CLOSE_AFTER_TIMEOUT_MS = 1_000
+
+/**
+ * A small JSON object body, or an error whose message the caller can show.
+ *
+ * A body over `maxBytes` is refused as soon as it is, not when it ends. A
+ * body that has not ended within `timeoutMs` is refused, and the connection
+ * is closed a moment later, once the caller has had time to say so.
+ */
 export const readJsonBody = (
   req: http.IncomingMessage,
-  maxBytes = MAX_JSON_BODY_BYTES
+  maxBytes = MAX_JSON_BODY_BYTES,
+  timeoutMs = JSON_BODY_TIMEOUT_MS
 ): Promise<Record<string, unknown>> =>
   new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
     let size = 0
+    let settled = false
+    const timer = setTimeout(() => {
+      // Still arriving (or never sent): nothing more is read from it.
+      fail(new Error("The request body did not arrive in time."))
+      const socket = req.socket
+      const closer = setTimeout(() => socket.destroy(), CLOSE_AFTER_TIMEOUT_MS)
+      closer.unref()
+    }, timeoutMs)
+    timer.unref()
+    const fail = (error: Error) => {
+      if (settled) return
+      settled = true
+      chunks.length = 0
+      reject(error)
+    }
     req.on("data", (chunk: Buffer) => {
+      if (settled) return
       size += chunk.length
-      if (size <= maxBytes) chunks.push(chunk)
-    })
-    req.on("end", () => {
       if (size > maxBytes) {
-        reject(new Error("The request body is too large."))
+        // Refused now; the rest is drained (and dropped) so the answer can
+        // be read, and the clock above still bounds how long that takes.
+        fail(new Error("The request body is too large."))
         return
       }
+      chunks.push(chunk)
+    })
+    req.on("end", () => {
+      clearTimeout(timer)
+      if (settled) return
+      settled = true
       try {
         const parsed: unknown = JSON.parse(
           Buffer.concat(chunks as Uint8Array[]).toString("utf8") || "{}"
@@ -133,5 +173,13 @@ export const readJsonBody = (
         reject(new Error("The request body is not JSON."))
       }
     })
-    req.on("error", (error) => reject(error))
+    req.on("error", (error) => {
+      clearTimeout(timer)
+      fail(error)
+    })
+    // A caller that hangs up mid-body: no "end" will come.
+    req.on("close", () => {
+      clearTimeout(timer)
+      fail(new Error("The request was closed before its body arrived."))
+    })
   })
