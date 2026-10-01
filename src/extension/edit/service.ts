@@ -65,6 +65,10 @@ export interface FileEditProposal {
   text: string
 }
 
+/** With a folder open, a chat edit stays inside it. */
+const outsideWorkspace = (uri: vscode.Uri) =>
+  !!vscode.workspace.workspaceFolders?.length && !vscode.workspace.getWorkspaceFolder(uri)
+
 export interface PendingEditInfo {
   line: number
   streaming: boolean
@@ -270,6 +274,11 @@ export class InlineEditService extends Base {
     const pending = this._pending
     const uri = vscode.Uri.file(proposal.file)
     const relative = vscode.workspace.asRelativePath(uri)
+    // The tools keep to the workspace themselves; the command that reaches
+    // this can be run by anything, so it holds the line too.
+    if (outsideWorkspace(uri)) {
+      return { ok: false, message: `Not changed: ${relative} is outside the workspace.` }
+    }
     if (this.running || (pending && (mode === "review" || pending.document.uri.fsPath === proposal.file))) {
       const where = pending ? ` in ${vscode.workspace.asRelativePath(pending.document.uri)}` : ""
       return {
@@ -298,12 +307,17 @@ export class InlineEditService extends Base {
       if (!(await vscode.workspace.applyEdit(edit))) {
         return { ok: false, message: `Not changed: the editor refused the edit to ${relative}.` }
       }
-      await document.save()
+      const saved = await document.save()
       const editor = await vscode.window.showTextDocument(document, { preview: true, preserveFocus: true })
       const end = proposal.startLine + proposal.text.split("\n").length - 1
       editor.revealRange(new vscode.Range(proposal.startLine, 0, end, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport)
-      logger.info(`Chat edited ${relative}:${proposal.startLine + 1}`)
-      return { ok: true, message: `Applied and saved: ${relative} ${lines} changed. The user can undo it.` }
+      logger.info(`Chat edited ${relative}:${proposal.startLine + 1}${saved ? "" : " (not saved)"}`)
+      return {
+        ok: true,
+        message: saved
+          ? `Applied and saved: ${relative} ${lines} changed.`
+          : `Applied: ${relative} ${lines} changed in the editor, but the file could not be saved; commands and git will still see the old file.`
+      }
     }
 
     const editor = await vscode.window.showTextDocument(document, { preview: false, preserveFocus: true })
@@ -335,6 +349,9 @@ export class InlineEditService extends Base {
   ): Promise<ChatEditOutcome> {
     const target = vscode.Uri.file(file)
     const relative = vscode.workspace.asRelativePath(target)
+    if (outsideWorkspace(target)) {
+      return { ok: false, message: `Not created: ${relative} is outside the workspace.` }
+    }
     if (fs.existsSync(file)) {
       return { ok: false, message: `Not created: ${relative} already exists. Use edit_file to change it.` }
     }

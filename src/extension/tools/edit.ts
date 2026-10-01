@@ -1,7 +1,7 @@
 /**
- * Where a proposed search-and-replace lands in a file. Pure: the chat's
- * `propose_edit` tool plans the change here and hands the result to the
- * editor's diff review, so nothing is written until the user accepts.
+ * Where a search-and-replace lands in a file. Pure: the chat's `edit_file`
+ * tool plans the change here and hands the result to the editor, which
+ * applies it or shows it for review.
  *
  * Models copy `find` from what `read_file` showed them, so the line-number
  * prefixes it adds are dropped, and when the exact text is not there a

@@ -1,13 +1,21 @@
 import * as assert from "assert"
+import { execFileSync } from "child_process"
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 import * as vscode from "vscode"
 
-import { editorEdits, editorKnowledge, terminalCommands } from "../../extension/chat/tool-sinks"
+import {
+  editorEdits,
+  editorHint,
+  editorKnowledge,
+  openDocumentText,
+  terminalCommands
+} from "../../extension/chat/tool-sinks"
 import { ChatEditMode, InlineEditService } from "../../extension/edit/service"
 import { GenerationTracker } from "../../extension/generations"
 import { planReplacement, Replacement } from "../../extension/tools/edit"
+import { WorkspaceView } from "../../extension/tools/view"
 
 const fakeContext = {
   globalState: { get: () => undefined, update: async () => undefined },
@@ -116,29 +124,93 @@ suite("Chat edit_file", () => {
     assert.strictEqual(ok.exitCode, 0)
     const failed = await commands.run("sh -c 'exit 3'")
     assert.strictEqual(failed.exitCode, 3)
+    // A command that leaves the shell elsewhere does not move the next one.
+    await commands.run("cd /")
+    const where = await commands.run("pwd")
+    assert.match(where.output, new RegExp(`${fs.realpathSync(path.dirname(file))}|${path.dirname(file)}`))
+  })
+
+  test("deleting asks only when git could not bring the file back", async function () {
+    this.timeout(20000)
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-chat-del-"))
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "pipe" })
+    git("init", "-q")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "T")
+    for (const name of ["clean.ts", "changed.ts"]) fs.writeFileSync(path.join(repo, name), "export const a = 1\n")
+    fs.mkdirSync(path.join(repo, ".vscode"))
+    fs.writeFileSync(path.join(repo, ".vscode", "tasks.json"), "{}\n")
+    git("add", ".")
+    git("commit", "-qm", "first")
+    fs.writeFileSync(path.join(repo, "changed.ts"), "export const a = 2\n")
+    fs.writeFileSync(path.join(repo, "new.ts"), "export const n = 1\n")
+
+    const asked: string[] = []
+    const apply = editorEdits(new WorkspaceView(repo), "apply", async (detail) => (asked.push(detail), false))
+    const clean = await apply.remove(path.join(repo, "clean.ts"))
+    assert.ok(clean.ok, clean.message)
+    assert.strictEqual(asked.length, 0, "committed and unchanged: git has it, so no question")
+    assert.ok(!fs.existsSync(path.join(repo, "clean.ts")))
+
+    for (const name of ["changed.ts", "new.ts"]) {
+      const kept = await apply.remove(path.join(repo, name))
+      assert.strictEqual(kept.ok, false, name)
+      assert.ok(fs.existsSync(path.join(repo, name)), name)
+    }
+    const guarded = await apply.remove(path.join(repo, ".vscode", "tasks.json"))
+    assert.strictEqual(guarded.ok, false)
+    assert.deepStrictEqual(asked, [
+      "delete changed.ts\n(git has no copy of it as it is now)",
+      "delete new.ts\n(git has no copy of it as it is now)",
+      "delete .vscode/tasks.json"
+    ])
+  })
+
+  test("the editor hint names the active file and selection, and only for a file the tools may read", async () => {
+    const dir = path.dirname(file)
+    fs.writeFileSync(path.join(dir, ".gitignore"), "secret.ts\n")
+    fs.writeFileSync(path.join(dir, "secret.ts"), "const key = 1\n")
+    const view = new WorkspaceView(dir)
+    const editor = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file))
+    editor.selection = new vscode.Selection(2, 0, 2, 0)
+    assert.strictEqual(editorHint(view), "The user's active editor is a.ts, cursor on line 3.")
+    editor.selection = new vscode.Selection(1, 0, 2, 10)
+    assert.strictEqual(editorHint(view), "The user's active editor is a.ts, with lines 2-3 selected.")
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(path.join(dir, "secret.ts")))
+    assert.strictEqual(editorHint(view), "")
+
+    // An open document is read as the editor has it, unsaved changes and all.
+    const shown = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(file))
+    await shown.edit((b) => b.insert(new vscode.Position(0, 0), "// unsaved\n"))
+    assert.match((await openDocumentText(file)) ?? "", /^\/\/ unsaved\n/)
+    assert.strictEqual(await openDocumentText(path.join(dir, "not-open.ts")), undefined)
   })
 
   test("delete and move apply straight away, or wait for approval when reviewing", async () => {
     const dir = path.dirname(file)
     const asked: string[] = []
-    const apply = editorEdits("apply", async () => true)
+    const view = new WorkspaceView(dir)
+    const apply = editorEdits(view, "apply", async (detail) => (asked.push(detail), true))
     const moved = await apply.move(file, path.join(dir, "moved", "b.ts"))
     assert.ok(moved.ok, moved.message)
     assert.ok(fs.existsSync(path.join(dir, "moved", "b.ts")) && !fs.existsSync(file))
 
-    const review = editorEdits("review", async (detail) => (asked.push(detail), false))
+    assert.strictEqual(asked.length, 0, "a move loses nothing, so applying it does not ask")
+    const review = editorEdits(view, "review", async (detail) => (asked.push(detail), false))
     const declined = await review.remove(path.join(dir, "moved", "b.ts"))
     assert.deepStrictEqual([declined.ok, asked.length], [false, 1])
-    assert.match(asked[0], /^delete .*moved\/b\.ts$/)
+    assert.strictEqual(asked[0], "delete moved/b.ts")
     assert.ok(fs.existsSync(path.join(dir, "moved", "b.ts")))
 
+    // Not in a git repository: nothing could bring the file back, so even applying asks.
     const removed = await apply.remove(path.join(dir, "moved", "b.ts"))
     assert.ok(removed.ok, removed.message)
+    assert.strictEqual(asked[1], "delete moved/b.ts\n(git has no copy of it as it is now)")
     assert.ok(!fs.existsSync(path.join(dir, "moved", "b.ts")))
   })
 
   test("the editor reports diagnostics, what is open and selected, and says when it cannot rename", async () => {
-    const knowledge = editorKnowledge(path.dirname(file), "apply", async () => true)
+    const knowledge = editorKnowledge(new WorkspaceView(path.dirname(file)), "apply", async () => true)
     const collection = vscode.languages.createDiagnosticCollection("twinny-test")
     try {
       const uri = vscode.Uri.file(file)
@@ -163,10 +235,7 @@ suite("Chat edit_file", () => {
 
       // The built-in TypeScript server answers in the test host.
       const references = await knowledge.references(file, 0, 6)
-      assert.deepStrictEqual(references.map((r) => [r.line, r.text?.trim()]), [
-        [1, "const a = 1"],
-        [3, "return a"]
-      ])
+      assert.deepStrictEqual(references.map((r) => [r.file, r.line]), [[file, 1], [file, 3]])
       const definition = await knowledge.definition(file, 2, 9)
       assert.deepStrictEqual(definition.map((d) => [d.file, d.line]), [[file, 1]])
       const rename = await knowledge.rename(file, 0, 6, "total")

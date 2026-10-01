@@ -48,8 +48,56 @@ export const leavesMachine = (provider: TwinnyProvider): boolean => {
 export const shouldShield = (provider: TwinnyProvider, mode: SecretShieldMode) =>
   mode === "always" || (mode === "offMachine" && leavesMachine(provider))
 
+/**
+ * A JSON text with every string inside it passed through `change`, for a
+ * tool call's arguments: the values are what holds a secret or a
+ * placeholder, and a value put back may need escaping the raw text would
+ * not give it (a private key has line breaks). Text that is not JSON is
+ * changed whole.
+ */
+export const mapJsonStrings = (json: string, change: (text: string) => string): string => {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(json)
+  } catch {
+    return change(json)
+  }
+  const walk = (value: unknown): unknown =>
+    typeof value === "string"
+      ? change(value)
+      : Array.isArray(value)
+        ? value.map(walk)
+        : value && typeof value === "object"
+          ? Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, walk(inner)]))
+          : value
+  return JSON.stringify(walk(parsed))
+}
+
+type CallsMessage = { tool_calls?: { function: { name: string; arguments: string } }[] }
+
+/**
+ * The model's own tool calls go back to it with each later request. Their
+ * arguments were written with placeholders and restored for the tool, so
+ * they hold real values again and are redacted like any other text.
+ */
+const redactToolCalls = (shield: SecretShield, message: ChatMessage): ChatMessage => {
+  const calls = (message as CallsMessage).tool_calls
+  if (!Array.isArray(calls) || !calls.length) return message
+  return {
+    ...message,
+    tool_calls: calls.map((call) => ({
+      ...call,
+      function: {
+        ...call.function,
+        arguments: mapJsonStrings(call.function.arguments, (text) => shield.redact(text))
+      }
+    }))
+  } as ChatMessage
+}
+
 const redactMessages = (shield: SecretShield, messages: ChatMessage[]): ChatMessage[] =>
-  messages.map((message) => {
+  messages.map((original) => {
+    const message = redactToolCalls(shield, original)
     if (typeof message.content === "string") {
       return { ...message, content: shield.redact(message.content) }
     }
@@ -114,8 +162,14 @@ export const shieldClient = (
       const restore = shield.restoreStream()
       for await (const chunk of chunks) {
         const content = restore.push(chunk.content)
-        if (content || chunk.usage || chunk.reasoning || chunk.finishReason || chunk.toolCalls) {
-          yield { ...chunk, content }
+        // A tool is given the real value, as the reader of a reply is: an
+        // edit that names a placeholder has to find the text in the file.
+        const toolCalls = chunk.toolCalls?.map((call) => ({
+          ...call,
+          arguments: mapJsonStrings(call.arguments, (text) => shield.restore(text))
+        }))
+        if (content || chunk.usage || chunk.reasoning || chunk.finishReason || toolCalls) {
+          yield { ...chunk, content, ...(toolCalls ? { toolCalls } : {}) }
         }
       }
       const rest = restore.flush()

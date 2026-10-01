@@ -90,6 +90,10 @@
   color: var(--vscode-errorForeground);
 }
 
+.stopped .glyph {
+  color: var(--tw-fg-faint);
+}
+
 .skipped .summary {
   text-decoration: line-through;
   text-decoration-color: var(--tw-rule);
@@ -216,18 +220,35 @@
   background: var(--tw-surface);
 }
 
+.locatedFile + .locatedFile {
+  margin-top: 4px;
+}
+
 .locatedLine {
   display: flex;
   gap: 8px;
+  padding-left: 10px;
   line-height: 1.6;
   white-space: nowrap;
+}
+
+.locatedLine .fileLink {
+  min-width: 2.6em;
+  color: var(--tw-fg-faint);
+  text-align: right;
 }
 
 .locatedLine .fileLink {
   flex-shrink: 0;
 }
 
+/* A line beside a match: there for reading, quieter than the match. */
+.locatedContext code {
+  color: var(--tw-fg-faint);
+}
+
 .locatedLine code {
+  white-space: pre;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

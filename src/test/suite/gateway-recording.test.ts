@@ -133,6 +133,24 @@ suite("Recorder and export", () => {
     assert.deepStrictEqual(embed?.input, ["x"])
     assert.strictEqual(toTrainingLine(record({ outcome: "cancelled" })), undefined)
     assert.strictEqual(toTrainingLine(record({ response: { content: "" } })), undefined)
+    // A tool conversation keeps its calls and results; a reply that is only calls is an example too.
+    const call = { id: "call_a", type: "function", function: { name: "read_file", arguments: "{\"path\":\"a.ts\"}" } }
+    const tools = [{ name: "read_file", description: "Reads a file.", parameters: { type: "object" } }]
+    const asked = toTrainingLine(record({ request: { messages: [{ role: "user", content: "What is in a.ts?" }], tools }, response: { content: "", toolCalls: [{ id: "call_a", name: "read_file", arguments: "{\"path\":\"a.ts\"}" }] } }))
+    assert.deepStrictEqual(asked?.messages, [{ role: "user", content: "What is in a.ts?" }, { role: "assistant", content: null, tool_calls: [call] }])
+    assert.deepStrictEqual(asked?.tools, [{ type: "function", function: tools[0] }])
+    const answered = toTrainingLine(
+      record({
+        request: { messages: [{ role: "user", content: "What is in a.ts?" }, { role: "assistant", content: null, tool_calls: [call] }, { role: "tool", tool_call_id: "call_a", content: "1: export const a = 1" }], tools },
+        response: { content: "It exports a.", finishReason: "stop" }
+      })
+    )
+    assert.deepStrictEqual(answered?.messages, [
+      { role: "user", content: "What is in a.ts?" },
+      { role: "assistant", content: null, tool_calls: [call] },
+      { role: "tool", content: "1: export const a = 1", tool_call_id: "call_a" },
+      { role: "assistant", content: "It exports a." }
+    ])
     const lines = [...exportLines([record(), record({ outcome: "error" })], "training")]
     assert.strictEqual(lines.length, 1)
     assert.strictEqual([...exportLines([record(), record({ outcome: "error" })], "raw")].length, 2)
@@ -279,6 +297,29 @@ suite("Gateway recording (in process)", function () {
     assert.strictEqual((await request(`${url}/twinny/v1/admin/recordings/export`, "GET", alice)).status, 403)
     assert.strictEqual((await request(`${url}/twinny/v1/admin/recordings?route=nope`, "GET", admin)).status, 400)
     assert.strictEqual((await request(`${url}/twinny/v1/admin/recordings/00000000000000-deadbeef`, "GET", admin)).status, 404)
+  })
+
+  test("a tool conversation is kept whole: the tools offered, the model's calls, and each result", async () => {
+    const tools = [{ name: "read_file", description: "Reads a file.", parameters: { type: "object", properties: { path: { type: "string" } } } }]
+    const first = [{ role: "user" as const, content: "What is in src/a.ts?" }]
+    assert.strictEqual(await readAll(client().chat({ model: "coder", messages: first, tools })), "")
+    const call = { id: "call_a", type: "function", function: { name: "read_file", arguments: "{\"path\":\"src/a.ts\"}" } }
+    const second = [...first, { role: "assistant", content: null, tool_calls: [call] }, { role: "tool", tool_call_id: "call_a", content: "1: export const a = 1" }]
+    assert.strictEqual(await readAll(client().chat({ model: "coder", messages: second as never, tools })), "Hello there")
+
+    const list = json(await request(`${url}/twinny/v1/admin/recordings?route=chat&q=read_file`, "GET", admin))
+    const records = list.records as Array<{ id: string; preview: string }>
+    assert.strictEqual(records.length, 2, "the search reaches calls and tool names")
+    assert.strictEqual(records[0].preview, "after 1 tool result · What is in src/a.ts?")
+    assert.strictEqual(records[1].preview, "What is in src/a.ts?")
+
+    const asked = json(await request(`${url}/twinny/v1/admin/recordings/${records[1].id}`, "GET", admin))
+    assert.deepStrictEqual(asked.request, { messages: first, tools })
+    assert.deepStrictEqual(asked.response, { content: "", toolCalls: [{ id: "call_a", name: "read_file", arguments: "{\"path\":\"src/a.ts\"}" }], finishReason: "stop" })
+    assert.deepStrictEqual((asked.usage as { promptTokens: number }).promptTokens, 40)
+    const answered = json(await request(`${url}/twinny/v1/admin/recordings/${records[0].id}`, "GET", admin))
+    assert.deepStrictEqual((answered.request as { messages: unknown[] }).messages, second)
+    assert.deepStrictEqual(answered.response, { content: "Hello there" })
   })
 
   test("saving the configuration switches routes off live and the disclosure follows", async () => {

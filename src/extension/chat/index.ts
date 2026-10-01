@@ -20,18 +20,33 @@ import type { ChatEditMode } from "../edit/service"
 import { WorkspaceSearch } from "../embeddings/search"
 import { GenerationTracker } from "../generations"
 import { readText, resolveInferenceProvider } from "../inference"
+import {
+  assumedContextWindow,
+  contextWindowOf,
+  knownContextWindow
+} from "../inference/context-window"
 import { ExtensionBridge } from "../messaging/bridge"
 import { Base } from "../providers/base"
 import { describeProviderError, stripThinking } from "../providers/errors"
 import { TemplateProvider } from "../templates/provider"
-import { toolModeFor, withTools } from "../tools/loop"
+import { SMALL_CONTEXT_TOKENS } from "../tools/budget"
+import { ToolLoopUsage, toolModeFor, withTools } from "../tools/loop"
+import { WorkspaceView } from "../tools/view"
 import { workspaceTools } from "../tools/workspace"
 import { getLanguage } from "../utils"
 
 import { ChatContextBuilder } from "./context"
 import { ContextEntry, formatContextEntries } from "./context-files"
 import { ChatGeneration } from "./generation"
-import { ChatCommandMode, editorEdits, editorKnowledge, indexSearch, terminalCommands } from "./tool-sinks"
+import {
+  ChatCommandMode,
+  editorEdits,
+  editorHint,
+  editorKnowledge,
+  indexSearch,
+  openDocumentText,
+  terminalCommands
+} from "./tool-sinks"
 import { ToolSteps } from "./tool-steps"
 import { buildChatTurn } from "./turn"
 
@@ -114,12 +129,18 @@ export class Chat extends Base {
   ): Promise<string | undefined> {
     const provider = this.start()
     if (!provider) return undefined
+    const view = this.toolsView()
     this._conversation = await buildChatTurn(messages, {
       systemPrompt: () => this._context.systemPrompt(),
-      additionalContext: (question, sources, history) =>
-        this._context.additionalContext(question, sources, mentions, history)
+      additionalContext: async (question, sources, history) => {
+        const context = await this._context.additionalContext(question, sources, mentions, history)
+        // With tools, where the user is in the editor comes with the
+        // question, so "this function" needs no tool call to place.
+        const hint = view ? editorHint(view) : ""
+        return hint ? `${hint}\n\n${context}` : context
+      }
     })
-    return this.run(provider, "", this.config.get<boolean>("chatTools", false))
+    return this.run(provider, "", view)
   }
 
   /** A code action (explain, refactor…) run over the editor selection. */
@@ -214,54 +235,82 @@ export class Chat extends Base {
   }
 
   /**
-   * Send the conversation; the reply joins it, so the next turn follows on.
-   * With `tools`, the model may look around the workspace first.
+   * The workspace as the tools will see it, when the user has tools on
+   * and a folder open. Made once per reply: its ignore rules are read at
+   * the start and hold until the end.
    */
-  private async run(provider: TwinnyProvider, prefix = "", tools = false) {
-    let transcript: string | undefined
+  private toolsView(): WorkspaceView | undefined {
+    if (!this.config.get<boolean>("chatTools", false)) return undefined
+    const root = workspace.workspaceFolders?.[0]?.uri.fsPath
+    if (!root) return undefined
+    return new WorkspaceView(root, this.config.get<string[]>("embeddingIgnoredGlobs", []), openDocumentText)
+  }
+
+  /**
+   * Send the conversation; the reply joins it, so the next turn follows on.
+   * With a `view`, the model may work in the workspace first.
+   */
+  private async run(provider: TwinnyProvider, prefix = "", view?: WorkspaceView) {
+    let toolNotes: string | undefined
+    const usage: ToolLoopUsage = {}
+    // Asked now, so the reply can say how much of the context it used.
+    void contextWindowOf(provider)
     const reply = await this._generation.generate(
-      this.client(provider, tools, (text) => (transcript = text)),
+      view
+        ? this.toolsClient(provider, view, {
+            onNotes: (notes) => (toolNotes = notes),
+            onUsage: (counted) => Object.assign(usage, counted)
+          })
+        : resolveInferenceProvider(provider),
       { model: provider.modelName, messages: this._conversation },
       provider,
       prefix,
-      () => transcript
+      {
+        toolNotes: () => toolNotes,
+        keepEmpty: () => !!view && this._steps.steps.length > 0,
+        meta: () => {
+          const contextWindow = knownContextWindow(provider)
+          return {
+            ...(usage.promptTokens ? { promptTokens: usage.promptTokens } : {}),
+            ...(usage.completionTokens ? { completionTokens: usage.completionTokens } : {}),
+            ...(contextWindow ? { contextWindow } : {})
+          }
+        }
+      }
     )
     if (reply) {
       this._conversation = [
         ...this._conversation,
-        { role: ASSISTANT, content: transcript ?? reply }
+        { role: ASSISTANT, content: reply }
       ]
     }
     return reply
   }
 
   /**
-   * The provider's client, with the workspace tools when asked for and a
-   * folder is open: reading and searching (by meaning too, when there is an
-   * index), editing files and running commands, each as the settings say.
+   * The provider's client with the workspace's tools: reading and
+   * searching (by meaning too, when there is an index), what the language
+   * servers know, editing files and running commands, each as the
+   * settings say.
    */
-  private client(
+  private toolsClient(
     provider: TwinnyProvider,
-    tools: boolean,
-    onTranscript: (text: string) => void
+    view: WorkspaceView,
+    hooks: { onNotes(notes: string | undefined): void; onUsage(usage: ToolLoopUsage): void }
   ) {
-    const client = resolveInferenceProvider(provider)
-    const root = tools ? workspace.workspaceFolders?.[0]?.uri.fsPath : undefined
-    if (!root) return client
     this._steps.reset()
-    const ignored = this.config.get<string[]>("embeddingIgnoredGlobs", [])
     const commandMode = this.config.get<ChatCommandMode>("chatToolsCommands", "ask")
     const editMode = this.config.get<ChatEditMode>("chatToolsEdits", "apply")
     const approveChange = (detail: string, approval: "command" | "change") =>
       this._steps.approve(detail, approval)
     const search = this._search
-    const available = workspaceTools(root, ignored, {
-      edits: editorEdits(editMode, approveChange),
-      editor: editorKnowledge(root, editMode, approveChange),
+    const available = workspaceTools(view, [], {
+      edits: editorEdits(view, editMode, approveChange),
+      editor: editorKnowledge(view, editMode, approveChange),
       commands:
         commandMode === "off"
           ? undefined
-          : terminalCommands(commandMode, root, (command) => this._steps.approve(command)),
+          : terminalCommands(commandMode, view.root, (command) => this._steps.approve(command)),
       codeSearch: search?.available
         ? indexSearch(search, () =>
             Number(
@@ -272,22 +321,48 @@ export class Chat extends Base {
           )
         : undefined
     })
-    return withTools(client, available, {
+    let warned = false
+    return withTools(resolveInferenceProvider(provider), available, {
       mode: toolModeFor(provider.provider),
       // OpenAI's reasoning models think silently on the chat route; at their
       // default effort one tool step can take minutes.
       reasoningEffort: provider.provider === API_PROVIDERS.OpenAI ? "low" : undefined,
-      onTranscript,
-      onRequest: (chars, step, mode) =>
-        logger.info(`Chat tools · request ${step + 1} (${mode}) · ${formatCount(chars)} chars`),
+      contextWindow: async () => {
+        const told = await contextWindowOf(provider)
+        if (told && told < SMALL_CONTEXT_TOKENS && !warned) {
+          warned = true
+          logger.warn(
+            `Chat tools · ${provider.modelName} is loaded with a ${formatCount(told)}-token context. ` +
+              "Tools need about 8k to work well; older results will be trimmed often. Raise the server's context length if you can."
+          )
+        }
+        return told ?? assumedContextWindow(provider)
+      },
       stepLines: false,
+      onNotes: hooks.onNotes,
+      onUsage: hooks.onUsage,
+      onRequest: (chars, step, mode, tokens) =>
+        logger.info(
+          `Chat tools · request ${step + 1} (${mode}) · ${formatCount(chars)} chars, about ${formatCount(tokens)} tokens`
+        ),
       onToolStart: (start) => this._steps.start(start),
       onStep: (step) => {
         this._steps.finish(step)
         logger.info(`Chat tools · ${step.summary}`)
       },
-      onFallback: (reason) =>
-        logger.warn(`Chat tools · ${provider.modelName} refused native tool calls, using text: ${reason}`)
+      onTrim: (results, tokens) =>
+        logger.info(
+          `Chat tools · trimmed ${results} older tool result${results === 1 ? "" : "s"} to fit the context (now about ${formatCount(tokens)} tokens)`
+        ),
+      onFallback: (reason, what) =>
+        logger.warn(
+          what === "tools"
+            ? `Chat tools · ${provider.modelName} refused native tool calls, using the text protocol: ${reason}`
+            : `Chat tools · ${provider.modelName} does not take a reasoning effort, carrying on without: ${reason}`
+        ),
+      // A step cut off by a stop or a failure is marked so before the
+      // reply (and its steps) are saved.
+      onEnd: () => this._steps.settle()
     })
   }
 

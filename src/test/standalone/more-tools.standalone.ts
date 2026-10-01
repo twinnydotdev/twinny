@@ -37,7 +37,23 @@ test("git arguments: read-only subcommands only, and settings cannot run program
   assert.deepStrictEqual(readOnlyGitArgs("git diff --stat"), ["diff", "--no-ext-diff", "--no-textconv", "--stat"])
   assert.deepStrictEqual(readOnlyGitArgs("status -u"), ["status", "-u"])
   assert.deepStrictEqual(readOnlyGitArgs("branch -a"), ["branch", "-a"])
-  for (const bad of ["push", "commit -m x", "checkout main", "diff --output=/tmp/x", "-c core.pager=evil log", "log -c alias.x=!rm", "branch new-thing", "branch -D main", "diff --ext-diff"]) {
+  assert.deepStrictEqual(readOnlyGitArgs("log -C -n 2"), ["log", "--no-ext-diff", "--no-textconv", "-C", "-n", "2"], "copy detection is a plain diff option")
+  assert.deepStrictEqual(readOnlyGitArgs("shortlog -sn"), ["shortlog", "-sn", "HEAD"], "without a revision shortlog would wait on standard input")
+  for (const bad of [
+    "push",
+    "commit -m x",
+    "checkout main",
+    "diff --output=/tmp/x",
+    "-c core.pager=evil log",
+    "branch new-thing",
+    "branch -D main",
+    "diff --ext-diff",
+    "diff --no-index /etc/passwd /dev/null",
+    "blame --contents /etc/passwd README.md",
+    "log -p --no-prefix",
+    "log --oneline | head -5",
+    "status > out.txt"
+  ]) {
     assert.strictEqual(typeof readOnlyGitArgs(bad), "string", bad)
   }
 })
@@ -103,7 +119,7 @@ test("grep tries the pattern as plain text when it matches nothing as a regex", 
   fs.writeFileSync(path.join(root, "keys.json"), "{ \"key\": \"ctrl+i\", \"call\": \"f(x)\" }\n")
   const tools = workspaceTools(root)
   const found = await tools.run({ name: "grep", args: { pattern: "\"key\": \"ctrl+i\"" } })
-  assert.match(found.output, /^\(Nothing matched as a regular expression; these match the text as written\.\)\nkeys.json:1: /)
-  assert.strictEqual((await tools.run({ name: "grep", args: { pattern: "f(x)" } })).output.split("\n").length, 2)
+  assert.match(found.output, /^\(Nothing matched as a regular expression; these match the text as written\.\)\nkeys.json\n1: /)
+  assert.strictEqual((await tools.run({ name: "grep", args: { pattern: "f(x)" } })).output.split("\n").length, 3)
   assert.strictEqual((await tools.run({ name: "grep", args: { pattern: "nothing+here" } })).output, "No matches.")
 })

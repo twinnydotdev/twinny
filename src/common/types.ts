@@ -67,6 +67,12 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
   meta?: ReplyMeta
   /** The tools the model used for this reply, shown above it; never sent to the model. */
   toolSteps?: ToolStepView[]
+  /**
+   * What those tools were asked and returned, cut to size. Not shown; the
+   * next turn sends it along with the user's question, so a follow-up
+   * ("now the same in the other file") has what this reply worked from.
+   */
+  toolNotes?: string
 }
 
 /** One tool call as the chat shows it: collapsed to a line, open to what went in and came out. */
@@ -78,7 +84,8 @@ export interface ToolStepView {
   args?: Record<string, string>
   /** What the model was given back, cut to a size worth showing. */
   output?: string
-  status: "running" | "waiting" | "done" | "failed" | "skipped"
+  /** `stopped`: the reply was stopped while the tool was running or waiting. */
+  status: "running" | "waiting" | "done" | "failed" | "skipped" | "stopped"
   /** For a step waiting on the user: the command that would run, or the change that would be made. */
   command?: string
   /** What the user is asked to approve: a shell command, or a change with no diff to review (a rename, a delete). */
@@ -93,6 +100,13 @@ export interface ReplyMeta {
   durationMs?: number
   /** Only when the backend reported it; never estimated. */
   completionTokens?: number
+  /**
+   * Tokens the reply's largest request came to, as the backend counted
+   * it: how much of the model's context the conversation now takes.
+   */
+  promptTokens?: number
+  /** Tokens the model's context holds, when its server says. */
+  contextWindow?: number
   /** The user stopped it before the model finished. */
   stopped?: boolean
   /**

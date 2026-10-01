@@ -7,9 +7,21 @@
 import { ToolStepView } from "../../common/types"
 import { ToolStart, ToolStep } from "../tools/loop"
 
-/** Characters of a tool's output kept for the user to read (and saved with the conversation); the model's copy is not cut. */
-const MAX_SHOWN_OUTPUT = 8_000
+/**
+ * Characters of a tool's output, and of each of its arguments, kept for
+ * the user to read. The steps are saved with the conversation, so a
+ * created file's whole content or a long diff is not kept in full; the
+ * model's own copy is not cut here.
+ */
+const MAX_SHOWN_OUTPUT = 4000
+const MAX_SHOWN_ARG = 2000
 const MAX_ARG_IN_SUMMARY = 80
+
+const shown = (text: string, limit: number) =>
+  text.length > limit ? `${text.slice(0, limit)}\n… (${text.length - limit} more characters)` : text
+
+const shownArgs = (args: Record<string, string>) =>
+  Object.fromEntries(Object.entries(args).map(([name, value]) => [name, shown(value, MAX_SHOWN_ARG)]))
 
 const firstArg = (args: Record<string, string>) => {
   const value = Object.values(args).find((v) => v.trim())?.trim() ?? ""
@@ -44,16 +56,13 @@ export class ToolSteps {
   public start(start: ToolStart) {
     this._steps = [
       ...this._steps,
-      { id: start.id, name: start.name, args: start.args, summary: startSummary(start), status: "running" }
+      { id: start.id, name: start.name, args: shownArgs(start.args), summary: startSummary(start), status: "running" }
     ]
     this.send()
   }
 
   public finish(step: ToolStep) {
-    const output =
-      step.output.length > MAX_SHOWN_OUTPUT
-        ? `${step.output.slice(0, MAX_SHOWN_OUTPUT)}\n… (${step.output.length - MAX_SHOWN_OUTPUT} more characters)`
-        : step.output
+    const output = shown(step.output, MAX_SHOWN_OUTPUT)
     const status = this._skipped.has(step.id) ? "skipped" : step.failed ? "failed" : "done"
     this.update(step.id, { summary: step.summary, output, status, command: undefined, approval: undefined })
   }
@@ -87,6 +96,22 @@ export class ToolSteps {
   /** Stopping the reply skips whatever is waiting. */
   public cancelWaiting() {
     for (const id of [...this._waiting.keys()]) this.answer(id, false)
+  }
+
+  /**
+   * The reply is over. A step still running or waiting was cut off by a
+   * stop or a failure, and says so rather than spinning for ever in the
+   * saved conversation.
+   */
+  public settle() {
+    this.cancelWaiting()
+    if (!this._steps.some((step) => step.status === "running" || step.status === "waiting")) return
+    this._steps = this._steps.map((step) =>
+      step.status === "running" || step.status === "waiting"
+        ? { ...step, status: "stopped" as const, command: undefined, approval: undefined }
+        : step
+    )
+    this.send()
   }
 
   private update(id: string, change: Partial<ToolStepView>) {

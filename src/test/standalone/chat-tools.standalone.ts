@@ -13,19 +13,38 @@ import { ToolSteps } from "../../extension/chat/tool-steps"
 import { ChatChunk, ChatRequest, InferenceClient } from "../../extension/inference"
 import { planReplacement } from "../../extension/tools/edit"
 import { toolModeFor, withTools } from "../../extension/tools/loop"
-import { displayableLength, findToolCall } from "../../extension/tools/protocol"
+import { displayableLength, findToolCall, nameArguments } from "../../extension/tools/protocol"
 import { workspaceTools } from "../../extension/tools/workspace"
 
-test("reads the JSON form, only once it is closed while streaming", () => {
+test("reads the JSON form as soon as its object closes, and not before", () => {
   const text = "Let me look.\n<tool_call>\n{\"name\": \"grep\", \"arguments\": {\"pattern\": \"foo\"}}\n</tool_call>"
-  assert.strictEqual(findToolCall(text.slice(0, -5)), undefined)
+  const objectEnd = text.indexOf("}}") + 2
+  assert.strictEqual(findToolCall(text.slice(0, objectEnd - 1)), undefined, "the object is still open")
+  // Complete at the object's end: the stream can stop there, without the closing tag.
+  const early = findToolCall(text.slice(0, objectEnd))
+  assert.deepStrictEqual(early?.call, { name: "grep", args: { pattern: "foo" } })
+  assert.deepStrictEqual([early?.end, early?.unclosed], [objectEnd, "</tool_call>"])
   const found = findToolCall(text)
   assert.deepStrictEqual(found?.call, { name: "grep", args: { pattern: "foo" } })
   assert.strictEqual(found?.start, "Let me look.\n".length)
-  assert.strictEqual(found?.end, text.length)
+  assert.deepStrictEqual([found?.end, found?.unclosed], [text.length, undefined])
 })
 
-test("reads Qwen's function form, wrapped or bare, and an unclosed call at the end", () => {
+test("a call's arguments may quote the closing marker without ending the call", () => {
+  const content = "# Demo\n\n```js\nconsole.log(1)\n```\n\nSee </tool_call> and {braces}.\n"
+  for (const [open, close] of [["```tool\n", "\n```"], ["<tool_call>\n", "\n</tool_call>"]]) {
+    const text = `${open}${JSON.stringify({ name: "create_file", arguments: { path: "README.md", content } })}${close}`
+    const found = findToolCall(text)
+    assert.deepStrictEqual(found?.call, { name: "create_file", args: { path: "README.md", content } }, open)
+    assert.strictEqual(found?.end, text.length)
+  }
+  // Cut off mid-string at the end of the reply: an error the model can act on, not a half-read call.
+  const cut = "```tool\n{\"name\": \"create_file\", \"arguments\": {\"content\": \"abc"
+  assert.strictEqual(findToolCall(cut), undefined)
+  assert.match(findToolCall(cut, true)?.error ?? "", /cut off/)
+})
+
+test("reads Qwen's function form, wrapped or bare, and an unclosed one at the end", () => {
   const qwen = "<tool_call>\n<function=read_file>\n<parameter=path>\nsrc/a.ts\n</parameter>\n<parameter=start_line>\n10\n</parameter>\n</function>\n</tool_call>"
   assert.deepStrictEqual(findToolCall(qwen)?.call, {
     name: "read_file",
@@ -33,9 +52,11 @@ test("reads Qwen's function form, wrapped or bare, and an unclosed call at the e
   })
   const bare = "<function=list_dir>\n</function>"
   assert.deepStrictEqual(findToolCall(bare)?.call, { name: "list_dir", args: {} })
-  const unclosed = "<tool_call>\n{\"name\": \"find_symbol\", \"arguments\": \"{\\\"name\\\": \\\"Chat\\\"}\"}"
-  assert.strictEqual(findToolCall(unclosed), undefined)
+  const unclosed = "<function=find_symbol>\n<parameter=name>\nChat\n</parameter>\n"
+  assert.strictEqual(findToolCall(unclosed), undefined, "the function form has no end of its own to read")
   assert.deepStrictEqual(findToolCall(unclosed, true)?.call, { name: "find_symbol", args: { name: "Chat" } })
+  const stringArgs = "<tool_call>\n{\"name\": \"find_symbol\", \"arguments\": \"{\\\"name\\\": \\\"Chat\\\"}\"}"
+  assert.deepStrictEqual(findToolCall(stringArgs)?.call, { name: "find_symbol", args: { name: "Chat" } })
 })
 
 test("reads the fenced form, and bare JSON only when it ends the reply with arguments", () => {
@@ -92,13 +113,21 @@ test("tools find, read and search, and stay inside the workspace", async () => {
   assert.strictEqual(method.output, "src/warmer.ts:2: public async warm() {")
 
   const read = await tools.run({ name: "read_file", args: { path: "./src/warmer.ts", start_line: "2", end_line: "3" } })
-  assert.match(read.output, /^src\/warmer.ts \(lines 2–3 of 6\)\n2: {3}public async warm\(\) \{\n3: {5}return 1$/)
+  assert.match(read.output, /^src\/warmer.ts \(lines 2–3 of 5\)\n2: {3}public async warm\(\) \{\n3: {5}return 1$/)
 
   const grep = await tools.run({ name: "grep", args: { pattern: "modelwarmer" } })
-  assert.strictEqual(grep.output.split("\n").length, 3, "lowercase ignores case; build/ is not searched")
+  assert.strictEqual(
+    grep.output,
+    "src/main.ts\n1: import { ModelWarmer } from './warmer'\n2: new ModelWarmer().warm()\nsrc/warmer.ts\n1: export class ModelWarmer {\n2-   public async warm() {\n3-     return 1",
+    "lowercase ignores case; matches are grouped under their file, with the lines beside them when there are few; build/ is not searched"
+  )
+  assert.strictEqual(grep.summary, "searched for `modelwarmer` · 3 matches in 2 files")
 
   const inFile = await tools.run({ name: "grep", args: { pattern: "return", path: "src/warmer.ts" } })
-  assert.strictEqual(inFile.output, "src/warmer.ts:3: return 1")
+  assert.strictEqual(
+    inFile.output,
+    "src/warmer.ts\n1- export class ModelWarmer {\n2-   public async warm() {\n3:     return 1\n4-   }\n5- }"
+  )
 
   const listing = await tools.run({ name: "list_dir", args: {} })
   assert.deepStrictEqual(listing.output.split("\n").sort(), [".gitignore", "link", "src/"].sort())
@@ -152,7 +181,7 @@ test("the loop runs a call, sends the result back and shows only prose, steps an
   assert.strictEqual(shown, "Looking.\n\n> looked up `ModelWarmer` · 1 definition\n\nIt is defined in src/warmer.ts:1.")
   assert.strictEqual(requests.length, 2)
   const system = requests[0].messages[0].content as string
-  assert.match(system, /^Be brief\.\n\nYou can look at the user's workspace/)
+  assert.match(system, /^Be brief\.\n\nYou can work in the user's workspace with tools\./)
   assert.match(system, /The workspace root contains: src\/, \.gitignore, link/)
   const [, , assistant, result] = requests[1].messages
   assert.doesNotMatch(assistant.content as string, /IGNORED/)
@@ -169,7 +198,7 @@ test("after the last step the model is told to answer, and a stray call is not r
     })
   )
   assert.strictEqual(requests.length, 3)
-  assert.match(requests[2].messages.at(-1)?.content as string, /used all your tool calls/)
+  assert.match(requests[2].messages.at(-1)?.content as string, /out of tool calls/)
   assert.ok(shown.endsWith("Done."))
 })
 
@@ -197,7 +226,7 @@ test("native calls go out as tools and come back as tool messages; the last requ
     shown,
     "> looked up `ModelWarmer` · 1 definition\n\n> read `src/warmer.ts:1–1`\n\n> tool call not understood · the arguments were not valid JSON\n\nIn src/warmer.ts:1."
   )
-  assert.deepStrictEqual(requests[0].tools?.map((t) => t.name), ["list_dir", "find_files", "read_file", "grep", "find_symbol", "git"])
+  assert.deepStrictEqual(requests[0].tools?.map((t) => t.name), ["list_dir", "find_files", "read_file", "grep", "find_symbol"])
   assert.doesNotMatch(requests[0].messages[0].content as string, /```tool/)
   const second = requests[1].messages
   assert.deepStrictEqual(
@@ -238,7 +267,7 @@ test("in native mode a call written as text still runs, and goes back as a nativ
       messages: [{ role: "user", content: "Where?" }]
     })
   )
-  assert.strictEqual(shown, "I'll search.\n\n> searched for `ModelWarmer` · 3 matches\n\nFound it.")
+  assert.strictEqual(shown, "I'll search.\n\n> searched for `ModelWarmer` · 3 matches in 2 files\n\nFound it.")
   const [, , assistant, tool] = requests[1].messages as unknown as Array<Record<string, unknown>>
   assert.strictEqual(assistant.content, "I'll search.")
   assert.deepStrictEqual(assistant.tool_calls, [
@@ -313,82 +342,31 @@ test("edit_file plans against the open buffer and hands the change to the sink",
   assert.strictEqual(workspaceTools(root).tools.some((t) => t.name === "edit_file"), false)
 })
 
-test("the transcript keeps what the tools found for the next turn", async () => {
+test("the reply's notes keep each call and what it returned for the next turn", async () => {
   const { client } = scripted([
     { calls: [{ id: "a", name: "find_symbol", arguments: "{\"name\":\"ModelWarmer\"}" }] },
     "In src/warmer.ts."
   ])
-  let transcript = ""
+  const notes: Array<string | undefined> = []
+  let ended = 0
   await collect(
     withTools(client, workspaceTools(makeWorkspace()), {
       mode: "native",
-      onTranscript: (text) => (transcript = text)
+      onNotes: (text) => notes.push(text),
+      onEnd: () => ended++
     }).chat({ model: "m", messages: [{ role: "user", content: "Where?" }] })
   )
-  assert.strictEqual(
-    transcript,
-    "[What I looked at in the workspace before answering]\nfind_symbol {\"name\":\"ModelWarmer\"}\nsrc/warmer.ts:1: export class ModelWarmer {\n\n[My answer]\nIn src/warmer.ts."
-  )
-})
+  assert.deepStrictEqual(notes, ["find_symbol {\"name\":\"ModelWarmer\"}\nsrc/warmer.ts:1: export class ModelWarmer {"])
+  assert.strictEqual(ended, 1)
 
-const editCall = (id: string, find: string, replace: string) => ({
-  id,
-  name: "edit_file",
-  arguments: JSON.stringify({ path: "src/warmer.ts", find, replace })
-})
-
-test("applied edits let the model carry on; the system prompt says so", async () => {
-  const outcomes: string[] = []
-  const sink = {
-    mode: "apply" as const,
-    edit: async (_file: string, replacement: { text: string }) => {
-      outcomes.push(replacement.text)
-      return { ok: true, message: "Applied and saved." }
-    },
-    create: async () => ({ ok: true, message: "Created." })
-  }
-  const { client, requests } = scripted([
-    { calls: [editCall("a", "return 1", "return 2")] },
-    { calls: [editCall("b", "export class ModelWarmer {", "export class Warmer {")] },
-    "Done both."
-  ])
-  const text = await collect(
-    withTools(client, workspaceTools(makeWorkspace(), [], { edits: sink }), { mode: "native" }).chat({
+  const plain: Array<string | undefined> = []
+  await collect(
+    withTools(scripted(["Hello."]).client, workspaceTools(makeWorkspace()), { onNotes: (text) => plain.push(text) }).chat({
       model: "m",
-      messages: [{ role: "user", content: "Two changes." }]
+      messages: [{ role: "user", content: "Hi" }]
     })
   )
-  assert.deepStrictEqual(outcomes, ["    return 2", "export class Warmer {"])
-  assert.ok(requests[2].tools?.length, "tools are still offered after an applied edit")
-  assert.match(requests[0].messages[0].content as string, /call edit_file, once per change, until the task is done; use create_file for a new file/)
-  assert.match(text, /edited `src\/warmer.ts:3`[\s\S]*edited `src\/warmer.ts:1`[\s\S]*Done both\.$/)
-})
-
-test("in review mode the model answers without tools once an edit is shown; a refused one lets it keep going", async () => {
-  const edit = editCall("e", "return 1", "return 2")
-  let shown = false
-  const sink = {
-    mode: "review" as const,
-    edit: async () => {
-      const first = !shown
-      shown = true
-      return first ? { ok: false, message: "Not changed: busy." } : { ok: true, pending: true, message: "Proposed." }
-    },
-    create: async () => ({ ok: true, pending: true, message: "Proposed." })
-  }
-  const { client, requests } = scripted([{ calls: [edit] }, { calls: [edit] }, "Changed it to return 2."])
-  const text = await collect(
-    withTools(client, workspaceTools(makeWorkspace(), [], { edits: sink }), { mode: "native" }).chat({
-      model: "m",
-      messages: [{ role: "user", content: "Return 2." }]
-    })
-  )
-  assert.strictEqual(requests.length, 3)
-  assert.ok(requests[1].tools?.length, "a refused edit leaves the tools offered")
-  assert.strictEqual(requests[2].tools, undefined)
-  assert.doesNotMatch(String(requests[2].messages.at(-1)?.content), /used all your tool calls/)
-  assert.match(requests[0].messages[0].content as string, /reviews each change before it is applied/)
-  assert.match(text, /not changed · Not changed: busy\.[\s\S]*proposed an edit to `src\/warmer.ts:3`[\s\S]*Changed it to return 2\.$/)
+  assert.deepStrictEqual(plain, [undefined], "a reply that used no tool has nothing to carry over")
 })
 
 test("create_file writes new files only, inside the workspace and outside .gitignore", async () => {
@@ -410,7 +388,7 @@ test("create_file writes new files only, inside the workspace and outside .gitig
   assert.deepStrictEqual([made.output, made.summary, made.final], ["Created.", "created `src/new/util.ts` · 2 lines", undefined])
   assert.deepStrictEqual(created, [[path.join(root, "src", "new", "util.ts"), "export const a = 1\nexport const b = 2\n"]])
   const found = await tools.run({ name: "grep", args: { pattern: "export const b" } })
-  assert.strictEqual(found.output, "src/new/util.ts:2: export const b = 2", "searches see the new file")
+  assert.strictEqual(found.output, "src/new/util.ts\n1- export const a = 1\n2: export const b = 2", "searches see the new file")
 
   for (const [bad, why] of [
     ["src/warmer.ts", /already exists; use edit_file/],
@@ -429,7 +407,7 @@ test("run_command reports the exit code and output, or that the user skipped it"
   const outcomes = [
     { ran: true, output: "3 passing\n", exitCode: 0 },
     { ran: false, output: "" },
-    { ran: true, output: "compiling…", timedOut: true }
+    { ran: true, output: "compiling…", timedOut: "running" as const }
   ]
   const asked: string[] = []
   const tools = workspaceTools(makeWorkspace(), [], {
@@ -530,9 +508,9 @@ test("the loop reports each call before and after it runs, and can leave step li
   ])
 })
 
-test("hosted providers use native tools when fluency.js can pass them; relays and Perplexity use text", () => {
+test("hosted providers use native tools when fluency.js can pass them, as do the gateway and a paired device; Perplexity and QVAC use text", () => {
   const modes = Object.fromEntries(
-    ["anthropic", "gemini", "mistral", "groq", "openrouter", "openai", "ollama", "lmstudio", "perplexity", "twinny-remote", "twinny-p2p"].map((kind) => [kind, toolModeFor(kind)])
+    ["anthropic", "gemini", "mistral", "groq", "openrouter", "openai", "ollama", "lmstudio", "perplexity", "qvac", "twinny-remote", "twinny-p2p"].map((kind) => [kind, toolModeFor(kind)])
   )
   assert.deepStrictEqual(modes, {
     anthropic: "native",
@@ -544,7 +522,35 @@ test("hosted providers use native tools when fluency.js can pass them; relays an
     ollama: "native",
     lmstudio: "native",
     perplexity: "text",
-    "twinny-remote": "text",
-    "twinny-p2p": "text"
+    qvac: "text",
+    "twinny-remote": "native",
+    "twinny-p2p": "native"
   })
+})
+
+test("a call written as code calls a function is read too, its arguments matched to the tool's", () => {
+  const tools = [
+    { name: "read_file", description: "", parameters: [{ name: "path", description: "" }, { name: "start_line", description: "", optional: true }] },
+    { name: "grep", description: "", parameters: [{ name: "pattern", description: "" }, { name: "path", description: "", optional: true }] }
+  ]
+  const read = (text: string) => {
+    const found = findToolCall(text, true)
+    return found?.call ? nameArguments(found.call, tools) : found?.error
+  }
+  assert.deepStrictEqual(read("```tool\nfind_files(\"**/inference*adapter*\")\n```"), { name: "find_files", args: { "0": "**/inference*adapter*" } }, "an unknown tool keeps its positions")
+  assert.deepStrictEqual(read("```tool\ngrep(\"a, b (c)\", 'src')\n```"), { name: "grep", args: { pattern: "a, b (c)", path: "src" } })
+  assert.deepStrictEqual(read("```tool\nread_file(path=\"src/a.ts\", start_line=10)\n```"), { name: "read_file", args: { path: "src/a.ts", start_line: "10" } })
+  assert.deepStrictEqual(read("```tool\nread_file(\"src/a.ts\", 10);\n```"), { name: "read_file", args: { path: "src/a.ts", start_line: "10" } })
+  assert.deepStrictEqual(read("```tool\ngrep {\"pattern\": \"x\"}\n```"), { name: "grep", args: { pattern: "x" } })
+  assert.deepStrictEqual(read("```tool\ngrep({\"pattern\": \"x\", \"path\": \"src\"})\n```"), { name: "grep", args: { pattern: "x", path: "src" } })
+  assert.deepStrictEqual(read("<tool_call>\nlist_dir()\n</tool_call>"), { name: "list_dir", args: {} })
+  assert.strictEqual(read("```tool\nplease read the file\n```"), "the call was not valid JSON")
+})
+
+test("the text protocol lists tools without the parentheses that invite function calls", async () => {
+  const { client, requests } = scripted(["Hi."])
+  await collect(withTools(client, workspaceTools(makeWorkspace())).chat({ model: "m", messages: [{ role: "user", content: "Hi" }] }))
+  const system = requests[0].messages[0].content as string
+  assert.match(system, /\n- read_file \{path, start_line\?, end_line\?\}: /)
+  assert.doesNotMatch(system, /\n- \w+\(/)
 })

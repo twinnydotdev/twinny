@@ -200,9 +200,20 @@ export class RemoteInferenceProvider implements InferenceProvider {
   }
 
   public chat(request: ChatRequest, options?: InferenceOptions) {
-    // The protocol carries a conversation as roles and content; anything
-    // the extension keeps on a message for itself stays here.
-    const messages = request.messages.map(({ role, content }) => ({ role, content }))
+    // The protocol carries a conversation as roles and content, plus what
+    // a tool conversation needs: the calls an assistant turn made and the
+    // call a result answers. Anything else the extension keeps on a
+    // message for itself stays here.
+    const messages = request.messages.map((message) => {
+      const { role, content } = message
+      const { tool_calls, tool_call_id } = message as { tool_calls?: unknown[]; tool_call_id?: string }
+      return {
+        role,
+        content,
+        ...(role === "assistant" && tool_calls?.length ? { tool_calls } : {}),
+        ...((role as string) === "tool" && tool_call_id ? { tool_call_id } : {})
+      }
+    })
     return this.stream<ChatChunk>("chat", { ...request, messages }, options)
   }
 

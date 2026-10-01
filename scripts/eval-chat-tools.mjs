@@ -7,6 +7,8 @@
  *   npx tsc -p . --outDir out
  *   node scripts/eval-chat-tools.mjs [model] [--base http://localhost:11434/v1] [--runs 1] [--only plain,native,text] [--limit 3]
  *   node scripts/eval-chat-tools.mjs [model] --edits [--only native,text] [--runs 1]
+ *   node scripts/eval-chat-tools.mjs [model] --context 8192     (trim as if the context were this small)
+ *   node scripts/eval-chat-tools.mjs [model] --workspace ../other-checkout   (ask about another copy of the repository)
  *
  * Edit tasks run in a throwaway git worktree of HEAD with edits applied
  * as they come (the default \`apply\` mode), then the file is checked and
@@ -36,7 +38,11 @@ const flag = (name, fallback) => {
 const model = args.find((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--")) ?? "qwen3-coder:30b"
 const base = new URL(flag("base", "http://localhost:11434/v1"))
 const runs = Number(flag("runs", "1"))
+/** The folder the questions are asked about; this repository unless another checkout is named. */
+const target = path.resolve(flag("workspace", root))
 const editing = args.includes("--edits")
+/** Plan for a context this small, to see how a model copes when old results are trimmed. */
+const contextTokens = Number(flag("context", "0")) || undefined
 const modes = flag("only", editing ? "native,text" : "plain,native,text").split(",")
 
 const provider = {
@@ -70,17 +76,22 @@ const QUESTIONS = ALL_QUESTIONS.slice(0, limit)
 const SYSTEM =
   "You are twinny, a coding assistant in the user's editor. The user's workspace is the twinny VS Code extension. Answer briefly and precisely."
 
-const ask = async (question, mode, workspace = root, edits = undefined, commands = undefined) => {
+const ask = async (question, mode, workspace = target, edits = undefined, commands = undefined) => {
   const steps = []
   const fallbacks = []
   let requests = 0
   let maxChars = 0
+  let usage = {}
+  let trimmed = 0
   const client = resolveInferenceProvider(provider)
   const chat =
     mode !== "plain"
       ? withTools(client, workspaceTools(workspace, [], { edits, commands }), {
           mode,
           onFallback: (reason) => fallbacks.push(reason),
+          onUsage: (counted) => (usage = counted),
+          onTrim: (results) => (trimmed += results),
+          ...(contextTokens ? { contextWindow: () => contextTokens } : {}),
           onStep: (step) => steps.push(step),
           onRequest: (chars) => {
             requests++
@@ -109,6 +120,8 @@ const ask = async (question, mode, workspace = root, edits = undefined, commands
     requests,
     fallbacks,
     maxChars,
+    promptTokens: usage.promptTokens ?? 0,
+    trimmed,
     seconds: (Date.now() - started) / 1000
   }
 }
@@ -128,6 +141,8 @@ for (const mode of editing ? [] : modes) {
         hitCap: r.requests > 12,
         fellBack: r.fallbacks.length > 0,
         maxChars: r.maxChars,
+        promptTokens: r.promptTokens,
+        trimmed: r.trimmed,
         seconds: r.seconds
       }
       results.push(row)
@@ -171,7 +186,8 @@ const EDIT_TASKS = [
   },
   {
     ask: "Rename WARM_INTERVAL_MS to REWARM_INTERVAL_MS everywhere it is used.",
-    files: ["src/extension/completion/warm-up.ts", "src/test/suite/warm-up.test.ts"],
+    // This script names the constant too, so renaming it here is right as well.
+    files: ["src/extension/completion/warm-up.ts", "src/test/suite/warm-up.test.ts", "scripts/eval-chat-tools.mjs"],
     file: "src/extension/completion/warm-up.ts",
     expect: /export const REWARM_INTERVAL_MS\b/,
     run: (tree) => {
@@ -300,6 +316,8 @@ if (editing) {
             hitCap: r.requests > 12,
             fellBack: r.fallbacks.length > 0,
             maxChars: r.maxChars,
+            promptTokens: r.promptTokens,
+            trimmed: r.trimmed,
             seconds: r.seconds
           }
           results.push(row)
@@ -328,7 +346,7 @@ for (const mode of modes) {
   console.log(
     `${mode.padEnd(6)} ${correct}/${rows.length} correct · avg ${avg("seconds")}s` +
       (mode !== "plain"
-        ? ` · avg ${avg("steps")} steps · ${rows.reduce((s, r) => s + r.parseErrors, 0)} unreadable calls · ${rows.filter((r) => r.hitCap).length} hit the cap · largest prompt ${Math.max(...rows.map((r) => r.maxChars))} chars · ${rows.filter((r) => r.fellBack).length} fell back`
+        ? ` · avg ${avg("steps")} steps · ${rows.reduce((s, r) => s + r.parseErrors, 0)} unreadable calls · ${rows.filter((r) => r.hitCap).length} hit the cap · largest prompt ${Math.max(...rows.map((r) => r.maxChars))} chars (${Math.max(...rows.map((r) => r.promptTokens))} tokens counted) · ${rows.reduce((s, r) => s + r.trimmed, 0)} results trimmed · ${rows.filter((r) => r.fellBack).length} fell back`
         : "")
   )
 }

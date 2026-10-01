@@ -182,7 +182,9 @@ export async function* responsesChat(
   for await (const event of events(response.body)) {
     if (options?.signal?.aborted) return
     switch (event.type) {
+      // A refusal is the model's answer too; left out, the reply would be blank.
       case "response.output_text.delta":
+      case "response.refusal.delta":
         if (event.delta) yield { content: event.delta }
         break
       case "response.reasoning_summary_text.delta":

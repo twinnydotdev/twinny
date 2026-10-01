@@ -24,6 +24,9 @@ export interface Backend {
 /** A prompt or message containing this never gets its reply. */
 export const STALL = "STALL"
 
+/** A chat containing this is refused when it offers tools, the way Ollama refuses a model without them. */
+export const NO_TOOLS = "NOTOOLS"
+
 export const startBackend = (): Promise<Backend> =>
   new Promise((resolve) => {
     const requests: BackendRequest[] = []
@@ -68,6 +71,12 @@ export const startBackend = (): Promise<Backend> =>
           return
         }
         if (req.url === "/v1/chat/completions") {
+          if (Array.isArray(body.tools) && JSON.stringify(body).includes(NO_TOOLS)) {
+            finished = true
+            res.writeHead(400, { "Content-Type": "application/json" })
+            res.end(JSON.stringify({ error: { message: `${String(body.model)} does not support tools` } }))
+            return
+          }
           res.writeHead(200, { "Content-Type": "text/event-stream" })
           const chunk = (content: string) =>
             `data: ${JSON.stringify({
@@ -77,6 +86,31 @@ export const startBackend = (): Promise<Backend> =>
               model: body.model,
               choices: [{ index: 0, delta: { content }, finish_reason: null }]
             })}\n\n`
+          const messages = (Array.isArray(body.messages) ? body.messages : []) as Array<{ role?: string }>
+          // Offered tools and not yet answered by one: read a file, or call whatever comes first.
+          if (Array.isArray(body.tools) && body.tools.length && !messages.some((m) => m.role === "tool")) {
+            const names = (body.tools as Array<{ function: { name: string } }>).map((entry) => entry.function.name)
+            const tool = names.includes("read_file") ? "read_file" : names[0]
+            const frame = (delta: Record<string, unknown>, finish: string | null, usage?: Record<string, number>) =>
+              `data: ${JSON.stringify({
+                id: "c1",
+                object: "chat.completion.chunk",
+                created: 1,
+                model: body.model,
+                choices: [{ index: 0, delta, finish_reason: finish }],
+                ...(usage ? { usage } : {})
+              })}\n\n`
+            res.write(
+              frame(
+                { tool_calls: [{ index: 0, id: "call_a", type: "function", function: { name: tool, arguments: "{\"path\":" } }] },
+                null
+              )
+            )
+            res.write(frame({ tool_calls: [{ index: 0, function: { arguments: "\"src/a.ts\"}" } }] }, null))
+            finished = true
+            res.end(`${frame({}, "tool_calls", { prompt_tokens: 40, completion_tokens: 9 })}data: [DONE]\n\n`)
+            return
+          }
           res.write(chunk("Hello"))
           if (stalls) return
           res.write(chunk(" there"))

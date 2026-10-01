@@ -15,7 +15,8 @@ const STATUS_ICON: Record<ToolStepView["status"], string> = {
   waiting: "codicon-terminal",
   done: "codicon-check",
   failed: "codicon-error",
-  skipped: "codicon-circle-slash"
+  skipped: "codicon-circle-slash",
+  stopped: "codicon-debug-stop"
 }
 
 /** `a \`b\` c` with the backticked parts set as code. */
@@ -48,7 +49,9 @@ const Step = ({ step }: { step: ToolStepView }) => {
         aria-expanded={open}
       >
         <span className={styles.glyph} aria-hidden="true">
-          <span className={cx("codicon", STATUS_ICON[step.status])} />
+          <span
+            className={cx("codicon", waiting && step.approval === "change" ? "codicon-question" : STATUS_ICON[step.status])}
+          />
         </span>
         <span className={styles.summary}>
           <Summary text={step.summary} />

@@ -8,6 +8,7 @@ import { EVENT_NAME } from "../common/constants"
 import {
   classifyDiff,
   DiffLine,
+  groupByFile,
   languageForPath,
   parseCommandRun,
   parseLocatedLines,
@@ -60,12 +61,21 @@ const Diff = ({ lines }: { lines: DiffLine[] }) => (
   </pre>
 )
 
-/** A path that opens the file, at the line when there is one (1-based). */
-const FileLink = ({ path, line, endLine }: { path: string; line?: number; endLine?: number }) => (
+interface FileLinkProps {
+  path: string
+  /** 1-based. */
+  line?: number
+  endLine?: number
+  /** Shown in place of the path and line, e.g. the line number alone under its file. */
+  label?: string
+}
+
+/** A path that opens the file, at the line when there is one. */
+const FileLink = ({ path, line, endLine, label }: FileLinkProps) => (
   <button
     type="button"
     className={styles.fileLink}
-    title={path}
+    title={line !== undefined ? `${path}:${line}` : path}
     onClick={() =>
       emit(EVENT_NAME.twinnyOpenFile, {
         path,
@@ -73,8 +83,14 @@ const FileLink = ({ path, line, endLine }: { path: string; line?: number; endLin
       })
     }
   >
-    {path}
-    {line !== undefined && <span className={styles.fileLine}>:{line}{endLine && endLine !== line ? `–${endLine}` : ""}</span>}
+    {label ?? (
+      <>
+        {path}
+        {line !== undefined && (
+          <span className={styles.fileLine}>:{line}{endLine && endLine !== line ? `–${endLine}` : ""}</span>
+        )}
+      </>
+    )}
   </button>
 )
 
@@ -182,7 +198,7 @@ export const ToolOutput = ({ step }: { step: ToolStepView }) => {
           <Args args={args} />
           <div className={styles.located}>
             {files.map((file) => (
-              <div key={file} className={styles.locatedLine}>
+              <div key={file}>
                 <FileLink path={file} />
               </div>
             ))}
@@ -205,10 +221,15 @@ export const ToolOutput = ({ step }: { step: ToolStepView }) => {
         <>
           <Args args={args} />
           <div className={styles.located}>
-            {lines.map((line, i) => (
-              <div key={i} className={styles.locatedLine}>
-                <FileLink path={line.path} line={line.line} />
-                <code>{line.text}</code>
+            {groupByFile(lines).map((group, g) => (
+              <div key={`${group.path}:${g}`} className={styles.locatedFile}>
+                <FileLink path={group.path} />
+                {group.lines.map((line, i) => (
+                  <div key={i} className={cx(styles.locatedLine, line.context && styles.locatedContext)}>
+                    <FileLink path={line.path} line={line.line} label={String(line.line)} />
+                    <code>{line.text}</code>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

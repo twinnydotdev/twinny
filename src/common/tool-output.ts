@@ -55,8 +55,6 @@ export const parseReadFile = (output: string): FileSlice | undefined => {
       note = line.slice(2)
     }
   }
-  // A file's final newline reads as an empty last line; it is not code.
-  while (code.length > 1 && !code[code.length - 1].trim()) code.pop()
   return { path: match[1], startLine: Number(match[2]), code: code.join("\n"), note }
 }
 
@@ -140,13 +138,46 @@ export interface LocatedLine {
   /** 1-based. */
   line: number
   text: string
+  /** A line shown beside a match, not a match itself. */
+  context?: boolean
 }
 
-/** `grep` and `find_symbol` output: `path:line: text` per line. */
+/**
+ * Lines that name a place: `path:line: text` each (find_symbol,
+ * diagnostics, references), or grep's grouping of a path on its own line
+ * with `line: text` under it, and `line- text` for the lines beside a
+ * match.
+ */
 export const parseLocatedLines = (output: string): LocatedLine[] | undefined => {
-  const lines = output.split("\n").filter((line) => line.trim())
-  const parsed = lines.map((line) => line.match(/^([^:\n]+):(\d+): (.*)$/))
-  const matched = parsed.filter((match): match is RegExpMatchArray => !!match)
-  if (!matched.length) return undefined
-  return matched.map((match) => ({ path: match[1], line: Number(match[2]), text: match[3] }))
+  const located: LocatedLine[] = []
+  let file: string | undefined
+  for (const line of output.split("\n")) {
+    if (!line.trim() || line === "--" || line.startsWith("… ") || line.startsWith("(")) continue
+    const flat = line.match(/^([^:\n]+):(\d+): (.*)$/)
+    if (flat) {
+      located.push({ path: flat[1], line: Number(flat[2]), text: flat[3] })
+      continue
+    }
+    const numbered = line.match(/^(\d+)([:-]) ?(.*)$/)
+    if (numbered && file) {
+      located.push({
+        path: file,
+        line: Number(numbered[1]),
+        text: numbered[3],
+        ...(numbered[2] === "-" ? { context: true } : {})
+      })
+    } else if (!numbered) file = line
+  }
+  return located.some((line) => !line.context) ? located : undefined
+}
+
+/** Located lines gathered under their file, in the order the files first appear. */
+export const groupByFile = (lines: LocatedLine[]): { path: string; lines: LocatedLine[] }[] => {
+  const groups: { path: string; lines: LocatedLine[] }[] = []
+  for (const line of lines) {
+    const last = groups[groups.length - 1]
+    if (last?.path === line.path) last.lines.push(line)
+    else groups.push({ path: line.path, lines: [line] })
+  }
+  return groups
 }

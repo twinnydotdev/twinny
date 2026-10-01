@@ -633,7 +633,8 @@
           "order": 20,
           "type": "boolean",
           "default": false,
-          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, see what you have open and selected, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review. Files ignored by `.gitignore` are off limits. Each step shows in the reply. Needs a capable coder model such as `qwen3-coder:30b`; small models tend to call tools badly."
+          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, and by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review; commands ask first unless `#twinny.chatToolsCommands#` says otherwise. Files ignored by a `.gitignore` are off limits, and changes to `.vscode/` or a `.gitignore` are always shown for review. Each step shows above the reply. Needs a capable coder model such as `qwen3-coder:30b` with a context of 8k tokens or more; small models tend to call tools badly. Set in your user settings; a workspace cannot turn it on.",
+          "scope": "machine"
         },
         "twinny.chatToolsEdits": {
           "order": 20,
@@ -643,11 +644,12 @@
             "review"
           ],
           "enumDescriptions": [
-            "Edits go straight into the file and are saved; the model carries on until the task is done. Ctrl+Z in the file undoes an edit.",
-            "Each edit opens as a diff to accept or reject, and the model stops until you have decided."
+            "Edits go straight into the file and are saved; the model carries on until the task is done. Ctrl+Z in the file undoes an edit. Deleting a file git has no copy of still asks first.",
+            "Each edit opens as a diff to accept or reject, and the model stops until you have decided. Renames, moves and deletes ask in the chat."
           ],
           "default": "apply",
-          "markdownDescription": "What happens when the chat model edits a file (with `#twinny.chatTools#` on)."
+          "markdownDescription": "What happens when the chat model changes a file (with `#twinny.chatTools#` on).",
+          "scope": "machine"
         },
         "twinny.chatToolsCommands": {
           "order": 20,
@@ -658,12 +660,13 @@
             "off"
           ],
           "enumDescriptions": [
-            "Each command the model wants to run is shown with Run and Skip first.",
-            "Commands run straight away in the Twinny terminal. A command cannot be undone like an edit can.",
+            "Each command the model wants to run is shown in the chat with Run and Skip first.",
+            "Commands run straight away in a terminal. A command cannot be undone like an edit can.",
             "The model cannot run commands."
           ],
           "default": "ask",
-          "markdownDescription": "Whether the chat model may run shell commands (tests, builds, git) in the Twinny terminal, with `#twinny.chatTools#` on. It sees the exit code and the end of the output."
+          "markdownDescription": "Whether the chat model may run shell commands (tests, builds) in the **twinny tools** terminal, with `#twinny.chatTools#` on. It sees the exit code and the end of the output. Reading git (status, diff, log) never asks: it cannot change anything.",
+          "scope": "machine"
         },
         "twinny.githubToken": {
           "order": 21,
@@ -755,7 +758,7 @@
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",
-    "fluency.js": "^1.0.30",
+    "fluency.js": "^1.0.31",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",

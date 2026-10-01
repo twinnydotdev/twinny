@@ -362,5 +362,9 @@
   "tool-output": "output",
   "tool-hit-not-shown": "not shown to keep the reply short; the model can read the file",
   "tool-change-waiting": "make this change?",
-  "tool-apply": "Apply"
+  "tool-apply": "Apply",
+  "reply-context": "{{used}} context",
+  "reply-context-of": "{{used}} / {{window}} context",
+  "reply-context-title": "The conversation now takes {{used}} tokens of the model's context, as the server counted this reply's largest request.",
+  "reply-context-of-title": "The conversation now takes {{used}} of the {{window}} tokens this model is loaded to hold. As it fills, older tool results are trimmed; past full, the server drops the oldest messages."
 }

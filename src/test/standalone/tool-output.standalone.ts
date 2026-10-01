@@ -10,6 +10,7 @@ import { test } from "node:test"
 
 import {
   classifyDiff,
+  groupByFile,
   languageForPath,
   parseCommandRun,
   parseLocatedLines,
@@ -30,7 +31,7 @@ test("read_file output comes back as the file slice, with a real tool's output",
   assert.strictEqual(slice.code.split("\n").length, 150)
   assert.match(slice.note ?? "", /read on with start_line 160/)
   assert.strictEqual(parseReadFile("a.ts does not exist."), undefined)
-  assert.strictEqual(parseReadFile("b.ts (lines 1–3 of 3)\n1: x\n2: y\n3: ")?.code, "x\ny")
+  assert.strictEqual(parseReadFile("b.ts (lines 1–2 of 2)\n1: x\n2: y")?.code, "x\ny")
 })
 
 test("a command's diff is recognised and classified line by line", () => {
@@ -59,6 +60,21 @@ test("search hits and located lines keep their paths and lines", () => {
     { path: "src/a.ts", line: 12, text: "export class A {" }
   ])
   assert.strictEqual(parseLocatedLines("No matches."), undefined)
+  // grep groups its matches under each file.
+  const grouped = parseLocatedLines("(Nothing matched as a regular expression; these match the text as written.)\nsrc/a.ts\n3: const a = 1\n9: a + 1\n… 4 more in this file\nsrc/b.ts\n1: import { a }")
+  assert.deepStrictEqual(grouped, [
+    { path: "src/a.ts", line: 3, text: "const a = 1" },
+    { path: "src/a.ts", line: 9, text: "a + 1" },
+    { path: "src/b.ts", line: 1, text: "import { a }" }
+  ])
+  assert.deepStrictEqual(groupByFile(grouped ?? []).map((g) => [g.path, g.lines.length]), [["src/a.ts", 2], ["src/b.ts", 1]])
+  // A few matches come with the lines beside them, as rg -C prints them.
+  assert.deepStrictEqual(parseLocatedLines("package.json\n361-       {\n362:         \"key\": \"ctrl+i\",\n363-         \"mac\": \"cmd+i\",\n--\n400: x"), [
+    { path: "package.json", line: 361, text: "      {", context: true },
+    { path: "package.json", line: 362, text: "        \"key\": \"ctrl+i\"," },
+    { path: "package.json", line: 363, text: "        \"mac\": \"cmd+i\",", context: true },
+    { path: "package.json", line: 400, text: "x" }
+  ])
 })
 
 test("languages come from file names", () => {

@@ -128,6 +128,51 @@ const reasoningOf = (delta: unknown): string | undefined => {
   return typeof text === "string" && text ? text : undefined
 }
 
+/** One server, as far as what it accepts goes. */
+const serverKey = (provider: TwinnyProvider) =>
+  [provider.provider, provider.apiHostname ?? "", provider.apiPort ?? "", provider.apiPath ?? ""].join("|")
+
+/** Servers that turned `stream_options` down; it is not sent to them again. */
+const refusedStreamOptions = new Set<string>()
+
+/**
+ * OpenAI-style servers count a streamed request's tokens only when asked
+ * with `stream_options` (Ollama, llama.cpp, LM Studio and OpenAI itself all
+ * take it). The count is what lets a reply say how much of the model's
+ * context it used. QVAC's own server is left out: it is not known to.
+ */
+const asksForUsage = (provider: TwinnyProvider) =>
+  (provider.provider === API_PROVIDERS.OpenAI ||
+    (isOpenAICompatibleProvider(provider.provider) && provider.provider !== API_PROVIDERS.Qvac)) &&
+  !refusedStreamOptions.has(serverKey(provider))
+
+const usesTools = (messages: ChatMessage[], parameters: ChatParameters) =>
+  !!parameters.tools?.length ||
+  messages.some(
+    (message) => message.role === "tool" || !!(message as { tool_calls?: unknown[] }).tool_calls?.length
+  )
+
+/**
+ * A tool conversation sends its system prompt, its tool list and every
+ * earlier step again with each request. Anthropic caches a prefix it is
+ * told to (a tenth of the price to read back, and faster). Two marks: the
+ * system prompt, which covers the tools before it and never changes, and
+ * the newest tool result, which covers the conversation so far; the next
+ * step reads that back and marks its own newest result. Other providers
+ * cache on their own or not at all, and plain chats are too short-lived to
+ * be worth the write.
+ */
+const withCacheBreakpoints = (messages: ChatMessage[]): ChatMessage[] => {
+  const system = messages.findIndex((message) => message.role === "system")
+  const result = messages.map((message) => message.role as string).lastIndexOf("tool")
+  if (system === -1 && result === -1) return messages
+  return messages.map((message, index) =>
+    index === system || index === result
+      ? ({ ...message, cache_control: { type: "ephemeral" } } as ChatMessage)
+      : message
+  )
+}
+
 /**
  * Everything here is forwarded to the provider as-is, so it must carry only
  * real API parameters.
@@ -136,14 +181,21 @@ export const buildStreamingRequest = (
   provider: TwinnyProvider,
   messages: ChatMessage[],
   parameters: ChatParameters = {}
-): CompletionStreaming<LLMProvider> => ({
-  messages: flattenTextContent(messages),
-  model: provider.modelName,
-  stream: true,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  provider: getFluencyProvider(provider) as any,
-  ...requestParameters(provider, parameters)
-})
+): CompletionStreaming<LLMProvider> => {
+  const flat = flattenTextContent(messages)
+  return {
+    messages:
+      provider.provider === API_PROVIDERS.Anthropic && usesTools(messages, parameters)
+        ? withCacheBreakpoints(flat)
+        : flat,
+    model: provider.modelName,
+    stream: true,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    provider: getFluencyProvider(provider) as any,
+    ...(asksForUsage(provider) ? { stream_options: { include_usage: true } } : {}),
+    ...requestParameters(provider, parameters)
+  } as CompletionStreaming<LLMProvider>
+}
 
 export const buildBlockingRequest = (
   provider: TwinnyProvider,
@@ -186,7 +238,16 @@ export async function* fluencyChat(
   if (supportsStreaming(config)) {
     const body = buildStreamingRequest(config, messages, request)
     logRequest(`${config.provider}/chat.completions (stream)`, body)
-    const parts = await client.chat.completions.create(body)
+    const parts = await client.chat.completions.create(body).catch((error: unknown) => {
+      // A strict server that does not know `stream_options` says so by
+      // name; it is asked again without, and not asked for counts again.
+      const asked = "stream_options" in body
+      if (!asked || !/stream_options|include_usage/i.test(error instanceof Error ? error.message : String(error))) {
+        throw error
+      }
+      refusedStreamOptions.add(serverKey(config))
+      return client.chat.completions.create(buildStreamingRequest(config, messages, request))
+    })
     const toolCalls = toolCallCollector()
     for await (const part of parts) {
       if (options?.signal?.aborted) break

@@ -20,6 +20,16 @@ const contentText = (content: ChatCompletionMessage["content"]): string => {
 const contentLength = (content: ChatCompletionMessage["content"]) =>
   contentText(content).length
 
+/** What a feature adds to a reply as it ends. */
+export interface ReplyExtras {
+  /** What the reply's tools were asked and returned, kept with it for the next turn; never shown. */
+  toolNotes?(): string | undefined
+  /** More about how the reply came about, read once it has ended. */
+  meta?(): Partial<ReplyMeta>
+  /** True when the reply is worth keeping with no text: its tools ran, and their steps are its record. */
+  keepEmpty?(): boolean
+}
+
 /**
  * One chat request from start to finish: a run on the generation tracker
  * (which owns the spinner and the stop keybinding), streaming partial text to
@@ -70,7 +80,7 @@ export class ChatGeneration {
     request: ChatRequest,
     provider: TwinnyProvider,
     prefix = "",
-    modelText?: () => string | undefined
+    extras: ReplyExtras = {}
   ): Promise<string> {
     if (this._cancelled) return ""
     const run = this._generations.start("chat")
@@ -81,6 +91,7 @@ export class ChatGeneration {
     const meta: ReplyMeta = { model: provider.modelName, provider: provider.label }
     const finish = (): ReplyMeta => ({
       ...meta,
+      ...extras.meta?.(),
       durationMs: Date.now() - started,
       ...(run.signal.aborted ? { stopped: true } : {})
     })
@@ -100,6 +111,9 @@ export class ChatGeneration {
           if (chunk.usage?.completionTokens) {
             meta.completionTokens = chunk.usage.completionTokens
           }
+          if (chunk.usage?.promptTokens) {
+            meta.promptTokens = chunk.usage.promptTokens
+          }
           text += chunk.content
           this._bridge.emit(EVENT_NAME.twinnyOnCompletion, {
             content: text.trimStart() || " ",
@@ -117,14 +131,14 @@ export class ChatGeneration {
           (run.signal.aborted ? " · stopped by the user" : "")
       )
       logger.block("Chat reply", reply)
-      if (reply) this.addMessage(reply, finish(), modelText?.())
+      if (reply || extras.keepEmpty?.()) this.addMessage(reply, finish(), extras.toolNotes?.())
       return reply
     } catch (error) {
       run.abort()
       // Keep whatever streamed before the failure; it is still useful.
       // A bare heading is not.
       const partial = text.trim() === prefix.trim() ? "" : text.trim()
-      if (partial) this.addMessage(partial, finish())
+      if (partial || extras.keepEmpty?.()) this.addMessage(partial, finish(), extras.toolNotes?.())
       this.report(error, provider)
       return partial
     } finally {
@@ -134,12 +148,12 @@ export class ChatGeneration {
     }
   }
 
-  private addMessage(content: string, meta?: ReplyMeta, prompt?: string) {
+  private addMessage(content: string, meta?: ReplyMeta, toolNotes?: string) {
     this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
       content,
       role: ASSISTANT,
       ...(meta ? { meta } : {}),
-      ...(prompt ? { prompt } : {})
+      ...(toolNotes ? { toolNotes } : {})
     })
   }
 

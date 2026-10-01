@@ -12,7 +12,7 @@
  */
 import * as cheerio from "cheerio"
 
-import { SYSTEM, TOP_LEVEL_MENTIONS, USER } from "../../common/constants"
+import { ASSISTANT, SYSTEM, TOP_LEVEL_MENTIONS, USER } from "../../common/constants"
 import { ChatCompletionMessage } from "../../common/types"
 
 export type ContextSource = "workspace" | "problems" | "git" | "terminal"
@@ -62,14 +62,23 @@ export const composerText = (html: string): string => {
 
 /**
  * What the model is sent for one message of the webview's conversation:
- * the prompt a feature recorded for it, a user turn as plain text, anything
- * else as it is.
+ * the prompt a feature recorded for a user turn, a user turn as plain
+ * text, a reply as it was shown.
  */
 const modelText = (message: ChatCompletionMessage): string => {
-  if (message.prompt !== undefined) return message.prompt
   const content = typeof message.content === "string" ? message.content : ""
+  if (message.role === ASSISTANT) {
+    // A reply goes back as it was shown, whatever else was recorded with
+    // it. One stopped before any text (its tools ran, and their notes say
+    // what they did) still takes its turn: a blank one is refused by some
+    // providers, and a missing one puts two user turns in a row.
+    return content.trim() ? content : STOPPED_REPLY
+  }
+  if (message.prompt !== undefined) return message.prompt
   return message.role === USER ? withoutSources(composerText(content)) : content
 }
+
+const STOPPED_REPLY = "(This reply was stopped before any text was written.)"
 
 /** The API shape: text, plus image parts when the user attached any. */
 const toApiMessage = (
@@ -107,6 +116,18 @@ export interface TurnContext {
 }
 
 /**
+ * What the previous reply's tools were asked and returned comes with the
+ * new question, once: as context from the user's side, and not in the
+ * reply itself. A model shown a transcript in its own earlier turn writes
+ * the next one the same way, tool results and all, without calling a tool
+ * (qwen3-coder did, one follow-up in three). Older replies carry only
+ * their answers, which already say what they found.
+ */
+const TOOL_NOTES_HEADER =
+  "[For reference: the tool calls and results behind your previous reply. The user did not see them.]"
+const NEW_MESSAGE_HEADER = "[The user's new message:]"
+
+/**
  * The messages to send for the webview's conversation, whose last message
  * is the user's new question.
  */
@@ -126,9 +147,14 @@ export const buildChatTurn = async (
     contextSources(said),
     history.map(({ message, text }) => ({ ...message, content: text }) as ChatCompletionMessage)
   )
+  const previous = messages[messages.length - 2]
+  const notes = previous?.role === ASSISTANT ? previous.toolNotes?.trim() : undefined
+  // The notes go before the question and the question's own context after
+  // it: what the user is asking now is what the message should end on.
+  const asked = `${question}\n\n${extra.trim()}`.trim()
   return [
     { role: SYSTEM, content: await context.systemPrompt() },
     ...history.map(({ message, text }) => toApiMessage(message, text)),
-    toApiMessage(last, `${question}\n\n${extra.trim()}`.trim())
+    toApiMessage(last, notes ? `${TOOL_NOTES_HEADER}\n${notes}\n\n${NEW_MESSAGE_HEADER}\n${asked}` : asked)
   ]
 }

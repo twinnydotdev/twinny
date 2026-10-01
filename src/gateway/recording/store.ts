@@ -44,7 +44,7 @@ export interface RecordingRecord {
   usage?: RecordingUsage
   /** The request as the protocol received it, minus the alias. */
   request: unknown
-  /** The reply: `{ content }` for chat, `{ text }` for fim, `{ count, dimensions }` for embeddings. */
+  /** The reply: `{ content, toolCalls?, finishReason? }` for chat, `{ text }` for fim, `{ count, dimensions }` for embeddings. */
   response: unknown
 }
 
@@ -105,9 +105,13 @@ export const previewOf = (record: RecordingRecord): string => {
   const request = record.request as Record<string, unknown> | undefined
   let text = ""
   if (record.route === "chat" && Array.isArray(request?.messages)) {
-    const users = (request?.messages as Array<{ role?: string; content?: unknown }>).filter((m) => m.role === "user")
+    const messages = request?.messages as Array<{ role?: string; content?: unknown }>
+    const users = messages.filter((m) => m.role === "user")
     const last = users[users.length - 1]
     text = typeof last?.content === "string" ? last.content : JSON.stringify(last?.content ?? "")
+    // A tool run asks the same question once per step; the steps so far tell its rows apart.
+    const results = messages.slice(messages.lastIndexOf(last) + 1).filter((m) => m.role === "tool").length
+    if (results) text = `after ${results} tool result${results === 1 ? "" : "s"} · ${text}`
   } else if (record.route === "fim" && typeof request?.prompt === "string") {
     text = request.prompt.slice(-160)
   } else if (record.route === "embeddings") {
