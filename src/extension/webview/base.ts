@@ -257,7 +257,8 @@ export class BaseProvider {
         )
       }),
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (!event.affectsConfiguration("twinny")) return
+        // A new locale remounts the whole webview, so only a change to it is sent.
+        if (!event.affectsConfiguration("twinny.locale")) return
         bridge.emit(EVENT_NAME.twinnySetLocale, this.getLocale())
       })
     )

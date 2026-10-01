@@ -18,6 +18,7 @@ import {
   MentionType
 } from "../common/types"
 
+import { useAgentMode } from "./hooks/useAgentMode"
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useConversationHistory } from "./hooks/useConversationHistory"
 import { useProviders } from "./hooks/useProviders"
@@ -58,6 +59,17 @@ const loadPromptHistory = (): string[] => {
   }
 }
 
+interface QueuedMessage {
+  id: string
+  /** As the composer had it, so it can go back there. */
+  html: string
+  /** As sent: paragraphs joined with line breaks. */
+  input: string
+  text: string
+  mentions: MentionType[]
+  images: ImageAttachment[]
+}
+
 interface ChatProps {
   fullScreen?: boolean
   active?: boolean
@@ -88,6 +100,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   } = useWorkspaceSearch()
   const { steps: toolSteps, clear: clearToolSteps, take: takeToolSteps } = useToolSteps()
   const [isBottom, setIsBottom] = useState(false)
+  const { agentMode, toggleAgentMode } = useAgentMode()
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -101,6 +114,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const recallIndexRef = useRef(-1)
   const draftRef = useRef("")
   const [showShortcuts, setShowShortcuts] = useState(false)
+  /*
+   * Messages typed while a reply is running: each goes out when the one
+   * before it is answered. Stopping the reply puts them back in the
+   * composer instead, since what they followed on from was cut short.
+   */
+  const [queued, setQueued] = useState<QueuedMessage[]>([])
+  const queuedRef = useRef<QueuedMessage[]>([])
+  const userStoppedRef = useRef(false)
   const showShortcutsRef = useRef(false)
   const lastEscapeRef = useRef(0)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -173,6 +194,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   useServerEvent(EVENT_NAME.twinnyOnLoading, () => setIsLoading(true))
 
   useServerEvent(EVENT_NAME.twinnyNewConversation, () => {
+    updateQueue([])
     setMessages([])
     setCompletion(null)
     clearSearchReport()
@@ -195,12 +217,40 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setCompletion(null)
     stopRef.current = false
     generatingRef.current = false
+    const stopped = userStoppedRef.current
+    userStoppedRef.current = false
+    const [next, ...rest] = queuedRef.current
+    if (next && !stopped) {
+      updateQueue(rest)
+      // After this event's own state updates, so the reply is in the transcript first.
+      setTimeout(() => sendRef.current(next), 0)
+      return
+    }
+    if (next) restoreQueue()
     setTimeout(() => {
       chatRef.current?.focus()
     }, 200)
   })
 
+  const updateQueue = (next: QueuedMessage[]) => {
+    queuedRef.current = next
+    setQueued(next)
+  }
+
+  /* Queued messages back in the composer, after anything already typed there. */
+  const restoreQueue = () => {
+    const editor = editorRef.current
+    const waiting = queuedRef.current
+    updateQueue([])
+    if (!editor || !waiting.length) return
+    const draft = editor.isEmpty ? "" : editor.getHTML()
+    editor.commands.setContent(draft + waiting.map((message) => message.html).join(""), false)
+    imagesRef.current = [...imagesRef.current, ...waiting.flatMap((message) => message.images)]
+    editor.commands.focus("end")
+  }
+
   const handleStopGeneration = useCallback(() => {
+    userStoppedRef.current = true
     emit(EVENT_NAME.twinnyStopGeneration)
   }, [])
 
@@ -359,6 +409,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   const stopIfGenerating = useCallback(() => {
     if (!generatingRef.current) return false
+    userStoppedRef.current = true
     emit(EVENT_NAME.twinnyStopGeneration)
     return true
   }, [])
@@ -408,9 +459,51 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   useEffect(() => () => clearTimeout(hintTimerRef.current), [])
 
+  /** One message to the model: into the transcript and out to the extension. */
+  const sendMessage = (message: QueuedMessage) => {
+    generatingRef.current = true
+    setIsLoading(true)
+    clearSearchReport()
+    clearToolSteps()
+
+    const conversationId = conversation?.id || uuidv4()
+
+    setMessages((prevMessages) => {
+      const updatedMessages: ChatCompletionMessage[] = [
+        ...(prevMessages || []),
+        {
+          role: USER,
+          content: message.input,
+          images: message.images.length > 0 ? message.images : undefined
+        }
+      ]
+
+      const currentConversation = {
+        id: conversationId,
+        messages: updatedMessages,
+        title: conversation?.title || t("chat-new-conversation-title")
+      }
+
+      saveLastConversation(currentConversation)
+      setActiveConversation(currentConversation)
+
+      emit(EVENT_NAME.twinnyChatMessage, {
+        messages: updatedMessages,
+        mentions: message.mentions,
+        conversationId
+      })
+
+      return updatedMessages
+    })
+  }
+  // The queue sends from an event handler; it always reaches this render's.
+  const sendRef = useRef(sendMessage)
+  sendRef.current = sendMessage
+
+  /** Sends the composer's message, or queues it while a reply is running. */
   const handleSubmitForm = useCallback(() => {
-    const input = editorRef.current
-      ?.getHTML()
+    const html = editorRef.current?.getHTML() || ""
+    const input = html
       .replace(/<p>/g, "")
       .replace(/<\/p>/g, "<br>")
       .replace(/<br>$/, "")
@@ -421,50 +514,26 @@ export const Chat = (props: ChatProps): JSX.Element => {
       .text()
       .trim()
 
-    if (!text || generatingRef.current || !input || chatDisabled) return
+    if (!text || !input || chatDisabled) return
 
-    generatingRef.current = true
-
-    const mentions = getMentions()
-
-    setIsLoading(true)
-    clearSearchReport()
-    clearToolSteps()
+    const message: QueuedMessage = {
+      id: uuidv4(),
+      html,
+      input,
+      text,
+      mentions: getMentions(),
+      images: imagesRef.current
+    }
+    imagesRef.current = []
     clearEditor()
+    rememberPrompt(html)
 
-    rememberPrompt(editorRef.current?.getHTML() || "")
-
-    const conversationId = conversation?.id || uuidv4()
-
-    setMessages((prevMessages) => {
-      const updatedMessages: ChatCompletionMessage[] = [
-        ...(prevMessages || []),
-        {
-          role: USER,
-          content: input,
-          images: imagesRef.current.length > 0 ? imagesRef.current : undefined
-        }
-      ]
-
-      const currentConversation = {
-        id: conversationId,
-        messages: updatedMessages,
-        title: conversation?.title || t("chat-new-conversation-title")
-      }
-
-      imagesRef.current = []
-      saveLastConversation(currentConversation)
-      setActiveConversation(currentConversation)
-
-      emit(EVENT_NAME.twinnyChatMessage, {
-        messages: updatedMessages,
-        mentions,
-        conversationId
-      })
-
-      return updatedMessages
-    })
-  }, [conversation?.id, t, chatDisabled, clearSearchReport, clearToolSteps])
+    if (generatingRef.current) {
+      updateQueue([...queuedRef.current, message])
+      return
+    }
+    sendRef.current(message)
+  }, [chatDisabled])
 
   /*
    * A stopped reply is picked up by asking for the rest. The transcript
@@ -632,6 +701,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           interrupt: handleInterrupt,
           newConversation: startNewConversation,
           toggleShortcuts,
+          toggleAgentMode,
           scrollTranscript
         }),
         Placeholder.configure({
@@ -982,8 +1052,31 @@ export const Chat = (props: ChatProps): JSX.Element => {
             )
           )}
         </div>
-        <div className={styles.composer}>
+        <div className={cx(styles.composer, { [styles.agentBusy]: agentMode && (isLoading || generatingRef.current) })}>
           {showShortcuts && <Shortcuts />}
+          {!!queued.length && (
+            <ol className={styles.queue} aria-label={t("queued-title")}>
+              {queued.map((message) => (
+                <li key={message.id} className={styles.queued}>
+                  <span className={styles.queuedLabel}>{t("queued")}</span>
+                  <span className={styles.queuedText} title={message.text}>
+                    {message.text}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.queuedRemove}
+                    onClick={() =>
+                      updateQueue(queuedRef.current.filter((entry) => entry.id !== message.id))
+                    }
+                    title={t("queued-remove")}
+                    aria-label={t("queued-remove")}
+                  >
+                    <i className="codicon codicon-close" />
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
           <div
             role="separator"
             aria-orientation="horizontal"
@@ -1000,7 +1093,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
           <form onDrop={handleDrop} onPaste={handlePaste}>
             <div
               className={cx(styles.chatBox, {
-                [styles.chatBoxDisabled]: chatDisabled
+                [styles.chatBoxDisabled]: chatDisabled,
+                [styles.agent]: agentMode
               })}
               title={chatDisabled ? t("chat-disabled-no-provider") : undefined}
               onMouseDown={handleComposerMouseDown}
@@ -1014,7 +1108,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 style={{ display: "none" }}
               />
               <span className={styles.prompt} aria-hidden="true">
-                &#10095;
+                {agentMode ? <>&#10095;&#10095;</> : <>&#10095;</>}
               </span>
               <div
                 ref={editorWrapRef}
@@ -1030,6 +1124,18 @@ export const Chat = (props: ChatProps): JSX.Element => {
                   editor={editorRef.current}
                 />
               </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={agentMode}
+                disabled={chatDisabled}
+                className={cx(styles.agentToggle, { [styles.agentToggleOn]: agentMode })}
+                onClick={toggleAgentMode}
+                title={t(agentMode ? "agent-mode-on-title" : "agent-mode-off-title")}
+              >
+                <span className={styles.agentDot} aria-hidden="true" />
+                {t(agentMode ? "agent-mode-on" : "agent-mode")}
+              </button>
               <div className={styles.chatButtons}>
                 <VSCodeButton
                   appearance="icon"

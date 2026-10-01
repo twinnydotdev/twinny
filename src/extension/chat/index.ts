@@ -5,6 +5,7 @@ import {
   ASSISTANT,
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
+  GLOBAL_STORAGE_KEY,
   SYSTEM,
   USER,
   WEBUI_TABS
@@ -235,12 +236,23 @@ export class Chat extends Base {
   }
 
   /**
+   * Agent mode, as the composer's switch left it (stored the way the webview
+   * stores global values). Until it is first switched, `twinny.chatTools`.
+   */
+  private agentMode(): boolean {
+    const stored = this.context?.globalState.get<boolean>(
+      `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.agentMode}`
+    )
+    return stored ?? this.config.get<boolean>("chatTools", false)
+  }
+
+  /**
    * The workspace as the tools will see it, when the user has tools on
    * and a folder open. Made once per reply: its ignore rules are read at
    * the start and hold until the end.
    */
   private toolsView(): WorkspaceView | undefined {
-    if (!this.config.get<boolean>("chatTools", false)) return undefined
+    if (!this.agentMode()) return undefined
     const root = workspace.workspaceFolders?.[0]?.uri.fsPath
     if (!root) return undefined
     return new WorkspaceView(root, this.config.get<string[]>("embeddingIgnoredGlobs", []), openDocumentText)

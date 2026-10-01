@@ -86,6 +86,12 @@ export const CustomKeyMap = Extension.create({
         if (!editor.isEmpty) return false
         return this.options.toggleShortcuts?.() ?? false
       },
+      // Agent mode on and off, where Claude Code switches its modes.
+      "Shift-Tab": ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.toggleAgentMode?.() ?? false
+      },
       PageUp: () => this.options.scrollTranscript?.(-1) ?? false,
       PageDown: () => this.options.scrollTranscript?.(1) ?? false,
       // Earlier prompts, as in a shell: from an empty composer, or while
