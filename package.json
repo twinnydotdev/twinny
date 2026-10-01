@@ -629,6 +629,42 @@
           "default": true,
           "markdownDescription": "Writes what Twinny is doing to the **Twinny** output channel: one line per completion or chat request with model, timing, size and why it stopped. Set the channel's log level to *Debug* (the dropdown in the Output panel) to also see the prompts and replies. Warnings and errors are written even when this is off."
         },
+        "twinny.chatTools": {
+          "order": 20,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, see what you have open and selected, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review. Files ignored by `.gitignore` are off limits. Each step shows in the reply. Needs a capable coder model such as `qwen3-coder:30b`; small models tend to call tools badly."
+        },
+        "twinny.chatToolsEdits": {
+          "order": 20,
+          "type": "string",
+          "enum": [
+            "apply",
+            "review"
+          ],
+          "enumDescriptions": [
+            "Edits go straight into the file and are saved; the model carries on until the task is done. Ctrl+Z in the file undoes an edit.",
+            "Each edit opens as a diff to accept or reject, and the model stops until you have decided."
+          ],
+          "default": "apply",
+          "markdownDescription": "What happens when the chat model edits a file (with `#twinny.chatTools#` on)."
+        },
+        "twinny.chatToolsCommands": {
+          "order": 20,
+          "type": "string",
+          "enum": [
+            "ask",
+            "allow",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Each command the model wants to run is shown with Run and Skip first.",
+            "Commands run straight away in the Twinny terminal. A command cannot be undone like an edit can.",
+            "The model cannot run commands."
+          ],
+          "default": "ask",
+          "markdownDescription": "Whether the chat model may run shell commands (tests, builds, git) in the Twinny terminal, with `#twinny.chatTools#` on. It sees the exit code and the end of the output."
+        },
         "twinny.githubToken": {
           "order": 21,
           "type": "string",
@@ -719,7 +755,7 @@
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",
-    "fluency.js": "^1.0.29",
+    "fluency.js": "^1.0.30",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",

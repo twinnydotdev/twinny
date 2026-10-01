@@ -1,7 +1,7 @@
 import React, { memo } from "react"
 
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, MentionType, } from "../common/types"
+import { ChatCompletionMessage, MentionType, ToolStepView } from "../common/types"
 
 import Message from "./message"
 import TypingIndicator from "./typing-indicator"
@@ -12,6 +12,8 @@ interface MessageListProps {
   completion?: ChatCompletionMessage | null
   /** The workspace search for the reply in progress, shown under it. */
   context?: WorkspaceSearchReport
+  /** The tool steps of the reply in progress, shown above it. */
+  steps?: ToolStepView[]
   isLoading: boolean
   index: number
   generatingRef: React.RefObject<boolean>
@@ -35,6 +37,7 @@ const MessageItem = memo(
     messages,
     completion,
     context,
+    steps,
     isLoading,
     index,
     handleDeleteMessage,
@@ -86,6 +89,7 @@ const MessageItem = memo(
             isAssistant={true}
             message={completion}
             context={context}
+            steps={steps}
             index={index}
             isLoading={isLoading}
             messages={messages}
@@ -96,7 +100,7 @@ const MessageItem = memo(
           />
         )}
         {isLoading && !completion && isLastMessage && (
-          <TypingIndicator context={context} />
+          <TypingIndicator context={context} steps={steps} />
         )}
       </>
     )

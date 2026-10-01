@@ -239,6 +239,7 @@ export class BaseProvider {
           .update(key, value, vscode.ConfigurationTarget.Global),
       [EVENT_NAME.twinnySidebarReady]: () => this._sidebarReadyHandler?.(),
       [EVENT_NAME.twinnyStopGeneration]: () => this.destroyStream(),
+      [EVENT_NAME.twinnyToolApproval]: ({ id, run }) => this.chat?.answerToolApproval(id, run),
       [EVENT_NAME.twinnySymbolSearch]: ({ query }) => searchSymbols(query),
       [EVENT_NAME.twinnyTextSelection]: () => getTextSelection()
     })

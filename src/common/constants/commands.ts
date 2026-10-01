@@ -7,6 +7,8 @@ export const TWINNY_COMMAND_NAME = {
   acceptEdit: "twinny.acceptEdit",
   rejectEdit: "twinny.rejectEdit",
   applyCode: "twinny.applyCode",
+  chatFileEdit: "twinny.chatFileEdit",
+  chatFileCreate: "twinny.chatFileCreate",
   embeddings: "twinny.embeddings",
   enable: "twinny.enable",
   review: "twinny.review",

@@ -28,11 +28,6 @@ interface MainProps {
 export const Main = ({ fullScreen }: MainProps) => {
   const [tab, setTab] = useState<string | undefined>(WEBUI_TABS.chat)
   const { locale, renderKey } = useLocale()
-  const tabsWithProps = {
-    [WEBUI_TABS.chat]: <Chat fullScreen={fullScreen} />,
-    // Setting up the first chat provider lands back in the chat, ready to go.
-    [WEBUI_TABS.providers]: <Providers onDone={() => setTab(WEBUI_TABS.chat)} />
-  }
 
   useServerEvent(EVENT_NAME.twinnySetTab, setTab)
   useServerEvent(PROVIDER_EVENT_NAME.focusProviderTab, setTab)
@@ -41,25 +36,22 @@ export const Main = ({ fullScreen }: MainProps) => {
     return null
   }
 
-  if (tab === WEBUI_TABS.history) {
-    return (
-      <div className={styles.page}>
-        <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
-      </div>
+  const onChat = tab === WEBUI_TABS.chat
+  const page =
+    tab === WEBUI_TABS.history ? (
+      <ConversationHistory onSelect={() => setTab(WEBUI_TABS.chat)} />
+    ) : tab === WEBUI_TABS.providers ? (
+      <Providers onDone={() => setTab(WEBUI_TABS.chat)} />
+    ) : (
+      tabs[tab]
     )
-  }
-
-  const allTabs = { ...tabs, ...tabsWithProps }
-
-  const element: JSX.Element = allTabs[tab]
 
   return (
-    <div
-      key={renderKey}
-      data-locale={locale}
-      className={tab === WEBUI_TABS.chat ? undefined : styles.page}
-    >
-      {element}
+    <div key={renderKey} data-locale={locale}>
+      <div hidden={!onChat}>
+        <Chat fullScreen={fullScreen} active={onChat} />
+      </div>
+      {!onChat && <div className={styles.page}>{page}</div>}
     </div>
   )
 }

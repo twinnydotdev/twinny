@@ -5,6 +5,7 @@
  */
 import { TokenJS } from "fluency.js"
 
+import { API_PROVIDERS } from "../../../common/constants"
 import {
   getEndpointDefaults,
   supportsType,
@@ -21,6 +22,7 @@ import {
 
 import { fluencyChat, hostedModels } from "./fluency"
 import { HttpInferenceProvider } from "./http"
+import { needsResponsesApi, responsesChat } from "./openai-responses"
 
 export class HostedInferenceProvider implements InferenceProvider {
   public readonly id: string
@@ -41,6 +43,10 @@ export class HostedInferenceProvider implements InferenceProvider {
   }
 
   public chat(request: ChatRequest, options?: InferenceOptions) {
+    // Tools on OpenAI go through the Responses API; see openai-responses.ts.
+    if (this._config.provider === API_PROVIDERS.OpenAI && needsResponsesApi(request)) {
+      return responsesChat(this._config, request, options)
+    }
     const client = new TokenJS({ apiKey: this._config.apiKey || undefined })
     return fluencyChat(client, this._config, request, options)
   }

@@ -11,7 +11,7 @@ import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, ImageAttachment, MentionType, ReplyMeta } from "../common/types"
+import { ChatCompletionMessage, ImageAttachment, MentionType, ReplyMeta, ToolStepView } from "../common/types"
 
 import { useSuggestion } from "./hooks/useSuggestion"
 import CodeBlock from "./code-block"
@@ -19,6 +19,7 @@ import { createCustomImageExtension } from "./image-extension"
 import { MentionExtension } from "./mention-extention"
 import { emit } from "./messaging"
 import { useToast } from "./toast"
+import ToolSteps from "./tool-steps"
 import { getThinkingMessage } from "./utils"
 import WorkspaceContext from "./workspace-context"
 
@@ -32,6 +33,8 @@ interface MessageProps {
    * carries its own in `message.context`.
    */
   context?: WorkspaceSearchReport
+  /** Tool steps behind a reply still streaming; a finished reply carries its own. */
+  steps?: ToolStepView[]
   isLoading?: boolean
   message?: ChatCompletionMessage
   messages?: ChatCompletionMessage[]
@@ -225,6 +228,7 @@ export const Message: React.FC<MessageProps> = ({
   index = 0,
   isAssistant,
   context,
+  steps,
   isLoading,
   message,
   onDelete,
@@ -615,7 +619,10 @@ export const Message: React.FC<MessageProps> = ({
         </div>
       </div>
       {message.role === ASSISTANT && (
-        <WorkspaceContext report={message.context ?? context} />
+        <>
+          <WorkspaceContext report={message.context ?? context} />
+          <ToolSteps steps={message.toolSteps ?? steps} />
+        </>
       )}
       {editing ? (
         <EditorContent className={styles.tiptap} editor={editor} />

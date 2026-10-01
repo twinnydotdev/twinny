@@ -114,7 +114,7 @@ export const shieldClient = (
       const restore = shield.restoreStream()
       for await (const chunk of chunks) {
         const content = restore.push(chunk.content)
-        if (content || chunk.usage || chunk.reasoning || chunk.finishReason) {
+        if (content || chunk.usage || chunk.reasoning || chunk.finishReason || chunk.toolCalls) {
           yield { ...chunk, content }
         }
       }

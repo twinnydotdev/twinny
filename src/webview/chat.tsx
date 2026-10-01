@@ -23,6 +23,7 @@ import { useConversationHistory } from "./hooks/useConversationHistory"
 import { useProviders } from "./hooks/useProviders"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
+import { useToolSteps } from "./hooks/useToolSteps"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch"
 import { ProviderSelect } from "./providers/provider-select"
@@ -52,10 +53,11 @@ const loadPromptHistory = (): string[] => {
 
 interface ChatProps {
   fullScreen?: boolean
+  active?: boolean
 }
 
 export const Chat = (props: ChatProps): JSX.Element => {
-  const { fullScreen } = props
+  const { fullScreen, active = true } = props
   const generatingRef = useRef(false)
   const editorRef = useRef<Editor | null>(null)
   const imagesRef = useRef<ImageAttachment[]>([])
@@ -77,6 +79,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     clear: clearSearchReport,
     take: takeSearchReport
   } = useWorkspaceSearch()
+  const { steps: toolSteps, clear: clearToolSteps, take: takeToolSteps } = useToolSteps()
   const [isBottom, setIsBottom] = useState(false)
 
   const { conversation, saveLastConversation, setActiveConversation } =
@@ -108,9 +111,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
     let incoming = added
     if (added.role === ASSISTANT) {
       const context = takeSearchReport()
-      if (context) incoming = { ...added, context }
+      const steps = takeToolSteps()
+      incoming = { ...added, ...(context ? { context } : {}), ...(steps ? { toolSteps: steps } : {}) }
     } else {
       clearSearchReport()
+      clearToolSteps()
     }
 
     setMessages((prev) => {
@@ -159,6 +164,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setMessages([])
     setCompletion(null)
     clearSearchReport()
+    clearToolSteps()
     setActiveConversation({
       id: uuidv4(),
       title: t("chat-new-conversation-title"),
@@ -193,6 +199,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     generatingRef.current = true
     setIsLoading(true)
     clearSearchReport()
+    clearToolSteps()
     setMessages((prev) => {
       if (!prev) return prev
       const updatedMessages = prev.slice(0, index)
@@ -235,6 +242,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     generatingRef.current = true
     setIsLoading(true)
     clearSearchReport()
+    clearToolSteps()
     setMessages((prev) => {
       if (!prev) return prev
 
@@ -343,6 +351,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
     setIsLoading(true)
     clearSearchReport()
+    clearToolSteps()
     clearEditor()
 
     rememberPrompt(editorRef.current?.getHTML() || "")
@@ -377,7 +386,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
       return updatedMessages
     })
-  }, [conversation?.id, t, chatDisabled, clearSearchReport])
+  }, [conversation?.id, t, chatDisabled, clearSearchReport, clearToolSteps])
 
   /*
    * A stopped reply is picked up by asking for the rest. The transcript
@@ -388,6 +397,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     generatingRef.current = true
     setIsLoading(true)
     clearSearchReport()
+    clearToolSteps()
     setMessages((prev) => {
       const updatedMessages: ChatCompletionMessage[] = [
         ...(prev || []),
@@ -407,7 +417,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       })
       return updatedMessages
     })
-  }, [conversation, chatDisabled, clearSearchReport, t])
+  }, [conversation, chatDisabled, clearSearchReport, clearToolSteps, t])
 
   const handleOpenAsMarkdown = useCallback(() => {
     if (!messages.length) return
@@ -434,7 +444,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
     emit(EVENT_NAME.twinnyOpenFile, filePath)
   }, [])
 
-  useEffect(() => emit(EVENT_NAME.twinnyHideBackButton), [])
+  // Coming back to the chat hides the other tabs' back button and puts the
+  // cursor in the composer, as opening it did when it was remounted.
+  useEffect(() => {
+    if (!active) return
+    emit(EVENT_NAME.twinnyHideBackButton)
+    editorRef.current?.commands.focus()
+  }, [active])
 
   useEffect(() => {
     if (editorRef.current) emit(EVENT_NAME.twinnySidebarReady)
@@ -725,6 +741,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         key={`message-list-${index}`}
         completion={completion}
         context={searchReport}
+        steps={toolSteps}
         generatingRef={generatingRef}
         handleDeleteImage={handleDeleteImage}
         handleDeleteMessage={handleDeleteMessage}
@@ -746,6 +763,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       messages,
       completion,
       searchReport,
+      toolSteps,
       generatingRef
     ]
   )

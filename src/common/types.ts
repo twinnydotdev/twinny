@@ -65,6 +65,24 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
   prompt?: string
   /** How a reply came about; shown under it, never sent to the model. */
   meta?: ReplyMeta
+  /** The tools the model used for this reply, shown above it; never sent to the model. */
+  toolSteps?: ToolStepView[]
+}
+
+/** One tool call as the chat shows it: collapsed to a line, open to what went in and came out. */
+export interface ToolStepView {
+  id: string
+  name: string
+  /** What it did, in a line: "searched for `foo` · 3 matches". */
+  summary: string
+  args?: Record<string, string>
+  /** What the model was given back, cut to a size worth showing. */
+  output?: string
+  status: "running" | "waiting" | "done" | "failed" | "skipped"
+  /** For a step waiting on the user: the command that would run, or the change that would be made. */
+  command?: string
+  /** What the user is asked to approve: a shell command, or a change with no diff to review (a rename, a delete). */
+  approval?: "command" | "change"
 }
 
 /** What twinny knows about how one reply was produced. */

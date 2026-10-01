@@ -69,7 +69,8 @@ export class ChatGeneration {
     inference: InferenceClient,
     request: ChatRequest,
     provider: TwinnyProvider,
-    prefix = ""
+    prefix = "",
+    modelText?: () => string | undefined
   ): Promise<string> {
     if (this._cancelled) return ""
     const run = this._generations.start("chat")
@@ -116,7 +117,7 @@ export class ChatGeneration {
           (run.signal.aborted ? " · stopped by the user" : "")
       )
       logger.block("Chat reply", reply)
-      if (reply) this.addMessage(reply, finish())
+      if (reply) this.addMessage(reply, finish(), modelText?.())
       return reply
     } catch (error) {
       run.abort()
@@ -133,11 +134,12 @@ export class ChatGeneration {
     }
   }
 
-  private addMessage(content: string, meta?: ReplyMeta) {
+  private addMessage(content: string, meta?: ReplyMeta, prompt?: string) {
     this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
       content,
       role: ASSISTANT,
-      ...(meta ? { meta } : {})
+      ...(meta ? { meta } : {}),
+      ...(prompt ? { prompt } : {})
     })
   }
 

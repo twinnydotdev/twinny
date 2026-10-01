@@ -354,5 +354,13 @@
   "insert-at-cursor": "Insert at the cursor in the editor, replacing any selection",
   "stop-generation-esc": "Stop generation (Esc)",
   "show-more": "Show more",
-  "show-less": "Show less"
+  "show-less": "Show less",
+  "tool-command-waiting": "run this command?",
+  "tool-run": "Run",
+  "tool-skip": "Skip",
+  "tool-input": "input",
+  "tool-output": "output",
+  "tool-hit-not-shown": "not shown to keep the reply short; the model can read the file",
+  "tool-change-waiting": "make this change?",
+  "tool-apply": "Apply"
 }

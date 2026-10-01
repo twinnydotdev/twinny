@@ -24,6 +24,8 @@ export type {
   ChatChunk,
   ChatMessage,
   ChatRequest,
+  ChatToolCall,
+  ChatToolDefinition,
   EmbeddingRequest,
   EmbeddingResponse,
   FimChunk,
