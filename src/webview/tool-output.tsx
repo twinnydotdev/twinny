@@ -30,20 +30,37 @@ interface CodeProps {
   startLine?: number
 }
 
+/** Room for a line number and the space after it. */
+const GUTTER = "3.6em"
+
 /** Code highlighted as in the chat's code blocks, sized for a step. */
 export const Code = ({ code, language, startLine }: CodeProps) => {
   const theme = useTheme()
+  const numbered = startLine !== undefined
   return (
     <SyntaxHighlighter
       language={language}
       style={theme === Theme.Dark ? vscDarkPlus : vs}
-      showLineNumbers={startLine !== undefined}
+      showLineNumbers={numbered}
       startingLineNumber={startLine}
       wrapLongLines
       className={styles.code}
       customStyle={{ margin: 0, padding: "6px 8px", background: "var(--tw-surface)", fontSize: "inherit" }}
       codeTagProps={{ style: { fontFamily: "var(--tw-font)", fontSize: "inherit" } }}
-      lineNumberStyle={{ minWidth: "2.6em", paddingRight: "1em", opacity: 0.45, userSelect: "none" }}
+      // With numbers and wrapping both on, the highlighter makes each line a
+      // flex row, so every token becomes a column and wraps on its own. A
+      // line stays text instead, its number hung in the left margin.
+      lineProps={numbered ? { style: { display: "block", paddingLeft: GUTTER } } : undefined}
+      lineNumberStyle={{
+        display: "inline-block",
+        boxSizing: "border-box",
+        width: GUTTER,
+        marginLeft: `-${GUTTER}`,
+        paddingRight: "1em",
+        textAlign: "right",
+        opacity: 0.45,
+        userSelect: "none"
+      }}
     >
       {code}
     </SyntaxHighlighter>

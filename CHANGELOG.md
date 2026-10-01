@@ -2,6 +2,12 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.1 · 2026-10-01
+
+Extension release: code in agent mode's steps wraps properly. `twinny-server` carries the version number only.
+
+- **Code in tool steps reads as code again.** A file the agent read, shown with line numbers in a narrow chat, broke every word into its own wrapped column. Long lines now wrap as text, under the code and clear of the line numbers.
+
 ## 4.3.0 · 2026-10-01
 
 Extension release: agent mode switched from the chat, messages queued while a reply runs, terminal-style chat keys, and a fix for Anthropic tool calls. `twinny-server` carries the version number only.
