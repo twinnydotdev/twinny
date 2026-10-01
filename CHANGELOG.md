@@ -2,7 +2,9 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
-## Unreleased
+## 4.3.0 · 2026-10-01
+
+Extension release: agent mode switched from the chat, messages queued while a reply runs, terminal-style chat keys, and a fix for Anthropic tool calls. `twinny-server` carries the version number only.
 
 - **Messages sent while a reply runs are queued, not lost.** Pressing Enter while the model is answering, or working through tools in agent mode, used to clear what you typed without sending it. It now waits under the transcript, marked *queued*, and goes out when the reply ends, one message per reply. Hover a queued message to drop it. Stopping the reply (`Esc`, `Ctrl+C` or the stop button) puts queued messages back in the composer instead of sending them.
 - **Agent mode with Anthropic no longer fails after a tool with no arguments.** When Claude called a tool that takes nothing, such as looking at the editor, the next step failed with "Unexpected end of JSON input" before it was sent. Calls with no arguments now go back as `{}`; Bedrock, Gemini and Cohere had the same failure.
