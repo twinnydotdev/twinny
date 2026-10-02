@@ -205,7 +205,7 @@
   "preset-group-local": "On your machine",
   "preset-group-hosted": "Hosted APIs",
   "preset-group-gateway": "Another machine",
-  "preset-twinny-remote": "A Twinny gateway you run with twinny-node serve; needs its address and token",
+  "preset-twinny-remote": "A Twinny gateway you run with twinny-server; needs its address and token",
   "preset-show-more": "Show {{count}} more",
   "preset-ollama": "Runs models locally. Install from ollama.com, then pull a model.",
   "preset-lmstudio": "Desktop app with a local server on port 1234.",

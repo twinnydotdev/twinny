@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.4",
+  "version": "4.3.5",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -460,7 +460,7 @@
             "Chinese (Hong Kong)",
             "German",
             "Spanish",
-            "Spanish (Colombia)",
+            "Spanish (Chile)",
             "Japanese",
             "French",
             "Italian",
@@ -496,7 +496,7 @@
           "order": 6,
           "type": "number",
           "default": 0.2,
-          "markdownDescription": "Controls the randomness of the model's output. Lower values (e.g., 0.2) produce more focused and deterministic outputs, while higher values (e.g., 0.8) lead to more diverse and creative completions.",
+          "markdownDescription": "Controls the randomness of code completions. Lower values (e.g., 0.2) produce more focused and deterministic completions, while higher values (e.g., 0.8) lead to more diverse ones. Chat, inline edit and code review send no temperature; the server's default applies.",
           "required": true
         },
         "twinny.multilineCompletionsEnabled": {
@@ -537,13 +537,6 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Enables caching of Fill-in-Middle (FIM) completions for identical prompts. This can significantly improve performance but may use more memory."
-        },
-        "twinny.numPredictChat": {
-          "order": 11,
-          "type": "number",
-          "default": 512,
-          "markdownDescription": "Sets the maximum number of tokens to generate for chat completions. Higher values allow for longer completions but may increase response time.",
-          "required": true
         },
         "twinny.numPredictFim": {
           "order": 12,

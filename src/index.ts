@@ -421,6 +421,9 @@ export async function activate(context: ExtensionContext) {
       )
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.review)
     }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.templates, () =>
+      sidebarProvider.editDefaultTemplates()
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageTemplates, async () => {
       commands.executeCommand(
         "setContext",

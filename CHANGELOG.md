@@ -2,6 +2,18 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.5 · 2026-10-02
+
+Extension release: settings, labels and a command that did not do what they said. `twinny-server` carries the version number only.
+
+- **Edit twinny templates runs.** The command was in the command palette but was never registered, so choosing it failed with "command 'twinny.templates' not found". It now opens `~/.twinny/templates` in a new window, as **Open template editor** under **Manage twinny templates** does.
+- **Chilean Spanish is used when chosen.** The sidebar registered the `es-CL` translations under the key `esCL`, so `twinny.locale` set to `es-CL` fell back to the general Spanish ones. The two differ in one string today. The setting's description also called it Spanish (Colombia); it is Spanish (Chile).
+- **`twinny.numPredictChat` is gone.** Nothing has read it since 3.21: chat requests set no length limit of their own, so the provider's default applies. Removing it changes no reply.
+- **`twinny.temperature` says what it covers.** It applies to code completions only; chat, inline edit and code review in the extension send no temperature, so the server's default applies. The description implied all of them.
+- **The Stop button over an inline edit names the right key on macOS.** It showed `⌘⇧/`; the binding is `Ctrl+Shift+/` on every platform (`⌘⇧/` is macOS's Help search), so it now shows `⌃⇧/`.
+- **The gateway preset names `twinny-server`.** Its description in the Providers tab said the gateway is run with `twinny-node serve`.
+- `docs/gateway.md` documents `policy.secretShield`, the READMEs list agent mode, and `docs/providers.md` points to the provider pages on docs.twinny.dev instead of setup from 3.x that no longer matched the presets.
+
 ## 4.3.4 · 2026-10-02
 
 Extension release: the chat's provider and model dropdowns open again. `twinny-server` carries the version number only.

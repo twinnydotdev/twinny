@@ -7,7 +7,7 @@ import { InlineEditService } from "./service"
 const mac = process.platform === "darwin"
 const ACCEPT_KEY = mac ? "⌘⇧↩" : "Ctrl+Shift+Enter"
 const REJECT_KEY = mac ? "⌘⇧⌫" : "Ctrl+Shift+Backspace"
-const STOP_KEY = mac ? "⌘⇧/" : "Ctrl+Shift+/"
+const STOP_KEY = mac ? "⌃⇧/" : "Ctrl+Shift+/"
 
 /**
  * The buttons above an inline edit: "Stop" while it streams, then

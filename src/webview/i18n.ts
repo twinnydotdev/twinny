@@ -21,7 +21,7 @@ i18n.use(initReactI18next).init({
     de: { translation: de },
     en: { translation: en },
     es: { translation: es },
-    esCL: { translation: esCL },
+    "es-CL": { translation: esCL },
     fr: { translation: fr },
     it: { translation: it },
     ja: { translation: ja },
@@ -34,7 +34,7 @@ i18n.use(initReactI18next).init({
   },
   detection: {
     order: ["localStorage"],
-    availableLanguages: ["en", "zh-CN", "zh-HK", "ja", "es", "esCL", "de", "fr", "it", "pt", "ru", "ko", "nl"]
+    availableLanguages: ["en", "zh-CN", "zh-HK", "ja", "es", "es-CL", "de", "fr", "it", "pt", "ru", "ko", "nl"]
   }
 })
 
