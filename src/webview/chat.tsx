@@ -1162,6 +1162,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 >
                   <span className={styles.agentDot} aria-hidden="true" />
                   {t(agentMode ? "agent-mode-on" : "agent-mode")}
+                  <span className={styles.switchKey}>{t("agent-mode-key")}</span>
                 </button>
                 {agentMode && autoRunAvailable && (
                   <button
@@ -1174,7 +1175,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                     title={t(autoRun ? "auto-run-on-title" : "auto-run-off-title")}
                   >
                     <span className="codicon codicon-terminal" aria-hidden="true" />
-                    {t("auto-run")}
+                    <span className={styles.switchLabel}>{t("auto-run")}</span>
                   </button>
                 )}
               </div>

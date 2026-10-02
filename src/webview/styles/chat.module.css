@@ -367,6 +367,7 @@
 
 .chatBox {
   position: relative;
+  container-type: inline-size;
   display: flex;
   align-items: stretch;
   cursor: text;
@@ -494,17 +495,37 @@
 }
 
 /* Bottom left of the composer, across from the send button. */
-/* Agent mode, and with it whether commands run unasked, at the composer's bottom left. */
+/*
+ * Agent mode, and with it whether commands run unasked, at the composer's
+ * bottom left. They give way to the camera and send buttons on the right:
+ * the key hint goes first as the composer narrows, then auto-run's word,
+ * and they never reach under the buttons.
+ */
 .modeSwitches {
   position: absolute;
   bottom: 7px;
   left: var(--tw-pad);
+  max-width: calc(100% - var(--tw-pad) - 64px);
   display: flex;
   align-items: center;
   gap: 4px;
+  overflow: hidden;
+}
+
+@container (max-width: 380px) {
+  .switchKey {
+    display: none;
+  }
+}
+
+@container (max-width: 250px) {
+  .switchLabel {
+    display: none;
+  }
 }
 
 .agentToggle {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;

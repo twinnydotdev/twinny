@@ -12,7 +12,7 @@ Extension release: agent mode's steps show inside the reply, commands run in the
 - **Always run, one command at a time.** A waiting command now has **Always run** between Run and Skip. It runs the command and remembers that exact command, so the model can run it again without asking; any other command still asks. **Twinny - Forget commands set to always run** clears the list.
 - **Approve from the keyboard.** When a command or change is waiting and the composer is empty, `Enter` runs or applies it, `Shift+Enter` always runs it, and `Esc` skips it. A second `Esc` still stops the reply.
 - **Stop one command, not the whole reply.** A running command has a stop button on its line. It ends that command and anything it started; the model gets the output so far, is told you stopped it, and carries on.
-- **Model names fit in the composer footer.** The provider dropdown takes only the room it needs, and the model's name gets the rest. In a narrow panel, "? for shortcuts" shrinks to "?".
+- **Model names fit in the composer footer, and nothing overlaps in a narrow panel.** The provider dropdown takes only the room it needs, and the model's name gets the rest. As the panel narrows, "? for shortcuts" shrinks to "?", the agent switch drops its key hint, auto-run keeps only its icon, and the placeholder is cut short on one line. The switches no longer run under the camera and send buttons, and the dropdown arrows no longer cover the names.
 
 ## 4.3.1 · 2026-10-01
 
