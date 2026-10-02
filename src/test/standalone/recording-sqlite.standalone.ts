@@ -9,7 +9,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { test } from "node:test"
 
-import { newRecordingId, openRecordingStore, RecordingRecord, sqliteAvailable, SqliteRecordingStore } from "../../gateway/recording/store"
+import { loadSqlite, newRecordingId, openRecordingStore, RecordingRecord, sqliteAvailable, SqliteRecordingStore } from "../../gateway/recording/store"
 
 const record = (over: Partial<RecordingRecord> = {}): RecordingRecord => ({
   id: newRecordingId(new Date(over.at ?? "2026-09-15T10:00:00Z")),
@@ -88,4 +88,35 @@ test("sqlite store: append, list, page, filter, search, get, count, each, keys, 
   assert.strictEqual(again.count(), 4)
   again.close()
   assert.strictEqual(openRecordingStore("jsonl", dir).kind, "jsonl")
+})
+
+test("sqlite store: chat records carry their conversation's thread, old rows get one on open", { skip: !sqliteAvailable() && "node:sqlite not available" }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-sqlite-thread-"))
+  const opener = { role: "user", content: "fix the build" }
+  const steps = [
+    { messages: [{ role: "system", content: "s" }, opener] },
+    { messages: [{ role: "system", content: "s" }, opener, { role: "assistant", content: "", tool_calls: [] }, { role: "tool", content: "ok" }] },
+    { messages: [{ role: "system", content: "s2" }, opener, { role: "assistant", content: "done" }, { role: "user", content: "[For reference: …]\nnotes\n\n[The user's new message:]\nand the tests?" }] }
+  ]
+  const store = openRecordingStore("sqlite", dir) as SqliteRecordingStore
+  steps.forEach((request, i) => store.append(record({ at: `2026-09-15T10:00:0${i}.000Z`, request })))
+  store.append(record({ at: "2026-09-15T10:00:05.000Z", request: { messages: [{ role: "user", content: "something else" }] } }))
+  store.append(record({ at: "2026-09-15T10:00:06.000Z", route: "fim", request: { prompt: "a", suffix: "" }, response: { text: "b" } }))
+  const rows = store.list().records
+  assert.strictEqual(rows[0].thread, undefined, "autocomplete has no thread")
+  assert.ok(rows[1].thread && rows[1].thread !== rows[2].thread)
+  assert.strictEqual(new Set(rows.slice(2).map((r) => r.thread)).size, 1, "every step and turn of one conversation")
+  assert.strictEqual(rows[2].preview, "and the tests?", "the tool notes are not the preview")
+
+  // A database from before threads: the column empty, the preview as it was.
+  const db = new (loadSqlite()!.DatabaseSync)(path.join(dir, "recordings.sqlite"))
+  db.exec("UPDATE recordings SET thread = NULL, preview = 'old'")
+  db.close()
+  store.close()
+  const reopened = openRecordingStore("sqlite", dir)
+  const again = reopened.list().records
+  assert.deepStrictEqual(again.map((r) => r.thread), rows.map((r) => r.thread))
+  assert.strictEqual(again[2].preview, "and the tests?")
+  assert.strictEqual(again[0].preview, "old", "only chat rows are backfilled")
+  reopened.close()
 })

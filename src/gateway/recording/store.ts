@@ -9,7 +9,7 @@
  * A record is content: the prompt or conversation and the reply. Nothing
  * here decides whether to keep it; that is the recorder's job.
  */
-import { randomBytes } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -61,6 +61,8 @@ export interface RecordingSummary {
   ms: number
   usage?: RecordingUsage
   preview: string
+  /** Chat only: the conversation the record is a step of. See `threadOf`. */
+  thread?: string
 }
 
 export interface RecordingQuery {
@@ -100,15 +102,49 @@ export const newRecordingId = (at = new Date()): string =>
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 500
 
+type ChatMessage = { role?: string; content?: unknown }
+
+const chatMessages = (record: RecordingRecord): ChatMessage[] | undefined => {
+  const request = record.request as Record<string, unknown> | undefined
+  return record.route === "chat" && Array.isArray(request?.messages) ? (request?.messages as ChatMessage[]) : undefined
+}
+
+/** A message's words: a string as is, content parts by their text. */
+const wordsOf = (content: unknown): string => {
+  if (typeof content === "string") return content
+  if (Array.isArray(content)) {
+    const texts = content.map((part) => (part as { text?: unknown })?.text).filter((text): text is string => typeof text === "string")
+    if (texts.length) return texts.join("\n")
+  }
+  return JSON.stringify(content ?? "")
+}
+
+/** The extension puts the previous reply's tool notes ahead of a follow-up; the question comes after this line. */
+const NEW_MESSAGE_HEADER = "[The user's new message:]"
+
+/**
+ * The conversation a chat record is a step of. Every tool step and every
+ * later turn sends the conversation again from its first user message, so
+ * that message and the key name it; the system prompt is left out because
+ * it can change between turns.
+ */
+export const threadOf = (record: RecordingRecord): string | undefined => {
+  const first = chatMessages(record)?.find((m) => m.role === "user")
+  if (!first) return undefined
+  return createHash("sha1").update(`${record.key}\n${JSON.stringify(first.content ?? "")}`).digest("hex").slice(0, 12)
+}
+
 /** What a list row shows of the content: the last user turn, the prompt tail, or the inputs. */
 export const previewOf = (record: RecordingRecord): string => {
   const request = record.request as Record<string, unknown> | undefined
+  const messages = chatMessages(record)
   let text = ""
-  if (record.route === "chat" && Array.isArray(request?.messages)) {
-    const messages = request?.messages as Array<{ role?: string; content?: unknown }>
+  if (messages) {
     const users = messages.filter((m) => m.role === "user")
     const last = users[users.length - 1]
-    text = typeof last?.content === "string" ? last.content : JSON.stringify(last?.content ?? "")
+    text = wordsOf(last?.content)
+    const asked = text.indexOf(NEW_MESSAGE_HEADER)
+    if (asked >= 0) text = text.slice(asked + NEW_MESSAGE_HEADER.length)
     // A tool run asks the same question once per step; the steps so far tell its rows apart.
     const results = messages.slice(messages.lastIndexOf(last) + 1).filter((m) => m.role === "tool").length
     if (results) text = `after ${results} tool result${results === 1 ? "" : "s"} · ${text}`
@@ -135,19 +171,23 @@ const matches = (record: RecordingRecord, query: RecordingQuery): boolean => {
   return true
 }
 
-const summarize = (record: RecordingRecord): RecordingSummary => ({
-  id: record.id,
-  at: record.at,
-  key: record.key,
-  route: record.route,
-  alias: record.alias,
-  ...(record.model ? { model: record.model } : {}),
-  outcome: record.outcome,
-  ...(record.ended ? { ended: record.ended } : {}),
-  ms: record.ms,
-  ...(record.usage ? { usage: record.usage } : {}),
-  preview: previewOf(record)
-})
+const summarize = (record: RecordingRecord): RecordingSummary => {
+  const thread = threadOf(record)
+  return {
+    id: record.id,
+    at: record.at,
+    key: record.key,
+    route: record.route,
+    alias: record.alias,
+    ...(record.model ? { model: record.model } : {}),
+    outcome: record.outcome,
+    ...(record.ended ? { ended: record.ended } : {}),
+    ms: record.ms,
+    ...(record.usage ? { usage: record.usage } : {}),
+    preview: previewOf(record),
+    ...(thread ? { thread } : {})
+  }
+}
 
 const clampLimit = (limit?: number) => Math.min(MAX_LIMIT, Math.max(1, limit ?? DEFAULT_LIMIT))
 
@@ -309,7 +349,8 @@ CREATE TABLE IF NOT EXISTS recordings (
   completion_tokens INTEGER,
   request TEXT NOT NULL,
   response TEXT NOT NULL,
-  preview TEXT NOT NULL
+  preview TEXT NOT NULL,
+  thread TEXT
 );
 CREATE INDEX IF NOT EXISTS recordings_ts ON recordings (ts);
 CREATE INDEX IF NOT EXISTS recordings_key_ts ON recordings (key, ts);
@@ -328,12 +369,15 @@ export class SqliteRecordingStore implements RecordingStore {
     this._db = new sqlite.DatabaseSync(location)
     this._db.exec("PRAGMA journal_mode = WAL")
     this._db.exec(SCHEMA)
-    // Databases made before the column existed.
-    try {
-      this._db.exec("ALTER TABLE recordings ADD COLUMN ended TEXT")
-    } catch {
-      // Already there.
+    // Databases made before the columns existed.
+    for (const column of ["ended", "thread"]) {
+      try {
+        this._db.exec(`ALTER TABLE recordings ADD COLUMN ${column} TEXT`)
+      } catch {
+        // Already there.
+      }
     }
+    this.backfillThreads()
     if (fresh) {
       try {
         fs.chmodSync(location, 0o600)
@@ -343,11 +387,37 @@ export class SqliteRecordingStore implements RecordingStore {
     }
   }
 
+  /**
+   * Chat records kept before conversations had a thread get one, and a
+   * fresh preview, once. Empty threads mark rows with no user message so
+   * they are not read again.
+   */
+  private backfillThreads(): void {
+    // In batches: months of agent steps are too much request text to hold at once.
+    const select = this._db.prepare("SELECT id, key, request FROM recordings WHERE thread IS NULL AND route = 'chat' LIMIT 200")
+    const update = this._db.prepare("UPDATE recordings SET thread = ?, preview = ? WHERE id = ?")
+    for (;;) {
+      const rows = select.all()
+      if (!rows.length) return
+      this._db.exec("BEGIN")
+      try {
+        for (const row of rows) {
+          const record = { id: String(row.id), key: String(row.key), route: "chat", request: JSON.parse(String(row.request)) } as RecordingRecord
+          update.run(threadOf(record) ?? "", previewOf(record), record.id)
+        }
+        this._db.exec("COMMIT")
+      } catch (e) {
+        this._db.exec("ROLLBACK")
+        throw e
+      }
+    }
+  }
+
   public append(record: RecordingRecord): void {
     this._db
       .prepare(
-        `INSERT INTO recordings (id, ts, at, key, route, alias, model, provider, outcome, ended, ms, prompt_tokens, completion_tokens, request, response, preview)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO recordings (id, ts, at, key, route, alias, model, provider, outcome, ended, ms, prompt_tokens, completion_tokens, request, response, preview, thread)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         record.id,
@@ -365,7 +435,8 @@ export class SqliteRecordingStore implements RecordingStore {
         record.usage?.completionTokens ?? null,
         JSON.stringify(record.request),
         JSON.stringify(record.response),
-        previewOf(record)
+        previewOf(record),
+        record.route === "chat" ? threadOf(record) ?? "" : null
       )
   }
 
@@ -415,7 +486,7 @@ export class SqliteRecordingStore implements RecordingStore {
     const limit = clampLimit(query.limit)
     const { sql, params } = this.where(query)
     const rows = this._db
-      .prepare(`SELECT id, at, key, route, alias, model, outcome, ended, ms, prompt_tokens, completion_tokens, preview FROM recordings ${sql} ORDER BY id DESC LIMIT ?`)
+      .prepare(`SELECT id, at, key, route, alias, model, outcome, ended, ms, prompt_tokens, completion_tokens, preview, thread FROM recordings ${sql} ORDER BY id DESC LIMIT ?`)
       .all(...params, limit + 1)
     const page = rows.slice(0, limit).map((row) => {
       const usage: RecordingUsage = {}
@@ -432,7 +503,8 @@ export class SqliteRecordingStore implements RecordingStore {
         ...(row.ended === "client" ? { ended: "client" as const } : {}),
         ms: Number(row.ms),
         ...(Object.keys(usage).length ? { usage } : {}),
-        preview: String(row.preview)
+        preview: String(row.preview),
+        ...(row.thread ? { thread: String(row.thread) } : {})
       }
     })
     return { records: page, ...(rows.length > limit ? { nextBefore: page[page.length - 1].id } : {}) }

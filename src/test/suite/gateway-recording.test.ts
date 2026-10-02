@@ -19,7 +19,7 @@ import { LicenseStore } from "../../gateway/license"
 import { createGatewayLog } from "../../gateway/log"
 import { exportLines, toTrainingLine } from "../../gateway/recording/export"
 import { Recorder } from "../../gateway/recording/recorder"
-import { JsonlRecordingStore, newRecordingId, previewOf, RecordingRecord } from "../../gateway/recording/store"
+import { JsonlRecordingStore, newRecordingId, previewOf, RecordingRecord, threadOf } from "../../gateway/recording/store"
 import { buildRouteTable } from "../../gateway/routes"
 import { GatewayServer } from "../../gateway/server"
 import { RemoteInferenceProvider } from "../../protocol/client"
@@ -90,6 +90,17 @@ suite("Recording store (jsonl)", () => {
     assert.strictEqual(store.list({ outcome: "ok" }).records.length, 3)
     assert.strictEqual(store.list({ outcome: "cancelled" }).records.length, 0)
     assert.strictEqual(previewOf(record({ route: "embeddings", request: { input: ["a", "b"] } })), "a ⏎ b")
+    assert.strictEqual(previewOf(record({ request: { messages: [{ role: "user", content: [{ type: "text", text: "from parts" }] }] } })), "from parts")
+  })
+
+  test("a conversation's steps and turns share a thread; another opener or developer does not", () => {
+    const opener = { role: "user", content: "fix the build" }
+    const step = threadOf(record({ request: { messages: [{ role: "system", content: "a" }, opener] } }))
+    assert.ok(step)
+    assert.strictEqual(threadOf(record({ request: { messages: [{ role: "system", content: "b" }, opener, { role: "assistant", content: "x" }, { role: "user", content: "more" }] } })), step)
+    assert.notStrictEqual(threadOf(record({ key: "bob", request: { messages: [opener] } })), step)
+    assert.notStrictEqual(threadOf(record({ request: { messages: [{ role: "user", content: "other" }] } })), step)
+    assert.strictEqual(threadOf(record({ route: "fim", request: { prompt: "a" } })), undefined)
   })
 })
 
@@ -267,11 +278,13 @@ suite("Gateway recording (in process)", function () {
     assert.strictEqual(vectors.vectors.length, 2)
 
     const list = json(await request(`${url}/twinny/v1/admin/recordings`, "GET", admin))
-    const records = list.records as Array<{ id: string; route: string; key: string; model: string; preview: string; outcome: string }>
+    const records = list.records as Array<{ id: string; route: string; key: string; model: string; preview: string; outcome: string; thread?: string }>
     assert.deepStrictEqual(records.map((r) => r.route), ["embeddings", "fim", "chat"])
     assert.ok(records.every((r) => r.key === "alice" && r.outcome === "ok"))
     assert.strictEqual(records[2].model, "backend-coder:7b")
     assert.strictEqual(records[2].preview, "Say hello")
+    assert.ok(records[2].thread, "chat rows name their conversation")
+    assert.strictEqual(records[1].thread, undefined)
 
     const chat = json(await request(`${url}/twinny/v1/admin/recordings/${records[2].id}`, "GET", admin))
     assert.deepStrictEqual(chat.request, { messages: [{ role: "system", content: "Be brief." }, { role: "user", content: "Say hello" }], temperature: 0.1 })

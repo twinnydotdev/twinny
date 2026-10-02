@@ -32,18 +32,33 @@ interface ListResponse {
 }
 
 /**
- * A list row: one record, or an indexing run of embedding records. The
- * list is newest-first, so consecutive embedding records from one
- * developer to one alias with no gap over `RUN_GAP_MS` fold into a run;
- * a run of one is just its record.
+ * A list row: one record, an indexing run of embedding records, or a chat
+ * conversation. The list is newest-first, so consecutive embedding records
+ * from one developer to one alias with no gap over `RUN_GAP_MS` fold into
+ * a run. Chat records of one thread fold into a conversation where its
+ * newest step is, wherever the others are: autocomplete interleaves with
+ * them. The newest step carries the whole conversation. A run or a
+ * conversation of one is just its record.
  */
-type ListRow = { kind: "record"; record: RecordingSummary } | { kind: "run"; id: string; calls: RecordingSummary[]; failed: number; ms: number }
+type ListRow =
+  | { kind: "record"; record: RecordingSummary }
+  | { kind: "run"; id: string; calls: RecordingSummary[]; failed: number; ms: number }
+  | { kind: "conversation"; id: string; steps: RecordingSummary[]; ms: number }
 
-const groupRuns = (rows: RecordingSummary[]): ListRow[] => {
+const groupRows = (rows: RecordingSummary[]): ListRow[] => {
+  const threads = new Map<string, RecordingSummary[]>()
+  for (const record of rows) if (record.thread) threads.set(record.thread, [...(threads.get(record.thread) ?? []), record])
   const out: ListRow[] = []
   let run: Extract<ListRow, { kind: "run" }> | undefined
   let last: RecordingSummary | undefined
   for (const record of rows) {
+    const steps = record.thread ? threads.get(record.thread) : undefined
+    if (steps && steps.length > 1) {
+      if (steps[0] === record) out.push({ kind: "conversation", id: record.thread!, steps, ms: steps.reduce((sum, step) => sum + step.ms, 0) })
+      run = undefined
+      last = record
+      continue
+    }
     const joins =
       record.route === "embeddings" &&
       last?.route === "embeddings" &&
@@ -66,6 +81,14 @@ const groupRuns = (rows: RecordingSummary[]): ListRow[] => {
   }
   return out
 }
+
+/** The records in the order they show: a folded group by its head, an open one by every record. */
+const visibleRecords = (grouped: ListRow[], expanded: Set<string>): RecordingSummary[] =>
+  grouped.flatMap((row) => {
+    if (row.kind === "record") return [row.record]
+    const members = row.kind === "run" ? row.calls : row.steps
+    return expanded.has(row.id) ? members : [members[0]]
+  })
 
 /* -------------------------------------------------------------------------- */
 /*  Small pieces                                                              */
@@ -636,13 +659,34 @@ interface RecordRowProps {
   now: number
   term: string
   onOpen: (id: string) => Promise<void>
-  /** A call inside an expanded indexing run. */
+  /** A call inside an expanded indexing run, or a step inside a conversation. */
   nested?: boolean
+  /** The newest step of a folded conversation: the whole of it, with the steps behind a caret. */
+  conversation?: { steps: number; ms: number; open: boolean; onToggle: () => void }
 }
 
-const RecordRow = ({ record: r, selected, now, term, onOpen, nested }: RecordRowProps) => (
-  <tr className={`${selected ? "selected" : ""} ${nested ? "nested" : ""}`} onClick={() => void onOpen(r.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && void onOpen(r.id)}>
+const RecordRow = ({ record: r, selected, now, term, onOpen, nested, conversation }: RecordRowProps) => (
+  <tr
+    className={`${selected ? "selected" : ""} ${nested ? "nested" : ""} ${conversation ? "run" : ""}`}
+    onClick={() => void onOpen(r.id)}
+    tabIndex={0}
+    onKeyDown={(e) => e.key === "Enter" && void onOpen(r.id)}
+    aria-expanded={conversation?.open}
+  >
     <td className="muted" title={`${whenExact(r.at)} UTC`}>
+      {conversation && (
+        <button
+          type="button"
+          className="caret"
+          title={conversation.open ? "Fold the steps" : "Show each step"}
+          onClick={(e) => {
+            e.stopPropagation()
+            conversation.onToggle()
+          }}
+        >
+          {conversation.open ? "▾" : "▸"}
+        </button>
+      )}
       {timeAgo(r.at, now)}
     </td>
     <td>{r.key}</td>
@@ -653,11 +697,14 @@ const RecordRow = ({ record: r, selected, now, term, onOpen, nested }: RecordRow
     <td>
       <OutcomePill record={r} />
     </td>
-    <td className="num">{duration(r.ms)}</td>
+    <td className="num" title={conversation ? "All steps together" : undefined}>
+      {duration(conversation?.ms ?? r.ms)}
+    </td>
     <td className="num">
       <Tokens usage={r.usage} />
     </td>
     <td className="preview">
+      {conversation && <b>{plural(conversation.steps, "step")} · </b>}
       <Preview text={r.preview} term={term} />
     </td>
   </tr>
@@ -723,8 +770,9 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
   }, [load])
 
   const rows = useMemo(() => (data ? [...data.records, ...more] : []), [data, more])
-  const grouped = useMemo(() => groupRuns(rows), [rows])
+  const grouped = useMemo(() => groupRows(rows), [rows])
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const visible = useMemo(() => visibleRecords(grouped, expanded), [grouped, expanded])
   const toggleRun = (id: string) =>
     setExpanded((current) => {
       const next = new Set(current)
@@ -732,7 +780,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
       else next.add(id)
       return next
     })
-  const openIndex = open ? rows.findIndex((r) => r.id === open.id) : -1
+  const openIndex = open ? visible.findIndex((r) => r.id === open.id) : -1
 
   const loadMore = async () => {
     const before = data?.nextBefore
@@ -774,10 +822,10 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
   const step = useCallback(
     (delta: 1 | -1) => {
       if (openIndex < 0) return
-      const next = rows[openIndex + delta]
+      const next = visible[openIndex + delta]
       if (next) void show(next.id)
     },
-    [openIndex, rows, show]
+    [openIndex, visible, show]
   )
 
   // j/k and the arrows walk the list while a record is open; Esc closes it.
@@ -835,14 +883,15 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
     const byRoute: Record<string, number> = {}
     const byOutcome: Record<string, number> = {}
     for (const row of grouped) {
-      const route = row.kind === "run" ? "embeddings" : row.record.route
-      const outcome = row.kind === "run" ? (row.failed ? "error" : "ok") : row.record.outcome
+      const route = row.kind === "run" ? "embeddings" : row.kind === "conversation" ? "chat" : row.record.route
+      const outcome = row.kind === "run" ? (row.failed ? "error" : "ok") : row.kind === "conversation" ? row.steps[0].outcome : row.record.outcome
       byRoute[route] = (byRoute[route] ?? 0) + 1
       byOutcome[outcome] = (byOutcome[outcome] ?? 0) + 1
     }
     return { byRoute, byOutcome }
   }, [grouped])
   const runs = grouped.filter((row) => row.kind === "run").length
+  const conversations = grouped.filter((row) => row.kind === "conversation").length
   // Filters and exports only when there is, or can be, something to filter:
   // on the free plan the page is its status line and the settings.
   const usable = licensed || rows.length > 0 || filtered
@@ -870,6 +919,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
                 {fmt(grouped.length)}
                 {data.nextBefore ? "+" : ""} shown
                 {runs ? ` · ${plural(runs, "indexing run")} folded` : ""}
+                {conversations ? ` · ${plural(conversations, "conversation")} folded` : ""}
               </span>
             )}
           </h2>
@@ -960,6 +1010,24 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
               <tbody>
                 {grouped.map((row) => {
                   if (row.kind === "record") return <RecordRow key={row.record.id} record={row.record} selected={open?.id === row.record.id} now={now} term={term} onOpen={show} />
+                  if (row.kind === "conversation") {
+                    const [head, ...older] = row.steps
+                    const isOpen = expanded.has(row.id)
+                    const holdsOpen = !!open && row.steps.some((s) => s.id === open.id)
+                    return (
+                      <React.Fragment key={row.id}>
+                        <RecordRow
+                          record={head}
+                          selected={open?.id === head.id || (holdsOpen && !isOpen)}
+                          now={now}
+                          term={term}
+                          onOpen={show}
+                          conversation={{ steps: row.steps.length, ms: row.ms, open: isOpen, onToggle: () => toggleRun(row.id) }}
+                        />
+                        {isOpen && older.map((step) => <RecordRow key={step.id} record={step} selected={open?.id === step.id} now={now} term={term} onOpen={show} nested />)}
+                      </React.Fragment>
+                    )
+                  }
                   const first = row.calls[0]
                   const isOpen = expanded.has(row.id)
                   const holdsOpen = !!open && row.calls.some((c) => c.id === open.id)
@@ -1010,7 +1078,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
         {!data?.nextBefore && rows.length > 0 && <div className="hint">Click a row to open it. ↑ ↓ move between records, Esc closes.</div>}
       </section>
 
-      {open && <RecordPanel record={open} index={openIndex} total={rows.length} onStep={step} onClose={() => setOpen(null)} />}
+      {open && <RecordPanel record={open} index={openIndex} total={visible.length} onStep={step} onClose={() => setOpen(null)} />}
 
       {data && <RecordingSettings apiKey={apiKey} summary={data.summary} licensed={licensed} onSaved={() => void load()} />}
     </>

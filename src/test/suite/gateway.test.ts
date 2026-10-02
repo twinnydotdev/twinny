@@ -80,10 +80,17 @@ const configFor = (backendPort: number, extra: Record<string, unknown> = {}, dat
   ...extra
 })
 
-/** Spawns `twinny-node serve` with the test host's own binary running as Node. */
+/**
+ * Spawns `twinny-node serve` with the test host's own binary running as Node.
+ * Its home is the scratch directory, so every default path (recordings, the
+ * data format marker, whatever is added next) lands there: `reset --all`
+ * once removed the real ~/.twinny/server/recordings.
+ */
 const spawnCli = (args: string[], env: Record<string, string | undefined>) => {
   const node = process.env.TWINNY_TEST_NODE || process.execPath
-  const merged: Record<string, string | undefined> = { ...process.env, ELECTRON_RUN_AS_NODE: "1", ...env }
+  const home = path.join(scratch, "home")
+  fs.mkdirSync(home, { recursive: true })
+  const merged: Record<string, string | undefined> = { ...process.env, ELECTRON_RUN_AS_NODE: "1", HOME: home, USERPROFILE: home, ...env }
   for (const key of Object.keys(merged)) if (merged[key] === undefined) delete merged[key]
   return cp.spawn(node, [CLI, ...args], {
     env: merged as NodeJS.ProcessEnv,

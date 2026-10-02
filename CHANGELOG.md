@@ -2,6 +2,14 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.3 · 2026-10-02
+
+`twinny-server` release: Recordings folds an agent conversation's steps into one row, and the tests no longer touch the real data directory. The extension carries the version number only.
+
+- **Recordings: one row per conversation.** Agent mode sends the conversation again for every tool step, and every step was its own row in **Recordings**, so one reply could fill the list with a dozen near-identical entries. Now the steps and later turns of a chat fold into one row with a step count, wherever they fall among other requests. Opening it shows the whole conversation, and the caret lists each step. ↑ ↓ move between rows as shown. Storage is unchanged: each step is still its own record, and the training export still has one example per step. Records kept before this are grouped the first time the gateway opens them.
+- **Recordings: the preview is the question.** A follow-up's preview showed the tool notes the extension sends ahead of it, as JSON. It now shows the question the developer asked.
+- **Tests no longer touch the real data directory.** The gateway tests' CLI processes run with a scratch home, so a full test run no longer removes `~/.twinny/server/recordings`.
+
 ## 4.3.2 · 2026-10-02
 
 Extension release: agent mode's steps show inside the reply, commands run in the background with their output in the chat, and commands can be approved from the keyboard. `twinny-server` carries the version number only.
