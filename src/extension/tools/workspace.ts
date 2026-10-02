@@ -433,6 +433,8 @@ export interface CommandOutcome {
    * to carry on (a server in the terminal), `stopped` when it was ended.
    */
   timedOut?: "running" | "stopped"
+  /** It was stopped by the user's stop on its step; the reply carries on. */
+  stoppedByUser?: boolean
 }
 
 /** A hit from the embeddings index. Lines are 0-based, inclusive. */
@@ -458,7 +460,7 @@ const runCommand = (sink: CommandSink): Tool => ({
     "Run a shell command in the workspace root and get its exit code and the end of its output: tests, builds, type checks." +
     (sink.mode === "ask" ? " The user is asked before it runs and may skip it." : " It runs straight away."),
   guidance:
-    "Use run_command to check your work (tests, type checks, builds). Never run commands that delete files, rewrite history or install software unless the user asked for exactly that.",
+    "Use run_command to check your work (tests, type checks, builds). Never run commands that delete files, rewrite history or install software unless the user asked for exactly that. Nothing can answer a prompt, and you get the output after two minutes at most: no interactive commands, servers or watch modes.",
   parameters: [{ name: "command", description: "One command line for the user's shell." }],
   async run({ command }, context) {
     const line = command?.trim()
@@ -469,6 +471,12 @@ const runCommand = (sink: CommandSink): Tool => ({
       return {
         output: "The user chose not to run this command. Carry on without it, or ask the user.",
         summary: `\`${line}\` skipped`
+      }
+    }
+    if (outcome.stoppedByUser) {
+      return {
+        output: `$ ${line}\n(stopped by the user before it ended; this is its output so far)\n${outcome.output.trim() || "(no output)"}`,
+        summary: `\`${line}\` stopped`
       }
     }
     const status =

@@ -133,6 +133,7 @@ export const ProviderSelect = () => {
         {effectiveProvider?.id && providerModels.length > 0 ? (
           <VSCodeDropdown
             value={selectedModel || providerModels[0] || ""}
+            title={selectedModel || providerModels[0] || ""}
             name="model"
             onChange={(e: unknown) => {
               const event = e as React.ChangeEvent<HTMLSelectElement>

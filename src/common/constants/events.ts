@@ -48,6 +48,7 @@ export const EVENT_NAME = {
   twinnySymbolSearch: "twinny-symbol-search",
   twinnyTextSelection: "twinny-text-selection",
   twinnyToolApproval: "twinny-tool-approval",
+  twinnyToolStop: "twinny-tool-stop",
   twinnyToolSteps: "twinny-tool-steps",
   twinnyUpdateContextItems: "twinny-update-context-items",
   twinnyWorkspaceSearch: "twinny-workspace-search"

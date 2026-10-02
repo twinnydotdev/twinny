@@ -449,6 +449,22 @@
   display: flex;
   align-items: center;
   border-top: 1px solid var(--tw-rule-soft);
+  container-type: inline-size;
+}
+
+/* In a narrow panel the hint is just its key, leaving the room to the model's name. */
+.shortcutsHintKey {
+  display: none;
+}
+
+@container (max-width: 420px) {
+  .shortcutsHintText {
+    display: none;
+  }
+
+  .shortcutsHintKey {
+    display: inline;
+  }
 }
 
 /*
@@ -478,10 +494,17 @@
 }
 
 /* Bottom left of the composer, across from the send button. */
-.agentToggle {
+/* Agent mode, and with it whether commands run unasked, at the composer's bottom left. */
+.modeSwitches {
   position: absolute;
   bottom: 7px;
   left: var(--tw-pad);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agentToggle {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -519,6 +542,10 @@
 .agentToggleOn:hover {
   color: var(--tw-agent);
   background: color-mix(in srgb, var(--tw-agent) 12%, transparent);
+}
+
+.agentToggle :global(.codicon) {
+  font-size: 11px !important;
 }
 
 .agentToggleOn .agentDot {

@@ -1,6 +1,7 @@
 /**
  * What the chat's tools reach in the editor: edits go through the inline
- * edit service, commands run in a terminal of their own, `search_code`
+ * edit service, commands run in the background (or a terminal of their
+ * own, as the user set), `search_code`
  * asks the embeddings index, and the language servers answer for errors,
  * references and renames. The tools themselves (`tools/workspace.ts`)
  * know none of this, so they run headless in tests and the eval.
@@ -10,7 +11,8 @@
  * bring them back or because they widen what the model may do: deleting a
  * file git has no copy of, and changing `.vscode/` or a `.gitignore`.
  */
-import { exec, execFile } from "child_process"
+import { ChildProcess, execFile, spawn } from "child_process"
+import { existsSync } from "fs"
 import path from "path"
 import {
   commands,
@@ -45,6 +47,8 @@ import { WorkspaceView } from "../tools/view"
 import { CodeSearch, CommandOutcome, CommandSink, EditSink } from "../tools/workspace"
 
 export type ChatCommandMode = "ask" | "allow" | "off"
+/** Where the model's commands run: a process of their own, or the twinny tools terminal. */
+export type ChatCommandPlace = "background" | "terminal"
 
 /** How long a command may run before the model is given what it has so far. */
 const COMMAND_TIMEOUT_MS = 120_000
@@ -366,7 +370,8 @@ const execute = (
   terminal: Terminal,
   run: () => ReturnType<TerminalShellIntegration["executeCommand"]>,
   timeoutMs: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onOutput?: (output: string) => void
 ) => {
   const execution = run()
   busy.add(terminal)
@@ -374,6 +379,7 @@ const execute = (
   const reading = (async () => {
     for await (const chunk of execution.read()) {
       output = (output + chunk).slice(-MAX_CAPTURE_CHARS)
+      onOutput?.(output)
     }
   })().catch((error) => logger.warn(`Chat command output: ${error}`))
 
@@ -422,7 +428,8 @@ const runInTerminal = async (
   command: string,
   cwd: string,
   fresh: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onOutput?: (output: string) => void
 ): Promise<CommandOutcome> => {
   // Commands are promised the workspace root, and an earlier one may have
   // left the shell elsewhere. Unless the shell is new, or has sat idle
@@ -431,7 +438,7 @@ const runInTerminal = async (
   if (!fresh && !(idle && integration.cwd?.fsPath === cwd)) {
     await execute(terminal, () => integration.executeCommand("cd", [cwd]), 5000, signal).ended
   }
-  const run = execute(terminal, () => integration.executeCommand(command), COMMAND_TIMEOUT_MS, signal)
+  const run = execute(terminal, () => integration.executeCommand(command), COMMAND_TIMEOUT_MS, signal, onOutput)
   const ended = await run.ended
   // The last chunk can land just after the end event.
   await Promise.race([run.reading, new Promise((resolve) => setTimeout(resolve, 300))])
@@ -441,20 +448,83 @@ const runInTerminal = async (
   return { ran: true, output: tail, exitCode: ended.exitCode }
 }
 
-/** Without shell integration: in the background, from the workspace root. */
-const runDetached = (command: string, cwd: string, signal?: AbortSignal): Promise<CommandOutcome> =>
+/**
+ * bash where there is one: the lines models write assume a POSIX shell,
+ * which fish, say, is not. PATH comes from the extension host either way.
+ */
+const BACKGROUND_SHELL: string | boolean =
+  process.platform !== "win32" && existsSync("/bin/bash") ? "/bin/bash" : true
+
+/**
+ * Ends a background command and whatever it started: its process group
+ * on POSIX; on Windows, where killing the shell leaves its children
+ * running, `taskkill /T` down the tree.
+ */
+const killTree = (child: ChildProcess, group: boolean) => {
+  try {
+    if (process.platform === "win32" && child.pid) {
+      execFile("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true }, (error) => {
+        if (error) child.kill()
+      })
+    } else if (group && child.pid) {
+      process.kill(-child.pid, "SIGTERM")
+    } else {
+      child.kill()
+    }
+  } catch {
+    child.kill()
+  }
+}
+
+/**
+ * In a process of its own, through a shell, from the workspace
+ * root. Nothing can type into it, so a command that waits for input gets
+ * end-of-file instead of hanging. Ending it (the wait ran out, or the
+ * user stopped the reply) ends whatever it started too.
+ */
+const runInBackground = (
+  command: string,
+  cwd: string,
+  signal?: AbortSignal,
+  onOutput?: (output: string) => void
+): Promise<CommandOutcome> =>
   new Promise((resolve) => {
-    exec(
-      command,
-      { cwd, timeout: COMMAND_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024, windowsHide: true, signal },
-      (error, stdout, stderr) => {
-        const output = tailOutput(`${stdout}${stderr ? `\n${stderr}` : ""}`, OUTPUT_TAIL)
-        // Ended by the wait running out, or by the user stopping the reply.
-        const ended = !!error && ((error as { killed?: boolean }).killed === true || error.name === "AbortError")
-        const code = error ? (typeof error.code === "number" ? error.code : 1) : 0
-        resolve(ended ? { ran: true, output, timedOut: "stopped" } : { ran: true, output, exitCode: code })
-      }
-    )
+    const group = process.platform !== "win32"
+    const child = spawn(command, {
+      cwd,
+      shell: BACKGROUND_SHELL,
+      detached: group,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, PAGER: "cat", GIT_PAGER: "cat", NO_COLOR: "1" }
+    })
+    let output = ""
+    let ended: "stopped" | undefined
+    const take = (chunk: Buffer) => {
+      output = (output + chunk.toString()).slice(-MAX_CAPTURE_CHARS)
+      onOutput?.(output)
+    }
+    child.stdout?.on("data", take)
+    child.stderr?.on("data", take)
+    const stop = () => {
+      if (ended || child.exitCode !== null) return
+      ended = "stopped"
+      killTree(child, group)
+    }
+    const timer = setTimeout(stop, COMMAND_TIMEOUT_MS)
+    if (signal?.aborted) stop()
+    else signal?.addEventListener("abort", stop, { once: true })
+    const finish = (exitCode?: number) => {
+      clearTimeout(timer)
+      signal?.removeEventListener("abort", stop)
+      const tail = tailOutput(stripAnsi(output), OUTPUT_TAIL)
+      resolve(ended ? { ran: true, output: tail, timedOut: ended } : { ran: true, output: tail, exitCode })
+    }
+    child.on("error", (error) => {
+      output += `\n${error.message}`
+      finish(127)
+    })
+    child.on("close", (code) => finish(code ?? undefined))
   })
 
 /** Asks in a notification, for hosts without a chat to ask in. */
@@ -462,17 +532,28 @@ const askInNotification = async (command: string) =>
   (await window.showInformationMessage(`Twinny wants to run: ${command}`, "Run", "Skip")) === "Run"
 
 /**
- * Commands the model asks for: put to the user first in `ask` mode (in
- * the chat's tool steps when `approve` is given), then run.
+ * Commands the model asks for: put to the user first while `mode` says
+ * `ask` (in the chat's tool steps when `approve` is given), then run in
+ * the background or in the tools terminal. `mode` is asked for each
+ * command, so switching auto-run on mid-reply holds for the rest of it.
+ * `onOutput` hears what the command prints as it prints it.
  */
 export const terminalCommands = (
-  mode: "ask" | "allow",
+  mode: (command: string) => "ask" | "allow",
   cwd: string,
-  approve: (command: string) => Promise<boolean> = askInNotification
+  approve: (command: string) => Promise<boolean> = askInNotification,
+  options: {
+    place?: ChatCommandPlace
+    onOutput?: (output: string) => void
+    /** Hears, as a command starts, how to stop just that command. */
+    onStart?: (stop: () => void) => void
+  } = {}
 ): CommandSink => ({
-  mode,
+  get mode() {
+    return mode("")
+  },
   async run(command, signal) {
-    if (mode === "ask") {
+    if (mode(command) === "ask") {
       if (!(await approve(command))) {
         logger.info(`Chat command skipped: ${command}`)
         return { ran: false, output: "" }
@@ -480,14 +561,35 @@ export const terminalCommands = (
     }
     if (signal?.aborted) return { ran: false, output: "" }
     logger.info(`Chat command: ${command}`)
-    const { terminal, fresh } = toolsTerminal(cwd)
-    terminal.show(true)
-    const integration = await integrationOf(terminal)
-    if (integration) return runInTerminal(terminal, integration, command, cwd, fresh, signal)
-    logger.info("Chat command: no shell integration in the tools terminal, running in the background")
-    return runDetached(command, cwd, signal)
+    const onOutput = options.onOutput && ((output: string) => options.onOutput!(stripAnsi(output)))
+    // Its own stop, which the reply's stop also pulls.
+    const own = new AbortController()
+    const follow = () => own.abort()
+    signal?.addEventListener("abort", follow, { once: true })
+    let stoppedByUser = false
+    options.onStart?.(() => {
+      stoppedByUser = true
+      own.abort()
+    })
+    try {
+      const outcome = await (async () => {
+        if (options.place !== "terminal") return runInBackground(command, cwd, own.signal, onOutput)
+        const { terminal, fresh } = toolsTerminal(cwd)
+        terminal.show(true)
+        const integration = await integrationOf(terminal)
+        if (integration) return runInTerminal(terminal, integration, command, cwd, fresh, own.signal, onOutput)
+        logger.info("Chat command: no shell integration in the tools terminal, running in the background")
+        return runInBackground(command, cwd, own.signal, onOutput)
+      })()
+      return stoppedByUser && outcome.timedOut === "stopped" ? { ...outcome, stoppedByUser: true } : outcome
+    } finally {
+      signal?.removeEventListener("abort", follow)
+    }
   }
 })
+
+/** A command as Always run keeps it: trimmed, its spaces collapsed. */
+export const normalCommand = (command: string) => command.trim().replace(/\s+/g, " ")
 
 /** `search_code` over the embeddings index, with the chat's own threshold. */
 export const indexSearch = (

@@ -25,7 +25,11 @@ export const TEAM_NUDGE_STORAGE_KEY = "twinny.teamNudge"
 export const GLOBAL_STORAGE_KEY = {
   selectedModel: "twinny.selectedModel",
   /** Whether the chat runs as an agent; switched from the composer, kept for every window. */
-  agentMode: "agentMode"
+  agentMode: "agentMode",
+  /** Whether agent mode runs commands without asking; switched from the composer. */
+  autoRunCommands: "autoRunCommands",
+  /** Commands the user chose "Always run" for, each run without asking from then on. */
+  alwaysRunCommands: "alwaysRunCommands"
 }
 
 export const WORKSPACE_STORAGE_KEY = {

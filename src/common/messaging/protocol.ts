@@ -333,8 +333,13 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyStopGeneration]: Channel
   [EVENT_NAME.twinnySymbolSearch]: Channel<{ query: string }, ContextItem[]>
   [EVENT_NAME.twinnyTextSelection]: Channel<void, string>
-  /** The user's answer to a command waiting in the tool steps. */
-  [EVENT_NAME.twinnyToolApproval]: Channel<{ id: string; run: boolean }>
+  /**
+   * The user's answer to a command waiting in the tool steps; `always`
+   * runs that same command without asking from then on.
+   */
+  [EVENT_NAME.twinnyToolApproval]: Channel<{ id: string; run: boolean; always?: boolean }>
+  /** Stop the command a running tool step is waiting on, and only that. */
+  [EVENT_NAME.twinnyToolStop]: Channel<{ id: string }>
 
   [CONVERSATION_EVENT_NAME.clearAllConversations]: Channel
   [CONVERSATION_EVENT_NAME.getActiveConversation]: Channel

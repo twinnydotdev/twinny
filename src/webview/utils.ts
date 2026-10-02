@@ -54,6 +54,8 @@ export const CustomKeyMap = Extension.create({
         if (mentionState && mentionState.active) {
           return false
         }
+        // An empty composer answers a command waiting on the user.
+        if (editor.isEmpty && this.options.approve?.("run")) return true
         this.options.handleSubmitForm()
         this.options.clearEditor()
         return true
@@ -63,6 +65,7 @@ export const CustomKeyMap = Extension.create({
         return true
       },
       "Shift-Enter": ({ editor }) => {
+        if (editor.isEmpty && this.options.approve?.("always")) return true
         editor.commands.insertContent("\n")
         return true
       },

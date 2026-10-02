@@ -2,6 +2,18 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.2 · 2026-10-02
+
+Extension release: agent mode's steps show inside the reply, commands run in the background with their output in the chat, and commands can be approved from the keyboard. `twinny-server` carries the version number only.
+
+- **Steps show where they happened in the reply.** Before, every tool step sat in one block above the reply, so a command waiting for Run was above the text you were reading. Now the reply reads in order: what the model said, the tool it used, what it said next. A command waiting for you is at the bottom, where you are already looking. Conversations saved earlier show their steps at the top, as before.
+- **Commands run in the background, with their output in the chat.** A command the model runs no longer opens the **twinny tools** terminal. It runs through `bash` from the workspace root, and its output appears in its step as it prints. Nothing can answer a prompt, and a command is stopped after two minutes, so interactive commands, servers and watch modes belong in a terminal. Set `twinny.chatToolsCommandsRunIn` to `terminal` to run them in the terminal as before.
+- **An auto-run switch.** With agent mode on, an **auto-run** switch next to the agent switch lets every command run without asking. Until you first flip it, `twinny.chatToolsCommands` decides, so commands still ask by default.
+- **Always run, one command at a time.** A waiting command now has **Always run** between Run and Skip. It runs the command and remembers that exact command, so the model can run it again without asking; any other command still asks. **Twinny - Forget commands set to always run** clears the list.
+- **Approve from the keyboard.** When a command or change is waiting and the composer is empty, `Enter` runs or applies it, `Shift+Enter` always runs it, and `Esc` skips it. A second `Esc` still stops the reply.
+- **Stop one command, not the whole reply.** A running command has a stop button on its line. It ends that command and anything it started; the model gets the output so far, is told you stopped it, and carries on.
+- **Model names fit in the composer footer.** The provider dropdown takes only the room it needs, and the model's name gets the rest. In a narrow panel, "? for shortcuts" shrinks to "?".
+
 ## 4.3.1 · 2026-10-01
 
 Extension release: code in agent mode's steps wraps properly. `twinny-server` carries the version number only.

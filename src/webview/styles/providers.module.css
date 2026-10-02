@@ -602,8 +602,17 @@
 }
 
 .providerSelector > div {
-  flex: 1 1 50%;
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+/*
+ * A provider's label is short and the model's name is what gets cut off,
+ * so the provider takes what it needs, up to a third, and the model the rest.
+ */
+.providerSelector > .providerSelectorProvider {
+  flex: 0 1 auto;
+  max-width: 34%;
 }
 
 .providerSelector > div + div {

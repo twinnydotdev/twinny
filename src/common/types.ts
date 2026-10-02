@@ -90,6 +90,14 @@ export interface ToolStepView {
   command?: string
   /** What the user is asked to approve: a shell command, or a change with no diff to review (a rename, a delete). */
   approval?: "command" | "change"
+  /**
+   * How much of the reply's text (thinking left out) was written when the
+   * step started, so the chat shows it at that point in the reply rather
+   * than above it. Missing on steps saved before this was kept.
+   */
+  at?: number
+  /** A running command the user can stop on its own, leaving the reply to carry on. */
+  stoppable?: boolean
 }
 
 /** What twinny knows about how one reply was produced. */

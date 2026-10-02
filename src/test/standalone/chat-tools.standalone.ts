@@ -15,6 +15,7 @@ import { planReplacement } from "../../extension/tools/edit"
 import { toolModeFor, withTools } from "../../extension/tools/loop"
 import { displayableLength, findToolCall, nameArguments } from "../../extension/tools/protocol"
 import { workspaceTools } from "../../extension/tools/workspace"
+import { replyParts } from "../../webview/reply-parts"
 
 test("reads the JSON form as soon as its object closes, and not before", () => {
   const text = "Let me look.\n<tool_call>\n{\"name\": \"grep\", \"arguments\": {\"pattern\": \"foo\"}}\n</tool_call>"
@@ -483,6 +484,55 @@ test("ToolSteps shows each call as it starts and ends, and holds a command for R
 
   steps.reset()
   assert.deepStrictEqual(steps.steps, [])
+})
+
+test("a running command can be stopped on its own: its step says stopped and the model is told", async () => {
+  const sent: string[][] = []
+  const steps = new ToolSteps((all) => sent.push(all.map((s) => `${s.id}:${s.status}:${s.stoppable ? "stop" : "-"}`)))
+  let stops = 0
+  steps.start({ id: "0.0", name: "run_command", args: { command: "npm run dev" } })
+  steps.stoppable(() => stops++)
+  assert.deepStrictEqual(sent.at(-1), ["0.0:running:stop"])
+  steps.stop("0.0")
+  steps.stop("0.0")
+  assert.strictEqual(stops, 1, "a second click does nothing")
+  steps.finish({ id: "0.0", index: 0, mode: "native", summary: "`npm run dev` stopped", output: "…", promptChars: 0 })
+  assert.deepStrictEqual(sent.at(-1), ["0.0:stopped:-"])
+
+  const tools = workspaceTools(makeWorkspace(), [], {
+    commands: { mode: "allow", run: async () => ({ ran: true, output: "listening on 3000\n", timedOut: "stopped", stoppedByUser: true }) }
+  })
+  const result = await tools.run({ name: "run_command", args: { command: "npm run dev" } })
+  assert.match(result.output, /stopped by the user[\s\S]*listening on 3000/)
+  assert.strictEqual(result.summary, "`npm run dev` stopped")
+  assert.ok(!result.failed)
+})
+
+test("a reply's text is cut where its tools ran, never inside a code block", () => {
+  const step = (id: string, at?: number) => ({ id, name: "grep", summary: id, status: "done" as const, ...(at === undefined ? {} : { at }) })
+  const text = "Looking.\n\nFound it:\n```ts\nconst a = 1\n```\nDone."
+  const shape = (parts: ReturnType<typeof replyParts>) =>
+    parts.map((part) => ("steps" in part ? `[${part.steps.map((s) => s.id).join(",")}]` : JSON.stringify(part.text)))
+  assert.deepStrictEqual(shape(replyParts(text, [step("a", 8), step("b", 8)])), [
+    JSON.stringify("Looking."),
+    "[a,b]",
+    JSON.stringify(text.slice(8))
+  ])
+  // Inside the fence: moved to just after it closes.
+  const inside = text.indexOf("const")
+  const close = text.indexOf("```\nDone") + 3
+  assert.deepStrictEqual(shape(replyParts(text, [step("c", inside)])), [
+    JSON.stringify(text.slice(0, close)),
+    "[c]",
+    JSON.stringify(text.slice(close))
+  ])
+  // Saved before steps had a place, or past the end: first, and last.
+  assert.deepStrictEqual(shape(replyParts(text, [step("old"), step("late", 999)])), [
+    "[old]",
+    JSON.stringify(text),
+    "[late]"
+  ])
+  assert.deepStrictEqual(shape(replyParts(text, [])), [JSON.stringify(text)])
 })
 
 test("the loop reports each call before and after it runs, and can leave step lines out of the text", async () => {

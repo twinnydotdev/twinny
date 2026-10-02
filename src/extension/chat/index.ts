@@ -41,10 +41,12 @@ import { ContextEntry, formatContextEntries } from "./context-files"
 import { ChatGeneration } from "./generation"
 import {
   ChatCommandMode,
+  ChatCommandPlace,
   editorEdits,
   editorHint,
   editorKnowledge,
   indexSearch,
+  normalCommand,
   openDocumentText,
   terminalCommands
 } from "./tool-sinks"
@@ -107,9 +109,24 @@ export class Chat extends Base {
     this._generation.abort()
   }
 
-  /** Run or Skip, clicked on a command waiting in the tool steps. */
-  public answerToolApproval(id: string, run: boolean) {
+  /**
+   * Run, Always run or Skip, on a command waiting in the tool steps.
+   * Always run keeps that exact command, to run unasked from then on.
+   */
+  public answerToolApproval(id: string, run: boolean, always = false) {
+    const step = this._steps.steps.find((s) => s.id === id)
+    if (run && always && step?.approval === "command" && step.command) {
+      const key = `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.alwaysRunCommands}`
+      const kept = this.context?.globalState.get<string[]>(key) ?? []
+      const command = normalCommand(step.command)
+      if (!kept.includes(command)) void this.context?.globalState.update(key, [...kept, command])
+    }
     this._steps.answer(id, run)
+  }
+
+  /** The stop button on a running command: ends it, and the reply carries on. */
+  public stopToolStep(id: string) {
+    this._steps.stop(id)
   }
 
   public dispose() {
@@ -247,6 +264,20 @@ export class Chat extends Base {
   }
 
   /**
+   * Whether a command asks first: not when the composer's auto-run switch
+   * is on (until it is first switched, `twinny.chatToolsCommands`), nor
+   * when the user chose Always run for that exact command. Read for each
+   * command, so either holds for the rest of the reply.
+   */
+  private commandMode(setting: ChatCommandMode, command: string): "ask" | "allow" {
+    const state = this.context?.globalState
+    const stored = state?.get<boolean>(`${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.autoRunCommands}`)
+    if (stored ?? setting === "allow") return "allow"
+    const kept = state?.get<string[]>(`${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.alwaysRunCommands}`)
+    return kept?.includes(normalCommand(command)) ? "allow" : "ask"
+  }
+
+  /**
    * The workspace as the tools will see it, when the user has tools on
    * and a folder open. Made once per reply: its ignore rules are read at
    * the start and hold until the end.
@@ -322,7 +353,16 @@ export class Chat extends Base {
       commands:
         commandMode === "off"
           ? undefined
-          : terminalCommands(commandMode, view.root, (command) => this._steps.approve(command)),
+          : terminalCommands(
+              (command) => this.commandMode(commandMode, command),
+              view.root,
+              (command) => this._steps.approve(command),
+              {
+                place: this.config.get<ChatCommandPlace>("chatToolsCommandsRunIn", "background"),
+                onOutput: (output) => this._steps.progress(output),
+                onStart: (stop) => this._steps.stoppable(stop)
+              }
+            ),
       codeSearch: search?.available
         ? indexSearch(search, () =>
             Number(

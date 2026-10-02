@@ -9,6 +9,7 @@ import {
   editorEdits,
   editorHint,
   editorKnowledge,
+  normalCommand,
   openDocumentText,
   terminalCommands
 } from "../../extension/chat/tool-sinks"
@@ -115,19 +116,86 @@ suite("Chat edit_file", () => {
     assert.strictEqual(service.pendingFor(document), undefined)
   })
 
-  test("run_command runs in allow mode and reports output and exit code", async function () {
-    this.timeout(30000)
-    const commands = terminalCommands("allow", path.dirname(file))
-    const ok = await commands.run("echo twinny-ran")
-    assert.strictEqual(ok.ran, true)
-    assert.match(ok.output, /twinny-ran/)
-    assert.strictEqual(ok.exitCode, 0)
-    const failed = await commands.run("sh -c 'exit 3'")
-    assert.strictEqual(failed.exitCode, 3)
-    // A command that leaves the shell elsewhere does not move the next one.
-    await commands.run("cd /")
-    const where = await commands.run("pwd")
-    assert.match(where.output, new RegExp(`${fs.realpathSync(path.dirname(file))}|${path.dirname(file)}`))
+  for (const place of ["background", "terminal"] as const) {
+    test(`run_command runs in allow mode (${place}) and reports output and exit code`, async function () {
+      this.timeout(30000)
+      const commands = terminalCommands(() => "allow", path.dirname(file), undefined, { place })
+      const ok = await commands.run("echo twinny-ran")
+      assert.strictEqual(ok.ran, true)
+      assert.match(ok.output, /twinny-ran/)
+      assert.strictEqual(ok.exitCode, 0)
+      const failed = await commands.run("sh -c 'exit 3'")
+      assert.strictEqual(failed.exitCode, 3)
+      // A command that leaves the shell elsewhere does not move the next one.
+      await commands.run("cd /")
+      const where = await commands.run("pwd")
+      assert.match(where.output, new RegExp(`${fs.realpathSync(path.dirname(file))}|${path.dirname(file)}`))
+    })
+  }
+
+  test("a background command streams its output, and stopping the reply ends it and what it started", async function () {
+    this.timeout(20000)
+    const heard: string[] = []
+    const commands = terminalCommands(() => "allow", path.dirname(file), undefined, {
+      onOutput: (output) => heard.push(output)
+    })
+    const stop = new AbortController()
+    const marker = path.join(path.dirname(file), "twinny-still-running")
+    const running = commands.run(`echo first; sleep 1; (sleep 3; touch ${marker}) & wait`, stop.signal)
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    assert.ok(heard.some((output) => output.includes("first")), "output arrives while it runs")
+    stop.abort()
+    const outcome = await running
+    assert.strictEqual(outcome.timedOut, "stopped")
+    assert.match(outcome.output, /first/)
+    await new Promise((resolve) => setTimeout(resolve, 3500))
+    assert.ok(!fs.existsSync(marker), "the child it started was ended with it")
+  })
+
+  test("a command's own stop ends it alone and says the user stopped it", async function () {
+    this.timeout(20000)
+    let stop: (() => void) | undefined
+    const commands = terminalCommands(() => "allow", path.dirname(file), undefined, {
+      onStart: (given) => (stop = given)
+    })
+    const running = commands.run("echo started; sleep 10")
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    assert.ok(stop, "the stop is handed over as the command starts")
+    const started = Date.now()
+    stop!()
+    const outcome = await running
+    assert.ok(Date.now() - started < 3000)
+    assert.strictEqual(outcome.stoppedByUser, true)
+    assert.match(outcome.output, /started/)
+    // The reply's own stop is not the user's stop on the step.
+    const reply = new AbortController()
+    const next = commands.run("sleep 10", reply.signal)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    reply.abort()
+    assert.strictEqual((await next).stoppedByUser, undefined)
+  })
+
+  test("auto-run is asked for each command, so switching it mid-reply holds for the next one", async () => {
+    let mode: "ask" | "allow" = "ask"
+    const asked: string[] = []
+    const always = new Set<string>()
+    const commands = terminalCommands(
+      (command) => (always.has(normalCommand(command)) ? "allow" : mode),
+      path.dirname(file),
+      async (command) => (asked.push(command), false)
+    )
+    assert.strictEqual(commands.mode, "ask")
+    assert.strictEqual((await commands.run("echo one")).ran, false)
+    mode = "allow"
+    assert.strictEqual(commands.mode, "allow")
+    assert.strictEqual((await commands.run("echo two")).ran, true)
+    assert.deepStrictEqual(asked, ["echo one"])
+    // Always run holds for that exact command, however it is spaced.
+    mode = "ask"
+    always.add(normalCommand("echo  three "))
+    assert.strictEqual((await commands.run("echo three")).ran, true)
+    assert.strictEqual((await commands.run("echo four")).ran, false)
+    assert.deepStrictEqual(asked, ["echo one", "echo four"])
   })
 
   test("deleting asks only when git could not bring the file back", async function () {
