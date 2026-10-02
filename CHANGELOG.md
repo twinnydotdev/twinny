@@ -2,6 +2,12 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.4 · 2026-10-02
+
+Extension release: the chat's provider and model dropdowns open again. `twinny-server` carries the version number only.
+
+- **The provider and model dropdowns open again.** In 4.3.2 the chat footer's dropdowns were made to fit a narrow panel, and that change hid their lists, so clicking one did nothing. The lists open again, and long names are still cut short in a narrow panel.
+
 ## 4.3.3 · 2026-10-02
 
 `twinny-server` release: Recordings folds an agent conversation's steps into one row, and the tests no longer touch the real data directory. The extension carries the version number only.
