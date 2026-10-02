@@ -16,6 +16,9 @@ import { ToolStart, ToolStep } from "../tools/loop"
 const MAX_SHOWN_OUTPUT = 4000
 const MAX_SHOWN_ARG = 2000
 const MAX_ARG_IN_SUMMARY = 80
+/** What a running command has printed is shown as its tail, refreshed this often. */
+const MAX_LIVE_OUTPUT = 2000
+const LIVE_EVERY_MS = 250
 
 const shown = (text: string, limit: number) =>
   text.length > limit ? `${text.slice(0, limit)}\n… (${text.length - limit} more characters)` : text
@@ -39,6 +42,10 @@ export class ToolSteps {
   private _steps: ToolStepView[] = []
   private readonly _waiting = new Map<string, (run: boolean) => void>()
   private readonly _skipped = new Set<string>()
+  private readonly _stoppers = new Map<string, () => void>()
+  private readonly _stopped = new Set<string>()
+  private _live: { id: string; output: string } | undefined
+  private _liveTimer: ReturnType<typeof setTimeout> | undefined
 
   constructor(private readonly _emit: (steps: ToolStepView[]) => void) {}
 
@@ -47,6 +54,11 @@ export class ToolSteps {
     this.cancelWaiting()
     this._steps = []
     this._skipped.clear()
+    this._stoppers.clear()
+    this._stopped.clear()
+    clearTimeout(this._liveTimer)
+    this._liveTimer = undefined
+    this._live = undefined
   }
 
   public get steps(): ToolStepView[] {
@@ -63,8 +75,57 @@ export class ToolSteps {
 
   public finish(step: ToolStep) {
     const output = shown(step.output, MAX_SHOWN_OUTPUT)
-    const status = this._skipped.has(step.id) ? "skipped" : step.failed ? "failed" : "done"
-    this.update(step.id, { summary: step.summary, output, status, command: undefined, approval: undefined })
+    this._stoppers.delete(step.id)
+    const status = this._skipped.has(step.id)
+      ? "skipped"
+      : this._stopped.has(step.id)
+        ? "stopped"
+        : step.failed
+          ? "failed"
+          : "done"
+    this.update(step.id, {
+      summary: step.summary,
+      output,
+      status,
+      command: undefined,
+      approval: undefined,
+      stoppable: undefined
+    })
+  }
+
+  /** How to stop the running step's command alone; its step gets a stop button. */
+  public stoppable(stop: () => void) {
+    const step = [...this._steps].reverse().find((s) => s.status === "running")
+    if (!step) return
+    this._stoppers.set(step.id, stop)
+    this.update(step.id, { stoppable: true })
+  }
+
+  /** The user's stop on a running step: that command ends, the reply goes on. */
+  public stop(id: string) {
+    const stop = this._stoppers.get(id)
+    if (!stop) return
+    this._stoppers.delete(id)
+    this._stopped.add(id)
+    this.update(id, { stoppable: undefined })
+    stop()
+  }
+
+  /**
+   * What the running step has printed so far (a command's output), sent
+   * at most a few times a second; `finish` replaces it with the result.
+   */
+  public progress(output: string) {
+    const step = [...this._steps].reverse().find((s) => s.status === "running")
+    if (!step) return
+    this._live = { id: step.id, output: output.slice(-MAX_LIVE_OUTPUT) }
+    if (this._liveTimer) return
+    this._liveTimer = setTimeout(() => {
+      this._liveTimer = undefined
+      const live = this._live
+      if (!live || !this._steps.some((s) => s.id === live.id && s.status === "running")) return
+      this.update(live.id, { output: live.output })
+    }, LIVE_EVERY_MS)
   }
 
   /**
@@ -108,7 +169,7 @@ export class ToolSteps {
     if (!this._steps.some((step) => step.status === "running" || step.status === "waiting")) return
     this._steps = this._steps.map((step) =>
       step.status === "running" || step.status === "waiting"
-        ? { ...step, status: "stopped" as const, command: undefined, approval: undefined }
+        ? { ...step, status: "stopped" as const, command: undefined, approval: undefined, stoppable: undefined }
         : step
     )
     this.send()

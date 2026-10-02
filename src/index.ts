@@ -18,6 +18,7 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_NAME,
+  GLOBAL_STORAGE_KEY,
   TEAM_NUDGE_STORAGE_KEY,
   TWINNY_COMMAND_NAME,
   URL_TEAMS,
@@ -502,6 +503,16 @@ export async function activate(context: ExtensionContext) {
       await commands.executeCommand("twinny.sidebar.focus")
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnyShowShortcuts)
+    }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.forgetAlwaysRunCommands, async () => {
+      const key = `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.alwaysRunCommands}`
+      const kept = context.globalState.get<string[]>(key) ?? []
+      await context.globalState.update(key, undefined)
+      window.showInformationMessage(
+        kept.length
+          ? `Twinny will ask again before running ${kept.length === 1 ? "the command" : `the ${kept.length} commands`} you chose Always run for.`
+          : "No commands were set to always run."
+      )
     }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")

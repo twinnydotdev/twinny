@@ -10,18 +10,27 @@ import { useServerEvent } from "../messaging"
  * shows it over the pending reply, then takes it with the reply itself and
  * clears here for the next turn. The ref lets an event handler read the
  * latest list without a stale closure.
+ *
+ * Each step is marked, when first seen, with how much of the reply
+ * `replyText` says is written, so it shows at that point in the reply.
  */
-export const useToolSteps = () => {
+export const useToolSteps = (replyText: () => string = () => "") => {
   const [steps, setSteps] = useState<ToolStepView[]>([])
   const stepsRef = useRef<ToolStepView[]>([])
+  const atRef = useRef(new Map<string, number>())
 
   useServerEvent(EVENT_NAME.twinnyToolSteps, (incoming) => {
-    stepsRef.current = incoming ?? []
+    const marks = atRef.current
+    stepsRef.current = (incoming ?? []).map((step) => {
+      if (!marks.has(step.id)) marks.set(step.id, replyText().length)
+      return { ...step, at: marks.get(step.id) }
+    })
     setSteps(stepsRef.current)
   })
 
   const clear = useCallback(() => {
     stepsRef.current = []
+    atRef.current = new Map()
     setSteps([])
   }, [])
 

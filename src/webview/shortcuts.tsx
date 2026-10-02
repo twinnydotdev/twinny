@@ -6,6 +6,9 @@ import styles from "./styles/chat.module.css"
 const SHORTCUTS: [keys: string[], label: string][] = [
   [["Enter"], "shortcut-send"],
   [["Shift+Enter"], "shortcut-newline"],
+  [["Enter"], "shortcut-approve"],
+  [["Shift+Enter"], "shortcut-always"],
+  [["Esc"], "shortcut-skip"],
   [["Esc"], "shortcut-stop"],
   [["Esc", "Esc"], "shortcut-clear"],
   [["Ctrl+C"], "shortcut-interrupt"],

@@ -18,6 +18,7 @@ import CodeBlock from "./code-block"
 import { createCustomImageExtension } from "./image-extension"
 import { MentionExtension } from "./mention-extention"
 import { emit } from "./messaging"
+import { replyParts } from "./reply-parts"
 import { useToast } from "./toast"
 import ToolSteps from "./tool-steps"
 import { getThinkingMessage } from "./utils"
@@ -647,16 +648,22 @@ export const Message: React.FC<MessageProps> = ({
       {message.role === ASSISTANT && (
         <>
           <WorkspaceContext report={message.context ?? context} />
-          <ToolSteps steps={message.toolSteps ?? steps} />
+          {editing && <ToolSteps steps={message.toolSteps ?? steps} />}
         </>
       )}
       {editing ? (
         <EditorContent className={styles.tiptap} editor={editor} />
       ) : message.role === ASSISTANT ? (
         <>
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {messageContent.trimStart()}
-          </Markdown>
+          {replyParts(messageContent, message.toolSteps ?? steps).map((part, i) =>
+            "steps" in part ? (
+              <ToolSteps key={i} steps={part.steps} />
+            ) : part.text.trim() ? (
+              <Markdown key={i} remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {part.text.trim()}
+              </Markdown>
+            ) : null
+          )}
           {renderImageGallery()}
           {message.meta && <ReplyFooter meta={message.meta} onContinue={onContinue} />}
         </>

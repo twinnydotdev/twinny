@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.1",
+  "version": "4.3.2",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -291,6 +291,10 @@
         "command": "twinny.showShortcuts",
         "title": "Twinny - Chat keyboard shortcuts",
         "icon": "$(keyboard)"
+      },
+      {
+        "command": "twinny.forgetAlwaysRunCommands",
+        "title": "Twinny - Forget commands set to always run"
       },
       {
         "command": "twinny.newConversation",
@@ -643,7 +647,7 @@
           "order": 20,
           "type": "boolean",
           "default": false,
-          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, and by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review; commands ask first unless `#twinny.chatToolsCommands#` says otherwise. Files ignored by a `.gitignore` are off limits, and changes to `.vscode/` or a `.gitignore` are always shown for review. Each step shows above the reply. Needs a capable coder model such as `qwen3-coder:30b` with a context of 8k tokens or more; small models tend to call tools badly. Set in your user settings; a workspace cannot turn it on.",
+          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, and by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review; commands ask first unless `#twinny.chatToolsCommands#` says otherwise. Files ignored by a `.gitignore` are off limits, and changes to `.vscode/` or a `.gitignore` are always shown for review. Each step shows in the reply at the point it ran. Needs a capable coder model such as `qwen3-coder:30b` with a context of 8k tokens or more; small models tend to call tools badly. Set in your user settings; a workspace cannot turn it on.",
           "scope": "machine"
         },
         "twinny.chatToolsEdits": {
@@ -670,12 +674,27 @@
             "off"
           ],
           "enumDescriptions": [
-            "Each command the model wants to run is shown in the chat with Run and Skip first.",
-            "Commands run straight away in a terminal. A command cannot be undone like an edit can.",
+            "Each command the model wants to run is shown in the chat with Run, Always run and Skip first.",
+            "Commands run straight away. A command cannot be undone like an edit can.",
             "The model cannot run commands."
           ],
           "default": "ask",
-          "markdownDescription": "Whether the chat model may run shell commands (tests, builds) in the **twinny tools** terminal, with `#twinny.chatTools#` on. It sees the exit code and the end of the output. Reading git (status, diff, log) never asks: it cannot change anything.",
+          "markdownDescription": "Whether the chat model may run shell commands (tests, builds), with `#twinny.chatTools#` on. It sees the exit code and the end of the output. This sets where the **auto-run** switch in the chat's composer starts; once you switch it, the switch decides (`off` still turns commands off). Reading git (status, diff, log) never asks: it cannot change anything.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsCommandsRunIn": {
+          "order": 20,
+          "type": "string",
+          "enum": [
+            "background",
+            "terminal"
+          ],
+          "enumDescriptions": [
+            "Each command runs in a process of its own through your shell, from the workspace root. Its output shows in the chat as it prints. Nothing can answer a prompt, and it is stopped after two minutes.",
+            "Commands run in the **twinny tools** terminal, which opens beside the editor, so you can watch and type into them. Needs VS Code's shell integration; without it they run in the background."
+          ],
+          "default": "background",
+          "markdownDescription": "Where the chat model's commands run (with `#twinny.chatToolsCommands#` not `off`).",
           "scope": "machine"
         },
         "twinny.githubToken": {

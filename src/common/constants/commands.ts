@@ -22,6 +22,7 @@ export const TWINNY_COMMAND_NAME = {
   newConversation: "twinny.newConversation",
   exportConversation: "twinny.exportConversation",
   showShortcuts: "twinny.showShortcuts",
+  forgetAlwaysRunCommands: "twinny.forgetAlwaysRunCommands",
   openPanelChat: "twinny.openPanelChat",
   openChat: "twinny.openChat",
   openTeamPlugins: "twinny.openTeamPlugins",

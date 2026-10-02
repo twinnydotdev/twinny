@@ -17,6 +17,12 @@
   padding: 0;
 }
 
+.head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -107,6 +113,19 @@
 }
 
 .detailLabel,
+/* The tail of a command still running, under its line. */
+.live {
+  margin: 2px 0 4px 20px;
+  padding: 4px 8px;
+  background: var(--tw-surface);
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .approvalLabel {
   margin: 4px 0 2px;
   color: var(--tw-fg-faint);
@@ -343,4 +362,39 @@
 
 .run :global(.codicon) {
   font-size: 12px !important;
+}
+
+/* Stops a running command alone; the reply carries on. */
+.stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--tw-fg-faint);
+  cursor: pointer;
+}
+
+.stop:hover,
+.stop:focus-visible {
+  color: var(--tw-fg);
+  background: color-mix(in srgb, var(--tw-fg) 10%, transparent);
+  outline: none;
+}
+
+.stop :global(.codicon) {
+  font-size: 12px !important;
+}
+
+/* The composer's keys for the question above. */
+.keys {
+  margin-top: 6px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
 }

@@ -15,10 +15,12 @@ import {
   AnyContextItem,
   ChatCompletionMessage,
   ImageAttachment,
-  MentionType
+  MentionType,
+  ToolStepView
 } from "../common/types"
 
 import { useAgentMode } from "./hooks/useAgentMode"
+import { useAutoRun } from "./hooks/useAutoRun"
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useConversationHistory } from "./hooks/useConversationHistory"
 import { useProviders } from "./hooks/useProviders"
@@ -34,8 +36,9 @@ import MessageItem from "./message-item"
 import { emit, useServerEvent } from "./messaging"
 import { Shortcuts } from "./shortcuts"
 import { Suggestions } from "./suggestions"
+import { answerToolStep } from "./tool-steps"
 import { conversationMarkdown } from "./transcript"
-import { CustomKeyMap } from "./utils"
+import { CustomKeyMap, getThinkingMessage } from "./utils"
 
 import styles from "./styles/chat.module.css"
 
@@ -98,9 +101,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
     clear: clearSearchReport,
     take: takeSearchReport
   } = useWorkspaceSearch()
-  const { steps: toolSteps, clear: clearToolSteps, take: takeToolSteps } = useToolSteps()
+  // Kept as the events arrive, not on render, so a step that comes in
+  // right behind a chunk of text is placed after that chunk.
+  const completionRef = useRef<ChatCompletionMessage | null | undefined>()
+  completionRef.current = completion
+  const { steps: toolSteps, clear: clearToolSteps, take: takeToolSteps } = useToolSteps(
+    () => getThinkingMessage(String(completionRef.current?.content ?? "")).message
+  )
   const [isBottom, setIsBottom] = useState(false)
   const { agentMode, toggleAgentMode } = useAgentMode()
+  const { autoRun, autoRunAvailable, toggleAutoRun } = useAutoRun()
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -189,7 +199,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
     handleAddMessage(incoming)
   })
 
-  useServerEvent(EVENT_NAME.twinnyOnCompletion, setCompletion)
+  useServerEvent(EVENT_NAME.twinnyOnCompletion, (incoming) => {
+    completionRef.current = incoming
+    setCompletion(incoming)
+  })
 
   useServerEvent(EVENT_NAME.twinnyOnLoading, () => setIsLoading(true))
 
@@ -407,6 +420,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
     return true
   }, [])
 
+  /* A command or change waiting on the user, answered from the keys. */
+  const waitingStepRef = useRef<ToolStepView>()
+  waitingStepRef.current = toolSteps.find((step) => step.status === "waiting")
+  const approveWaiting = useCallback((how: "run" | "always" | "skip") => {
+    const step = waitingStepRef.current
+    if (!step) return false
+    answerToolStep(step, how)
+    return true
+  }, [])
+
   const stopIfGenerating = useCallback(() => {
     if (!generatingRef.current) return false
     userStoppedRef.current = true
@@ -415,14 +438,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   /*
-   * Esc closes the shortcuts, else stops a reply, else clears the draft on
-   * the second press. False leaves the key to the editor.
+   * Esc closes the shortcuts, else skips what a tool is waiting on, else
+   * stops a reply, else clears the draft on the second press. False leaves
+   * the key to the editor.
    */
   const handleEscape = useCallback(() => {
     if (showShortcutsRef.current) {
       setShortcuts(false)
       return true
     }
+    if (approveWaiting("skip")) return true
     if (stopIfGenerating()) return true
     const editor = editorRef.current
     if (!editor || editor.isEmpty) return false
@@ -437,7 +462,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
     setHint(t("shortcuts-esc-again"))
     hintTimerRef.current = setTimeout(() => setHint(null), DOUBLE_ESCAPE_MS)
     return true
-  }, [clearDraft, setShortcuts, stopIfGenerating, t])
+  }, [approveWaiting, clearDraft, setShortcuts, stopIfGenerating, t])
 
   /* Ctrl+C with nothing selected; with a selection it is still a copy. */
   const handleInterrupt = useCallback(() => {
@@ -698,6 +723,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           clearEditor,
           recallPrompt,
           escape: handleEscape,
+          approve: approveWaiting,
           interrupt: handleInterrupt,
           newConversation: startNewConversation,
           toggleShortcuts,
@@ -1124,18 +1150,35 @@ export const Chat = (props: ChatProps): JSX.Element => {
                   editor={editorRef.current}
                 />
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={agentMode}
-                disabled={chatDisabled}
-                className={cx(styles.agentToggle, { [styles.agentToggleOn]: agentMode })}
-                onClick={toggleAgentMode}
-                title={t(agentMode ? "agent-mode-on-title" : "agent-mode-off-title")}
-              >
-                <span className={styles.agentDot} aria-hidden="true" />
-                {t(agentMode ? "agent-mode-on" : "agent-mode")}
-              </button>
+              <div className={styles.modeSwitches}>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={agentMode}
+                  disabled={chatDisabled}
+                  className={cx(styles.agentToggle, { [styles.agentToggleOn]: agentMode })}
+                  onClick={toggleAgentMode}
+                  title={t(agentMode ? "agent-mode-on-title" : "agent-mode-off-title")}
+                >
+                  <span className={styles.agentDot} aria-hidden="true" />
+                  {t(agentMode ? "agent-mode-on" : "agent-mode")}
+                  <span className={styles.switchKey}>{t("agent-mode-key")}</span>
+                </button>
+                {agentMode && autoRunAvailable && (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoRun}
+                    disabled={chatDisabled}
+                    className={cx(styles.agentToggle, { [styles.agentToggleOn]: autoRun })}
+                    onClick={toggleAutoRun}
+                    title={t(autoRun ? "auto-run-on-title" : "auto-run-off-title")}
+                  >
+                    <span className="codicon codicon-terminal" aria-hidden="true" />
+                    <span className={styles.switchLabel}>{t("auto-run")}</span>
+                  </button>
+                )}
+              </div>
               <div className={styles.chatButtons}>
                 <VSCodeButton
                   appearance="icon"
@@ -1178,8 +1221,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
               className={styles.shortcutsHint}
               onClick={toggleShortcuts}
               aria-expanded={showShortcuts}
+              title={t("shortcuts-hint")}
             >
-              {t("shortcuts-hint")}
+              <span className={styles.shortcutsHintText}>{t("shortcuts-hint")}</span>
+              <span className={styles.shortcutsHintKey}>?</span>
             </button>
           </div>
         </div>
