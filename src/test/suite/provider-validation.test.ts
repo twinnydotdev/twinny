@@ -219,6 +219,13 @@ suite("Provider validation", () => {
       assert.strictEqual(getEndpointDefaults(API_PROVIDERS.Anthropic, "chat"), undefined)
     })
 
+    test("llmman uses Ollama's routes on its own port", () => {
+      assert.deepStrictEqual(getEndpointDefaults(API_PROVIDERS.Llmman, "fim"), {
+        ...getEndpointDefaults(API_PROVIDERS.Ollama, "fim"),
+        apiPort: 17434
+      })
+    })
+
     test("hosted chat ignores the endpoint fields; everything else uses them", () => {
       assert.strictEqual(usesEndpoint(API_PROVIDERS.OpenAI, "chat"), false)
       assert.strictEqual(usesEndpoint(API_PROVIDERS.OpenAI, "embedding"), true)

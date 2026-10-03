@@ -47,6 +47,7 @@ const codicon = (name: string) => <i className={`codicon codicon-${name}`} />
 
 const LOCAL_LOGOS: Record<string, ReactNode> = {
   [API_PROVIDERS.Ollama]: <SvgOllama />,
+  [API_PROVIDERS.Llmman]: codicon("server"),
   [API_PROVIDERS.LMStudio]: codicon("vm"),
   [API_PROVIDERS.LlamaCpp]: codicon("terminal"),
   [API_PROVIDERS.OpenWebUI]: codicon("browser"),
@@ -112,6 +113,7 @@ const hosted = (
 export const PRESETS: ProviderPreset[] = [
   // chat
   local(API_PROVIDERS.Ollama, "chat"),
+  local(API_PROVIDERS.Llmman, "chat"),
   local(API_PROVIDERS.LMStudio, "chat"),
   local(API_PROVIDERS.LlamaCpp, "chat"),
   local(API_PROVIDERS.OpenAICompatible, "chat"),
@@ -140,6 +142,7 @@ export const PRESETS: ProviderPreset[] = [
   ),
   // fim
   local(API_PROVIDERS.Ollama, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
+  local(API_PROVIDERS.Llmman, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
   local(API_PROVIDERS.LMStudio, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
   local(API_PROVIDERS.LlamaCpp, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
   local(API_PROVIDERS.OpenAICompatible, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
@@ -154,6 +157,7 @@ export const PRESETS: ProviderPreset[] = [
   ),
   // embedding
   local(API_PROVIDERS.Ollama, "embedding"),
+  local(API_PROVIDERS.Llmman, "embedding"),
   local(API_PROVIDERS.LMStudio, "embedding"),
   local(API_PROVIDERS.LlamaCpp, "embedding"),
   local(API_PROVIDERS.OpenAICompatible, "embedding"),

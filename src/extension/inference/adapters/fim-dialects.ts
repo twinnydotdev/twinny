@@ -122,6 +122,7 @@ export function createStreamRequestBodyFim(
     case API_PROVIDERS.OpenAICompatible:
     case API_PROVIDERS.OpenWebUI:
     case API_PROVIDERS.Ollama:
+    case API_PROVIDERS.Llmman:
     case API_PROVIDERS.TwinnyP2P:
       return {
         model: options.model,
@@ -201,6 +202,7 @@ export const getFimDataFromProvider = (
   switch (provider) {
     case API_PROVIDERS.OpenAICompatible:
     case API_PROVIDERS.Ollama:
+    case API_PROVIDERS.Llmman:
     case API_PROVIDERS.OpenWebUI:
     case API_PROVIDERS.TwinnyP2P:
       if (typeof data.response === "string") return data.response

@@ -96,6 +96,15 @@ export interface EndpointDefaults {
   apiPath?: string
 }
 
+/** Ollama's routes on a given port; llmman serves the same API elsewhere. */
+const ollamaEndpoints = (
+  apiPort: number
+): Partial<Record<ProviderType, EndpointDefaults>> => ({
+  chat: { apiHostname: "localhost", apiPort, apiPath: "/v1" },
+  fim: { apiHostname: "localhost", apiPort, apiPath: "/api/generate" },
+  embedding: { apiHostname: "localhost", apiPort, apiPath: "/api/embed" }
+})
+
 /**
  * Where each server usually listens and which route serves each job. The
  * chat path is the OpenAI-style *base* (fluency.js appends
@@ -105,11 +114,8 @@ const ENDPOINT_DEFAULTS: Record<
   string,
   Partial<Record<ProviderType, EndpointDefaults>>
 > = {
-  [API_PROVIDERS.Ollama]: {
-    chat: { apiHostname: "localhost", apiPort: 11434, apiPath: "/v1" },
-    fim: { apiHostname: "localhost", apiPort: 11434, apiPath: "/api/generate" },
-    embedding: { apiHostname: "localhost", apiPort: 11434, apiPath: "/api/embed" }
-  },
+  [API_PROVIDERS.Ollama]: ollamaEndpoints(11434),
+  [API_PROVIDERS.Llmman]: ollamaEndpoints(17434),
   [API_PROVIDERS.LMStudio]: {
     chat: { apiHostname: "localhost", apiPort: 1234, apiPath: "/v1" },
     fim: { apiHostname: "localhost", apiPort: 1234, apiPath: "/v1/completions" },

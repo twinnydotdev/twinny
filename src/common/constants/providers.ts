@@ -5,6 +5,8 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
   Ollama: "ollama",
+  /** https://github.com/llmmanorg/llmman serves the Ollama API on port 17434. */
+  Llmman: "llmman",
   LlamaCpp: "llamacpp",
   OpenAICompatible: "openai-compatible",
   Qvac: "qvac",
@@ -37,6 +39,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.Gemini]: "Gemini",
   [API_PROVIDERS.Groq]: "Groq",
   [API_PROVIDERS.LiteLLM]: "LiteLLM",
+  [API_PROVIDERS.Llmman]: "llmman",
   [API_PROVIDERS.LlamaCpp]: "llama.cpp",
   [API_PROVIDERS.LMStudio]: "LM Studio",
   [API_PROVIDERS.Mistral]: "Mistral",

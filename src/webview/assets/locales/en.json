@@ -208,6 +208,7 @@
   "preset-twinny-remote": "A Twinny gateway you run with twinny-server; needs its address and token",
   "preset-show-more": "Show {{count}} more",
   "preset-ollama": "Runs models locally. Install from ollama.com, then pull a model.",
+  "preset-llmman": "Local model runner with an Ollama-compatible API on port 17434. Run llmman serve, then pull a model.",
   "preset-lmstudio": "Desktop app with a local server on port 1234.",
   "preset-llamacpp": "The llama-server binary, default port 8080.",
   "preset-openai-compatible": "Any server that speaks the OpenAI API, e.g. vLLM or TGI.",

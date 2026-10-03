@@ -68,6 +68,7 @@ const OPENWEBUI_MODELS: ListRoute = {
 const listRoutesFor = (provider: string): ListRoute[] => {
   switch (provider) {
     case API_PROVIDERS.Ollama:
+    case API_PROVIDERS.Llmman:
     case API_PROVIDERS.TwinnyP2P:
       return [OLLAMA_TAGS, OPENAI_MODELS]
     case API_PROVIDERS.OpenWebUI:

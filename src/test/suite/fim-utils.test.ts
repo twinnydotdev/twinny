@@ -58,6 +58,10 @@ suite("FIM utilities", () => {
         "a"
       )
       assert.strictEqual(
+        getFimDataFromProvider(API_PROVIDERS.Llmman, chunk({ response: "a" })),
+        "a"
+      )
+      assert.strictEqual(
         getFimDataFromProvider(API_PROVIDERS.LlamaCpp, chunk({ content: "b" })),
         "b"
       )
@@ -112,6 +116,13 @@ suite("FIM utilities", () => {
       keepAlive: "5m",
       stop: ["<a>", "<b>", "<c>", "<d>", "<e>"]
     }
+
+    test("llmman gets Ollama's request body", () => {
+      assert.deepStrictEqual(
+        createStreamRequestBodyFim(API_PROVIDERS.Llmman, "p", options),
+        createStreamRequestBodyFim(API_PROVIDERS.Ollama, "p", options)
+      )
+    })
 
     test("sends stop sequences to Ollama inside options", () => {
       const body = createStreamRequestBodyFim(API_PROVIDERS.Ollama, "p", options)
