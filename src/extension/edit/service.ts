@@ -46,6 +46,29 @@ export interface InlineEditArgs {
 /** What the CodeLens needs to know about the edit in a document. */
 export type { Hunk } from "./region"
 
+/** Whether the chat's edits go straight into files or wait for review. */
+export type ChatEditMode = "apply" | "review"
+
+/** What became of a chat edit; `pending` while it waits for review. */
+export interface ChatEditOutcome {
+  ok: boolean
+  message: string
+  pending?: boolean
+}
+
+/** A whole-lines replacement in a file on disk, from the chat's `edit_file` tool. */
+export interface FileEditProposal {
+  file: string
+  startLine: number
+  endLine: number
+  original: string
+  text: string
+}
+
+/** With a folder open, a chat edit stays inside it. */
+const outsideWorkspace = (uri: vscode.Uri) =>
+  !!vscode.workspace.workspaceFolders?.length && !vscode.workspace.getWorkspaceFolder(uri)
+
 export interface PendingEditInfo {
   line: number
   streaming: boolean
@@ -235,6 +258,137 @@ export class InlineEditService extends Base {
     editor.revealRange(region.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport)
     this.present()
     logger.info(`Applied chat code ${how} in ${vscode.workspace.asRelativePath(document.uri)}`)
+  }
+
+  /**
+   * A chat tool's search-and-replace. `apply` writes it into the file and
+   * saves, leaving the file open behind the chat so the change is visible
+   * and Ctrl+Z undoes it; `review` shows it as a pending diff to accept or
+   * reject, and nothing changes until the user decides. Resolves to what
+   * the model is told, since it cannot see the editor.
+   */
+  public async chatEdit(
+    proposal: FileEditProposal,
+    mode: ChatEditMode = "apply"
+  ): Promise<ChatEditOutcome> {
+    const pending = this._pending
+    const uri = vscode.Uri.file(proposal.file)
+    const relative = vscode.workspace.asRelativePath(uri)
+    // The tools keep to the workspace themselves; the command that reaches
+    // this can be run by anything, so it holds the line too.
+    if (outsideWorkspace(uri)) {
+      return { ok: false, message: `Not changed: ${relative} is outside the workspace.` }
+    }
+    if (this.running || (pending && (mode === "review" || pending.document.uri.fsPath === proposal.file))) {
+      const where = pending ? ` in ${vscode.workspace.asRelativePath(pending.document.uri)}` : ""
+      return {
+        ok: false,
+        message: `Not changed: an edit${where} is waiting for the user's review. Tell the user to accept or reject it, then ask again.`
+      }
+    }
+    const document = await vscode.workspace.openTextDocument(uri)
+    const last = document.lineAt(Math.min(proposal.endLine, document.lineCount - 1))
+    const range = new vscode.Range(proposal.startLine, 0, proposal.endLine, last.range.end.character)
+    const current = document.getText(range).replace(/\r\n/g, "\n")
+    if (proposal.endLine >= document.lineCount || current !== proposal.original) {
+      return {
+        ok: false,
+        message: "Not changed: the file changed while you were working. Read it again and retry."
+      }
+    }
+    const lines =
+      proposal.startLine === proposal.endLine
+        ? `line ${proposal.startLine + 1}`
+        : `lines ${proposal.startLine + 1}-${proposal.endLine + 1}`
+
+    if (mode === "apply") {
+      const edit = new vscode.WorkspaceEdit()
+      edit.replace(uri, range, proposal.text)
+      if (!(await vscode.workspace.applyEdit(edit))) {
+        return { ok: false, message: `Not changed: the editor refused the edit to ${relative}.` }
+      }
+      const saved = await document.save()
+      const editor = await vscode.window.showTextDocument(document, { preview: true, preserveFocus: true })
+      const end = proposal.startLine + proposal.text.split("\n").length - 1
+      editor.revealRange(new vscode.Range(proposal.startLine, 0, end, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport)
+      logger.info(`Chat edited ${relative}:${proposal.startLine + 1}${saved ? "" : " (not saved)"}`)
+      return {
+        ok: true,
+        message: saved
+          ? `Applied and saved: ${relative} ${lines} changed.`
+          : `Applied: ${relative} ${lines} changed in the editor, but the file could not be saved; commands and git will still see the old file.`
+      }
+    }
+
+    const editor = await vscode.window.showTextDocument(document, { preview: false, preserveFocus: true })
+    const region = new DiffRegion(editor, range)
+    this._pending = region
+    await region.render(layoutDiff(current, proposal.text))
+    editor.revealRange(region.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport)
+    this.present()
+    logger.info(`Chat proposed an edit to ${relative}:${proposal.startLine + 1}`)
+    return {
+      ok: true,
+      pending: true,
+      message:
+        `Proposed: the change to ${relative} ${lines} is shown in the editor for the user to accept or reject. ` +
+        "It is not applied yet. Tell the user in a sentence what you changed."
+    }
+  }
+
+  /**
+   * A chat tool's new file. `apply` creates it (folders included) through a
+   * workspace edit and leaves it open behind the chat; `review` opens it
+   * unsaved at its path with the content as a pending diff, so accepting
+   * and saving puts it there and rejecting leaves nothing behind.
+   */
+  public async chatCreate(
+    file: string,
+    content: string,
+    mode: ChatEditMode = "apply"
+  ): Promise<ChatEditOutcome> {
+    const target = vscode.Uri.file(file)
+    const relative = vscode.workspace.asRelativePath(target)
+    if (outsideWorkspace(target)) {
+      return { ok: false, message: `Not created: ${relative} is outside the workspace.` }
+    }
+    if (fs.existsSync(file)) {
+      return { ok: false, message: `Not created: ${relative} already exists. Use edit_file to change it.` }
+    }
+    if (this.running || (this._pending && mode === "review")) {
+      return {
+        ok: false,
+        message: "Not created: an edit is waiting for the user's review. Tell the user to accept or reject it, then ask again."
+      }
+    }
+
+    if (mode === "apply") {
+      const edit = new vscode.WorkspaceEdit()
+      edit.createFile(target, { ignoreIfExists: false, contents: Buffer.from(content, "utf8") })
+      if (!(await vscode.workspace.applyEdit(edit))) {
+        return { ok: false, message: `Not created: the editor refused to create ${relative}.` }
+      }
+      const document = await vscode.workspace.openTextDocument(target)
+      if (document.isDirty) await document.save()
+      await vscode.window.showTextDocument(document, { preview: true, preserveFocus: true })
+      logger.info(`Chat created ${relative}`)
+      return { ok: true, message: `Created and saved ${relative}.` }
+    }
+
+    const document = await vscode.workspace.openTextDocument(target.with({ scheme: "untitled" }))
+    const editor = await vscode.window.showTextDocument(document, { preview: false, preserveFocus: true })
+    const region = new DiffRegion(editor, new vscode.Range(0, 0, 0, 0))
+    this._pending = region
+    await region.render(layoutDiff("", content.endsWith("\n") ? content : `${content}\n`))
+    this.present()
+    logger.info(`Chat proposed a new file ${relative}`)
+    return {
+      ok: true,
+      pending: true,
+      message:
+        `Proposed: ${relative} is open, unsaved, for the user to accept and save or reject. ` +
+        "It does not exist on disk yet. Tell the user in a sentence what the file is for."
+    }
   }
 
   /**

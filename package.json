@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.2.9",
+  "version": "4.3.5",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -148,6 +148,11 @@
           "command": "twinny.exportConversation",
           "when": "view == twinny.sidebar",
           "group": "conversation@1"
+        },
+        {
+          "command": "twinny.showShortcuts",
+          "when": "view == twinny.sidebar",
+          "group": "conversation@2"
         }
       ],
       "scm/title": [
@@ -281,6 +286,15 @@
         "command": "twinny.exportConversation",
         "title": "Twinny - Open conversation as Markdown",
         "icon": "$(markdown)"
+      },
+      {
+        "command": "twinny.showShortcuts",
+        "title": "Twinny - Chat keyboard shortcuts",
+        "icon": "$(keyboard)"
+      },
+      {
+        "command": "twinny.forgetAlwaysRunCommands",
+        "title": "Twinny - Forget commands set to always run"
       },
       {
         "command": "twinny.newConversation",
@@ -446,7 +460,7 @@
             "Chinese (Hong Kong)",
             "German",
             "Spanish",
-            "Spanish (Colombia)",
+            "Spanish (Chile)",
             "Japanese",
             "French",
             "Italian",
@@ -482,7 +496,7 @@
           "order": 6,
           "type": "number",
           "default": 0.2,
-          "markdownDescription": "Controls the randomness of the model's output. Lower values (e.g., 0.2) produce more focused and deterministic outputs, while higher values (e.g., 0.8) lead to more diverse and creative completions.",
+          "markdownDescription": "Controls the randomness of code completions. Lower values (e.g., 0.2) produce more focused and deterministic completions, while higher values (e.g., 0.8) lead to more diverse ones. Chat, inline edit and code review send no temperature; the server's default applies.",
           "required": true
         },
         "twinny.multilineCompletionsEnabled": {
@@ -523,13 +537,6 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Enables caching of Fill-in-Middle (FIM) completions for identical prompts. This can significantly improve performance but may use more memory."
-        },
-        "twinny.numPredictChat": {
-          "order": 11,
-          "type": "number",
-          "default": 512,
-          "markdownDescription": "Sets the maximum number of tokens to generate for chat completions. Higher values allow for longer completions but may increase response time.",
-          "required": true
         },
         "twinny.numPredictFim": {
           "order": 12,
@@ -629,6 +636,60 @@
           "default": true,
           "markdownDescription": "Writes what Twinny is doing to the **Twinny** output channel: one line per completion or chat request with model, timing, size and why it stopped. Set the channel's log level to *Debug* (the dropdown in the Output panel) to also see the prompts and replies. Warnings and errors are written even when this is off."
         },
+        "twinny.chatTools": {
+          "order": 20,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, and by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review; commands ask first unless `#twinny.chatToolsCommands#` says otherwise. Files ignored by a `.gitignore` are off limits, and changes to `.vscode/` or a `.gitignore` are always shown for review. Each step shows in the reply at the point it ran. Needs a capable coder model such as `qwen3-coder:30b` with a context of 8k tokens or more; small models tend to call tools badly. Set in your user settings; a workspace cannot turn it on.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsEdits": {
+          "order": 20,
+          "type": "string",
+          "enum": [
+            "apply",
+            "review"
+          ],
+          "enumDescriptions": [
+            "Edits go straight into the file and are saved; the model carries on until the task is done. Ctrl+Z in the file undoes an edit. Deleting a file git has no copy of still asks first.",
+            "Each edit opens as a diff to accept or reject, and the model stops until you have decided. Renames, moves and deletes ask in the chat."
+          ],
+          "default": "apply",
+          "markdownDescription": "What happens when the chat model changes a file (with `#twinny.chatTools#` on).",
+          "scope": "machine"
+        },
+        "twinny.chatToolsCommands": {
+          "order": 20,
+          "type": "string",
+          "enum": [
+            "ask",
+            "allow",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Each command the model wants to run is shown in the chat with Run, Always run and Skip first.",
+            "Commands run straight away. A command cannot be undone like an edit can.",
+            "The model cannot run commands."
+          ],
+          "default": "ask",
+          "markdownDescription": "Whether the chat model may run shell commands (tests, builds), with `#twinny.chatTools#` on. It sees the exit code and the end of the output. This sets where the **auto-run** switch in the chat's composer starts; once you switch it, the switch decides (`off` still turns commands off). Reading git (status, diff, log) never asks: it cannot change anything.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsCommandsRunIn": {
+          "order": 20,
+          "type": "string",
+          "enum": [
+            "background",
+            "terminal"
+          ],
+          "enumDescriptions": [
+            "Each command runs in a process of its own through your shell, from the workspace root. Its output shows in the chat as it prints. Nothing can answer a prompt, and it is stopped after two minutes.",
+            "Commands run in the **twinny tools** terminal, which opens beside the editor, so you can watch and type into them. Needs VS Code's shell integration; without it they run in the background."
+          ],
+          "default": "background",
+          "markdownDescription": "Where the chat model's commands run (with `#twinny.chatToolsCommands#` not `off`).",
+          "scope": "machine"
+        },
         "twinny.githubToken": {
           "order": 21,
           "type": "string",
@@ -719,7 +780,7 @@
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",
-    "fluency.js": "^1.0.29",
+    "fluency.js": "^1.0.31",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",

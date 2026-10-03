@@ -483,6 +483,7 @@ One JSON file, passed with `--config`. Every field except `providers` and
 | `teamDefaults.{chat,fim,embeddings}` | The alias a developer gets for each job on Connect to team. | none |
 | `policy.teamOnly` | Only the team gateway: a connected developer may not add or activate providers of any other kind. | `false` |
 | `policy.lockDefaults` | Keep the team's default models active for their jobs while connected. | `false` |
+| `policy.secretShield` | Which backends get prompts with credentials swapped for placeholders: `offMachine` (hosted APIs, other hosts, paired devices, other gateways, the team pool), `always` (every backend) or `off`. Applies on every plan. | `offMachine` |
 | `recording.chat`, `recording.fim`, `recording.embeddings` | Keep the content of these requests. Needs the `recording` licence feature; disclosed to developers. | `false` |
 | `recording.retentionDays` | Records older than this are deleted. | `90` |
 | `recording.dir` | Where records live. | `~/.twinny/server/recordings` |
@@ -708,6 +709,26 @@ Plugin requests also count against `limits.maxActiveRequests`, wait in
 the same queue, get the same `limits.maxOutputTokens` and deadline, and
 are aborted when the gateway stops. `limits.perKey` applies to each
 plugin under its own name (`plugin:github`).
+
+### Secret shield
+
+`policy.secretShield` swaps API keys, tokens, private keys and passwords
+in a prompt for placeholders such as `REDACTED_GITHUB_TOKEN_1` before the
+request reaches a backend, and puts them back in the reply, for every
+client: the extension, the TUI and Neovim.
+
+| Value | Prompts shielded on their way to |
+| --- | --- |
+| `offMachine` (default) | hosted APIs, backends on other hosts, paired devices, other gateways and the team pool |
+| `always` | every backend, including those on the gateway's own host |
+| `off` | nothing; prompts are forwarded as they arrive |
+
+Unlike the rules above it needs no licence feature. Set it under
+**Policy** on the admin page or in the file:
+
+```json
+"policy": { "secretShield": "always" }
+```
 
 ## Pooling teammates' computers
 
@@ -1196,6 +1217,13 @@ the gateway.
   end. On expiry the backend call is aborted and the client sees `timeout`.
 - **Backpressure.** Chunks are written at the pace the client reads them;
   nothing is buffered whole. Request bodies are capped by `maxBodyBytes`.
+- **Slow bodies.** The small JSON bodies of the other routes (sign-in,
+  join, page links, admin and plugin calls) must arrive within 30 seconds.
+  A caller that sends headers and then stalls is answered `400` with "The
+  request body did not arrive in time." and its connection is closed a
+  second later, so an open port cannot be held by connections that never
+  finish asking. A body over its route's size limit is refused as soon as
+  it is over. Inference bodies are bound by `requestDeadlineMs` instead.
 - **Shutdown.** On SIGINT or SIGTERM the gateway stops accepting requests
   (health answers `503 stopping`), waits up to `shutdownGraceMs` for active
   requests, aborts whatever remains with `cancelled`, closes every

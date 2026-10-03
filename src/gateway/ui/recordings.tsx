@@ -32,18 +32,33 @@ interface ListResponse {
 }
 
 /**
- * A list row: one record, or an indexing run of embedding records. The
- * list is newest-first, so consecutive embedding records from one
- * developer to one alias with no gap over `RUN_GAP_MS` fold into a run;
- * a run of one is just its record.
+ * A list row: one record, an indexing run of embedding records, or a chat
+ * conversation. The list is newest-first, so consecutive embedding records
+ * from one developer to one alias with no gap over `RUN_GAP_MS` fold into
+ * a run. Chat records of one thread fold into a conversation where its
+ * newest step is, wherever the others are: autocomplete interleaves with
+ * them. The newest step carries the whole conversation. A run or a
+ * conversation of one is just its record.
  */
-type ListRow = { kind: "record"; record: RecordingSummary } | { kind: "run"; id: string; calls: RecordingSummary[]; failed: number; ms: number }
+type ListRow =
+  | { kind: "record"; record: RecordingSummary }
+  | { kind: "run"; id: string; calls: RecordingSummary[]; failed: number; ms: number }
+  | { kind: "conversation"; id: string; steps: RecordingSummary[]; ms: number }
 
-const groupRuns = (rows: RecordingSummary[]): ListRow[] => {
+const groupRows = (rows: RecordingSummary[]): ListRow[] => {
+  const threads = new Map<string, RecordingSummary[]>()
+  for (const record of rows) if (record.thread) threads.set(record.thread, [...(threads.get(record.thread) ?? []), record])
   const out: ListRow[] = []
   let run: Extract<ListRow, { kind: "run" }> | undefined
   let last: RecordingSummary | undefined
   for (const record of rows) {
+    const steps = record.thread ? threads.get(record.thread) : undefined
+    if (steps && steps.length > 1) {
+      if (steps[0] === record) out.push({ kind: "conversation", id: record.thread!, steps, ms: steps.reduce((sum, step) => sum + step.ms, 0) })
+      run = undefined
+      last = record
+      continue
+    }
     const joins =
       record.route === "embeddings" &&
       last?.route === "embeddings" &&
@@ -66,6 +81,14 @@ const groupRuns = (rows: RecordingSummary[]): ListRow[] => {
   }
   return out
 }
+
+/** The records in the order they show: a folded group by its head, an open one by every record. */
+const visibleRecords = (grouped: ListRow[], expanded: Set<string>): RecordingSummary[] =>
+  grouped.flatMap((row) => {
+    if (row.kind === "record") return [row.record]
+    const members = row.kind === "run" ? row.calls : row.steps
+    return expanded.has(row.id) ? members : [members[0]]
+  })
 
 /* -------------------------------------------------------------------------- */
 /*  Small pieces                                                              */
@@ -224,9 +247,50 @@ const RecordingSettings = ({ apiKey, summary, licensed, onSaved }: { apiKey: str
 /*  One record                                                                */
 /* -------------------------------------------------------------------------- */
 
-type ChatMessage = { role?: string; content?: unknown }
+type ChatMessage = { role?: string; content?: unknown; tool_calls?: unknown; tool_call_id?: unknown }
 
-const contentText = (content: unknown): string => (typeof content === "string" ? content : JSON.stringify(content, null, 2))
+/** A tool call, from a message (`function: { name, arguments }`) or from a reply (`name`, `arguments`). */
+interface ToolCall {
+  id: string
+  name: string
+  arguments: string
+}
+
+const toolCallsOf = (value: unknown): ToolCall[] =>
+  Array.isArray(value)
+    ? value.flatMap((entry) => {
+        const call = (entry ?? {}) as { id?: unknown; name?: unknown; arguments?: unknown; function?: { name?: unknown; arguments?: unknown } }
+        const name = call.function?.name ?? call.name
+        const args = call.function?.arguments ?? call.arguments
+        if (typeof name !== "string") return []
+        return [{ id: typeof call.id === "string" ? call.id : "", name, arguments: typeof args === "string" ? args : JSON.stringify(args ?? {}) }]
+      })
+    : []
+
+/** A call's arguments laid out to read, or as written when they are not JSON. */
+const prettyArguments = (text: string): { code: string; language: string } => {
+  try {
+    return { code: JSON.stringify(JSON.parse(text), null, 2), language: "json" }
+  } catch {
+    return { code: text, language: "text" }
+  }
+}
+
+/** A call on one line: `read_file path=src/a.ts`. */
+const callLine = (call: ToolCall, max = 90): string => {
+  let line = call.name
+  try {
+    const args = JSON.parse(call.arguments) as Record<string, unknown>
+    const parts = Object.entries(args).map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`)
+    if (parts.length) line += ` ${parts.join(" ").replace(/\s+/g, " ")}`
+  } catch {
+    if (call.arguments.trim()) line += ` ${call.arguments.replace(/\s+/g, " ")}`
+  }
+  return line.length > max ? `${line.slice(0, max)}…` : line
+}
+
+const contentText = (content: unknown): string =>
+  typeof content === "string" ? content : content === null || content === undefined ? "" : JSON.stringify(content, null, 2)
 
 const firstLine = (text: string, max = 110): string => {
   const line = text.trim().split("\n")[0] ?? ""
@@ -236,17 +300,106 @@ const firstLine = (text: string, max = 110): string => {
 const Body = ({ text, raw, language }: { text: string; raw: boolean; language?: string }) =>
   raw || language ? <CodeBlock code={text} language={language ?? "markdown"} bare wrap /> : <MarkdownView text={text} />
 
-/** A chat as its turns; system prompts folded, since they are long and the same every time. */
+/** Arguments holding text of several lines (an edit's find and replace, a new file), or nothing when JSON reads fine. */
+const longArguments = (text: string): Array<[string, unknown]> | undefined => {
+  try {
+    const args = JSON.parse(text) as unknown
+    if (!args || typeof args !== "object" || Array.isArray(args)) return undefined
+    const entries = Object.entries(args as Record<string, unknown>)
+    return entries.some(([, value]) => typeof value === "string" && value.includes("\n")) ? entries : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The calls a turn made: the tool's name, then its arguments. JSON as
+ * written, unless an argument is text of several lines: then each
+ * argument is shown on its own, the text as it is rather than escaped.
+ */
+const ToolCalls = ({ calls, raw }: { calls: ToolCall[]; raw: boolean }) => (
+  <div className="tool-calls">
+    {calls.map((call, i) => {
+      const args = prettyArguments(call.arguments)
+      const long = raw ? undefined : longArguments(call.arguments)
+      return (
+        <div key={call.id || i} className="tool-call">
+          <div className="tool-call-head">
+            <span className="tool-name">{call.name}</span>
+            {call.id && <span className="muted tool-id">{call.id}</span>}
+          </div>
+          {long ? (
+            <dl className="tool-args">
+              {long.map(([name, value]) => (
+                <React.Fragment key={name}>
+                  <dt>{name}</dt>
+                  <dd>
+                    {typeof value === "string" && value.includes("\n") ? (
+                      <CodeBlock code={value.replace(/\n$/, "")} language={guessLanguage(value)} bare wrap />
+                    ) : (
+                      <code>{typeof value === "string" ? value : JSON.stringify(value)}</code>
+                    )}
+                  </dd>
+                </React.Fragment>
+              ))}
+            </dl>
+          ) : (
+            args.code !== "{}" && <CodeBlock code={args.code} language={args.language} bare wrap />
+          )}
+        </div>
+      )
+    })}
+  </div>
+)
+
+type OfferedTool = { name?: unknown; description?: unknown; parameters?: unknown }
+
+/** The tools the request offered, folded: they are the same on every step of a run. */
+const OfferedTools = ({ tools, raw }: { tools: OfferedTool[]; raw: boolean }) => (
+  <details className="turn system tools">
+    <summary>
+      <span className="role">tools</span>
+      <span className="muted summary-text">{tools.map((tool) => String(tool.name ?? "?")).join(", ")}</span>
+      <span className="muted summary-len">{fmt(tools.length)} offered</span>
+    </summary>
+    <div className="turn-body">
+      {raw ? (
+        <CodeBlock code={JSON.stringify(tools, null, 2)} language="json" bare wrap />
+      ) : (
+        <dl className="tool-list">
+          {tools.map((tool, i) => (
+            <React.Fragment key={i}>
+              <dt>{String(tool.name ?? "?")}</dt>
+              <dd>{typeof tool.description === "string" ? tool.description : ""}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      )}
+    </div>
+  </details>
+)
+
+/**
+ * A chat as its turns. System prompts and the tools offered are folded,
+ * since they are long and the same every time; so is each tool result,
+ * under the call it answers.
+ */
 const ChatView = ({ record, raw }: { record: RecordingRecord; raw: boolean }) => {
   const request = (record.request ?? {}) as Record<string, unknown>
   const response = (record.response ?? {}) as Record<string, unknown>
   const messages = Array.isArray(request.messages) ? (request.messages as ChatMessage[]) : []
+  const tools = Array.isArray(request.tools) ? (request.tools as OfferedTool[]) : []
   const reply = typeof response.content === "string" ? response.content : ""
+  const replyCalls = toolCallsOf(response.toolCalls)
+  // Which call each result answers, by the id the model gave it.
+  const called = new Map<string, ToolCall>()
+  for (const m of messages) for (const call of toolCallsOf(m.tool_calls)) if (call.id) called.set(call.id, call)
   return (
     <div className="turns">
+      {tools.length > 0 && <OfferedTools tools={tools} raw={raw} />}
       {messages.map((m, i) => {
         const text = contentText(m.content)
-        const isJson = typeof m.content !== "string"
+        const isJson = typeof m.content !== "string" && m.content !== null && m.content !== undefined
         if (m.role === "system") {
           return (
             <details key={i} className="turn system">
@@ -261,14 +414,38 @@ const ChatView = ({ record, raw }: { record: RecordingRecord; raw: boolean }) =>
             </details>
           )
         }
+        if (m.role === "tool") {
+          const call = typeof m.tool_call_id === "string" ? called.get(m.tool_call_id) : undefined
+          return (
+            <details key={i} className="turn system tool">
+              <summary>
+                <span className="role">tool result</span>
+                <span className="muted summary-text">
+                  {call && <span className="tool-name">{callLine(call, 60)}</span>}
+                  {call && " → "}
+                  {firstLine(text)}
+                </span>
+                <span className="muted summary-len">{compact(text.length)} chars</span>
+              </summary>
+              <div className="turn-body">
+                <CodeBlock code={text} language="text" bare wrap />
+              </div>
+            </details>
+          )
+        }
+        const calls = toolCallsOf(m.tool_calls)
         return (
           <div key={i} className={`turn ${m.role ?? ""}`}>
             <div className="turn-head">
-              <span className="role">{m.role ?? "?"}</span>
-              <CopyButton text={text} />
+              <span className="role">
+                {m.role ?? "?"}
+                {calls.length > 0 && <span className="muted"> · {plural(calls.length, "tool call")}</span>}
+              </span>
+              {text && <CopyButton text={text} />}
             </div>
             <div className="turn-body">
-              <Body text={text} raw={raw} language={isJson ? "json" : undefined} />
+              {text && <Body text={text} raw={raw} language={isJson ? "json" : undefined} />}
+              {calls.length > 0 && <ToolCalls calls={calls} raw={raw} />}
             </div>
           </div>
         )
@@ -277,11 +454,15 @@ const ChatView = ({ record, raw }: { record: RecordingRecord; raw: boolean }) =>
         <div className="turn-head">
           <span className="role">
             assistant · <OutcomePill record={record} />
+            {replyCalls.length > 0 && <span className="muted"> · {plural(replyCalls.length, "tool call")}</span>}
+            {response.finishReason === "length" && <span className="muted"> · cut off at the output cap</span>}
           </span>
           {reply && <CopyButton text={reply} />}
         </div>
         <div className="turn-body">
-          {reply ? <Body text={reply} raw={raw} /> : <div className="muted">{record.outcome === "ok" ? "The reply was empty." : "No reply was produced."}</div>}
+          {reply && <Body text={reply} raw={raw} />}
+          {replyCalls.length > 0 && <ToolCalls calls={replyCalls} raw={raw} />}
+          {!reply && !replyCalls.length && <div className="muted">{record.outcome === "ok" ? "The reply was empty." : "No reply was produced."}</div>}
         </div>
       </div>
     </div>
@@ -478,13 +659,34 @@ interface RecordRowProps {
   now: number
   term: string
   onOpen: (id: string) => Promise<void>
-  /** A call inside an expanded indexing run. */
+  /** A call inside an expanded indexing run, or a step inside a conversation. */
   nested?: boolean
+  /** The newest step of a folded conversation: the whole of it, with the steps behind a caret. */
+  conversation?: { steps: number; ms: number; open: boolean; onToggle: () => void }
 }
 
-const RecordRow = ({ record: r, selected, now, term, onOpen, nested }: RecordRowProps) => (
-  <tr className={`${selected ? "selected" : ""} ${nested ? "nested" : ""}`} onClick={() => void onOpen(r.id)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && void onOpen(r.id)}>
+const RecordRow = ({ record: r, selected, now, term, onOpen, nested, conversation }: RecordRowProps) => (
+  <tr
+    className={`${selected ? "selected" : ""} ${nested ? "nested" : ""} ${conversation ? "run" : ""}`}
+    onClick={() => void onOpen(r.id)}
+    tabIndex={0}
+    onKeyDown={(e) => e.key === "Enter" && void onOpen(r.id)}
+    aria-expanded={conversation?.open}
+  >
     <td className="muted" title={`${whenExact(r.at)} UTC`}>
+      {conversation && (
+        <button
+          type="button"
+          className="caret"
+          title={conversation.open ? "Fold the steps" : "Show each step"}
+          onClick={(e) => {
+            e.stopPropagation()
+            conversation.onToggle()
+          }}
+        >
+          {conversation.open ? "▾" : "▸"}
+        </button>
+      )}
       {timeAgo(r.at, now)}
     </td>
     <td>{r.key}</td>
@@ -495,11 +697,14 @@ const RecordRow = ({ record: r, selected, now, term, onOpen, nested }: RecordRow
     <td>
       <OutcomePill record={r} />
     </td>
-    <td className="num">{duration(r.ms)}</td>
+    <td className="num" title={conversation ? "All steps together" : undefined}>
+      {duration(conversation?.ms ?? r.ms)}
+    </td>
     <td className="num">
       <Tokens usage={r.usage} />
     </td>
     <td className="preview">
+      {conversation && <b>{plural(conversation.steps, "step")} · </b>}
       <Preview text={r.preview} term={term} />
     </td>
   </tr>
@@ -565,8 +770,9 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
   }, [load])
 
   const rows = useMemo(() => (data ? [...data.records, ...more] : []), [data, more])
-  const grouped = useMemo(() => groupRuns(rows), [rows])
+  const grouped = useMemo(() => groupRows(rows), [rows])
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const visible = useMemo(() => visibleRecords(grouped, expanded), [grouped, expanded])
   const toggleRun = (id: string) =>
     setExpanded((current) => {
       const next = new Set(current)
@@ -574,7 +780,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
       else next.add(id)
       return next
     })
-  const openIndex = open ? rows.findIndex((r) => r.id === open.id) : -1
+  const openIndex = open ? visible.findIndex((r) => r.id === open.id) : -1
 
   const loadMore = async () => {
     const before = data?.nextBefore
@@ -616,10 +822,10 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
   const step = useCallback(
     (delta: 1 | -1) => {
       if (openIndex < 0) return
-      const next = rows[openIndex + delta]
+      const next = visible[openIndex + delta]
       if (next) void show(next.id)
     },
-    [openIndex, rows, show]
+    [openIndex, visible, show]
   )
 
   // j/k and the arrows walk the list while a record is open; Esc closes it.
@@ -677,14 +883,15 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
     const byRoute: Record<string, number> = {}
     const byOutcome: Record<string, number> = {}
     for (const row of grouped) {
-      const route = row.kind === "run" ? "embeddings" : row.record.route
-      const outcome = row.kind === "run" ? (row.failed ? "error" : "ok") : row.record.outcome
+      const route = row.kind === "run" ? "embeddings" : row.kind === "conversation" ? "chat" : row.record.route
+      const outcome = row.kind === "run" ? (row.failed ? "error" : "ok") : row.kind === "conversation" ? row.steps[0].outcome : row.record.outcome
       byRoute[route] = (byRoute[route] ?? 0) + 1
       byOutcome[outcome] = (byOutcome[outcome] ?? 0) + 1
     }
     return { byRoute, byOutcome }
   }, [grouped])
   const runs = grouped.filter((row) => row.kind === "run").length
+  const conversations = grouped.filter((row) => row.kind === "conversation").length
   // Filters and exports only when there is, or can be, something to filter:
   // on the free plan the page is its status line and the settings.
   const usable = licensed || rows.length > 0 || filtered
@@ -712,6 +919,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
                 {fmt(grouped.length)}
                 {data.nextBefore ? "+" : ""} shown
                 {runs ? ` · ${plural(runs, "indexing run")} folded` : ""}
+                {conversations ? ` · ${plural(conversations, "conversation")} folded` : ""}
               </span>
             )}
           </h2>
@@ -802,6 +1010,24 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
               <tbody>
                 {grouped.map((row) => {
                   if (row.kind === "record") return <RecordRow key={row.record.id} record={row.record} selected={open?.id === row.record.id} now={now} term={term} onOpen={show} />
+                  if (row.kind === "conversation") {
+                    const [head, ...older] = row.steps
+                    const isOpen = expanded.has(row.id)
+                    const holdsOpen = !!open && row.steps.some((s) => s.id === open.id)
+                    return (
+                      <React.Fragment key={row.id}>
+                        <RecordRow
+                          record={head}
+                          selected={open?.id === head.id || (holdsOpen && !isOpen)}
+                          now={now}
+                          term={term}
+                          onOpen={show}
+                          conversation={{ steps: row.steps.length, ms: row.ms, open: isOpen, onToggle: () => toggleRun(row.id) }}
+                        />
+                        {isOpen && older.map((step) => <RecordRow key={step.id} record={step} selected={open?.id === step.id} now={now} term={term} onOpen={show} nested />)}
+                      </React.Fragment>
+                    )
+                  }
                   const first = row.calls[0]
                   const isOpen = expanded.has(row.id)
                   const holdsOpen = !!open && row.calls.some((c) => c.id === open.id)
@@ -852,7 +1078,7 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
         {!data?.nextBefore && rows.length > 0 && <div className="hint">Click a row to open it. ↑ ↓ move between records, Esc closes.</div>}
       </section>
 
-      {open && <RecordPanel record={open} index={openIndex} total={rows.length} onStep={step} onClose={() => setOpen(null)} />}
+      {open && <RecordPanel record={open} index={openIndex} total={visible.length} onStep={step} onClose={() => setOpen(null)} />}
 
       {data && <RecordingSettings apiKey={apiKey} summary={data.summary} licensed={licensed} onSaved={() => void load()} />}
     </>

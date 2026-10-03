@@ -2,6 +2,66 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.5 · 2026-10-02
+
+Extension release: settings, labels and a command that did not do what they said. `twinny-server` carries the version number only.
+
+- **Edit twinny templates runs.** The command was in the command palette but was never registered, so choosing it failed with "command 'twinny.templates' not found". It now opens `~/.twinny/templates` in a new window, as **Open template editor** under **Manage twinny templates** does.
+- **Chilean Spanish is used when chosen.** The sidebar registered the `es-CL` translations under the key `esCL`, so `twinny.locale` set to `es-CL` fell back to the general Spanish ones. The two differ in one string today. The setting's description also called it Spanish (Colombia); it is Spanish (Chile).
+- **`twinny.numPredictChat` is gone.** Nothing has read it since 3.21: chat requests set no length limit of their own, so the provider's default applies. Removing it changes no reply.
+- **`twinny.temperature` says what it covers.** It applies to code completions only; chat, inline edit and code review in the extension send no temperature, so the server's default applies. The description implied all of them.
+- **The Stop button over an inline edit names the right key on macOS.** It showed `⌘⇧/`; the binding is `Ctrl+Shift+/` on every platform (`⌘⇧/` is macOS's Help search), so it now shows `⌃⇧/`.
+- **The gateway preset names `twinny-server`.** Its description in the Providers tab said the gateway is run with `twinny-node serve`.
+- `docs/gateway.md` documents `policy.secretShield`, the READMEs list agent mode, and `docs/providers.md` points to the provider pages on docs.twinny.dev instead of setup from 3.x that no longer matched the presets.
+
+## 4.3.4 · 2026-10-02
+
+Extension release: the chat's provider and model dropdowns open again. `twinny-server` carries the version number only.
+
+- **The provider and model dropdowns open again.** In 4.3.2 the chat footer's dropdowns were made to fit a narrow panel, and that change hid their lists, so clicking one did nothing. The lists open again, and long names are still cut short in a narrow panel.
+
+## 4.3.3 · 2026-10-02
+
+`twinny-server` release: Recordings folds an agent conversation's steps into one row, and the tests no longer touch the real data directory. The extension carries the version number only.
+
+- **Recordings: one row per conversation.** Agent mode sends the conversation again for every tool step, and every step was its own row in **Recordings**, so one reply could fill the list with a dozen near-identical entries. Now the steps and later turns of a chat fold into one row with a step count, wherever they fall among other requests. Opening it shows the whole conversation, and the caret lists each step. ↑ ↓ move between rows as shown. Storage is unchanged: each step is still its own record, and the training export still has one example per step. Records kept before this are grouped the first time the gateway opens them.
+- **Recordings: the preview is the question.** A follow-up's preview showed the tool notes the extension sends ahead of it, as JSON. It now shows the question the developer asked.
+- **Tests no longer touch the real data directory.** The gateway tests' CLI processes run with a scratch home, so a full test run no longer removes `~/.twinny/server/recordings`.
+
+## 4.3.2 · 2026-10-02
+
+Extension release: agent mode's steps show inside the reply, commands run in the background with their output in the chat, and commands can be approved from the keyboard. `twinny-server` carries the version number only.
+
+- **Steps show where they happened in the reply.** Before, every tool step sat in one block above the reply, so a command waiting for Run was above the text you were reading. Now the reply reads in order: what the model said, the tool it used, what it said next. A command waiting for you is at the bottom, where you are already looking. Conversations saved earlier show their steps at the top, as before.
+- **Commands run in the background, with their output in the chat.** A command the model runs no longer opens the **twinny tools** terminal. It runs through `bash` from the workspace root, and its output appears in its step as it prints. Nothing can answer a prompt, and a command is stopped after two minutes, so interactive commands, servers and watch modes belong in a terminal. Set `twinny.chatToolsCommandsRunIn` to `terminal` to run them in the terminal as before.
+- **An auto-run switch.** With agent mode on, an **auto-run** switch next to the agent switch lets every command run without asking. Until you first flip it, `twinny.chatToolsCommands` decides, so commands still ask by default.
+- **Always run, one command at a time.** A waiting command now has **Always run** between Run and Skip. It runs the command and remembers that exact command, so the model can run it again without asking; any other command still asks. **Twinny - Forget commands set to always run** clears the list.
+- **Approve from the keyboard.** When a command or change is waiting and the composer is empty, `Enter` runs or applies it, `Shift+Enter` always runs it, and `Esc` skips it. A second `Esc` still stops the reply.
+- **Stop one command, not the whole reply.** A running command has a stop button on its line. It ends that command and anything it started; the model gets the output so far, is told you stopped it, and carries on.
+- **Model names fit in the composer footer, and nothing overlaps in a narrow panel.** The provider dropdown takes only the room it needs, and the model's name gets the rest. As the panel narrows, "? for shortcuts" shrinks to "?", the agent switch drops its key hint, auto-run keeps only its icon, and the placeholder is cut short on one line. The switches no longer run under the camera and send buttons, and the dropdown arrows no longer cover the names.
+
+## 4.3.1 · 2026-10-01
+
+Extension release: code in agent mode's steps wraps properly. `twinny-server` carries the version number only.
+
+- **Code in tool steps reads as code again.** A file the agent read, shown with line numbers in a narrow chat, broke every word into its own wrapped column. Long lines now wrap as text, under the code and clear of the line numbers.
+
+## 4.3.0 · 2026-10-01
+
+Extension release: agent mode switched from the chat, messages queued while a reply runs, terminal-style chat keys, and a fix for Anthropic tool calls. `twinny-server` carries the version number only.
+
+- **Messages sent while a reply runs are queued, not lost.** Pressing Enter while the model is answering, or working through tools in agent mode, used to clear what you typed without sending it. It now waits under the transcript, marked *queued*, and goes out when the reply ends, one message per reply. Hover a queued message to drop it. Stopping the reply (`Esc`, `Ctrl+C` or the stop button) puts queued messages back in the composer instead of sending them.
+- **Agent mode with Anthropic no longer fails after a tool with no arguments.** When Claude called a tool that takes nothing, such as looking at the editor, the next step failed with "Unexpected end of JSON input" before it was sent. Calls with no arguments now go back as `{}`; Bedrock, Gemini and Cohere had the same failure.
+- **Agent mode, one key away.** A switch at the bottom left of the chat's composer, or `Shift+Tab`, turns agent mode on and off: the model may then read, search and edit files and run commands in the workspace. The choice is kept for every window; until you first switch it, the `twinny.chatTools` setting decides. While it is on, the prompt turns to a bright `❯❯`, and it pulses while the model works.
+- **Chat keys, as in a terminal.** `Ctrl+C` stops a reply, or clears the draft when nothing is streaming; with text selected it still copies. `Esc` twice clears the draft, and `↑` brings a cleared draft back. `Ctrl+L` starts a new conversation, `PgUp` and `PgDn` scroll the transcript from the composer, and typing with the focus on the transcript goes to the composer. `Esc` and `Ctrl+C` stop a reply from anywhere in the chat, not only the composer. Press `?` on an empty composer for the list, or run **Twinny - Chat keyboard shortcuts** from the view's `…` menu.
+
+## 4.2.10 · 2026-09-30
+
+Extension release: twinny starts in WSL again, and the Embeddings tab holds still while indexing.
+
+- **Works in WSL remotes.** Opening a folder through WSL failed activation with `Cannot read properties of undefined (reading 'header')`, so chat never loaded and completions did nothing. LanceDB's native loader read the Node process report to tell glibc from musl, and the VS Code server under WSL returns none. The check now falls back to glibc, and LanceDB loads when the index is first opened rather than at startup, so a native module that fails to load turns embeddings off instead of stopping the extension.
+- **No flicker while indexing.** The line naming the files being embedded came and went between files, making the page below it jump many times a second. It now keeps its place for the whole run.
+
 ## 4.2.9 · 2026-09-29
 
 `twinny-server` release: `twinny-server --version` and the gateway's `/twinny/v1` responses report the right version. The 4.2.8 package was published with a bundle built before the version bump, so it called itself 4.2.7. Publishing now refuses a `cli.js` that was not built for the package's version.

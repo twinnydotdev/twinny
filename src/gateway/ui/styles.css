@@ -247,6 +247,7 @@ tr.selected td, table.rows tbody tr.selected:hover td { background: var(--accent
 tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 table.rows tr.run td { background: color-mix(in srgb, var(--ink) 2.5%, transparent); }
 table.rows tr.run .caret { display: inline-block; width: 14px; color: var(--ink-3); }
+table.rows button.caret { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 table.rows tr.nested td:first-child { padding-left: 30px; }
 table.rows tr.nested td { color: var(--ink-2); }
 td.preview { color: var(--ink-2); max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -277,6 +278,20 @@ td.preview { color: var(--ink-2); max-width: 380px; white-space: nowrap; overflo
 .turn.system summary .summary-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .turn.system summary .summary-len { font-size: 11px; flex: none; }
 .turn.system[open] summary { border-bottom: 1px solid var(--line); }
+.turn.tool .role, .turn.tools .role { color: var(--ink-2); }
+.tool-name { font-family: var(--mono); color: var(--ink); }
+.tool-calls { display: flex; flex-direction: column; gap: 8px; }
+.turn-body > .md + .tool-calls, .turn-body > .code + .tool-calls { margin-top: 10px; }
+.tool-call { border-left: 2px solid color-mix(in srgb, var(--accent) 55%, var(--line)); padding-left: 10px; }
+.tool-call-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.tool-call .tool-name { font-weight: 600; }
+.tool-id { font-size: 11px; }
+.tool-args { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; align-items: baseline; }
+.tool-args dt { color: var(--ink-2); }
+.tool-args dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.tool-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; }
+.tool-list dt { font-family: var(--mono); }
+.tool-list dd { margin: 0; color: var(--ink-2); }
 
 /* Code blocks: the light Prism build with the page's own chrome around it */
 .code { border: 1px solid var(--line); border-radius: 6px; background: var(--bg); overflow: hidden; margin: 0; }

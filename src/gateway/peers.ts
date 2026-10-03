@@ -126,6 +126,8 @@ interface Peer {
   machine: string
   backend: string
   models: Set<string>
+  /** Whether the sharer said it takes tool conversations. */
+  tools: boolean
   slots: number
   connectedAt: number
   served: number
@@ -232,6 +234,7 @@ export class PeerRegistry extends EventEmitter {
       machine: "",
       backend: "",
       models: new Set(),
+      tools: false,
       slots: 1,
       connectedAt: Date.now(),
       served: 0,
@@ -266,6 +269,7 @@ export class PeerRegistry extends EventEmitter {
         peer.machine = frame.name
         peer.backend = frame.backend.kind
         peer.models = new Set(frame.models.map((model) => model.id))
+        peer.tools = frame.tools === true
         peer.slots = Math.min(frame.slots, MAX_PEER_SLOTS)
         this._peers.set(peer.id, peer)
         this.send(peer, { type: "welcome", protocol: PEER_PROTOCOL_VERSION, wanted: this._options.wanted(), slots: peer.slots })
@@ -284,12 +288,13 @@ export class PeerRegistry extends EventEmitter {
    * The peer to hand a job for this model: offering it, with a free
    * slot, not degraded, least in flight; ties go to the longest-idle.
    * `undefined` when none qualifies; `busy` says whether one would have,
-   * had it a free slot.
+   * had it a free slot. `needsTools` leaves out sharers from before tool
+   * conversations, which would refuse the job.
    */
-  public pick(model: string, exclude: string[] = []): { peer?: PeerSnapshot; offered: number; busy: boolean } {
+  public pick(model: string, exclude: string[] = [], needsTools = false): { peer?: PeerSnapshot; offered: number; busy: boolean } {
     const now = Date.now()
     const offering = [...this._peers.values()].filter(
-      (peer) => peer.models.has(model) && !exclude.includes(peer.id) && !peer.closed
+      (peer) => peer.models.has(model) && !exclude.includes(peer.id) && !peer.closed && (!needsTools || peer.tools)
     )
     const ready = offering.filter((peer) => peer.degradedUntil <= now)
     const free = ready.filter((peer) => peer.jobs.size < peer.slots)

@@ -54,6 +54,8 @@ export const CustomKeyMap = Extension.create({
         if (mentionState && mentionState.active) {
           return false
         }
+        // An empty composer answers a command waiting on the user.
+        if (editor.isEmpty && this.options.approve?.("run")) return true
         this.options.handleSubmitForm()
         this.options.clearEditor()
         return true
@@ -63,15 +65,38 @@ export const CustomKeyMap = Extension.create({
         return true
       },
       "Shift-Enter": ({ editor }) => {
+        if (editor.isEmpty && this.options.approve?.("always")) return true
         editor.commands.insertContent("\n")
         return true
       },
-      // Stops a reply on its way, from where the user is already typing.
+      // Stops a reply on its way, from where the user is already typing;
+      // pressed twice with nothing running, it clears the draft.
       Escape: ({ editor }) => {
         const mentionState = MentionPluginKey.getState(editor.state)
         if (mentionState && mentionState.active) return false
-        return this.options.stopGeneration?.() ?? false
+        return this.options.escape?.() ?? false
       },
+      // As in a terminal: stop the reply, or clear the line. With text
+      // selected it stays a copy.
+      "Ctrl-c": ({ editor }) => {
+        if (!editor.state.selection.empty) return false
+        return this.options.interrupt?.() ?? false
+      },
+      "Ctrl-l": () => this.options.newConversation?.() ?? false,
+      // On an empty composer "?" asks for the shortcuts; anywhere else it
+      // is a question mark.
+      "?": ({ editor }) => {
+        if (!editor.isEmpty) return false
+        return this.options.toggleShortcuts?.() ?? false
+      },
+      // Agent mode on and off, where Claude Code switches its modes.
+      "Shift-Tab": ({ editor }) => {
+        const mentionState = MentionPluginKey.getState(editor.state)
+        if (mentionState && mentionState.active) return false
+        return this.options.toggleAgentMode?.() ?? false
+      },
+      PageUp: () => this.options.scrollTranscript?.(-1) ?? false,
+      PageDown: () => this.options.scrollTranscript?.(1) ?? false,
       // Earlier prompts, as in a shell: from an empty composer, or while
       // already stepping through them.
       ArrowUp: ({ editor }) => {

@@ -18,6 +18,7 @@ import {
   EVENT_NAME,
   EXTENSION_CONTEXT_NAME,
   EXTENSION_NAME,
+  GLOBAL_STORAGE_KEY,
   TEAM_NUDGE_STORAGE_KEY,
   TWINNY_COMMAND_NAME,
   URL_TEAMS,
@@ -32,7 +33,12 @@ import { CompletionProvider } from "./extension/completion/provider"
 import { setContext } from "./extension/context"
 import { InlineEditCodeActionProvider } from "./extension/edit/code-actions"
 import { InlineEditCodeLensProvider } from "./extension/edit/code-lens"
-import { InlineEditArgs, InlineEditService } from "./extension/edit/service"
+import {
+  ChatEditMode,
+  FileEditProposal,
+  InlineEditArgs,
+  InlineEditService
+} from "./extension/edit/service"
 import { WorkspaceIndex } from "./extension/embeddings"
 import { GenerationTracker } from "./extension/generations"
 import { P2pRuntime } from "./extension/p2p/runtime"
@@ -347,6 +353,14 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.applyCode, (code: string) =>
       inlineEdit.propose(String(code ?? ""))
     ),
+    commands.registerCommand(
+      TWINNY_COMMAND_NAME.chatFileEdit,
+      (proposal: FileEditProposal, mode?: ChatEditMode) => inlineEdit.chatEdit(proposal, mode)
+    ),
+    commands.registerCommand(
+      TWINNY_COMMAND_NAME.chatFileCreate,
+      (file: string, content: string, mode?: ChatEditMode) => inlineEdit.chatCreate(file, content, mode)
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.addTests, () =>
       inlineEdit.writeTests()
     ),
@@ -407,6 +421,9 @@ export async function activate(context: ExtensionContext) {
       )
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.review)
     }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.templates, () =>
+      sidebarProvider.editDefaultTemplates()
+    ),
     commands.registerCommand(TWINNY_COMMAND_NAME.manageTemplates, async () => {
       commands.executeCommand(
         "setContext",
@@ -485,6 +502,21 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand(TWINNY_COMMAND_NAME.exportConversation, () =>
       sidebarProvider.bridge?.emit(EVENT_NAME.twinnyExportConversation)
     ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.showShortcuts, async () => {
+      await commands.executeCommand("twinny.sidebar.focus")
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnySetTab, WEBUI_TABS.chat)
+      sidebarProvider.bridge?.emit(EVENT_NAME.twinnyShowShortcuts)
+    }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.forgetAlwaysRunCommands, async () => {
+      const key = `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.alwaysRunCommands}`
+      const kept = context.globalState.get<string[]>(key) ?? []
+      await context.globalState.update(key, undefined)
+      window.showInformationMessage(
+        kept.length
+          ? `Twinny will ask again before running ${kept.length === 1 ? "the command" : `the ${kept.length} commands`} you chose Always run for.`
+          : "No commands were set to always run."
+      )
+    }),
     commands.registerCommand(TWINNY_COMMAND_NAME.openPanelChat, () => {
       commands.executeCommand("workbench.action.closeSidebar")
       fullScreenProvider.createOrShowPanel()

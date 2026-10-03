@@ -3,6 +3,28 @@
 import esbuild from "esbuild"
 import { copy } from "esbuild-plugin-copy";
 import fs from "node:fs"
+import path from "node:path"
+
+const lanceGlibcCheck = {
+  name: "lancedb-glibc-check",
+  setup(build) {
+    build.onLoad({ filter: /@lancedb[\\/]lancedb[\\/]dist[\\/]native\.js$/ }, async (args) => {
+      const source = await fs.promises.readFile(args.path, "utf8")
+      const unsafe = "process.report.getReport().header"
+      if (!source.includes(unsafe)) {
+        throw new Error(`${args.path} no longer reads ${unsafe}; review the lancedb-glibc-check patch`)
+      }
+      return {
+        contents: source.replace(
+          unsafe,
+          "((process.report.getReport() || {}).header || { glibcVersionRuntime: true })"
+        ),
+        loader: "js",
+        resolveDir: path.dirname(args.path)
+      }
+    })
+  }
+};
 
 (async () => {
   const extensionConfig = {
@@ -16,6 +38,7 @@ import fs from "node:fs"
     loader: { ".node": "file" },
     assetNames: "[name]",
     plugins: [
+      lanceGlibcCheck,
       copy({
         resolveFrom: "cwd",
         assets: [

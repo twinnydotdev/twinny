@@ -20,6 +20,7 @@ import { InferenceError } from "../extension/inference/errors"
 import type {
   ChatChunk,
   ChatRequest,
+  ChatToolCall,
   EmbeddingRequest,
   EmbeddingResponse,
   FimChunk,
@@ -91,6 +92,12 @@ export interface PeerHelloFrame {
   backend: PeerBackend
   models: PeerModel[]
   slots: number
+  /**
+   * This sharer takes tool conversations: `tools` on a chat job, tool
+   * turns in its messages, tool calls on its chunks. One that does not
+   * say so is from before they existed and would refuse such a job.
+   */
+  tools?: boolean
 }
 
 export interface PeerModelsFrame {
@@ -253,14 +260,40 @@ const parseUsage = (value: unknown): InferenceUsage | undefined => {
   return Object.keys(usage).length ? usage : undefined
 }
 
+/** The tool calls a sharer's model made; anything not shaped like one is refused. */
+const parseToolCalls = (value: unknown): ChatToolCall[] | undefined => {
+  if (value === undefined || value === null) return undefined
+  if (!Array.isArray(value))
+    throw new PeerProtocolError("\"toolCalls\" must be a list.")
+  const calls = value.map((call) => {
+    if (
+      !isRecord(call) ||
+      typeof call.id !== "string" ||
+      typeof call.name !== "string" ||
+      typeof call.arguments !== "string"
+    )
+      throw new PeerProtocolError("\"toolCalls\" has a call without an id, a name or arguments.")
+    return { id: call.id, name: call.name, arguments: call.arguments }
+  })
+  return calls.length ? calls : undefined
+}
+
 const parseChunk = (value: unknown): FimChunk | ChatChunk => {
   if (!isRecord(value))
     throw new PeerProtocolError("\"chunk\" must be an object.")
   const usage = parseUsage(value.usage)
   if (typeof value.text === "string")
     return { text: value.text, ...(usage ? { usage } : {}) }
-  if (typeof value.content === "string")
-    return { content: value.content, ...(usage ? { usage } : {}) }
+  if (typeof value.content === "string") {
+    const toolCalls = parseToolCalls(value.toolCalls)
+    return {
+      content: value.content,
+      ...(usage ? { usage } : {}),
+      ...(typeof value.reasoning === "string" && value.reasoning ? { reasoning: value.reasoning } : {}),
+      ...(value.finishReason === "stop" || value.finishReason === "length" ? { finishReason: value.finishReason } : {}),
+      ...(toolCalls ? { toolCalls } : {})
+    }
+  }
   throw new PeerProtocolError("\"chunk\" carries neither text nor content.")
 }
 
@@ -306,7 +339,8 @@ export const parsePeerFrame = (text: string): PeerToGatewayFrame => {
         name,
         backend: { kind },
         models: parsePeerModels(frame.models),
-        slots: parseSlots(frame.slots, DEFAULT_PEER_SLOTS)
+        slots: parseSlots(frame.slots, DEFAULT_PEER_SLOTS),
+        ...(frame.tools === true ? { tools: true } : {})
       }
     }
     case "models":

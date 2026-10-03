@@ -225,9 +225,37 @@ const optionalStringList = (
   return value as string[]
 }
 
-const ROLES = ["system", "user", "assistant"]
+const ROLES = ["system", "user", "assistant", "tool"]
 
-const parseMessages = (messages: unknown): ChatRequest["messages"] => {
+const MAX_TOOLS = 64
+const MAX_TOOL_NAME_CHARS = 64
+const TOOL_NAME = /^[A-Za-z0-9_-]+$/
+
+/** The calls an assistant turn made, in the OpenAI shape the tool loop writes. */
+const parseMessageToolCalls = (value: unknown, index: number) => {
+  if (!Array.isArray(value)) {
+    throw new RemoteRequestError(`message ${index}: "tool_calls" must be a list.`)
+  }
+  return value.map((call) => {
+    if (!isRecord(call) || !isRecord(call.function)) {
+      throw new RemoteRequestError(`message ${index} has a tool call that is not an object.`)
+    }
+    rejectUnknownFields(call, ["id", "type", "function"])
+    rejectUnknownFields(call.function, ["name", "arguments"])
+    const { id } = call
+    const { name, arguments: args } = call.function
+    if (typeof id !== "string" || !id || typeof name !== "string" || !name || typeof args !== "string") {
+      throw new RemoteRequestError(`message ${index} has a tool call without an id, a name or arguments.`)
+    }
+    return { id, type: "function" as const, function: { name, arguments: args } }
+  })
+}
+
+/**
+ * A conversation. `tools` admits what a tool conversation adds (chat
+ * only): tool results, and the calls on an assistant's turn.
+ */
+const parseMessages = (messages: unknown, tools = false): ChatRequest["messages"] => {
   if (!Array.isArray(messages) || messages.length === 0) {
     throw new RemoteRequestError("\"messages\" must be a non-empty list.")
   }
@@ -235,17 +263,69 @@ const parseMessages = (messages: unknown): ChatRequest["messages"] => {
     if (!isRecord(message)) {
       throw new RemoteRequestError(`message ${index} must be an object.`)
     }
-    rejectUnknownFields(message, ["role", "content"])
     const { role, content } = message
-    if (typeof role !== "string" || !ROLES.includes(role)) {
+    if (typeof role !== "string" || !ROLES.includes(role) || (role === "tool" && !tools)) {
       throw new RemoteRequestError(`message ${index} has no valid role.`)
     }
-    if (typeof content !== "string" && !Array.isArray(content)) {
+    // What a tool conversation adds, each on the one role that carries it:
+    // the calls on the assistant's turn, the call answered on a result.
+    rejectUnknownFields(message, [
+      "role",
+      "content",
+      ...(role === "assistant" && tools ? ["tool_calls"] : []),
+      ...(role === "tool" ? ["tool_call_id"] : [])
+    ])
+    if (role === "tool") {
+      if (typeof content !== "string") {
+        throw new RemoteRequestError(`message ${index} has no content.`)
+      }
+      if (typeof message.tool_call_id !== "string" || !message.tool_call_id) {
+        throw new RemoteRequestError(`message ${index} does not say which tool call it answers.`)
+      }
+      return { role, content, tool_call_id: message.tool_call_id } as unknown as ChatRequest["messages"][number]
+    }
+    const calls =
+      message.tool_calls === undefined || message.tool_calls === null
+        ? undefined
+        : parseMessageToolCalls(message.tool_calls, index)
+    // A turn that only made calls has nothing to say: its content is null.
+    const empty = content === null || content === undefined
+    if (calls?.length ? !empty && typeof content !== "string" : typeof content !== "string" && !Array.isArray(content)) {
       throw new RemoteRequestError(`message ${index} has no content.`)
     }
-    return { role, content } as ChatRequest["messages"][number]
+    return {
+      role,
+      content: empty ? null : content,
+      ...(calls?.length ? { tool_calls: calls } : {})
+    } as unknown as ChatRequest["messages"][number]
   })
 }
+
+/** The tools a request offers: a name, what it does, and a JSON schema for its arguments. */
+const parseTools = (value: unknown): ChatRequest["tools"] => {
+  if (value === undefined || value === null) return undefined
+  if (!Array.isArray(value) || value.length > MAX_TOOLS) {
+    throw new RemoteRequestError(`"tools" must be a list of at most ${MAX_TOOLS} tools.`)
+  }
+  const tools = value.map((tool, index) => {
+    if (!isRecord(tool)) throw new RemoteRequestError(`tool ${index} must be an object.`)
+    rejectUnknownFields(tool, ["name", "description", "parameters"])
+    const { name, description, parameters } = tool
+    if (typeof name !== "string" || !TOOL_NAME.test(name) || name.length > MAX_TOOL_NAME_CHARS) {
+      throw new RemoteRequestError(`tool ${index} has no valid name.`)
+    }
+    if (typeof description !== "string") {
+      throw new RemoteRequestError(`tool "${name}" has no description.`)
+    }
+    if (!isRecord(parameters)) {
+      throw new RemoteRequestError(`tool "${name}" has no parameters schema.`)
+    }
+    return { name, description, parameters }
+  })
+  return tools.length ? tools : undefined
+}
+
+const REASONING_EFFORTS = ["low", "medium", "high"]
 
 export const parseFimRequest = (input: unknown): FimRequest => {
   const body = requireRecord(input)
@@ -295,12 +375,24 @@ export const parseFimRequest = (input: unknown): FimRequest => {
 
 export const parseChatRequest = (input: unknown): ChatRequest => {
   const body = requireRecord(input)
-  rejectUnknownFields(body, ["model", "messages", "maxTokens", "temperature"])
+  rejectUnknownFields(body, ["model", "messages", "maxTokens", "temperature", "tools", "think", "reasoningEffort"])
+  const { think, reasoningEffort } = body
+  if (think !== undefined && think !== null && typeof think !== "boolean") {
+    throw new RemoteRequestError("\"think\" must be true or false.")
+  }
+  if (reasoningEffort !== undefined && reasoningEffort !== null && !REASONING_EFFORTS.includes(reasoningEffort as string)) {
+    throw new RemoteRequestError(`"reasoningEffort" must be one of ${REASONING_EFFORTS.join(", ")}.`)
+  }
+  const tools = parseTools(body.tools)
   return {
     model: requireModel(body),
-    messages: parseMessages(body.messages),
+    messages: parseMessages(body.messages, true),
     maxTokens: optionalNumber(body, "maxTokens"),
-    temperature: optionalNumber(body, "temperature")
+    temperature: optionalNumber(body, "temperature"),
+    // Left out when absent, so a plain chat reaches the backend as it always did.
+    ...(tools ? { tools } : {}),
+    ...(typeof think === "boolean" ? { think } : {}),
+    ...(typeof reasoningEffort === "string" ? { reasoningEffort: reasoningEffort as ChatRequest["reasoningEffort"] } : {})
   }
 }
 

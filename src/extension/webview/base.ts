@@ -239,6 +239,8 @@ export class BaseProvider {
           .update(key, value, vscode.ConfigurationTarget.Global),
       [EVENT_NAME.twinnySidebarReady]: () => this._sidebarReadyHandler?.(),
       [EVENT_NAME.twinnyStopGeneration]: () => this.destroyStream(),
+      [EVENT_NAME.twinnyToolApproval]: ({ id, run, always }) => this.chat?.answerToolApproval(id, run, always),
+      [EVENT_NAME.twinnyToolStop]: ({ id }) => this.chat?.stopToolStep(id),
       [EVENT_NAME.twinnySymbolSearch]: ({ query }) => searchSymbols(query),
       [EVENT_NAME.twinnyTextSelection]: () => getTextSelection()
     })
@@ -256,7 +258,8 @@ export class BaseProvider {
         )
       }),
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (!event.affectsConfiguration("twinny")) return
+        // A new locale remounts the whole webview, so only a change to it is sent.
+        if (!event.affectsConfiguration("twinny.locale")) return
         bridge.emit(EVENT_NAME.twinnySetLocale, this.getLocale())
       })
     )

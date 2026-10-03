@@ -1,0 +1,400 @@
+/*
+ * The tools behind a reply, a line each, in the same idiom as the
+ * workspace search panel: a left rule, small type, nothing boxed. A line
+ * opens to its input and output; a command waiting for the user is the one
+ * thing that asks for attention.
+ */
+.panel {
+  margin: -2px 0 10px;
+  padding: 0 0 0 10px;
+  border-left: 1px solid var(--tw-rule);
+  list-style: none;
+  font-size: var(--tw-fs-xs);
+}
+
+.step {
+  margin: 0;
+  padding: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tw-fg-faint);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.row:disabled {
+  cursor: default;
+}
+
+.row:not(:disabled):hover,
+.row:focus-visible {
+  color: var(--tw-fg-dim);
+  outline: none;
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.glyph :global(.codicon) {
+  font-size: 12px !important;
+}
+
+.summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary code {
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  background: none;
+  padding: 0;
+}
+
+.chevron {
+  flex-shrink: 0;
+  font-size: 11px !important;
+  opacity: 0.7;
+}
+
+.running .glyph,
+.waiting .glyph {
+  color: var(--tw-accent);
+}
+
+.failed .glyph {
+  color: var(--vscode-errorForeground);
+}
+
+.stopped .glyph {
+  color: var(--tw-fg-faint);
+}
+
+.skipped .summary {
+  text-decoration: line-through;
+  text-decoration-color: var(--tw-rule);
+}
+
+.detail,
+.approval {
+  margin: 2px 0 6px 20px;
+  padding: 0 0 0 10px;
+  border-left: 1px solid var(--tw-rule-soft);
+}
+
+.detailLabel,
+/* The tail of a command still running, under its line. */
+.live {
+  margin: 2px 0 4px 20px;
+  padding: 4px 8px;
+  background: var(--tw-surface);
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approvalLabel {
+  margin: 4px 0 2px;
+  color: var(--tw-fg-faint);
+  text-transform: lowercase;
+  letter-spacing: var(--tw-track);
+}
+
+.args {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 0;
+}
+
+.args dt {
+  color: var(--tw-fg-faint);
+}
+
+.args dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.args code {
+  color: var(--tw-code);
+  font-family: var(--tw-font);
+  background: none;
+  padding: 0;
+}
+
+.args pre,
+.output {
+  margin: 0;
+  padding: 6px 8px;
+  max-height: 240px;
+  overflow: auto;
+  background: var(--tw-surface);
+  color: var(--tw-code);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approvalLabel {
+  color: var(--tw-fg-dim);
+}
+
+.command {
+  border-left: 2px solid var(--tw-accent);
+}
+
+/* Highlighted code: the highlighter sets colours, the step sets size. */
+.code {
+  max-height: 280px;
+  overflow: auto !important;
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+}
+
+.detailLabel .fileLink,
+.located .fileLink {
+  text-transform: none;
+}
+
+.fileLink {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tw-link);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: normal;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.fileLink:hover,
+.fileLink:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.fileLine {
+  color: var(--tw-fg-faint);
+}
+
+.relevance {
+  margin-left: 8px;
+  color: var(--tw-fg-faint);
+}
+
+.note {
+  margin: 3px 0 0;
+  color: var(--tw-fg-faint);
+  overflow-wrap: anywhere;
+}
+
+.hit + .hit {
+  margin-top: 6px;
+}
+
+.located {
+  max-height: 240px;
+  overflow: auto;
+  padding: 4px 8px;
+  background: var(--tw-surface);
+}
+
+.locatedFile + .locatedFile {
+  margin-top: 4px;
+}
+
+.locatedLine {
+  display: flex;
+  gap: 8px;
+  padding-left: 10px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.locatedLine .fileLink {
+  min-width: 2.6em;
+  color: var(--tw-fg-faint);
+  text-align: right;
+}
+
+.locatedLine .fileLink {
+  flex-shrink: 0;
+}
+
+/* A line beside a match: there for reading, quieter than the match. */
+.locatedContext code {
+  color: var(--tw-fg-faint);
+}
+
+.locatedLine code {
+  white-space: pre;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--tw-code);
+  font-family: var(--tw-font);
+  background: none;
+  padding: 0;
+}
+
+/* A unified diff, coloured with the editor's own diff colours. */
+.diff {
+  margin: 0;
+  padding: 4px 0;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--tw-surface);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+}
+
+.diffLine {
+  padding: 0 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--tw-fg-dim);
+}
+
+.diff-add {
+  background: var(--vscode-diffEditor-insertedLineBackground, rgba(155, 185, 85, 0.2));
+  color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+}
+
+.diff-del {
+  background: var(--vscode-diffEditor-removedLineBackground, rgba(255, 0, 0, 0.2));
+  color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
+}
+
+.diff-hunk {
+  color: var(--tw-accent);
+}
+
+.diff-meta {
+  color: var(--tw-fg-faint);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0 2px;
+}
+
+.run,
+.skip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-xs);
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.run {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.run:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.skip {
+  background: transparent;
+  border-color: var(--tw-rule);
+  color: var(--tw-fg-dim);
+}
+
+.skip:hover {
+  color: var(--tw-fg);
+}
+
+.run:focus-visible,
+.skip:focus-visible {
+  outline: 1px solid var(--tw-accent);
+  outline-offset: 1px;
+}
+
+.run :global(.codicon) {
+  font-size: 12px !important;
+}
+
+/* Stops a running command alone; the reply carries on. */
+.stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--tw-fg-faint);
+  cursor: pointer;
+}
+
+.stop:hover,
+.stop:focus-visible {
+  color: var(--tw-fg);
+  background: color-mix(in srgb, var(--tw-fg) 10%, transparent);
+  outline: none;
+}
+
+.stop :global(.codicon) {
+  font-size: 12px !important;
+}
+
+/* The composer's keys for the question above. */
+.keys {
+  margin-top: 6px;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}

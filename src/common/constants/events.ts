@@ -32,6 +32,7 @@ export const EVENT_NAME = {
   twinnyRunInTerminal: "twinny-run-in-terminal",
   twinnyInsertAtCursor: "twinny-insert-at-cursor",
   twinnyExportConversation: "twinny-export-conversation",
+  twinnyShowShortcuts: "twinny-show-shortcuts",
   twinnySendLanguage: "twinny-send-language",
   twinnySendLoader: "twinny-send-loader",
   twinnySendTheme: "twinny-send-theme",
@@ -46,6 +47,9 @@ export const EVENT_NAME = {
   twinnyStopGeneration: "twinny-stop-generation",
   twinnySymbolSearch: "twinny-symbol-search",
   twinnyTextSelection: "twinny-text-selection",
+  twinnyToolApproval: "twinny-tool-approval",
+  twinnyToolStop: "twinny-tool-stop",
+  twinnyToolSteps: "twinny-tool-steps",
   twinnyUpdateContextItems: "twinny-update-context-items",
   twinnyWorkspaceSearch: "twinny-workspace-search"
 } as const

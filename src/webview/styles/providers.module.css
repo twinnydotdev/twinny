@@ -602,8 +602,17 @@
 }
 
 .providerSelector > div {
-  flex: 1 1 50%;
+  flex: 1 1 0;
   min-width: 0;
+}
+
+/*
+ * A provider's label is short and the model's name is what gets cut off,
+ * so the provider takes what it needs, up to a third, and the model the rest.
+ */
+.providerSelector > .providerSelectorProvider {
+  flex: 0 1 auto;
+  max-width: 34%;
 }
 
 .providerSelector > div + div {
@@ -622,6 +631,14 @@
   color: var(--tw-fg-faint);
 }
 
+/* In a narrow footer the server icon gives its room to the provider's name. */
+@container (max-width: 300px) {
+  /* Over the codicon font's own display rule. */
+  .providerSelectorProvider > i {
+    display: none !important;
+  }
+}
+
 .providerSelectorProvider vscode-dropdown::part(control) {
   padding-left: 6px;
 }
@@ -629,6 +646,7 @@
 .providerSelector vscode-dropdown,
 .providerSelector vscode-text-field {
   width: 100%;
+  min-width: 0;
   background: transparent;
   border: none;
 }
@@ -645,6 +663,17 @@
   font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
+}
+
+/* A narrow column shrinks the control, chevron included, and cuts the name short. */
+.providerSelector vscode-dropdown::part(control) {
+  min-width: 0;
+}
+
+.providerSelector vscode-dropdown::part(selected-value) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .providerSelector vscode-dropdown:hover::part(control),

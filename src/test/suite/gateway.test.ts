@@ -14,16 +14,20 @@ import * as path from "path"
 import { API_PROVIDERS } from "../../common/constants"
 import { TwinnyProvider } from "../../common/types"
 import {
+  ChatChunk,
+  ChatRequest,
   FimRequest,
   InferenceError,
   isInferenceError,
   readText,
   resolveInferenceProvider
 } from "../../extension/inference"
+import { toolModeFor, withTools } from "../../extension/tools/loop"
+import { workspaceTools } from "../../extension/tools/workspace"
 import { ConfigurationSnapshot } from "../../gateway/configuration"
 import { KeyStore } from "../../gateway/keys"
 
-import { Backend, STALL,startBackend } from "./support/backend"
+import { Backend, NO_TOOLS, STALL, startBackend } from "./support/backend"
 
 const CLI = path.resolve(__dirname, "../../../packages/twinny-server/cli.js")
 const TOKEN = "tok-SECRETMARKER-4f1c"
@@ -76,10 +80,17 @@ const configFor = (backendPort: number, extra: Record<string, unknown> = {}, dat
   ...extra
 })
 
-/** Spawns `twinny-node serve` with the test host's own binary running as Node. */
+/**
+ * Spawns `twinny-node serve` with the test host's own binary running as Node.
+ * Its home is the scratch directory, so every default path (recordings, the
+ * data format marker, whatever is added next) lands there: `reset --all`
+ * once removed the real ~/.twinny/server/recordings.
+ */
 const spawnCli = (args: string[], env: Record<string, string | undefined>) => {
   const node = process.env.TWINNY_TEST_NODE || process.execPath
-  const merged: Record<string, string | undefined> = { ...process.env, ELECTRON_RUN_AS_NODE: "1", ...env }
+  const home = path.join(scratch, "home")
+  fs.mkdirSync(home, { recursive: true })
+  const merged: Record<string, string | undefined> = { ...process.env, ELECTRON_RUN_AS_NODE: "1", HOME: home, USERPROFILE: home, ...env }
   for (const key of Object.keys(merged)) if (merged[key] === undefined) delete merged[key]
   return cp.spawn(node, [CLI, ...args], {
     env: merged as NodeJS.ProcessEnv,
@@ -265,6 +276,119 @@ suite("Gateway process", function () {
     assert.strictEqual(text, "Hello there")
     assert.strictEqual(backend.requests[0].path, "/v1/chat/completions")
     assert.strictEqual(backend.requests[0].model, "backend-coder:7b")
+  })
+
+  test("a tool conversation crosses the gateway: tools out, the model's calls back, results in", async () => {
+    const client = resolveInferenceProvider(remoteProvider(gateway, { type: "chat" }))
+    const tools = [
+      {
+        name: "read_file",
+        description: "Reads a file.",
+        parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }
+      }
+    ]
+    const chunks: ChatChunk[] = []
+    for await (const chunk of client.chat({ model: "coder", messages: [{ role: "user", content: "read it" }], tools })) {
+      chunks.push(chunk)
+    }
+    const calls = chunks.flatMap((chunk) => chunk.toolCalls ?? [])
+    assert.deepStrictEqual(calls, [{ id: "call_a", name: "read_file", arguments: "{\"path\":\"src/a.ts\"}" }])
+    assert.deepStrictEqual(
+      chunks.map((chunk) => chunk.usage).find(Boolean),
+      { promptTokens: 40, completionTokens: 9 },
+      "a reply that is only calls still reports what it cost"
+    )
+    const offered = backend.requests[0].body?.tools as Array<{ type: string; function: { name: string } }>
+    assert.strictEqual(offered[0].type, "function")
+    assert.strictEqual(offered[0].function.name, "read_file")
+
+    backend.requests.length = 0
+    const text = await readText(
+      client.chat({
+        model: "coder",
+        tools,
+        messages: [
+          { role: "user", content: "read it" },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [{ id: "call_a", type: "function", function: { name: "read_file", arguments: "{\"path\":\"src/a.ts\"}" } }],
+            // What the extension keeps on a message for itself does not travel.
+            id: "local-only"
+          },
+          { role: "tool", tool_call_id: "call_a", content: "src/a.ts (lines 1–1 of 1)\n1: export const a = 1" }
+        ] as unknown as ChatRequest["messages"]
+      })
+    )
+    assert.strictEqual(text, "Hello there")
+    const sent = backend.requests[0].body?.messages as Array<Record<string, unknown>>
+    assert.strictEqual(sent[1].role, "assistant")
+    assert.strictEqual((sent[1].tool_calls as Array<{ id: string }>)[0].id, "call_a")
+    assert.ok(!("id" in sent[1]))
+    assert.strictEqual(sent[2].role, "tool")
+    assert.strictEqual(sent[2].tool_call_id, "call_a")
+  })
+
+  test("the tool loop runs natively through the gateway, and in text when the backend's model has no tools", async () => {
+    assert.strictEqual(toolModeFor(API_PROVIDERS.TwinnyRemote), "native")
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-gw-tools-"))
+    fs.mkdirSync(path.join(root, "src"))
+    fs.writeFileSync(path.join(root, "src", "a.ts"), "export const a = 1\n")
+    const client = resolveInferenceProvider(remoteProvider(gateway, { type: "chat" }))
+    const steps: string[] = []
+    const fallbacks: string[] = []
+    const run = (content: string) =>
+      readText(
+        withTools(client, workspaceTools(root), {
+          mode: "native",
+          onStep: (step) => steps.push(step.summary),
+          onFallback: (reason, what) => fallbacks.push(`${what}: ${reason}`)
+        }).chat({ model: "coder", messages: [{ role: "user", content }] })
+      )
+
+    const answer = await run("read it")
+    assert.match(answer, /Hello there/)
+    assert.strictEqual(steps.length, 1, "the backend's call ran here, in the developer's workspace")
+    assert.strictEqual(fallbacks.length, 0)
+    const followUp = backend.requests[backend.requests.length - 1].body?.messages as Array<{ role: string; content: string }>
+    const result = followUp.find((message) => message.role === "tool")
+    assert.match(result?.content ?? "", /export const a = 1/, "the tool's result reached the backend")
+
+    backend.requests.length = 0
+    const plain = await run(`read it ${NO_TOOLS}`)
+    assert.match(plain, /Hello there/)
+    assert.strictEqual(fallbacks.length, 1)
+    assert.match(fallbacks[0], /^tools: .*does not support tools/)
+    assert.ok(!backend.requests[backend.requests.length - 1].body?.tools, "the second try offers tools in the prompt, not natively")
+  })
+
+  test("malformed tool conversations are refused before any provider work", async () => {
+    const post = async (body: Record<string, unknown>) => {
+      const response = await fetch(`${gateway.url}/twinny/v1/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` },
+        body: JSON.stringify({ model: "coder", messages: [{ role: "user", content: "x" }], ...body })
+      })
+      const text = await response.text()
+      return { status: response.status, text }
+    }
+    const refused: Array<[Record<string, unknown>, RegExp]> = [
+      [{ tools: [{ name: "x", description: "d", parameters: {}, url: "http://attacker" }] }, /unknown field \\"url\\"/],
+      [{ tools: [{ name: "bad name", description: "d", parameters: {} }] }, /no valid name/],
+      [{ tools: "all" }, /must be a list/],
+      [{ reasoningEffort: "extreme" }, /reasoningEffort/],
+      [{ think: "no" }, /think/],
+      [{ messages: [{ role: "tool", content: "x" }] }, /which tool call/],
+      [{ messages: [{ role: "user", content: "x", tool_calls: [] }] }, /unknown field \\"tool_calls\\"/],
+      [{ messages: [{ role: "assistant", content: null, tool_calls: [{ id: "a", type: "function", function: { name: "x", arguments: {} } }] }] }, /tool call without/],
+      [{ messages: [{ role: "assistant", content: null }] }, /no content/]
+    ]
+    for (const [body, message] of refused) {
+      const { status, text } = await post(body)
+      assert.strictEqual(status, 400, JSON.stringify(body))
+      assert.match(text, message, JSON.stringify(body))
+    }
+    assert.strictEqual(backend.requests.length, 0, "none of these may reach the backend")
   })
 
   test("embeddings answer through the embedding alias", async () => {

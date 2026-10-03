@@ -17,6 +17,7 @@
 - **[代码补全](https://docs.twinny.dev/zh-cn/features/code-completion/)。** 输入时的中间填充建议，以幽灵文本流式显示，在合理处停止。上下文来自打开的文件、导入、语言服务器和你最近的编辑。针对 7B 模型调优。
 - **[内联编辑](https://docs.twinny.dev/zh-cn/features/inline-edit/)。** 按 Ctrl+I，描述改动，在编辑器中以差异形式审阅。按块接受或拒绝。任何诊断上都有"用 twinny 修复"。
 - **[对话](https://docs.twinny.dev/zh-cn/features/chat/)。** 输入 `@` 附加文件、符号、问题面板、git 差异、终端，或工作区索引的搜索结果。对话会被保存。
+- **[智能体模式](https://docs.twinny.dev/zh-cn/features/agent-mode/)**（实验性）。对话中的开关或 Shift+Tab 让模型在工作区中读取、搜索、编辑文件并运行命令，每一步都显示在回答中。除非你另行设置，运行命令前会先询问。
 - **[工作区索引](https://docs.twinny.dev/zh-cn/features/workspace-index/)。** 对工作区的关键词与向量混合搜索，进入提示词前重排，保存时更新。回复下方显示来源。
 - **[代码审查](https://docs.twinny.dev/zh-cn/features/code-review/)**：审查工作树、分支相对基线的改动，或 GitHub 拉取请求；**[提交信息](https://docs.twinny.dev/zh-cn/features/commit-messages/)**由暂存的差异生成。
 - **[终端](https://docs.twinny.dev/zh-cn/features/terminal/)。** 用一句描述写出命令，运行前先展示。命令失败时，twinny 找到文件和行号并给出修复。

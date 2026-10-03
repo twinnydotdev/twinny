@@ -191,11 +191,24 @@ vscode-button::part(content) {
   caret-color: var(--tw-cursor);
 }
 
-/* Tiptap's Placeholder extension had no styling at all, so it never showed. */
+/*
+ * Tiptap's Placeholder extension had no styling at all, so it never showed.
+ * One line, cut short in a narrow panel rather than wrapping under the
+ * composer's switches.
+ */
+.tiptap p.is-editor-empty:first-child {
+  position: relative;
+}
+
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  float: left;
-  height: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--tw-fg-faint);
   pointer-events: none;
 }
