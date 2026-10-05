@@ -543,7 +543,7 @@ balancing, no fallback chain and no automatic download.
 | `/twinny/v1/admin/recordings` | GET | admin key | A page of recorded requests: `route`, `key`, `since`, `q`, `before`, `limit`. With the store and settings summary. |
 | `/twinny/v1/admin/recordings/<id>` | GET | admin key | One record in full. |
 | `/twinny/v1/admin/recordings/export` | GET | admin key | JSON lines: `format=training` (default) or `raw`; same filters. |
-| `/twinny/v1/signin` | POST | no | Starts a sign-in: `{"name","machine"}` (both optional suggestions) → `{"deviceCode","userCode","expiresAt","interval"}`. Bounded to 5 waiting per client address and 100 in total; ten-minute expiry. |
+| `/twinny/v1/signin` | POST | no | Starts a sign-in: `{"name","machine"}` (both optional suggestions) → `{"deviceCode","userCode","expiresAt","interval"}`. Bounded to 5 waiting per client address (the `X-Forwarded-For` address behind a loopback reverse proxy, as for the demo) and 100 in total; ten-minute expiry. |
 | `/twinny/v1/signin/poll` | POST | no | `{"deviceCode"}` → `{"status"}`: `pending`, `slow-down` (polled faster than `interval`), `denied`, `expired`, or `approved` with `key` and `name`, returned once. |
 | `/twinny/v1/page-link` | POST | personal key | A one-time code that signs this key in to the page: `{}` → `{"code","expiresAt"}`. Valid for one minute; at most 5 outstanding per key name. Refused for the shared token and a demo's guests. |
 | `/twinny/v1/page-link/open` | POST | no | `{"code"}` → `{"key","name"}`, once: the page trades the code for the key that asked for it. 410 for a code that is used, expired or unknown; the key's own refusal if it was revoked meanwhile. Audited as `page.signed-in`. |
@@ -1277,6 +1277,8 @@ telemetry, conversation storage or analytics.
   types and released only to the holder of the 64-hex device code, once.
   Requests live in memory for ten minutes and are capped per client
   address, so the open sign-in routes cannot fill memory or mint keys.
+  Behind a reverse proxy on loopback the address is the one the proxy
+  forwards, so one developer's waiting requests never block another's.
 - **Keys are hashed at rest** (SHA-256) and compared in constant time. The
   file is created with mode 600 and rewritten atomically. A lost key cannot
   be recovered; revoke it and make a new one.
