@@ -368,6 +368,7 @@
   "shortcut-mention": "Add a file, symbol, git or terminal output",
   "shortcut-help": "Show or hide this list",
   "shortcut-agent": "Agent mode on or off",
+  "shortcut-accept-suggestion": "Accept the grey suggestion (Ctrl+→ a word)",
   "queued": "queued",
   "queued-title": "Messages waiting for the current reply",
   "queued-remove": "Don't send this message",

@@ -190,6 +190,8 @@ export class BaseProvider {
           TWINNY_COMMAND_NAME.templateCompletion,
           template
         ),
+      [EVENT_NAME.twinnyComposerSuggest]: async ({ draft, recent }) =>
+        (await this.chat?.suggestDraft(draft, recent)) ?? "",
       [EVENT_NAME.twinnyEditDefaultTemplates]: () => this.editDefaultTemplates(),
       [EVENT_NAME.twinnyFileListRequest]: () =>
         this._fileTreeProvider.getAllFiles(),

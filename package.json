@@ -636,6 +636,12 @@
           "default": true,
           "markdownDescription": "Writes what Twinny is doing to the **Twinny** output channel: one line per completion or chat request with model, timing, size and why it stopped. Set the channel's log level to *Debug* (the dropdown in the Output panel) to also see the prompts and replies. Warnings and errors are written even when this is off."
         },
+        "twinny.chatSuggestions": {
+          "order": 19,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Shows grey text ahead of the cursor in the chat composer; `Tab` accepts it and `Ctrl+→` accepts a word of it. It finishes words from what you have typed before, as a phone keyboard does, and once a conversation has an exchange, a pause after a word asks the chat model for the rest of the message given the last few turns. No requests are made while a reply is coming."
+        },
         "twinny.chatTools": {
           "order": 20,
           "type": "boolean",

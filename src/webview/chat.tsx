@@ -22,6 +22,7 @@ import {
 import { useAgentMode } from "./hooks/useAgentMode"
 import { useAutoRun } from "./hooks/useAutoRun"
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
+import { useComposerSuggestions } from "./hooks/useComposerSuggestions"
 import { useConversationHistory } from "./hooks/useConversationHistory"
 import { useProviders } from "./hooks/useProviders"
 import { useSelection } from "./hooks/useSelection"
@@ -31,6 +32,7 @@ import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch"
 import { ProviderSelect } from "./providers/provider-select"
 import { EmptyChat } from "./empty-chat"
+import { GhostText } from "./ghost-text"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { emit, useServerEvent } from "./messaging"
@@ -698,6 +700,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [JSON.stringify(filePaths)]
   )
 
+  const { updateSuggestion } = useComposerSuggestions({
+    editorRef,
+    messages,
+    promptHistoryRef,
+    busyRef: generatingRef
+  })
+  // The editor keeps the handlers it was made with; this one changes.
+  const updateSuggestionRef = useRef(updateSuggestion)
+  updateSuggestionRef.current = updateSuggestion
+
   const CustomImageExtension = createCustomImageExtension((id: string) => {
     imagesRef.current = imagesRef.current.filter((img) => img.id !== id)
   })
@@ -730,6 +742,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
           toggleAgentMode,
           scrollTranscript
         }),
+        GhostText,
         Placeholder.configure({
           placeholder: t("placeholder"),
           // Still shown while the composer is off for want of a provider.
@@ -741,6 +754,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         recallIndexRef.current = -1
         lastEscapeRef.current = 0
         if (showShortcutsRef.current) setShortcuts(false)
+        updateSuggestionRef.current()
       }
     },
     [

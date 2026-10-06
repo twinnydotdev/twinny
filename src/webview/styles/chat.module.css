@@ -433,6 +433,13 @@
   margin: 0;
 }
 
+/* A suggestion ahead of the cursor, as the editor shows an inline completion. */
+.tiptap :global(.ghostText) {
+  color: var(--vscode-editorGhostText-foreground, var(--tw-fg-faint));
+  pointer-events: none;
+  user-select: none;
+}
+
 .chatButtons {
   position: absolute;
   bottom: 4px;

@@ -62,6 +62,12 @@ export interface ContextValue<T = unknown> {
   value: T
 }
 
+/** A turn of the conversation as the composer's suggestions are shown it. */
+export interface ComposerTurn {
+  role: string
+  content: string
+}
+
 export interface ChatRequest {
   messages: ChatCompletionMessage[]
   /** Files/symbols the user @-mentioned in the composer. */
@@ -304,6 +310,11 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyAcceptSolution]: Channel<string>
   [EVENT_NAME.twinnyChatMessage]: Channel<ChatRequest>
   [EVENT_NAME.twinnyClickSuggestion]: Channel<string>
+  /**
+   * The rest of the message being typed, as the chat model guesses it from
+   * the last few turns; empty when it has no good guess.
+   */
+  [EVENT_NAME.twinnyComposerSuggest]: Channel<{ draft: string; recent: ComposerTurn[] }, string>
   [EVENT_NAME.twinnyEditDefaultTemplates]: Channel
   [EVENT_NAME.twinnyFileListRequest]: Channel<void, string[]>
   [EVENT_NAME.twinnyGetConfigValue]: Channel<{ key: string }, ConfigValue>

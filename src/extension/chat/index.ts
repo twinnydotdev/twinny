@@ -1,5 +1,6 @@
 import { ExtensionContext, workspace } from "vscode"
 
+import { cleanModelSuggestion, composerSuggestionMessages } from "../../common/composer-predict"
 import {
   API_PROVIDERS,
   ASSISTANT,
@@ -11,6 +12,7 @@ import {
   WEBUI_TABS
 } from "../../common/constants"
 import { formatCount, logger } from "../../common/logger"
+import type { ComposerTurn } from "../../common/messaging/protocol"
 import { kebabToSentence } from "../../common/text"
 import {
   ChatCompletionMessage,
@@ -20,7 +22,7 @@ import {
 import type { ChatEditMode } from "../edit/service"
 import { WorkspaceSearch } from "../embeddings/search"
 import { GenerationTracker } from "../generations"
-import { readText, resolveInferenceProvider } from "../inference"
+import { isCancelled, readText, resolveInferenceProvider } from "../inference"
 import {
   assumedContextWindow,
   contextWindowOf,
@@ -55,6 +57,8 @@ import { buildChatTurn } from "./turn"
 
 /** Templates whose answer benefits from `@workspace`-style lookups. */
 const TEMPLATES_WITH_RAG = ["explain"]
+/** Room for a sentence of the composer's grey text, and no more. */
+const SUGGESTION_MAX_TOKENS = 32
 
 /**
  * The chat feature's front door.
@@ -67,6 +71,7 @@ const TEMPLATES_WITH_RAG = ["explain"]
  */
 export class Chat extends Base {
   private _conversation: ChatCompletionMessage[] = []
+  private _suggestion?: AbortController
   private readonly _bridge: ExtensionBridge
   private readonly _context: ChatContextBuilder
   private readonly _generation: ChatGeneration
@@ -238,6 +243,43 @@ export class Chat extends Base {
         `Simple completion failed: ${describeProviderError(error, provider)}`
       )
       return undefined
+    }
+  }
+
+  /**
+   * The rest of the message the user is typing, as the model guesses it
+   * from the last few turns, for the composer's grey text. A newer call
+   * cancels the one before; any failure is just no guess.
+   */
+  public async suggestDraft(draft: string, recent: ComposerTurn[]): Promise<string> {
+    this._suggestion?.abort()
+    const provider = this.getProvider()
+    if (!provider || !draft.trim()) return ""
+    const controller = new AbortController()
+    this._suggestion = controller
+
+    try {
+      const reply = await readText(
+        resolveInferenceProvider(provider).chat(
+          {
+            model: provider.modelName,
+            messages: composerSuggestionMessages(draft, recent),
+            maxTokens: SUGGESTION_MAX_TOKENS,
+            temperature: 0,
+            think: false
+          },
+          { signal: controller.signal }
+        )
+      )
+      if (controller.signal.aborted) return ""
+      return cleanModelSuggestion(draft, stripThinking(reply))
+    } catch (error) {
+      if (!isCancelled(error)) {
+        logger.debug(`Composer suggestion failed: ${describeProviderError(error, provider)}`)
+      }
+      return ""
+    } finally {
+      if (this._suggestion === controller) this._suggestion = undefined
     }
   }
 
