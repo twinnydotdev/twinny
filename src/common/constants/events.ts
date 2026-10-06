@@ -11,6 +11,7 @@ export const EVENT_NAME = {
   twinnyAddMessage: "twinny-add-message",
   twinnyChatMessage: "twinny-chat-message",
   twinnyClickSuggestion: "twinny-click-suggestion",
+  twinnyComposerSuggest: "twinny-composer-suggest",
   twinnyEditDefaultTemplates: "twinny-edit-default-templates",
   twinnyFileListRequest: "twinny-file-list-request",
   twinnyGetConfigValue: "twinny-get-config-value",

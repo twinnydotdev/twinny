@@ -122,7 +122,13 @@ interface Reply {
   body: Record<string, unknown>
 }
 
-const request = (url: string, method: string, key: string | undefined, body?: unknown): Promise<Reply> =>
+const request = (
+  url: string,
+  method: string,
+  key: string | undefined,
+  body?: unknown,
+  headers: Record<string, string> = {}
+): Promise<Reply> =>
   new Promise((resolve, reject) => {
     const target = new URL(url)
     const payload = body === undefined ? undefined : JSON.stringify(body)
@@ -134,7 +140,8 @@ const request = (url: string, method: string, key: string | undefined, body?: un
         method,
         headers: {
           ...(key ? { Authorization: `Bearer ${key}` } : {}),
-          ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {})
+          ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}),
+          ...headers
         }
       },
       (res) => {
@@ -292,5 +299,21 @@ suite("Gateway sign-in (in process)", function () {
     clock += SIGNIN_POLL_INTERVAL_S * 1000
     assert.deepStrictEqual(await client.pollSignIn(waiting.deviceCode), { status: "pending" }, "the request survives a refused approval")
     assert.ok(!keys.active().some((k) => k.name === "frank"))
+  })
+
+  test("behind a loopback reverse proxy the per-address cap counts the forwarded address, not the proxy", async () => {
+    // The in-process server is reached over loopback, exactly like a gateway
+    // behind nginx or Caddy on the same machine: X-Forwarded-For is believed.
+    const from = (address: string) =>
+      request(`${url}/twinny/v1/signin`, "POST", undefined, { name: "proxied" }, { "X-Forwarded-For": address })
+    for (let i = 0; i < MAX_PENDING_PER_ADDRESS; i++) {
+      assert.strictEqual((await from("10.9.0.1")).status, 201)
+    }
+    const capped = await from("10.9.0.1")
+    assert.strictEqual(capped.status, 400)
+    assert.match(message(capped), /Too many sign-in requests/)
+    // A colleague behind the same proxy is another address and is not locked out.
+    const neighbour = await from("10.9.0.2")
+    assert.strictEqual(neighbour.status, 201, message(neighbour))
   })
 })

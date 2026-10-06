@@ -15,6 +15,7 @@ const SHORTCUTS: [keys: string[], label: string][] = [
   [["↑", "↓"], "shortcut-history"],
   [["PgUp", "PgDn"], "shortcut-scroll"],
   [["Ctrl+L"], "shortcut-new"],
+  [["Tab"], "shortcut-accept-suggestion"],
   [["Shift+Tab"], "shortcut-agent"],
   [["@"], "shortcut-mention"],
   [["?"], "shortcut-help"]

@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.6 · 2026-10-06
+
+Extension release: the chat composer suggests how to finish what you are typing. `twinny-server` release: sign-in's per-address limit works behind a reverse proxy.
+
+- **Grey suggestions in the chat composer.** As in the editor, a suggestion shows in grey after the cursor: **Tab** accepts it, **Ctrl+→** accepts one word of it, and **Esc** puts it away. From the first key it finishes the word you are typing, or guesses the next one after a space, from your own earlier prompts, as a phone keyboard does. Once the conversation has a reply, a short pause after a word asks the chat model for the rest of the message given the last three exchanges, so the suggestion follows the conversation. Nothing is asked of the model while a reply is coming. `twinny.chatSuggestions` turns it off.
+- **Gateway: sign-in requests are counted per developer behind a proxy.** `POST /twinny/v1/signin` allows five waiting requests per client address, and took the address from the connection. Behind nginx or Caddy on the same machine, as `docs/gateway.md` describes, every developer arrives from the proxy's loopback address, so the whole team shared five, and one client could hold sign-in shut for everyone for ten minutes. It now takes the forwarded address, by the rule the audit log already follows: `X-Forwarded-For` is believed only from a loopback peer.
+
 ## 4.3.5 · 2026-10-02
 
 Extension release: settings, labels and a command that did not do what they said. `twinny-server` carries the version number only.

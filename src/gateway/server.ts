@@ -1576,7 +1576,7 @@ export class GatewayServer {
         sendJson(res, 200, result)
         return
       }
-      const address = req.socket.remoteAddress ?? "unknown"
+      const address = clientAddress(req)
       const started = this._signIns.start({
         name: body.name,
         machine: body.machine,
