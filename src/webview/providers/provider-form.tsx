@@ -625,7 +625,9 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
               <VSCodeOption value="xhigh">Extra high</VSCodeOption>
               <VSCodeOption value="max">Maximum</VSCodeOption>
             </VSCodeDropdown>,
-            "Lower effort usually reduces inline-completion latency. Supported values depend on the selected model."
+            draft.type === "fim"
+              ? "Lower effort usually reduces inline-completion latency. Supported values depend on the selected model."
+              : "Lower effort usually reduces response latency. Supported values depend on the selected model."
           )}
         </>
       )}

@@ -150,7 +150,10 @@ export class BaseProvider {
       teamChanged: async () => {
         await Promise.all([teamShare?.teamChanged(), teamPlugins?.teamChanged()])
       },
-      chatGPTPlanSigningOut: () => this._generations.stopAll()
+      chatGPTPlanSigningOut: () => {
+        this._generations.stopAll()
+        this.chat?.abortAll()
+      }
     })
     this.providers = providerManager
     if (this._p2p) {

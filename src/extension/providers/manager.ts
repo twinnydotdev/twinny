@@ -59,6 +59,19 @@ export interface ProviderManagerHooks {
   chatGPTPlanSigningOut?(): void
 }
 
+const sharedChatGPTPlanRequests = new WeakMap<
+  ExtensionContext,
+  Set<AbortController>
+>()
+
+const chatGPTPlanRequestsFor = (context: ExtensionContext) => {
+  const existing = sharedChatGPTPlanRequests.get(context)
+  if (existing) return existing
+  const created = new Set<AbortController>()
+  sharedChatGPTPlanRequests.set(context, created)
+  return created
+}
+
 const TEAM_FEATURE_LABEL: Record<ProviderType, string> = { chat: "chat", fim: "autocomplete", embedding: "embeddings" }
 
 export class ProviderManager {
@@ -66,7 +79,7 @@ export class ProviderManager {
   private readonly _bridge: ExtensionBridge
   private readonly _credentials: RemoteCredentials
   private readonly _chatGPTPlan: ChatGPTPlanSession
-  private readonly _chatGPTPlanRequests = new Set<AbortController>()
+  private readonly _chatGPTPlanRequests: Set<AbortController>
   private readonly _team: TeamConnection
   /** What an opened link asked the tab to show, until the tab collects it. */
   private _pendingOpen?: TeamOpen
@@ -78,6 +91,7 @@ export class ProviderManager {
     private readonly _hooks: ProviderManagerHooks = {}
   ) {
     this._store = new ProviderStore(context)
+    this._chatGPTPlanRequests = chatGPTPlanRequestsFor(context)
     this._bridge = bridge
     this._credentials = new RemoteCredentials(context)
     this._chatGPTPlan = ChatGPTPlanSession.shared(context)
