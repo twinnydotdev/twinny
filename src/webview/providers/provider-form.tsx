@@ -214,6 +214,11 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   }, [listKey])
 
   const modelInList = models.includes(draft.modelName)
+  const planModelUnavailable =
+    isChatGPTPlan &&
+    !!planStatus?.sharing &&
+    !modelsLoading &&
+    (!!modelsError || models.length === 0 || !modelInList)
   const showModelDropdown =
     models.length > 0 && (isChatGPTPlan || !customModel)
 
@@ -253,7 +258,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
 
   const handleTest = async () => {
     setSubmitted(true)
-    if (!validation.valid) return
+    if (!validation.valid || planModelUnavailable) return
     setTesting(true)
     setTestResult(null)
     setTestResult(await testProvider(normalized))
@@ -263,7 +268,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitted(true)
-    if (!validation.valid || saving) return
+    if (!validation.valid || planModelUnavailable || saving) return
     setSaving(true)
     const result = isEditing
       ? await updateProvider(normalized)
@@ -371,9 +376,12 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
               <>
                 <span className={styles.staticValue}>
                   <i className="codicon codicon-pass-filled" />
-                  <span>
-                    {planStatus.email || planStatus.name || "Connected"}
-                  </span>
+                  <span>Connected</span>
+                  {(planStatus.email || planStatus.name) && (
+                    <span className={styles.fieldHint}>
+                      {planStatus.email || planStatus.name}
+                    </span>
+                  )}
                 </span>
                 <VSCodeButton
                   appearance="secondary"
@@ -384,18 +392,21 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
                 </VSCodeButton>
               </>
             ) : (
-              <VSCodeButton
-                appearance="primary"
-                disabled={planAuthLoading}
-                onClick={handlePlanSignIn}
-              >
-                <i
-                  className={`codicon codicon-${
-                    planAuthLoading ? "loading" : "account"
-                  }`}
-                />
-                {planAuthLoading ? "Connecting..." : "Continue with ChatGPT"}
-              </VSCodeButton>
+              <>
+                <span className={styles.staticValue}>Not connected</span>
+                <VSCodeButton
+                  appearance="primary"
+                  disabled={planAuthLoading}
+                  onClick={handlePlanSignIn}
+                >
+                  <i
+                    className={`codicon codicon-${
+                      planAuthLoading ? "loading" : "account"
+                    }`}
+                  />
+                  {planAuthLoading ? "Connecting..." : "Continue with ChatGPT"}
+                </VSCodeButton>
+              </>
             )}
           </div>
           {planStatus?.connected && !planStatus.sharing && (
@@ -581,6 +592,8 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         </div>,
         modelsLoading
           ? t("loading-available-models")
+          : planModelUnavailable && draft.modelName
+            ? t("model-not-listed", { model: draft.modelName })
           : models.length
             ? t("models-found", { count: models.length })
             : modelsError
@@ -649,7 +662,11 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       <div className={styles.formActions}>
         <VSCodeButton
           appearance="secondary"
-          disabled={testing || (isChatGPTPlan && !planStatus?.sharing)}
+          disabled={
+            testing ||
+            (isChatGPTPlan && !planStatus?.sharing) ||
+            planModelUnavailable
+          }
           onClick={handleTest}
         >
           <i className={`codicon codicon-${testing ? "loading" : "debug-start"}`} />
@@ -665,7 +682,8 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
           disabled={
             saving ||
             (submitted && !validation.valid) ||
-            (isChatGPTPlan && !planStatus?.sharing)
+            (isChatGPTPlan && !planStatus?.sharing) ||
+            planModelUnavailable
           }
         >
           {t("save")}
