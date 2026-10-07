@@ -110,6 +110,22 @@ const redactMessages = (shield: SecretShield, messages: ChatMessage[]): ChatMess
     } as ChatMessage
   })
 
+const redactFimContext = (
+  shield: SecretShield,
+  context: import("./types").FimStructuredContext | undefined
+) =>
+  context
+    ? {
+        ...context,
+        prefix: shield.redact(context.prefix),
+        suffix: shield.redact(context.suffix),
+        files: context.files?.map((file) => ({
+          ...file,
+          text: shield.redact(file.text)
+        }))
+      }
+    : undefined
+
 const tell = (
   shield: SecretShield,
   what: string,
@@ -137,6 +153,7 @@ export const shieldClient = (
       prompt: shield.redact(request.prompt),
       prefix: request.prefix === undefined ? undefined : shield.redact(request.prefix),
       suffix: request.suffix === undefined ? undefined : shield.redact(request.suffix),
+      context: redactFimContext(shield, request.context),
       messages: request.messages && redactMessages(shield, request.messages)
     }
     tell(shield, "completion", provider, options)
