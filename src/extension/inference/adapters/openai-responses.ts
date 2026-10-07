@@ -135,16 +135,18 @@ export async function* responsesChat(
   if (!response.body) throw new Error("The server answered without a body.")
 
   const calls: ChatToolCall[] = []
+  const text: string[] = []
+  const reasoning: string[] = []
   for await (const event of responseEvents(response.body)) {
     if (options?.signal?.aborted) return
     switch (event.type) {
       // A refusal is the model's answer too; left out, the reply would be blank.
       case "response.output_text.delta":
       case "response.refusal.delta":
-        if (event.delta) yield { content: event.delta }
+        if (event.delta) text.push(event.delta)
         break
       case "response.reasoning_summary_text.delta":
-        if (event.delta) yield { content: "", reasoning: event.delta }
+        if (event.delta) reasoning.push(event.delta)
         break
       case "response.output_item.done":
         if (event.item?.type === "function_call" && event.item.name) {
@@ -155,16 +157,18 @@ export async function* responsesChat(
           })
         }
         break
-      case "response.completed":
-      case "response.incomplete": {
+      case "response.completed": {
         const usage: InferenceUsage | undefined = event.response?.usage
           ? {
               promptTokens: event.response.usage.input_tokens,
               completionTokens: event.response.usage.output_tokens
             }
           : undefined
-        const finishReason: ChatFinishReason =
-          event.response?.incomplete_details?.reason === "max_output_tokens" ? "length" : "stop"
+        if (text.length) yield { content: text.join("") }
+        if (reasoning.length) {
+          yield { content: "", reasoning: reasoning.join("") }
+        }
+        const finishReason: ChatFinishReason = "stop"
         yield {
           content: "",
           finishReason,
@@ -173,12 +177,17 @@ export async function* responsesChat(
         }
         return
       }
+      case "response.incomplete":
+        throw new Error(
+          `The response was incomplete${event.response?.incomplete_details?.reason ? `: ${event.response.incomplete_details.reason}` : ""}.`
+        )
       case "response.failed":
-        throw new Error(event.response?.error?.message || "The response failed.")
+        throw new Error(
+          event.response?.error?.message || "The response failed."
+        )
       case "error":
         throw new Error(event.message || event.error?.message || "The server reported an error.")
     }
   }
-  // Ended without a completion event: still hand over what arrived.
-  if (calls.length) yield { content: "", toolCalls: calls }
+  throw new Error("The response ended without response.completed.")
 }

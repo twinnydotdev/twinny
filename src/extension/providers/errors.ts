@@ -3,6 +3,7 @@
  * The inference layer decides what kind of failure it was; this file only
  * puts words to it. Pure: no vscode imports, so it is unit-tested directly.
  */
+import { API_PROVIDERS } from "../../common/constants"
 import { isAbortError, toInferenceError } from "../inference/errors"
 
 export { isAbortError }
@@ -62,6 +63,8 @@ export const describeProviderError = (
         provider.provider === "twinny-remote"
           ? `${name} refused the request: ${raw.replace(/^The gateway responded with status \d+:?\s*/i, "")} ` +
             "Enter a current gateway key on the provider."
+          : provider.provider === API_PROVIDERS.ChatGPTPlan
+            ? `${name} could not use the connected ChatGPT session. Sign in again.`
           : `${name} rejected the request as unauthorised. ` +
             "Check the API key on the provider."
       break
@@ -71,7 +74,11 @@ export const describeProviderError = (
         "Check the model name, or pull the model first."
       break
     case "rate-limited":
-      summary = `${name} is rate limiting requests. Wait a moment and try again.`
+      summary =
+        provider.provider === API_PROVIDERS.ChatGPTPlan &&
+        /subscription_sharing_usage_limit_exceeded/.test(lower)
+          ? `${name} has reached the ChatGPT plan usage limit. Try again after the limit resets.`
+          : `${name} is rate limiting requests. Wait a moment and try again.`
       break
     case "timeout":
       summary = `The request to ${name} timed out. The model may still be loading; try again.`
