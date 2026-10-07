@@ -652,7 +652,7 @@ export class CompletionProvider
             prefix: prefixSuffix.prefix,
             suffix: prefixSuffix.suffix,
             files: contextFiles
-          } satisfies FimStructuredContext
+          } as FimStructuredContext
         }
       }
     }
