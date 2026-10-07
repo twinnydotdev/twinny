@@ -293,3 +293,126 @@ test("ChatGPT Plan usage-unavailable failures stay transient provider errors", a
     fake.close()
   }
 })
+
+test("ChatGPT Plan rejects incomplete and explicit error terminal events", async () => {
+  for (const terminal of [
+    {
+      type: "response.incomplete",
+      response: {
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" }
+      }
+    },
+    {
+      type: "error",
+      code: "server_error",
+      message: "OpenAI stream failed"
+    }
+  ]) {
+    const fake = await serve((request, response) => {
+      if (request.path === "/v1/responses") {
+        response.writeHead(200, { "Content-Type": "text/event-stream" })
+        response.end(
+          sse([
+            { type: "response.output_text.delta", delta: "partial" },
+            terminal
+          ])
+        )
+        return
+      }
+      response.writeHead(404)
+      response.end()
+    })
+    try {
+      const provider = new ChatGPTPlanInferenceProvider(config, access, {
+        responses: fake.responses
+      })
+      await assert.rejects(
+        readText(
+          provider.fim({
+            model: "gpt-test",
+            prompt: "x",
+            context: { prefix: "const x = ", suffix: ";" }
+          })
+        ),
+        terminal.type === "response.incomplete"
+          ? /incomplete: max_output_tokens/
+          : /server_error: OpenAI stream failed/
+      )
+    } finally {
+      fake.close()
+    }
+  }
+})
+
+test("ChatGPT Plan rejects a stream that ends after deltas without completion", async () => {
+  const fake = await serve((request, response) => {
+    if (request.path === "/v1/responses") {
+      response.writeHead(200, { "Content-Type": "text/event-stream" })
+      response.end(
+        sse([{ type: "response.output_text.delta", delta: "partial" }])
+      )
+      return
+    }
+    response.writeHead(404)
+    response.end()
+  })
+  try {
+    const provider = new ChatGPTPlanInferenceProvider(config, access, {
+      responses: fake.responses
+    })
+    await assert.rejects(
+      readText(
+        provider.fim({
+          model: "gpt-test",
+          prompt: "x",
+          context: { prefix: "const x = ", suffix: ";" }
+        })
+      ),
+      /ended without response.completed/
+    )
+  } finally {
+    fake.close()
+  }
+})
+
+test("ChatGPT Plan cancellation aborts the HTTP stream", async () => {
+  let connectionClosed!: () => void
+  const closed = new Promise<void>((resolve) => (connectionClosed = resolve))
+  const fake = await serve((request, response) => {
+    if (request.path === "/v1/responses") {
+      response.writeHead(200, { "Content-Type": "text/event-stream" })
+      response.write(
+        sse([{ type: "response.output_text.delta", delta: "stale" }])
+      )
+      response.once("close", connectionClosed)
+      return
+    }
+    response.writeHead(404)
+    response.end()
+  })
+  try {
+    const provider = new ChatGPTPlanInferenceProvider(config, access, {
+      responses: fake.responses
+    })
+    const controller = new AbortController()
+    const iterable = provider.fim(
+      {
+        model: "gpt-test",
+        prompt: "x",
+        context: { prefix: "const x = ", suffix: ";" }
+      },
+      { signal: controller.signal }
+    )
+    const stream = iterable[Symbol.asyncIterator]()
+    assert.deepStrictEqual(await stream.next(), {
+      done: false,
+      value: { text: "stale" }
+    })
+    controller.abort()
+    await assert.rejects(stream.next(), /abort/i)
+    await closed
+  } finally {
+    fake.close()
+  }
+})
