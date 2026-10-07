@@ -129,7 +129,12 @@ const classify = (
   if ((status === 404 || /not found/.test(lower)) && /model/.test(lower)) {
     return "model-unavailable"
   }
-  if (status === 429 || /rate limit|too many requests/.test(lower)) {
+  if (
+    status === 429 ||
+    /rate limit|too many requests|subscription_sharing_usage_limit_exceeded|subscription_sharing_usage_unavailable/.test(
+      lower
+    )
+  ) {
     return "rate-limited"
   }
   if (/timed? ?out/.test(lower) || status === 408 || status === 504) {
