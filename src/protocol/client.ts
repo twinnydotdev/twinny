@@ -196,7 +196,12 @@ export class RemoteInferenceProvider implements InferenceProvider {
   }
 
   public fim(request: FimRequest, options?: InferenceOptions) {
-    return this.stream<FimChunk>("fim", request, options)
+    // Structured context is for adapters that consume it directly. The
+    // traditional gateway request already carries that context rendered in
+    // prompt, and older gateways correctly reject unknown wire fields.
+    const wireRequest = { ...request }
+    delete wireRequest.context
+    return this.stream<FimChunk>("fim", wireRequest, options)
   }
 
   public chat(request: ChatRequest, options?: InferenceOptions) {
