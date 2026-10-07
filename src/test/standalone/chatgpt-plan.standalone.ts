@@ -70,8 +70,7 @@ const config: TwinnyProvider = {
   modelName: "gpt-test",
   provider: API_PROVIDERS.ChatGPTPlan,
   type: "fim",
-  reasoningEffort: "low",
-  fastMode: true
+  reasoningEffort: "low"
 }
 
 const access = {
@@ -172,7 +171,7 @@ test("ChatGPT Plan lists visible models and streams a structured completion", as
     assert.strictEqual(inference.body?.top_p, undefined)
     assert.strictEqual(inference.body?.previous_response_id, undefined)
     assert.deepStrictEqual(inference.body?.reasoning, { effort: "low" })
-    assert.strictEqual(inference.body?.service_tier, "fast")
+    assert.strictEqual(inference.body?.service_tier, undefined)
 
     const input = JSON.stringify(inference.body?.input)
     assert.ok(input.includes("src/repository.ts"))

@@ -187,8 +187,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
       stream: true,
       ...(this._config.reasoningEffort
         ? { reasoning: { effort: this._config.reasoningEffort } }
-        : {}),
-      ...(this._config.fastMode ? { service_tier: "fast" } : {})
+        : {})
     }
 
     const started = Date.now()

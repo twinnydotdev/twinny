@@ -275,8 +275,6 @@ export interface TwinnyProvider {
     | "high"
     | "xhigh"
     | "max"
-  /** Ask the Responses API for Fast mode when the account and model allow it. */
-  fastMode?: boolean
   provider: string
   repositoryLevel?: boolean
   type: string

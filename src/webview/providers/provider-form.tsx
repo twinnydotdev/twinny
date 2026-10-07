@@ -627,22 +627,6 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
             </VSCodeDropdown>,
             "Lower effort usually reduces inline-completion latency. Supported values depend on the selected model."
           )}
-          <div className={styles.checkbox}>
-            <VSCodeCheckbox
-              id="fastMode"
-              checked={!!draft.fastMode}
-              onChange={(e) =>
-                update({
-                  fastMode: (e.target as HTMLInputElement).checked
-                })
-              }
-            >
-              Enable Fast mode
-            </VSCodeCheckbox>
-            <span className={styles.fieldHint}>
-              Requests faster processing when the connected account and model allow it.
-            </span>
-          </div>
         </>
       )}
 

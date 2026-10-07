@@ -300,7 +300,6 @@ export const normalizeProvider = (input: TwinnyProvider): TwinnyProvider => {
     normalized.apiProtocol = "https"
     normalized.fimTemplate = undefined
     normalized.reasoningEffort = reasoningEffort(input.reasoningEffort)
-    if (input.fastMode === true) normalized.fastMode = true
   }
 
   return normalized
