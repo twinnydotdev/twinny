@@ -601,6 +601,51 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
               : undefined
       )}
 
+      {isChatGPTPlan && (
+        <>
+          {field(
+            "reasoningEffort",
+            "Reasoning effort",
+            <VSCodeDropdown
+              id="reasoningEffort"
+              value={draft.reasoningEffort || ""}
+              onChange={(e) =>
+                update({
+                  reasoningEffort:
+                    (valueOf(e) || undefined) as TwinnyProvider["reasoningEffort"]
+                })
+              }
+            >
+              <VSCodeOption value="">Model default</VSCodeOption>
+              <VSCodeOption value="none">None (fastest)</VSCodeOption>
+              <VSCodeOption value="minimal">Minimal</VSCodeOption>
+              <VSCodeOption value="low">Low</VSCodeOption>
+              <VSCodeOption value="medium">Medium</VSCodeOption>
+              <VSCodeOption value="high">High</VSCodeOption>
+              <VSCodeOption value="xhigh">Extra high</VSCodeOption>
+              <VSCodeOption value="max">Maximum</VSCodeOption>
+            </VSCodeDropdown>,
+            "Lower effort usually reduces inline-completion latency. Supported values depend on the selected model."
+          )}
+          <div className={styles.checkbox}>
+            <VSCodeCheckbox
+              id="fastMode"
+              checked={!!draft.fastMode}
+              onChange={(e) =>
+                update({
+                  fastMode: (e.target as HTMLInputElement).checked
+                })
+              }
+            >
+              Enable Fast mode
+            </VSCodeCheckbox>
+            <span className={styles.fieldHint}>
+              Requests faster processing when the connected account and model allow it.
+            </span>
+          </div>
+        </>
+      )}
+
       {draft.type === "fim" && !isChatGPTPlan && (
         <>
           {field(
