@@ -6,13 +6,13 @@ import { test } from "node:test"
 import { API_PROVIDERS } from "../../common/constants"
 import { TwinnyProvider } from "../../common/types"
 import {
-  ChatGPTPlanInferenceProvider
-} from "../../extension/inference/adapters/chatgpt-plan"
-import {
   isInferenceError,
   ProviderRegistry,
   readText
 } from "../../extension/inference"
+import {
+  ChatGPTPlanInferenceProvider
+} from "../../extension/inference/adapters/chatgpt-plan"
 
 interface Received {
   method?: string
