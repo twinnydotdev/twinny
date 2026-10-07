@@ -64,6 +64,11 @@ export interface ChatGPTPlanStatus {
   clientId?: string
 }
 
+export interface ChatGPTPlanSessionDependencies {
+  fetch?: typeof fetch
+  now?: () => number
+}
+
 export class ChatGPTPlanSessionError extends Error {
   constructor(
     public readonly code:
@@ -132,7 +137,18 @@ export class ChatGPTPlanSession {
     return created
   }
 
-  constructor(private readonly _context: ExtensionContext) {}
+  constructor(
+    private readonly _context: ExtensionContext,
+    private readonly _dependencies: ChatGPTPlanSessionDependencies = {}
+  ) {}
+
+  private request(input: RequestInfo | URL, init?: RequestInit) {
+    return (this._dependencies.fetch || fetch)(input, init)
+  }
+
+  private now() {
+    return this._dependencies.now ? this._dependencies.now() : Date.now()
+  }
 
   public async status(): Promise<ChatGPTPlanStatus> {
     const profile = this._context.globalState.get<ChatGPTPlanProfile>(PROFILE_KEY)
@@ -161,7 +177,7 @@ export class ChatGPTPlanSession {
       )
     }
 
-    const now = Date.now()
+    const now = this.now()
     if (credentials.expiresAt - now > REFRESH_SKEW_MS) {
       return credentials.accessToken
     }
@@ -268,7 +284,7 @@ export class ChatGPTPlanSession {
       accessToken: token.access_token,
       refreshToken: token.refresh_token,
       idToken: token.id_token,
-      expiresAt: Date.now() + token.expires_in * 1000,
+      expiresAt: this.now() + token.expires_in * 1000,
       earliestRefreshAt:
         typeof token.earliest_refresh_at === "number"
           ? token.earliest_refresh_at * 1000
@@ -298,7 +314,7 @@ export class ChatGPTPlanSession {
             token_type_hint: "refresh_token",
             client_id: profile.clientId
           })
-          await fetch(discovery.revocation_endpoint, {
+          await this.request(discovery.revocation_endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: body.toString()
@@ -322,9 +338,9 @@ export class ChatGPTPlanSession {
 
   private discovery() {
     if (!this._discovery) {
-      this._discovery = fetch(`${ISSUER}/.well-known/openid-configuration`).then(
-        (response) => json<OpenIdConfiguration>(response)
-      )
+      this._discovery = this.request(
+        `${ISSUER}/.well-known/openid-configuration`
+      ).then((response) => json<OpenIdConfiguration>(response))
     }
     return this._discovery
   }
@@ -364,7 +380,7 @@ export class ChatGPTPlanSession {
         resource: RESOURCE
       })
       const token = await json<TokenResponse>(
-        await fetch(discovery.token_endpoint, {
+        await this.request(discovery.token_endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: body.toString()
@@ -381,7 +397,7 @@ export class ChatGPTPlanSession {
         accessToken: token.access_token,
         refreshToken: token.refresh_token,
         idToken: token.id_token || current.idToken,
-        expiresAt: Date.now() + token.expires_in * 1000,
+        expiresAt: this.now() + token.expires_in * 1000,
         earliestRefreshAt:
           typeof token.earliest_refresh_at === "number"
             ? token.earliest_refresh_at * 1000
@@ -414,7 +430,7 @@ export class ChatGPTPlanSession {
       resource: RESOURCE
     })
     return json<TokenResponse>(
-      await fetch(endpoint, {
+      await this.request(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString()
@@ -525,7 +541,8 @@ export class ChatGPTPlanSession {
         "OpenAI returned an unsupported ID-token signature."
       )
     }
-    const jwks = await json<{ keys: crypto.JsonWebKey[] }>(await fetch(jwksUri))
+    type OpenAIJwk = crypto.JsonWebKey & { kid?: string }
+    const jwks = await json<{ keys: OpenAIJwk[] }>(await this.request(jwksUri))
     const jwk = jwks.keys.find((candidate) => candidate.kid === header.kid)
     if (!jwk) {
       throw new ChatGPTPlanSessionError("oauth-failed", "OpenAI ID-token signing key was not found.")
@@ -551,7 +568,7 @@ export class ChatGPTPlanSession {
       claims.iss !== ISSUER ||
       !audience.includes(clientId) ||
       !claims.exp ||
-      claims.exp * 1000 <= Date.now() ||
+      claims.exp * 1000 <= this.now() ||
       claims.nonce !== nonce ||
       !claims.sub
     ) {
