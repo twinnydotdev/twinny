@@ -78,6 +78,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const [saving, setSaving] = useState(false)
 
   const [models, setModels] = useState<string[]>([])
+  const [modelLabels, setModelLabels] = useState<Record<string, string>>({})
   const [modelsError, setModelsError] = useState<string | undefined>()
   const [modelsLoading, setModelsLoading] = useState(false)
   const [customModel, setCustomModel] = useState(false)
@@ -181,6 +182,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
     const probe = normalizeProvider(draft)
     if (isChatGPTPlan && !planStatus?.sharing) {
       setModels([])
+      setModelLabels({})
       setModelsError(undefined)
       setModelsLoading(false)
       return
@@ -194,6 +196,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       listModels(probe).then((result) => {
         if (cancelled) return
         setModels(result.models)
+        setModelLabels(result.labels || {})
         setModelsError(result.error)
         setModelsLoading(false)
         // A preset leaves the model blank so the first thing the server
@@ -211,7 +214,8 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   }, [listKey])
 
   const modelInList = models.includes(draft.modelName)
-  const showModelDropdown = models.length > 0 && !customModel
+  const showModelDropdown =
+    models.length > 0 && (isChatGPTPlan || !customModel)
 
   const handlePlanSignIn = async () => {
     setPlanAuthLoading(true)
@@ -238,6 +242,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       const status = await signOutChatGPTPlan()
       setPlanStatus(status)
       setModels([])
+      setModelLabels({})
       setDraft((current) => ({ ...current, modelName: "" }))
     } catch (error) {
       setPlanAuthError(String(error))
@@ -547,7 +552,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
               )}
               {models.map((model) => (
                 <VSCodeOption key={model} value={model}>
-                  {model}
+                  {modelLabels[model] || model}
                 </VSCodeOption>
               ))}
             </VSCodeDropdown>
@@ -555,11 +560,14 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
             <VSCodeTextField
               id="modelName"
               value={draft.modelName}
-              placeholder={t("model-name-placeholder")}
+              placeholder={
+                isChatGPTPlan ? "Sign in to load available models" : t("model-name-placeholder")
+              }
+              disabled={isChatGPTPlan}
               onInput={(e) => update({ modelName: valueOf(e) })}
             />
           )}
-          {models.length > 0 && (
+          {models.length > 0 && !isChatGPTPlan && (
             <VSCodeButton
               appearance="icon"
               title={customModel ? t("choose-from-list") : t("type-model-name")}
