@@ -165,7 +165,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
   ): AsyncGenerator<FimChunk> {
     let token: string
     try {
-      token = await this._access.getAccessToken()
+      token = await (this._access || defaultAccess()).getAccessToken()
     } catch (error) {
       throw authError(error)
     }
