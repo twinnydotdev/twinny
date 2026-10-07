@@ -116,7 +116,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
 
   constructor(
     private readonly _config: TwinnyProvider,
-    private readonly _access: ChatGPTPlanAccess = defaultAccess()
+    private readonly _access?: ChatGPTPlanAccess
   ) {
     this.id = _config.provider
   }
@@ -128,7 +128,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
   public async models(options?: InferenceOptions): Promise<InferenceModel[]> {
     let token: string
     try {
-      token = await this._access.getAccessToken()
+      token = await (this._access || defaultAccess()).getAccessToken()
     } catch (error) {
       throw authError(error)
     }
