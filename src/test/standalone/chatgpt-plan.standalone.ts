@@ -218,17 +218,16 @@ test("ChatGPT Plan usage-limit terminal failures become rate-limited errors", as
       }
     )
 
+    const stream = registry.resolve(config).fim({
+      model: "gpt-test",
+      prompt: "x",
+      context: {
+        prefix: "const x = ",
+        suffix: ";"
+      }
+    })
     await assert.rejects(
-      readText(
-        registry.resolve(config).fim({
-          model: "gpt-test",
-          prompt: "x",
-          context: {
-            prefix: "const x = ",
-            suffix: ";"
-          }
-        })
-      ),
+      stream[Symbol.asyncIterator]().next(),
       (error: unknown) =>
         isInferenceError(error) && error.kind === "rate-limited"
     )
@@ -377,6 +376,8 @@ test("ChatGPT Plan rejects a stream that ends after deltas without completion", 
 })
 
 test("ChatGPT Plan cancellation aborts the HTTP stream", async () => {
+  let responseStarted!: () => void
+  const started = new Promise<void>((resolve) => (responseStarted = resolve))
   let connectionClosed!: () => void
   const closed = new Promise<void>((resolve) => (connectionClosed = resolve))
   const fake = await serve((request, response) => {
@@ -385,6 +386,7 @@ test("ChatGPT Plan cancellation aborts the HTTP stream", async () => {
       response.write(
         sse([{ type: "response.output_text.delta", delta: "stale" }])
       )
+      responseStarted()
       response.once("close", connectionClosed)
       return
     }
@@ -405,12 +407,10 @@ test("ChatGPT Plan cancellation aborts the HTTP stream", async () => {
       { signal: controller.signal }
     )
     const stream = iterable[Symbol.asyncIterator]()
-    assert.deepStrictEqual(await stream.next(), {
-      done: false,
-      value: { text: "stale" }
-    })
+    const pending = stream.next()
+    await started
     controller.abort()
-    await assert.rejects(stream.next(), /abort/i)
+    await assert.rejects(pending, /abort/i)
     await closed
   } finally {
     fake.close()

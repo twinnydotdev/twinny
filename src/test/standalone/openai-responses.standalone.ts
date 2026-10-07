@@ -133,18 +133,51 @@ test("a refusal keeps OpenAI's own words, so the loop can tell what to drop", as
   }
 })
 
-test("a response that runs out of tokens says so", async () => {
+test("incomplete, failed, error and unterminated responses reject buffered output", async () => {
+  const terminals = [
+    {
+      event: {
+        type: "response.incomplete",
+        response: {
+          status: "incomplete",
+          incomplete_details: { reason: "max_output_tokens" }
+        }
+      },
+      message: /incomplete: max_output_tokens/
+    },
+    {
+      event: {
+        type: "response.failed",
+        response: { status: "failed", error: { message: "generation failed" } }
+      },
+      message: /generation failed/
+    },
+    {
+      event: { type: "error", message: "stream failed" },
+      message: /stream failed/
+    },
+    { event: undefined, message: /without response.completed/ }
+  ]
+  for (const terminal of terminals) {
   const fake = await serve(() => ({
     status: 200,
     body: sse([
       { type: "response.output_text.delta", delta: "Partial" },
-      { type: "response.incomplete", response: { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } } }
+        ...(terminal.event ? [terminal.event] : [])
     ])
   }))
   try {
-    const chunks = await collect(responsesChat(fake.config, { model: "gpt-x", messages: conversation }))
-    assert.strictEqual(chunks.at(-1)?.finishReason, "length")
+      await assert.rejects(
+        collect(
+          responsesChat(fake.config, {
+            model: "gpt-x",
+            messages: conversation
+          })
+        ),
+        terminal.message
+      )
   } finally {
     fake.close()
+  }
   }
 })

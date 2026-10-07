@@ -201,7 +201,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
     if (!response.ok) throw await responseError(response)
     if (!response.body) throw new Error("OpenAI answered without a response stream.")
 
-    let completed = false
+    const deltas: string[] = []
     for await (const event of responseEvents(response.body)) {
       if (options?.signal?.aborted) return
       switch (event.type) {
@@ -213,12 +213,16 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
                 `ChatGPT Plan FIM first text in ${firstDeltaAt - started}ms`
               )
             }
-            yield { text: event.delta }
+            // Plan-sharing streams may emit text before a terminal usage
+            // failure. Keep it private until response.completed proves the
+            // request succeeded so early consumers cannot accept stale text.
+            deltas.push(event.delta)
           }
           break
         case "response.completed": {
-          completed = true
           const usage = event.response?.usage
+          const text = deltas.join("")
+          if (text) yield { text }
           yield {
             text: "",
             ...(usage
@@ -244,8 +248,6 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
           )
       }
     }
-    if (!completed) {
-      throw new Error("ChatGPT Plan response ended without response.completed.")
-    }
+    throw new Error("ChatGPT Plan response ended without response.completed.")
   }
 }
