@@ -10,6 +10,8 @@
  */
 import type * as VsCode from "vscode"
 
+import { SecretShield } from "./secret-shield"
+
 /**
  * The gateway CLI shares the inference adapters, and so this logger, with
  * no VS Code around. There the channel is stderr, warnings and errors
@@ -49,9 +51,11 @@ const SECRET_KEY = /("?(?:api[_-]?key|authorization|token|secret|password)"?\s*[
 const BEARER = /Bearer\s+[A-Za-z0-9._~+/=-]+/g
 
 export const redact = (text: string): string =>
-  text
+  new SecretShield().redact(
+    text
     .replace(BEARER, "Bearer ***")
     .replace(SECRET_KEY, (_, key: string, quote: string) => `${key}${quote}***`)
+  )
 
 const describe = (error: unknown): string => {
   if (error instanceof Error) {

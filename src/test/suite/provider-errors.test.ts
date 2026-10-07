@@ -1,5 +1,8 @@
 import * as assert from "assert"
 
+import { API_PROVIDERS } from "../../common/constants"
+import { redact } from "../../common/logger"
+import { InferenceError } from "../../extension/inference/errors"
 import {
   describeProviderError,
   describeProviderErrorPlain,
@@ -32,6 +35,26 @@ suite("Provider errors", () => {
   test("points at the API key for 401s", () => {
     const error = Object.assign(new Error("401 Unauthorized"), { status: 401 })
     assert.ok(describeProviderError(error, provider).includes("API key"))
+  })
+
+  test("tells ChatGPT Plan users to sign in again instead of checking an API key", () => {
+    const text = describeProviderError(
+      new InferenceError("authentication", "session expired"),
+      { ...provider, provider: API_PROVIDERS.ChatGPTPlan }
+    )
+    assert.ok(text.includes("Sign in again"))
+    assert.ok(!text.includes("API key"))
+  })
+
+  test("explains a ChatGPT plan usage limit", () => {
+    const text = describeProviderError(
+      new InferenceError(
+        "rate-limited",
+        "subscription_sharing_usage_limit_exceeded: limit reached"
+      ),
+      { ...provider, provider: API_PROVIDERS.ChatGPTPlan }
+    )
+    assert.ok(text.includes("ChatGPT plan usage limit"))
   })
 
   test("names the model when the server says it is missing", () => {
@@ -77,5 +100,20 @@ suite("Provider errors", () => {
     )
     assert.strictEqual(stripThinking("<think>never closed"), "")
     assert.strictEqual(stripThinking("plain"), "plain")
+  })
+
+  test("redacts well-known bare credentials from logs", () => {
+    const text = redact(
+      [
+        `ghp_${"aB3".repeat(12)}`,
+        `AKIA${"A1".repeat(8)}`,
+        `${"eyJ" + "aB3".repeat(4)}.${"eyJ" + "cD4".repeat(4)}.${"eF5".repeat(6)}`,
+        "-----BEGIN PRIVATE KEY-----\nsecret material\n-----END PRIVATE KEY-----"
+      ].join("\n")
+    )
+    assert.ok(!text.includes("ghp_"))
+    assert.ok(!text.includes("AKIA"))
+    assert.ok(!text.includes("eyJ"))
+    assert.ok(!text.includes("PRIVATE KEY"))
   })
 })
