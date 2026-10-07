@@ -34,6 +34,11 @@ export interface ChatGPTPlanAccess {
   getAccessToken(): Promise<string>
 }
 
+export interface ChatGPTPlanEndpoints {
+  models?: string
+  responses?: string
+}
+
 const defaultAccess = (): ChatGPTPlanAccess => {
   const context = getContext()
   if (!context) {
@@ -116,7 +121,8 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
 
   constructor(
     private readonly _config: TwinnyProvider,
-    private readonly _access?: ChatGPTPlanAccess
+    private readonly _access?: ChatGPTPlanAccess,
+    private readonly _endpoints: ChatGPTPlanEndpoints = {}
   ) {
     this.id = _config.provider
   }
@@ -132,7 +138,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
     } catch (error) {
       throw authError(error)
     }
-    const response = await fetch(MODELS_URL, {
+    const response = await fetch(this._endpoints.models || MODELS_URL, {
       headers: { Authorization: `Bearer ${token}` },
       signal: options?.signal
     })
@@ -179,7 +185,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
 
     const started = Date.now()
     let firstDeltaAt: number | undefined
-    const response = await fetch(RESPONSES_URL, {
+    const response = await fetch(this._endpoints.responses || RESPONSES_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
