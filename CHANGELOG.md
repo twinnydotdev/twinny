@@ -2,6 +2,15 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## Unreleased
+
+`twinny-server`: access tokens for the GitHub, GitLab, Gitea and Bitbucket plugins are saved once and shared.
+
+- **Tokens are saved once, for any number of repositories.** Each repository used to keep its own copy of the token pasted with it, so an expired token meant removing and re-adding every repository. A plugin page now has a **Tokens** panel: save a token once, then each repository reads with one of the saved tokens, picked in its **reads with** column. That covers one classic token for everything, a fine-grained token per organisation, and a token per repository. The add form offers the token most repositories already use, and saving a token can list the repositories it reads so you can tick several and watch them in one go.
+- **One replace for an expired token.** **Replace** checks the new value with the host first, then every repository on that token syncs with it. When the host refuses a token (401), the token and each repository on it say so, and the token's **replace** button is highlighted.
+- **Existing setups move over by themselves.** On first start, tokens stored per repository in `repos.json` are folded into saved tokens. The same value pasted for many repositories becomes one token. Repository ids stay the same, so reviews and triage are kept. An older version cannot read saved tokens: rolled back, it reports its repositories as having no token, and the first change it saves drops the saved tokens from `repos.json` for good. Keep a backup of the file before rolling back.
+- API: `POST api/tokens`, `PUT api/tokens/<id>` (`token`, `label`), `DELETE api/tokens/<id>`, `GET api/tokens/<id>/repos`, `tokenId` on `POST api/repos` and `PUT api/repos/<id>`. Developers a plugin is shared with never see the tokens.
+
 ## 4.3.6 · 2026-10-06
 
 Extension release: the chat composer suggests how to finish what you are typing. `twinny-server` release: sign-in's per-address limit works behind a reverse proxy.

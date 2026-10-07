@@ -21,7 +21,7 @@ import { LicenseStore } from "../../gateway/license"
 import { createGatewayLog } from "../../gateway/log"
 import { BUNDLED_PLUGINS, PluginContext, PluginError, PluginHost, PluginInstance, pluginsFileFor, PluginStore } from "../../gateway/plugins"
 import { PluginEventBus } from "../../gateway/plugins/events"
-import { PullPage, RepoStore } from "../../gateway/plugins/forge"
+import { Forge, PullPage, readJson, RepoRecord, RepoStore, TokenView } from "../../gateway/plugins/forge"
 import { appJwt } from "../../gateway/plugins/github"
 import { PullsPlugin } from "../../gateway/plugins/pulls"
 import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore, stripThinking } from "../../gateway/plugins/reviews"
@@ -966,6 +966,195 @@ suite("Pull-request plugin core", () => {
     const repos = (listing.body as { repos: Array<{ fullName: string; error?: string; syncedAt?: string }> }).repos
     assert.strictEqual(repos.find((repo) => repo.fullName === "bad/one")?.error, "boom")
     assert.ok(repos.find((repo) => repo.fullName === "good/one")?.syncedAt)
+    await plugin.stop()
+  })
+})
+
+suite("Saved tokens", function () {
+  this.timeout(20_000)
+
+  /** A host where each token reads the repositories listed for it; any other token is refused with a 401. */
+  const forge = (grants: Map<string, string[]>): Forge => {
+    const check = async (repo: RepoRecord) => {
+      const readable = repo.token ? grants.get(repo.token) : undefined
+      if (!readable) await readJson(new Response(JSON.stringify({ message: "Bad credentials" }), { status: 401 }), `Reading ${repo.fullName}`)
+      if (!readable?.includes(repo.fullName)) await readJson(new Response("{}", { status: 404 }), `Reading ${repo.fullName}`)
+      return repo.fullName
+    }
+    return {
+      noun: "Pull request",
+      repoUrl: (name) => `x://${name}`,
+      hasAppAuth: () => false,
+      checkRepo: check,
+      listPulls: async (repo) => (await check(repo), []),
+      pullContent: async () => ({ body: "", files: [], moreFiles: 0 }),
+      postReview: async () => ({}),
+      approvePull: async () => undefined,
+      whoAmI: async (repo) => {
+        if (!repo.token || !grants.has(repo.token)) await readJson(new Response("{}", { status: 401 }), "Asking who the token is")
+        return `user-${repo.token}`
+      },
+      listRepos: async (token) => grants.get(token) ?? [],
+      tokenKind: (token) => (token.startsWith("ghp_") ? "classic" : undefined),
+      status: () => ({ baseUrl: "x://" })
+    }
+  }
+  const call = (plugin: PullsPlugin, method: string, route: string, body: Record<string, unknown> = {}) =>
+    plugin.handle({ method, path: route, query: new URLSearchParams(), body: async () => body, principal: "op" })
+  const fails = (plugin: PullsPlugin, method: string, route: string, body: Record<string, unknown> = {}) =>
+    call(plugin, method, route, body).then(
+      () => assert.fail(`${method} ${route} should have failed`),
+      (error: PluginError) => error
+    )
+  const overview = async (plugin: PullsPlugin) =>
+    (await call(plugin, "GET", "")).body as { repos: Array<{ id: string; fullName: string; tokenId?: string; tokenRefused?: boolean; error?: string }>; tokens: TokenView[] }
+  const start = (name: string, grants: Map<string, string[]>) => {
+    const dir = path.join(scratch, name)
+    fs.mkdirSync(dir, { recursive: true })
+    const plugin = new PullsPlugin({ dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now }, () => forge(grants), 0)
+    plugin.start()
+    return { plugin, dir }
+  }
+
+  test("tokens pasted per repository before are folded into one saved token per value, and the ids stay", () => {
+    const dir = path.join(scratch, "tokens-migrate")
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, "repos.json")
+    const repo = (id: string, fullName: string, token?: string) => ({ id, fullName, auth: token ? "token" : "app", ...(token ? { token } : {}), addedAt: "2026-09-01T00:00:00Z", addedBy: "op" })
+    fs.writeFileSync(file, JSON.stringify({ version: 1, repos: [repo("00000001", "a/one", "old"), repo("00000002", "a/two", "old"), repo("00000003", "b/three", "other"), repo("00000004", "c/four")], settings: { me: "op" } }))
+    const store = RepoStore.open(file)
+    const tokens = store.tokens()
+    assert.strictEqual(tokens.length, 2, "two distinct values, two tokens")
+    const shared = tokens.find((token) => token.token === "old")
+    assert.deepStrictEqual(store.usersOf(shared!.id).map((entry) => entry.id), ["00000001", "00000002"])
+    assert.strictEqual(store.get("00000002")?.token, "old", "a repository is handed out with its token's value")
+    assert.strictEqual(store.get("00000004")?.token, undefined)
+    const written = JSON.parse(fs.readFileSync(file, "utf8")) as { repos: Array<Record<string, unknown>>; tokens: unknown[]; settings: unknown }
+    assert.ok(written.repos.every((entry) => !("token" in entry)), "values live in tokens only, once")
+    assert.strictEqual(written.tokens.length, 2)
+    assert.deepStrictEqual(written.settings, { me: "op" })
+
+    store.updateToken(shared!.id, { token: "new" })
+    assert.deepStrictEqual(RepoStore.open(file).repos().map((entry) => entry.token), ["new", "new", "other", undefined], "one replace moves both along")
+    assert.throws(() => store.removeToken(shared!.id), /2 repositories read with this token/)
+    assert.throws(() => store.updateToken(shared!.id, { token: "other" }), /already saved/)
+  })
+
+  test("a token saved once reads every repository it may, and the add form defaults to it", async () => {
+    const grants = new Map([["ghp_all", ["acme/a", "acme/b", "acme/c"]]])
+    const { plugin } = start("tokens-shared", grants)
+    const refused = await fails(plugin, "POST", "tokens", { token: "ghp_nope" })
+    assert.strictEqual(refused.status, 400, "a token the host refuses is the caller's mistake")
+    const saved = await call(plugin, "POST", "tokens", { token: "  ghp_all  ", label: "classic" })
+    assert.strictEqual(saved.status, 201)
+    const token = (saved.body as { token: TokenView }).token
+    assert.deepStrictEqual({ label: token.label, login: token.login, kind: token.kind, repos: token.repos }, { label: "classic", login: "user-ghp_all", kind: "classic", repos: 0 })
+    assert.ok(!JSON.stringify(saved.body).includes("\"ghp_all\""), "never the value")
+    const again = await call(plugin, "POST", "tokens", { token: "ghp_all" })
+    assert.deepStrictEqual([again.status, (again.body as { existed: boolean; token: TokenView }).token.id], [200, token.id], "pasted again, it is the same token")
+
+    const listed = (await call(plugin, "GET", `tokens/${token.id}/repos`)).body as { repositories: Array<{ fullName: string; watched: boolean }> }
+    assert.deepStrictEqual(listed.repositories.map((entry) => entry.fullName), ["acme/a", "acme/b", "acme/c"])
+
+    await call(plugin, "POST", "repos", { fullName: "acme/a", tokenId: token.id })
+    await call(plugin, "POST", "repos", { fullName: "acme/b" })
+    await call(plugin, "POST", "repos", { fullName: "acme/c", token: "ghp_all" })
+    const view = await overview(plugin)
+    assert.deepStrictEqual(view.repos.map((repo) => repo.tokenId), [token.id, token.id, token.id], "named, the only one, or pasted again: one token")
+    assert.strictEqual(view.tokens.length, 1)
+    assert.strictEqual(view.tokens[0].repos, 3)
+    const after = (await call(plugin, "GET", `tokens/${token.id}/repos`)).body as { repositories: Array<{ watched: boolean }> }
+    assert.ok(after.repositories.every((entry) => entry.watched))
+    await plugin.stop()
+  })
+
+  test("an expired token shows on every repository on it, and one replace brings them all back", async () => {
+    const grants = new Map([["ghp_old", ["acme/a", "acme/b"]]])
+    const { plugin } = start("tokens-expire", grants)
+    await call(plugin, "POST", "repos", { fullName: "acme/a", token: "ghp_old" })
+    await call(plugin, "POST", "repos", { fullName: "acme/b", token: "ghp_old" })
+    grants.delete("ghp_old")
+    await plugin.syncAll()
+    let view = await overview(plugin)
+    assert.ok(view.repos.every((repo) => repo.tokenRefused && /token was refused/.test(repo.error ?? "")))
+    assert.strictEqual(view.tokens[0].refused, 2)
+
+    const id = view.tokens[0].id
+    const wrong = await fails(plugin, "PUT", `tokens/${id}`, { token: "ghp_typo" })
+    assert.strictEqual(wrong.status, 400, "a new value the host refuses is not saved")
+    grants.set("ghp_new", ["acme/a", "acme/b"])
+    const replaced = await call(plugin, "PUT", `tokens/${id}`, { token: "ghp_new" })
+    assert.strictEqual((replaced.body as { token: TokenView }).token.login, "user-ghp_new")
+    assert.ok((replaced.body as { token: TokenView }).token.replacedAt)
+    await plugin.syncAll()
+    view = await overview(plugin)
+    assert.ok(view.repos.every((repo) => !repo.tokenRefused && !repo.error), "both sync again")
+    assert.strictEqual(view.tokens[0].refused, 0)
+
+    const relabelled = await call(plugin, "PUT", `tokens/${id}`, { label: "team bot" })
+    assert.strictEqual((relabelled.body as { token: TokenView }).token.label, "team bot")
+    await plugin.stop()
+  })
+
+  test("fine-grained tokens per repository or per organisation, and a repository moved between them", async () => {
+    const grants = new Map([["github_pat_acme", ["acme/a", "acme/b"]], ["github_pat_beta", ["beta/x"]]])
+    const { plugin } = start("tokens-fine", grants)
+    const acme = ((await call(plugin, "POST", "tokens", { token: "github_pat_acme" })).body as { token: TokenView }).token
+    const beta = ((await call(plugin, "POST", "tokens", { token: "github_pat_beta" })).body as { token: TokenView }).token
+    const unnamed = await fails(plugin, "POST", "repos", { fullName: "acme/a" })
+    assert.match(unnamed.message, /Choose which saved token/, "with several, which is the caller's to say")
+    const outOfScope = await fails(plugin, "POST", "repos", { fullName: "beta/x", tokenId: acme.id })
+    assert.match(outOfScope.message, /not found/)
+    await call(plugin, "POST", "repos", { fullName: "acme/a", tokenId: acme.id })
+    await call(plugin, "POST", "repos", { fullName: "beta/x", tokenId: beta.id })
+    let view = await overview(plugin)
+    const repo = view.repos.find((entry) => entry.fullName === "acme/a")!
+
+    const cannot = await fails(plugin, "PUT", `repos/${repo.id}`, { tokenId: beta.id })
+    assert.match(cannot.message, /not found/, "moved only once the new token reads it")
+    assert.strictEqual((await overview(plugin)).repos.find((entry) => entry.id === repo.id)?.tokenId, acme.id)
+    grants.set("github_pat_beta", ["beta/x", "acme/a"])
+    await call(plugin, "PUT", `repos/${repo.id}`, { tokenId: beta.id })
+    view = await overview(plugin)
+    assert.strictEqual(view.repos.find((entry) => entry.id === repo.id)?.tokenId, beta.id)
+    assert.deepStrictEqual(view.tokens.map((token) => token.repos), [0, 2])
+    const noApp = await fails(plugin, "PUT", `repos/${repo.id}`, { tokenId: null })
+    assert.match(noApp.message, /no app/)
+
+    const inUse = await fails(plugin, "DELETE", `tokens/${beta.id}`)
+    assert.strictEqual(inUse.status, 409)
+    await call(plugin, "DELETE", `tokens/${acme.id}`)
+    assert.deepStrictEqual((await overview(plugin)).tokens.map((token) => token.id), [beta.id])
+    await plugin.stop()
+  })
+
+  test("a scoped token that may not say whose it is still saves; a replacement must read its repositories", async () => {
+    const grants = new Map([["scoped", ["acme/a"]], ["other-account", ["beta/x"]]])
+    const dir = path.join(scratch, "tokens-scoped")
+    fs.mkdirSync(dir, { recursive: true })
+    const plugin = new PullsPlugin(
+      { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now },
+      () => ({ ...forge(grants), whoAmI: async () => readJson(new Response("{}", { status: 403 }), "Asking who the token is").then(() => undefined) }),
+      0
+    )
+    plugin.start()
+    const saved = await call(plugin, "POST", "tokens", { token: "scoped" })
+    assert.strictEqual(saved.status, 201)
+    const token = (saved.body as { token: TokenView }).token
+    assert.strictEqual(token.login, undefined)
+    await call(plugin, "POST", "repos", { fullName: "acme/a", tokenId: token.id })
+    const wrong = await fails(plugin, "PUT", `tokens/${token.id}`, { token: "other-account" })
+    assert.strictEqual(wrong.status, 409, "a working token that cannot read acme/a is not swapped in")
+    assert.match(wrong.message, /Not replaced/)
+    assert.strictEqual((await overview(plugin)).repos[0].error, undefined)
+    await plugin.stop()
+  })
+
+  test("a developer never sees the saved tokens", async () => {
+    const { plugin } = start("tokens-member", new Map([["t", ["a/b"]]]))
+    await call(plugin, "POST", "tokens", { token: "t" })
+    const listing = await plugin.handle({ method: "GET", path: "", query: new URLSearchParams(), body: async () => ({}), principal: "dev", member: true })
+    assert.deepStrictEqual((listing.body as { tokens: unknown[] }).tokens, [])
     await plugin.stop()
   })
 })

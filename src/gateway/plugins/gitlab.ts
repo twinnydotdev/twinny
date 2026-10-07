@@ -5,10 +5,11 @@
  *
  * The list comes from GraphQL (one call per project, pipeline and
  * approval state included); a merge request's description and diffs
- * from the REST API. GitLab has no app install to lean on, so every
- * project brings a token; a group token pasted for each project works.
+ * from the REST API. GitLab has no app install to lean on, so projects
+ * read with saved tokens: one group or personal token for all of them,
+ * or a project token each.
  */
-import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
+import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str, tokenProbe } from "./forge"
 import {
   GatewayPlugin,
   PluginContext,
@@ -205,6 +206,22 @@ export class GitLabForge implements Forge {
     return str((await readJson(response, "Asking GitLab who the token is")).username) || undefined
   }
 
+  public async listRepos(token: string, signal: AbortSignal): Promise<string[]> {
+    const names: string[] = []
+    for (let page = 1; names.length < MAX_LISTED_REPOS; page++) {
+      const response = await this._context.fetch(`${this.baseUrl}/api/v4/projects?membership=true&simple=true&archived=false&order_by=last_activity_at&per_page=100&page=${page}`, { headers: this.headers(tokenProbe(token)), signal })
+      const answer = arr(await readJson(response, "Listing what the token can read"))
+      names.push(...answer.map((entry) => str(rec(entry).path_with_namespace)).filter(Boolean))
+      if (answer.length < 100) break
+    }
+    return names.slice(0, MAX_LISTED_REPOS)
+  }
+
+  public tokenKind(token: string): string | undefined {
+    if (token.startsWith("glpat-")) return "personal, group or project"
+    return undefined
+  }
+
   public async checkRepo(repo: RepoRecord, signal: AbortSignal): Promise<string> {
     const response = await this._context.fetch(this.project(repo), {
       headers: this.headers(repo),
@@ -381,7 +398,7 @@ export const gitlabPlugin: GatewayPlugin = {
   id: "gitlab",
   name: "GitLab",
   description:
-    "Watch projects on gitlab.com or a self-managed GitLab and see their open merge requests, pipelines and approvals. Reads with an access token per project.",
+    "Watch projects on gitlab.com or a self-managed GitLab and see their open merge requests, pipelines and approvals. Reads with access tokens saved once and shared by any number of projects.",
   memberRoutes: MEMBER_ROUTES,
   create: (context) =>
     new PullsPlugin(context, (store, ctx) => new GitLabForge(store, ctx), undefined, "gitlab")

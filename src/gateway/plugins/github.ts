@@ -1,13 +1,14 @@
 /**
  * The GitHub plugin: open pull requests of watched repositories, read
- * with a repository token or, once one is set up, a GitHub App.
+ * with a saved token or, once one is set up, a GitHub App.
  *
  * A GitHub App is the tidier way for a team: install it on the
  * repositories once, paste its App ID and private key here, and every
  * repository it can see may be watched with no token of its own. The
  * gateway signs a short JWT with the key, swaps it for an installation
- * token (an hour, cached) and reads with that. Tokens work too, per
- * repository, for a quick start or a personal account.
+ * token (an hour, cached) and reads with that. Tokens work too, for a
+ * quick start or a personal account: a classic token saved once reads
+ * every repository, a fine-grained one the repositories it was given.
  *
  * Host-specific routes under api/:
  *   PUT    app { appId, privateKey }  → checks the key against GitHub, keeps it
@@ -22,7 +23,7 @@ import { createSign } from "node:crypto"
 import { noAnswer, timeoutSignal } from "../../common/deadline"
 import { messageOf } from "../../common/errors"
 
-import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
+import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
 import {
   GatewayPlugin,
   json,
@@ -413,6 +414,23 @@ export class GitHubForge implements Forge {
   public async whoAmI(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined> {
     if (repo.auth !== "token" || !repo.token) return undefined
     return str(rec(await this.rest("/user", repo.token, signal, "Asking GitHub who the token is")).login) || undefined
+  }
+
+  public async listRepos(token: string, signal: AbortSignal): Promise<string[]> {
+    const names: string[] = []
+    for (let page = 1; names.length < MAX_LISTED_REPOS; page++) {
+      const answer = arr(await this.rest(`/user/repos?per_page=100&sort=updated&page=${page}`, token, signal, "Listing what the token can read"))
+      names.push(...answer.map((entry) => str(rec(entry).full_name)).filter(Boolean))
+      if (answer.length < 100) break
+    }
+    return names.slice(0, MAX_LISTED_REPOS)
+  }
+
+  public tokenKind(token: string): string | undefined {
+    if (token.startsWith("github_pat_")) return "fine-grained"
+    if (token.startsWith("ghp_")) return "classic"
+    if (token.startsWith("gho_") || token.startsWith("ghu_")) return "OAuth"
+    return undefined
   }
 
   public async checkRepo(repo: RepoRecord, signal: AbortSignal): Promise<string> {

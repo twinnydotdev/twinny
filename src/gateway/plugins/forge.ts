@@ -24,6 +24,8 @@ export type { IssueSummary } from "./triage"
 export const MAX_PULLS_PER_REPO = 50
 /** Watched repositories per plugin. */
 export const MAX_REPOS = 100
+/** Saved access tokens per plugin. */
+export const MAX_TOKENS = 50
 /** Files shown for one pull; the rest are counted. */
 export const MAX_FILES = 200
 /** A patch longer than this is cut and marked so. */
@@ -107,8 +109,11 @@ export interface PullContent {
 export interface RepoRecord {
   id: string
   fullName: string
-  /** `token`: its own token. `app`: the host's app credentials (GitHub only). */
+  /** `token`: one of the saved tokens. `app`: the host's app credentials (GitHub only). */
   auth: "token" | "app"
+  /** Which saved token it reads with; one token may serve many repositories. */
+  tokenId?: string
+  /** The token's value, filled in from `tokenId` as the store hands the record out; never saved here. */
   token?: string
   addedAt: string
   addedBy: string
@@ -120,12 +125,48 @@ export interface RepoRecord {
   autoTriage?: boolean
 }
 
+/**
+ * An access token saved once and used by any number of repositories: a
+ * classic token for everything, a fine-grained one for a few, or one per
+ * repository. Replacing its value moves every repository on it along.
+ */
+export interface TokenRecord {
+  id: string
+  token: string
+  label?: string
+  /** Who the host said the token is, when it last said. */
+  login?: string
+  addedAt: string
+  addedBy: string
+  /** When the value was last replaced. */
+  replacedAt?: string
+}
+
+/** What the page sees of a token: never its value. */
+export interface TokenView {
+  id: string
+  label?: string
+  login?: string
+  /** What the value's shape says it is, where the host has shapes (GitHub). */
+  kind?: string
+  addedAt: string
+  addedBy: string
+  replacedAt?: string
+  /** Repositories reading with it. */
+  repos: number
+  /** Repositories whose last sync the host refused with it. */
+  refused: number
+}
+
 /** What the page sees: never the token. */
 export interface RepoView {
   id: string
   fullName: string
   url: string
   auth: "token" | "app"
+  tokenId?: string
+  /** The host refused the token on the last sync: it expired or was revoked. */
+  tokenRefused?: boolean
   addedAt: string
   addedBy: string
   autoReview: boolean
@@ -182,6 +223,10 @@ export interface Forge {
   approvePull(repo: RepoRecord, pull: PullSummary, signal: AbortSignal): Promise<void>
   /** The username the repository's token acts as; nothing for app credentials. */
   whoAmI?(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined>
+  /** What a token can read, for picking repositories to watch; the newest first, at most a few hundred. */
+  listRepos?(token: string, signal: AbortSignal): Promise<string[]>
+  /** What the token's shape says it is, e.g. "classic" or "fine-grained". */
+  tokenKind?(token: string): string | undefined
   /** Open issues, on hosts that have an issue tracker the plugin reads. */
   listIssues?(repo: RepoRecord, signal: AbortSignal): Promise<IssueSummary[]>
   issueBody?(repo: RepoRecord, number: number, signal: AbortSignal): Promise<string>
@@ -197,11 +242,13 @@ export interface Forge {
 interface ReposFile {
   version: 1
   repos: RepoRecord[]
+  /** Added after the first release; a file without it has its tokens inline on the repositories. */
+  tokens: TokenRecord[]
   /** Host-specific settings, e.g. GitHub App credentials. */
   settings: Record<string, unknown>
 }
 
-const parseReposFile = (text: string, file: string): ReposFile => {
+const parseReposFile = (text: string, file: string): ReposFile & { migrated: boolean } => {
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
@@ -212,6 +259,27 @@ const parseReposFile = (text: string, file: string): ReposFile => {
   }
   if (!isRecord(parsed) || parsed.version !== 1 || !Array.isArray(parsed.repos))
     throw new Error(`${file} is not a twinny-server repositories file.`)
+  const tokens: TokenRecord[] = []
+  for (const entry of Array.isArray(parsed.tokens) ? parsed.tokens : []) {
+    if (
+      !isRecord(entry) ||
+      typeof entry.id !== "string" ||
+      typeof entry.token !== "string" ||
+      typeof entry.addedAt !== "string" ||
+      typeof entry.addedBy !== "string"
+    )
+      throw new Error(`${file} has a malformed token entry.`)
+    tokens.push({
+      id: entry.id,
+      token: entry.token,
+      ...(typeof entry.label === "string" && entry.label ? { label: entry.label } : {}),
+      ...(typeof entry.login === "string" && entry.login ? { login: entry.login } : {}),
+      addedAt: entry.addedAt,
+      addedBy: entry.addedBy,
+      ...(typeof entry.replacedAt === "string" ? { replacedAt: entry.replacedAt } : {})
+    })
+  }
+  let migrated = false
   const repos: RepoRecord[] = []
   for (const entry of parsed.repos) {
     if (
@@ -223,11 +291,25 @@ const parseReposFile = (text: string, file: string): ReposFile => {
       typeof entry.addedBy !== "string"
     )
       throw new Error(`${file} has a malformed repository entry.`)
+    let tokenId = typeof entry.tokenId === "string" ? entry.tokenId : undefined
+    if (tokenId && !tokens.some((token) => token.id === tokenId))
+      throw new Error(`${file} names a token ${entry.fullName} reads with that is not saved.`)
+    if (!tokenId && typeof entry.token === "string" && entry.token) {
+      // An inline token from before tokens were saved once: the same value pasted for many repositories becomes one token.
+      const value = entry.token
+      let saved = tokens.find((token) => token.token === value)
+      if (!saved) {
+        saved = { id: newId(tokens), token: value, addedAt: entry.addedAt, addedBy: entry.addedBy }
+        tokens.push(saved)
+      }
+      tokenId = saved.id
+      migrated = true
+    }
     repos.push({
       id: entry.id,
       fullName: entry.fullName,
       auth: entry.auth,
-      ...(typeof entry.token === "string" ? { token: entry.token } : {}),
+      ...(tokenId ? { tokenId } : {}),
       addedAt: entry.addedAt,
       addedBy: entry.addedBy,
       ...(entry.autoReview === true ? { autoReview: true } : {}),
@@ -238,13 +320,27 @@ const parseReposFile = (text: string, file: string): ReposFile => {
   return {
     version: 1,
     repos,
-    settings: isRecord(parsed.settings) ? parsed.settings : {}
+    tokens,
+    settings: isRecord(parsed.settings) ? parsed.settings : {},
+    migrated
   }
 }
 
-/** The plugin's file: repositories, their tokens and the host's settings. */
+/** An eight-hex id no entry in the list has yet. */
+const newId = (taken: Array<{ id: string }>): string => {
+  let id = randomBytes(4).toString("hex")
+  while (taken.some((entry) => entry.id === id)) id = randomBytes(4).toString("hex")
+  return id
+}
+
+/**
+ * The plugin's file: repositories, the tokens they read with and the
+ * host's settings. A repository record is handed out with its token's
+ * value filled in, so a host reads `repo.token` whichever token it is.
+ */
 export class RepoStore {
   private _repos: RepoRecord[] = []
+  private _tokens: TokenRecord[] = []
   private _settings: Record<string, unknown> = {}
 
   constructor(public readonly file: string) {}
@@ -256,12 +352,12 @@ export class RepoStore {
   }
 
   public repos(): RepoRecord[] {
-    return this._repos.map((repo) => ({ ...repo }))
+    return this._repos.map((repo) => this.resolved(repo))
   }
 
   public get(id: string): RepoRecord | undefined {
     const repo = this._repos.find((entry) => entry.id === id)
-    return repo && { ...repo }
+    return repo && this.resolved(repo)
   }
 
   public byName(fullName: string): RepoRecord | undefined {
@@ -269,25 +365,28 @@ export class RepoStore {
     const repo = this._repos.find(
       (entry) => entry.fullName.toLowerCase() === wanted
     )
-    return repo && { ...repo }
+    return repo && this.resolved(repo)
   }
 
+  /** Adds a repository; an inline `token` is saved as a token (or matched to the one saved with that value). */
   public add(repo: Omit<RepoRecord, "id">): RepoRecord {
     if (this._repos.length >= MAX_REPOS)
       throw new PluginError(
         `This plugin watches at most ${MAX_REPOS} repositories.`,
         429
       )
-    let id = randomBytes(4).toString("hex")
-    while (this._repos.some((entry) => entry.id === id))
-      id = randomBytes(4).toString("hex")
-    const record: RepoRecord = { id, ...repo }
+    if (repo.tokenId && !this.token(repo.tokenId)) throw new PluginError("No such token.", 404)
+    const record: RepoRecord = { id: newId(this._repos), ...repo }
+    if (record.token) {
+      if (!record.tokenId) record.tokenId = this.addToken({ token: record.token, addedAt: record.addedAt, addedBy: record.addedBy }).token.id
+      delete record.token
+    }
     this._repos.push(record)
     this.save()
-    return { ...record }
+    return this.resolved(record)
   }
 
-  public update(id: string, changes: Partial<Pick<RepoRecord, "autoReview" | "autoPost" | "autoTriage">>): RepoRecord {
+  public update(id: string, changes: Partial<Pick<RepoRecord, "autoReview" | "autoPost" | "autoTriage">> & { tokenId?: string | null }): RepoRecord {
     const repo = this._repos.find((entry) => entry.id === id)
     if (!repo) throw new PluginError("No such repository.", 404)
     if (changes.autoReview === true) repo.autoReview = true
@@ -296,14 +395,90 @@ export class RepoStore {
     else if (changes.autoPost === false) delete repo.autoPost
     if (changes.autoTriage === true) repo.autoTriage = true
     else if (changes.autoTriage === false) delete repo.autoTriage
+    if (typeof changes.tokenId === "string") {
+      if (!this.token(changes.tokenId)) throw new PluginError("No such token.", 404)
+      repo.auth = "token"
+      repo.tokenId = changes.tokenId
+    } else if (changes.tokenId === null) {
+      repo.auth = "app"
+      delete repo.tokenId
+    }
     this.save()
-    return { ...repo }
+    return this.resolved(repo)
   }
 
   public remove(id: string): boolean {
     const before = this._repos.length
     this._repos = this._repos.filter((entry) => entry.id !== id)
     if (this._repos.length === before) return false
+    this.save()
+    return true
+  }
+
+  /** The saved tokens, values included: for the plugin, never the page. */
+  public tokens(): TokenRecord[] {
+    return this._tokens.map((token) => ({ ...token }))
+  }
+
+  public token(id: string): TokenRecord | undefined {
+    const token = this._tokens.find((entry) => entry.id === id)
+    return token && { ...token }
+  }
+
+  /** Repositories reading with a token. */
+  public usersOf(tokenId: string): RepoRecord[] {
+    return this.repos().filter((repo) => repo.tokenId === tokenId)
+  }
+
+  /**
+   * Saves a token, or finds the one already saved with the same value, so
+   * pasting a token again never splits the repositories that share it.
+   */
+  public addToken(token: Omit<TokenRecord, "id">): { token: TokenRecord; existed: boolean } {
+    const same = this._tokens.find((entry) => entry.token === token.token)
+    if (same) {
+      if (token.login && !same.login) {
+        same.login = token.login
+        this.save()
+      }
+      return { token: { ...same }, existed: true }
+    }
+    if (this._tokens.length >= MAX_TOKENS)
+      throw new PluginError(`This plugin keeps at most ${MAX_TOKENS} tokens.`, 429)
+    const record: TokenRecord = { id: newId(this._tokens), ...token }
+    this._tokens.push(record)
+    this.save()
+    return { token: { ...record }, existed: false }
+  }
+
+  /** A new value or label; every repository on the token reads with the new value from now on. */
+  public updateToken(id: string, changes: { token?: string; label?: string; login?: string; replacedAt?: string }): TokenRecord {
+    const token = this._tokens.find((entry) => entry.id === id)
+    if (!token) throw new PluginError("No such token.", 404)
+    if (changes.token !== undefined) {
+      if (this._tokens.some((entry) => entry.id !== id && entry.token === changes.token))
+        throw new PluginError("That token is already saved: switch the repositories to it instead.", 409)
+      token.token = changes.token
+      delete token.login
+    }
+    if (changes.login) token.login = changes.login
+    if (changes.replacedAt) token.replacedAt = changes.replacedAt
+    if (changes.label !== undefined) {
+      if (changes.label) token.label = changes.label
+      else delete token.label
+    }
+    this.save()
+    return { ...token }
+  }
+
+  /** Forgets a token no repository reads with. */
+  public removeToken(id: string): boolean {
+    const users = this._repos.filter((repo) => repo.tokenId === id).length
+    if (users)
+      throw new PluginError(`${users === 1 ? "A repository reads" : `${users} repositories read`} with this token: move or remove them first.`, 409)
+    const before = this._tokens.length
+    this._tokens = this._tokens.filter((entry) => entry.id !== id)
+    if (this._tokens.length === before) return false
     this.save()
     return true
   }
@@ -321,10 +496,13 @@ export class RepoStore {
     try {
       const parsed = parseReposFile(fs.readFileSync(this.file, "utf8"), this.file)
       this._repos = parsed.repos
+      this._tokens = parsed.tokens
       this._settings = parsed.settings
+      if (parsed.migrated) this.save()
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         this._repos = []
+        this._tokens = []
         this._settings = {}
         return
       }
@@ -332,15 +510,27 @@ export class RepoStore {
     }
   }
 
+  private resolved(repo: RepoRecord): RepoRecord {
+    const value = repo.tokenId ? this._tokens.find((entry) => entry.id === repo.tokenId)?.token : undefined
+    return { ...repo, ...(value ? { token: value } : {}) }
+  }
+
   private save(): void {
     const content: ReposFile = {
       version: 1,
       repos: this._repos,
+      tokens: this._tokens,
       settings: this._settings
     }
     writePrivateJson(this.file, content)
   }
 }
+
+/** Repositories a token's picker lists, at most. */
+export const MAX_LISTED_REPOS = 300
+
+/** A stand-in record for asking the host about a token before any repository uses it. */
+export const tokenProbe = (token: string): RepoRecord => ({ id: "", fullName: "the token", auth: "token", token, addedAt: "", addedBy: "" })
 
 export const cutPatch = (patch: string | undefined): Pick<PullFile, "patch" | "truncated"> => {
   if (patch === undefined) return {}
@@ -366,6 +556,10 @@ export const baseUrlOf = (store: RepoStore, fallback: string): string => {
   const set = store.settings().baseUrl
   return typeof set === "string" && set ? set : fallback
 }
+
+/** Failures where the host refused the token outright (401): expired or revoked. */
+const tokenRefused = new WeakSet<Error>()
+export const isTokenRefused = (error: unknown): boolean => error instanceof Error && tokenRefused.has(error)
 
 /** Reads a JSON answer, turning HTTP failures into a message the page can show. */
 export const readJson = async (
@@ -394,10 +588,12 @@ export const readJson = async (
           : response.status === 404
             ? "not found, or the token cannot see it"
             : `status ${response.status}`
-    throw new PluginError(
+    const failure = new PluginError(
       `${what}: ${why}${detail ? ` (${detail})` : ""}.`,
       502
     )
+    if (response.status === 401) tokenRefused.add(failure)
+    throw failure
   }
   if (!isRecord(parsed) && !Array.isArray(parsed))
     throw new PluginError(`${what}: the answer was not JSON.`, 502)
