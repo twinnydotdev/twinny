@@ -252,6 +252,7 @@ suite("Inference layer", function () {
       assert.deepStrictEqual(capabilities(API_PROVIDERS.Anthropic), ["chat"])
       assert.deepStrictEqual(capabilities(API_PROVIDERS.Mistral), ["chat", "fim"])
       assert.deepStrictEqual(capabilities(API_PROVIDERS.OpenAI), ["chat", "fim", "embeddings"])
+      assert.deepStrictEqual(capabilities(API_PROVIDERS.ChatGPTPlan, "fim"), ["fim"])
     })
 
     test("an unknown kind fails as provider-unavailable", () => {
