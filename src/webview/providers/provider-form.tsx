@@ -15,13 +15,14 @@ import {
   FIM_TEMPLATE_FORMAT,
   PROVIDER_DISPLAY_NAMES
 } from "../../common/constants"
-import { ProviderTestResult } from "../../common/messaging/protocol"
+import { ChatGPTPlanStatus, ProviderTestResult } from "../../common/messaging/protocol"
 import { pickModel } from "../../common/model-pick"
 import {
   describeProviderEndpoint,
   expectsApiKey,
   getEndpointDefaults,
   hasConfigurableEndpoint,
+  isChatGPTPlanProvider,
   isP2pProvider,
   isRemoteProvider,
   normalizeProvider,
@@ -52,8 +53,15 @@ interface ProviderFormProps {
 
 export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) => {
   const { t } = useTranslation()
-  const { saveProvider, updateProvider, testProvider, listModels } =
-    useProviders()
+  const {
+    saveProvider,
+    updateProvider,
+    testProvider,
+    listModels,
+    getChatGPTPlanStatus,
+    signInChatGPTPlan,
+    signOutChatGPTPlan
+  } = useProviders()
   const { devices } = useDevices()
   const isEditing = !!initial.id
 
@@ -76,14 +84,40 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
 
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<ProviderTestResult | null>(null)
+  const [planStatus, setPlanStatus] = useState<ChatGPTPlanStatus | null>(null)
+  const [planAuthLoading, setPlanAuthLoading] = useState(false)
+  const [planAuthError, setPlanAuthError] = useState<string | undefined>()
 
   const normalized = useMemo(() => normalizeProvider(draft), [draft])
   const validation = useMemo(() => validateProvider(normalized), [normalized])
   const endpoint = describeProviderEndpoint(normalized)
   const isP2p = isP2pProvider(draft.provider)
   const isRemote = isRemoteProvider(draft.provider)
+  const isChatGPTPlan = isChatGPTPlanProvider(draft.provider)
   const showEndpointFields = hasConfigurableEndpoint(draft.provider, draft.type)
   const device = isP2p ? devices.find((d) => d.id === draft.deviceId) : undefined
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isChatGPTPlan) {
+      setPlanStatus(null)
+      setPlanAuthError(undefined)
+      return
+    }
+    getChatGPTPlanStatus()
+      .then((status) => {
+        if (!cancelled) setPlanStatus(status)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setPlanStatus(null)
+          setPlanAuthError(String(error))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isChatGPTPlan])
 
   const errorFor = (field: ProviderField) =>
     serverErrors[field] ||
@@ -139,11 +173,18 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
     draft.apiHostname,
     draft.apiPort,
     draft.apiProtocol,
-    draft.apiKey
+    draft.apiKey,
+    isChatGPTPlan ? (planStatus?.sharing ? "plan-ready" : "plan-blocked") : ""
   ].join("|")
   useEffect(() => {
     let cancelled = false
     const probe = normalizeProvider(draft)
+    if (isChatGPTPlan && !planStatus?.sharing) {
+      setModels([])
+      setModelsError(undefined)
+      setModelsLoading(false)
+      return
+    }
     if ((showEndpointFields && !probe.apiHostname) || (isP2p && !probe.deviceId)) {
       setModels([])
       return
@@ -171,6 +212,39 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
 
   const modelInList = models.includes(draft.modelName)
   const showModelDropdown = models.length > 0 && !customModel
+
+  const handlePlanSignIn = async () => {
+    setPlanAuthLoading(true)
+    setPlanAuthError(undefined)
+    try {
+      const status = await signInChatGPTPlan()
+      setPlanStatus(status)
+      if (!status.sharing) {
+        setPlanAuthError(
+          "ChatGPT sign-in succeeded, but plan usage was not authorized."
+        )
+      }
+    } catch (error) {
+      setPlanAuthError(String(error))
+    } finally {
+      setPlanAuthLoading(false)
+    }
+  }
+
+  const handlePlanSignOut = async () => {
+    setPlanAuthLoading(true)
+    setPlanAuthError(undefined)
+    try {
+      const status = await signOutChatGPTPlan()
+      setPlanStatus(status)
+      setModels([])
+      setDraft((current) => ({ ...current, modelName: "" }))
+    } catch (error) {
+      setPlanAuthError(String(error))
+    } finally {
+      setPlanAuthLoading(false)
+    }
+  }
 
   const handleTest = async () => {
     setSubmitted(true)
@@ -284,6 +358,54 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         )}
       </div>
 
+      {isChatGPTPlan && (
+        <div className={styles.field}>
+          <label>ChatGPT account</label>
+          <div className={styles.inlineControl}>
+            {planStatus?.connected ? (
+              <>
+                <span className={styles.staticValue}>
+                  <i className="codicon codicon-pass-filled" />
+                  <span>
+                    {planStatus.email || planStatus.name || "Connected"}
+                  </span>
+                </span>
+                <VSCodeButton
+                  appearance="secondary"
+                  disabled={planAuthLoading}
+                  onClick={handlePlanSignOut}
+                >
+                  Sign out
+                </VSCodeButton>
+              </>
+            ) : (
+              <VSCodeButton
+                appearance="primary"
+                disabled={planAuthLoading}
+                onClick={handlePlanSignIn}
+              >
+                <i
+                  className={`codicon codicon-${
+                    planAuthLoading ? "loading" : "account"
+                  }`}
+                />
+                {planAuthLoading ? "Connecting..." : "Continue with ChatGPT"}
+              </VSCodeButton>
+            )}
+          </div>
+          {planStatus?.connected && !planStatus.sharing && (
+            <span className={styles.fieldHint}>
+              ChatGPT is connected, but plan usage is not enabled for Twinny.
+            </span>
+          )}
+          {planAuthError && (
+            <span className={styles.fieldError} role="alert">
+              {planAuthError}
+            </span>
+          )}
+        </div>
+      )}
+
       {isP2p &&
         field(
           "deviceId",
@@ -375,6 +497,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       )}
 
       {!isP2p &&
+        !isChatGPTPlan &&
         field(
         "apiKey",
         isRemote ? t("gateway-token") : t("api-key"),
@@ -457,7 +580,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
               : undefined
       )}
 
-      {draft.type === "fim" && (
+      {draft.type === "fim" && !isChatGPTPlan && (
         <>
           {field(
             "fimTemplate",
@@ -518,7 +641,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       <div className={styles.formActions}>
         <VSCodeButton
           appearance="secondary"
-          disabled={testing}
+          disabled={testing || (isChatGPTPlan && !planStatus?.sharing)}
           onClick={handleTest}
         >
           <i className={`codicon codicon-${testing ? "loading" : "debug-start"}`} />
@@ -531,7 +654,11 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         <VSCodeButton
           appearance="primary"
           type="submit"
-          disabled={saving || (submitted && !validation.valid)}
+          disabled={
+            saving ||
+            (submitted && !validation.valid) ||
+            (isChatGPTPlan && !planStatus?.sharing)
+          }
         >
           {t("save")}
         </VSCodeButton>
