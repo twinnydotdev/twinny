@@ -96,6 +96,8 @@ export interface ProviderTestResult {
 /** Models a provider's endpoint says it serves. */
 export interface ProviderModelList {
   models: string[]
+  /** Optional human-facing names keyed by the callable model id. */
+  labels?: Record<string, string>
   /** Set when the endpoint could not be listed; `models` is then empty. */
   error?: string
 }
