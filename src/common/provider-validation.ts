@@ -25,6 +25,7 @@ export const PROVIDER_TYPES: ProviderType[] = ["chat", "fim", "embedding"]
 export const HOSTED_PROVIDERS: string[] = [
   API_PROVIDERS.Anthropic,
   API_PROVIDERS.OpenAI,
+  API_PROVIDERS.ChatGPTPlan,
   API_PROVIDERS.Mistral,
   API_PROVIDERS.Groq,
   API_PROVIDERS.OpenRouter,
@@ -35,7 +36,9 @@ export const HOSTED_PROVIDERS: string[] = [
 
 /** Providers that will reject a request without a key. */
 const KEY_REQUIRED_PROVIDERS: string[] = [
-  ...HOSTED_PROVIDERS,
+  ...HOSTED_PROVIDERS.filter(
+    (provider) => provider !== API_PROVIDERS.ChatGPTPlan
+  ),
   API_PROVIDERS.Deepseek
 ]
 
@@ -50,6 +53,9 @@ const CHAT_ONLY_PROVIDERS: string[] = [
 
 export const isHostedProvider = (provider: string) =>
   HOSTED_PROVIDERS.includes(provider)
+
+export const isChatGPTPlanProvider = (provider: string) =>
+  provider === API_PROVIDERS.ChatGPTPlan
 
 export const isOpenAICompatibleProvider = (provider: string) =>
   (Object.values(OPEN_AI_COMPATIBLE_PROVIDERS) as string[]).includes(provider)
@@ -77,7 +83,8 @@ export const isRemoteProvider = (provider: string) =>
  * else is a raw HTTP request to the address the user gives.
  */
 export const usesEndpoint = (provider: string, type: string) =>
-  type !== "chat" || !isHostedProvider(provider)
+  !isChatGPTPlanProvider(provider) &&
+  (type !== "chat" || !isHostedProvider(provider))
 
 /** Whether the person configures the hostname / port / path themselves. */
 export const hasConfigurableEndpoint = (provider: string, type: string) =>
@@ -87,7 +94,9 @@ export const expectsApiKey = (provider: string) =>
   KEY_REQUIRED_PROVIDERS.includes(provider)
 
 export const supportsType = (provider: string, type: string) =>
-  type === "chat" || !CHAT_ONLY_PROVIDERS.includes(provider)
+  isChatGPTPlanProvider(provider)
+    ? type === "fim"
+    : type === "chat" || !CHAT_ONLY_PROVIDERS.includes(provider)
 
 export interface EndpointDefaults {
   apiHostname?: string
@@ -264,6 +273,18 @@ export const normalizeProvider = (input: TwinnyProvider): TwinnyProvider => {
     normalized.apiKey = ""
   }
 
+  if (isChatGPTPlanProvider(providerName)) {
+    // This provider is a fixed OpenAI service authenticated through
+    // Sign in with ChatGPT. Endpoint and bearer credentials never belong
+    // in exported TwinnyProvider configuration.
+    normalized.apiHostname = ""
+    normalized.apiPort = undefined
+    normalized.apiPath = ""
+    normalized.apiKey = ""
+    normalized.apiProtocol = "https"
+    normalized.fimTemplate = undefined
+  }
+
   return normalized
 }
 
@@ -309,7 +330,7 @@ export const validateProvider = (
   if (!knownProviders.includes(providerName)) {
     errors.provider = `Unknown provider "${providerName}".`
   } else if (!supportsType(providerName, type)) {
-    errors.provider = `${providerName} only supports chat in twinny. For ${type} use a local server, OpenRouter, DeepSeek or Mistral.`
+    errors.provider = `${providerName} does not support ${type} in twinny.`
   }
 
   if (
