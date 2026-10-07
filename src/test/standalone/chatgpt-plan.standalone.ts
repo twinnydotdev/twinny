@@ -236,3 +236,60 @@ test("ChatGPT Plan usage-limit terminal failures become rate-limited errors", as
     fake.close()
   }
 })
+
+
+test("ChatGPT Plan usage-unavailable failures stay transient provider errors", async () => {
+  const fake = await serve((request, response) => {
+    if (request.path === "/v1/responses") {
+      response.writeHead(200, { "Content-Type": "text/event-stream" })
+      response.end(
+        sse([
+          {
+            type: "response.failed",
+            response: {
+              status: "failed",
+              error: {
+                code: "subscription_sharing_usage_unavailable",
+                message: "Usage availability could not be checked"
+              }
+            }
+          }
+        ])
+      )
+      return
+    }
+    response.writeHead(404)
+    response.end()
+  })
+
+  try {
+    const registry = new ProviderRegistry().register(
+      API_PROVIDERS.ChatGPTPlan,
+      {
+        id: "chatgpt-plan-test",
+        create: (providerConfig) =>
+          new ChatGPTPlanInferenceProvider(providerConfig, access, {
+            models: fake.models,
+            responses: fake.responses
+          })
+      }
+    )
+
+    await assert.rejects(
+      readText(
+        registry.resolve(config).fim({
+          model: "gpt-test",
+          prompt: "x",
+          context: {
+            prefix: "const x = ",
+            suffix: ";"
+          }
+        })
+      ),
+      (error: unknown) =>
+        isInferenceError(error) && error.kind === "provider-unavailable"
+    )
+  } finally {
+    fake.close()
+  }
+})
