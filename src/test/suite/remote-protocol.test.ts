@@ -272,10 +272,20 @@ suite("Remote protocol: round trip", () => {
   test("FIM streams chunk by chunk and reaches the mapped backend model", async () => {
     const client = resolveInferenceProvider(remoteConfig(gateway.port))
     const seen: string[] = []
-    for await (const chunk of client.fim(fimRequest)) seen.push(chunk.text)
+    for await (const chunk of client.fim({
+      ...fimRequest,
+      context: {
+        language: "python",
+        prefix: "def add(a, b):\n    return",
+        suffix: ""
+      }
+    })) {
+      seen.push(chunk.text)
+    }
     assert.deepStrictEqual(seen, ["def", " add", "(a, b)"])
     assert.strictEqual(backend.fimRequests[0].model, "backend-coder")
     assert.strictEqual(backend.fimRequests[0].prompt, fimRequest.prompt)
+    assert.strictEqual(backend.fimRequests[0].context, undefined)
     assert.deepStrictEqual(backend.fimRequests[0].stop, ["\n\n"])
     assert.strictEqual(gateway.outcomes[0].outcome, "ok")
     assert.strictEqual(gateway.outcomes[0].alias, "coder")

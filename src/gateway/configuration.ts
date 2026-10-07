@@ -3,12 +3,12 @@ import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
-import { API_PROVIDERS, PROVIDER_DISPLAY_NAMES } from "../common/constants/providers"
+import { PROVIDER_DISPLAY_NAMES } from "../common/constants/providers"
 import { getEndpointDefaults, validateProvider } from "../common/provider-validation"
 import { providerRegistry } from "../extension/inference/registry"
 import type { TeamDefaults } from "../protocol/types"
 
-import { GatewayConfig, GatewayModelConfig, GatewayPolicy, GatewayPricing,GatewayProviderConfig, GatewayRecordingConfig, parseGatewayConfig, providerForRoute, readGatewaySecrets, TEAM_PROVIDER_KIND } from "./config"
+import { GatewayConfig, GatewayModelConfig, GatewayPolicy, GatewayPricing,GatewayProviderConfig, GatewayRecordingConfig, isGatewayServableProvider, parseGatewayConfig, providerForRoute, readGatewaySecrets, TEAM_PROVIDER_KIND } from "./config"
 import { buildRouteTable, RouteTable } from "./routes"
 
 export interface ProviderKind {
@@ -45,7 +45,7 @@ const TEAM_KIND_LABEL = "Team members' computers"
  */
 const listKinds = (): ProviderKind[] =>
   providerRegistry.providerIds()
-    .filter((id) => id !== API_PROVIDERS.TwinnyP2P)
+    .filter(isGatewayServableProvider)
     .map((id) => {
       if (id === TEAM_PROVIDER_KIND) return { id, label: TEAM_KIND_LABEL, defaults: { provider: id } }
       const chat = getEndpointDefaults(id, "chat")

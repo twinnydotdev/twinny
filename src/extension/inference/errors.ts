@@ -120,6 +120,27 @@ const classify = (
     return "provider-unavailable"
   }
   if (
+    /subscription_sharing_unsupported_capability|subscription_sharing_route_not_supported/.test(
+      lower
+    )
+  ) {
+    return "unsupported-capability"
+  }
+  if (
+    /subscription_sharing_usage_unavailable|subscription_sharing_user_unavailable/.test(
+      lower
+    )
+  ) {
+    return "provider-unavailable"
+  }
+  if (
+    /subscription_sharing_user_not_eligible|subscription_sharing_invalid_user|chatpass_v2_scope_not_authorized|chatpass_v2_invalid_authorization_context/.test(
+      lower
+    )
+  ) {
+    return "authentication"
+  }
+  if (
     status === 401 ||
     status === 403 ||
     /api key|unauthori[sz]ed|authentication/.test(lower)
@@ -129,7 +150,12 @@ const classify = (
   if ((status === 404 || /not found/.test(lower)) && /model/.test(lower)) {
     return "model-unavailable"
   }
-  if (status === 429 || /rate limit|too many requests/.test(lower)) {
+  if (
+    status === 429 ||
+    /rate limit|too many requests|subscription_sharing_usage_limit_exceeded/.test(
+      lower
+    )
+  ) {
     return "rate-limited"
   }
   if (/timed? ?out/.test(lower) || status === 408 || status === 504) {

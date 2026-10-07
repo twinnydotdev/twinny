@@ -96,8 +96,18 @@ export interface ProviderTestResult {
 /** Models a provider's endpoint says it serves. */
 export interface ProviderModelList {
   models: string[]
+  /** Optional human-facing names keyed by the callable model id. */
+  labels?: Record<string, string>
   /** Set when the endpoint could not be listed; `models` is then empty. */
   error?: string
+}
+
+export interface ChatGPTPlanStatus {
+  connected: boolean
+  sharing: boolean
+  email?: string
+  name?: string
+  clientId?: string
 }
 
 /** Reply to add/update: either the stored provider or the field errors. */
@@ -368,6 +378,9 @@ export interface ClientEvents {
   [EMBEDDING_EVENT_NAME.getStatus]: Channel<void, EmbeddingStatus>
 
   [PROVIDER_EVENT_NAME.addProvider]: Channel<TwinnyProvider, ProviderSaveResult>
+  [PROVIDER_EVENT_NAME.getChatGPTPlanStatus]: Channel<void, ChatGPTPlanStatus>
+  [PROVIDER_EVENT_NAME.signInChatGPTPlan]: Channel<void, ChatGPTPlanStatus>
+  [PROVIDER_EVENT_NAME.signOutChatGPTPlan]: Channel<void, ChatGPTPlanStatus>
   [PROVIDER_EVENT_NAME.previewTeam]: Channel<TeamConnectionRequest, TeamPreview>
   [PROVIDER_EVENT_NAME.applyTeam]: Channel<TeamApplyRequest, TeamApplyResult>
   [PROVIDER_EVENT_NAME.cancelTeam]: Channel

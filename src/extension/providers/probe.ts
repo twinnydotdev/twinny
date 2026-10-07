@@ -80,10 +80,11 @@ const testEmbedding = async (
 
 export const testProvider = async (
   provider: TwinnyProvider,
-  timeoutMs = PROBE_TIMEOUT_MS
+  timeoutMs = PROBE_TIMEOUT_MS,
+  parentSignal?: AbortSignal
 ): Promise<ProviderTestResult> => {
   const started = Date.now()
-  const { signal, done } = deadline(timeoutMs)
+  const { signal, done } = deadline(timeoutMs, { parent: parentSignal })
   try {
     const client = resolveInferenceProvider(provider)
     let sample: string
@@ -132,15 +133,24 @@ export const testProvider = async (
 
 /** Asks the provider what it has, for the model dropdown. */
 export const listProviderModels = async (
-  provider: TwinnyProvider
+  provider: TwinnyProvider,
+  signal?: AbortSignal
 ): Promise<ProviderModelList> => {
   if (usesEndpoint(provider.provider, provider.type) && !provider.apiHostname) {
     return { models: [], error: "No hostname set." }
   }
   try {
-    const models = await resolveInferenceProvider(provider).models()
+    const models = await resolveInferenceProvider(provider).models({ signal })
+    const labels = Object.fromEntries(
+      models
+        .filter((model) => model.name && model.name !== model.id)
+        .map((model) => [model.id, model.name])
+    )
     return models.length
-      ? { models: models.map((model) => model.id) }
+      ? {
+          models: models.map((model) => model.id),
+          ...(Object.keys(labels).length ? { labels } : {})
+        }
       : { models: [], error: "The server did not list any models." }
   } catch (error) {
     return { models: [], error: describeProviderErrorPlain(error, provider) }

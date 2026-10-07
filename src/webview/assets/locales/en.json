@@ -215,6 +215,7 @@
   "preset-litellm": "A LiteLLM proxy in front of hosted APIs.",
   "preset-oobabooga": "text-generation-webui with the API extension on.",
   "preset-openai": "GPT models. Needs an API key from platform.openai.com.",
+  "preset-openai-chatgpt-plan": "Use models available to your ChatGPT account. No API key required.",
   "preset-anthropic": "Claude models. Needs an API key from console.anthropic.com.",
   "preset-deepseek": "DeepSeek chat and coder models. Needs an API key.",
   "preset-gemini": "Google Gemini. Needs an API key from AI Studio.",

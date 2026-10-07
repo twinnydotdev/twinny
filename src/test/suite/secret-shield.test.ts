@@ -123,4 +123,48 @@ suite("Secret shield", () => {
     assert.strictEqual(reply, `Rotate ${AWS} now.`)
     assert.strictEqual(reported, 1)
   })
+
+  test("structured FIM context is shielded in every field", async () => {
+    let sent = ""
+    const inner = {
+      id: "fake",
+      capabilities: () => ["fim"],
+      models: async () => [],
+      chat: () => (async function* () {})(),
+      embeddings: async () => ({ vectors: [] }),
+      fim: (request) => {
+        sent = JSON.stringify(request)
+        return (async function* () {
+          yield { text: "REDACTED_GITHUB_TOKEN_1" }
+        })()
+      }
+    } as InferenceClient
+    const plan = provider({
+      provider: "openai-chatgpt-plan",
+      type: "fim",
+      apiHostname: undefined
+    })
+    const client = shieldClient(inner, plan)
+    let reply = ""
+    for await (const chunk of client.fim({
+      model: "m",
+      prompt: `prompt ${GITHUB}`,
+      prefix: `prefix ${GITHUB}`,
+      suffix: `suffix ${GITHUB}`,
+      context: {
+        prefix: `structured prefix ${GITHUB}`,
+        suffix: `structured suffix ${GITHUB}`,
+        files: [
+          { name: "related.ts", text: `related ${GITHUB}` },
+          { name: "Recent edits", text: `recent ${GITHUB}` },
+          { name: "IntelliSense context", text: `lsp ${GITHUB}` }
+        ]
+      }
+    })) {
+      reply += chunk.text
+    }
+    assert.ok(!sent.includes(GITHUB), "structured context leaked a secret")
+    assert.ok(sent.includes("REDACTED_GITHUB_TOKEN_1"))
+    assert.strictEqual(reply, GITHUB)
+  })
 })

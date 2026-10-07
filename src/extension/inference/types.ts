@@ -8,7 +8,7 @@
  * nothing else.
  */
 import type { ShieldReport } from "../../common/secret-shield"
-import { ChatCompletionMessage } from "../../common/types"
+import { ChatCompletionMessage, FimContextFile } from "../../common/types"
 
 export type InferenceCapability = "fim" | "chat" | "embeddings"
 
@@ -52,6 +52,15 @@ export interface InferenceOptions {
   onShield?(report: ShieldReport[]): void
 }
 
+export interface FimStructuredContext {
+  language?: string
+  fileName?: string
+  repoName?: string
+  prefix: string
+  suffix: string
+  files?: FimContextFile[]
+}
+
 export interface FimRequest {
   model: string
   /** The hole as the model expects it: prefix, suffix and template applied. */
@@ -59,6 +68,11 @@ export interface FimRequest {
   /** The raw sides of the hole, for providers with a native FIM endpoint. */
   prefix?: string
   suffix?: string
+  /**
+   * Provider-neutral context for instruction models that should not receive
+   * provider-specific FIM marker dialects.
+   */
+  context?: FimStructuredContext
   stop?: string[]
   /** Cap on generated tokens. Unset or negative means the server's default. */
   maxTokens?: number

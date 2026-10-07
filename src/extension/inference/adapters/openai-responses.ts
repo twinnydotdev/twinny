@@ -13,7 +13,6 @@ import { TwinnyProvider } from "../../../common/types"
 import {
   ChatChunk,
   ChatFinishReason,
-  ChatMessage,
   ChatRequest,
   ChatToolCall,
   InferenceOptions,
@@ -21,34 +20,10 @@ import {
 } from "../types"
 
 import { logRequest, responseError } from "./json-stream"
+import { toResponsesInput } from "./responses-input"
+import { responseEvents } from "./responses-stream"
 
 const DEFAULT_BASE = "https://api.openai.com/v1"
-
-type InputItem =
-  | { role: "user" | "assistant"; content: string | Array<Record<string, unknown>> }
-  | { type: "function_call"; call_id: string; name: string; arguments: string }
-  | { type: "function_call_output"; call_id: string; output: string }
-
-const textOf = (content: ChatMessage["content"]): string =>
-  typeof content === "string"
-    ? content
-    : Array.isArray(content)
-      ? content.map((part) => (part.type === "text" ? part.text : "")).join("\n")
-      : ""
-
-type Part = { type: string; text?: string; image_url?: { url: string } }
-
-/** A user turn's parts in Responses terms; plain text stays a string. */
-const userContent = (content: ChatMessage["content"]): string | Array<Record<string, unknown>> => {
-  if (!Array.isArray(content)) return textOf(content)
-  const parts = content as Part[]
-  if (!parts.some((part) => part.type === "image_url")) return textOf(content)
-  return parts.map((part) =>
-    part.type === "image_url"
-      ? { type: "input_image", image_url: part.image_url?.url }
-      : { type: "input_text", text: part.text ?? "" }
-  )
-}
 
 /** Whether a conversation needs the Responses API: it offers tools or already holds tool calls. */
 export const needsResponsesApi = (request: ChatRequest) =>
@@ -59,83 +34,10 @@ export const needsResponsesApi = (request: ChatRequest) =>
       !!(message as { tool_calls?: unknown[] }).tool_calls?.length
   )
 
-/** The conversation as Responses input: system turns become instructions. */
-export const toResponsesInput = (messages: ChatMessage[]) => {
-  const instructions: string[] = []
-  const input: InputItem[] = []
-  for (const message of messages) {
-    if (message.role === "system" || message.role === "developer") {
-      instructions.push(textOf(message.content))
-    } else if (message.role === "user") {
-      input.push({ role: "user", content: userContent(message.content) })
-    } else if (message.role === "assistant") {
-      const text = textOf(message.content)
-      if (text.trim()) input.push({ role: "assistant", content: text })
-      const calls = (message as { tool_calls?: { id: string; function: { name: string; arguments: string } }[] })
-        .tool_calls ?? []
-      for (const call of calls) {
-        input.push({ type: "function_call", call_id: call.id, name: call.function.name, arguments: call.function.arguments })
-      }
-    } else if (message.role === "tool") {
-      input.push({
-        type: "function_call_output",
-        call_id: (message as { tool_call_id: string }).tool_call_id,
-        output: textOf(message.content)
-      })
-    }
-  }
-  return { instructions: instructions.join("\n\n").trim() || undefined, input }
-}
-
 const baseUrl = (config: TwinnyProvider) =>
   config.apiHostname
     ? `${getProviderOrigin(config)}${config.apiPath || "/v1"}`.replace(/\/$/, "")
     : DEFAULT_BASE
-
-interface ResponsesEvent {
-  type: string
-  delta?: string
-  item?: { type: string; call_id?: string; name?: string; arguments?: string }
-  response?: {
-    status?: string
-    incomplete_details?: { reason?: string } | null
-    usage?: { input_tokens?: number; output_tokens?: number }
-    error?: { message?: string } | null
-  }
-  message?: string
-  error?: { message?: string }
-}
-
-/** Server-sent events, one parsed `data:` payload at a time. */
-async function* events(body: ReadableStream<Uint8Array>): AsyncGenerator<ResponsesEvent> {
-  const reader = body.pipeThrough(new TextDecoderStream()).getReader()
-  let buffer = ""
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buffer += value
-      let split: number
-      while ((split = buffer.indexOf("\n\n")) !== -1) {
-        const block = buffer.slice(0, split)
-        buffer = buffer.slice(split + 2)
-        const data = block
-          .split("\n")
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trim())
-          .join("")
-        if (!data || data === "[DONE]") continue
-        try {
-          yield JSON.parse(data) as ResponsesEvent
-        } catch {
-          // A malformed event is skipped; the stream carries on.
-        }
-      }
-    }
-  } finally {
-    await reader.cancel().catch(() => undefined)
-  }
-}
 
 /** One request to `/v1/responses`, streamed as twinny chat chunks. */
 export async function* responsesChat(
@@ -179,16 +81,18 @@ export async function* responsesChat(
   if (!response.body) throw new Error("The server answered without a body.")
 
   const calls: ChatToolCall[] = []
-  for await (const event of events(response.body)) {
+  const text: string[] = []
+  const reasoning: string[] = []
+  for await (const event of responseEvents(response.body)) {
     if (options?.signal?.aborted) return
     switch (event.type) {
       // A refusal is the model's answer too; left out, the reply would be blank.
       case "response.output_text.delta":
       case "response.refusal.delta":
-        if (event.delta) yield { content: event.delta }
+        if (event.delta) text.push(event.delta)
         break
       case "response.reasoning_summary_text.delta":
-        if (event.delta) yield { content: "", reasoning: event.delta }
+        if (event.delta) reasoning.push(event.delta)
         break
       case "response.output_item.done":
         if (event.item?.type === "function_call" && event.item.name) {
@@ -199,16 +103,18 @@ export async function* responsesChat(
           })
         }
         break
-      case "response.completed":
-      case "response.incomplete": {
+      case "response.completed": {
         const usage: InferenceUsage | undefined = event.response?.usage
           ? {
               promptTokens: event.response.usage.input_tokens,
               completionTokens: event.response.usage.output_tokens
             }
           : undefined
-        const finishReason: ChatFinishReason =
-          event.response?.incomplete_details?.reason === "max_output_tokens" ? "length" : "stop"
+        if (text.length) yield { content: text.join("") }
+        if (reasoning.length) {
+          yield { content: "", reasoning: reasoning.join("") }
+        }
+        const finishReason: ChatFinishReason = "stop"
         yield {
           content: "",
           finishReason,
@@ -217,12 +123,17 @@ export async function* responsesChat(
         }
         return
       }
+      case "response.incomplete":
+        throw new Error(
+          `The response was incomplete${event.response?.incomplete_details?.reason ? `: ${event.response.incomplete_details.reason}` : ""}.`
+        )
       case "response.failed":
-        throw new Error(event.response?.error?.message || "The response failed.")
+        throw new Error(
+          event.response?.error?.message || "The response failed."
+        )
       case "error":
         throw new Error(event.message || event.error?.message || "The server reported an error.")
     }
   }
-  // Ended without a completion event: still hand over what arrived.
-  if (calls.length) yield { content: "", toolCalls: calls }
+  throw new Error("The response ended without response.completed.")
 }

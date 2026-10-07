@@ -1,0 +1,38 @@
+name: ChatGPT Plan feature validation
+
+on:
+  push:
+    branches:
+      - feat/chatgpt-plan-completion
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full Twinny test suite
+        run: xvfb-run -a npm test
+
+      - name: Standalone tests
+        run: npm run test:sqlite
+
+      - name: Package extension
+        run: npm run vscode:package
