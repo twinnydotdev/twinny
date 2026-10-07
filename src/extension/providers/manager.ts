@@ -20,6 +20,7 @@ import {
 } from "../../common/provider-validation"
 import type { TeamOpen } from "../../common/team"
 import { TwinnyProvider } from "../../common/types"
+import { ChatGPTPlanSession } from "../chatgpt-plan/session"
 import { ExtensionBridge } from "../messaging/bridge"
 
 import { RemoteCredentials } from "./credentials"
@@ -62,6 +63,7 @@ export class ProviderManager {
   private readonly _store: ProviderStore
   private readonly _bridge: ExtensionBridge
   private readonly _credentials: RemoteCredentials
+  private readonly _chatGPTPlan: ChatGPTPlanSession
   private readonly _team: TeamConnection
   /** What an opened link asked the tab to show, until the tab collects it. */
   private _pendingOpen?: TeamOpen
@@ -75,6 +77,7 @@ export class ProviderManager {
     this._store = new ProviderStore(context)
     this._bridge = bridge
     this._credentials = new RemoteCredentials(context)
+    this._chatGPTPlan = ChatGPTPlanSession.shared(context)
     this._policy = new TeamPolicyStore(context.globalState)
     this._team = new TeamConnection(
       this._store,
@@ -188,6 +191,14 @@ export class ProviderManager {
   private _registerHandlers() {
     this._bridge.handleAll({
       [PROVIDER_EVENT_NAME.addProvider]: (p) => this.addProvider(p),
+      [PROVIDER_EVENT_NAME.getChatGPTPlanStatus]: () =>
+        this._chatGPTPlan.status(),
+      [PROVIDER_EVENT_NAME.signInChatGPTPlan]: () =>
+        this._chatGPTPlan.signIn(),
+      [PROVIDER_EVENT_NAME.signOutChatGPTPlan]: async () => {
+        await this._chatGPTPlan.signOut()
+        return this._chatGPTPlan.status()
+      },
       [PROVIDER_EVENT_NAME.previewTeam]: async (input) => {
         await whenProviderSetupDone()
         return this._team.preview(input)
