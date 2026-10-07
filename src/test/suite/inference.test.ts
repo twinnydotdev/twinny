@@ -252,7 +252,7 @@ suite("Inference layer", function () {
       assert.deepStrictEqual(capabilities(API_PROVIDERS.Anthropic), ["chat"])
       assert.deepStrictEqual(capabilities(API_PROVIDERS.Mistral), ["chat", "fim"])
       assert.deepStrictEqual(capabilities(API_PROVIDERS.OpenAI), ["chat", "fim", "embeddings"])
-      assert.deepStrictEqual(capabilities(API_PROVIDERS.ChatGPTPlan, "fim"), ["fim"])
+      assert.deepStrictEqual(capabilities(API_PROVIDERS.ChatGPTPlan, "fim"), ["fim", "chat"])
     })
 
     test("an unknown kind fails as provider-unavailable", () => {
@@ -403,6 +403,56 @@ suite("Inference layer", function () {
         assert.deepStrictEqual(fake.requests[0].messages, [
           { role: "user", content: "hi" }
         ])
+      } finally {
+        chat.dispose()
+      }
+    })
+
+    test("stopping all generations cancels a one-shot chat request", async () => {
+      let started!: () => void
+      const entered = new Promise<void>((resolve) => (started = resolve))
+      let requestSignal: AbortSignal | undefined
+      const blocking: InferenceProvider = {
+        id: "blocking-chat",
+        capabilities: () => ["chat"],
+        chat: async function* (_request, options) {
+          requestSignal = options?.signal
+          started()
+          await new Promise<void>((_resolve, reject) => {
+            options?.signal?.addEventListener(
+              "abort",
+              () => {
+                const error = new Error("aborted")
+                error.name = "AbortError"
+                reject(error)
+              },
+              { once: true }
+            )
+          })
+          yield { content: "late" }
+        }
+      }
+      providerRegistry.register("blocking-chat", {
+        id: "blocking-chat",
+        create: () => blocking
+      })
+      const config = {
+        ...fakeChatConfig,
+        provider: "blocking-chat"
+      }
+      const chat = new Chat(
+        generations,
+        undefined,
+        contextWith({ [ACTIVE_CHAT_PROVIDER_STORAGE_KEY]: config }),
+        stubBridge().bridge,
+        undefined
+      )
+      try {
+        const pending = chat.generateSimpleCompletion("hi")
+        await entered
+        generations.stopAll()
+        assert.strictEqual(requestSignal?.aborted, true)
+        assert.strictEqual(await pending, undefined)
       } finally {
         chat.dispose()
       }

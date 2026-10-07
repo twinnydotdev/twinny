@@ -128,7 +128,7 @@ test("ChatGPT Plan lists visible models and streams a structured completion", as
       {
         id: "gpt-test",
         name: "GPT Test",
-        capabilities: ["fim"]
+        capabilities: ["fim", "chat"]
       }
     ])
 
@@ -180,6 +180,237 @@ test("ChatGPT Plan lists visible models and streams a structured completion", as
     assert.ok(!input.includes("<PRE>legacy"))
   } finally {
     fake.close()
+  }
+})
+
+test("ChatGPT Plan streams chat through the account Responses route", async () => {
+  const fake = await serve((request, response) => {
+    if (request.path !== "/v1/responses") {
+      response.writeHead(404)
+      response.end()
+      return
+    }
+    response.writeHead(200, { "Content-Type": "text/event-stream" })
+    response.end(
+      sse([
+        { type: "response.output_text.delta", delta: "Hello" },
+        { type: "response.output_text.delta", delta: " from ChatGPT Plan" },
+        {
+          type: "response.completed",
+          response: {
+            status: "completed",
+            usage: { input_tokens: 12, output_tokens: 4 }
+          }
+        }
+      ])
+    )
+  })
+
+  try {
+    const provider = new ChatGPTPlanInferenceProvider(
+      { ...config, type: "chat" },
+      access,
+      { responses: fake.responses }
+    )
+    const chunks = []
+    for await (const chunk of provider.chat({
+      model: "gpt-test",
+      messages: [
+        { role: "system", content: "Be concise." },
+        { role: "user", content: "Say hello." },
+        { role: "assistant", content: "Previous answer." },
+        { role: "user", content: "Try again." }
+      ],
+      maxTokens: 8,
+      temperature: 0
+    })) {
+      chunks.push(chunk)
+    }
+
+    assert.strictEqual(
+      chunks.map((chunk) => chunk.content).join(""),
+      "Hello from ChatGPT Plan"
+    )
+    assert.deepStrictEqual(chunks[chunks.length - 1], {
+      content: "",
+      finishReason: "stop",
+      usage: { promptTokens: 12, completionTokens: 4 }
+    })
+
+    const inference = fake.received[0]
+    assert.strictEqual(inference.auth, "Bearer oauth-test-token")
+    assert.strictEqual(inference.body?.model, "gpt-test")
+    assert.strictEqual(inference.body?.instructions, "Be concise.")
+    assert.strictEqual(inference.body?.store, false)
+    assert.strictEqual(inference.body?.stream, true)
+    assert.strictEqual(inference.body?.temperature, undefined)
+    assert.strictEqual(inference.body?.max_output_tokens, undefined)
+    assert.strictEqual(inference.body?.top_p, undefined)
+    assert.strictEqual(inference.body?.previous_response_id, undefined)
+    assert.strictEqual(inference.body?.service_tier, undefined)
+    assert.deepStrictEqual(inference.body?.reasoning, { effort: "low" })
+    assert.deepStrictEqual(inference.body?.input, [
+      { role: "user", content: "Say hello." },
+      { role: "assistant", content: "Previous answer." },
+      { role: "user", content: "Try again." }
+    ])
+  } finally {
+    fake.close()
+  }
+})
+
+test("ChatGPT Plan chat discards partial text after a terminal failure", async () => {
+  const fake = await serve((request, response) => {
+    if (request.path !== "/v1/responses") {
+      response.writeHead(404)
+      response.end()
+      return
+    }
+    response.writeHead(200, { "Content-Type": "text/event-stream" })
+    response.end(
+      sse([
+        { type: "response.output_text.delta", delta: "partial" },
+        {
+          type: "response.failed",
+          response: {
+            status: "failed",
+            error: {
+              code: "subscription_sharing_usage_limit_exceeded",
+              message: "Plan usage limit reached"
+            }
+          }
+        }
+      ])
+    )
+  })
+
+  try {
+    const provider = new ChatGPTPlanInferenceProvider(
+      { ...config, type: "chat" },
+      access,
+      { responses: fake.responses }
+    )
+    let shown = ""
+    await assert.rejects(
+      (async () => {
+        for await (const chunk of provider.chat({
+          model: "gpt-test",
+          messages: [{ role: "user", content: "Hello" }]
+        })) {
+          shown += chunk.content
+        }
+      })(),
+      /subscription_sharing_usage_limit_exceeded/
+    )
+    assert.strictEqual(shown, "")
+  } finally {
+    fake.close()
+  }
+})
+
+test("ChatGPT Plan chat cancellation aborts the HTTP stream", async () => {
+  let responseStarted!: () => void
+  const started = new Promise<void>((resolve) => (responseStarted = resolve))
+  let connectionClosed!: () => void
+  const closed = new Promise<void>((resolve) => (connectionClosed = resolve))
+  const fake = await serve((request, response) => {
+    if (request.path !== "/v1/responses") {
+      response.writeHead(404)
+      response.end()
+      return
+    }
+    response.writeHead(200, { "Content-Type": "text/event-stream" })
+    response.write(
+      sse([{ type: "response.output_text.delta", delta: "stale" }])
+    )
+    responseStarted()
+    response.once("close", connectionClosed)
+  })
+
+  try {
+    const provider = new ChatGPTPlanInferenceProvider(
+      { ...config, type: "chat" },
+      access,
+      { responses: fake.responses }
+    )
+    const controller = new AbortController()
+    const stream = provider.chat(
+      {
+        model: "gpt-test",
+        messages: [{ role: "user", content: "Hello" }]
+      },
+      { signal: controller.signal }
+    )[Symbol.asyncIterator]()
+    const pending = stream.next()
+    await started
+    controller.abort()
+    await assert.rejects(pending, /abort/i)
+    await closed
+  } finally {
+    fake.close()
+  }
+})
+
+test("ChatGPT Plan chat rejects every non-success terminal state", async () => {
+  const cases = [
+    {
+      events: [
+        { type: "response.output_text.delta", delta: "partial" },
+        {
+          type: "response.incomplete",
+          response: {
+            status: "incomplete",
+            incomplete_details: { reason: "max_output_tokens" }
+          }
+        }
+      ],
+      expected: /incomplete: max_output_tokens/
+    },
+    {
+      events: [
+        { type: "response.output_text.delta", delta: "partial" },
+        { type: "error", code: "server_error", message: "stream failed" }
+      ],
+      expected: /server_error: stream failed/
+    },
+    {
+      events: [{ type: "response.output_text.delta", delta: "partial" }],
+      expected: /ended without response.completed/
+    }
+  ]
+
+  for (const scenario of cases) {
+    const fake = await serve((request, response) => {
+      if (request.path !== "/v1/responses") {
+        response.writeHead(404)
+        response.end()
+        return
+      }
+      response.writeHead(200, { "Content-Type": "text/event-stream" })
+      response.end(sse(scenario.events))
+    })
+    try {
+      const provider = new ChatGPTPlanInferenceProvider(
+        { ...config, type: "chat" },
+        access,
+        { responses: fake.responses }
+      )
+      let shown = ""
+      await assert.rejects(
+        (async () => {
+          for await (const chunk of provider.chat({
+            model: "gpt-test",
+            messages: [{ role: "user", content: "Hello" }]
+          })) {
+            shown += chunk.content
+          }
+        })(),
+        scenario.expected
+      )
+      assert.strictEqual(shown, "")
+    } finally {
+      fake.close()
+    }
   }
 })
 

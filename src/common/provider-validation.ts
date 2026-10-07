@@ -92,7 +92,7 @@ export const expectsApiKey = (provider: string) =>
 
 export const supportsType = (provider: string, type: string) =>
   isChatGPTPlanProvider(provider)
-    ? type === "fim"
+    ? type === "chat" || type === "fim"
     : type === "chat" || !CHAT_ONLY_PROVIDERS.includes(provider)
 
 export interface EndpointDefaults {

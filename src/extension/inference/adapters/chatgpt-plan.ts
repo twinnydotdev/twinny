@@ -2,15 +2,20 @@ import { logger } from "../../../common/logger"
 import { TwinnyProvider } from "../../../common/types"
 import { InferenceError } from "../errors"
 import {
+  ChatChunk,
+  ChatFinishReason,
+  ChatRequest,
   FimChunk,
   FimRequest,
   InferenceCapability,
   InferenceModel,
   InferenceOptions,
-  InferenceProvider
+  InferenceProvider,
+  InferenceUsage
 } from "../types"
 
 import { responseError } from "./json-stream"
+import { toResponsesInput } from "./responses-input"
 import { responseEvents } from "./responses-stream"
 
 const MODELS_URL = "https://api.openai.com/v1/models"
@@ -132,7 +137,7 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
   }
 
   public capabilities(): InferenceCapability[] {
-    return ["fim"]
+    return ["fim", "chat"]
   }
 
   public async models(options?: InferenceOptions): Promise<InferenceModel[]> {
@@ -159,8 +164,93 @@ export class ChatGPTPlanInferenceProvider implements InferenceProvider {
       .map((model) => ({
         id: model.slug as string,
         name: model.display_name || (model.slug as string),
-        capabilities: ["fim"] as InferenceCapability[]
+        capabilities: ["fim", "chat"] as InferenceCapability[]
       }))
+  }
+
+  /**
+   * Chat through the same plan-sharing Responses route as FIM. Request
+   * policy remains deliberately narrower than the API-key adapter: the
+   * subscription route has rejected otherwise valid API fields in practice.
+   */
+  public async *chat(
+    request: ChatRequest,
+    options?: InferenceOptions
+  ): AsyncGenerator<ChatChunk> {
+    let token: string
+    try {
+      token = await (this._access || defaultAccess()).getAccessToken()
+    } catch (error) {
+      throw authError(error)
+    }
+
+    const { instructions, input } = toResponsesInput(request.messages)
+    const body = {
+      model: request.model || this._config.modelName,
+      input,
+      ...(instructions ? { instructions } : {}),
+      store: false,
+      stream: true,
+      ...(this._config.reasoningEffort
+        ? { reasoning: { effort: this._config.reasoningEffort } }
+        : {})
+    }
+    const response = await fetch(this._endpoints.responses || RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
+      signal: options?.signal
+    })
+    if (!response.ok) throw await responseError(response)
+    if (!response.body) throw new Error("OpenAI answered without a response stream.")
+
+    // Plan-sharing may report a terminal account or usage failure after
+    // sending deltas. Hold everything until response.completed so a failed
+    // response cannot become part of the saved conversation.
+    const text: string[] = []
+    const reasoning: string[] = []
+    for await (const event of responseEvents(response.body)) {
+      if (options?.signal?.aborted) return
+      switch (event.type) {
+        case "response.output_text.delta":
+        case "response.refusal.delta":
+          if (event.delta) text.push(event.delta)
+          break
+        case "response.reasoning_summary_text.delta":
+          if (event.delta) reasoning.push(event.delta)
+          break
+        case "response.completed": {
+          const usage: InferenceUsage | undefined = event.response?.usage
+            ? {
+                promptTokens: event.response.usage.input_tokens,
+                completionTokens: event.response.usage.output_tokens
+              }
+            : undefined
+          if (text.length) yield { content: text.join("") }
+          if (reasoning.length) {
+            yield { content: "", reasoning: reasoning.join("") }
+          }
+          const finishReason: ChatFinishReason = "stop"
+          yield {
+            content: "",
+            finishReason,
+            ...(usage ? { usage } : {})
+          }
+          return
+        }
+        case "response.failed":
+        case "error":
+          throw failure(event)
+        case "response.incomplete":
+          throw new Error(
+            `ChatGPT Plan response was incomplete${event.response?.incomplete_details?.reason ? `: ${event.response.incomplete_details.reason}` : ""}.`
+          )
+      }
+    }
+    throw new Error("ChatGPT Plan response ended without response.completed.")
   }
 
   public async *fim(

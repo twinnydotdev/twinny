@@ -11,9 +11,9 @@ import { test } from "node:test"
 import { TwinnyProvider } from "../../common/types"
 import {
   needsResponsesApi,
-  responsesChat,
-  toResponsesInput
+  responsesChat
 } from "../../extension/inference/adapters/openai-responses"
+import { toResponsesInput } from "../../extension/inference/adapters/responses-input"
 import { ChatChunk, ChatMessage } from "../../extension/inference/types"
 
 const conversation = [

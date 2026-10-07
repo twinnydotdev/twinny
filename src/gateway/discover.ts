@@ -17,6 +17,8 @@ import { getEndpointDefaults } from "../common/provider-validation"
 import { TwinnyProvider } from "../common/types"
 import { providerRegistry } from "../extension/inference/registry"
 
+import { isGatewayServableProvider } from "./config"
+
 export type { DiscoveredServer, LocalServerCandidate }
 
 /**
@@ -44,8 +46,9 @@ export const parseBackendOption = (value: string, defaultKind?: string): LocalSe
   const port = match[2] ? Number(match[2]) : undefined
   if (!host || (port !== undefined && (port < 1 || port > 65535))) throw new Error(`"${value}" is not a host, host:port or URL.`)
   if (!kind) kind = port ? kindForPort(port) : API_PROVIDERS.Ollama
-  if (!providerRegistry.providerIds().includes(kind)) {
-    throw new Error(`"${kind}" is not a provider kind the gateway can serve. Known: ${providerRegistry.providerIds().join(", ")}.`)
+  const known = providerRegistry.providerIds().filter(isGatewayServableProvider)
+  if (!known.includes(kind)) {
+    throw new Error(`"${kind}" is not a provider kind the gateway can serve. Known: ${known.join(", ")}.`)
   }
   const defaults = getEndpointDefaults(kind, "chat")
   return {

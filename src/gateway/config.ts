@@ -226,8 +226,14 @@ export const DEFAULT_RECORDING: GatewayRecordingConfig = {
 export const expandHome = (value: string): string =>
   value === "~" ? os.homedir() : value.startsWith("~/") ? path.join(os.homedir(), value.slice(2)) : value
 
-/** Provider kinds that only make sense inside the extension. */
-const UNSERVABLE_PROVIDERS: string[] = [API_PROVIDERS.TwinnyP2P]
+/** Provider kinds that require Extension Host state and cannot run headlessly. */
+const UNSERVABLE_PROVIDERS: string[] = [
+  API_PROVIDERS.ChatGPTPlan,
+  API_PROVIDERS.TwinnyP2P
+]
+
+export const isGatewayServableProvider = (kind: string) =>
+  !UNSERVABLE_PROVIDERS.includes(kind)
 
 /**
  * The gateway's own provider kind: aliases served by whichever connected
@@ -369,11 +375,11 @@ export const parseGatewayConfig = (
         problems.add(`${where}.provider must name an adapter kind.`)
         continue
       }
-      if (UNSERVABLE_PROVIDERS.includes(kind) || (kind !== TEAM_PROVIDER_KIND && !knownProviders.includes(kind))) {
+      if (!isGatewayServableProvider(kind) || (kind !== TEAM_PROVIDER_KIND && !knownProviders.includes(kind))) {
         throw new GatewayConfigError("unsupported-provider", [
           ...problems.list,
           `${where}.provider "${kind}" is not a provider kind this gateway can serve. ` +
-            `Known kinds: ${[...knownProviders.filter((k) => !UNSERVABLE_PROVIDERS.includes(k)), TEAM_PROVIDER_KIND].join(", ")}.`
+            `Known kinds: ${[...knownProviders.filter(isGatewayServableProvider), TEAM_PROVIDER_KIND].join(", ")}.`
         ])
       }
       const entry: GatewayProviderConfig = { provider: kind }

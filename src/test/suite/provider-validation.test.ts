@@ -226,9 +226,9 @@ suite("Provider validation", () => {
       assert.strictEqual(usesEndpoint(API_PROVIDERS.Ollama, "chat"), true)
     })
 
-    test("ChatGPT Plan is FIM-only and has no user-configurable endpoint", () => {
+    test("ChatGPT Plan supports chat and FIM without a user-configurable endpoint", () => {
       assert.strictEqual(supportsType(API_PROVIDERS.ChatGPTPlan, "fim"), true)
-      assert.strictEqual(supportsType(API_PROVIDERS.ChatGPTPlan, "chat"), false)
+      assert.strictEqual(supportsType(API_PROVIDERS.ChatGPTPlan, "chat"), true)
       assert.strictEqual(
         supportsType(API_PROVIDERS.ChatGPTPlan, "embedding"),
         false
@@ -237,7 +237,12 @@ suite("Provider validation", () => {
         hasConfigurableEndpoint(API_PROVIDERS.ChatGPTPlan, "fim"),
         false
       )
+      assert.strictEqual(
+        hasConfigurableEndpoint(API_PROVIDERS.ChatGPTPlan, "chat"),
+        false
+      )
       assert.strictEqual(usesEndpoint(API_PROVIDERS.ChatGPTPlan, "fim"), false)
+      assert.strictEqual(usesEndpoint(API_PROVIDERS.ChatGPTPlan, "chat"), false)
 
       const normalized = normalizeProvider({
         ...ollamaChat,

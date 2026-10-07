@@ -119,6 +119,12 @@ export const PRESETS: ProviderPreset[] = [
   local(API_PROVIDERS.LiteLLM, "chat"),
   local(API_PROVIDERS.Oobabooga, "chat"),
   gateway("chat"),
+  hosted(
+    API_PROVIDERS.ChatGPTPlan,
+    "ChatGPT Plan",
+    <SvgOpenAI />,
+    ""
+  ),
   hosted(API_PROVIDERS.OpenAI, "OpenAI", <SvgOpenAI />, "gpt-4.1"),
   hosted(
     API_PROVIDERS.Anthropic,
