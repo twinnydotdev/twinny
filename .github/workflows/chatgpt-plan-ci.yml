@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/chatgpt-plan-completion
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
