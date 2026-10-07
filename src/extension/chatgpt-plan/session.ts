@@ -76,6 +76,8 @@ export interface ChatGPTPlanStatus {
 export interface ChatGPTPlanSessionDependencies {
   fetch?: typeof fetch
   now?: () => number
+  openExternal?: (uri: Uri) => Promise<boolean>
+  callbackTimeoutMs?: number
 }
 
 export class ChatGPTPlanSessionError extends Error {
@@ -255,7 +257,9 @@ export class ChatGPTPlanSession {
     authorize.searchParams.set("code_challenge_method", "S256")
     authorize.searchParams.set("code_challenge", challengeFor(verifier))
 
-    const opened = await env.openExternal(Uri.parse(authorize.toString()))
+    const opened = await (this._dependencies.openExternal || env.openExternal)(
+      Uri.parse(authorize.toString())
+    )
     if (!opened) {
       callback.cancel()
       throw new ChatGPTPlanSessionError(
@@ -565,7 +569,7 @@ export class ChatGPTPlanSession {
         )
       )
       server.close()
-    }, CALLBACK_TIMEOUT_MS)
+    }, this._dependencies.callbackTimeoutMs || CALLBACK_TIMEOUT_MS)
 
     return {
       redirectUri,

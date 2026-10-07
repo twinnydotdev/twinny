@@ -1,207 +1,38 @@
 import * as assert from "assert"
-import { ExtensionContext } from "vscode"
+import * as crypto from "crypto"
+import * as http from "http"
+import { ExtensionContext, Uri } from "vscode"
 
-import { ChatGPTPlanSession, ChatGPTPlanSessionError } from "../../extension/chatgpt-plan/session"
+import {
+  ChatGPTPlanSession,
+  ChatGPTPlanSessionDependencies,
+  ChatGPTPlanSessionError} from "../../extension/chatgpt-plan/session"
 
 const CREDENTIALS_KEY = "twinny.chatgpt-plan.credentials"
 const PROFILE_KEY = "twinny.chatgpt-plan.profile"
+const REQUIRED_SCOPE = "chatgpt.tokens.use.direct"
+const NOW = 1_800_000_000_000
 
-suite("ChatGPT Plan session", () => {
-  test("serializes concurrent refreshes and persists the rotated refresh token", async () => {
-    const now = 1_800_000_000_000
-    let stored = JSON.stringify({
-      accessToken: "expired-access",
-      refreshToken: "refresh-old",
-      idToken: "id-old",
-      expiresAt: now - 1,
-      scopes: [
-        "chatgpt.tokens.use.direct",
-        "email",
-        "offline_access",
-        "openid",
-        "profile",
-        "resource.invoke"
-      ]
-    })
-    const state = new Map<string, unknown>([
-      [
-        PROFILE_KEY,
-        {
-          clientId: "oaiapp_test",
-          subject: "subject-1",
-          email: "dev@example.com"
-        }
-      ]
-    ])
+interface StoredContext {
+  context: ExtensionContext
+  state: Map<string, unknown>
+  readCredentials(): string | undefined
+}
 
-    const context = {
+const contextWith = (
+  credentials?: Record<string, unknown>,
+  profile?: Record<string, unknown>
+): StoredContext => {
+  let stored = credentials ? JSON.stringify(credentials) : undefined
+  const state = new Map<string, unknown>()
+  if (profile) state.set(PROFILE_KEY, profile)
+  return {
+    context: {
       globalState: {
         get: <T>(key: string) => state.get(key) as T | undefined,
         update: async (key: string, value: unknown) => {
-          state.set(key, value)
-        }
-      },
-      secrets: {
-        get: async (key: string) =>
-          key === CREDENTIALS_KEY ? stored : undefined,
-        store: async (key: string, value: string) => {
-          if (key === CREDENTIALS_KEY) stored = value
-        },
-        delete: async (key: string) => {
-          if (key === CREDENTIALS_KEY) stored = ""
-        }
-      }
-    } as unknown as ExtensionContext
-
-    let refreshCalls = 0
-    let refreshBody = ""
-    const fakeFetch: typeof fetch = async (input, init) => {
-      const url = String(input)
-      if (url.endsWith("/.well-known/openid-configuration")) {
-        return new Response(
-          JSON.stringify({
-            authorization_endpoint:
-              "https://auth.openai.com/api/accounts/authorize",
-            token_endpoint:
-              "https://auth.openai.com/api/accounts/oauth/token",
-            jwks_uri: "https://auth.openai.com/.well-known/jwks.json"
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          }
-        )
-      }
-
-      if (url.endsWith("/api/accounts/oauth/token")) {
-        refreshCalls++
-        refreshBody = String(init?.body || "")
-        // Keep the exchange in flight long enough for all callers to join
-        // the same single-flight promise.
-        await new Promise((resolve) => setTimeout(resolve, 20))
-        return new Response(
-          JSON.stringify({
-            access_token: "access-new",
-            refresh_token: "refresh-new",
-            id_token: "id-new",
-            token_type: "Bearer",
-            expires_in: 3600,
-            scope:
-              "chatgpt.tokens.use.direct email offline_access openid profile resource.invoke"
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          }
-        )
-      }
-
-      throw new Error(`Unexpected request: ${url}`)
-    }
-
-    const session = new ChatGPTPlanSession(context, {
-      fetch: fakeFetch,
-      now: () => now
-    })
-
-    const tokens = await Promise.all([
-      session.getAccessToken(),
-      session.getAccessToken(),
-      session.getAccessToken()
-    ])
-
-    assert.deepStrictEqual(tokens, [
-      "access-new",
-      "access-new",
-      "access-new"
-    ])
-    assert.strictEqual(refreshCalls, 1)
-    assert.ok(refreshBody.includes("grant_type=refresh_token"))
-    assert.ok(refreshBody.includes("client_id=oaiapp_test"))
-    assert.ok(refreshBody.includes("refresh_token=refresh-old"))
-    assert.ok(
-      refreshBody.includes(
-        "resource=https%3A%2F%2Fapi.openai.com%2Fv1"
-      )
-    )
-    assert.ok(!refreshBody.includes("scope="))
-
-    const persisted = JSON.parse(stored) as {
-      accessToken: string
-      refreshToken: string
-      idToken: string
-      expiresAt: number
-    }
-    assert.strictEqual(persisted.accessToken, "access-new")
-    assert.strictEqual(persisted.refreshToken, "refresh-new")
-    assert.strictEqual(persisted.idToken, "id-new")
-    assert.strictEqual(persisted.expiresAt, now + 3_600_000)
-  })
-
-  test("does not refresh a still-valid token", async () => {
-    const now = 1_800_000_000_000
-    const credentials = JSON.stringify({
-      accessToken: "access-valid",
-      refreshToken: "refresh-valid",
-      idToken: "id-valid",
-      expiresAt: now + 30 * 60_000,
-      scopes: ["chatgpt.tokens.use.direct"]
-    })
-    const context = {
-      globalState: {
-        get: <T>() =>
-          ({
-            clientId: "oaiapp_test",
-            subject: "subject-1"
-          }) as T,
-        update: async () => undefined
-      },
-      secrets: {
-        get: async () => credentials,
-        store: async () => undefined,
-        delete: async () => undefined
-      }
-    } as unknown as ExtensionContext
-
-    let requests = 0
-    const fakeFetch: typeof fetch = async () => {
-      requests++
-      throw new Error("A valid access token must not hit OAuth.")
-    }
-
-    const session = new ChatGPTPlanSession(context, {
-      fetch: fakeFetch,
-      now: () => now
-    })
-    assert.strictEqual(await session.getAccessToken(), "access-valid")
-    assert.strictEqual(requests, 0)
-  })
-})
-
-
-  test("clears unusable tokens after a terminal refresh error", async () => {
-    const now = 1_800_000_000_000
-    let stored: string | undefined = JSON.stringify({
-      accessToken: "expired-access",
-      refreshToken: "refresh-dead",
-      idToken: "id-old",
-      expiresAt: now - 1,
-      scopes: ["chatgpt.tokens.use.direct", "offline_access"]
-    })
-    const state = new Map<string, unknown>([
-      [
-        PROFILE_KEY,
-        {
-          clientId: "oaiapp_test",
-          subject: "subject-1"
-        }
-      ]
-    ])
-    const context = {
-      globalState: {
-        get: <T>(key: string) => state.get(key) as T | undefined,
-        update: async (key: string, value: unknown) => {
-          state.set(key, value)
+          if (value === undefined) state.delete(key)
+          else state.set(key, value)
         }
       },
       secrets: {
@@ -214,37 +45,404 @@ suite("ChatGPT Plan session", () => {
           if (key === CREDENTIALS_KEY) stored = undefined
         }
       }
-    } as unknown as ExtensionContext
+    } as unknown as ExtensionContext,
+    state,
+    readCredentials: () => stored
+  }
+}
 
-    const fakeFetch: typeof fetch = async (input) => {
+const discovery = (revocation = false) =>
+  new Response(
+    JSON.stringify({
+      authorization_endpoint: "https://auth.openai.com/api/accounts/authorize",
+      token_endpoint: "https://auth.openai.com/api/accounts/oauth/token",
+      jwks_uri: "https://auth.openai.com/.well-known/jwks.json",
+      ...(revocation
+        ? {
+            revocation_endpoint:
+              "https://auth.openai.com/api/accounts/oauth/revoke"
+          }
+        : {})
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+  )
+
+const get = (url: string) =>
+  new Promise<void>((resolve, reject) => {
+    const request = http.get(url, (response) => {
+      response.resume()
+      response.once("end", resolve)
+    })
+    request.once("error", reject)
+  })
+
+const base64Url = (value: Buffer | string) =>
+  Buffer.from(value)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "")
+
+const keys = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 })
+const otherKeys = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 })
+const publicJwk = keys.publicKey.export({ format: "jwk" }) as crypto.JsonWebKey
+
+const idToken = (
+  claims: Record<string, unknown>,
+  privateKey: crypto.KeyObject = keys.privateKey,
+  kid = "test-key"
+) => {
+  const header = base64Url(JSON.stringify({ alg: "RS256", kid, typ: "JWT" }))
+  const payload = base64Url(JSON.stringify(claims))
+  const signature = crypto.sign(
+    "RSA-SHA256",
+    Buffer.from(`${header}.${payload}`),
+    privateKey
+  )
+  return `${header}.${payload}.${base64Url(signature)}`
+}
+
+type CallbackKind =
+  | "success"
+  | "invalid-state"
+  | "missing-code"
+  | "oauth-error"
+  | "timeout"
+
+interface SignInOptions {
+  callback?: CallbackKind
+  claims?: Record<string, unknown>
+  scope?: string
+  refreshToken?: string | null
+  signingKey?: crypto.KeyObject
+  jwksKid?: string
+}
+
+const signInFixture = (options: SignInOptions = {}) => {
+  const stored = contextWith()
+  let authorize: URL | undefined
+  let nonce = ""
+  const callbackKind = options.callback || "success"
+  const openExternal = async (uri: Uri) => {
+    authorize = new URL(uri.toString(true))
+    nonce = authorize.searchParams.get("nonce") || ""
+    if (callbackKind === "timeout") return true
+    const callback = new URL(authorize.searchParams.get("redirect_uri") || "")
+    callback.searchParams.set(
+      "state",
+      callbackKind === "invalid-state"
+        ? "wrong-state"
+        : authorize.searchParams.get("state") || ""
+    )
+    if (callbackKind === "oauth-error") {
+      callback.searchParams.set("error", "access_denied")
+    } else if (callbackKind !== "missing-code") {
+      callback.searchParams.set("code", "authorization-code")
+      callback.searchParams.set("client_id", "oaiapp_test")
+    }
+    setTimeout(() => void get(callback.toString()), 0)
+    return true
+  }
+
+  const fakeFetch: typeof fetch = async (input, init) => {
+    const url = String(input)
+    if (url.endsWith("/.well-known/openid-configuration")) {
+      return discovery()
+    }
+    if (url.endsWith("/api/accounts/oauth/token")) {
+      const claims = {
+        iss: "https://auth.openai.com",
+        aud: "oaiapp_test",
+        exp: Math.floor(NOW / 1000) + 3600,
+        nonce,
+        sub: "subject-1",
+        email: "dev@example.com",
+        name: "Dev",
+        ...options.claims
+      }
+      const token: Record<string, unknown> = {
+        access_token: "access-token",
+        id_token: idToken(
+          claims,
+          options.signingKey || keys.privateKey
+        ),
+        expires_in: 3600,
+        scope:
+          options.scope === undefined
+            ? `${REQUIRED_SCOPE} email offline_access openid profile resource.invoke`
+            : options.scope
+      }
+      if (options.refreshToken !== null) {
+        token.refresh_token = options.refreshToken || "refresh-token"
+      }
+      assert.match(String(init?.body), /code_verifier=/)
+      return new Response(JSON.stringify(token), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    }
+    if (url.endsWith("/.well-known/jwks.json")) {
+      return new Response(
+        JSON.stringify({
+          keys: [
+            {
+              ...publicJwk,
+              kid: options.jwksKid || "test-key",
+              use: "sig",
+              alg: "RS256"
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+    throw new Error(`Unexpected request: ${url}`)
+  }
+
+  const dependencies: ChatGPTPlanSessionDependencies = {
+    fetch: fakeFetch,
+    now: () => NOW,
+    openExternal,
+    callbackTimeoutMs: 20
+  }
+  return {
+    ...stored,
+    session: new ChatGPTPlanSession(stored.context, dependencies),
+    authorize: () => authorize
+  }
+}
+
+const isSessionError = (
+  code: ChatGPTPlanSessionError["code"],
+  message?: RegExp
+) => (error: unknown) =>
+  error instanceof ChatGPTPlanSessionError &&
+  error.code === code &&
+  (!message || message.test(error.message))
+
+suite("ChatGPT Plan session", () => {
+  test("serializes concurrent refreshes and persists the rotated refresh token", async () => {
+    const stored = contextWith(
+      {
+        accessToken: "expired-access",
+        refreshToken: "refresh-old",
+        idToken: "id-old",
+        expiresAt: NOW - 1,
+        scopes: [REQUIRED_SCOPE, "offline_access"]
+      },
+      {
+        clientId: "oaiapp_test",
+        subject: "subject-1",
+        email: "dev@example.com"
+      }
+    )
+    let refreshCalls = 0
+    let refreshBody = ""
+    const fakeFetch: typeof fetch = async (input, init) => {
       const url = String(input)
       if (url.endsWith("/.well-known/openid-configuration")) {
-        return new Response(
-          JSON.stringify({
-            authorization_endpoint:
-              "https://auth.openai.com/api/accounts/authorize",
-            token_endpoint:
-              "https://auth.openai.com/api/accounts/oauth/token",
-            jwks_uri: "https://auth.openai.com/.well-known/jwks.json"
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          }
-        )
+        return discovery()
       }
       if (url.endsWith("/api/accounts/oauth/token")) {
-        return new Response(JSON.stringify({ error: "invalid_grant" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        })
+        refreshCalls++
+        refreshBody = String(init?.body || "")
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return new Response(
+          JSON.stringify({
+            access_token: "access-new",
+            refresh_token: "refresh-new",
+            id_token: "id-new",
+            token_type: "Bearer",
+            expires_in: 3600,
+            scope: `${REQUIRED_SCOPE} offline_access`
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
       }
       throw new Error(`Unexpected request: ${url}`)
     }
-
-    const session = new ChatGPTPlanSession(context, {
+    const session = new ChatGPTPlanSession(stored.context, {
       fetch: fakeFetch,
-      now: () => now
+      now: () => NOW
+    })
+
+    const tokens = await Promise.all([
+      session.getAccessToken(),
+      session.getAccessToken(),
+      session.getAccessToken()
+    ])
+
+    assert.deepStrictEqual(tokens, ["access-new", "access-new", "access-new"])
+    assert.strictEqual(refreshCalls, 1)
+    assert.match(refreshBody, /grant_type=refresh_token/)
+    assert.match(refreshBody, /client_id=oaiapp_test/)
+    assert.match(refreshBody, /refresh_token=refresh-old/)
+    assert.match(
+      refreshBody,
+      /resource=https%3A%2F%2Fapi.openai.com%2Fv1/
+    )
+    assert.doesNotMatch(refreshBody, /scope=/)
+
+    const persisted = JSON.parse(stored.readCredentials() || "{}") as {
+      accessToken: string
+      refreshToken: string
+      idToken: string
+      expiresAt: number
+    }
+    assert.strictEqual(persisted.accessToken, "access-new")
+    assert.strictEqual(persisted.refreshToken, "refresh-new")
+    assert.strictEqual(persisted.idToken, "id-new")
+    assert.strictEqual(persisted.expiresAt, NOW + 3_600_000)
+  })
+
+  test("does not refresh a still-valid token", async () => {
+    const stored = contextWith(
+      {
+        accessToken: "access-valid",
+        refreshToken: "refresh-valid",
+        idToken: "id-valid",
+        expiresAt: NOW + 30 * 60_000,
+        scopes: [REQUIRED_SCOPE]
+      },
+      { clientId: "oaiapp_test", subject: "subject-1" }
+    )
+    let requests = 0
+    const session = new ChatGPTPlanSession(stored.context, {
+      fetch: async () => {
+        requests++
+        throw new Error("A valid access token must not hit OAuth.")
+      },
+      now: () => NOW
+    })
+    assert.strictEqual(await session.getAccessToken(), "access-valid")
+    assert.strictEqual(requests, 0)
+  })
+
+  test("signs in with state, nonce and PKCE and stores only credentials in SecretStorage", async () => {
+    const fixture = signInFixture()
+    const status = await fixture.session.signIn()
+    assert.deepStrictEqual(status, {
+      connected: true,
+      sharing: true,
+      email: "dev@example.com",
+      name: "Dev",
+      clientId: "oaiapp_test"
+    })
+    const authorize = fixture.authorize()
+    assert.ok(authorize)
+    assert.strictEqual(authorize?.searchParams.get("client_id"), "dynamic_agent_client")
+    assert.strictEqual(authorize?.searchParams.get("code_challenge_method"), "S256")
+    assert.ok(authorize?.searchParams.get("code_challenge"))
+    assert.ok(authorize?.searchParams.get("state"))
+    assert.ok(authorize?.searchParams.get("nonce"))
+    assert.ok(fixture.readCredentials()?.includes("refresh-token"))
+    assert.doesNotMatch(JSON.stringify([...fixture.state.entries()]), /access-token|refresh-token/)
+  })
+
+  for (const [name, callback, message] of [
+    ["invalid state", "invalid-state", /invalid OAuth state/],
+    ["missing authorization code", "missing-code", /authorization code missing/],
+    ["OAuth error callback", "oauth-error", /access_denied/]
+  ] as Array<[string, CallbackKind, RegExp]>) {
+    test(`rejects ${name}`, async () => {
+      const fixture = signInFixture({ callback })
+      await assert.rejects(
+        fixture.session.signIn(),
+        isSessionError("oauth-failed", message)
+      )
+      assert.strictEqual(fixture.readCredentials(), undefined)
+    })
+  }
+
+  test("rejects a callback timeout", async () => {
+    const fixture = signInFixture({ callback: "timeout" })
+    await assert.rejects(
+      fixture.session.signIn(),
+      isSessionError("oauth-failed", /timed out/)
+    )
+  })
+
+  for (const [name, claims] of [
+    ["wrong nonce", { nonce: "wrong-nonce" }],
+    ["expired ID token", { exp: Math.floor(NOW / 1000) - 1 }],
+    ["wrong issuer", { iss: "https://example.invalid" }],
+    ["wrong audience", { aud: "another-client" }]
+  ] as Array<[string, Record<string, unknown>]>) {
+    test(`rejects ${name}`, async () => {
+      const fixture = signInFixture({ claims })
+      await assert.rejects(
+        fixture.session.signIn(),
+        isSessionError("oauth-failed", /claims validation failed/)
+      )
+      assert.strictEqual(fixture.readCredentials(), undefined)
+    })
+  }
+
+  test("rejects an invalid ID-token signature", async () => {
+    const fixture = signInFixture({ signingKey: otherKeys.privateKey })
+    await assert.rejects(
+      fixture.session.signIn(),
+      isSessionError("oauth-failed", /signature validation failed/)
+    )
+  })
+
+  test("rejects JWKS without the token kid", async () => {
+    const fixture = signInFixture({ jwksKid: "another-key" })
+    await assert.rejects(
+      fixture.session.signIn(),
+      isSessionError("oauth-failed", /signing key was not found/)
+    )
+  })
+
+  test("keeps identity but blocks inference when plan sharing was not granted", async () => {
+    const fixture = signInFixture({
+      scope: "email offline_access openid profile resource.invoke"
+    })
+    const status = await fixture.session.signIn()
+    assert.strictEqual(status.connected, true)
+    assert.strictEqual(status.sharing, false)
+    await assert.rejects(
+      fixture.session.getAccessToken(),
+      isSessionError("plan-not-enabled", /was not authorized/)
+    )
+  })
+
+  test("rejects a sign-in response without a refresh token", async () => {
+    const fixture = signInFixture({ refreshToken: null })
+    await assert.rejects(
+      fixture.session.signIn(),
+      isSessionError("oauth-failed", /renewable session credentials/)
+    )
+    assert.strictEqual(fixture.readCredentials(), undefined)
+  })
+
+  test("clears unusable tokens after a refresh 401", async () => {
+    const stored = contextWith(
+      {
+        accessToken: "expired-access",
+        refreshToken: "refresh-dead",
+        idToken: "id-old",
+        expiresAt: NOW - 1,
+        scopes: [REQUIRED_SCOPE, "offline_access"]
+      },
+      { clientId: "oaiapp_test", subject: "subject-1" }
+    )
+    const fakeFetch: typeof fetch = async (input) => {
+      const url = String(input)
+      if (url.endsWith("/.well-known/openid-configuration")) {
+        return discovery()
+      }
+      if (url.endsWith("/api/accounts/oauth/token")) {
+        return new Response(
+          JSON.stringify({ error: "invalid_refresh_token" }),
+          { status: 401, headers: { "Content-Type": "application/json" } }
+        )
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }
+    const session = new ChatGPTPlanSession(stored.context, {
+      fetch: fakeFetch,
+      now: () => NOW
     })
 
     await assert.rejects(
@@ -252,81 +450,69 @@ suite("ChatGPT Plan session", () => {
       (error: unknown) =>
         error instanceof ChatGPTPlanSessionError &&
         error.code === "reauthentication-required" &&
-        error.oauthCode === "invalid_grant"
+        error.oauthCode === "invalid_refresh_token" &&
+        error.status === 401
     )
-    assert.strictEqual(stored, undefined)
+    assert.strictEqual(stored.readCredentials(), undefined)
     assert.strictEqual((await session.status()).connected, false)
-    assert.strictEqual(
-      state.get(PROFILE_KEY) !== undefined,
-      true,
-      "issued client/account mapping is retained for reauthorization"
+    assert.ok(stored.state.has(PROFILE_KEY))
+  })
+
+  test("requires reauthentication when refresh omits its rotated token", async () => {
+    const stored = contextWith(
+      {
+        accessToken: "expired-access",
+        refreshToken: "refresh-old",
+        idToken: "id-old",
+        expiresAt: NOW - 1,
+        scopes: [REQUIRED_SCOPE]
+      },
+      { clientId: "oaiapp_test", subject: "subject-1" }
+    )
+    const session = new ChatGPTPlanSession(stored.context, {
+      now: () => NOW,
+      fetch: async (input) => {
+        const url = String(input)
+        if (url.endsWith("/.well-known/openid-configuration")) {
+          return discovery()
+        }
+        return new Response(
+          JSON.stringify({ access_token: "new", expires_in: 3600 }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      }
+    })
+    await assert.rejects(
+      session.getAccessToken(),
+      isSessionError("reauthentication-required", /rotated refresh token/)
     )
   })
 
   test("signs out locally even when remote revocation is unavailable", async () => {
-    let stored: string | undefined = JSON.stringify({
-      accessToken: "access",
-      refreshToken: "refresh",
-      idToken: "id",
-      expiresAt: 1_900_000_000_000,
-      scopes: ["chatgpt.tokens.use.direct", "offline_access"]
-    })
-    const state = new Map<string, unknown>([
-      [
-        PROFILE_KEY,
-        {
-          clientId: "oaiapp_test",
-          subject: "subject-1"
-        }
-      ]
-    ])
-    const context = {
-      globalState: {
-        get: <T>(key: string) => state.get(key) as T | undefined,
-        update: async (key: string, value: unknown) => {
-          state.set(key, value)
-        }
+    const stored = contextWith(
+      {
+        accessToken: "access",
+        refreshToken: "refresh",
+        idToken: "id",
+        expiresAt: NOW + 3600_000,
+        scopes: [REQUIRED_SCOPE, "offline_access"]
       },
-      secrets: {
-        get: async () => stored,
-        store: async (_key: string, value: string) => {
-          stored = value
-        },
-        delete: async () => {
-          stored = undefined
+      { clientId: "oaiapp_test", subject: "subject-1" }
+    )
+    const session = new ChatGPTPlanSession(stored.context, {
+      fetch: async (input) => {
+        const url = String(input)
+        if (url.endsWith("/.well-known/openid-configuration")) {
+          return discovery(true)
         }
+        if (url.endsWith("/api/accounts/oauth/revoke")) {
+          throw new Error("network unavailable")
+        }
+        throw new Error(`Unexpected request: ${url}`)
       }
-    } as unknown as ExtensionContext
-
-    const fakeFetch: typeof fetch = async (input) => {
-      const url = String(input)
-      if (url.endsWith("/.well-known/openid-configuration")) {
-        return new Response(
-          JSON.stringify({
-            authorization_endpoint:
-              "https://auth.openai.com/api/accounts/authorize",
-            token_endpoint:
-              "https://auth.openai.com/api/accounts/oauth/token",
-            jwks_uri: "https://auth.openai.com/.well-known/jwks.json",
-            revocation_endpoint:
-              "https://auth.openai.com/api/accounts/oauth/revoke"
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          }
-        )
-      }
-      if (url.endsWith("/api/accounts/oauth/revoke")) {
-        throw new Error("network unavailable")
-      }
-      throw new Error(`Unexpected request: ${url}`)
-    }
-
-    const session = new ChatGPTPlanSession(context, {
-      fetch: fakeFetch
     })
     assert.strictEqual(await session.signOut(), false)
-    assert.strictEqual(stored, undefined)
+    assert.strictEqual(stored.readCredentials(), undefined)
     assert.strictEqual((await session.status()).connected, false)
   })
+})
