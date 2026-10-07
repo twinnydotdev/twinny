@@ -21,6 +21,7 @@ import {
 } from "../types"
 
 import { logRequest, responseError } from "./json-stream"
+import { responseEvents } from "./responses-stream"
 
 const DEFAULT_BASE = "https://api.openai.com/v1"
 
@@ -92,51 +93,6 @@ const baseUrl = (config: TwinnyProvider) =>
     ? `${getProviderOrigin(config)}${config.apiPath || "/v1"}`.replace(/\/$/, "")
     : DEFAULT_BASE
 
-interface ResponsesEvent {
-  type: string
-  delta?: string
-  item?: { type: string; call_id?: string; name?: string; arguments?: string }
-  response?: {
-    status?: string
-    incomplete_details?: { reason?: string } | null
-    usage?: { input_tokens?: number; output_tokens?: number }
-    error?: { message?: string } | null
-  }
-  message?: string
-  error?: { message?: string }
-}
-
-/** Server-sent events, one parsed `data:` payload at a time. */
-async function* events(body: ReadableStream<Uint8Array>): AsyncGenerator<ResponsesEvent> {
-  const reader = body.pipeThrough(new TextDecoderStream()).getReader()
-  let buffer = ""
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buffer += value
-      let split: number
-      while ((split = buffer.indexOf("\n\n")) !== -1) {
-        const block = buffer.slice(0, split)
-        buffer = buffer.slice(split + 2)
-        const data = block
-          .split("\n")
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trim())
-          .join("")
-        if (!data || data === "[DONE]") continue
-        try {
-          yield JSON.parse(data) as ResponsesEvent
-        } catch {
-          // A malformed event is skipped; the stream carries on.
-        }
-      }
-    }
-  } finally {
-    await reader.cancel().catch(() => undefined)
-  }
-}
-
 /** One request to `/v1/responses`, streamed as twinny chat chunks. */
 export async function* responsesChat(
   config: TwinnyProvider,
@@ -179,7 +135,7 @@ export async function* responsesChat(
   if (!response.body) throw new Error("The server answered without a body.")
 
   const calls: ChatToolCall[] = []
-  for await (const event of events(response.body)) {
+  for await (const event of responseEvents(response.body)) {
     if (options?.signal?.aborted) return
     switch (event.type) {
       // A refusal is the model's answer too; left out, the reply would be blank.
