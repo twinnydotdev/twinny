@@ -149,7 +149,8 @@ export class BaseProvider {
     const providerManager = new ProviderManager(this.context, bridge, {
       teamChanged: async () => {
         await Promise.all([teamShare?.teamChanged(), teamPlugins?.teamChanged()])
-      }
+      },
+      chatGPTPlanSigningOut: () => this._generations.stopAll()
     })
     this.providers = providerManager
     if (this._p2p) {

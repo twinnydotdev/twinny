@@ -23,7 +23,13 @@ const contextWith = (
   credentials?: Record<string, unknown>,
   profile?: Record<string, unknown>
 ): StoredContext => {
-  let stored = credentials ? JSON.stringify(credentials) : undefined
+  let stored = credentials
+    ? JSON.stringify({
+        clientId: profile?.clientId,
+        subject: profile?.subject,
+        ...credentials
+      })
+    : undefined
   const state = new Map<string, unknown>()
   if (profile) state.set(PROFILE_KEY, profile)
   return {
@@ -318,6 +324,70 @@ suite("ChatGPT Plan session", () => {
     assert.strictEqual(requests, 0)
   })
 
+  test("does not return a refreshed token after plan sharing is removed", async () => {
+    const stored = contextWith(
+      {
+        accessToken: "expired-access",
+        refreshToken: "refresh-old",
+        idToken: "id-old",
+        expiresAt: NOW - 1,
+        scopes: [REQUIRED_SCOPE, "offline_access"]
+      },
+      { clientId: "oaiapp_test", subject: "subject-1" }
+    )
+    const session = new ChatGPTPlanSession(stored.context, {
+      now: () => NOW,
+      fetch: async (input) => {
+        const url = String(input)
+        if (url.endsWith("/.well-known/openid-configuration")) {
+          return discovery()
+        }
+        return new Response(
+          JSON.stringify({
+            access_token: "access-without-plan",
+            refresh_token: "refresh-new",
+            expires_in: 3600,
+            scope: "offline_access openid"
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      }
+    })
+
+    await assert.rejects(
+      session.getAccessToken(),
+      isSessionError("plan-not-enabled", /no longer authorized/)
+    )
+    assert.deepStrictEqual(await session.status(), {
+      connected: true,
+      sharing: false,
+      email: undefined,
+      name: undefined,
+      clientId: "oaiapp_test"
+    })
+  })
+
+  test("rejects credentials bound to another account registration", async () => {
+    const stored = contextWith(
+      {
+        clientId: "oaiapp_other",
+        subject: "subject-2",
+        accessToken: "access",
+        refreshToken: "refresh",
+        idToken: "id",
+        expiresAt: NOW + 3600_000,
+        scopes: [REQUIRED_SCOPE]
+      },
+      { clientId: "oaiapp_test", subject: "subject-1" }
+    )
+    const session = new ChatGPTPlanSession(stored.context, { now: () => NOW })
+    await assert.rejects(
+      session.getAccessToken(),
+      isSessionError("reauthentication-required", /do not match/)
+    )
+    assert.strictEqual(stored.readCredentials(), undefined)
+  })
+
   test("signs in with state, nonce and PKCE and stores only credentials in SecretStorage", async () => {
     const fixture = signInFixture()
     const status = await fixture.session.signIn()
@@ -512,6 +582,65 @@ suite("ChatGPT Plan session", () => {
       }
     })
     assert.strictEqual(await session.signOut(), false)
+    assert.strictEqual(stored.readCredentials(), undefined)
+    assert.strictEqual((await session.status()).connected, false)
+  })
+
+  test("waits for a rotating refresh before revoking and cannot resurrect sign-out", async () => {
+    const stored = contextWith(
+      {
+        accessToken: "expired-access",
+        refreshToken: "refresh-old",
+        idToken: "id-old",
+        expiresAt: NOW - 1,
+        scopes: [REQUIRED_SCOPE, "offline_access"]
+      },
+      { clientId: "oaiapp_test", subject: "subject-1" }
+    )
+    let refreshStarted!: () => void
+    const started = new Promise<void>((resolve) => (refreshStarted = resolve))
+    let finishRefresh!: (response: Response) => void
+    const refreshResponse = new Promise<Response>(
+      (resolve) => (finishRefresh = resolve)
+    )
+    let revokedBody = ""
+    const session = new ChatGPTPlanSession(stored.context, {
+      now: () => NOW,
+      fetch: async (input, init) => {
+        const url = String(input)
+        if (url.endsWith("/.well-known/openid-configuration")) {
+          return discovery(true)
+        }
+        if (url.endsWith("/api/accounts/oauth/token")) {
+          refreshStarted()
+          return refreshResponse
+        }
+        if (url.endsWith("/api/accounts/oauth/revoke")) {
+          revokedBody = String(init?.body || "")
+          return new Response("", { status: 200 })
+        }
+        throw new Error(`Unexpected request: ${url}`)
+      }
+    })
+
+    const token = session.getAccessToken()
+    await started
+    const signedOut = session.signOut()
+    finishRefresh(
+      new Response(
+        JSON.stringify({
+          access_token: "access-new",
+          refresh_token: "refresh-new",
+          expires_in: 3600,
+          scope: `${REQUIRED_SCOPE} offline_access`
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    )
+
+    await assert.rejects(token, isSessionError("not-signed-in", /signing out/))
+    assert.strictEqual(await signedOut, true)
+    assert.match(revokedBody, /token=refresh-new/)
     assert.strictEqual(stored.readCredentials(), undefined)
     assert.strictEqual((await session.status()).connected, false)
   })

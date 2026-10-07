@@ -21,7 +21,6 @@ import {
 import type { TeamOpen } from "../../common/team"
 import { TwinnyProvider } from "../../common/types"
 import { ChatGPTPlanSession } from "../chatgpt-plan/session"
-import { setChatGPTPlanAccessFactory } from "../inference/adapters/chatgpt-plan"
 import { ExtensionBridge } from "../messaging/bridge"
 
 import { RemoteCredentials } from "./credentials"
@@ -56,6 +55,8 @@ const ACTIVE_EVENTS = {
 export interface ProviderManagerHooks {
   /** After connecting to a team or leaving one. */
   teamChanged?(): Promise<void> | void
+  /** Stop requests before plan credentials are revoked and cleared. */
+  chatGPTPlanSigningOut?(): void
 }
 
 const TEAM_FEATURE_LABEL: Record<ProviderType, string> = { chat: "chat", fim: "autocomplete", embedding: "embeddings" }
@@ -65,6 +66,7 @@ export class ProviderManager {
   private readonly _bridge: ExtensionBridge
   private readonly _credentials: RemoteCredentials
   private readonly _chatGPTPlan: ChatGPTPlanSession
+  private readonly _chatGPTPlanRequests = new Set<AbortController>()
   private readonly _team: TeamConnection
   /** What an opened link asked the tab to show, until the tab collects it. */
   private _pendingOpen?: TeamOpen
@@ -79,7 +81,6 @@ export class ProviderManager {
     this._bridge = bridge
     this._credentials = new RemoteCredentials(context)
     this._chatGPTPlan = ChatGPTPlanSession.shared(context)
-    setChatGPTPlanAccessFactory(() => this._chatGPTPlan)
     this._policy = new TeamPolicyStore(context.globalState)
     this._team = new TeamConnection(
       this._store,
@@ -198,6 +199,8 @@ export class ProviderManager {
       [PROVIDER_EVENT_NAME.signInChatGPTPlan]: () =>
         this._chatGPTPlan.signIn(),
       [PROVIDER_EVENT_NAME.signOutChatGPTPlan]: async () => {
+        for (const controller of this._chatGPTPlanRequests) controller.abort()
+        this._hooks.chatGPTPlanSigningOut?.()
         const revoked = await this._chatGPTPlan.signOut()
         if (!revoked) {
           void window.showWarningMessage(
@@ -258,8 +261,12 @@ export class ProviderManager {
         void this.broadcastActive("fim"),
       [PROVIDER_EVENT_NAME.getAllProviders]: () => this.broadcastProviders(),
       [PROVIDER_EVENT_NAME.importProviders]: () => this.importProviders(),
-      [PROVIDER_EVENT_NAME.listProviderModels]: (p) =>
-        listProviderModels(resolveProviderEndpoint(normalizeProvider(p))),
+      [PROVIDER_EVENT_NAME.listProviderModels]: (p) => {
+        const provider = resolveProviderEndpoint(normalizeProvider(p))
+        return this.withChatGPTPlanSignal(provider, (signal) =>
+          listProviderModels(provider, signal)
+        )
+      },
       [PROVIDER_EVENT_NAME.removeProvider]: (p) => this.removeProvider(p),
       [PROVIDER_EVENT_NAME.resetProvidersToDefaults]: () =>
         this.resetProvidersToDefaults(),
@@ -269,11 +276,27 @@ export class ProviderManager {
         this.setActiveProvider("embedding", p),
       [PROVIDER_EVENT_NAME.setActiveFimProvider]: (p) =>
         this.setActiveProvider("fim", p),
-      [PROVIDER_EVENT_NAME.testProvider]: (p) =>
-        testProvider(resolveProviderEndpoint(normalizeProvider(p))),
+      [PROVIDER_EVENT_NAME.testProvider]: (p) => {
+        const provider = resolveProviderEndpoint(normalizeProvider(p))
+        return this.withChatGPTPlanSignal(provider, (signal) =>
+          testProvider(provider, undefined, signal)
+        )
+      },
       [PROVIDER_EVENT_NAME.updateProvider]: (p) => this.updateProvider(p),
       [PROVIDER_EVENT_NAME.useDiscoveredServer]: (server) =>
         this.useDiscoveredServer(server)
+    })
+  }
+
+  private withChatGPTPlanSignal<T>(
+    provider: TwinnyProvider,
+    run: (signal?: AbortSignal) => Promise<T>
+  ): Promise<T> {
+    if (provider.provider !== API_PROVIDERS.ChatGPTPlan) return run()
+    const controller = new AbortController()
+    this._chatGPTPlanRequests.add(controller)
+    return run(controller.signal).finally(() => {
+      this._chatGPTPlanRequests.delete(controller)
     })
   }
 
