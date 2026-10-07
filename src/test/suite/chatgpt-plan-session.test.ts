@@ -1,7 +1,7 @@
 import * as assert from "assert"
 import { ExtensionContext } from "vscode"
 
-import { ChatGPTPlanSession } from "../../extension/chatgpt-plan/session"
+import { ChatGPTPlanSession, ChatGPTPlanSessionError } from "../../extension/chatgpt-plan/session"
 
 const CREDENTIALS_KEY = "twinny.chatgpt-plan.credentials"
 const PROFILE_KEY = "twinny.chatgpt-plan.profile"
@@ -177,3 +177,156 @@ suite("ChatGPT Plan session", () => {
     assert.strictEqual(requests, 0)
   })
 })
+
+
+  test("clears unusable tokens after a terminal refresh error", async () => {
+    const now = 1_800_000_000_000
+    let stored: string | undefined = JSON.stringify({
+      accessToken: "expired-access",
+      refreshToken: "refresh-dead",
+      idToken: "id-old",
+      expiresAt: now - 1,
+      scopes: ["chatgpt.tokens.use.direct", "offline_access"]
+    })
+    const state = new Map<string, unknown>([
+      [
+        PROFILE_KEY,
+        {
+          clientId: "oaiapp_test",
+          subject: "subject-1"
+        }
+      ]
+    ])
+    const context = {
+      globalState: {
+        get: <T>(key: string) => state.get(key) as T | undefined,
+        update: async (key: string, value: unknown) => {
+          state.set(key, value)
+        }
+      },
+      secrets: {
+        get: async (key: string) =>
+          key === CREDENTIALS_KEY ? stored : undefined,
+        store: async (key: string, value: string) => {
+          if (key === CREDENTIALS_KEY) stored = value
+        },
+        delete: async (key: string) => {
+          if (key === CREDENTIALS_KEY) stored = undefined
+        }
+      }
+    } as unknown as ExtensionContext
+
+    const fakeFetch: typeof fetch = async (input) => {
+      const url = String(input)
+      if (url.endsWith("/.well-known/openid-configuration")) {
+        return new Response(
+          JSON.stringify({
+            authorization_endpoint:
+              "https://auth.openai.com/api/accounts/authorize",
+            token_endpoint:
+              "https://auth.openai.com/api/accounts/oauth/token",
+            jwks_uri: "https://auth.openai.com/.well-known/jwks.json"
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        )
+      }
+      if (url.endsWith("/api/accounts/oauth/token")) {
+        return new Response(JSON.stringify({ error: "invalid_grant" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }
+
+    const session = new ChatGPTPlanSession(context, {
+      fetch: fakeFetch,
+      now: () => now
+    })
+
+    await assert.rejects(
+      session.getAccessToken(),
+      (error: unknown) =>
+        error instanceof ChatGPTPlanSessionError &&
+        error.code === "reauthentication-required" &&
+        error.oauthCode === "invalid_grant"
+    )
+    assert.strictEqual(stored, undefined)
+    assert.strictEqual((await session.status()).connected, false)
+    assert.strictEqual(
+      state.get(PROFILE_KEY) !== undefined,
+      true,
+      "issued client/account mapping is retained for reauthorization"
+    )
+  })
+
+  test("signs out locally even when remote revocation is unavailable", async () => {
+    let stored: string | undefined = JSON.stringify({
+      accessToken: "access",
+      refreshToken: "refresh",
+      idToken: "id",
+      expiresAt: 1_900_000_000_000,
+      scopes: ["chatgpt.tokens.use.direct", "offline_access"]
+    })
+    const state = new Map<string, unknown>([
+      [
+        PROFILE_KEY,
+        {
+          clientId: "oaiapp_test",
+          subject: "subject-1"
+        }
+      ]
+    ])
+    const context = {
+      globalState: {
+        get: <T>(key: string) => state.get(key) as T | undefined,
+        update: async (key: string, value: unknown) => {
+          state.set(key, value)
+        }
+      },
+      secrets: {
+        get: async () => stored,
+        store: async (_key: string, value: string) => {
+          stored = value
+        },
+        delete: async () => {
+          stored = undefined
+        }
+      }
+    } as unknown as ExtensionContext
+
+    const fakeFetch: typeof fetch = async (input) => {
+      const url = String(input)
+      if (url.endsWith("/.well-known/openid-configuration")) {
+        return new Response(
+          JSON.stringify({
+            authorization_endpoint:
+              "https://auth.openai.com/api/accounts/authorize",
+            token_endpoint:
+              "https://auth.openai.com/api/accounts/oauth/token",
+            jwks_uri: "https://auth.openai.com/.well-known/jwks.json",
+            revocation_endpoint:
+              "https://auth.openai.com/api/accounts/oauth/revoke"
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        )
+      }
+      if (url.endsWith("/api/accounts/oauth/revoke")) {
+        throw new Error("network unavailable")
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }
+
+    const session = new ChatGPTPlanSession(context, {
+      fetch: fakeFetch
+    })
+    assert.strictEqual(await session.signOut(), false)
+    assert.strictEqual(stored, undefined)
+    assert.strictEqual((await session.status()).connected, false)
+  })
