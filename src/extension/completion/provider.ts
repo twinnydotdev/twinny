@@ -31,7 +31,12 @@ import {
   PrefixSuffix
 } from "../../common/types"
 import { GenerationRun, GenerationTracker } from "../generations"
-import { FimRequest, isCancelled, resolveInferenceProvider } from "../inference"
+import {
+  FimRequest,
+  FimStructuredContext,
+  isCancelled,
+  resolveInferenceProvider
+} from "../inference"
 import { Base } from "../providers/base"
 import { describeProviderErrorPlain } from "../providers/errors"
 import { TwinnyProvider } from "../providers/manager"
@@ -299,11 +304,12 @@ export class CompletionProvider
     const where = `${workspace.asRelativePath(document.uri)}:${position.line + 1}`
 
     if (this.isStale(request)) return
-    const [node, prompt] = await Promise.all([
+    const [node, prepared] = await Promise.all([
       this.getNodeAtCursor(document, position),
       this.getPrompt(request)
     ])
-    if (!prompt || this.isStale(request)) return
+    if (!prepared || this.isStale(request)) return
+    const { prompt, context } = prepared
     logger.info(
       `FIM #${request.id} → ${provider.modelName} · ${where} · ` +
         `prompt ${formatCount(prompt.length)} chars`
@@ -356,7 +362,14 @@ export class CompletionProvider
     let streamEnded = false
     try {
       const chunks = inference.fim(
-        this.buildFimRequest(prompt, provider, stopWords, prefixSuffix, request.wordFragment),
+        this.buildFimRequest(
+          prompt,
+          provider,
+          stopWords,
+          prefixSuffix,
+          request.wordFragment,
+          context
+        ),
         { signal: run.signal }
       )
       let stoppedEarly = false
@@ -474,7 +487,8 @@ export class CompletionProvider
     provider: TwinnyProvider,
     stopWords: string[],
     prefixSuffix: PrefixSuffix,
-    wordFragment = ""
+    wordFragment = "",
+    context?: FimStructuredContext
   ): FimRequest {
     const messages = getFimChat(
       provider.modelName,
@@ -488,6 +502,7 @@ export class CompletionProvider
       messages,
       prefix: prefixSuffix.prefix,
       suffix: prefixSuffix.suffix,
+      context,
       stop: stopWords,
       maxTokens: this.config.get<number>("numPredictFim", 512),
       temperature: this.config.get<number>("temperature", 0.2),
@@ -627,27 +642,54 @@ export class CompletionProvider
           language: languageId
         }
       )
-      if (template) return template
+      if (template) {
+        return {
+          prompt: template,
+          context: {
+            language: languageId,
+            fileName,
+            repoName: sanitizeWorkspaceName(workspace.name) || "untitled",
+            prefix: prefixSuffix.prefix,
+            suffix: prefixSuffix.suffix,
+            files: contextFiles
+          } satisfies FimStructuredContext
+        }
+      }
     }
 
+    const repoName = sanitizeWorkspaceName(workspace.name) || "untitled"
+    const context: FimStructuredContext = {
+      language: languageId,
+      fileName,
+      repoName,
+      prefix: prefixSuffix.prefix,
+      suffix: prefixSuffix.suffix,
+      files: contextFiles
+    }
     const templateArgs = {
       contextFiles,
       prefixSuffix,
       header: this.getPromptHeader(languageId, document.uri),
       language: languageId,
       fileName,
-      repoName: sanitizeWorkspaceName(workspace.name) || "untitled"
+      repoName
     }
 
     if (provider.repositoryLevel) {
-      return getFimTemplateRepositoryLevel(
-        templateArgs,
-        provider.modelName,
-        provider.fimTemplate
-      )
+      return {
+        prompt: getFimTemplateRepositoryLevel(
+          templateArgs,
+          provider.modelName,
+          provider.fimTemplate
+        ),
+        context
+      }
     }
 
-    return getFimPrompt(provider.modelName, provider.fimTemplate, templateArgs)
+    return {
+      prompt: getFimPrompt(provider.modelName, provider.fimTemplate, templateArgs),
+      context
+    }
   }
 
   /** Called by the activation code once the editor has inserted a suggestion. */
