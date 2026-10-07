@@ -34,7 +34,12 @@ export const LOOPBACK = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1|\[::1\])
  * it listens on loopback.
  */
 export const leavesMachine = (provider: TwinnyProvider): boolean => {
-  if (HOSTED_PROVIDERS.includes(provider.provider)) return true
+  if (
+    HOSTED_PROVIDERS.includes(provider.provider) ||
+    provider.provider === API_PROVIDERS.ChatGPTPlan
+  ) {
+    return true
+  }
   if (
     provider.provider === API_PROVIDERS.TwinnyP2P ||
     provider.provider === API_PROVIDERS.TwinnyRemote
