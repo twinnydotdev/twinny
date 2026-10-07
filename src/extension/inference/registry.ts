@@ -12,6 +12,7 @@ import { HOSTED_PROVIDERS } from "../../common/provider-validation"
 import { TwinnyProvider } from "../../common/types"
 import { RemoteInferenceProvider } from "../../protocol/client"
 
+import { ChatGPTPlanInferenceProvider } from "./adapters/chatgpt-plan"
 import { HostedInferenceProvider } from "./adapters/hosted"
 import { HttpInferenceProvider } from "./adapters/http"
 import { InferenceError, toInferenceError, unsupportedCapability } from "./errors"
@@ -159,11 +160,17 @@ export const remoteAdapter: InferenceAdapter = {
   create: (config) => RemoteInferenceProvider.fromProvider(config, undefined, workspaceName)
 }
 
+export const chatGPTPlanAdapter: InferenceAdapter = {
+  id: "chatgpt-plan",
+  create: (config) => new ChatGPTPlanInferenceProvider(config)
+}
+
 /** The registry the extension uses, with every built-in kind served. */
 export const providerRegistry = new ProviderRegistry()
   .register(Object.values(OPEN_AI_COMPATIBLE_PROVIDERS), httpAdapter)
   .register(HOSTED_PROVIDERS, hostedAdapter)
   .register(API_PROVIDERS.TwinnyRemote, remoteAdapter)
+  .register(API_PROVIDERS.ChatGPTPlan, chatGPTPlanAdapter)
 
 /** The `twinny.secretShield` setting, when VS Code is around. */
 const secretShieldMode = (): SecretShieldMode => {
