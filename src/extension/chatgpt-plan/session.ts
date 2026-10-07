@@ -23,6 +23,15 @@ const SCOPES = [
 const REFRESH_SKEW_MS = 60_000
 const CALLBACK_TIMEOUT_MS = 5 * 60_000
 
+const TERMINAL_REFRESH_ERRORS = new Set([
+  "invalid_grant",
+  "invalid_refresh_token",
+  "token_expired",
+  "refresh_token_expired",
+  "refresh_token_invalidated",
+  "refresh_token_reused"
+])
+
 interface OpenIdConfiguration {
   authorization_endpoint: string
   token_endpoint: string
@@ -76,7 +85,9 @@ export class ChatGPTPlanSessionError extends Error {
       | "plan-not-enabled"
       | "reauthentication-required"
       | "oauth-failed",
-    message: string
+    message: string,
+    public readonly oauthCode?: string,
+    public readonly status?: number
   ) {
     super(message)
     this.name = "ChatGPTPlanSessionError"
@@ -115,11 +126,27 @@ const scopesOf = (scope: string | undefined) =>
 const json = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const detail = (await response.text().catch(() => "")).trim().slice(0, 500)
+    let oauthCode: string | undefined
+    if (detail) {
+      try {
+        const parsed = JSON.parse(detail) as {
+          error?: string | { code?: string }
+        }
+        oauthCode =
+          typeof parsed.error === "string"
+            ? parsed.error
+            : parsed.error?.code
+      } catch {
+        // Keep non-JSON diagnostic text in the message below.
+      }
+    }
     throw new ChatGPTPlanSessionError(
       response.status === 400 || response.status === 401
         ? "reauthentication-required"
         : "oauth-failed",
-      `OpenAI OAuth request failed (${response.status})${detail ? `: ${detail}` : ""}`
+      `OpenAI OAuth request failed (${response.status})${detail ? `: ${detail}` : ""}`,
+      oauthCode,
+      response.status
     )
   }
   return (await response.json()) as T
@@ -128,6 +155,8 @@ const json = async <T>(response: Response): Promise<T> => {
 export class ChatGPTPlanSession {
   private _discovery?: Promise<OpenIdConfiguration>
   private _refresh?: Promise<ChatGPTPlanCredentials>
+  /** Issued by dynamic registration before identity validation completes. */
+  private _pendingClientId?: string
 
   public static shared(context: ExtensionContext) {
     const existing = shared.get(context)
@@ -204,8 +233,9 @@ export class ChatGPTPlanSession {
     const verifier = randomValue(48)
     const callback = await this.callback(state)
 
-    const initial = !profile?.clientId
-    const clientId = profile?.clientId || DYNAMIC_CLIENT_ID
+    const registeredClientId = profile?.clientId || this._pendingClientId
+    const initial = !registeredClientId
+    const clientId = registeredClientId || DYNAMIC_CLIENT_ID
     const authorize = new URL(discovery.authorization_endpoint)
     authorize.searchParams.set("client_id", clientId)
     authorize.searchParams.set("ext_agent_host_id", hostId)
@@ -237,7 +267,13 @@ export class ChatGPTPlanSession {
     const returned = await callback.result
     const issuedClientId = initial
       ? returned.clientId
-      : profile?.clientId
+      : registeredClientId
+
+    if (initial && issuedClientId) {
+      // If token exchange reports invalid_grant, reuse this issued ID for
+      // the next authorization attempt instead of registering another client.
+      this._pendingClientId = issuedClientId
+    }
 
     if (!issuedClientId) {
       throw new ChatGPTPlanSessionError(
@@ -298,34 +334,41 @@ export class ChatGPTPlanSession {
       email: identity.email,
       name: identity.name
     } as ChatGPTPlanProfile)
+    this._pendingClientId = undefined
 
     return this.status()
   }
 
-  public async signOut(): Promise<void> {
+  public async signOut(): Promise<boolean> {
     const profile = this._context.globalState.get<ChatGPTPlanProfile>(PROFILE_KEY)
     const credentials = await this.readCredentials()
+    let revocationConfirmed = true
     if (profile && credentials) {
       try {
         const discovery = await this.discovery()
-        if (discovery.revocation_endpoint) {
+        if (!discovery.revocation_endpoint) {
+          revocationConfirmed = false
+        } else {
           const body = new URLSearchParams({
             token: credentials.refreshToken,
             token_type_hint: "refresh_token",
             client_id: profile.clientId
           })
-          await this.request(discovery.revocation_endpoint, {
+          const response = await this.request(discovery.revocation_endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: body.toString()
           })
+          revocationConfirmed = response.ok
         }
       } catch {
-        // Signing out locally must still succeed. The retained registration
-        // lets the user reconnect later with the same issued client ID.
+        revocationConfirmed = false
       }
     }
+    // Local sign-out always wins. Keep the account/client mapping so the
+    // same registered client can be reused on a later sign-in.
     await this._context.secrets.delete(CREDENTIALS_KEY)
+    return revocationConfirmed
   }
 
   private async hostId(): Promise<string> {
@@ -379,13 +422,26 @@ export class ChatGPTPlanSession {
         refresh_token: current.refreshToken,
         resource: RESOURCE
       })
-      const token = await json<TokenResponse>(
-        await this.request(discovery.token_endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: body.toString()
-        })
-      )
+      let token: TokenResponse
+      try {
+        token = await json<TokenResponse>(
+          await this.request(discovery.token_endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: body.toString()
+          })
+        )
+      } catch (error) {
+        if (
+          error instanceof ChatGPTPlanSessionError &&
+          error.oauthCode &&
+          TERMINAL_REFRESH_ERRORS.has(error.oauthCode)
+        ) {
+          // The registered client remains valid; only this token set is dead.
+          await this._context.secrets.delete(CREDENTIALS_KEY)
+        }
+        throw error
+      }
       if (!token.refresh_token) {
         throw new ChatGPTPlanSessionError(
           "reauthentication-required",
