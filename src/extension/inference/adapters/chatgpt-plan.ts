@@ -1,10 +1,10 @@
 import { logger } from "../../../common/logger"
 import { TwinnyProvider } from "../../../common/types"
-import { getContext } from "../../context"
 import {
   ChatGPTPlanSession,
   ChatGPTPlanSessionError
 } from "../../chatgpt-plan/session"
+import { getContext } from "../../context"
 import { InferenceError } from "../errors"
 import {
   FimChunk,
