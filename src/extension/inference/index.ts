@@ -31,6 +31,7 @@ export type {
   EmbeddingResponse,
   FimChunk,
   FimRequest,
+  FimStructuredContext,
   InferenceCapability,
   InferenceClient,
   InferenceModel,
