@@ -8,6 +8,7 @@ import {
   isProviderLike,
   normalizeProvider,
   summarizeProvider,
+  supportsType,
   usesEndpoint,
   validateProvider
 } from "../../common/provider-validation"
@@ -223,6 +224,38 @@ suite("Provider validation", () => {
       assert.strictEqual(usesEndpoint(API_PROVIDERS.OpenAI, "chat"), false)
       assert.strictEqual(usesEndpoint(API_PROVIDERS.OpenAI, "embedding"), true)
       assert.strictEqual(usesEndpoint(API_PROVIDERS.Ollama, "chat"), true)
+    })
+
+    test("ChatGPT Plan is FIM-only and has no user-configurable endpoint", () => {
+      assert.strictEqual(supportsType(API_PROVIDERS.ChatGPTPlan, "fim"), true)
+      assert.strictEqual(supportsType(API_PROVIDERS.ChatGPTPlan, "chat"), false)
+      assert.strictEqual(
+        supportsType(API_PROVIDERS.ChatGPTPlan, "embedding"),
+        false
+      )
+      assert.strictEqual(
+        hasConfigurableEndpoint(API_PROVIDERS.ChatGPTPlan, "fim"),
+        false
+      )
+      assert.strictEqual(usesEndpoint(API_PROVIDERS.ChatGPTPlan, "fim"), false)
+
+      const normalized = normalizeProvider({
+        ...ollamaChat,
+        provider: API_PROVIDERS.ChatGPTPlan,
+        type: "fim",
+        label: "ChatGPT Plan",
+        modelName: "gpt-test",
+        apiHostname: "should-not-survive",
+        apiPort: 9999,
+        apiPath: "/private",
+        apiKey: "must-not-survive"
+      })
+      assert.strictEqual(normalized.apiHostname, "")
+      assert.strictEqual(normalized.apiPort, undefined)
+      assert.strictEqual(normalized.apiPath, "")
+      assert.strictEqual(normalized.apiKey, "")
+      assert.strictEqual(normalized.fimTemplate, undefined)
+      assert.ok(validateProvider(normalized).valid)
     })
 
     test("describes the URL a chat request will really hit", () => {
