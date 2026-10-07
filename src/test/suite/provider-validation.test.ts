@@ -248,13 +248,17 @@ suite("Provider validation", () => {
         apiHostname: "should-not-survive",
         apiPort: 9999,
         apiPath: "/private",
-        apiKey: "must-not-survive"
+        apiKey: "must-not-survive",
+        reasoningEffort: "low",
+        fastMode: true
       })
       assert.strictEqual(normalized.apiHostname, "")
       assert.strictEqual(normalized.apiPort, undefined)
       assert.strictEqual(normalized.apiPath, "")
       assert.strictEqual(normalized.apiKey, "")
       assert.strictEqual(normalized.fimTemplate, undefined)
+      assert.strictEqual(normalized.reasoningEffort, "low")
+      assert.strictEqual(normalized.fastMode, true)
       assert.ok(validateProvider(normalized).valid)
     })
 

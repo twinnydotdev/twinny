@@ -184,6 +184,25 @@ export const getEndpointDefaults = (
 const trim = (value: unknown) =>
   typeof value === "string" ? value.trim() : ""
 
+const REASONING_EFFORTS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max"
+] as const
+
+const reasoningEffort = (
+  value: unknown
+): TwinnyProvider["reasoningEffort"] =>
+  REASONING_EFFORTS.includes(
+    trim(value) as (typeof REASONING_EFFORTS)[number]
+  )
+    ? (trim(value) as TwinnyProvider["reasoningEffort"])
+    : undefined
+
 /** Junk stays NaN rather than vanishing, so validation can point at it. */
 const parsePort = (value: unknown): number | undefined => {
   if (value === undefined || value === null || value === "") return undefined
@@ -280,6 +299,8 @@ export const normalizeProvider = (input: TwinnyProvider): TwinnyProvider => {
     normalized.apiKey = ""
     normalized.apiProtocol = "https"
     normalized.fimTemplate = undefined
+    normalized.reasoningEffort = reasoningEffort(input.reasoningEffort)
+    if (input.fastMode === true) normalized.fastMode = true
   }
 
   return normalized

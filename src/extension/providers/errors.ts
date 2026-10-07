@@ -48,7 +48,14 @@ export const describeProviderError = (
 
   switch (failure.kind) {
     case "unsupported-capability":
-      summary = `${name} cannot do this. Pick a provider that supports it.`
+      summary =
+        provider.provider === API_PROVIDERS.ChatGPTPlan &&
+        /service[_ -]?tier|fast mode/i.test(raw)
+          ? `${name} cannot use Fast mode for this account or model. Disable Fast mode and test again.`
+          : provider.provider === API_PROVIDERS.ChatGPTPlan &&
+              /reasoning(?:[._ -]?effort)?/i.test(raw)
+            ? `${name} does not support this reasoning effort. Choose another effort and test again.`
+            : `${name} cannot do this. Pick a provider that supports it.`
       break
     case "provider-unavailable":
       summary =

@@ -266,6 +266,17 @@ export interface TwinnyProvider {
   label: string
   logo?: ReactNode
   modelName: string
+  /** Responses reasoning budget for ChatGPT Plan completions. Unset uses the model default. */
+  reasoningEffort?:
+    | "none"
+    | "minimal"
+    | "low"
+    | "medium"
+    | "high"
+    | "xhigh"
+    | "max"
+  /** Ask the Responses API for Fast mode when the account and model allow it. */
+  fastMode?: boolean
   provider: string
   repositoryLevel?: boolean
   type: string
