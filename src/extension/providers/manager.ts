@@ -196,7 +196,12 @@ export class ProviderManager {
       [PROVIDER_EVENT_NAME.signInChatGPTPlan]: () =>
         this._chatGPTPlan.signIn(),
       [PROVIDER_EVENT_NAME.signOutChatGPTPlan]: async () => {
-        await this._chatGPTPlan.signOut()
+        const revoked = await this._chatGPTPlan.signOut()
+        if (!revoked) {
+          void window.showWarningMessage(
+            "Signed out of ChatGPT locally, but remote session revocation could not be confirmed. You can disconnect Twinny from ChatGPT Settings."
+          )
+        }
         return this._chatGPTPlan.status()
       },
       [PROVIDER_EVENT_NAME.previewTeam]: async (input) => {
