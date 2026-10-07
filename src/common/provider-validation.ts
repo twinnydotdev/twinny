@@ -25,7 +25,6 @@ export const PROVIDER_TYPES: ProviderType[] = ["chat", "fim", "embedding"]
 export const HOSTED_PROVIDERS: string[] = [
   API_PROVIDERS.Anthropic,
   API_PROVIDERS.OpenAI,
-  API_PROVIDERS.ChatGPTPlan,
   API_PROVIDERS.Mistral,
   API_PROVIDERS.Groq,
   API_PROVIDERS.OpenRouter,
@@ -36,9 +35,7 @@ export const HOSTED_PROVIDERS: string[] = [
 
 /** Providers that will reject a request without a key. */
 const KEY_REQUIRED_PROVIDERS: string[] = [
-  ...HOSTED_PROVIDERS.filter(
-    (provider) => provider !== API_PROVIDERS.ChatGPTPlan
-  ),
+  ...HOSTED_PROVIDERS,
   API_PROVIDERS.Deepseek
 ]
 
