@@ -139,14 +139,15 @@ export const listProviderModels = async (
   }
   try {
     const models = await resolveInferenceProvider(provider).models()
+    const labels = Object.fromEntries(
+      models
+        .filter((model) => model.name && model.name !== model.id)
+        .map((model) => [model.id, model.name])
+    )
     return models.length
       ? {
           models: models.map((model) => model.id),
-          labels: Object.fromEntries(
-            models
-              .filter((model) => model.name && model.name !== model.id)
-              .map((model) => [model.id, model.name])
-          )
+          ...(Object.keys(labels).length ? { labels } : {})
         }
       : { models: [], error: "The server did not list any models." }
   } catch (error) {

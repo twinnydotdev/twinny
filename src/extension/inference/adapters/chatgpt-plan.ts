@@ -1,10 +1,5 @@
 import { logger } from "../../../common/logger"
 import { TwinnyProvider } from "../../../common/types"
-import {
-  ChatGPTPlanSession,
-  ChatGPTPlanSessionError
-} from "../../chatgpt-plan/session"
-import { getContext } from "../../context"
 import { InferenceError } from "../errors"
 import {
   FimChunk,
@@ -34,27 +29,35 @@ export interface ChatGPTPlanAccess {
   getAccessToken(): Promise<string>
 }
 
+let accessFactory: (() => ChatGPTPlanAccess) | undefined
+
+/** Installed by the extension host; the headless gateway never owns OAuth state. */
+export const setChatGPTPlanAccessFactory = (
+  factory: (() => ChatGPTPlanAccess) | undefined
+) => {
+  accessFactory = factory
+}
+
 export interface ChatGPTPlanEndpoints {
   models?: string
   responses?: string
 }
 
 const defaultAccess = (): ChatGPTPlanAccess => {
-  const context = getContext()
-  if (!context) {
+  if (!accessFactory) {
     throw new InferenceError(
       "authentication",
-      "Twinny has no extension context for ChatGPT Plan authentication."
+      "Twinny has no ChatGPT Plan authentication session."
     )
   }
-  return ChatGPTPlanSession.shared(context)
+  return accessFactory()
 }
 
 const authError = (error: unknown) => {
-  if (!(error instanceof ChatGPTPlanSessionError)) return error
+  if (error instanceof InferenceError) return error
   return new InferenceError(
     "authentication",
-    error.message,
+    error instanceof Error ? error.message : String(error),
     { cause: error }
   )
 }
@@ -102,12 +105,13 @@ const completionInput = (request: FimRequest): string => {
 }
 
 const failure = (event: {
+  code?: string | null
   response?: { error?: { code?: string; message?: string } | null }
   error?: { code?: string; message?: string }
   message?: string
 }) => {
   const problem = event.response?.error || event.error
-  const code = problem?.code
+  const code = problem?.code || event.code || undefined
   const message = problem?.message || event.message || "The response failed."
   const error = new Error(code ? `${code}: ${message}` : message) as Error & {
     code?: string

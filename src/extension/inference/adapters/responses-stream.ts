@@ -7,6 +7,7 @@
  */
 export interface ResponsesEvent {
   type: string
+  code?: string | null
   delta?: string
   item?: { type: string; call_id?: string; name?: string; arguments?: string }
   response?: {
