@@ -28,6 +28,7 @@ import { messageOf } from "./common/errors"
 import { formatMs, logger } from "./common/logger"
 import { getLineBreakCount } from "./common/text"
 import { ContextItem, SelectionContextItem } from "./common/types"
+import { ChatGPTPlanSession } from "./extension/chatgpt-plan/session"
 import { FileInteractionCache } from "./extension/completion/file-interaction"
 import { CompletionProvider } from "./extension/completion/provider"
 import { setContext } from "./extension/context"
@@ -41,6 +42,7 @@ import {
 } from "./extension/edit/service"
 import { WorkspaceIndex } from "./extension/embeddings"
 import { GenerationTracker } from "./extension/generations"
+import { setChatGPTPlanAccessFactory } from "./extension/inference/adapters/chatgpt-plan"
 import { P2pRuntime } from "./extension/p2p/runtime"
 import { RemoteCredentials } from "./extension/providers/credentials"
 import { providerUrl } from "./extension/providers/errors"
@@ -164,6 +166,11 @@ const logStartup = (context: ExtensionContext, startedAt: number) => {
 
 export async function activate(context: ExtensionContext) {
   setContext(context)
+  const chatGPTPlan = ChatGPTPlanSession.shared(context)
+  setChatGPTPlanAccessFactory(() => chatGPTPlan)
+  context.subscriptions.push({
+    dispose: () => setChatGPTPlanAccessFactory(undefined)
+  })
   // Every model request runs on the tracker: the spinner, the stop
   // keybinding and the stop command all read it.
   const generations = new GenerationTracker()

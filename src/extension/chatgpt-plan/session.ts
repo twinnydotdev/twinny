@@ -57,6 +57,8 @@ interface ChatGPTPlanProfile {
 }
 
 interface ChatGPTPlanCredentials {
+  clientId: string
+  subject: string
   accessToken: string
   refreshToken: string
   idToken: string
@@ -157,6 +159,9 @@ const json = async <T>(response: Response): Promise<T> => {
 export class ChatGPTPlanSession {
   private _discovery?: Promise<OpenIdConfiguration>
   private _refresh?: Promise<ChatGPTPlanCredentials>
+  private _signIn?: Promise<ChatGPTPlanStatus>
+  private _signOut?: Promise<boolean>
+  private _signingOut = false
   /** Issued by dynamic registration before identity validation completes. */
   private _pendingClientId?: string
 
@@ -184,9 +189,14 @@ export class ChatGPTPlanSession {
   public async status(): Promise<ChatGPTPlanStatus> {
     const profile = this._context.globalState.get<ChatGPTPlanProfile>(PROFILE_KEY)
     const credentials = await this.readCredentials()
+    const bound =
+      !!profile &&
+      !!credentials &&
+      credentials.clientId === profile.clientId &&
+      credentials.subject === profile.subject
     return {
-      connected: !!profile && !!credentials,
-      sharing: !!credentials?.scopes.includes(REQUIRED_SCOPE),
+      connected: bound,
+      sharing: bound && credentials.scopes.includes(REQUIRED_SCOPE),
       email: profile?.email,
       name: profile?.name,
       clientId: profile?.clientId
@@ -194,11 +204,35 @@ export class ChatGPTPlanSession {
   }
 
   public async getAccessToken(): Promise<string> {
+    if (this._signingOut) {
+      throw new ChatGPTPlanSessionError(
+        "not-signed-in",
+        "The ChatGPT session is signing out."
+      )
+    }
+    const profile = this._context.globalState.get<ChatGPTPlanProfile>(PROFILE_KEY)
     const credentials = await this.readCredentials()
     if (!credentials) {
       throw new ChatGPTPlanSessionError(
         "not-signed-in",
         "Sign in with ChatGPT before using this provider."
+      )
+    }
+    if (
+      !profile ||
+      credentials.clientId !== profile.clientId ||
+      credentials.subject !== profile.subject
+    ) {
+      await this._context.secrets.delete(CREDENTIALS_KEY)
+      throw new ChatGPTPlanSessionError(
+        "reauthentication-required",
+        "The ChatGPT credentials do not match the registered account. Sign in again."
+      )
+    }
+    if (this._signingOut) {
+      throw new ChatGPTPlanSessionError(
+        "not-signed-in",
+        "The ChatGPT session is signing out."
       )
     }
     if (!credentials.scopes.includes(REQUIRED_SCOPE)) {
@@ -221,10 +255,36 @@ export class ChatGPTPlanSession {
     }
 
     const refreshed = await this.refresh(credentials)
+    if (this._signingOut) {
+      throw new ChatGPTPlanSessionError(
+        "not-signed-in",
+        "The ChatGPT session is signing out."
+      )
+    }
+    if (!refreshed.scopes.includes(REQUIRED_SCOPE)) {
+      throw new ChatGPTPlanSessionError(
+        "plan-not-enabled",
+        "ChatGPT plan usage is no longer authorized for Twinny."
+      )
+    }
     return refreshed.accessToken
   }
 
   public async signIn(): Promise<ChatGPTPlanStatus> {
+    if (this._signIn) return this._signIn
+    const attempt = (async () => {
+      if (this._signOut) await this._signOut
+      return this.signInOnce()
+    })()
+    this._signIn = attempt
+    try {
+      return await attempt
+    } finally {
+      if (this._signIn === attempt) this._signIn = undefined
+    }
+  }
+
+  private async signInOnce(): Promise<ChatGPTPlanStatus> {
     const discovery = await this.discovery()
     const profile = this._context.globalState.get<ChatGPTPlanProfile>(PROFILE_KEY)
     const previous = await this.readCredentials()
@@ -321,6 +381,8 @@ export class ChatGPTPlanSession {
 
     const scopes = scopesOf(token.scope)
     const credentials: ChatGPTPlanCredentials = {
+      clientId: issuedClientId,
+      subject: identity.subject,
       accessToken: token.access_token,
       refreshToken: token.refresh_token,
       idToken: token.id_token,
@@ -344,6 +406,21 @@ export class ChatGPTPlanSession {
   }
 
   public async signOut(): Promise<boolean> {
+    if (this._signOut) return this._signOut
+    this._signingOut = true
+    const attempt = this.signOutOnce()
+    this._signOut = attempt
+    try {
+      return await attempt
+    } finally {
+      if (this._signOut === attempt) this._signOut = undefined
+      this._signingOut = false
+    }
+  }
+
+  private async signOutOnce(): Promise<boolean> {
+    if (this._signIn) await this._signIn.catch(() => undefined)
+    if (this._refresh) await this._refresh.catch(() => undefined)
     const profile = this._context.globalState.get<ChatGPTPlanProfile>(PROFILE_KEY)
     const credentials = await this.readCredentials()
     let revocationConfirmed = true
@@ -454,6 +531,8 @@ export class ChatGPTPlanSession {
       }
       const scopes = token.scope ? scopesOf(token.scope) : current.scopes
       const next: ChatGPTPlanCredentials = {
+        clientId: profile.clientId,
+        subject: profile.subject,
         accessToken: token.access_token,
         refreshToken: token.refresh_token,
         idToken: token.id_token || current.idToken,
