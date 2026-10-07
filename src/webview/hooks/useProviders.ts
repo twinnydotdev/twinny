@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 import { PROVIDER_EVENT_NAME } from "../../common/constants"
 import { messageOf } from "../../common/errors"
 import {
+  ChatGPTPlanStatus,
   ProviderModelList,
   ProviderSaveResult,
   ProviderTestResult
@@ -90,6 +91,12 @@ export const useProviders = () => {
       bridge.request(PROVIDER_EVENT_NAME.addProvider, p),
     updateProvider: (p: TwinnyProvider): Promise<ProviderSaveResult> =>
       bridge.request(PROVIDER_EVENT_NAME.updateProvider, p),
+    getChatGPTPlanStatus: (): Promise<ChatGPTPlanStatus> =>
+      bridge.request(PROVIDER_EVENT_NAME.getChatGPTPlanStatus),
+    signInChatGPTPlan: (): Promise<ChatGPTPlanStatus> =>
+      bridge.request(PROVIDER_EVENT_NAME.signInChatGPTPlan),
+    signOutChatGPTPlan: (): Promise<ChatGPTPlanStatus> =>
+      bridge.request(PROVIDER_EVENT_NAME.signOutChatGPTPlan),
     /** Sends one real request to the provider and reports what happened. */
     testProvider: (p: TwinnyProvider): Promise<ProviderTestResult> =>
       bridge.request(PROVIDER_EVENT_NAME.testProvider, p).catch(failed),
