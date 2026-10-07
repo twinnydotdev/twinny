@@ -145,6 +145,13 @@ export const PRESETS: ProviderPreset[] = [
   local(API_PROVIDERS.OpenAICompatible, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
   gateway("fim"),
   hosted(
+    API_PROVIDERS.ChatGPTPlan,
+    "ChatGPT Plan",
+    <SvgOpenAI />,
+    "",
+    "fim"
+  ),
+  hosted(
     API_PROVIDERS.Mistral,
     "Codestral",
     <SvgMistral />,
