@@ -21,6 +21,7 @@ import {
 import type { TeamOpen } from "../../common/team"
 import { TwinnyProvider } from "../../common/types"
 import { ChatGPTPlanSession } from "../chatgpt-plan/session"
+import { setChatGPTPlanAccessFactory } from "../inference/adapters/chatgpt-plan"
 import { ExtensionBridge } from "../messaging/bridge"
 
 import { RemoteCredentials } from "./credentials"
@@ -78,6 +79,7 @@ export class ProviderManager {
     this._bridge = bridge
     this._credentials = new RemoteCredentials(context)
     this._chatGPTPlan = ChatGPTPlanSession.shared(context)
+    setChatGPTPlanAccessFactory(() => this._chatGPTPlan)
     this._policy = new TeamPolicyStore(context.globalState)
     this._team = new TeamConnection(
       this._store,
