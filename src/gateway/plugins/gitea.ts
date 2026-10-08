@@ -4,7 +4,7 @@
  * read with an access token (scope: read on repository). Statuses and
  * reviews come from their own routes; a pull's changes from its `.diff`.
  */
-import { arr, baseUrlOf, CheckState, Forge, IssueSummary, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str } from "./forge"
+import { arr, baseUrlOf, CheckState, Forge, IssueSummary, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str, tokenProbe } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
 import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
@@ -61,6 +61,16 @@ export class GiteaForge implements Forge {
   public async whoAmI(repo: RepoRecord, signal: AbortSignal): Promise<string | undefined> {
     const answer = await readJson(await this._context.fetch(`${this.baseUrl}/api/v1/user`, { headers: this.headers(repo), signal }), "Asking the host who the token is")
     return str(answer.login) || undefined
+  }
+
+  public async listRepos(token: string, signal: AbortSignal): Promise<string[]> {
+    const names: string[] = []
+    for (let page = 1; names.length < MAX_LISTED_REPOS; page++) {
+      const answer = arr(await readJson(await this._context.fetch(`${this.baseUrl}/api/v1/user/repos?limit=50&page=${page}`, { headers: this.headers(tokenProbe(token)), signal }), "Listing what the token can read"))
+      names.push(...answer.map((entry) => str(rec(entry).full_name)).filter(Boolean))
+      if (answer.length < 50) break
+    }
+    return names.slice(0, MAX_LISTED_REPOS)
   }
 
   public async checkRepo(repo: RepoRecord, signal: AbortSignal): Promise<string> {
@@ -231,7 +241,7 @@ export const giteaPlugin: GatewayPlugin = {
   id: "gitea",
   name: "Gitea / Forgejo",
   description:
-    "Watch repositories on your own Gitea or Forgejo (or Codeberg) and see their open pull requests, statuses and reviews. Reads with an access token per repository.",
+    "Watch repositories on your own Gitea or Forgejo (or Codeberg) and see their open pull requests, statuses and reviews. Reads with access tokens saved once and shared by any number of repositories.",
   memberRoutes: MEMBER_ROUTES,
   create: (context) => new PullsPlugin(context, (store, ctx) => new GiteaForge(store, ctx), undefined, "gitea")
 }

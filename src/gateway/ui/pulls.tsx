@@ -7,7 +7,7 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 
 import { messageOf } from "../../common/errors"
-import type { PullPage, PullSummary, RepoView } from "../plugins/forge"
+import type { PullPage, PullSummary, RepoView, TokenView } from "../plugins/forge"
 import type { GitHubStatus } from "../plugins/github"
 import type { ReviewBrief, ReviewRecord } from "../plugins/reviews"
 import type { TriageBrief, TriagePriority, TriageRecord } from "../plugins/triage"
@@ -39,7 +39,7 @@ const WORDS: Record<PullsHost, HostWords> = {
     nouns: "pull requests",
     hash: "#",
     repoNoun: "repository",
-    tokenHint: "A fine-grained token with Pull requests, Contents, Checks and Commit statuses read access, or a classic token with repo scope. Leave blank to read through the GitHub App.",
+    tokenHint: "A classic token with repo scope reads every repository you can; a fine-grained one (Pull requests, Contents, Checks and Commit statuses: read) only those it was given.",
     fullNameHint: "owner/name"
   },
   gitlab: {
@@ -77,6 +77,10 @@ interface ReviewSetup {
 
 interface Overview {
   repos: RepoView[]
+  /** Saved tokens; empty for a developer. */
+  tokens: TokenView[]
+  /** Whether the host can list what a token reads. */
+  canListRepos: boolean
   appAuth: boolean
   host: { baseUrl: string } & Partial<GitHubStatus>
   /** Who the operator is on the host: set by hand, or what a token said. */
@@ -306,6 +310,20 @@ const Approvals = ({ pull, long }: { pull: PullSummary; long?: boolean }) => {
 /*  Repositories                                                              */
 /* -------------------------------------------------------------------------- */
 
+/** How a saved token is named on the page: its label, else whose it is. */
+/** "3 repositories", "1 project". */
+const countOf = (n: number, words: HostWords): string => plural(n, words.repoNoun, words.repoNoun === "project" ? "projects" : "repositories")
+
+const tokenName = (token: TokenView): string => token.label || (token.login ? `${token.login}'s token` : `token ${token.id.slice(0, 4)}`)
+
+/** Where the add form's token choice points: a saved token, a new one, or the app. */
+const NEW_TOKEN = "new"
+const APP = "app"
+
+/** The token most repositories already share, which a new repository most likely wants too. */
+const likeliestToken = (tokens: TokenView[]): string =>
+  tokens.length ? [...tokens].sort((a, b) => b.repos - a.repos)[0].id : NEW_TOKEN
+
 interface ReposPanelProps {
   host: PullsHost
   words: HostWords
@@ -318,6 +336,12 @@ interface ReposPanelProps {
 const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPanelProps) => {
   const [fullName, setFullName] = useState("")
   const [token, setToken] = useState("")
+  const [readsWith, setReadsWith] = useState<string>(() => (overview.tokens.length ? likeliestToken(overview.tokens) : overview.appAuth ? APP : NEW_TOKEN))
+  // A token saved or removed elsewhere on the page: never post a dead id, and offer a fresh one.
+  useEffect(() => {
+    const known = readsWith === APP ? overview.appAuth : readsWith === NEW_TOKEN || overview.tokens.some((entry) => entry.id === readsWith)
+    if (!known || (readsWith === NEW_TOKEN && overview.tokens.length > 0 && !token)) setReadsWith(overview.tokens.length ? likeliestToken(overview.tokens) : overview.appAuth ? APP : NEW_TOKEN)
+  }, [overview.tokens, overview.appAuth])
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | undefined>()
   const [confirm, setConfirm] = useState<string | null>(null)
@@ -341,9 +365,12 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
     const name = fullName.trim()
     if (!name) return
     void run("add", async () => {
-      await api(`${base}/repos`, apiKey, { method: "POST", body: { fullName: name, ...(token.trim() ? { token: token.trim() } : {}) } })
+      const body = readsWith === NEW_TOKEN ? { token: token.trim() } : readsWith === APP ? {} : { tokenId: readsWith }
+      const answer = await api<{ repo: RepoView }>(`${base}/repos`, apiKey, { method: "POST", body: { fullName: name, ...body } })
       setFullName("")
       setToken("")
+      // A token pasted here is saved now: the next repository can pick it.
+      if (readsWith === NEW_TOKEN && answer.repo.tokenId) setReadsWith(answer.repo.tokenId)
     })
   }
 
@@ -400,7 +427,21 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                       {repo.error && <div className="repo-problem">{repo.error}</div>}
                     </td>
                     <td>
-                      <span className="tag">{repo.auth === "app" ? "GitHub App" : "token"}</span>
+                      <select
+                        className="mini"
+                        value={repo.tokenId ?? APP}
+                        disabled={busy !== null}
+                        aria-label={`What ${repo.fullName} reads with`}
+                        onChange={(e) => void run(`token:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { tokenId: e.target.value === APP ? null : e.target.value } }))}
+                      >
+                        {overview.tokens.map((token) => (
+                          <option key={token.id} value={token.id}>
+                            {tokenName(token)}
+                          </option>
+                        ))}
+                        {(overview.appAuth || repo.auth === "app") && <option value={APP}>GitHub App</option>}
+                      </select>
+                      {repo.tokenRefused && <div className="repo-problem">refused: replace the token below</div>}
                     </td>
                     <td>{fmt(repo.pulls.length)}</td>
                     <td className={failing ? "bad-text" : "muted"}>{fmt(failing)}</td>
@@ -465,8 +506,22 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
 
       <form className="newkey create" onSubmit={add}>
         <input placeholder={words.fullNameHint} value={fullName} onChange={(e) => setFullName(e.target.value)} aria-label={`${words.repoNoun} name`} disabled={busy !== null} spellCheck={false} />
-        <input type="password" placeholder={overview.appAuth ? "token (optional)" : "access token"} value={token} onChange={(e) => setToken(e.target.value)} aria-label="Access token" disabled={busy !== null} autoComplete="off" />
-        <button type="submit" className="primary" disabled={busy !== null || !fullName.trim() || (!overview.appAuth && !token.trim())}>
+        {(overview.tokens.length > 0 || overview.appAuth) && (
+          <select value={readsWith} onChange={(e) => setReadsWith(e.target.value)} aria-label="Reads with" disabled={busy !== null}>
+            {overview.tokens.map((saved) => (
+              <option key={saved.id} value={saved.id}>
+                {tokenName(saved)}
+                {saved.repos ? ` · ${countOf(saved.repos, words)}` : ""}
+              </option>
+            ))}
+            {overview.appAuth && <option value={APP}>GitHub App</option>}
+            <option value={NEW_TOKEN}>paste a new token…</option>
+          </select>
+        )}
+        {readsWith === NEW_TOKEN && (
+          <input type="password" placeholder="access token" value={token} onChange={(e) => setToken(e.target.value)} aria-label="Access token" disabled={busy !== null} autoComplete="off" />
+        )}
+        <button type="submit" className="primary" disabled={busy !== null || !fullName.trim() || (readsWith === NEW_TOKEN && !token.trim())}>
           {busy === "add" ? "…" : `watch ${words.repoNoun}`}
         </button>
         {host === "github" && overview.appAuth && (
@@ -474,7 +529,7 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
             {busy === "picker" ? "…" : "pick from the App"}
           </button>
         )}
-        <span className="muted">{words.tokenHint}</span>
+        {readsWith === NEW_TOKEN && <span className="muted">{words.tokenHint} Saved once, it is offered for the next {words.repoNoun} too.</span>}
       </form>
       {picker && (
         <div className="picker">
@@ -496,6 +551,270 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
           </button>
         </div>
       )}
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Tokens: saved once, shared by any number of repositories                  */
+/* -------------------------------------------------------------------------- */
+
+interface TokenPickerState {
+  tokenId: string
+  repositories: Array<{ fullName: string; watched: boolean }>
+  chosen: string[]
+  /** Per name: what went wrong adding it. */
+  failed: Record<string, string>
+  filter: string
+}
+
+const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPanelProps) => {
+  const [label, setLabel] = useState("")
+  const [token, setToken] = useState("")
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | undefined>()
+  const [notice, setNotice] = useState<string | undefined>()
+  /** The token whose value is being replaced, or relabelled. */
+  const [replacing, setReplacing] = useState<{ id: string; value: string } | null>(null)
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null)
+  const [confirm, setConfirm] = useState<string | null>(null)
+  const [picker, setPicker] = useState<TokenPickerState | null>(null)
+
+  const run = async (what: string, action: () => Promise<string | void>) => {
+    setBusy(what)
+    setError(undefined)
+    setNotice(undefined)
+    try {
+      const said = await action()
+      if (said) setNotice(said)
+      await onChanged()
+    } catch (e) {
+      setError(messageOf(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const openPicker = (tokenId: string) =>
+    run(`pick:${tokenId}`, async () => {
+      const answer = await api<{ repositories: Array<{ fullName: string; watched: boolean }> }>(`${base}/tokens/${tokenId}/repos`, apiKey)
+      setPicker({ tokenId, repositories: answer.repositories, chosen: [], failed: {}, filter: "" })
+    })
+
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    if (!token.trim()) return
+    void run("save", async () => {
+      const answer = await api<{ token: TokenView; existed: boolean }>(`${base}/tokens`, apiKey, { method: "POST", body: { token: token.trim(), ...(label.trim() ? { label: label.trim() } : {}) } })
+      setToken("")
+      setLabel("")
+      if (overview.canListRepos) {
+        const listed = await api<{ repositories: Array<{ fullName: string; watched: boolean }> }>(`${base}/tokens/${answer.token.id}/repos`, apiKey)
+        setPicker({ tokenId: answer.token.id, repositories: listed.repositories, chosen: [], failed: {}, filter: "" })
+      }
+      return answer.existed ? `That token was already saved as ${tokenName(answer.token)}.` : `Saved${answer.token.login ? `: it is ${answer.token.login}` : ""}.`
+    })
+  }
+
+  const replace = (id: string, value: string) =>
+    run(`replace:${id}`, async () => {
+      const answer = await api<{ token: TokenView }>(`${base}/tokens/${id}`, apiKey, { method: "PUT", body: { token: value.trim() } })
+      setReplacing(null)
+      return `Replaced${answer.token.login ? `; it is ${answer.token.login}` : ""}. ${answer.token.repos ? `${countOf(answer.token.repos, words)} sync with it now.` : ""}`
+    })
+
+  const watchChosen = (state: TokenPickerState) =>
+    run("watch", async () => {
+      const failed: Record<string, string> = {}
+      let added = 0
+      for (const fullName of state.chosen) {
+        try {
+          await api(`${base}/repos`, apiKey, { method: "POST", body: { fullName, tokenId: state.tokenId } })
+          added++
+        } catch (e) {
+          failed[fullName] = messageOf(e)
+        }
+      }
+      const watched = new Set(state.chosen.filter((name) => !failed[name]))
+      setPicker({
+        ...state,
+        repositories: state.repositories.map((entry) => (watched.has(entry.fullName) ? { ...entry, watched: true } : entry)),
+        chosen: Object.keys(failed),
+        failed
+      })
+      return `Watching ${countOf(added, words)} more${Object.keys(failed).length ? `; ${fmt(Object.keys(failed).length)} could not be added` : ""}.`
+    })
+
+  const pickerToken = picker && overview.tokens.find((entry) => entry.id === picker.tokenId)
+  const shown = picker ? picker.repositories.filter((entry) => !picker.filter || entry.fullName.toLowerCase().includes(picker.filter.toLowerCase())) : []
+  const choosable = shown.filter((entry) => !entry.watched).map((entry) => entry.fullName)
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <h2>
+          Tokens
+          <span className="count">{fmt(overview.tokens.length)}</span>
+        </h2>
+      </div>
+      {error && <div className="error">{error}</div>}
+      {notice && <div className="success-bar">{notice}</div>}
+      {overview.tokens.length > 0 && (
+        <div className="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>token</th>
+                <th>is</th>
+                <th>{words.repoNoun === "project" ? "projects" : "repositories"}</th>
+                <th>saved</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {overview.tokens.map((saved) => (
+                <tr key={saved.id} className={saved.refused ? "repo-error" : ""}>
+                  <td>
+                    {renaming?.id === saved.id ? (
+                      <form
+                        className="inline-edit"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          void run(`label:${saved.id}`, () => api(`${base}/tokens/${saved.id}`, apiKey, { method: "PUT", body: { label: renaming.value.trim() } }).then(() => setRenaming(null)))
+                        }}
+                      >
+                        <input value={renaming.value} onChange={(e) => setRenaming({ id: saved.id, value: e.target.value })} aria-label="Label" placeholder="label" autoFocus disabled={busy !== null} />
+                        <button type="submit" className="mini" disabled={busy !== null}>save</button>{" "}
+                        <button type="button" className="ghost mini" onClick={() => setRenaming(null)}>cancel</button>
+                      </form>
+                    ) : (
+                      <>
+                        <span className="entity-name">{tokenName(saved)}</span>
+                        {saved.kind && <span className="tag">{saved.kind}</span>}
+                      </>
+                    )}
+                    {saved.refused > 0 && (
+                      <div className="repo-problem">
+                        {HOST_NAMES[host]} refused it for {countOf(saved.refused, words)}: expired or revoked
+                      </div>
+                    )}
+                  </td>
+                  <td className="muted">{saved.login ?? "—"}</td>
+                  <td>{fmt(saved.repos)}</td>
+                  <td className="muted" title={saved.replacedAt ?? saved.addedAt}>
+                    {saved.replacedAt ? `replaced ${timeAgo(saved.replacedAt)}` : `${timeAgo(saved.addedAt)} by ${saved.addedBy}`}
+                  </td>
+                  <td className="actions">
+                    {replacing?.id === saved.id ? (
+                      <form
+                        className="inline-edit"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          if (replacing.value.trim()) void replace(saved.id, replacing.value)
+                        }}
+                      >
+                        <input type="password" value={replacing.value} onChange={(e) => setReplacing({ id: saved.id, value: e.target.value })} aria-label="New token" placeholder="new token" autoFocus autoComplete="off" disabled={busy !== null} />
+                        <button type="submit" className="primary mini" disabled={busy !== null || !replacing.value.trim()}>
+                          {busy === `replace:${saved.id}` ? "…" : saved.repos ? `replace for ${countOf(saved.repos, words)}` : "replace"}
+                        </button>{" "}
+                        <button type="button" className="ghost mini" onClick={() => setReplacing(null)}>cancel</button>
+                      </form>
+                    ) : confirm === saved.id ? (
+                      <>
+                        <button type="button" className="danger mini" disabled={busy !== null} onClick={() => void run(`remove:${saved.id}`, () => api(`${base}/tokens/${saved.id}`, apiKey, { method: "DELETE" }).then(() => setConfirm(null)))}>
+                          remove
+                        </button>{" "}
+                        <button type="button" className="ghost mini" onClick={() => setConfirm(null)}>keep</button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className={saved.refused ? "primary mini" : "ghost mini"} disabled={busy !== null} onClick={() => setReplacing({ id: saved.id, value: "" })}>
+                          replace
+                        </button>{" "}
+                        <button type="button" className="ghost mini" disabled={busy !== null} onClick={() => setRenaming({ id: saved.id, value: saved.label ?? "" })}>
+                          label
+                        </button>{" "}
+                        {overview.canListRepos && (
+                          <>
+                            <button type="button" className="ghost mini" disabled={busy !== null} onClick={() => void openPicker(saved.id)}>
+                              {busy === `pick:${saved.id}` ? "…" : `add ${words.repoNoun === "project" ? "projects" : "repositories"}`}
+                            </button>{" "}
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          className="ghost mini"
+                          disabled={busy !== null || saved.repos > 0}
+                          title={saved.repos > 0 ? `Move or remove its ${words.repoNoun === "project" ? "projects" : "repositories"} first` : undefined}
+                          onClick={() => setConfirm(saved.id)}
+                        >
+                          remove
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {picker && (
+        <div className="picker">
+          <div className="picker-row">
+            <span className="entity-name">
+              {pickerToken ? tokenName(pickerToken) : "This token"} reads {countOf(picker.repositories.length, words)}
+              {picker.repositories.length >= 300 ? " (the 300 most recently updated)" : ""}
+            </span>
+            {picker.repositories.length > 8 && (
+              <input value={picker.filter} onChange={(e) => setPicker({ ...picker, filter: e.target.value })} placeholder="filter" aria-label="Filter" spellCheck={false} />
+            )}
+            <button
+              type="button"
+              className="ghost mini"
+              disabled={busy !== null || choosable.length === 0}
+              onClick={() => setPicker({ ...picker, chosen: choosable.every((name) => picker.chosen.includes(name)) ? picker.chosen.filter((name) => !choosable.includes(name)) : [...new Set([...picker.chosen, ...choosable])] })}
+            >
+              {choosable.length && choosable.every((name) => picker.chosen.includes(name)) ? "choose none" : `choose all ${fmt(choosable.length)}`}
+            </button>
+            <button type="button" className="primary mini" disabled={busy !== null || picker.chosen.length === 0} onClick={() => void watchChosen(picker)}>
+              {busy === "watch" ? "…" : `watch ${fmt(picker.chosen.length)}`}
+            </button>
+            <button type="button" className="ghost mini" onClick={() => setPicker(null)}>
+              close
+            </button>
+          </div>
+          {picker.repositories.length === 0 ? (
+            <div className="empty">The token reads no {words.repoNoun === "project" ? "projects" : "repositories"}.</div>
+          ) : (
+            <div className="picker-list">
+              {shown.map((entry) => (
+                <label key={entry.fullName} className="picker-row">
+                  <input
+                    type="checkbox"
+                    checked={entry.watched || picker.chosen.includes(entry.fullName)}
+                    disabled={entry.watched || busy !== null}
+                    onChange={(e) => setPicker({ ...picker, chosen: e.target.checked ? [...picker.chosen, entry.fullName] : picker.chosen.filter((name) => name !== entry.fullName) })}
+                  />
+                  <span className="entity-name">{entry.fullName}</span>
+                  {entry.watched && <span className="muted">watched</span>}
+                  {picker.failed[entry.fullName] && <span className="repo-problem">{picker.failed[entry.fullName]}</span>}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <form className="newkey create" onSubmit={save}>
+        <input placeholder="label (optional)" value={label} onChange={(e) => setLabel(e.target.value)} aria-label="Label" disabled={busy !== null} />
+        <input type="password" placeholder="access token" value={token} onChange={(e) => setToken(e.target.value)} aria-label="Access token" disabled={busy !== null} autoComplete="off" />
+        <button type="submit" className="primary" disabled={busy !== null || !token.trim()}>
+          {busy === "save" ? "…" : "save token"}
+        </button>
+        <span className="muted">{words.tokenHint}</span>
+      </form>
     </section>
   )
 }
@@ -1884,6 +2203,7 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
       ) : (
         <>
           <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
+          <TokensPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
           <ReviewsPanel words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
           <HostPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
         </>

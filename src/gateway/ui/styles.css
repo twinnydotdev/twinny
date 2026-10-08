@@ -435,6 +435,11 @@ table.pulls td { vertical-align: top; }
 .picker { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 .picker-row { display: flex; gap: 12px; align-items: center; }
 .picker-row .entity-name { flex: 1; }
+.picker-list { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+.picker-list .picker-row input[type="checkbox"] { margin: 0; accent-color: var(--ink-2); }
+.picker-list .repo-problem { margin-top: 0; }
+.inline-edit { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inline-edit input { min-width: 180px; }
 .app-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .app-form input { max-width: 200px; }
 .app-form textarea, textarea { font: 12px/1.4 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; resize: vertical; }

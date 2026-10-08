@@ -3,9 +3,14 @@
  * with their credentials, a sync loop that keeps each repository's open
  * pull requests in memory, and the admin routes the page uses.
  *
- *   GET    api/                        → repositories with their open pulls and sync state
- *   POST   api/repos { fullName, token? }
+ *   GET    api/                        → repositories with their open pulls and sync state, and the saved tokens
+ *   POST   api/repos { fullName, tokenId? | token? }   → no token named: the only saved one, else the host's app
+ *   PUT    api/repos/<id> { autoReview?, autoPost?, autoTriage?, tokenId? }   → tokenId null reads through the app
  *   DELETE api/repos/<id>
+ *   POST   api/tokens { token, label? }               → saved once, for any number of repositories
+ *   PUT    api/tokens/<id> { token?, label? }         → a new value moves every repository on it along
+ *   DELETE api/tokens/<id>                            → only once nothing reads with it
+ *   GET    api/tokens/<id>/repos                      → what the token can read, for picking
  *   POST   api/repos/<id>/sync
  *   POST   api/sync
  *   GET    api/repos/<id>/pulls/<n>    → one pull with its description and files
@@ -27,7 +32,7 @@
  * a pull looks like there; that contract and the shapes it fills are in
  * forge.ts. Tokens are kept in the plugin's repos.json,
  * owner-readable only, and never leave the process: the listing shows
- * only whether a repository has one.
+ * which saved token a repository reads with, by id and label.
  */
 import path from "node:path"
 
@@ -39,12 +44,15 @@ import {
   cleanBaseUrl,
   Forge,
   FULL_NAME_PATTERN,
+  isTokenRefused,
   MAX_PULLS_PER_REPO,
   PullPage,
   PullSummary,
   RepoRecord,
   RepoStore,
-  RepoView
+  RepoView,
+  tokenProbe,
+  TokenView
 } from "./forge"
 import {
   json,
@@ -85,6 +93,25 @@ export const MEMBER_ROUTES: readonly MemberRoute[] = [
   { method: "POST", path: new RegExp(`^${REPO}/issues/${NUMBER}/triage(?:/post)?$`) }
 ]
 
+/** How long a token's label may be. */
+const MAX_LABEL = 80
+/** Longer than any host's tokens; anything this long was pasted by mistake. */
+const MAX_TOKEN_CHARS = 4096
+
+/** A token as pasted: trimmed, one line. */
+const cleanToken = (value: unknown): string => {
+  const token = typeof value === "string" ? value.trim() : ""
+  if (!token) throw new PluginError("Paste the token.", 400)
+  if (token.length > MAX_TOKEN_CHARS || /\s/.test(token)) throw new PluginError("That does not look like a token: it has spaces or is far too long.", 400)
+  return token
+}
+
+const cleanLabel = (value: unknown): string => {
+  const label = typeof value === "string" ? value.trim() : ""
+  if (label.length > MAX_LABEL) throw new PluginError("That label is too long.", 400)
+  return label
+}
+
 /** How long a username on a host may be; longer is a mistake. */
 const MAX_USERNAME = 100
 
@@ -102,6 +129,8 @@ interface SyncState {
   pulls: PullSummary[]
   issues?: IssueSummary[]
   issuesError?: string
+  /** The last sync failed because the host refused the token. */
+  refused?: boolean
 }
 
 /** A signal that fires on a timeout or when the plugin stops, whichever first. */
@@ -381,6 +410,8 @@ export class PullsPlugin implements PluginInstance {
       fullName: repo.fullName,
       url: this._forge.repoUrl(repo.fullName),
       auth: repo.auth,
+      ...(repo.tokenId ? { tokenId: repo.tokenId } : {}),
+      ...(state?.refused ? { tokenRefused: true } : {}),
       addedAt: repo.addedAt,
       addedBy: repo.addedBy,
       autoReview: repo.autoReview === true,
@@ -405,6 +436,42 @@ export class PullsPlugin implements PluginInstance {
           return brief ? [[pull.number, brief]] : []
         })
       )
+    }
+  }
+
+  /** The saved tokens as the page sees them: never a value. */
+  public tokenViews(): TokenView[] {
+    const repos = this.store.repos()
+    return this.store.tokens().map((token) => {
+      const users = repos.filter((repo) => repo.tokenId === token.id)
+      const kind = this._forge.tokenKind?.(token.token)
+      return {
+        id: token.id,
+        ...(token.label ? { label: token.label } : {}),
+        ...(token.login ? { login: token.login } : {}),
+        ...(kind ? { kind } : {}),
+        addedAt: token.addedAt,
+        addedBy: token.addedBy,
+        ...(token.replacedAt ? { replacedAt: token.replacedAt } : {}),
+        repos: users.length,
+        refused: users.filter((repo) => this._state.get(repo.id)?.refused).length
+      }
+    })
+  }
+
+  /**
+   * Asks the host who a token is. A token the host refuses outright is
+   * turned away; one that may read repositories but not say whose it is
+   * (a scoped token) is taken at its word, and the first sync tells.
+   */
+  private async checkToken(token: string): Promise<string | undefined> {
+    if (!this._forge.whoAmI) return undefined
+    try {
+      return await this._forge.whoAmI(tokenProbe(token), withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS))
+    } catch (error) {
+      // The host refusing a pasted token is the caller's mistake, not a bad gateway.
+      if (isTokenRefused(error)) throw new PluginError(messageOf(error), 400)
+      return undefined
     }
   }
 
@@ -441,6 +508,7 @@ export class PullsPlugin implements PluginInstance {
         .slice(0, MAX_PULLS_PER_REPO)
       state.syncedAt = new Date(this._context.now()).toISOString()
       delete state.error
+      delete state.refused
       if (before) this.announce(repo, before, state.pulls)
       if (!this._detectedMe && repo.auth === "token" && this._forge.whoAmI) {
         // Best effort: a token that cannot say who it is changes nothing.
@@ -458,6 +526,7 @@ export class PullsPlugin implements PluginInstance {
       }
     } catch (error) {
       state.error = messageOf(error)
+      if (isTokenRefused(error)) state.refused = true
       this._context.log.warn({
         event: "plugin.sync-failed",
         reason: repo.fullName,
@@ -474,6 +543,9 @@ export class PullsPlugin implements PluginInstance {
       if (method !== "GET") return notFound()
       return json({
         repos: this.views(),
+        // A developer reads with the admin's tokens but is never shown them.
+        tokens: request.member ? [] : this.tokenViews(),
+        canListRepos: !!this._forge.listRepos,
         appAuth: this._forge.hasAppAuth(),
         host: this._forge.status(),
         me: this.me(request),
@@ -497,6 +569,26 @@ export class PullsPlugin implements PluginInstance {
       return json({ me: this.me(request) })
     }
     if (route === "repos" && method === "POST") return this.addRepo(request)
+    if (route === "tokens" && method === "POST") return this.addToken(request)
+    const tokenMatch = /^tokens\/([0-9a-f]{8})(\/repos)?$/.exec(route)
+    if (tokenMatch) {
+      const saved = this.store.token(tokenMatch[1])
+      if (!saved) return notFound("No such token.")
+      if (tokenMatch[2] && method === "GET") {
+        if (!this._forge.listRepos) throw new PluginError("This host cannot list what a token reads.", 400)
+        const names = await this._forge.listRepos(saved.token, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS))
+        const watched = new Set(this.store.repos().map((repo) => repo.fullName.toLowerCase()))
+        return json({ repositories: names.map((fullName) => ({ fullName, watched: watched.has(fullName.toLowerCase()) })) })
+      }
+      if (tokenMatch[2]) return notFound()
+      if (method === "PUT") return this.updateToken(request, saved.id)
+      if (method === "DELETE") {
+        this.store.removeToken(saved.id)
+        this._context.log.info({ event: "plugin.token-removed", key: request.principal, reason: saved.label ?? saved.id })
+        return json({ tokens: this.tokenViews() })
+      }
+      return notFound()
+    }
     const repoMatch = /^repos\/([0-9a-f]{8})(?:\/(.*))?$/.exec(route)
     if (repoMatch) {
       const repo = this.store.get(repoMatch[1])
@@ -504,8 +596,9 @@ export class PullsPlugin implements PluginInstance {
       const rest = repoMatch[2] ?? ""
       if (rest === "" && method === "PUT") {
         const body = await request.body()
+        if ("tokenId" in body) return this.moveRepo(request, repo, body.tokenId)
         if (typeof body.autoReview !== "boolean" && typeof body.autoPost !== "boolean" && typeof body.autoTriage !== "boolean")
-          throw new PluginError("Send { autoReview }, { autoPost } and/or { autoTriage } as true or false.", 400)
+          throw new PluginError("Send { autoReview }, { autoPost } and/or { autoTriage } as true or false, or { tokenId }.", 400)
         const updated = this.store.update(repo.id, {
           ...(typeof body.autoReview === "boolean" ? { autoReview: body.autoReview } : {}),
           ...(typeof body.autoPost === "boolean" ? { autoPost: body.autoPost } : {}),
@@ -777,26 +870,47 @@ export class PullsPlugin implements PluginInstance {
       )
     if (this.store.byName(fullName))
       throw new PluginError(`${fullName} is already watched.`, 409)
-    const token = typeof body.token === "string" ? body.token.trim() : ""
-    if (!token && !this._forge.hasAppAuth())
-      throw new PluginError(
-        "Give an access token for this repository: nothing else can read it.",
-        400
-      )
-    const candidate: Omit<RepoRecord, "id"> = {
+    const pasted = typeof body.token === "string" && body.token.trim() ? cleanToken(body.token) : ""
+    let tokenId = typeof body.tokenId === "string" && body.tokenId ? body.tokenId : undefined
+    if (tokenId && !this.store.token(tokenId)) throw new PluginError("No such token.", 404)
+    // Nothing named: the one saved token is the obvious choice; with several, which is the caller's to say.
+    const saved = this.store.tokens()
+    if (!pasted && !tokenId && !this._forge.hasAppAuth()) {
+      if (saved.length === 1) tokenId = saved[0].id
+      else
+        throw new PluginError(
+          saved.length ? "Choose which saved token reads this repository, or paste a new one." : "Give an access token for this repository: nothing else can read it.",
+          400
+        )
+    }
+    const value = pasted || (tokenId ? this.store.token(tokenId)?.token : undefined)
+    const candidate: RepoRecord = {
+      id: "",
       fullName,
-      auth: token ? "token" : "app",
-      ...(token ? { token } : {}),
+      auth: value ? "token" : "app",
+      ...(value ? { token: value } : {}),
       addedAt: new Date(this._context.now()).toISOString(),
       addedBy: request.principal
     }
     const canonical = await this._forge.checkRepo(
-      { id: "", ...candidate },
+      candidate,
       withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)
     )
     if (canonical !== fullName && this.store.byName(canonical))
       throw new PluginError(`${canonical} is already watched.`, 409)
-    const repo = this.store.add({ ...candidate, fullName: canonical })
+    if (pasted) {
+      // Saved only once it has read something; the same value pasted again is the token already saved.
+      const { token, existed } = this.store.addToken({ token: pasted, addedAt: candidate.addedAt, addedBy: request.principal })
+      tokenId = token.id
+      if (!existed) this._context.log.info({ event: "plugin.token-added", key: request.principal, reason: token.id })
+    }
+    const repo = this.store.add({
+      fullName: canonical,
+      auth: candidate.auth,
+      ...(tokenId && value ? { tokenId } : {}),
+      addedAt: candidate.addedAt,
+      addedBy: candidate.addedBy
+    })
     this._context.log.info({
       event: "plugin.repo-added",
       key: request.principal,
@@ -804,6 +918,81 @@ export class PullsPlugin implements PluginInstance {
     })
     await this.syncOne(repo)
     return json({ repo: this.view(repo) }, 201)
+  }
+
+  /** Switches the token a repository reads with, once the new one reads it; null reads through the app. */
+  private async moveRepo(request: PluginRequest, repo: RepoRecord, tokenId: unknown): Promise<PluginResponse> {
+    if (tokenId !== null && typeof tokenId !== "string") throw new PluginError("Send { tokenId } as a saved token's id, or null for the app.", 400)
+    if (tokenId === null && !this._forge.hasAppAuth()) throw new PluginError("There is no app to read through: choose a token.", 400)
+    const token = tokenId === null ? undefined : this.store.token(tokenId)
+    if (tokenId !== null && !token) throw new PluginError("No such token.", 404)
+    await this._forge.checkRepo(
+      { ...repo, auth: token ? "token" : "app", ...(token ? { token: token.token } : { token: undefined }) },
+      withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)
+    )
+    const updated = this.store.update(repo.id, { tokenId })
+    this._context.log.info({ event: "plugin.repo-token-changed", key: request.principal, reason: `${repo.fullName} → ${token ? (token.label ?? token.id) : "app"}` })
+    this._state.delete(repo.id)
+    await this.syncOne(updated)
+    return json({ repo: this.view(updated) })
+  }
+
+  private async addToken(request: PluginRequest): Promise<PluginResponse> {
+    const body = await request.body()
+    const value = cleanToken(body.token)
+    const label = cleanLabel(body.label)
+    const login = await this.checkToken(value)
+    const { token, existed } = this.store.addToken({
+      token: value,
+      ...(label ? { label } : {}),
+      ...(login ? { login } : {}),
+      addedAt: new Date(this._context.now()).toISOString(),
+      addedBy: request.principal
+    })
+    if (!existed) this._context.log.info({ event: "plugin.token-added", key: request.principal, reason: label || token.id })
+    return json({ token: this.tokenViews().find((view) => view.id === token.id), existed }, existed ? 200 : 201)
+  }
+
+  /**
+   * A label, or a new value for every repository on the token: the value
+   * is checked with the host first, then each repository syncs with it.
+   */
+  private async updateToken(request: PluginRequest, id: string): Promise<PluginResponse> {
+    const body = await request.body()
+    if (!("token" in body) && !("label" in body)) throw new PluginError("Send { token } and/or { label }.", 400)
+    const value = "token" in body ? cleanToken(body.token) : undefined
+    const label = "label" in body ? cleanLabel(body.label) : undefined
+    const login = value ? await this.checkToken(value) : undefined
+    if (value) {
+      // The value must read what it is about to be used for: one repository on it proves that before all move.
+      const [first] = this.store.usersOf(id)
+      if (first)
+        await this._forge.checkRepo({ ...first, token: value }, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)).catch((error: unknown) => {
+          throw new PluginError(`Not replaced: ${messageOf(error)}`, isTokenRefused(error) ? 400 : 409)
+        })
+    }
+    const token = this.store.updateToken(id, {
+      ...(value ? { token: value, replacedAt: new Date(this._context.now()).toISOString() } : {}),
+      ...(login ? { login } : {}),
+      ...(label !== undefined ? { label } : {})
+    })
+    if (value) {
+      const users = this.store.usersOf(id)
+      this._context.log.info({ event: "plugin.token-replaced", key: request.principal, reason: `${token.label ?? token.id} for ${users.length} repositories` })
+      for (const repo of users) {
+        const state = this._state.get(repo.id)
+        if (state) delete state.refused
+      }
+      // Whoever the old token said it was may not be who the new one is.
+      this._detectedMe = undefined
+      void (async () => {
+        for (const repo of users) {
+          if (this._stopped.signal.aborted) return
+          await this.syncOne(repo)
+        }
+      })()
+    } else this._context.log.info({ event: "plugin.token-labelled", key: request.principal, reason: `${token.id}: ${token.label ?? ""}` })
+    return json({ token: this.tokenViews().find((view) => view.id === id), repos: this.views() })
   }
 }
 
