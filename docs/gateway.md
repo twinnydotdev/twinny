@@ -1737,7 +1737,10 @@ destination** writes and deletes a probe, **back up now** does one at
 once.
 
 An archive is a gzipped tar with a manifest (sizes and SHA-256 hashes,
-checked on restore), readable by `tar` when not encrypted. With a
+checked on restore), readable by `tar` when not encrypted. A sqlite
+recordings database goes in as one consistent snapshot taken while the
+gateway runs (its `-wal`/`-shm` files are not copied), and a restore
+removes any stale `-wal`/`-shm` left next to the database it writes. With a
 passphrase it is AES-256-GCM encrypted (`.tar.gz.enc`); keep the
 passphrase somewhere other than the server, since the settings file that
 holds it is inside the backup. After a successful run, archives beyond
