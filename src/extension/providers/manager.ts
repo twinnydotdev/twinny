@@ -127,6 +127,11 @@ export class ProviderManager {
 
   private _policyCheckedAt = 0
 
+  /** Re-reads the team policy if it was last read over a minute ago. */
+  public refreshTeamPolicy(): Promise<void> {
+    return this.refreshPolicy()
+  }
+
   /**
    * Re-reads the team policy when it is stale, applies it to the active
    * providers, and says so when it appeared or changed.

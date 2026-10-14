@@ -32,6 +32,7 @@ import {
 import { hostedTakesTools } from "../inference/adapters/fluency"
 
 import { ContextPlan, fitResult, planContext, TokenEstimator, trimmedResult } from "./budget"
+import { instructionsSection } from "./instructions"
 import {
   displayableLength,
   FINAL_ANSWER_PROMPT,
@@ -48,6 +49,8 @@ import { ToolResult, WorkspaceTools } from "./workspace"
 export const DEFAULT_MAX_STEPS = 12
 /** Calls run from one native reply; a model that fans out wider is told which were left. */
 const MAX_CALLS_PER_REPLY = 8
+/** A result keeps at least this much of its output, whatever comes ahead of it. */
+const MIN_RESULT_CHARS = 1000
 
 export type ToolMode = "native" | "text"
 
@@ -202,6 +205,22 @@ const withClosingPrompt = (messages: ChatMessage[]): ChatMessage[] => {
 
 const stepLine = (summary: string) => `> ${summary}\n\n`
 
+/**
+ * A reply with its tool calls taken out, for the last request, whose
+ * calls are never run: the text before the first call, and each piece
+ * of prose after one.
+ */
+const withoutCalls = (text: string): { lead: string; after: string[] } => {
+  const pieces: string[] = []
+  let rest = text
+  for (let found = findToolCall(rest, true); found; found = findToolCall(rest, true)) {
+    pieces.push(rest.slice(0, found.start))
+    rest = rest.slice(found.end)
+  }
+  const [lead, ...after] = [...pieces, rest]
+  return { lead: lead.trimEnd(), after: after.map((piece) => piece.trim()).filter(Boolean) }
+}
+
 /** What goes between text already shown and a step line, so each line is its own paragraph. */
 const gapAfter = (shown: string) =>
   !shown.trim() || shown.endsWith("\n\n") ? "" : shown.endsWith("\n") ? "\n" : "\n\n"
@@ -302,6 +321,8 @@ interface ResultSlot {
   step: number
   name: string
   trimmed: boolean
+  /** A folder's instructions ahead of the output: kept when the output is trimmed. */
+  preface?: string
 }
 
 class ToolLoop {
@@ -339,9 +360,10 @@ class ToolLoop {
   }
 
   private prompt(request: ChatRequest) {
+    const { tools, orientation, instructions } = this._workspace
     return withToolPrompt(
       request.messages,
-      toolInstructions(this._workspace.tools, this._workspace.orientation, this._mode === "native")
+      [toolInstructions(tools, orientation, this._mode === "native"), ...(instructions ? [instructionsSection(instructions)] : [])].join("\n\n")
     )
   }
 
@@ -447,18 +469,29 @@ class ToolLoop {
 
       const nativeCalls = native && !last ? this.nativeCalls(reply.toolCalls) : []
       if (!nativeCalls.length) found ??= findToolCall(reply.text, true)
+      // What the model wrote, before a text call is cut out of it for the
+      // conversation: the prose ahead of the call is shown from this.
+      const written = reply.text
       const calls = nativeCalls.length ? nativeCalls : last ? [] : this.textCall(found, reply, step)
 
       if (!calls.length) {
         // The answer. A call written on the last request is never run and
-        // never shown; anything else held back was prose after all.
-        const end = last && found ? found.start : reply.text.length
-        if (end > reply.shown) yield this.show(reply.text.slice(reply.shown, end))
+        // never shown, but what the model wrote after it is; anything else
+        // held back was prose after all.
+        if (last && found) {
+          const { lead, after } = withoutCalls(written.slice(reply.shown))
+          if (lead) yield this.show(lead)
+          for (const piece of after) yield this.show(`${gapAfter(this._shown)}${piece}`)
+        } else if (written.length > reply.shown) {
+          yield this.show(written.slice(reply.shown))
+        }
         if (!this._shown.trim() && this._record.length) {
           yield this.show(
-            last
-              ? "I ran out of tool steps for this reply before I could finish. Ask me to continue and I will carry on from here."
-              : "The model finished without writing a reply; the steps above show what it did."
+            settled
+              ? "The change is waiting in the editor for you to accept or reject."
+              : last
+                ? "I ran out of tool steps for this reply before I could finish. Ask me to continue and I will carry on from here."
+                : "The model finished without writing a reply; the steps above show what it did."
           )
         }
         const usage = this._usage.promptTokens || this._usage.completionTokens ? { ...this._usage } : undefined
@@ -468,9 +501,12 @@ class ToolLoop {
         return
       }
 
-      if (found && found.start > reply.shown) {
-        yield this.show(reply.text.slice(reply.shown, found.start))
-      }
+      // Whatever was held back in case it began a call is prose when the
+      // calls came another way (natively), and so is all before a text call.
+      // Call markup a server left in the text beside its native calls is not prose.
+      const markup = found ?? (nativeCalls.length ? findToolCall(written, true) : undefined)
+      const proseEnd = markup ? markup.start : written.length
+      if (proseEnd > reply.shown) yield this.show(written.slice(reply.shown, proseEnd))
       const results: ToolResult[] = []
       for (const [i, pending] of calls.entries()) {
         const id = `${step}.${i}`
@@ -492,11 +528,22 @@ class ToolLoop {
           left > 0 && i === calls.length - 1
             ? `\n(${left} more ${left === 1 ? "call" : "calls"} in the same reply ${left === 1 ? "was" : "were"} not run; make ${left === 1 ? "it" : "them"} again if still needed.)`
             : ""
+        const { preface } = ran
+        // Calls made together share a result's room, so the next request
+        // has all of them rather than trimming the ones just asked for.
+        const room = this._plan
+          ? Math.max(MIN_RESULT_CHARS, Math.floor(this._plan.resultChars / calls.length) - (preface?.length ?? 0))
+          : undefined
         const result: ToolResult = {
           ...ran,
-          output: (this._plan ? fitResult(ran.output, this._plan.resultChars) : ran.output) + note || "(no output)"
+          output: (room ? fitResult(ran.output, room) : ran.output) + note || "(no output)"
         }
-        results.push(result)
+        // A folder's instructions go ahead of the output, where a cut to
+        // fit the context does not reach them; the step shows the output.
+        const sent = preface ? { ...result, output: `${preface}\n\n${result.output}` } : result
+        results.push(sent)
+        // The next turn's notes keep what the tool returned; the folder's
+        // instructions come again when that turn's tools reach the folder.
         this._record.push({ name, args: pending.call?.args ?? {}, output: result.output })
         this._options.onStep?.({
           id,
@@ -587,16 +634,15 @@ class ToolLoop {
     const message = this._messages[slot.message]
     if (!message) return
     const text = textOf(message.content)
+    const output = message.role === "tool" ? text : text.replace(/^<tool_result[^>]*>\n/, "").replace(/\n<\/tool_result>$/, "")
+    // Instructions hold for the whole reply, so they outlast the output they came with.
+    const { preface } = slot
+    const kept =
+      preface && output.startsWith(preface)
+        ? `${preface}\n\n${trimmedResult(output.slice(preface.length).trimStart())}`
+        : trimmedResult(output)
     this._messages[slot.message] = (
-      message.role === "tool"
-        ? { ...message, content: trimmedResult(text) }
-        : {
-            ...message,
-            content: toolResultMessage(
-              slot.name,
-              trimmedResult(text.replace(/^<tool_result[^>]*>\n/, "").replace(/\n<\/tool_result>$/, ""))
-            )
-          }
+      message.role === "tool" ? { ...message, content: kept } : { ...message, content: toolResultMessage(slot.name, kept) }
     ) as ChatMessage
     slot.trimmed = true
   }
@@ -654,7 +700,13 @@ class ToolLoop {
     found: FoundCall | undefined,
     step: number
   ) {
-    const slot = (name: string): ResultSlot => ({ message: this._messages.length, step, name, trimmed: false })
+    const slot = (name: string, preface?: string): ResultSlot => ({
+      message: this._messages.length,
+      step,
+      name,
+      trimmed: false,
+      ...(preface ? { preface } : {})
+    })
     if (this._mode === "native") {
       this._messages.push({
         role: ASSISTANT,
@@ -668,7 +720,7 @@ class ToolLoop {
         }))
       } as ChatMessage)
       calls.forEach(({ raw }, i) => {
-        this._results.push(slot(raw!.name))
+        this._results.push(slot(raw!.name, results[i].preface))
         this._messages.push({ role: "tool", tool_call_id: raw!.id, content: results[i].output } as ChatMessage)
       })
       return
@@ -676,7 +728,7 @@ class ToolLoop {
     const name = calls[0].call?.name ?? "error"
     // A call read before its closing marker arrived is recorded closed.
     this._messages.push({ role: ASSISTANT, content: found?.unclosed ? `${text.trimEnd()}\n${found.unclosed}` : text })
-    this._results.push(slot(name))
+    this._results.push(slot(name, results[0].preface))
     this._messages.push({ role: USER, content: toolResultMessage(name, results[0].output) })
   }
 }

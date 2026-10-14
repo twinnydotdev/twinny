@@ -1,0 +1,126 @@
+/*
+ * What agent mode may do, laid over the foot of the transcript like the
+ * keys sheet: a label and a few words to pick from per line, the chosen
+ * one in the foreground colour. Greyscale throughout.
+ */
+.panel {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: var(--tw-pad);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(300px, calc(100% - 2 * var(--tw-pad)));
+  padding: 8px 10px 10px;
+  background: var(--tw-bg);
+  border: 1px solid var(--tw-rule);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--tw-fg-dim);
+}
+
+.close {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tw-fg-faint);
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+  color: var(--tw-fg);
+  outline: none;
+}
+
+.close :global(.codicon) {
+  font-size: 12px !important;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.label {
+  min-width: 0;
+  color: var(--tw-fg-faint);
+}
+
+.choices,
+.link {
+  flex-shrink: 0;
+}
+
+.choices {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.choice {
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: none;
+  color: var(--tw-fg-faint);
+  font: inherit;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.choice:hover:not(:disabled),
+.choice:focus-visible {
+  color: var(--tw-fg-dim);
+  outline: none;
+}
+
+.chosen,
+.chosen:hover:not(:disabled) {
+  border-color: var(--tw-rule);
+  background: color-mix(in srgb, var(--tw-fg) 8%, transparent);
+  color: var(--tw-fg);
+}
+
+.choice:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.link,
+.more {
+  white-space: nowrap;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tw-fg-faint);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link:hover,
+.more:hover,
+.link:focus-visible,
+.more:focus-visible {
+  color: var(--tw-fg);
+  outline: none;
+}
+
+.more {
+  align-self: flex-start;
+  margin-top: 2px;
+}

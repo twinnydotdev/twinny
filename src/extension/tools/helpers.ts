@@ -4,6 +4,7 @@
  * a git command is one that only reads, and naming the few paths an edit
  * must not touch unreviewed.
  */
+import { posix as posixPath } from "path"
 
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
@@ -114,11 +115,45 @@ export const READ_ONLY_GIT = new Set(["status", "diff", "log", "show", "blame", 
  * repository, whatever the subcommand: `--output` writes the diff to a
  * path, `--ext-diff` and `--textconv` run what the configuration names,
  * `--no-index` compares any two paths on the machine, and `--contents`
- * blames any file as if it were the working copy. The prefix options
- * change the `a/path b/path` headers the ignored-file filter reads.
+ * and `--ignore-revs-file` read any file (the second shows its first
+ * line in its complaint). The prefix options and `--relative` change the
+ * `a/path b/path` headers the ignored-file filter reads, and `--ignored`
+ * names what `.gitignore` hides. Git takes any unambiguous start of a
+ * long option (`--conten` for `--contents`), so a start of one of these
+ * is refused as well.
  */
-const UNSAFE_GIT_OPTION =
-  /^(--output|--ext-diff|--textconv|--no-index|--contents|--no-prefix|--src-prefix|--dst-prefix|--line-prefix)(=|$)/
+const UNSAFE_GIT_OPTIONS = [
+  "--output",
+  "--ext-diff",
+  "--textconv",
+  "--no-index",
+  "--contents",
+  "--ignore-revs-file",
+  "--no-prefix",
+  "--src-prefix",
+  "--dst-prefix",
+  "--line-prefix",
+  "--relative",
+  "--ignored"
+]
+
+/** Short options that do the same for one subcommand: blame's revisions file, ls-files's ignored files. */
+const UNSAFE_GIT_SHORT: Record<string, RegExp> = {
+  blame: /^-S/,
+  "ls-files": /^-[^-]*i/
+}
+
+/** Options of their own whose names a refused one starts with: `diff --text`, `blame --ignore-rev`. */
+const SAFE_GIT_OPTIONS = new Set(["--text", "--ignore-rev"])
+
+const unsafeGitOption = (subcommand: string, arg: string): boolean => {
+  if (arg.startsWith("--") && arg.length > 2) {
+    const name = arg.split("=")[0]
+    if (SAFE_GIT_OPTIONS.has(name)) return false
+    return UNSAFE_GIT_OPTIONS.some((option) => option === name || (name.length >= 4 && option.startsWith(name)))
+  }
+  return !!UNSAFE_GIT_SHORT[subcommand]?.test(arg)
+}
 
 /** What `git branch` may be asked here: listing, never creating, moving or deleting. */
 const BRANCH_LISTING = /^(-a|-r|-v|-vv|-l|--list|--all|--remotes|--verbose|--show-current|--merged|--no-merged|--contains|--sort=.+|--format=.+)$/
@@ -140,7 +175,7 @@ export const readOnlyGitArgs = (line: string): string[] | string => {
   if (rest.some((arg) => SHELL_OPERATOR.test(arg))) {
     return "git here runs one command with no shell: no pipes, redirects or &&. Limit the output with git's own options, e.g. -n 5 or --stat"
   }
-  const unsafe = rest.find((arg) => UNSAFE_GIT_OPTION.test(arg))
+  const unsafe = rest.find((arg) => unsafeGitOption(subcommand, arg))
   if (unsafe) return `${unsafe.split("=")[0]} is not allowed in git here`
   if (subcommand === "branch" && rest.some((arg) => !BRANCH_LISTING.test(arg))) {
     return "git branch here only lists branches; use run_command to create, rename or delete one"
@@ -171,14 +206,42 @@ export const gitNamedPaths = (args: string[]): GitNamedPath[] => {
   const split = rest.indexOf("--")
   const before = split === -1 ? rest : rest.slice(0, split)
   const after = split === -1 ? [] : rest.slice(split + 1)
-  const named: GitNamedPath[] = after.map((path) => ({ path, inRepo: false }))
+  const named: GitNamedPath[] = after.map((path) => ({ path: tidyGitPath(path), inRepo: false }))
   for (const arg of before) {
     if (arg.startsWith("-")) continue
-    const object = arg.match(/^[^:]*:(\.\/)?(.+)$/)
-    if (object) named.push({ path: object[2], inRepo: !object[1] })
-    else if (subcommand === "blame") named.push({ path: arg, inRepo: false })
+    // `:0:path`: the file as staged, named from the repository's top.
+    const staged = arg.match(/^:[0-3]:(.+)$/)
+    const object = staged ? undefined : arg.match(/^[^:]*:(\.\/)?(.+)$/)
+    if (staged) named.push({ path: tidyGitPath(staged[1]), inRepo: true })
+    else if (object) named.push({ path: tidyGitPath(object[2]), inRepo: !object[1] })
+    else if (subcommand === "blame") named.push({ path: tidyGitPath(arg), inRepo: false })
   }
   return named
+}
+
+/**
+ * Listed paths with the hidden ones taken out: a path per line, or after
+ * the tab in `ls-files -s` output.
+ */
+export const withoutHiddenLines = (
+  output: string,
+  hidden: (path: string) => boolean
+): { text: string; dropped: number } => {
+  let dropped = 0
+  const kept = output.split("\n").filter((line) => {
+    const listed = line.includes("\t") ? line.slice(line.lastIndexOf("\t") + 1) : line
+    if (!listed.trim() || !hidden(tidyGitPath(listed.trim()))) return true
+    dropped++
+    return false
+  })
+  return { text: kept.join("\n"), dropped }
+}
+
+/** A path as git will read it: `/` separators, `.` and `..` worked out, no leading `./`. Pathspec magic is left as written. */
+export const tidyGitPath = (raw: string): string => {
+  if (raw.startsWith(":")) return raw
+  const tidied = posixPath.normalize(raw.replace(/\\/g, "/")).replace(/^(\.\/)+/, "")
+  return tidied === "." ? "" : tidied
 }
 
 /**
@@ -206,9 +269,18 @@ export const withoutHiddenDiffs = (
 
 /**
  * Files an edit could use to give itself more than the user allowed, so a
- * change to one is always put to the user as a diff: `.vscode/` (settings
- * and tasks that run on their own) and `.gitignore` (what the tools may
- * read). `relative` uses `/`.
+ * change to one is always put to the user as a diff: `.vscode/` and
+ * `*.code-workspace` (settings and tasks that run on their own),
+ * `.gitignore` (what the tools may
+ * read) and the project's instructions for agents (`AGENTS.md` and the
+ * files read in its place), which the next reply would obey. `relative`
+ * uses `/`.
  */
 export const isProtectedPath = (relative: string): boolean =>
-  /(^|\/)\.vscode\//.test(relative) || /(^|\/)\.gitignore$/.test(relative)
+  // Any case: on macOS and Windows `.VSCode/` is the same folder.
+  /(^|\/)\.vscode\//i.test(relative) ||
+  /(^|\/)\.gitignore$/i.test(relative) ||
+  /(^|\/)AGENTS\.md$/i.test(relative) ||
+  // A workspace file holds settings and tasks too.
+  /\.code-workspace$/i.test(relative) ||
+  /^(CLAUDE\.md|\.github\/copilot-instructions\.md)$/i.test(relative)

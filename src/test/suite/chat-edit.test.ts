@@ -5,6 +5,8 @@ import * as os from "os"
 import * as path from "path"
 import * as vscode from "vscode"
 
+import { ChangeStore, ReplyChanges, viewOf } from "../../extension/chat/reply-changes"
+import { ReplyChangesEditor } from "../../extension/chat/reply-changes-editor"
 import {
   editorEdits,
   editorHint,
@@ -83,6 +85,109 @@ suite("Chat edit_file", () => {
     assert.strictEqual(documentText(), "const a = 1\nfunction f() {\n  return a + 1\n}\n")
   })
 
+  test("what a reply changed is listed, opens beside what it was, and can be undone", async function () {
+    this.timeout(30000)
+    const dir = path.dirname(file)
+    const view = new WorkspaceView(dir)
+    const changes = new ReplyChanges(dir, openDocumentText)
+    const apply = editorEdits(view, "apply", async () => true, changes)
+    const current = fs.readFileSync(file, "utf8")
+    const edited = await apply.edit(file, planReplacement(current, "  return a", "  return a * 2") as Replacement)
+    assert.ok(edited.ok, edited.message)
+    const created = await apply.create(path.join(dir, "made.ts"), "export const made = 1\n")
+    assert.ok(created.ok, created.message)
+    fs.writeFileSync(path.join(dir, "keep.ts"), "export const keep = 1\n")
+    const moved = await apply.move(path.join(dir, "keep.ts"), path.join(dir, "kept.ts"))
+    assert.ok(moved.ok, moved.message)
+
+    const record = await changes.record()
+    assert.ok(record)
+    assert.deepStrictEqual(
+      viewOf(record).files.map(({ path: name, status, added, removed }) => [name, status, added, removed]),
+      [
+        ["a.ts", "modified", 1, 1],
+        ["keep.ts", "deleted", 0, 1],
+        ["kept.ts", "created", 1, 0],
+        ["made.ts", "created", 1, 0]
+      ]
+    )
+    const store = new ChangeStore(path.join(dir, ".changes"))
+    store.save(record)
+    const editor = new ReplyChangesEditor(store, openDocumentText)
+
+    await editor.openDiff(record.id, "a.ts")
+    const tab = vscode.window.tabGroups.activeTabGroup.activeTab
+    assert.ok(tab?.input instanceof vscode.TabInputTextDiff, "a diff opens")
+    const before = (tab!.input as vscode.TabInputTextDiff).original
+    assert.strictEqual(before.scheme, "twinny-before")
+    assert.strictEqual((await vscode.workspace.openTextDocument(before)).getText(), ORIGINAL)
+
+    const one = await editor.undo(record.id, ["made.ts"])
+    assert.ok(!fs.existsSync(path.join(dir, "made.ts")), "a new file is taken away")
+    assert.deepStrictEqual(one.view?.files.filter((f) => f.undone).map((f) => f.path), ["made.ts"])
+    const all = await editor.undo(record.id)
+    assert.strictEqual(all.error, undefined)
+    assert.strictEqual(fs.readFileSync(file, "utf8"), ORIGINAL, "the edit is put back, and saved")
+    assert.ok(fs.existsSync(path.join(dir, "keep.ts")) && !fs.existsSync(path.join(dir, "kept.ts")), "the move is put back")
+    assert.ok(all.view?.files.every((f) => f.undone))
+    assert.match((await editor.undo("no-such-reply")).error ?? "", /no longer keeps/)
+  })
+
+  test("files a command changes join the reply's changes, and undo puts them back", async function () {
+    this.timeout(30000)
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-cmd-changes-"))
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, stdio: "pipe" })
+    git("init", "-q")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "T")
+    fs.writeFileSync(path.join(repo, ".gitignore"), "build/\n")
+    fs.writeFileSync(path.join(repo, "a.ts"), "export const a = 1\n")
+    git("add", ".")
+    git("commit", "-qm", "first")
+
+    const changes = new ReplyChanges(repo, openDocumentText)
+    const view = new WorkspaceView(repo, [], undefined, ["secret/"])
+    const commands = terminalCommands(() => "allow", repo, undefined, { changes, visible: (file) => view.visible(file) })
+    const outcome = await commands.run(
+      "sed -i 's/= 1/= 2/' a.ts && echo made > b.ts && mkdir -p build secret && echo out > build/x.js && echo hush > secret/k.ts"
+    )
+    assert.strictEqual(outcome.exitCode, 0, outcome.output)
+    const record = await changes.record()
+    assert.deepStrictEqual(
+      record && viewOf(record).files.map(({ path: name, status }) => [name, status]),
+      [
+        ["a.ts", "modified"],
+        ["b.ts", "created"]
+      ],
+      "ignored and blocked files are not listed"
+    )
+    const store = new ChangeStore(path.join(repo, ".git", "twinny-test-changes"))
+    store.save(record!)
+    const undone = await new ReplyChangesEditor(store, openDocumentText).undo(record!.id)
+    assert.strictEqual(undone.error, undefined)
+    assert.strictEqual(fs.readFileSync(path.join(repo, "a.ts"), "utf8"), "export const a = 1\n")
+    assert.ok(!fs.existsSync(path.join(repo, "b.ts")))
+
+    // Outside a repository a command runs as ever, and nothing is listed.
+    const plain = new ReplyChanges(path.dirname(file))
+    const loose = terminalCommands(() => "allow", path.dirname(file), undefined, { changes: plain })
+    assert.strictEqual((await loose.run("echo hi > loose.txt")).exitCode, 0)
+    assert.strictEqual(await plain.record(), undefined)
+  })
+
+  test("an edit that removes lines takes their line breaks too", async () => {
+    const removed = await edit("function f() {\n  return a\n}\n", "", "apply")
+    assert.ok(removed.ok, removed.message)
+    assert.strictEqual(fs.readFileSync(file, "utf8"), "const a = 1\n")
+    // The last line, with no line break after it: the one before goes instead.
+    const tail = path.join(path.dirname(file), "tail.ts")
+    fs.writeFileSync(tail, "const a = 1\nconst b = 2")
+    const plan = planReplacement(fs.readFileSync(tail, "utf8"), "const b = 2", "") as Replacement
+    const last = await service.chatEdit({ file: tail, ...plan }, "apply")
+    assert.ok(last.ok, last.message)
+    assert.strictEqual(fs.readFileSync(tail, "utf8"), "const a = 1")
+  })
+
   test("refuses when the lines changed since the model read them", async () => {
     const plan = planReplacement(ORIGINAL, "const a = 1", "const a = 2") as Replacement
     const document = await vscode.workspace.openTextDocument(file)
@@ -152,6 +257,52 @@ suite("Chat edit_file", () => {
     assert.ok(!fs.existsSync(marker), "the child it started was ended with it")
   })
 
+  test("a command that leaves something running in the background ends, and takes it with it", async function () {
+    this.timeout(20000)
+    const marker = path.join(path.dirname(file), "twinny-left-behind")
+    const commands = terminalCommands(() => "allow", path.dirname(file))
+    const started = Date.now()
+    const outcome = await commands.run(`(sleep 2; touch ${marker}) & echo started`)
+    assert.ok(Date.now() - started < 3000, "the step ends when the shell does, not when the server would")
+    assert.strictEqual(outcome.exitCode, 0)
+    assert.match(outcome.output, /started\n\(it left processes running in the background; they were ended with it\)/)
+    await new Promise((resolve) => setTimeout(resolve, 2500))
+    assert.ok(!fs.existsSync(marker), "what it left running was ended")
+  })
+
+  test("a chat that goes ends the commands it started, and only those", async function () {
+    this.timeout(20000)
+    const closing = new AbortController()
+    const mine = terminalCommands(() => "allow", path.dirname(file), undefined, { lifetime: closing.signal })
+    const other = terminalCommands(() => "allow", path.dirname(file), undefined, { lifetime: new AbortController().signal })
+    const running = mine.run("echo mine; sleep 30")
+    const elsewhere = other.run("sleep 1; echo other")
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    closing.abort()
+    const outcome = await running
+    assert.strictEqual(outcome.timedOut, "stopped")
+    assert.strictEqual((await elsewhere).exitCode, 0, "another chat's command runs on")
+  })
+
+  test("a command that ignores SIGTERM is still ended when its time runs out", async function () {
+    this.timeout(20000)
+    const commands = terminalCommands(() => "allow", path.dirname(file), undefined, { timeoutMs: 800 })
+    const started = Date.now()
+    const outcome = await commands.run("trap '' TERM; echo ready; sleep 30")
+    assert.ok(Date.now() - started < 6000, `ended in ${Date.now() - started} ms`)
+    assert.strictEqual(outcome.timedOut, "stopped")
+    assert.match(outcome.output, /ready/)
+  })
+
+  test("output keeps whole characters however the bytes are split", async function () {
+    this.timeout(20000)
+    const commands = terminalCommands(() => "allow", path.dirname(file))
+    const outcome = await commands.run("for i in $(seq 1 3000); do printf '€€€€€€€€€€'; done; echo")
+    assert.strictEqual(outcome.exitCode, 0)
+    assert.ok(outcome.output.includes("€€€€"))
+    assert.ok(!outcome.output.includes("\uFFFD"), "no replacement characters")
+  })
+
   test("a command's own stop ends it alone and says the user stopped it", async function () {
     this.timeout(20000)
     let stop: (() => void) | undefined
@@ -205,13 +356,16 @@ suite("Chat edit_file", () => {
     git("init", "-q")
     git("config", "user.email", "t@example.com")
     git("config", "user.name", "T")
-    for (const name of ["clean.ts", "changed.ts"]) fs.writeFileSync(path.join(repo, name), "export const a = 1\n")
+    for (const name of ["clean.ts", "changed.ts", "local.json"]) fs.writeFileSync(path.join(repo, name), "export const a = 1\n")
     fs.mkdirSync(path.join(repo, ".vscode"))
     fs.writeFileSync(path.join(repo, ".vscode", "tasks.json"), "{}\n")
     git("add", ".")
     git("commit", "-qm", "first")
     fs.writeFileSync(path.join(repo, "changed.ts"), "export const a = 2\n")
     fs.writeFileSync(path.join(repo, "new.ts"), "export const n = 1\n")
+    // Local settings git is told to look away from: it reports them clean whatever they hold.
+    git("update-index", "--skip-worktree", "local.json")
+    fs.writeFileSync(path.join(repo, "local.json"), "{\"mine\": true}\n")
 
     const asked: string[] = []
     const apply = editorEdits(new WorkspaceView(repo), "apply", async (detail) => (asked.push(detail), false))
@@ -220,7 +374,7 @@ suite("Chat edit_file", () => {
     assert.strictEqual(asked.length, 0, "committed and unchanged: git has it, so no question")
     assert.ok(!fs.existsSync(path.join(repo, "clean.ts")))
 
-    for (const name of ["changed.ts", "new.ts"]) {
+    for (const name of ["changed.ts", "new.ts", "local.json"]) {
       const kept = await apply.remove(path.join(repo, name))
       assert.strictEqual(kept.ok, false, name)
       assert.ok(fs.existsSync(path.join(repo, name)), name)
@@ -230,6 +384,7 @@ suite("Chat edit_file", () => {
     assert.deepStrictEqual(asked, [
       "delete changed.ts\n(git has no copy of it as it is now)",
       "delete new.ts\n(git has no copy of it as it is now)",
+      "delete local.json\n(git has no copy of it as it is now)",
       "delete .vscode/tasks.json"
     ])
   })
@@ -275,6 +430,48 @@ suite("Chat edit_file", () => {
     assert.ok(removed.ok, removed.message)
     assert.strictEqual(asked[1], "delete moved/b.ts\n(git has no copy of it as it is now)")
     assert.ok(!fs.existsSync(path.join(dir, "moved", "b.ts")))
+  })
+
+  test("an applied edit comes back with the errors it brought into the file, and only those", async function () {
+    this.timeout(30000)
+    const dir = path.dirname(file)
+    const view = new WorkspaceView(dir)
+    const apply = editorEdits(view, "apply", async () => true)
+    const plan = (target: string, find: string, replace: string) =>
+      planReplacement(fs.readFileSync(target, "utf8"), find, replace) as Replacement
+
+    const broken = await apply.edit(file, plan(file, "  return a", "  return a.nope"))
+    assert.ok(broken.ok, broken.message)
+    assert.strictEqual(broken.newErrors, 1)
+    assert.match(
+      broken.message,
+      /^Applied and saved: .*\nThe editor now reports an error in a\.ts on the lines you changed:\n3: Property 'nope' does not exist on type '1'\. \(ts\)\nFix it if your change caused it\.$/
+    )
+    const fixed = await apply.edit(file, plan(file, "  return a.nope", "  return a"))
+    assert.strictEqual(fixed.newErrors, undefined, "a fix reports nothing")
+    // Open and checked now: an error the edit causes away from its own lines is named too.
+    const away = await apply.edit(file, plan(file, "const a = 1", "const b = 1"))
+    assert.strictEqual(away.newErrors, 1, away.message)
+    assert.match(away.message, /in a\.ts that was not there before:\n3: Cannot find name 'a'/)
+    await apply.edit(file, plan(file, "const b = 1", "const a = 1"))
+
+    // A file not open until the edit: the errors it already had are not put
+    // down to the edit, and one on the lines the edit wrote is.
+    const old = path.join(dir, "old.ts")
+    fs.writeFileSync(old, "const wrong: number = \"text\"\nexport const value = 1\nexport const other = 1\n")
+    const unrelated = await apply.edit(old, plan(old, "export const value = 1", "export const value = 2"))
+    assert.ok(unrelated.ok, unrelated.message)
+    assert.strictEqual(unrelated.newErrors, undefined, unrelated.message)
+    await vscode.commands.executeCommand("workbench.action.closeAllEditors")
+    const cold = path.join(dir, "cold.ts")
+    fs.writeFileSync(cold, "const wrong: number = \"text\"\nexport const value = 1\n")
+    const near = await apply.edit(cold, plan(cold, "export const value = 1", "export const value: string = 1"))
+    assert.strictEqual(near.newErrors, 1, near.message)
+    assert.match(near.message, /in cold\.ts on the lines you changed:\n2: Type 'number' is not assignable to type 'string'\./)
+
+    const created = await apply.create(path.join(dir, "made.ts"), "export const made: string = 1\n")
+    assert.strictEqual(created.newErrors, 1, created.message)
+
   })
 
   test("the editor reports diagnostics, what is open and selected, and says when it cannot rename", async () => {

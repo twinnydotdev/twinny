@@ -29,7 +29,9 @@ export const GLOBAL_STORAGE_KEY = {
   /** Whether agent mode runs commands without asking; switched from the composer. */
   autoRunCommands: "autoRunCommands",
   /** Commands the user chose "Always run" for, each run without asking from then on. */
-  alwaysRunCommands: "alwaysRunCommands"
+  alwaysRunCommands: "alwaysRunCommands",
+  /** MCP tools (`server/tool`) the user chose Always run for. */
+  alwaysRunMcpTools: "alwaysRunMcpTools"
 }
 
 export const WORKSPACE_STORAGE_KEY = {

@@ -284,6 +284,28 @@
   font-size: 11px;
 }
 
+/* The AGENTS.md agent mode followed: quiet, opens the file. */
+.replyInstructions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.replyInstructions:hover {
+  color: var(--tw-fg);
+}
+
+.replyInstructions .codicon {
+  font-size: 11px;
+}
+
 .replyContinue {
   display: inline-flex;
   align-items: center;

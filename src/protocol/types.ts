@@ -61,6 +61,42 @@ export interface TeamPolicy {
   peers?: string[]
   /** Put before every chat's system prompt on connected extensions. */
   systemPrompt?: string
+  /** What agent mode may do on connected extensions; absent leaves it to each developer. */
+  agent?: TeamAgentPolicy
+}
+
+/**
+ * Sent by extensions that enforce `policy.agent`. A gateway whose team
+ * sets agent rules refuses agent requests from a client without it: an
+ * extension from before the rules would ignore them.
+ */
+export const AGENT_RULES_HEADER = "X-Twinny-Agent-Rules"
+
+/** How the agent may run commands, at most: `ask` puts every one to the developer, `off` takes them away. */
+export const TEAM_AGENT_COMMANDS = ["ask", "off"] as const
+export type TeamAgentCommands = (typeof TEAM_AGENT_COMMANDS)[number]
+
+/**
+ * Agent mode on connected extensions, only ever tightened from what each
+ * developer set: a rule left out leaves their own setting in force.
+ */
+export interface TeamAgentPolicy {
+  /** Agent mode is off: chat answers without reading or changing the workspace. */
+  off?: boolean
+  /**
+   * `ask`: every command waits for the developer's Run; auto-run and
+   * Always run do nothing. `off`: the agent cannot run commands.
+   */
+  commands?: TeamAgentCommands
+  /** `review`: every change the agent makes waits in the editor as a diff to accept. */
+  edits?: "review"
+  /** `off`: agent mode uses none of the developer's MCP servers. */
+  mcp?: "off"
+  /**
+   * Paths the agent may not list, read, search or change, in `.gitignore`
+   * syntax, on top of what each repository's `.gitignore` hides.
+   */
+  blockedPaths?: string[]
 }
 
 /** The gateway has a team pool: connected extensions may share their computer. */

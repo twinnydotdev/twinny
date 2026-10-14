@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.7",
+  "version": "4.3.8",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -646,7 +646,7 @@
           "order": 20,
           "type": "boolean",
           "default": false,
-          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, and by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review; commands ask first unless `#twinny.chatToolsCommands#` says otherwise. Files ignored by a `.gitignore` are off limits, and changes to `.vscode/` or a `.gitignore` are always shown for review. Each step shows in the reply at the point it ran. Needs a capable coder model such as `qwen3-coder:30b` with a context of 8k tokens or more; small models tend to call tools badly. Set in your user settings; a workspace cannot turn it on.",
+          "markdownDescription": "**Experimental.** Lets the chat model work in the workspace: find, read and search files (by regular expression, and by meaning through the embeddings index), read git history, ask the language servers for errors, references and definitions, edit, create, rename, move and delete files, and run commands. Edits are applied straight away unless `#twinny.chatToolsEdits#` asks for review; each applied edit comes back with any errors the editor then reports in the file, and the reply ends with the files it changed, each of which can be compared with what it was or undone. Commands ask first unless `#twinny.chatToolsCommands#` says otherwise. The project's `AGENTS.md` (or `CLAUDE.md`) is followed, and a folder's own `AGENTS.md` once the model works there. Files ignored by a `.gitignore` are off limits, and changes to `.vscode/`, a `.gitignore` or an `AGENTS.md` are always shown for review. Each step shows in the reply at the point it ran. Needs a capable coder model such as `qwen3-coder:30b` with a context of 8k tokens or more; small models tend to call tools badly. Set in your user settings; a workspace cannot turn it on.",
           "scope": "machine"
         },
         "twinny.chatToolsEdits": {
@@ -679,6 +679,52 @@
           ],
           "default": "ask",
           "markdownDescription": "Whether the chat model may run shell commands (tests, builds), with `#twinny.chatTools#` on. It sees the exit code and the end of the output. This sets where the **auto-run** switch in the chat's composer starts; once you switch it, the switch decides (`off` still turns commands off). Reading git (status, diff, log) never asks: it cannot change anything.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsMcpServers": {
+          "order": 20,
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "command"
+            ],
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "The program that runs the server, e.g. npx or uvx."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Its arguments."
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Environment variables for it, on top of VS Code's."
+              },
+              "cwd": {
+                "type": "string",
+                "description": "The folder it runs in; the workspace root by default."
+              }
+            }
+          },
+          "markdownDescription": "Model Context Protocol servers whose tools agent mode can use (with `#twinny.chatTools#` on), by name: `{ \"github\": { \"command\": \"npx\", \"args\": [\"-y\", \"@modelcontextprotocol/server-github\"], \"env\": { \"GITHUB_TOKEN\": \"…\" } } }`. Servers run on this machine over standard input and output, start with the first agent reply and stop with the chat. Each call is shown with Run and Skip first, unless you chose Always run for that tool. Every tool goes into every agent request, so a server with many tools makes small models pick worse. Set in your user settings; a workspace cannot add one.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsMaxSteps": {
+          "order": 20,
+          "type": "number",
+          "default": 12,
+          "minimum": 4,
+          "maximum": 40,
+          "markdownDescription": "How many tool steps one agent reply may take before the model is asked to answer with what it has (with `#twinny.chatTools#` on). More lets a capable model finish longer tasks in one reply; each step is another request to the model.",
           "scope": "machine"
         },
         "twinny.chatToolsCommandsRunIn": {

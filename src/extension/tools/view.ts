@@ -31,6 +31,16 @@ export const linesOf = (text: string): string[] => {
   return unix === "" ? [] : unix.replace(/\n$/, "").split("\n")
 }
 
+/** Whether anything is at `file`, a link that leads nowhere included. */
+const present = (file: string) => {
+  try {
+    fs.lstatSync(file)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** A tool's input was wrong; the message goes back to the model to fix its call. */
 export class ToolInputError extends Error {}
 
@@ -44,13 +54,26 @@ export class WorkspaceView {
   private _files?: Promise<string[]>
   private _tree?: Promise<{ files: string[]; dirs: string[] }>
 
+  /** Paths the team's rules keep from the agent, said so when one is asked for. */
+  private readonly _blocked?: Ignore
+
   constructor(
     readonly root: string,
     ignoredGlobs: string[] = [],
-    private readonly _read?: (file: string) => Promise<string | undefined>
+    private readonly _read?: (file: string) => Promise<string | undefined>,
+    blockedGlobs: string[] = []
   ) {
     this._realRoot = fs.realpathSync(root)
     this._base = ignore().add([".git", "node_modules", ...ignoredGlobs])
+    if (blockedGlobs.length) this._blocked = ignore().add(blockedGlobs)
+  }
+
+  /** Whether the team's rules keep a path under the root from the agent. */
+  blocked(relative: string, isDirectory = false): boolean {
+    if (!this._blocked) return false
+    const parts = relative.split(/[\\/]+/).filter(Boolean)
+    if (!parts.length || parts[0] === "..") return false
+    return this._blocked.ignores(parts.join("/") + (isDirectory ? "/" : ""))
   }
 
   private gitignoreOf(dir: string): Ignore | null {
@@ -74,7 +97,7 @@ export class WorkspaceView {
     const parts = relative.split(/[\\/]+/).filter(Boolean)
     if (!parts.length || parts[0] === "..") return false
     const whole = parts.join("/") + (isDirectory ? "/" : "")
-    if (this._base.ignores(whole)) return true
+    if (this._base.ignores(whole) || this._blocked?.ignores(whole)) return true
     for (let depth = 0; depth < parts.length; depth++) {
       const rules = this.gitignoreOf(path.join(this.root, ...parts.slice(0, depth)))
       if (rules?.ignores(parts.slice(depth).join("/") + (isDirectory ? "/" : ""))) return true
@@ -112,8 +135,22 @@ export class WorkspaceView {
       throw new ToolInputError(`${cleaned} is outside the workspace.`)
     }
     const stat = fs.statSync(real)
+    // A link is judged by where it leads as well as by its own name, so
+    // `envlink -> .env` hides what `.env` hides.
+    const realRel = path.relative(this._realRoot, real)
+    if (realRel && realRel !== rel && this.ignored(realRel, stat.isDirectory())) {
+      throw new ToolInputError(
+        this.blocked(realRel, stat.isDirectory())
+          ? `${cleaned} leads to a path the team's rules keep from the agent, and cannot be read.`
+          : `${cleaned} leads to a path ignored by .gitignore and cannot be read.`
+      )
+    }
     if (rel && this.ignored(rel, stat.isDirectory())) {
-      throw new ToolInputError(`${cleaned} is ignored by .gitignore and cannot be read.`)
+      throw new ToolInputError(
+        this.blocked(rel, stat.isDirectory())
+          ? `${cleaned} is kept from the agent by the team's rules and cannot be read.`
+          : `${cleaned} is ignored by .gitignore and cannot be read.`
+      )
     }
     if (kind === "file" && !stat.isFile()) throw new ToolInputError(`${cleaned} is not a file.`)
     if (kind === "dir" && !stat.isDirectory()) throw new ToolInputError(`${cleaned} is not a directory.`)
@@ -129,16 +166,28 @@ export class WorkspaceView {
     if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
       throw new ToolInputError(`${cleaned} is outside the workspace.`)
     }
-    if (fs.existsSync(absolute)) {
+    // Anything at the path counts, a link that leads nowhere included:
+    // writing the new file would follow it, wherever it points.
+    if (present(absolute)) {
       throw new ToolInputError(`${cleaned} already exists; use edit_file to change it.`)
     }
     let parent = path.dirname(absolute)
-    while (!fs.existsSync(parent)) parent = path.dirname(parent)
-    if (!this.inside(fs.realpathSync(parent))) {
+    while (!present(parent)) parent = path.dirname(parent)
+    let realParent: string
+    try {
+      realParent = fs.realpathSync(parent)
+    } catch {
+      throw new ToolInputError(`${cleaned} is outside the workspace.`)
+    }
+    if (!this.inside(realParent)) {
       throw new ToolInputError(`${cleaned} is outside the workspace.`)
     }
     if (this.ignored(rel)) {
-      throw new ToolInputError(`${cleaned} is ignored by .gitignore; twinny does not write there.`)
+      throw new ToolInputError(
+        this.blocked(rel)
+          ? `${cleaned} is kept from the agent by the team's rules; twinny does not write there.`
+          : `${cleaned} is ignored by .gitignore; twinny does not write there.`
+      )
     }
     return absolute
   }
@@ -151,6 +200,22 @@ export class WorkspaceView {
 
   relative(absolute: string) {
     return path.relative(this.root, absolute).split(path.sep).join("/") || "."
+  }
+
+  /** Where `absolute` really is, relative to the root, links followed as far as they exist; `/` separators. */
+  realRelative(absolute: string): string {
+    let existing = absolute
+    const rest: string[] = []
+    while (!fs.existsSync(existing) && path.dirname(existing) !== existing) {
+      rest.unshift(path.basename(existing))
+      existing = path.dirname(existing)
+    }
+    try {
+      const real = path.join(fs.realpathSync(existing), ...rest)
+      return path.relative(this._realRoot, real).split(path.sep).join("/") || "."
+    } catch {
+      return this.relative(absolute)
+    }
   }
 
   /** Entries of a directory that are not ignored, directories first. */

@@ -10,6 +10,8 @@
  * model's context fills after a couple of whole files.
  */
 import { planReplacement, Replacement } from "./edit"
+import { FolderInstructions, folderInstructionsNote, InstructionFile, readRootInstructions } from "./instructions"
+import { coerceArguments, JsonSchema, McpToolSpec } from "./mcp"
 import {
   deleteFile,
   diagnostics,
@@ -39,6 +41,11 @@ export interface ToolResult {
    * for review, and the open file shows both sides of it until then.
    */
   final?: boolean
+  /**
+   * What the model reads ahead of the output, and the user does not see in
+   * the step: the instructions of a folder the call reached.
+   */
+  preface?: string
 }
 
 /** What a running tool is told: when the user has stopped the reply. */
@@ -86,7 +93,13 @@ export interface EditOutcome {
   message: string
   /** Waiting for the user's review rather than made. */
   pending?: boolean
+  /** Errors the editor reports in the file since the change; the message names them. */
+  newErrors?: number
 }
+
+/** ` · 2 new errors`, for a step's line, when the change left any. */
+const errorsNote = (outcome: EditOutcome) =>
+  outcome.newErrors ? ` · ${plural(outcome.newErrors, "new error")}` : ""
 
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
@@ -366,7 +379,7 @@ const createFile = (view: WorkspaceView, sink: EditSink): Tool => ({
     view.forgetFiles()
     return {
       output: outcome.message,
-      summary: `${outcome.pending ? "proposed a new file" : "created"} \`${rel}\` · ${plural(linesOf(content).length, "line")}`,
+      summary: `${outcome.pending ? "proposed a new file" : "created"} \`${rel}\` · ${plural(linesOf(content).length, "line")}${errorsNote(outcome)}`,
       final: outcome.pending
     }
   }
@@ -400,7 +413,7 @@ const editFile = (view: WorkspaceView, sink: EditSink): Tool => ({
     }
     return {
       output: outcome.message,
-      summary: `${outcome.pending ? "proposed an edit to" : "edited"} \`${rel}:${lines}\``,
+      summary: `${outcome.pending ? "proposed an edit to" : "edited"} \`${rel}:${lines}\`${errorsNote(outcome)}`,
       final: outcome.pending
     }
   }
@@ -410,6 +423,10 @@ export interface WorkspaceTools {
   tools: Tool[]
   /** A line naming the top-level entries, so the model starts oriented. */
   orientation: string
+  /** The root's instructions for agents (`AGENTS.md`), for the system prompt. */
+  instructions?: InstructionFile
+  /** The instruction files used so far: the root's, then each folder's as a tool reached it. */
+  instructionFiles?(): string[]
   run(call: ToolCall, context?: ToolContext): Promise<ToolResult>
 }
 
@@ -541,7 +558,28 @@ export interface ToolExtras {
   editor?: EditorSink
   /** Whether `git` is offered when the root is in a repository; on by default. */
   git?: boolean
+  /** Whether the project's `AGENTS.md` files are read; on by default. */
+  instructions?: boolean
+  /** Tools from MCP servers the user set up, and how to call one. */
+  mcp?: McpSink
 }
+
+/**
+ * Where MCP tools go: the host has the servers running, puts each call to
+ * the user as it says, and turns the answer into a result.
+ */
+export interface McpSink {
+  tools: McpToolSpec[]
+  call(tool: McpToolSpec, args: Record<string, unknown>, context?: ToolContext): Promise<ToolResult>
+}
+
+const mcpTool = (spec: McpToolSpec, sink: McpSink): Tool => ({
+  ...spec,
+  run: (args, context) => sink.call(spec, coerceArguments(spec.schema as JsonSchema | undefined, args), context)
+})
+
+/** Arguments that name a place in the workspace, whose folders' instructions apply. */
+const PLACE_ARGUMENTS = ["path", "from", "to"]
 
 /**
  * The reading tools, plus `search_code`, the editor's tools, `edit_file`
@@ -576,10 +614,22 @@ export const workspaceTools = (
     tools.push(moveFile(view, ops), deleteFile(view, ops))
   }
   if (commands) tools.push(runCommand(commands))
+  for (const spec of extras.mcp?.tools ?? []) tools.push(mcpTool(spec, extras.mcp!))
   const top = view.entries(view.root).map((e) => (e.dir ? `${e.name}/` : e.name))
+  const reading = extras.instructions !== false
+  const instructions = reading ? readRootInstructions(view.root) : undefined
+  const folders = reading ? new FolderInstructions(view) : undefined
+  /** A finished call with the instructions of the folders it reached, the first time the reply reaches them. */
+  const withFolderInstructions = (call: ToolCall, result: ToolResult): ToolResult => {
+    if (!folders || result.failed) return result
+    const found = PLACE_ARGUMENTS.flatMap((name) => (call.args[name] ? folders.for(call.args[name]) : []))
+    return found.length ? { ...result, preface: found.map(folderInstructionsNote).join("\n\n") } : result
+  }
   return {
     tools,
     orientation: `The workspace root contains: ${top.slice(0, 40).join(", ")}${top.length > 40 ? ", …" : ""}`,
+    instructions,
+    instructionFiles: () => [...(instructions ? [instructions.path] : []), ...(folders?.given ?? [])],
     async run(call, context) {
       const tool = tools.find((t) => t.name === call.name)
       if (!tool) {
@@ -590,7 +640,7 @@ export const workspaceTools = (
         }
       }
       try {
-        return await tool.run(call.args, context)
+        return withFolderInstructions(call, await tool.run(call.args, context))
       } catch (error) {
         // Whatever goes wrong inside a tool is the model's to read and work
         // around; it never ends the reply.

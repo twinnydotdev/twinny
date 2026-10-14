@@ -4,6 +4,7 @@ import { EVENT_NAME, GLOBAL_STORAGE_KEY } from "../../common/constants"
 import { bridge } from "../messaging"
 
 import { StorageType, useStorageContext } from "./useStorageContext"
+import { useTeamAgentPolicy } from "./useTeamAgentPolicy"
 
 /**
  * Agent mode on or off. Kept in the extension's global storage, not in
@@ -18,6 +19,12 @@ export const useAgentMode = () => {
   )
   const [fallback, setFallback] = useState(false)
   const onRef = useRef(false)
+  const team = useTeamAgentPolicy()
+  // A team that turned agent mode off keeps it off; the developer's own
+  // choice is kept for when they leave the team.
+  const teamOff = !!team?.off
+  const teamOffRef = useRef(teamOff)
+  teamOffRef.current = teamOff
 
   useEffect(() => {
     if (!loaded || context !== undefined) return
@@ -26,13 +33,13 @@ export const useAgentMode = () => {
       .then(({ value }) => setFallback(value === true))
   }, [loaded, context])
 
-  const on = context ?? fallback
+  const on = !teamOff && (context ?? fallback)
   onRef.current = on
 
   const toggle = useCallback(() => {
-    setContext(!onRef.current)
+    if (!teamOffRef.current) setContext(!onRef.current)
     return true
   }, [setContext])
 
-  return { agentMode: on, toggleAgentMode: toggle }
+  return { agentMode: on, toggleAgentMode: toggle, agentModeTeamOff: teamOff, teamAgentRules: team }
 }

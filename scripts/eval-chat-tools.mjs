@@ -237,7 +237,7 @@ const applyingSink = (log) => ({
   mode: "apply",
   async edit(file, replacement) {
     const lines = fs.readFileSync(file, "utf8").split("\n")
-    lines.splice(replacement.startLine, replacement.endLine - replacement.startLine + 1, ...replacement.text.split("\n"))
+    lines.splice(replacement.startLine, replacement.endLine - replacement.startLine + 1, ...(replacement.text === "" ? [] : replacement.text.split("\n")))
     fs.writeFileSync(file, lines.join("\n"))
     log.push({ file })
     return { ok: true, message: "Applied and saved. The user can undo it." }

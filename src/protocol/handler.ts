@@ -81,6 +81,8 @@ export interface RemoteHandlerOptions {
    * host has somewhere to put it.
    */
   capture?: boolean
+  /** A look at the request before it runs: an error refuses it with that error. */
+  inspect?(capability: InferenceCapability, body: unknown): InferenceError | undefined
 }
 
 /** The content of one inference request, when the host asked for it. */
@@ -281,6 +283,9 @@ const runInference = async (
     const failure = terminalError(error, controller.signal)
     return fail({ outcome: failure.kind === "cancelled" ? "cancelled" : "error", error: failure, kind: failure.kind })
   }
+
+  const refusal = options.inspect?.(capability, body)
+  if (refusal) return fail({ outcome: "error", error: refusal, kind: refusal.kind })
 
   const result = await runInferenceJob({
     capability,

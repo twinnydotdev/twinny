@@ -10,6 +10,8 @@ import * as os from "os"
 import * as path from "path"
 
 import { providerRegistry } from "../../extension/inference/registry"
+import { AGENT_PROMPT_MARKER } from "../../extension/tools/protocol"
+import { OUTDATED_AGENT_CLIENT } from "../../gateway/agent-rules"
 import { parseGatewayConfig, policyForExtensions, readGatewaySecrets } from "../../gateway/config"
 import { KeyStore } from "../../gateway/keys"
 import { LicenseStore } from "../../gateway/license"
@@ -17,6 +19,8 @@ import { createGatewayLog } from "../../gateway/log"
 import { buildRouteTable } from "../../gateway/routes"
 import { globMatch, refuseByRouting } from "../../gateway/routing"
 import { GatewayServer } from "../../gateway/server"
+import { AGENT_RULES_HEADER } from "../../protocol/types"
+import { parseTeam } from "../../protocol/wire"
 
 import { generateSigningKeys, issueLicense } from "./support/sign-license"
 
@@ -103,6 +107,39 @@ suite("Policy configuration", () => {
     assert.ok(problems({ routing: [{ workspace: "x", aliases: ["nope"] }] }).some((p) => /not a configured alias/.test(p)))
     assert.ok(problems({ quotas: { default: { requestsPerDay: 1 } } }).some((p) => /quotas/.test(p)), "unknown key is named")
   })
+
+  test("agent rules are parsed, tidied and sent to extensions", () => {
+    const config = parseGatewayConfig(
+      {
+        ...base,
+        policy: { agent: { commands: "ask", edits: "review", mcp: "off", blockedPaths: [" .env* ", "", "infra/", "infra/"], off: false } }
+      },
+      providerRegistry.providerIds()
+    )
+    assert.deepStrictEqual(config.policy?.agent, { commands: "ask", edits: "review", mcp: "off", blockedPaths: [".env*", "infra/"] })
+    assert.deepStrictEqual(policyForExtensions(config.policy), { agent: config.policy?.agent })
+    const empty = parseGatewayConfig({ ...base, policy: { agent: { off: false, blockedPaths: [" "] } } }, providerRegistry.providerIds())
+    assert.strictEqual(empty.policy, undefined, "rules that tighten nothing are left out")
+  })
+
+  test("agent rules that are not rules are refused by name", () => {
+    const problems = (agent: unknown): string[] => {
+      try {
+        parseGatewayConfig({ ...base, policy: { agent } }, providerRegistry.providerIds())
+        return []
+      } catch (error) {
+        return (error as { problems?: string[] }).problems ?? [String(error)]
+      }
+    }
+    assert.ok(problems("off").some((p) => /policy\.agent must be an object/.test(p)))
+    assert.ok(problems({ off: "yes" }).some((p) => /policy\.agent\.off must be true or false/.test(p)))
+    assert.ok(problems({ commands: "allow" }).some((p) => /policy\.agent\.commands must be one of ask, off/.test(p)))
+    assert.ok(problems({ edits: "apply" }).some((p) => /policy\.agent\.edits must be review/.test(p)))
+    assert.ok(problems({ mcp: "on" }).some((p) => /policy\.agent\.mcp must be off/.test(p)))
+    assert.ok(problems({ blockedPaths: ".env" }).some((p) => /blockedPaths must be a list/.test(p)))
+    assert.ok(problems({ blockedPaths: Array.from({ length: 201 }, (_, i) => `p${i}`) }).some((p) => /more than 200/.test(p)))
+    assert.ok(problems({ tools: [] }).some((p) => /policy\.agent/.test(p) && /tools/.test(p)), "an unknown rule is named")
+  })
 })
 
 suite("Policy enforced by the gateway (in process)", function () {
@@ -145,7 +182,8 @@ suite("Policy enforced by the gateway (in process)", function () {
         ],
         policy: {
           systemPrompt: "Team says hi.",
-          routing: [{ workspace: "secret-*", localOnly: true }]
+          routing: [{ workspace: "secret-*", localOnly: true }],
+          agent: { commands: "off", blockedPaths: ["secrets/"] }
         }
       },
       providerRegistry.providerIds()
@@ -170,12 +208,43 @@ suite("Policy enforced by the gateway (in process)", function () {
     backend.close()
   })
 
+  test("with agent rules set, an agent request from an extension that does not follow them is refused, and others pass", async () => {
+    const chat = (body: Record<string, unknown>, headers: Record<string, string> = {}) =>
+      request(`${url}/twinny/v1/chat`, "POST", alice, { model: "coder", messages: [{ role: "user", content: "x" }], ...body }, headers)
+    const tools = [{ name: "read_file", description: "Reads.", parameters: { type: "object", properties: {} } }]
+
+    const native = await chat({ tools })
+    assert.strictEqual(native.status, 403, native.text)
+    assert.strictEqual((native.body.error as { message: string }).message, OUTDATED_AGENT_CLIENT)
+    assert.doesNotMatch(OUTDATED_AGENT_CLIENT, /\btools?\b|function.?call/i, "an old agent reading it does not fall back to text calls")
+    const textMode = await chat({
+      messages: [
+        { role: "system", content: `You are twinny.\n\n${AGENT_PROMPT_MARKER} tools. To use one, write…` },
+        { role: "user", content: "x" }
+      ]
+    })
+    assert.strictEqual(textMode.status, 403, "an agent writing its calls as text is an agent too")
+    const answered = await chat({
+      messages: [
+        { role: "user", content: "x" },
+        { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "read_file", arguments: "{}" } }] },
+        { role: "tool", tool_call_id: "c1", content: "a" }
+      ]
+    })
+    assert.strictEqual(answered.status, 403)
+
+    assert.strictEqual((await chat({ tools }, { [AGENT_RULES_HEADER]: "1" })).status, 200, "an extension that follows them is served")
+    assert.strictEqual((await chat({})).status, 200, "a plain chat is served from any client")
+  })
+
   test("routing rules keep a workspace off hosted models; the team payload carries the prompt but not the rules", async () => {
     const team = await request(`${url}/twinny/v1/team`, "GET", alice)
     assert.strictEqual(team.status, 200)
     const policy = team.body.policy as Record<string, unknown>
     assert.strictEqual(policy.systemPrompt, "Team says hi.")
     assert.strictEqual(policy.routing, undefined)
+    assert.deepStrictEqual(policy.agent, { commands: "off", blockedPaths: ["secrets/"] })
+    assert.deepStrictEqual(parseTeam(team.body).policy?.agent, { commands: "off", blockedPaths: ["secrets/"] }, "and the extension reads them back")
 
     const refused = await request(`${url}/twinny/v1/chat`, "POST", alice, { model: "gpt", messages: [{ role: "user", content: "x" }] }, { "X-Twinny-Workspace": "secret-sauce" })
     assert.strictEqual(refused.status, 401)

@@ -1,6 +1,6 @@
 import { ASSISTANT, EVENT_NAME } from "../../common/constants"
 import { formatCount, logger } from "../../common/logger"
-import { ChatCompletionMessage, ReplyMeta, TwinnyProvider } from "../../common/types"
+import { ChatCompletionMessage, ReplyChangesView, ReplyMeta, TwinnyProvider } from "../../common/types"
 import { GenerationRun, GenerationTracker } from "../generations"
 import { ChatRequest, InferenceClient, isCancelled } from "../inference"
 import { ExtensionBridge } from "../messaging/bridge"
@@ -28,6 +28,10 @@ export interface ReplyExtras {
   meta?(): Partial<ReplyMeta>
   /** True when the reply is worth keeping with no text: its tools ran, and their steps are its record. */
   keepEmpty?(): boolean
+  /** Waited for once the reply has ended, before it is kept: work that reads the workspace as the reply left it. */
+  settle?(): Promise<void>
+  /** The files the reply changed, kept with it (read after `settle`). */
+  changes?(): ReplyChangesView | undefined
 }
 
 /**
@@ -41,6 +45,8 @@ export interface ReplyExtras {
 export class ChatGeneration {
   private _run?: GenerationRun
   private _cancelled = false
+  /** Runs stopped because the user left their conversation: what they wrote is not kept. */
+  private readonly _discarded = new WeakSet<GenerationRun>()
   private readonly _stopSubscription: { dispose(): void }
 
   constructor(
@@ -71,6 +77,21 @@ export class ChatGeneration {
     this._bridge.emit(EVENT_NAME.twinnyStopGeneration)
   }
 
+  /** Whether a reply is being written now. */
+  public get running(): boolean {
+    return !!this._run
+  }
+
+  /**
+   * Stop the reply being written and keep none of it: the user started
+   * another conversation or opened an old one, and the reply belongs to
+   * neither.
+   */
+  public discard() {
+    if (this._run) this._discarded.add(this._run)
+    this.abort()
+  }
+
   /**
    * Run one request against a resolved provider and show the reply as it
    * streams. Whether the provider streams or answers whole is its business.
@@ -93,7 +114,8 @@ export class ChatGeneration {
       ...meta,
       ...extras.meta?.(),
       durationMs: Date.now() - started,
-      ...(run.signal.aborted ? { stopped: true } : {})
+      // Stopped by the user; a failure ends the run too, but is not a stop.
+      ...(this._cancelled ? { stopped: true } : {})
     })
 
     try {
@@ -131,14 +153,19 @@ export class ChatGeneration {
           (run.signal.aborted ? " · stopped by the user" : "")
       )
       logger.block("Chat reply", reply)
-      if (reply || extras.keepEmpty?.()) this.addMessage(reply, finish(), extras.toolNotes?.())
+      await extras.settle?.()
+      // A discarded reply is nobody's: not shown, and not part of the conversation.
+      if (this._discarded.has(run)) return ""
+      if (reply || extras.keepEmpty?.()) this.addMessage(reply, finish(), extras.toolNotes?.(), extras.changes?.())
       return reply
     } catch (error) {
       run.abort()
       // Keep whatever streamed before the failure; it is still useful.
       // A bare heading is not.
       const partial = text.trim() === prefix.trim() ? "" : text.trim()
-      if (partial || extras.keepEmpty?.()) this.addMessage(partial, finish(), extras.toolNotes?.())
+      if (this._discarded.has(run)) return ""
+      await extras.settle?.().catch(() => undefined)
+      if (partial || extras.keepEmpty?.()) this.addMessage(partial, finish(), extras.toolNotes?.(), extras.changes?.())
       this.report(error, provider)
       return partial
     } finally {
@@ -148,12 +175,13 @@ export class ChatGeneration {
     }
   }
 
-  private addMessage(content: string, meta?: ReplyMeta, toolNotes?: string) {
+  private addMessage(content: string, meta?: ReplyMeta, toolNotes?: string, changes?: ReplyChangesView) {
     this._bridge.emit(EVENT_NAME.twinnyAddMessage, {
       content,
       role: ASSISTANT,
       ...(meta ? { meta } : {}),
-      ...(toolNotes ? { toolNotes } : {})
+      ...(toolNotes ? { toolNotes } : {}),
+      ...(changes ? { changes } : {})
     })
   }
 

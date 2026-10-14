@@ -2,7 +2,7 @@ import React, { FormEvent, useEffect, useState } from "react"
 
 import { messageOf } from "../../common/errors"
 import type { InferenceCapability } from "../../extension/inference/types"
-import type { RemoteStatus, TeamPolicy } from "../../protocol/types"
+import type { RemoteStatus, TeamAgentPolicy, TeamPolicy } from "../../protocol/types"
 import type { GatewayModelConfig, GatewayPolicy,GatewayProviderConfig  } from "../config"
 import type {
   ConfigurationSnapshot,
@@ -554,6 +554,16 @@ export const ConfigurationPanel = ({
   const savedModel = (alias: string) => saved.models.find((m) => m.alias === alias)
   const defaultsFor = (alias: string) => CAPABILITIES.filter((c) => draft.teamDefaults?.[c] === alias)
   const licensedPolicy = features.includes("policy")
+  const agentRules: TeamAgentPolicy = draft.policy?.agent ?? {}
+  /** A change to the agent rules; an empty set of rules leaves `policy.agent` out. */
+  const setAgentRules = (change: (agent: TeamAgentPolicy) => void) => {
+    const agent: TeamAgentPolicy = { ...agentRules }
+    change(agent)
+    const policy: GatewayPolicy = { ...draft.policy }
+    if (Object.keys(agent).length) policy.agent = agent
+    else delete policy.agent
+    setDraft({ ...draft, policy }); setNotice("")
+  }
   const initialProvider =
     editor?.type === "provider" ? draft.providers[editor.name] : undefined
   return (
@@ -694,6 +704,87 @@ export const ConfigurationPanel = ({
               <span><b>Keep the team defaults active</b><small>Chat, autocomplete and embeddings stay on the team's models; developers cannot switch them to another provider while connected.</small></span>
             </label>
           </fieldset>
+        </section>
+
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Agent mode</h2>
+            <span className="muted">What the chat may do in a developer&apos;s workspace; developers can still tighten their own settings</span>
+          </div>
+          <fieldset className="policy-rule">
+            <legend>Agent mode</legend>
+            {([
+              [false, "Allow", "Developers may switch on agent mode: the chat finds, reads and changes files and runs commands, as the rules below and their own settings allow."],
+              [true, "Off", "The chat answers without reading or changing the workspace. The agent switch is turned off and cannot be turned on."]
+            ] as const).map(([off, title, detail]) => (
+              <label key={String(off)} className="policy-option">
+                <input type="radio" name="policy-agent-off" checked={(agentRules.off === true) === off} disabled={locked} onChange={() => setAgentRules((agent) => {
+                  if (off) agent.off = true
+                  else delete agent.off
+                })} />
+                <span><b>{title}</b><small>{detail}</small></span>
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="policy-rule" disabled={agentRules.off === true}>
+            <legend>Commands</legend>
+            {([
+              [undefined, "Developer's choice", "Each developer's settings decide, auto-run included."],
+              ["ask", "Ask every time", "Every command waits for the developer's Run. Auto-run and Always run do nothing."],
+              ["off", "Never", "The agent cannot run commands. Reading git history still works."]
+            ] as const).map(([mode, title, detail]) => (
+              <label key={mode ?? "own"} className="policy-option">
+                <input type="radio" name="policy-agent-commands" checked={agentRules.commands === mode} disabled={locked} onChange={() => setAgentRules((agent) => {
+                  if (mode) agent.commands = mode
+                  else delete agent.commands
+                })} />
+                <span><b>{title}</b><small>{detail}</small></span>
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="policy-rule" disabled={agentRules.off === true}>
+            <legend>Changes to files</legend>
+            {([
+              [undefined, "Developer's choice", "Changes apply and save straight away unless a developer chose to review them. Every change can be undone from the reply."],
+              ["review", "Always review", "Every change waits in the editor as a diff to accept or reject, and the agent stops until it is answered."]
+            ] as const).map(([mode, title, detail]) => (
+              <label key={mode ?? "own"} className="policy-option">
+                <input type="radio" name="policy-agent-edits" checked={agentRules.edits === mode} disabled={locked} onChange={() => setAgentRules((agent) => {
+                  if (mode) agent.edits = mode
+                  else delete agent.edits
+                })} />
+                <span><b>{title}</b><small>{detail}</small></span>
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="policy-rule" disabled={agentRules.off === true}>
+            <legend>MCP servers</legend>
+            {([
+              [undefined, "Developer's choice", "Developers may give agent mode the tools of MCP servers they set up on their machine. Each call asks first unless they chose Always run for that tool."],
+              ["off", "Off", "Agent mode uses no MCP servers. Taking commands away (Never) does this too."]
+            ] as const).map(([mode, title, detail]) => (
+              <label key={mode ?? "own"} className="policy-option">
+                <input type="radio" name="policy-agent-mcp" checked={agentRules.mcp === mode} disabled={locked} onChange={() => setAgentRules((agent) => {
+                  if (mode) agent.mcp = mode
+                  else delete agent.mcp
+                })} />
+                <span><b>{title}</b><small>{detail}</small></span>
+              </label>
+            ))}
+          </fieldset>
+          <label className="config-field">
+            <span>paths the agent may not touch, one per line</span>
+            <textarea rows={3} value={(agentRules.blockedPaths ?? []).join("\n")} disabled={locked || agentRules.off === true} placeholder={"e.g.\n.env*\ninfra/\nsecrets/**"} onChange={(event) => {
+              const lines = event.target.value.split("\n")
+              setAgentRules((agent) => {
+                if (lines.some((line) => line.trim())) agent.blockedPaths = lines
+                else delete agent.blockedPaths
+              })
+            }} />
+          </label>
+          <p className="config-hint">
+            .gitignore patterns, from each workspace&apos;s root. A blocked path is hidden from the agent&apos;s listing, reading, search and git as well as from changes. Commands the agent runs are not bound by it: set Commands to Ask every time or Never to keep them in check. Agent rules reach a developer at their next agent reply; an extension too old to follow them is refused agent requests while any are set.
+          </p>
         </section>
 
         <section className="panel">

@@ -28,6 +28,9 @@ import {
   RemoteIdentity,
   RemoteRoute,
   RemoteStatus,
+  TEAM_AGENT_COMMANDS,
+  TeamAgentCommands,
+  TeamAgentPolicy,
   TeamPolicy
 } from "./types"
 
@@ -146,8 +149,9 @@ export const matchRemoteRoute = (
  * with a 4xx status so a client can tell it from a backend problem.
  */
 export class RemoteRequestError extends InferenceError {
-  constructor(message: string, status = 400) {
-    super("inference-failure", `Invalid request: ${message}`, { status })
+  /** `plain`: the message is the whole sentence, not a fault in the request's shape. */
+  constructor(message: string, status = 400, plain = false) {
+    super("inference-failure", plain ? message : `Invalid request: ${message}`, { status })
     this.name = "RemoteRequestError"
   }
 }
@@ -513,6 +517,48 @@ export const parseModels = (input: unknown): InferenceModel[] => {
   return parsed
 }
 
+/** Most paths a team may keep from agents; more is a configuration mistake. */
+export const MAX_BLOCKED_PATHS = 200
+
+/**
+ * The agent rules as a gateway sends them, or undefined when they are not
+ * rules at all. A rule this version does not know is left out, and a value
+ * it does not know for a rule it does is read as the strictest it knows
+ * (ask before commands, review edits), so a newer gateway's additions
+ * neither cut the developer off from their team nor loosen anything.
+ */
+export const parseTeamAgentPolicy = (input: unknown): TeamAgentPolicy | undefined => {
+  if (!isRecord(input)) return undefined
+  const agent: TeamAgentPolicy = {}
+  if (input.off !== undefined) {
+    if (typeof input.off !== "boolean") return undefined
+    if (input.off) agent.off = true
+  }
+  if (input.commands !== undefined && input.commands !== null) {
+    if (typeof input.commands !== "string") return undefined
+    agent.commands = TEAM_AGENT_COMMANDS.includes(input.commands as TeamAgentCommands)
+      ? (input.commands as TeamAgentCommands)
+      : "ask"
+  }
+  if (input.edits !== undefined && input.edits !== null) {
+    if (typeof input.edits !== "string") return undefined
+    agent.edits = "review"
+  }
+  if (input.mcp !== undefined && input.mcp !== null) {
+    if (typeof input.mcp !== "string") return undefined
+    agent.mcp = "off"
+  }
+  if (input.blockedPaths !== undefined) {
+    const paths = input.blockedPaths
+    if (!Array.isArray(paths) || paths.length > MAX_BLOCKED_PATHS || !paths.every((p) => typeof p === "string")) {
+      return undefined
+    }
+    const kept = [...new Set((paths as string[]).map((p) => p.trim()).filter(Boolean))]
+    if (kept.length) agent.blockedPaths = kept
+  }
+  return agent
+}
+
 export const parseTeam = (input: unknown): RemoteTeam => {
   if (
     !isRecord(input) ||
@@ -597,6 +643,16 @@ export const parseTeam = (input: unknown): RemoteTeam => {
         )
       }
       if (input.policy.systemPrompt.trim()) policy.systemPrompt = input.policy.systemPrompt.slice(0, 20_000)
+    }
+    if (input.policy.agent !== undefined) {
+      const agent = parseTeamAgentPolicy(input.policy.agent)
+      if (!agent) {
+        throw new InferenceError(
+          "inference-failure",
+          "The gateway published an invalid team policy. Ask your admin to check its configuration."
+        )
+      }
+      if (Object.keys(agent).length) policy.agent = agent
     }
     team.policy = policy
   }

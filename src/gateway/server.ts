@@ -12,10 +12,12 @@ import http from "node:http"
 import { AddressInfo } from "node:net"
 
 import { messageOf } from "../common/errors"
+import { agentPolicyIsEmpty } from "../common/team-policy"
 import { InferenceError } from "../extension/inference/errors"
 import { handleRemoteRequest } from "../protocol/handler"
 import { PEER_CLOSE, peerRoutePath } from "../protocol/peer"
 import {
+  AGENT_RULES_HEADER,
   GATEWAY_PAGE_PATH,
   REMOTE_JOIN_PATH,
   REMOTE_PAGE_LINK_OPEN_PATH,
@@ -33,6 +35,7 @@ import {
 import {
   isInferenceCapability,
   matchRemoteRoute,
+  RemoteRequestError,
   toErrorBody
 } from "../protocol/wire"
 
@@ -41,6 +44,7 @@ import { exportLines } from "./recording/export"
 import { Recorder } from "./recording/recorder"
 import type { RecordingQuery, RecordingRoute } from "./recording/store"
 import { adminPageHtml } from "./admin-page"
+import { isAgentRequest, OUTDATED_AGENT_CLIENT } from "./agent-rules"
 import type { AuditLog } from "./audit"
 import {
   GatewayConfig,
@@ -2022,13 +2026,26 @@ export class GatewayServer {
 
     const recorder = this._options.recorder
     const capture = recorder?.enabled(capability) === true
+    // A team with agent rules hears agent requests only from extensions that follow them.
+    const agentRules =
+      policyLicensed &&
+      !agentPolicyIsEmpty(routes.policy()?.agent) &&
+      req.headers[AGENT_RULES_HEADER.toLowerCase()] !== "1"
     try {
       const outcome = await handleRemoteRequest(capability, req, res, {
         models: routes.models,
         route: ticket.route,
         maxBodyBytes: limits.maxBodyBytes,
         signal: ticket.signal,
-        capture
+        capture,
+        ...(agentRules
+          ? {
+              inspect: (route, body) =>
+                route === "chat" && isAgentRequest(body)
+                  ? new RemoteRequestError(OUTDATED_AGENT_CLIENT, 403, true)
+                  : undefined
+            }
+          : {})
       })
       const ms = Date.now() - started
       if (capture && recorder && outcome.captured && outcome.alias) {

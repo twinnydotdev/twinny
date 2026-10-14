@@ -42,13 +42,32 @@ const CLOSERS: Record<(typeof OPENERS)[number], string> = {
   "<function=": "</function>"
 }
 
+/**
+ * Whether what follows `<tool_call>` can still turn out to be a call: a
+ * JSON object (fenced or not), a tag, or a name with its arguments (or a
+ * name still being written). "`<tool_call>` tags, which…" is a model talking about calls.
+ */
+const couldBeCall = (body: string) => {
+  const rest = body.trimStart()
+  if (!rest || "{<[".includes(rest[0])) return true
+  // A fenced object (```json) is a call; one backtick is inline code around the tag, in prose.
+  if (rest.startsWith("```") || /^`{1,2}$/.test(rest)) return true
+  const name = rest.match(/^[A-Za-z_][\w.-]*/)
+  if (!name) return false
+  return /^\s*(:?\s*[({][\s\S]*)?$/.test(rest.slice(name[0].length))
+}
+
+/** The first opener in `text` that may be a call; a `<tool_call>` the model only mentions is passed over. */
 const firstOpener = (text: string) => {
-  let best: { index: number; opener: (typeof OPENERS)[number] } | undefined
-  for (const opener of OPENERS) {
-    const index = text.indexOf(opener)
-    if (index !== -1 && (!best || index < best.index)) best = { index, opener }
+  for (let from = 0; ; ) {
+    let best: { index: number; opener: (typeof OPENERS)[number] } | undefined
+    for (const opener of OPENERS) {
+      const index = text.indexOf(opener, from)
+      if (index !== -1 && (!best || index < best.index)) best = { index, opener }
+    }
+    if (!best || best.opener !== "<tool_call>" || couldBeCall(text.slice(best.index + best.opener.length))) return best
+    from = best.index + 1
   }
-  return best
 }
 
 /**
@@ -180,9 +199,10 @@ const parseJsonCall = (body: string): ToolCall | string => {
   } catch {
     return parseCallSyntax(json) ?? "the call was not valid JSON"
   }
-  const { name, arguments: args, parameters } = (parsed ?? {}) as Record<string, unknown>
+  const { name, arguments: args, parameters, args: short, input, params } = (parsed ?? {}) as Record<string, unknown>
   if (typeof name !== "string" || !name) return "the call had no \"name\""
-  return { name, args: asArgs(args ?? parameters ?? {}) ?? {} }
+  // `arguments` as asked; the other keys are what other tool formats taught the model.
+  return { name, args: asArgs(args ?? parameters ?? short ?? input ?? params ?? {}) ?? {} }
 }
 
 const parseFunctionCall = (body: string): ToolCall | string => {
@@ -284,6 +304,12 @@ export interface ToolSpec {
   parameters: ToolParameter[]
   /** A sentence for the system prompt on when and how to use the tool. */
   guidance?: string
+  /**
+   * The arguments' JSON schema as the tool's maker wrote it (an MCP
+   * server's), sent as it is to providers with native tool-calling;
+   * `parameters` still names them for the text protocol.
+   */
+  schema?: Record<string, unknown>
 }
 
 /**
@@ -298,7 +324,7 @@ const signature = (tool: ToolSpec) =>
 export const toolDefinition = (tool: ToolSpec) => ({
   name: tool.name,
   description: tool.description,
-  parameters: {
+  parameters: tool.schema ?? {
     type: "object",
     properties: Object.fromEntries(
       tool.parameters.map((p) => [p.name, { type: p.type ?? "string", description: p.description }])
@@ -306,6 +332,12 @@ export const toolDefinition = (tool: ToolSpec) => ({
     required: tool.parameters.filter((p) => !p.optional).map((p) => p.name)
   }
 })
+
+/**
+ * How the tools section of an agent's system prompt begins, in both
+ * forms. A gateway reads it to tell an agent request from a plain chat.
+ */
+export const AGENT_PROMPT_MARKER = "You can work in the user's workspace with"
 
 const GUIDANCE =
   "Paths are relative to the workspace root. Use tools when the answer depends on code you have not seen, and call them straight away rather than saying what you will look for. " +
@@ -319,9 +351,9 @@ const GUIDANCE =
 export const toolInstructions = (tools: ToolSpec[], orientation = "", native = false) => {
   const guidance = tools.flatMap((tool) => (tool.guidance ? [tool.guidance] : []))
   return (native
-    ? ["You can work in the user's workspace with the tools you have.", GUIDANCE, ...guidance, orientation]
+    ? [`${AGENT_PROMPT_MARKER} the tools you have.`, GUIDANCE, ...guidance, orientation]
     : [
-        "You can work in the user's workspace with tools. To use one, write one call in exactly this form and then stop writing:",
+        `${AGENT_PROMPT_MARKER} tools. To use one, write one call in exactly this form and then stop writing:`,
         "",
         "```tool",
         "{\"name\": \"grep\", \"arguments\": {\"pattern\": \"createServer\"}}",

@@ -46,12 +46,15 @@ export class ToolSteps {
   private readonly _stopped = new Set<string>()
   private _live: { id: string; output: string } | undefined
   private _liveTimer: ReturnType<typeof setTimeout> | undefined
+  /** The reply was discarded: its late steps are not sent, until the next reply starts. */
+  private _muted = false
 
   constructor(private readonly _emit: (steps: ToolStepView[]) => void) {}
 
   /** A new reply: forget the last one's steps and any command still waiting. */
   public reset() {
     this.cancelWaiting()
+    this._muted = false
     this._steps = []
     this._skipped.clear()
     this._stoppers.clear()
@@ -89,6 +92,8 @@ export class ToolSteps {
       status,
       command: undefined,
       approval: undefined,
+      noAlways: undefined,
+      mcpTool: undefined,
       stoppable: undefined
     })
   }
@@ -133,10 +138,20 @@ export class ToolSteps {
    * to run, or a change to make that has no diff to review. Resolves
    * false if they skip it, stop the reply, or a new one starts.
    */
-  public approve(detail: string, approval: "command" | "change" = "command"): Promise<boolean> {
+  public approve(
+    detail: string,
+    approval: "command" | "change" = "command",
+    options: { always?: boolean; mcpTool?: string } = {}
+  ): Promise<boolean> {
     const step = [...this._steps].reverse().find((s) => s.status === "running")
     if (!step) return Promise.resolve(false)
-    this.update(step.id, { status: "waiting", command: detail, approval })
+    this.update(step.id, {
+      status: "waiting",
+      command: detail,
+      approval,
+      ...(approval === "command" && options.always === false ? { noAlways: true } : {}),
+      ...(options.mcpTool ? { mcpTool: options.mcpTool } : {})
+    })
     return new Promise((resolve) => {
       this._waiting.set(step.id, (run) => {
         if (!run) this._skipped.add(step.id)
@@ -150,7 +165,7 @@ export class ToolSteps {
     const resolve = this._waiting.get(id)
     if (!resolve) return
     this._waiting.delete(id)
-    this.update(id, { status: "running", command: undefined, approval: undefined })
+    this.update(id, { status: "running", command: undefined, approval: undefined, noAlways: undefined, mcpTool: undefined })
     resolve(run)
   }
 
@@ -180,7 +195,17 @@ export class ToolSteps {
     this.send()
   }
 
+  /**
+   * The reply is being thrown away (the user left its conversation):
+   * whatever waits is skipped, and nothing more is sent for it.
+   */
+  public discard() {
+    this.cancelWaiting()
+    this._muted = true
+    this._steps = []
+  }
+
   private send() {
-    this._emit(this._steps)
+    if (!this._muted) this._emit(this._steps)
   }
 }

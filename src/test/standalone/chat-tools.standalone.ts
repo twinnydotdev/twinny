@@ -9,6 +9,7 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { test } from "node:test"
 
+import { ToolStepView } from "../../common/types"
 import { ToolSteps } from "../../extension/chat/tool-steps"
 import { ChatChunk, ChatRequest, InferenceClient } from "../../extension/inference"
 import { planReplacement } from "../../extension/tools/edit"
@@ -603,4 +604,49 @@ test("the text protocol lists tools without the parentheses that invite function
   const system = requests[0].messages[0].content as string
   assert.match(system, /\n- read_file \{path, start_line\?, end_line\?\}: /)
   assert.doesNotMatch(system, /\n- \w+\(/)
+})
+
+test("a line that only looks numbered is code: find is tried as written first", () => {
+  const status = "const STATUS = {\n  200: \"OK\",\n  404: \"Missing\",\n}\n"
+  const plan = planReplacement(status, "  404: \"Missing\",", "  404: \"Not Found\",\n  410: \"Gone\",")
+  assert.ok(typeof plan !== "string", String(plan))
+  assert.strictEqual(plan.text, "  404: \"Not Found\",\n  410: \"Gone\",")
+  const yaml = "ports:\n  8080: web\n  9090: metrics\n"
+  const both = planReplacement(yaml, "  8080: web\n  9090: metrics", "  8080: web\n  9091: metrics")
+  assert.ok(typeof both !== "string", String(both))
+  assert.strictEqual(both.text, "  8080: web\n  9091: metrics")
+  // A blank line whose number the model dropped still reads as pasted output.
+  const gap = planReplacement("a\n\nb\n", "1: a\n\n3: b", "1: A\n\n3: B")
+  assert.ok(typeof gap !== "string", String(gap))
+  assert.strictEqual(gap.text, "A\n\nB")
+  // Numbers pasted into replace alone, with a find that has none.
+  const alone = planReplacement("a\nb\n", "a\nb", "1: x\n2: y")
+  assert.ok(typeof alone !== "string", String(alone))
+  assert.strictEqual(alone.text, "x\ny")
+  // read_file's own numbers, rising by one, are still dropped, from find and replace alike.
+  const pasted = planReplacement("a\nb\nc\n", "2: b\n3: c", "2: B\n3: C")
+  assert.ok(typeof pasted !== "string", String(pasted))
+  assert.deepStrictEqual([pasted.startLine, pasted.text], [1, "B\nC"])
+})
+
+test("a step is never put inside a code block, and a stray fence does not move it", () => {
+  const step = (id: string, at: number) =>
+    ({ id, name: "read_file", summary: id, status: "done", at }) as ToolStepView
+  const where = (text: string, at: number) => {
+    const parts = replyParts(text, [step("s", at)])
+    const first = parts[0]
+    return "text" in first ? first.text.length : 0
+  }
+  // A call's fence the loop cut out leaves an opening fence that never closes; a later code block is not its close.
+  const stray = "Checking:\n```\n"
+  const later = `${stray}Found it:\n\n\`\`\`ts\nconst a = 1\n\`\`\`\n`
+  assert.strictEqual(where(later, stray.length), stray.length, "split where the step ran")
+  // A four-backtick fence holding a three-backtick line closes only on four.
+  const nested = "````md\n```\ninner\n```\n````\nafter"
+  assert.strictEqual(where(nested, nested.indexOf("inner")), nested.indexOf("\nafter"))
+  // A closing line with words after it is not a close.
+  const notClose = "```js\nlet x\n``` not a close\n```\nafter"
+  assert.strictEqual(where(notClose, notClose.indexOf("let")), notClose.indexOf("\nafter"))
+  // Outside any fence the step stays put.
+  assert.strictEqual(where("Plain text. More text.", 11), 11)
 })

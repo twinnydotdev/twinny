@@ -23,6 +23,7 @@ import {
 } from "../extension/inference/types"
 
 import {
+  AGENT_RULES_HEADER,
   REMOTE_JOIN_PATH,
   REMOTE_PAGE_LINK_PATH,
   REMOTE_PROTOCOL_BASE,
@@ -241,6 +242,8 @@ export class RemoteInferenceProvider implements InferenceProvider {
       Accept: "application/json, application/x-ndjson",
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // This client holds its agent to the team's rules.
+      [AGENT_RULES_HEADER]: "1",
       ...(this._workspace() ? { "X-Twinny-Workspace": String(this._workspace()).slice(0, 200) } : {})
     }
   }

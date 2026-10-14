@@ -11,13 +11,21 @@ import { Markdown as TiptapMarkdown } from "tiptap-markdown"
 
 import { ASSISTANT, EVENT_NAME, TWINNY, YOU } from "../common/constants"
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, ImageAttachment, MentionType, ReplyMeta, ToolStepView } from "../common/types"
+import {
+  ChatCompletionMessage,
+  ImageAttachment,
+  MentionType,
+  ReplyChangesView,
+  ReplyMeta,
+  ToolStepView
+} from "../common/types"
 
 import { useSuggestion } from "./hooks/useSuggestion"
 import CodeBlock from "./code-block"
 import { createCustomImageExtension } from "./image-extension"
 import { MentionExtension } from "./mention-extention"
 import { emit } from "./messaging"
+import { ReplyChanges } from "./reply-changes"
 import { replyParts } from "./reply-parts"
 import { useToast } from "./toast"
 import ToolSteps from "./tool-steps"
@@ -51,6 +59,8 @@ interface MessageProps {
   onDeleteImage?: (id: string) => void
   /** Ask for the rest of a reply the user stopped. Only the last reply offers it. */
   onContinue?: () => void
+  /** Keep a reply's changed files as they stand after an undo. */
+  onChangesUpdate?: (index: number, changes: ReplyChangesView) => void
 }
 
 const CustomKeyMap = Extension.create({
@@ -182,6 +192,7 @@ const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () =>
       )}
       {meta.stopped && <span className={styles.replyStopped}>{t("reply-stopped")}</span>}
       {!!meta.withheld?.length && <WithheldBadge withheld={meta.withheld} />}
+      {!!meta.instructions?.length && <InstructionsBadge files={meta.instructions} />}
       {onContinue && (
         <button type="button" className={styles.replyContinue} onClick={onContinue} title={t("reply-continue-title")}>
           <span className="codicon codicon-debug-continue" aria-hidden="true" />
@@ -202,6 +213,22 @@ const WithheldBadge = ({ withheld }: { withheld: NonNullable<ReplyMeta["withheld
       <span className="codicon codicon-shield" aria-hidden="true" />
       {t("reply-withheld", { count })}
     </span>
+  )
+}
+
+/** The project's instruction files agent mode followed; opens the first. */
+const InstructionsBadge = ({ files }: { files: string[] }) => {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      className={styles.replyInstructions}
+      title={t("reply-instructions-title", { files: files.join(", ") })}
+      onClick={() => emit(EVENT_NAME.twinnyOpenFile, { path: files[0] })}
+    >
+      <span className="codicon codicon-book" aria-hidden="true" />
+      {files.length > 1 ? t("reply-instructions-more", { file: files[0], count: files.length - 1 }) : files[0]}
+    </button>
   )
 }
 
@@ -262,7 +289,8 @@ export const Message: React.FC<MessageProps> = ({
   onHeightChange,
   messages,
   onDeleteImage,
-  onContinue
+  onContinue,
+  onChangesUpdate
 }) => {
   const { t } = useTranslation()
   const [isThinkingCollapsed, setIsThinkingCollapsed] = React.useState(false)
@@ -665,6 +693,13 @@ export const Message: React.FC<MessageProps> = ({
             ) : null
           )}
           {renderImageGallery()}
+          {message.changes && (
+            <ReplyChanges
+              changes={message.changes}
+              onUpdate={(changes) => index !== undefined && onChangesUpdate?.(index, changes)}
+              onError={showToast}
+            />
+          )}
           {message.meta && <ReplyFooter meta={message.meta} onContinue={onContinue} />}
         </>
       ) : (

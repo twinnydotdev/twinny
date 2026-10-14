@@ -20,7 +20,7 @@ import {
   TokenEstimator,
   trimmedResult
 } from "../../extension/tools/budget"
-import { flattenToolHistory, ToolLoopUsage, withTools } from "../../extension/tools/loop"
+import { flattenToolHistory, ToolLoopUsage, ToolStep, withTools } from "../../extension/tools/loop"
 import { ToolResult, WorkspaceTools, workspaceTools } from "../../extension/tools/workspace"
 import { parsePeerFrame } from "../../protocol/peer"
 
@@ -364,6 +364,20 @@ test("the previous reply's tool notes travel with the next question, once", asyn
   for (const message of turn) assert.deepStrictEqual(Object.keys(message).sort(), ["content", "role"])
 })
 
+test("a reply that failed after its tools ran still hands its notes on, past the error message", async () => {
+  const turn = await buildChatTurn(
+    [
+      { role: "user", content: "<p>first</p>" },
+      { role: "assistant", content: "", toolNotes: "read_file {\"path\":\"a.ts\"}\n1: x" },
+      { role: "assistant", content: "The provider failed: 500." },
+      { role: "user", content: "<p>try again</p>" }
+    ] as ChatCompletionMessage[],
+    { systemPrompt: async () => "s", additionalContext: async () => "" }
+  )
+  const last = turn[turn.length - 1].content as Array<{ text: string }>
+  assert.match(last.map((part) => part.text).join(""), /^\[For reference: [^\n]*\]\nread_file \{"path":"a\.ts"\}\n1: x\n\n\[The user's new message:\]\ntry again$/)
+})
+
 test("a reply stopped before any text still takes its turn, and its tools' notes still travel", async () => {
   const turn = await buildChatTurn(
     [
@@ -407,6 +421,112 @@ test("a gateway from before tools refuses the field by name, and the loop carrie
   assert.ok(requests[0].tools?.length)
   assert.ok(!requests[1].tools, "asked again without the field the gateway refused")
   assert.match(text, /It exports a\./)
+  // The call was keyed `args`, and its path still reached the tool.
+  assert.match(String(requests[2].messages[requests[2].messages.length - 1].content), /a\.ts \(lines 1–1 of 1\)\n1: export const a = 1/)
+})
+
+test("arguments keyed args, input or params reach the tool", async () => {
+  const root = workspace({ "a.ts": "export const a = 1\n" })
+  for (const key of ["args", "input", "params"]) {
+    const { client } = scripted([`\`\`\`tool\n{"name": "read_file", "${key}": {"path": "a.ts"}}\n\`\`\``, "Done."])
+    const steps: ToolStep[] = []
+    await collect(withTools(client, workspaceTools(root), { onStep: (step) => steps.push(step) }).chat(ask("Read.")))
+    assert.strictEqual(steps[0].failed, undefined, key)
+    assert.match(steps[0].output, /1: export const a = 1/, key)
+  }
+})
+
+test("an answer that talks about tool-call tags is an answer, not a broken call", async () => {
+  const root = workspace({ "a.ts": "x\n" })
+  for (const mode of ["text", "native"] as const) {
+    for (const answer of [
+      "Qwen wraps calls in `<tool_call>` tags, which Ollama strips from the reply.",
+      "Qwen wraps calls in <tool_call> tags, which Ollama strips from the reply."
+    ]) {
+      const { client, requests } = scripted([answer])
+      const steps: ToolStep[] = []
+      const { text } = await collect(
+        withTools(client, workspaceTools(root), { mode, maxSteps: 2, onStep: (step) => steps.push(step) }).chat(ask("How?"))
+      )
+      assert.strictEqual(text, answer, `${mode}: ${answer}`)
+      assert.strictEqual(steps.length, 0)
+      assert.strictEqual(requests.length, 1)
+    }
+  }
+})
+
+test("on the last request a stray call is left out and the answer after it is kept", async () => {
+  const root = workspace({ "a.ts": "export const a = 1\n" })
+  const call = "```tool\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"a.ts\"}}\n```"
+  const { client } = scripted([call, `Let me check once more:\n${call}\nSince I am out of calls: a is 1.`])
+  const { text } = await collect(withTools(client, workspaceTools(root), { maxSteps: 1, stepLines: false }).chat(ask("What is a?")))
+  assert.strictEqual(text, "Let me check once more:\n\nSince I am out of calls: a is 1.")
+})
+
+test("text held back in case it began a call is shown when the calls come natively", async () => {
+  const root = workspace({ "a.ts": "export const a = 1\n" })
+  const { client } = scripted([
+    { text: "Current code:\n```ts\nconst a = 1\n```", calls: [read("1", "a.ts")] },
+    { text: "Checking whether a <", calls: [read("2", "a.ts")] },
+    "Done."
+  ])
+  const { text } = await collect(withTools(client, workspaceTools(root), { mode: "native", stepLines: false }).chat(ask("Look.")))
+  assert.strictEqual(text, "Current code:\n```ts\nconst a = 1\n```Checking whether a <Done.")
+})
+
+test("call markup a server leaves in the text beside native calls is not shown", async () => {
+  const root = workspace({ "a.ts": "export const a = 1\n" })
+  const { client } = scripted([
+    { text: "Reading it.\n<tool_call>\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"a.ts\"", calls: [read("1", "a.ts")] },
+    "Done."
+  ])
+  const { text } = await collect(withTools(client, workspaceTools(root), { mode: "native", stepLines: false }).chat(ask("Read.")))
+  assert.strictEqual(text, "Reading it.\nDone.")
+})
+
+test("a call fenced as JSON inside tool_call tags is still a call", async () => {
+  const root = workspace({ "a.ts": "export const a = 1\n" })
+  const { client } = scripted(["<tool_call>\n```json\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"a.ts\"}}\n```\n</tool_call>", "It is 1."])
+  const steps: ToolStep[] = []
+  const { text } = await collect(
+    withTools(client, workspaceTools(root), { stepLines: false, onStep: (step) => steps.push(step) }).chat(ask("What is a?"))
+  )
+  assert.strictEqual(steps[0]?.name, "read_file")
+  assert.strictEqual(steps[0]?.failed, undefined)
+  assert.strictEqual(text, "It is 1.")
+})
+
+test("the next turn's notes keep what a tool returned, not the folder's instructions ahead of it", async () => {
+  const root = workspace({ "lib/AGENTS.md": "x".repeat(3000), "lib/a.ts": "export const answer = 42\n" })
+  const { client } = scripted([{ calls: [read("1", "lib/a.ts")] }, "42."])
+  let notes: string | undefined
+  await collect(withTools(client, workspaceTools(root), { mode: "native", onNotes: (n) => (notes = n) }).chat(ask("Read.")))
+  assert.match(notes ?? "", /1: export const answer = 42/)
+  assert.doesNotMatch(notes ?? "", /xxxx/)
+})
+
+test("a reply that ends on an edit waiting for review says so, not that it ran out of steps", async () => {
+  const { client } = scripted([{ calls: [{ id: "1", name: "wait", arguments: "{}" }] }, ""])
+  const tools = fakeTools(async () => ({ output: "Proposed.", summary: "proposed an edit", final: true }))
+  const { text } = await collect(withTools(client, tools, { mode: "native", stepLines: false }).chat(ask("Fix it.")))
+  assert.strictEqual(text, "The change is waiting in the editor for you to accept or reject.")
+})
+
+test("calls made together share the room, so the next request has every result whole", async () => {
+  const body = Array.from({ length: 400 }, (_, i) => `export const value${i} = ${i}`).join("\n")
+  const root = workspace({ "a.ts": body, "b.ts": body, "c.ts": body, "d.ts": body })
+  const { client, requests } = scripted([
+    { calls: ["a", "b", "c", "d"].map((name, i) => read(String(i), `${name}.ts`)) },
+    "Read all four."
+  ])
+  const trims: number[] = []
+  await collect(
+    withTools(client, workspaceTools(root), { mode: "native", contextWindow: () => 8192, onTrim: (n) => trims.push(n) }).chat(ask("Read them."))
+  )
+  const results = requests[1].messages.filter((m) => m.role === "tool").map((m) => String(m.content))
+  assert.strictEqual(results.length, 4)
+  assert.ok(results.every((result) => !result.includes("[The rest was trimmed")), "none trimmed before the model saw it")
+  assert.deepStrictEqual(trims, [])
 })
 
 test("a teammate's computer hands back its model's tool calls, and nothing shaped otherwise", () => {

@@ -4,7 +4,7 @@
  */
 import { API_PROVIDERS } from "./constants"
 import type { ProviderType } from "./provider-validation"
-import type { TeamPolicy, TeamPolicyState } from "./team"
+import type { TeamAgentPolicy, TeamPolicy, TeamPolicyState } from "./team"
 import type { TwinnyProvider } from "./types"
 
 const JOB_LABEL: Record<ProviderType, string> = {
@@ -15,7 +15,37 @@ const JOB_LABEL: Record<ProviderType, string> = {
 
 /** Whether a policy asks or discloses anything at all. */
 export const policyIsEmpty = (policy: TeamPolicy | undefined): boolean =>
-  !policy || (!policy.teamOnly && !policy.lockDefaults && !policy.recording?.length && !policy.peers?.length && !policy.systemPrompt?.trim())
+  !policy ||
+  (!policy.teamOnly &&
+    !policy.lockDefaults &&
+    !policy.recording?.length &&
+    !policy.peers?.length &&
+    !policy.systemPrompt?.trim() &&
+    agentPolicyIsEmpty(policy.agent))
+
+/** Whether the agent rules tighten anything. */
+export const agentPolicyIsEmpty = (agent: TeamAgentPolicy | undefined): boolean =>
+  !agent || (!agent.off && !agent.commands && !agent.edits && !agent.mcp && !agent.blockedPaths?.length)
+
+const MAX_PATHS_NAMED = 5
+
+/** The agent rules in sentences, for consent screens and the banner. */
+export const describeAgentPolicy = (agent: TeamAgentPolicy | undefined): string[] => {
+  if (!agent) return []
+  if (agent.off) return ["Agent mode is off: the chat cannot read or change your workspace."]
+  const lines: string[] = []
+  if (agent.commands === "off") lines.push("Agent mode cannot run commands.")
+  else if (agent.commands === "ask") lines.push("Agent mode asks before every command it runs.")
+  if (agent.edits === "review") lines.push("Every change agent mode makes waits for your review.")
+  if (agent.mcp === "off" && agent.commands !== "off") lines.push("Agent mode uses no MCP servers.")
+  const paths = agent.blockedPaths ?? []
+  if (paths.length) {
+    const named = paths.slice(0, MAX_PATHS_NAMED).join(", ")
+    const more = paths.length > MAX_PATHS_NAMED ? ` and ${paths.length - MAX_PATHS_NAMED} more` : ""
+    lines.push(`Agent mode cannot read or change ${named}${more}.`)
+  }
+  return lines
+}
 
 const RECORDING_LABEL: Record<string, string> = { chat: "chat conversations", fim: "autocomplete requests", embeddings: "embedding inputs" }
 
@@ -43,6 +73,7 @@ export const describePolicy = (policy: TeamPolicy): string[] => {
   const pooling = describePooling(policy.peers)
   if (pooling) lines.push(pooling)
   if (policy.systemPrompt) lines.push("The team's system prompt is put before every chat.")
+  lines.push(...describeAgentPolicy(policy.agent))
   return lines
 }
 

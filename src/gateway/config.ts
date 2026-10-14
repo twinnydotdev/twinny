@@ -23,8 +23,8 @@ import { validateProvider } from "../common/provider-validation"
 import { TwinnyProvider } from "../common/types"
 import type { SecretShieldMode } from "../extension/inference/shield"
 import { InferenceCapability } from "../extension/inference/types"
-import type { TeamDefaults, TeamPolicy } from "../protocol/types"
-import { isInferenceCapability } from "../protocol/wire"
+import { TEAM_AGENT_COMMANDS, TeamAgentCommands, TeamAgentPolicy, TeamDefaults, TeamPolicy } from "../protocol/types"
+import { isInferenceCapability, MAX_BLOCKED_PATHS } from "../protocol/wire"
 
 import type { RoutingRule } from "./routing"
 
@@ -595,7 +595,7 @@ export const parseGatewayConfig = (
     if (!isRecord(input.policy)) {
       problems.add("policy must be an object.")
     } else {
-      problems.unknownKeys("policy", input.policy, ["teamOnly", "lockDefaults", "systemPrompt", "routing", "secretShield"])
+      problems.unknownKeys("policy", input.policy, ["teamOnly", "lockDefaults", "systemPrompt", "routing", "secretShield", "agent"])
       const policy: GatewayPolicy = {}
       if (input.policy.teamOnly !== undefined) {
         if (typeof input.policy.teamOnly !== "boolean") problems.add("policy.teamOnly must be true or false.")
@@ -644,6 +644,45 @@ export const parseGatewayConfig = (
             rules.push(rule)
           })
           if (rules.length) policy.routing = rules
+        }
+      }
+      if (input.policy.agent !== undefined) {
+        const agent = input.policy.agent
+        if (!isRecord(agent)) problems.add("policy.agent must be an object.")
+        else {
+          problems.unknownKeys("policy.agent", agent, ["off", "commands", "edits", "mcp", "blockedPaths"])
+          const rules: TeamAgentPolicy = {}
+          if (agent.off !== undefined) {
+            if (typeof agent.off !== "boolean") problems.add("policy.agent.off must be true or false.")
+            else if (agent.off) rules.off = true
+          }
+          if (agent.commands !== undefined && agent.commands !== null) {
+            if (!TEAM_AGENT_COMMANDS.includes(agent.commands as TeamAgentCommands)) {
+              problems.add(`policy.agent.commands must be one of ${TEAM_AGENT_COMMANDS.join(", ")}.`)
+            } else rules.commands = agent.commands as TeamAgentCommands
+          }
+          if (agent.edits !== undefined && agent.edits !== null) {
+            if (agent.edits !== "review") problems.add("policy.agent.edits must be review.")
+            else rules.edits = "review"
+          }
+          if (agent.mcp !== undefined && agent.mcp !== null) {
+            if (agent.mcp !== "off") problems.add("policy.agent.mcp must be off.")
+            else rules.mcp = "off"
+          }
+          if (agent.blockedPaths !== undefined) {
+            const paths = agent.blockedPaths
+            if (!Array.isArray(paths) || !paths.every((p) => typeof p === "string")) {
+              problems.add("policy.agent.blockedPaths must be a list of paths or patterns.")
+            } else if (paths.length > MAX_BLOCKED_PATHS) {
+              problems.add(`policy.agent.blockedPaths holds more than ${MAX_BLOCKED_PATHS} entries.`)
+            } else if ((paths as string[]).some((p) => p.length > 500)) {
+              problems.add("policy.agent.blockedPaths has an entry longer than 500 characters.")
+            } else {
+              const kept = [...new Set((paths as string[]).map((p) => p.trim()).filter(Boolean))]
+              if (kept.length) rules.blockedPaths = kept
+            }
+          }
+          if (Object.keys(rules).length) policy.agent = rules
         }
       }
       if (Object.keys(policy).length) config.policy = policy

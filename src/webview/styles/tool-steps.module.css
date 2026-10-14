@@ -28,6 +28,8 @@
   align-items: center;
   gap: 6px;
   width: 100%;
+  /* Gives way to the buttons beside it: the summary is cut short instead. */
+  min-width: 0;
   min-height: 20px;
   margin: 0;
   padding: 0;

@@ -13,7 +13,15 @@ import { execFile } from "child_process"
 import fs from "fs"
 import path from "path"
 
-import { gitNamedPaths, globToRegExp, locateSymbol, readOnlyGitArgs, withoutHiddenDiffs } from "./helpers"
+import {
+  gitNamedPaths,
+  globToRegExp,
+  locateSymbol,
+  readOnlyGitArgs,
+  tidyGitPath,
+  withoutHiddenDiffs,
+  withoutHiddenLines
+} from "./helpers"
 import { clip, linesOf, plural, ToolInputError, WorkspaceView } from "./view"
 import type { EditOutcome, Tool } from "./workspace"
 
@@ -157,19 +165,63 @@ export const git = (view: WorkspaceView): Tool => {
       exitCode === 0 ? output.trim() : ""
     ))
   /**
+   * Whether a path from the workspace root is ignored, as the folder it
+   * is when it is one (`infra` under an `infra/` rule); a path that is
+   * not there is taken either way.
+   */
+  const ignoredHere = (relative: string) => {
+    if (!relative) return false
+    let isDirectory: boolean | undefined
+    try {
+      isDirectory = fs.statSync(path.join(view.root, relative)).isDirectory()
+    } catch {
+      isDirectory = undefined
+    }
+    return isDirectory === undefined
+      ? view.ignored(relative) || view.ignored(relative, true)
+      : view.ignored(relative, isDirectory)
+  }
+  /**
    * Whether a path as the repository names it is one the tools may not
    * show: ignored, or in a part of the repository outside the workspace
    * folder (a sibling package, when one package is what is open).
    */
   const hiddenIn = (inRepo: string, at: string) =>
-    inRepo.startsWith(at) ? view.ignored(inRepo.slice(at.length)) : at !== ""
+    inRepo.startsWith(at) ? ignoredHere(inRepo.slice(at.length)) : at !== ""
   /**
    * The same for a path given from the workspace root, where git runs.
    * Pathspec magic (`:/`, `:(top)`) addresses the repository's top, so it
    * is refused with the rest.
    */
   const hiddenHere = (relative: string) =>
-    relative.startsWith(":") || /^\.\.(\/|$)/.test(path.posix.normalize(relative.replace(/\\/g, "/"))) || path.isAbsolute(relative) || view.ignored(relative)
+    relative.startsWith(":") || /^\.\.(\/|$)/.test(path.posix.normalize(relative.replace(/\\/g, "/"))) || path.isAbsolute(relative) || ignoredHere(relative)
+
+  /**
+   * Why a word before `--` that is not an option may not go to git, if
+   * it may not: a path outside the workspace (git compares two paths
+   * anywhere on the machine when one is outside the repository), a hidden
+   * file named as itself, or an object id that is a file's contents,
+   * which `show` and `diff` would print whatever .gitignore says.
+   */
+  const refuseBareArguments = async (args: string[], signal?: AbortSignal): Promise<string | undefined> => {
+    const [subcommand, ...rest] = args
+    const split = rest.indexOf("--")
+    for (const arg of split === -1 ? rest : rest.slice(0, split)) {
+      if (arg.startsWith("-") || /^[^:]*:/.test(arg)) continue
+      const tidied = tidyGitPath(arg)
+      if (path.isAbsolute(arg) || /^\.\.(\/|$)/.test(tidied)) return `${arg} is outside the workspace and cannot be read.`
+      if (tidied && fs.existsSync(path.join(view.root, tidied)) && ignoredHere(tidied)) {
+        return `${arg} is outside the workspace or ignored by .gitignore and cannot be read.`
+      }
+      if (subcommand === "show" || subcommand === "diff") {
+        const { output, exitCode } = await runGit(view.root, ["cat-file", "-t", arg], signal)
+        if (exitCode === 0 && output.trim() === "blob") {
+          return `${arg} is a file's contents by id, which git here does not show; name the file instead, e.g. show HEAD:path/to/file.`
+        }
+      }
+    }
+    return undefined
+  }
 
   return {
     name: "git",
@@ -186,8 +238,14 @@ export const git = (view: WorkspaceView): Tool => {
       // What .gitignore keeps from read_file, git does not hand over either.
       const named = gitNamedPaths(parsed).find((p) => (p.inRepo ? hiddenIn(p.path, at) : hiddenHere(p.path)))
       if (named) throw new ToolInputError(`${named.path} is outside the workspace or ignored by .gitignore and cannot be read.`)
-      const { output, exitCode } = await runGit(view.root, parsed, context?.signal)
-      const { text, dropped } = withoutHiddenDiffs(output, (file) => hiddenIn(file, at))
+      const refusal = await refuseBareArguments(parsed, context?.signal)
+      if (refusal) throw new ToolInputError(refusal)
+      const { output: raw, exitCode } = await runGit(view.root, parsed, context?.signal)
+      // ls-files names what git tracks, ignored or not; the hidden ones are left out.
+      const listed = parsed[0] === "ls-files" ? withoutHiddenLines(raw, hiddenHere) : { text: raw, dropped: 0 }
+      const diffs = withoutHiddenDiffs(listed.text, (file) => hiddenIn(file, at))
+      const text = diffs.text
+      const dropped = diffs.dropped + listed.dropped
       const shown =
         text.length > MAX_GIT_OUTPUT
           ? `${cutToLine(text, MAX_GIT_OUTPUT)}\n… ${text.length - MAX_GIT_OUTPUT} more characters; narrow it with a path, -n or --stat`

@@ -24,13 +24,23 @@ export interface Replacement {
 
 const NUMBERED = /^\s*\d+: ?/
 
-/** `read_file` output pasted back in: every non-blank line numbered. */
+/**
+ * `read_file` output pasted back in: every non-blank line numbered, the
+ * numbers rising as `read_file` writes them (a model sometimes drops one
+ * on a blank line). Anything else that starts `404: ` is the code itself
+ * (a status map, YAML) and is kept.
+ */
 const withoutLineNumbers = (text: string) => {
   const lines = text.split("\n")
   const filled = lines.filter((line) => line.trim())
   if (!filled.length || !filled.every((line) => NUMBERED.test(line))) return text
+  const numbers = filled.map((line) => Number.parseInt(line.trim(), 10))
+  if (numbers.some((number, i) => i > 0 && number <= numbers[i - 1])) return text
   return lines.map((line) => line.replace(NUMBERED, "")).join("\n")
 }
+
+/** Whether any line of `text` starts the way `read_file` numbers lines. */
+const looksNumbered = (text: string) => text.split("\n").some((line) => NUMBERED.test(line))
 
 const trimBlankEdges = (text: string) =>
   text.replace(/^(?:[ \t]*\n)+/, "").replace(/(?:\n[ \t]*)+$/, "")
@@ -63,6 +73,10 @@ const looseMatches = (lines: string[], wanted: string[]) => {
   return found
 }
 
+/** Whether `find` is in the file at all, exactly or line by line with whitespace aside. */
+const inText = (text: string, lines: string[], find: string) =>
+  !!find.trim() && (text.includes(find) || looseMatches(lines, find.split("\n")).length > 0)
+
 /** Cut-short lines in `replace` put back as the original lines they stand for, or undefined if one stands for none. */
 const restoreCutLines = (replace: string, original: string[]): string | undefined => {
   const lines = replace.split("\n")
@@ -89,8 +103,17 @@ export const planReplacement = (
 ): Replacement | string => {
   const text = content.replace(/\r\n/g, "\n")
   const lines = text.split("\n")
-  const find = trimBlankEdges(withoutLineNumbers(rawFind.replace(/\r\n/g, "\n")))
-  const replace = withoutLineNumbers(rawReplace.replace(/\r\n/g, "\n")).replace(/\n+$/, "")
+  // `find` as written comes first: what looks like a line number may be
+  // the code (`404: "Missing"`). Numbers are dropped only when the text as
+  // written is not there; from `replace`, when they were from `find`, or
+  // when `find` has none (pasted output in `replace` alone).
+  const asWritten = trimBlankEdges(rawFind.replace(/\r\n/g, "\n"))
+  const unnumbered = trimBlankEdges(withoutLineNumbers(rawFind.replace(/\r\n/g, "\n")))
+  const numbered = unnumbered !== asWritten && !inText(text, lines, asWritten)
+  const find = numbered ? unnumbered : asWritten
+  const replaceText = rawReplace.replace(/\r\n/g, "\n")
+  const stripReplace = numbered || !looksNumbered(asWritten)
+  const replace = (stripReplace ? withoutLineNumbers(replaceText) : replaceText).replace(/\n+$/, "")
   if (!find.trim()) return "find is empty; it must be text already in the file"
 
   const exact = occurrences(text, find)

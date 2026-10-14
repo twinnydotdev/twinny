@@ -483,6 +483,11 @@ One JSON file, passed with `--config`. Every field except `providers` and
 | `teamDefaults.{chat,fim,embeddings}` | The alias a developer gets for each job on Connect to team. | none |
 | `policy.teamOnly` | Only the team gateway: a connected developer may not add or activate providers of any other kind. | `false` |
 | `policy.lockDefaults` | Keep the team's default models active for their jobs while connected. | `false` |
+| `policy.agent.off` | Agent mode is off on connected extensions: the chat answers without reading or changing the workspace. | `false` |
+| `policy.agent.commands` | `ask`: every command the agent runs waits for the developer's Run (auto-run and Always run do nothing). `off`: the agent cannot run commands. | developer's choice |
+| `policy.agent.edits` | `review`: every change the agent makes waits in the editor as a diff to accept. | developer's choice |
+| `policy.agent.mcp` | `off`: agent mode uses none of the MCP servers developers set up (`commands: "off"` does this too). | developer's choice |
+| `policy.agent.blockedPaths` | Paths, in `.gitignore` syntax from each workspace's root, the agent may not list, read, search, see in git or change. At most 200. | none |
 | `policy.secretShield` | Which backends get prompts with credentials swapped for placeholders: `offMachine` (hosted APIs, other hosts, paired devices, other gateways, the team pool), `always` (every backend) or `off`. Applies on every plan. | `offMachine` |
 | `recording.chat`, `recording.fim`, `recording.embeddings` | Keep the content of these requests. Needs the `recording` licence feature; disclosed to developers. | `false` |
 | `recording.retentionDays` | Records older than this are deleted. | `90` |
@@ -679,6 +684,49 @@ With the `policy` licence feature, `policy.systemPrompt` is put before
 every chat's system prompt on connected extensions. It is shown on the
 consent card before connecting and re-read at every VS Code start. Edit
 it under **Policy → Team system prompt**.
+
+### Agent mode
+
+`policy.agent` limits what agent mode (the chat reading, searching and
+changing files and running commands) may do on connected extensions. It
+only ever tightens a developer's own settings: a rule left out leaves
+theirs in force.
+
+```json
+"policy": {
+  "agent": {
+    "commands": "ask",
+    "edits": "review",
+    "blockedPaths": [".env*", "infra/", "secrets/**"]
+  }
+}
+```
+
+- `off: true` turns agent mode off; the chat's agent switch is shown off
+  and cannot be turned on.
+- `commands: "ask"` puts every command to the developer first;
+  `commands: "off"` takes commands away. Reading git history is not a
+  command and still works.
+- `edits: "review"` makes every change wait as a diff in the editor, and
+  the agent stops until it is answered.
+- `mcp: "off"` keeps the MCP servers developers set up
+  (`twinny.chatToolsMcpServers`) out of agent mode; with commands asked
+  for, every MCP call is asked for too.
+- `blockedPaths` hides paths from every tool the agent has, git included,
+  on top of each repository's `.gitignore`. A command the agent runs is
+  not held to them; use `commands` for that.
+
+Edit it under **Policy → Agent mode**. It is shown on the consent card
+like the other rules, and besides the re-read at VS Code start, an
+extension re-reads the policy before an agent reply when it is more than
+a minute old, so a change reaches developers at their next agent reply.
+The rules are enforced by the extension. An extension older than the
+rules would ignore them, so while a team sets any, the gateway refuses
+agent requests (a chat that offers or answers tools, or carries the
+agent's prompt) from a client that does not send
+`X-Twinny-Agent-Rules: 1`, and tells the developer to update twinny or
+switch agent mode off. Plain chat, completions and embeddings are served
+as before. A newer extension connected to an older gateway gets no rules.
 
 ### Routing rules
 

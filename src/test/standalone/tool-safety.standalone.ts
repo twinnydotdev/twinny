@@ -212,6 +212,94 @@ test("git does not hand over what .gitignore hides: not from history, not by nam
   assert.match((await tools.run({ name: "git", args: { args: "shortlog -sn" } })).output, /2\tT/, "shortlog does not hang on standard input")
 })
 
+test("git cannot be talked into reading outside the workspace or around .gitignore", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-gitbypass-"))
+  const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "twinny-outside-")), "creds.txt")
+  fs.writeFileSync(outside, "aws_secret=OUTSIDE-SECRET\n")
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" }).toString().trim()
+  git("init", "-q")
+  git("config", "user.email", "t@example.com")
+  git("config", "user.name", "T")
+  write(root, "src/a.ts", "export const a = 1\n")
+  write(root, "config/prod.json", "{\"password\": \"TRACKED-SECRET-1\"}\n")
+  git("add", ".")
+  git("commit", "-qm", "first")
+  const first = git("rev-parse", "HEAD:config/prod.json")
+  write(root, "config/prod.json", "{\"password\": \"TRACKED-SECRET-2\"}\n")
+  git("commit", "-qam", "second")
+  const second = git("rev-parse", "HEAD:config/prod.json")
+  // Ignored from now on, but still in the index and the history.
+  write(root, ".gitignore", "/config/prod.json\n.env\n")
+  write(root, ".env", "TOKEN=UNTRACKED-SECRET\n")
+  const tools = workspaceTools(root)
+  const run = (args: string) => tools.run({ name: "git", args: { args } })
+
+  for (const args of [
+    `diff /dev/null ${outside}`,
+    `diff --stat ${outside} src/a.ts`,
+    `blame --conten=${outside} src/a.ts`,
+    `blame --ignore-revs-file=${outside} src/a.ts`,
+    `blame -S ${outside} src/a.ts`,
+    `show ${first}`,
+    `diff ${first} ${second}`,
+    "show --relative=config HEAD",
+    "show --rel=config HEAD",
+    "show :0:config/prod.json",
+    "show HEAD:./config/./prod.json",
+    "show HEAD:src/../config/prod.json",
+    "status --ignored",
+    "ls-files -o -i --exclude-standard",
+    "log -p -- ./config/prod.json",
+    "diff ../",
+    "log config/prod.json"
+  ]) {
+    const result = await run(args)
+    assert.ok(result.failed, args)
+    assert.doesNotMatch(result.output, /SECRET/, args)
+    assert.match(result.output, /not allowed in git here|outside the workspace|ignored by \.gitignore|contents by id/, args)
+  }
+  const listed = await run("ls-files -s")
+  assert.doesNotMatch(listed.output, /prod\.json|${first}/, "an ignored file's object id is not handed out")
+  assert.match(listed.output, /src\/a\.ts/)
+  assert.match(listed.summary, /1 file left out/)
+  const untracked = await run("ls-files -o")
+  assert.doesNotMatch(untracked.output, /\.env/)
+  const history = await run("log -p")
+  assert.doesNotMatch(history.output, /TRACKED-SECRET/)
+
+  // What the tool is for still works.
+  assert.match((await run("show HEAD:src/a.ts")).output, /export const a = 1/)
+  assert.match((await run("show ./src/a.ts")).output, /exit code/, "a path that is not hidden goes through")
+  assert.match((await run("log --oneline -2")).output, /second\n.*first/)
+  assert.match((await run("diff HEAD~1 HEAD --stat")).output, /exit code 0/)
+  assert.ok(!(await run("show HEAD --stat")).failed, "a commit by id is not a file's contents")
+  assert.ok(!(await run("log --ignore-all-space -1")).failed, "an option that only starts like a refused one is fine")
+  assert.ok(!(await run("diff --text HEAD~1 HEAD")).failed, "diff --text is an option of its own, not --textconv")
+  assert.doesNotMatch((await run("blame --ignore-rev HEAD src/a.ts")).output, /not allowed in git here/)
+})
+
+test("a link is judged by where it leads, and protected files in any case", () => {
+  const root = monorepo()
+  fs.symlinkSync(path.join(root, "packages/api/.env"), path.join(root, "envlink"))
+  write(root, ".vscode/settings.json", "{}\n")
+  fs.symlinkSync(path.join(root, ".vscode"), path.join(root, "cfg"))
+  const view = new WorkspaceView(root)
+  assert.throws(() => view.resolve("envlink", "file"), /leads to a path ignored by \.gitignore/)
+  assert.strictEqual(view.realRelative(path.join(root, "cfg/settings.json")), ".vscode/settings.json")
+  assert.strictEqual(view.realRelative(path.join(root, "cfg/new/tasks.json")), ".vscode/new/tasks.json", "and for a file not made yet")
+  assert.strictEqual(view.realRelative(path.join(root, "src/a.ts")), "src/a.ts")
+  for (const file of [".VSCode/settings.json", ".GITIGNORE", "packages/a/.GitIgnore", "team.code-workspace"]) {
+    assert.ok(isProtectedPath(file), file)
+  }
+  // A link at a new file's path, even one that leads nowhere, would be written through.
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-dangle-"))
+  fs.symlinkSync(path.join(outside, "target.txt"), path.join(root, "dangling.txt"))
+  assert.throws(() => view.resolveNew("dangling.txt"), /already exists/)
+  fs.symlinkSync(path.join(outside, "missing-dir"), path.join(root, "gone"))
+  assert.throws(() => view.resolveNew("gone/new.ts"), /outside the workspace/)
+  assert.strictEqual(fs.existsSync(path.join(outside, "target.txt")), false)
+})
+
 test("with one package of a repository open, git keeps to that package", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-gitsub-"))
   const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" })

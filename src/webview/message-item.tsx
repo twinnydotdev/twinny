@@ -1,7 +1,7 @@
 import React, { memo } from "react"
 
 import { WorkspaceSearchReport } from "../common/messaging/protocol"
-import { ChatCompletionMessage, MentionType, ToolStepView } from "../common/types"
+import { ChatCompletionMessage, MentionType, ReplyChangesView, ToolStepView } from "../common/types"
 
 import Message from "./message"
 import TypingIndicator from "./typing-indicator"
@@ -29,6 +29,7 @@ interface MessageListProps {
   ) => void
   handleDeleteImage?: (id: string) => void
   handleContinue?: () => void
+  handleChangesUpdate?: (index: number, changes: ReplyChangesView) => void
 }
 
 const MessageItem = memo(
@@ -44,7 +45,8 @@ const MessageItem = memo(
     handleEditMessage,
     handleRegenerateMessage,
     handleDeleteImage,
-    handleContinue
+    handleContinue,
+    handleChangesUpdate
   }: MessageListProps) => {
     const isUserMessage = message?.role === "user"
     const isAgentMessage = message?.role === "assistant"
@@ -81,6 +83,7 @@ const MessageItem = memo(
             isAssistant
             onDeleteImage={handleDeleteImage}
             onContinue={canContinue ? handleContinue : undefined}
+            onChangesUpdate={handleChangesUpdate}
           />
         )}
         {completion && isLastMessage && (

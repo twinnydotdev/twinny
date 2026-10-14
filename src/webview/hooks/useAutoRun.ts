@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { EVENT_NAME, GLOBAL_STORAGE_KEY } from "../../common/constants"
+import type { TeamAgentPolicy } from "../../common/team"
 import { bridge } from "../messaging"
 
 import { StorageType, useStorageContext } from "./useStorageContext"
@@ -11,7 +12,7 @@ import { StorageType, useStorageContext } from "./useStorageContext"
  * `twinny.chatToolsCommands` decides (`allow` is on). `available` is false
  * when that setting is `off`: there are no commands to run.
  */
-export const useAutoRun = () => {
+export const useAutoRun = (team?: TeamAgentPolicy) => {
   const { context, setContext, loaded } = useStorageContext<boolean>(
     StorageType.Global,
     GLOBAL_STORAGE_KEY.autoRunCommands
@@ -26,7 +27,9 @@ export const useAutoRun = () => {
       .then(({ value }) => typeof value === "string" && setSetting(value))
   }, [loaded])
 
-  const on = context ?? setting === "allow"
+  // A team that asks for every command, or allows none, leaves nothing to auto-run.
+  const available = setting !== "off" && !team?.commands
+  const on = available && (context ?? setting === "allow")
   onRef.current = on
 
   const toggle = useCallback(() => {
@@ -35,5 +38,5 @@ export const useAutoRun = () => {
 
   const enable = useCallback(() => setContext(true), [setContext])
 
-  return { autoRun: on, autoRunAvailable: setting !== "off", toggleAutoRun: toggle, enableAutoRun: enable }
+  return { autoRun: on, autoRunAvailable: available, toggleAutoRun: toggle, enableAutoRun: enable, setAutoRun: setContext }
 }

@@ -1,8 +1,8 @@
-import type { TeamPolicy } from "../protocol/types"
+import type { TeamAgentPolicy, TeamPolicy } from "../protocol/types"
 
 import type { ProviderType } from "./provider-validation"
 
-export type { TeamPolicy }
+export type { TeamAgentPolicy, TeamPolicy }
 
 /** The policy a developer accepted when connecting, kept until they leave the team. */
 export interface TeamPolicyState {

@@ -16,6 +16,7 @@ import {
   ChatCompletionMessage,
   ImageAttachment,
   MentionType,
+  ReplyChangesView,
   ToolStepView
 } from "../common/types"
 
@@ -31,6 +32,7 @@ import { useToolSteps } from "./hooks/useToolSteps"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch"
 import { ProviderSelect } from "./providers/provider-select"
+import AgentSettings from "./agent-settings"
 import { EmptyChat } from "./empty-chat"
 import { GhostText } from "./ghost-text"
 import { createCustomImageExtension } from "./image-extension"
@@ -111,8 +113,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
     () => getThinkingMessage(String(completionRef.current?.content ?? "")).message
   )
   const [isBottom, setIsBottom] = useState(false)
-  const { agentMode, toggleAgentMode } = useAgentMode()
-  const { autoRun, autoRunAvailable, toggleAutoRun } = useAutoRun()
+  const { agentMode, toggleAgentMode, agentModeTeamOff, teamAgentRules } = useAgentMode()
+  const { autoRun, autoRunAvailable, toggleAutoRun, setAutoRun } = useAutoRun(teamAgentRules)
+  const [agentSettingsOpen, setAgentSettingsOpen] = useState(false)
+  const closeAgentSettings = useCallback(() => setAgentSettingsOpen(false), [])
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -310,6 +314,19 @@ export const Chat = (props: ChatProps): JSX.Element => {
     })
   }
 
+  /** A reply's changed files after an undo: kept with the message and saved. */
+  const handleChangesUpdate = useCallback(
+    (index: number, changes: ReplyChangesView) => {
+      setMessages((prev) => {
+        if (!prev?.[index] || prev[index].changes?.id !== changes.id) return prev
+        const updatedMessages = prev.map((message, i) => (i === index ? { ...message, changes } : message))
+        saveLastConversation({ ...conversation, messages: updatedMessages })
+        return updatedMessages
+      })
+    },
+    [conversation, saveLastConversation]
+  )
+
   const handleEditMessage = (
     message: string,
     index: number,
@@ -428,6 +445,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const approveWaiting = useCallback((how: "run" | "always" | "skip") => {
     const step = waitingStepRef.current
     if (!step) return false
+    // Shift+Enter means Always run, which only a command the team lets
+    // run unasked has; on a change or such a command it is a new line.
+    if (how === "always" && (step.approval !== "command" || step.noAlways)) return false
     answerToolStep(step, how)
     return true
   }, [])
@@ -689,8 +709,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
 
   // Switching conversation shows its messages, including none for a new one.
+  // Messages queued in the one left belong to it, and are not sent here.
   useEffect(() => {
     if (conversation?.id) setMessages(conversation.messages || [])
+    if (queuedRef.current.length) updateQueue([])
   }, [conversation?.id])
 
   const { suggestion, filePaths } = useSuggestion()
@@ -1002,6 +1024,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         handleEditMessage={handleEditMessage}
         handleRegenerateMessage={handleRegenerateMessage}
         handleContinue={handleContinue}
+        handleChangesUpdate={handleChangesUpdate}
         index={index}
         isLoading={isLoading}
         message={messages[index]}
@@ -1013,6 +1036,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
       handleEditMessage,
       handleRegenerateMessage,
       handleContinue,
+      handleChangesUpdate,
       isLoading,
       messages,
       completion,
@@ -1094,6 +1118,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
         </div>
         <div className={cx(styles.composer, { [styles.agentBusy]: agentMode && (isLoading || generatingRef.current) })}>
           {showShortcuts && <Shortcuts />}
+          {agentMode && agentSettingsOpen && (
+            <AgentSettings team={teamAgentRules} autoRun={autoRun} setAutoRun={setAutoRun} onClose={closeAgentSettings} />
+          )}
           {!!queued.length && (
             <ol className={styles.queue} aria-label={t("queued-title")}>
               {queued.map((message) => (
@@ -1169,10 +1196,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
                   type="button"
                   role="switch"
                   aria-checked={agentMode}
-                  disabled={chatDisabled}
+                  disabled={chatDisabled || agentModeTeamOff}
                   className={cx(styles.agentToggle, { [styles.agentToggleOn]: agentMode })}
                   onClick={toggleAgentMode}
-                  title={t(agentMode ? "agent-mode-on-title" : "agent-mode-off-title")}
+                  title={t(
+                    agentModeTeamOff ? "agent-mode-team-off-title" : agentMode ? "agent-mode-on-title" : "agent-mode-off-title"
+                  )}
                 >
                   <span className={styles.agentDot} aria-hidden="true" />
                   {t(agentMode ? "agent-mode-on" : "agent-mode")}
@@ -1190,6 +1219,19 @@ export const Chat = (props: ChatProps): JSX.Element => {
                   >
                     <span className="codicon codicon-terminal" aria-hidden="true" />
                     <span className={styles.switchLabel}>{t("auto-run")}</span>
+                  </button>
+                )}
+                {agentMode && (
+                  <button
+                    type="button"
+                    data-agent-settings-toggle
+                    aria-expanded={agentSettingsOpen}
+                    className={cx(styles.agentToggle, { [styles.agentToggleOn]: agentSettingsOpen })}
+                    onClick={() => setAgentSettingsOpen((open) => !open)}
+                    title={t("agent-settings-title")}
+                    aria-label={t("agent-settings-title")}
+                  >
+                    <span className="codicon codicon-settings-gear" aria-hidden="true" />
                   </button>
                 )}
               </div>

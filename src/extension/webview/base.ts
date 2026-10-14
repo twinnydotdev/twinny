@@ -152,6 +152,7 @@ export class BaseProvider {
       }
     })
     this.providers = providerManager
+    this.chat.refreshTeamPolicy = () => providerManager.refreshTeamPolicy()
     if (this._p2p) {
       this._p2pBridge = new P2pBridge(this._p2p, bridge, providerManager)
     }
@@ -243,6 +244,11 @@ export class BaseProvider {
       [EVENT_NAME.twinnyStopGeneration]: () => this.destroyStream(),
       [EVENT_NAME.twinnyToolApproval]: ({ id, run, always }) => this.chat?.answerToolApproval(id, run, always),
       [EVENT_NAME.twinnyToolStop]: ({ id }) => this.chat?.stopToolStep(id),
+      [EVENT_NAME.twinnyOpenChange]: ({ id, path }) => void this.chat?.openChange(id, path),
+      [EVENT_NAME.twinnyOpenAgentSettings]: () =>
+        void vscode.commands.executeCommand("workbench.action.openSettings", "twinny.chatTools"),
+      [EVENT_NAME.twinnyUndoChanges]: async ({ id, paths }) =>
+        (await this.chat?.undoChanges(id, paths)) ?? { error: "The chat is not ready." },
       [EVENT_NAME.twinnySymbolSearch]: ({ query }) => searchSymbols(query),
       [EVENT_NAME.twinnyTextSelection]: () => getTextSelection()
     })
@@ -380,6 +386,9 @@ export class BaseProvider {
     this.conversationHistory?.resetConversation()
     this.chat?.resetConversation()
     this.bridge?.emit(EVENT_NAME.twinnyNewConversation)
+    // A reply still being written belongs to the conversation left; the
+    // chat has cleared what it queued there before the reply stops.
+    this.chat?.discardReply()
   }
 
   private createNewUntitledDocument = async ({

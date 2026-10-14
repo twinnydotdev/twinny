@@ -45,7 +45,7 @@ export const answerToolStep = (step: ToolStepView, how: "run" | "always" | "skip
   emit(EVENT_NAME.twinnyToolApproval, {
     id: step.id,
     run: how !== "skip",
-    ...(how === "always" && step.approval !== "change" ? { always: true } : {})
+    ...(how === "always" && step.approval !== "change" && !step.noAlways ? { always: true } : {})
   })
 
 const Step = ({ step }: { step: ToolStepView }) => {
@@ -55,6 +55,10 @@ const Step = ({ step }: { step: ToolStepView }) => {
   const inspectable = !!step.output || !!Object.keys(step.args ?? {}).length
   // A command's output shows as it prints, without a click, until it ends.
   const live = step.status === "running" && step.name === "run_command" && !!step.output?.trim()
+  // A command that has had its turn can be copied, or put in the user's terminal to run again.
+  const finishedCommand =
+    step.name === "run_command" && step.status !== "running" && step.status !== "waiting" ? step.args?.command?.trim() : undefined
+  const [copied, setCopied] = useState(false)
 
   return (
     <li className={cx(styles.step, styles[step.status])}>
@@ -81,6 +85,30 @@ const Step = ({ step }: { step: ToolStepView }) => {
             />
           )}
         </button>
+        {finishedCommand && (
+          <>
+            <button
+              type="button"
+              className={styles.stop}
+              onClick={() => {
+                void navigator.clipboard.writeText(finishedCommand).then(() => setCopied(true))
+              }}
+              title={t(copied ? "copied-to-clipboard" : "tool-copy-command")}
+              aria-label={t("tool-copy-command")}
+            >
+              <span className={cx("codicon", copied ? "codicon-check" : "codicon-copy")} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={styles.stop}
+              onClick={() => emit(EVENT_NAME.twinnyRunInTerminal, finishedCommand)}
+              title={t("tool-command-to-terminal-title")}
+              aria-label={t("tool-command-to-terminal")}
+            >
+              <span className="codicon codicon-terminal" aria-hidden="true" />
+            </button>
+          </>
+        )}
         {step.stoppable && step.status === "running" && (
           <button
             type="button"
@@ -96,10 +124,10 @@ const Step = ({ step }: { step: ToolStepView }) => {
       {waiting && (
         <div className={styles.approval}>
           <div className={styles.approvalLabel}>
-            {t(step.approval === "change" ? "tool-change-waiting" : "tool-command-waiting")}
+            {t(step.approval === "change" ? "tool-change-waiting" : step.mcpTool ? "tool-mcp-waiting" : "tool-command-waiting")}
           </div>
           <div className={styles.command}>
-            {step.approval === "change" ? (
+            {step.approval === "change" || step.mcpTool ? (
               <pre className={styles.output}>{step.command}</pre>
             ) : (
               <Code code={step.command ?? ""} language="bash" />
@@ -110,11 +138,11 @@ const Step = ({ step }: { step: ToolStepView }) => {
               <span className={cx("codicon", step.approval === "change" ? "codicon-check" : "codicon-play")} aria-hidden="true" />
               {t(step.approval === "change" ? "tool-apply" : "tool-run")}
             </button>
-            {step.approval !== "change" && (
+            {step.approval !== "change" && !step.noAlways && (
               <button
                 type="button"
                 className={styles.skip}
-                title={t("tool-always-run-title")}
+                title={t(step.mcpTool ? "tool-always-run-mcp-title" : "tool-always-run-title", { tool: step.mcpTool })}
                 onClick={() => answerToolStep(step, "always")}
               >
                 {t("tool-always-run")}
@@ -125,7 +153,7 @@ const Step = ({ step }: { step: ToolStepView }) => {
             </button>
           </div>
           <div className={styles.keys}>
-            {t(step.approval === "change" ? "tool-change-keys" : "tool-command-keys")}
+            {t(step.approval === "change" ? "tool-change-keys" : step.noAlways ? "tool-command-keys-ask" : "tool-command-keys")}
           </div>
         </div>
       )}

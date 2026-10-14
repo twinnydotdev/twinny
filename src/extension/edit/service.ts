@@ -66,6 +66,19 @@ export interface FileEditProposal {
 }
 
 /** With a folder open, a chat edit stays inside it. */
+/**
+ * Whole lines taken out, line break and all: the next line's start when
+ * there is one, else from the end of the line before, so no blank line is
+ * left where they were.
+ */
+const removedLines = (document: vscode.TextDocument, lines: vscode.Range): vscode.Range => {
+  if (lines.end.line + 1 < document.lineCount) return new vscode.Range(lines.start.line, 0, lines.end.line + 1, 0)
+  if (lines.start.line > 0) {
+    return new vscode.Range(lines.start.line - 1, document.lineAt(lines.start.line - 1).range.end.character, lines.end.line, lines.end.character)
+  }
+  return lines
+}
+
 const outsideWorkspace = (uri: vscode.Uri) =>
   !!vscode.workspace.workspaceFolders?.length && !vscode.workspace.getWorkspaceFolder(uri)
 
@@ -303,14 +316,17 @@ export class InlineEditService extends Base {
 
     if (mode === "apply") {
       const edit = new vscode.WorkspaceEdit()
-      edit.replace(uri, range, proposal.text)
+      edit.replace(uri, proposal.text === "" ? removedLines(document, range) : range, proposal.text)
       if (!(await vscode.workspace.applyEdit(edit))) {
         return { ok: false, message: `Not changed: the editor refused the edit to ${relative}.` }
       }
       const saved = await document.save()
       const editor = await vscode.window.showTextDocument(document, { preview: true, preserveFocus: true })
-      const end = proposal.startLine + proposal.text.split("\n").length - 1
-      editor.revealRange(new vscode.Range(proposal.startLine, 0, end, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport)
+      // Lines taken out from the end leave fewer lines than the edit started at.
+      const lastLine = document.lineCount - 1
+      const start = Math.min(proposal.startLine, lastLine)
+      const end = Math.min(lastLine, Math.max(start, proposal.startLine + proposal.text.split("\n").length - 1))
+      editor.revealRange(new vscode.Range(start, 0, end, 0), vscode.TextEditorRevealType.InCenterIfOutsideViewport)
       logger.info(`Chat edited ${relative}:${proposal.startLine + 1}${saved ? "" : " (not saved)"}`)
       return {
         ok: true,

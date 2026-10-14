@@ -73,6 +73,30 @@ export type ChatCompletionMessage = ChatCompletionMessageParam & {
    * ("now the same in the other file") has what this reply worked from.
    */
   toolNotes?: string
+  /**
+   * The files agent mode changed while writing this reply, with what it
+   * takes to undo them; shown under it, never sent to the model.
+   */
+  changes?: ReplyChangesView
+}
+
+/** A file agent mode changed during a reply, as the chat lists it. */
+export interface FileChangeView {
+  /** Relative to the workspace root, with `/`. */
+  path: string
+  status: "modified" | "created" | "deleted"
+  added: number
+  removed: number
+  /** Put back as it was before the reply. */
+  undone?: boolean
+  /** No copy was kept (binary, or too large), so it cannot be undone from the chat. */
+  noUndo?: boolean
+}
+
+/** What one reply changed, by the id its copies are kept under. */
+export interface ReplyChangesView {
+  id: string
+  files: FileChangeView[]
 }
 
 /** One tool call as the chat shows it: collapsed to a line, open to what went in and came out. */
@@ -98,6 +122,10 @@ export interface ToolStepView {
   at?: number
   /** A running command the user can stop on its own, leaving the reply to carry on. */
   stoppable?: boolean
+  /** A waiting command that cannot be set to always run: the team asks for every command. */
+  noAlways?: boolean
+  /** A waiting call to an MCP server's tool (`server/tool`): Always run keeps the tool, not the call. */
+  mcpTool?: string
 }
 
 /** What twinny knows about how one reply was produced. */
@@ -122,6 +150,12 @@ export interface ReplyMeta {
    * request left the machine: kinds and counts, never the values.
    */
   withheld?: { kind: string; label: string; count: number }[]
+  /**
+   * The project's instructions for agents that agent mode followed:
+   * `AGENTS.md` at the root (or the file read in its place), then each
+   * folder's as the tools reached it. Relative paths.
+   */
+  instructions?: string[]
 }
 
 export interface Conversation {

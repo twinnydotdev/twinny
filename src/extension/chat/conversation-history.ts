@@ -37,8 +37,16 @@ export class ConversationHistory extends Base {
         this.getAllConversations(),
       [CONVERSATION_EVENT_NAME.getActiveConversation]: () =>
         void this.getActiveConversation(),
-      [CONVERSATION_EVENT_NAME.setActiveConversation]: (conversation) =>
-        this.setActiveConversation(conversation),
+      [CONVERSATION_EVENT_NAME.setActiveConversation]: (conversation) => {
+        // Another conversation opened while a reply is written: the reply
+        // belongs to the one left, and is not kept in this one. The chat
+        // hears of the switch first, so nothing it queued for the old
+        // conversation is sent when the reply stops.
+        const active = this.context?.globalState.get<Conversation>(ACTIVE_CONVERSATION_STORAGE_KEY)
+        const leaving = this._chatService.replying && conversation?.id !== active?.id
+        this.setActiveConversation(conversation)
+        if (leaving) this._chatService.discardReply()
+      },
       [CONVERSATION_EVENT_NAME.removeConversation]: (conversation) =>
         this.removeConversation(conversation),
       [CONVERSATION_EVENT_NAME.renameConversation]: ({ id, title }) =>

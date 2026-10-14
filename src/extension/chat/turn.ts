@@ -147,8 +147,12 @@ export const buildChatTurn = async (
     contextSources(said),
     history.map(({ message, text }) => ({ ...message, content: text }) as ChatCompletionMessage)
   )
-  const previous = messages[messages.length - 2]
-  const notes = previous?.role === ASSISTANT ? previous.toolNotes?.trim() : undefined
+  // The last reply's notes; when it failed after its tools ran, the error
+  // message came after it, and the notes are on the reply before that.
+  let notes: string | undefined
+  for (let i = messages.length - 2; i >= 0 && messages[i].role === ASSISTANT && !notes; i--) {
+    notes = messages[i].toolNotes?.trim() || undefined
+  }
   // The notes go before the question and the question's own context after
   // it: what the user is asking now is what the message should end on.
   const asked = `${question}\n\n${extra.trim()}`.trim()

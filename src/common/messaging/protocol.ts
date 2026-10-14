@@ -32,6 +32,7 @@ import type {
   LanguageType,
   MentionType,
   ModelCatalogue,
+  ReplyChangesView,
   ThemeType,
   ToolStepView,
   TwinnyProvider
@@ -351,6 +352,15 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyToolApproval]: Channel<{ id: string; run: boolean; always?: boolean }>
   /** Stop the command a running tool step is waiting on, and only that. */
   [EVENT_NAME.twinnyToolStop]: Channel<{ id: string }>
+  /** The agent's settings in VS Code's settings editor. */
+  [EVENT_NAME.twinnyOpenAgentSettings]: Channel
+  /** A file an agent reply changed, beside what it was before the reply. */
+  [EVENT_NAME.twinnyOpenChange]: Channel<{ id: string; path: string }>
+  /**
+   * Put an agent reply's changed files (all, or `paths`) back as they
+   * were; answers with the changes as they then stand, or why not.
+   */
+  [EVENT_NAME.twinnyUndoChanges]: Channel<{ id: string; paths?: string[] }, { view?: ReplyChangesView; error?: string }>
 
   [CONVERSATION_EVENT_NAME.clearAllConversations]: Channel
   [CONVERSATION_EVENT_NAME.getActiveConversation]: Channel
