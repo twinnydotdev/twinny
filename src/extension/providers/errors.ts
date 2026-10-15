@@ -3,6 +3,7 @@
  * The inference layer decides what kind of failure it was; this file only
  * puts words to it. Pure: no vscode imports, so it is unit-tested directly.
  */
+import { API_PROVIDERS } from "../../common/constants"
 import { isAbortError, toInferenceError } from "../inference/errors"
 
 export { isAbortError }
@@ -47,7 +48,14 @@ export const describeProviderError = (
 
   switch (failure.kind) {
     case "unsupported-capability":
-      summary = `${name} cannot do this. Pick a provider that supports it.`
+      summary =
+        provider.provider === API_PROVIDERS.ChatGPTPlan &&
+        /service[_ -]?tier|fast mode/i.test(raw)
+          ? `${name} cannot use Fast mode for this account or model. Disable Fast mode and test again.`
+          : provider.provider === API_PROVIDERS.ChatGPTPlan &&
+              /reasoning(?:[._ -]?effort)?/i.test(raw)
+            ? `${name} does not support this reasoning effort. Choose another effort and test again.`
+            : `${name} cannot do this. Pick a provider that supports it.`
       break
     case "provider-unavailable":
       summary =
@@ -62,6 +70,8 @@ export const describeProviderError = (
         provider.provider === "twinny-remote"
           ? `${name} refused the request: ${raw.replace(/^The gateway responded with status \d+:?\s*/i, "")} ` +
             "Enter a current gateway key on the provider."
+          : provider.provider === API_PROVIDERS.ChatGPTPlan
+            ? `${name} could not use the connected ChatGPT session. Sign in again.`
           : `${name} rejected the request as unauthorised. ` +
             "Check the API key on the provider."
       break
@@ -71,7 +81,11 @@ export const describeProviderError = (
         "Check the model name, or pull the model first."
       break
     case "rate-limited":
-      summary = `${name} is rate limiting requests. Wait a moment and try again.`
+      summary =
+        provider.provider === API_PROVIDERS.ChatGPTPlan &&
+        /subscription_sharing_usage_limit_exceeded/.test(lower)
+          ? `${name} has reached the ChatGPT plan usage limit. Try again after the limit resets.`
+          : `${name} is rate limiting requests. Wait a moment and try again.`
       break
     case "timeout":
       summary = `The request to ${name} timed out. The model may still be loading; try again.`

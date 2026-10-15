@@ -15,13 +15,14 @@ import {
   FIM_TEMPLATE_FORMAT,
   PROVIDER_DISPLAY_NAMES
 } from "../../common/constants"
-import { ProviderTestResult } from "../../common/messaging/protocol"
+import { ChatGPTPlanStatus, ProviderTestResult } from "../../common/messaging/protocol"
 import { pickModel } from "../../common/model-pick"
 import {
   describeProviderEndpoint,
   expectsApiKey,
   getEndpointDefaults,
   hasConfigurableEndpoint,
+  isChatGPTPlanProvider,
   isP2pProvider,
   isRemoteProvider,
   normalizeProvider,
@@ -52,8 +53,15 @@ interface ProviderFormProps {
 
 export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) => {
   const { t } = useTranslation()
-  const { saveProvider, updateProvider, testProvider, listModels } =
-    useProviders()
+  const {
+    saveProvider,
+    updateProvider,
+    testProvider,
+    listModels,
+    getChatGPTPlanStatus,
+    signInChatGPTPlan,
+    signOutChatGPTPlan
+  } = useProviders()
   const { devices } = useDevices()
   const isEditing = !!initial.id
 
@@ -70,20 +78,47 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const [saving, setSaving] = useState(false)
 
   const [models, setModels] = useState<string[]>([])
+  const [modelLabels, setModelLabels] = useState<Record<string, string>>({})
   const [modelsError, setModelsError] = useState<string | undefined>()
   const [modelsLoading, setModelsLoading] = useState(false)
   const [customModel, setCustomModel] = useState(false)
 
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<ProviderTestResult | null>(null)
+  const [planStatus, setPlanStatus] = useState<ChatGPTPlanStatus | null>(null)
+  const [planAuthLoading, setPlanAuthLoading] = useState(false)
+  const [planAuthError, setPlanAuthError] = useState<string | undefined>()
 
   const normalized = useMemo(() => normalizeProvider(draft), [draft])
   const validation = useMemo(() => validateProvider(normalized), [normalized])
   const endpoint = describeProviderEndpoint(normalized)
   const isP2p = isP2pProvider(draft.provider)
   const isRemote = isRemoteProvider(draft.provider)
+  const isChatGPTPlan = isChatGPTPlanProvider(draft.provider)
   const showEndpointFields = hasConfigurableEndpoint(draft.provider, draft.type)
   const device = isP2p ? devices.find((d) => d.id === draft.deviceId) : undefined
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isChatGPTPlan) {
+      setPlanStatus(null)
+      setPlanAuthError(undefined)
+      return
+    }
+    getChatGPTPlanStatus()
+      .then((status) => {
+        if (!cancelled) setPlanStatus(status)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setPlanStatus(null)
+          setPlanAuthError(String(error))
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isChatGPTPlan])
 
   const errorFor = (field: ProviderField) =>
     serverErrors[field] ||
@@ -139,11 +174,19 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
     draft.apiHostname,
     draft.apiPort,
     draft.apiProtocol,
-    draft.apiKey
+    draft.apiKey,
+    isChatGPTPlan ? (planStatus?.sharing ? "plan-ready" : "plan-blocked") : ""
   ].join("|")
   useEffect(() => {
     let cancelled = false
     const probe = normalizeProvider(draft)
+    if (isChatGPTPlan && !planStatus?.sharing) {
+      setModels([])
+      setModelLabels({})
+      setModelsError(undefined)
+      setModelsLoading(false)
+      return
+    }
     if ((showEndpointFields && !probe.apiHostname) || (isP2p && !probe.deviceId)) {
       setModels([])
       return
@@ -153,6 +196,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       listModels(probe).then((result) => {
         if (cancelled) return
         setModels(result.models)
+        setModelLabels(result.labels || {})
         setModelsError(result.error)
         setModelsLoading(false)
         // A preset leaves the model blank so the first thing the server
@@ -170,11 +214,51 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   }, [listKey])
 
   const modelInList = models.includes(draft.modelName)
-  const showModelDropdown = models.length > 0 && !customModel
+  const planModelUnavailable =
+    isChatGPTPlan &&
+    !!planStatus?.sharing &&
+    !modelsLoading &&
+    (!!modelsError || models.length === 0 || !modelInList)
+  const showModelDropdown =
+    models.length > 0 && (isChatGPTPlan || !customModel)
+
+  const handlePlanSignIn = async () => {
+    setPlanAuthLoading(true)
+    setPlanAuthError(undefined)
+    try {
+      const status = await signInChatGPTPlan()
+      setPlanStatus(status)
+      if (!status.sharing) {
+        setPlanAuthError(
+          "ChatGPT sign-in succeeded, but plan usage was not authorized."
+        )
+      }
+    } catch (error) {
+      setPlanAuthError(String(error))
+    } finally {
+      setPlanAuthLoading(false)
+    }
+  }
+
+  const handlePlanSignOut = async () => {
+    setPlanAuthLoading(true)
+    setPlanAuthError(undefined)
+    try {
+      const status = await signOutChatGPTPlan()
+      setPlanStatus(status)
+      setModels([])
+      setModelLabels({})
+      setDraft((current) => ({ ...current, modelName: "" }))
+    } catch (error) {
+      setPlanAuthError(String(error))
+    } finally {
+      setPlanAuthLoading(false)
+    }
+  }
 
   const handleTest = async () => {
     setSubmitted(true)
-    if (!validation.valid) return
+    if (!validation.valid || planModelUnavailable) return
     setTesting(true)
     setTestResult(null)
     setTestResult(await testProvider(normalized))
@@ -184,7 +268,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitted(true)
-    if (!validation.valid || saving) return
+    if (!validation.valid || planModelUnavailable || saving) return
     setSaving(true)
     const result = isEditing
       ? await updateProvider(normalized)
@@ -284,6 +368,60 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         )}
       </div>
 
+      {isChatGPTPlan && (
+        <div className={styles.field}>
+          <label>ChatGPT account</label>
+          <div className={styles.inlineControl}>
+            {planStatus?.connected ? (
+              <>
+                <span className={styles.staticValue}>
+                  <i className="codicon codicon-pass-filled" />
+                  <span>Connected</span>
+                  {(planStatus.email || planStatus.name) && (
+                    <span className={styles.fieldHint}>
+                      {planStatus.email || planStatus.name}
+                    </span>
+                  )}
+                </span>
+                <VSCodeButton
+                  appearance="secondary"
+                  disabled={planAuthLoading}
+                  onClick={handlePlanSignOut}
+                >
+                  Sign out
+                </VSCodeButton>
+              </>
+            ) : (
+              <>
+                <span className={styles.staticValue}>Not connected</span>
+                <VSCodeButton
+                  appearance="primary"
+                  disabled={planAuthLoading}
+                  onClick={handlePlanSignIn}
+                >
+                  <i
+                    className={`codicon codicon-${
+                      planAuthLoading ? "loading" : "account"
+                    }`}
+                  />
+                  {planAuthLoading ? "Connecting..." : "Continue with ChatGPT"}
+                </VSCodeButton>
+              </>
+            )}
+          </div>
+          {planStatus?.connected && !planStatus.sharing && (
+            <span className={styles.fieldHint}>
+              ChatGPT is connected, but plan usage is not enabled for Twinny.
+            </span>
+          )}
+          {planAuthError && (
+            <span className={styles.fieldError} role="alert">
+              {planAuthError}
+            </span>
+          )}
+        </div>
+      )}
+
       {isP2p &&
         field(
           "deviceId",
@@ -375,6 +513,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       )}
 
       {!isP2p &&
+        !isChatGPTPlan &&
         field(
         "apiKey",
         isRemote ? t("gateway-token") : t("api-key"),
@@ -424,7 +563,7 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
               )}
               {models.map((model) => (
                 <VSCodeOption key={model} value={model}>
-                  {model}
+                  {modelLabels[model] || model}
                 </VSCodeOption>
               ))}
             </VSCodeDropdown>
@@ -432,11 +571,14 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
             <VSCodeTextField
               id="modelName"
               value={draft.modelName}
-              placeholder={t("model-name-placeholder")}
+              placeholder={
+                isChatGPTPlan ? "Sign in to load available models" : t("model-name-placeholder")
+              }
+              disabled={isChatGPTPlan}
               onInput={(e) => update({ modelName: valueOf(e) })}
             />
           )}
-          {models.length > 0 && (
+          {models.length > 0 && !isChatGPTPlan && (
             <VSCodeButton
               appearance="icon"
               title={customModel ? t("choose-from-list") : t("type-model-name")}
@@ -450,6 +592,8 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         </div>,
         modelsLoading
           ? t("loading-available-models")
+          : planModelUnavailable && draft.modelName
+            ? t("model-not-listed", { model: draft.modelName })
           : models.length
             ? t("models-found", { count: models.length })
             : modelsError
@@ -457,7 +601,38 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
               : undefined
       )}
 
-      {draft.type === "fim" && (
+      {isChatGPTPlan && (
+        <>
+          {field(
+            "reasoningEffort",
+            "Reasoning effort",
+            <VSCodeDropdown
+              id="reasoningEffort"
+              value={draft.reasoningEffort || ""}
+              onChange={(e) =>
+                update({
+                  reasoningEffort:
+                    (valueOf(e) || undefined) as TwinnyProvider["reasoningEffort"]
+                })
+              }
+            >
+              <VSCodeOption value="">Model default</VSCodeOption>
+              <VSCodeOption value="none">None (fastest)</VSCodeOption>
+              <VSCodeOption value="minimal">Minimal</VSCodeOption>
+              <VSCodeOption value="low">Low</VSCodeOption>
+              <VSCodeOption value="medium">Medium</VSCodeOption>
+              <VSCodeOption value="high">High</VSCodeOption>
+              <VSCodeOption value="xhigh">Extra high</VSCodeOption>
+              <VSCodeOption value="max">Maximum</VSCodeOption>
+            </VSCodeDropdown>,
+            draft.type === "fim"
+              ? "Lower effort usually reduces inline-completion latency. Supported values depend on the selected model."
+              : "Lower effort usually reduces response latency. Supported values depend on the selected model."
+          )}
+        </>
+      )}
+
+      {draft.type === "fim" && !isChatGPTPlan && (
         <>
           {field(
             "fimTemplate",
@@ -518,7 +693,11 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
       <div className={styles.formActions}>
         <VSCodeButton
           appearance="secondary"
-          disabled={testing}
+          disabled={
+            testing ||
+            (isChatGPTPlan && !planStatus?.sharing) ||
+            planModelUnavailable
+          }
           onClick={handleTest}
         >
           <i className={`codicon codicon-${testing ? "loading" : "debug-start"}`} />
@@ -531,7 +710,12 @@ export const ProviderForm = ({ initial, onClose, onSaved }: ProviderFormProps) =
         <VSCodeButton
           appearance="primary"
           type="submit"
-          disabled={saving || (submitted && !validation.valid)}
+          disabled={
+            saving ||
+            (submitted && !validation.valid) ||
+            (isChatGPTPlan && !planStatus?.sharing) ||
+            planModelUnavailable
+          }
         >
           {t("save")}
         </VSCodeButton>

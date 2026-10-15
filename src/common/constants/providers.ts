@@ -15,6 +15,7 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
 export const API_PROVIDERS = {
   Anthropic: "anthropic",
   OpenAI: "openai",
+  ChatGPTPlan: "openai-chatgpt-plan",
   Mistral: "mistral",
   Groq: "groq",
   OpenRouter: "openrouter",
@@ -43,6 +44,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.Ollama]: "Ollama",
   [API_PROVIDERS.Oobabooga]: "Oobabooga",
   [API_PROVIDERS.OpenAI]: "OpenAI",
+  [API_PROVIDERS.ChatGPTPlan]: "ChatGPT Plan",
   [API_PROVIDERS.OpenAICompatible]: "OpenAI-compatible server",
   [API_PROVIDERS.OpenRouter]: "OpenRouter",
   [API_PROVIDERS.OpenWebUI]: "Open WebUI",

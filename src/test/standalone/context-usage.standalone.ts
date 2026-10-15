@@ -159,14 +159,16 @@ test("Ollama says what a loaded model holds; before it is loaded, what its Model
 
 test("llama.cpp says in its properties; a hosted API is not asked and is taken to be large", async () => {
   forgetContextWindows()
-  const server = await fakeServer({ "/props": () => ({ default_generation_settings: { n_ctx: 8192 } }) })
+  const server = await fakeServer({
+    "/props?model=m&autoload=false": () => ({ default_generation_settings: { n_ctx: 8192 } })
+  })
   try {
     const llama = provider("llamacpp", { apiHostname: "127.0.0.1", apiPort: server.port, apiProtocol: "http" })
     assert.strictEqual(await contextWindowOf(llama), 8192)
     const hosted = provider("anthropic")
     assert.strictEqual(await contextWindowOf(hosted), undefined)
     assert.strictEqual(assumedContextWindow(hosted), 128_000)
-    assert.deepStrictEqual(server.hits, ["GET /props"])
+    assert.deepStrictEqual(server.hits, ["GET /props?model=m&autoload=false"], "a router-mode server is told the model and not to load it")
   } finally {
     server.close()
   }

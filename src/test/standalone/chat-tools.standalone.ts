@@ -559,9 +559,9 @@ test("the loop reports each call before and after it runs, and can leave step li
   ])
 })
 
-test("hosted providers use native tools when fluency.js can pass them, as do the gateway and a paired device; Perplexity and QVAC use text", () => {
+test("hosted providers use native tools when supported; ChatGPT Plan, Perplexity and QVAC use text", () => {
   const modes = Object.fromEntries(
-    ["anthropic", "gemini", "mistral", "groq", "openrouter", "openai", "ollama", "lmstudio", "perplexity", "qvac", "twinny-remote", "twinny-p2p"].map((kind) => [kind, toolModeFor(kind)])
+    ["anthropic", "gemini", "mistral", "groq", "openrouter", "openai", "openai-chatgpt-plan", "ollama", "lmstudio", "perplexity", "qvac", "twinny-remote", "twinny-p2p"].map((kind) => [kind, toolModeFor(kind)])
   )
   assert.deepStrictEqual(modes, {
     anthropic: "native",
@@ -570,6 +570,7 @@ test("hosted providers use native tools when fluency.js can pass them, as do the
     groq: "native",
     openrouter: "native",
     openai: "native",
+    "openai-chatgpt-plan": "text",
     ollama: "native",
     lmstudio: "native",
     perplexity: "text",

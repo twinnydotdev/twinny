@@ -25,6 +25,7 @@ import {
   DEFAULT_RECORDING,
   DEFAULT_USAGE,
   GatewayConfigError,
+  isGatewayServableProvider,
   loadGatewayConfig,
   TEAM_PROVIDER_KIND
 } from "./config"
@@ -86,7 +87,10 @@ interface GatewayFiles {
   recordingsDir: string
 }
 
-const KNOWN_PROVIDERS = () => [...providerRegistry.providerIds(), TEAM_PROVIDER_KIND]
+const KNOWN_PROVIDERS = () => [
+  ...providerRegistry.providerIds().filter(isGatewayServableProvider),
+  TEAM_PROVIDER_KIND
+]
 
 /**
  * Where a configuration keeps its files, or the defaults when it does not

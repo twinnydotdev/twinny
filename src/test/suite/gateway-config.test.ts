@@ -4,6 +4,7 @@
  */
 import * as assert from "assert"
 
+import { API_PROVIDERS } from "../../common/constants"
 import { providerRegistry } from "../../extension/inference"
 import { ProviderRegistry } from "../../extension/inference/registry"
 import {
@@ -216,6 +217,31 @@ suite("Gateway config: team policy", () => {
     const routes = buildRouteTable(config, { providerKeys: {} }, providerRegistry)
     assert.deepStrictEqual(routes.policy(), { lockDefaults: true })
     assert.strictEqual(buildRouteTable(parseGatewayConfig(base, kinds), { providerKeys: {} }, providerRegistry).policy(), undefined)
+  })
+})
+
+suite("Gateway config: extension-only providers", () => {
+  test("refuses ChatGPT Plan because a headless gateway has no OAuth session", () => {
+    assert.throws(
+      () =>
+        parseGatewayConfig(
+          {
+            providers: {
+              plan: { provider: API_PROVIDERS.ChatGPTPlan }
+            },
+            models: [
+              {
+                alias: "chat",
+                provider: "plan",
+                model: "gpt-test",
+                capabilities: ["chat"]
+              }
+            ]
+          },
+          providerRegistry.providerIds()
+        ),
+      /not a provider kind this gateway can serve/
+    )
   })
 })
 

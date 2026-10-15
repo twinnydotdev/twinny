@@ -26,7 +26,7 @@ import {
 } from "../../common/types"
 import type { ChatEditMode } from "../edit/service"
 import { WorkspaceSearch } from "../embeddings/search"
-import { GenerationTracker } from "../generations"
+import { GenerationRun, GenerationTracker } from "../generations"
 import { isCancelled, readText, resolveInferenceProvider } from "../inference"
 import {
   assumedContextWindow,
@@ -88,7 +88,8 @@ const MAX_STEPS_SETTING = 40
  */
 export class Chat extends Base {
   private _conversation: ChatCompletionMessage[] = []
-  private _suggestion?: AbortController
+  private readonly _backgroundRuns = new Set<GenerationRun>()
+  private _suggestion?: GenerationRun
   private readonly _bridge: ExtensionBridge
   private readonly _context: ChatContextBuilder
   private readonly _generation: ChatGeneration
@@ -106,6 +107,7 @@ export class Chat extends Base {
   private _preparing = false
   /** Aborted when this chat goes: the commands it started end with it. */
   private readonly _lifetime = new AbortController()
+  private readonly _generations: GenerationTracker
 
   constructor(
     generations: GenerationTracker,
@@ -115,6 +117,7 @@ export class Chat extends Base {
     search: WorkspaceSearch | undefined
   ) {
     super(extensionContext)
+    this._generations = generations
     this._bridge = bridge
     this._search = search
     this._steps = new ToolSteps((steps) => bridge.emit(EVENT_NAME.twinnyToolSteps, steps))
@@ -140,6 +143,13 @@ export class Chat extends Base {
   public abort = () => {
     this._steps.cancelWaiting()
     this._generation.abort()
+  }
+
+  /** Stop every chat request, including background titles and draft hints. */
+  public abortAll = () => {
+    this.abort()
+    this._suggestion?.abort()
+    for (const run of [...this._backgroundRuns]) run.abort()
   }
 
   /**
@@ -219,6 +229,7 @@ export class Chat extends Base {
   }
 
   public dispose() {
+    this.abortAll()
     super.dispose()
     this._stopSubscription.dispose()
     this._steps.cancelWaiting()
@@ -329,19 +340,29 @@ export class Chat extends Base {
       logger.error("No chat provider configured.")
       return undefined
     }
+    const run = this._generations.start("completion")
+    this._backgroundRuns.add(run)
     try {
       const content = await readText(
-        resolveInferenceProvider(provider).chat({
-          model: provider.modelName,
-          messages: [{ role: USER, content: prompt }]
-        })
+        resolveInferenceProvider(provider).chat(
+          {
+            model: provider.modelName,
+            messages: [{ role: USER, content: prompt }]
+          },
+          { signal: run.signal }
+        )
       )
       return stripThinking(content) || undefined
     } catch (error) {
-      logger.error(
-        `Simple completion failed: ${describeProviderError(error, provider)}`
-      )
+      if (!isCancelled(error)) {
+        logger.error(
+          `Simple completion failed: ${describeProviderError(error, provider)}`
+        )
+      }
       return undefined
+    } finally {
+      run.finish()
+      this._backgroundRuns.delete(run)
     }
   }
 
@@ -354,8 +375,9 @@ export class Chat extends Base {
     this._suggestion?.abort()
     const provider = this.getProvider()
     if (!provider || !draft.trim()) return ""
-    const controller = new AbortController()
-    this._suggestion = controller
+    const run = this._generations.start("completion")
+    this._backgroundRuns.add(run)
+    this._suggestion = run
 
     try {
       const reply = await readText(
@@ -367,10 +389,10 @@ export class Chat extends Base {
             temperature: 0,
             think: false
           },
-          { signal: controller.signal }
+          { signal: run.signal }
         )
       )
-      if (controller.signal.aborted) return ""
+      if (run.signal.aborted) return ""
       return cleanModelSuggestion(draft, stripThinking(reply))
     } catch (error) {
       if (!isCancelled(error)) {
@@ -378,7 +400,9 @@ export class Chat extends Base {
       }
       return ""
     } finally {
-      if (this._suggestion === controller) this._suggestion = undefined
+      run.finish()
+      this._backgroundRuns.delete(run)
+      if (this._suggestion === run) this._suggestion = undefined
     }
   }
 
