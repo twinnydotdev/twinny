@@ -1,9 +1,6 @@
-name: ChatGPT Plan feature validation
+name: CI
 
 on:
-  push:
-    branches:
-      - feat/chatgpt-plan-completion
   pull_request:
     branches:
       - main
@@ -13,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
