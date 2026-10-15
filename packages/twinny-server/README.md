@@ -19,7 +19,7 @@ What you get:
 - **Operations.** A hash-chained audit log, read-only admin keys, Prometheus at `/metrics`, costs when a model has a price, a bounded queue for a busy GPU, Docker and Helm.
 
 Free for up to 5 developers (active keys), for good. Larger teams install a
-licence token, $6 a seat a month from [twinny.dev](https://twinny.dev/#pricing),
+licence token, $15 a seat a month from [twinny.dev](https://twinny.dev/#pricing),
 or a free [30-day trial](https://twinny.dev/#trial) first; see
 [Licensing and seats](https://docs.twinny.dev/teams/licensing/).
 The server never contacts Twinny. What changed in each version is in the

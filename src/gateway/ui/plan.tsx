@@ -8,8 +8,8 @@ import { fmt, plural } from "./format"
 import type { PlanSummary } from "./people"
 
 const DOCS_LICENSING = "https://docs.twinny.dev/teams/licensing/"
-/** Stripe Payment Link for the Team plan: yearly, quantity is seats. */
-const BUY_SEATS = "https://buy.stripe.com/eVq00igUndD80qW6AR7Zu00"
+/** Pricing on twinny.dev, which carries the current Stripe link, so a price change needs no release. */
+const BUY_SEATS = "https://twinny.dev/#pricing"
 
 const PLAN_LABEL: Record<PlanSummary["status"], string> = {
   free: "Free plan",

@@ -4,7 +4,7 @@ The AI coding assistant for Visual Studio Code that stays inside your network. C
 
 [Install from the Marketplace](https://marketplace.visualstudio.com/items?itemName=rjmacarthy.twinny) · [Documentation](https://docs.twinny.dev/) · [What's new](https://docs.twinny.dev/reference/whats-new/) · [Changelog](CHANGELOG.md) · [Teams](https://docs.twinny.dev/teams/overview/) · [中文](README.zh-CN.md) · [Português (BR)](README.pt-BR.md)
 
-**For teams:** one gateway on your network serves every developer's VS Code, with a key per person, usage, policy and an admin page. `npx twinny-server quickstart` sets it up. Free for five developers, $6 a seat a month after that, and a [30-day trial](https://twinny.dev/#trial) with no card. Details, prices and a live admin page at [twinny.dev](https://twinny.dev/#teams).
+**For teams:** one gateway on your network serves every developer's VS Code, with a key per person, usage, policy and an admin page. `npx twinny-server quickstart` sets it up. Free for five developers, $15 a seat a month after that, and a [30-day trial](https://twinny.dev/#trial) with no card. Details, prices and a live admin page at [twinny.dev](https://twinny.dev/#teams).
 
 ## Getting started
 

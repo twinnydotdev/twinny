@@ -2,6 +2,10 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.13 · 2026-10-15
+
+`twinny-server` release: the admin page's **Buy seats** link goes to [twinny.dev's pricing](https://twinny.dev/#pricing) instead of a Stripe link built into the gateway, so a change of price or checkout needs no new release. Team seats are now $15 a seat a month, billed yearly.
+
 ## 4.3.12 · 2026-10-15
 
 Extension release: a **ChatGPT Plan** provider, contributed by [@CoderLambert](https://github.com/CoderLambert) ([#540](https://github.com/twinnydotdev/twinny/pull/540)). `twinny-server` refuses the new provider kind, which needs the editor, and masks more secrets in its logs.
