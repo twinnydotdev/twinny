@@ -141,7 +141,7 @@ export const PRESETS: ProviderPreset[] = [
     API_PROVIDERS.DemonRoute,
     "DemonRoute",
     codicon("plug"),
-    "TobiasLogic/Qwen2.5-Coder-32B-abliterated",
+    "shoukewei/Qwen3.8-27B-OBLITERATED22-AGENT",
     "chat"
   ),
   hosted(API_PROVIDERS.Cohere, "Cohere", <SvgCohere />, "command-r-plus"),
