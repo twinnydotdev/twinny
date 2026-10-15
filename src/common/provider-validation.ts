@@ -155,6 +155,9 @@ const ENDPOINT_DEFAULTS: Record<
     chat: { apiHostname: "api.deepseek.com", apiProtocol: "https", apiPath: "/v1" },
     fim: { apiHostname: "api.deepseek.com", apiProtocol: "https", apiPath: "/beta/completions" }
   },
+  [API_PROVIDERS.DemonRoute]: {
+    chat: { apiHostname: "api.demonroute.com", apiProtocol: "https", apiPath: "/v1" }
+  },
   [API_PROVIDERS.OpenRouter]: {
     fim: { apiHostname: "openrouter.ai", apiProtocol: "https", apiPath: "/api/v1/completions" }
   },

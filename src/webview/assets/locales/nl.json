@@ -67,6 +67,7 @@
   "placeholder": "Hoe kan twinny je vandaag helpen?",
   "port": "Poort",
   "port-placeholder": "Voer een poortnummer in bijv. '11434'",
+  "preset-demonroute": "Open-weight chat models on one key. Needs an API key from demonroute.com.",
   "protocol": "Protocol",
   "provider": "Provider",
   "provider-name": "Provider naam",

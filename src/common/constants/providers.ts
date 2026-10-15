@@ -1,6 +1,7 @@
 export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   LiteLLM: "litellm",
   Deepseek: "deepseek",
+  DemonRoute: "demonroute",
   LMStudio: "lmstudio",
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
@@ -35,6 +36,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.Anthropic]: "Anthropic",
   [API_PROVIDERS.Cohere]: "Cohere",
   [API_PROVIDERS.Deepseek]: "DeepSeek",
+  [API_PROVIDERS.DemonRoute]: "DemonRoute",
   [API_PROVIDERS.Gemini]: "Gemini",
   [API_PROVIDERS.Groq]: "Groq",
   [API_PROVIDERS.LiteLLM]: "LiteLLM",

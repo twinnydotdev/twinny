@@ -137,6 +137,13 @@ export const PRESETS: ProviderPreset[] = [
   hosted(API_PROVIDERS.Groq, "Groq", <SvgGroq />, "llama-3.3-70b-versatile"),
   hosted(API_PROVIDERS.Mistral, "Mistral", <SvgMistral />, "mistral-small-latest"),
   hosted(API_PROVIDERS.OpenRouter, "OpenRouter", <SvgOpenRouter />, "openai/gpt-4.1"),
+  hosted(
+    API_PROVIDERS.DemonRoute,
+    "DemonRoute",
+    codicon("plug"),
+    "TobiasLogic/Qwen2.5-Coder-32B-abliterated",
+    "chat"
+  ),
   hosted(API_PROVIDERS.Cohere, "Cohere", <SvgCohere />, "command-r-plus"),
   hosted(
     API_PROVIDERS.Perplexity,
