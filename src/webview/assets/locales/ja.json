@@ -67,7 +67,7 @@
   "placeholder": "Twinnyは今日どのようにお手伝いしましょうか？",
   "port": "ポート",
   "port-placeholder": "ポート番号を入力してください。例: '11434'",
-  "preset-demonroute": "Open-weight chat models on one key. Needs an API key from demonroute.com.",
+  "preset-demonroute": "オープンウェイトのチャットモデルを1つのキーで利用できます。demonroute.com のAPIキーが必要です。",
   "protocol": "プロトコル",
   "provider": "インターフェースプロバイダー",
   "provider-name": "インターフェースプロバイダー名",

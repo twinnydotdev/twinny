@@ -67,7 +67,7 @@
   "placeholder": "오늘 twinny가 어떻게 도와드릴까요?",
   "port": "포트",
   "port-placeholder": "포트 번호를 입력하세요 예: '11434'",
-  "preset-demonroute": "Open-weight chat models on one key. Needs an API key from demonroute.com.",
+  "preset-demonroute": "하나의 키로 오픈 웨이트 채팅 모델을 사용할 수 있습니다. demonroute.com의 API 키가 필요합니다.",
   "protocol": "프로토콜",
   "provider": "제공자",
   "provider-name": "제공자 이름",

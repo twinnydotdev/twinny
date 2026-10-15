@@ -67,7 +67,7 @@
   "placeholder": "Come può aiutarti twinny oggi?",
   "port": "Porta",
   "port-placeholder": "Inserisci un numero di porta es. '11434'",
-  "preset-demonroute": "Open-weight chat models on one key. Needs an API key from demonroute.com.",
+  "preset-demonroute": "Modelli di chat a pesi aperti con un'unica chiave. Richiede una chiave API di demonroute.com.",
   "protocol": "Protocollo",
   "provider": "Provider",
   "provider-name": "Nome provider",

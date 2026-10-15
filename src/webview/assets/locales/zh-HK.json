@@ -67,7 +67,7 @@
   "placeholder": "Twinny今天能怎麼幫助您？",
   "port": "端口",
   "port-placeholder": "輸入端口号，例如 '11434'",
-  "preset-demonroute": "Open-weight chat models on one key. Needs an API key from demonroute.com.",
+  "preset-demonroute": "一個密鑰即可使用開放權重的聊天模型。需要 demonroute.com 的API密鑰。",
   "protocol": "協議",
   "provider": "接口提供者",
   "provider-name": "接口提供者名稱",
