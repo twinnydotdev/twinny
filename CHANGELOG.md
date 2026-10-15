@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.12 · 2026-10-15
+
+Extension release: a **ChatGPT Plan** provider, contributed by [@CoderLambert](https://github.com/CoderLambert) ([#540](https://github.com/twinnydotdev/twinny/pull/540)). `twinny-server` refuses the new provider kind, which needs the editor, and masks more secrets in its logs.
+
+- **ChatGPT Plan provider.** Completions and chat on the models your ChatGPT account can use, without an API key. Pick **ChatGPT Plan** in the provider presets, **Sign in** opens ChatGPT's sign-in in the browser, and the model list fills from your account. The sign-in is kept in VS Code's secret storage and survives restarts; **Sign out** ends it and stops any request in flight. A **Reasoning effort** setting (model default, none to maximum) trades answer quality for speed; lower is better for completions. Requests go to OpenAI's public Responses API with `store: false`. Embeddings are not offered. Expect hosted latency for completions (about 2–4 seconds), not a local model's.
+- **Fixed: a credential the secret shield put back into a reply could be written to the log.** Log lines now go through the shield's secret detection too, in the extension's output channel and `twinny-server`'s stderr.
+
 ## 4.3.11 · 2026-10-15
 
 Extension and `twinny-server` release: completions work against `llama-server` in router mode.
