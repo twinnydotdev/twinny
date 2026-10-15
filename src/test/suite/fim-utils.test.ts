@@ -136,6 +136,20 @@ suite("FIM utilities", () => {
       })
     })
 
+    test("names the model for llama.cpp, whose router mode refuses a request without one", () => {
+      const body = createStreamRequestBodyFim(API_PROVIDERS.LlamaCpp, "p", options)
+      assert.deepStrictEqual(body, {
+        model: "m",
+        prompt: "p",
+        stream: true,
+        temperature: 0.1,
+        max_tokens: 128,
+        stop: options.stop
+      })
+      const unnamed = createStreamRequestBodyFim(API_PROVIDERS.LlamaCpp, "p", { ...options, model: "" })
+      assert.strictEqual("model" in unnamed, false)
+    })
+
     test("caps stop sequences for hosted OpenAI-style APIs", () => {
       const body = createStreamRequestBodyFim(API_PROVIDERS.OpenRouter, "p", options)
       assert.deepStrictEqual(body.stop, ["<a>", "<b>", "<c>", "<d>"])

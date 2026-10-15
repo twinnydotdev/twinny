@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.11 · 2026-10-15
+
+Extension and `twinny-server` release: completions work against `llama-server` in router mode.
+
+- **Fixed: completions failed against `llama-server` in router mode** with `400 model name is missing from the request` ([#544](https://github.com/twinnydotdev/twinny/issues/544)). A llama.cpp completion request (and the warm-up before it) now names the provider's model, which the router uses to pick the model. A single-model server ignores it, and a provider with no model name set sends none, as before.
+- **The chat's context size is read from a router-mode `llama-server` too**, by naming the model when asking for its properties. Asking does not load the model.
+
 ## 4.3.10 · 2026-10-15
 
 Extension release: `@` mentions in the chat composer list matches as you type, and `@symbol` mentions attach the symbol. `twinny-server` carries the version number only.

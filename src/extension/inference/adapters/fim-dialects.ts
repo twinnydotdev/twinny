@@ -159,6 +159,16 @@ export function createStreamRequestBodyFim(
         stop: stop?.slice(0, MAX_HOSTED_STOP_SEQUENCES)
       }
     case API_PROVIDERS.LlamaCpp:
+      // llama-server in router mode picks the model by this field and
+      // refuses a request without it; a single-model server ignores it.
+      return {
+        ...(options.model ? { model: options.model } : {}),
+        prompt,
+        stream: true,
+        temperature: options.temperature,
+        max_tokens: maxTokens,
+        stop
+      }
     case API_PROVIDERS.Oobabooga:
       return {
         prompt,

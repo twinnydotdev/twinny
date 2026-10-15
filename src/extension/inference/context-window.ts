@@ -93,8 +93,15 @@ const fromOllama = async (provider: TwinnyProvider): Promise<number | undefined>
   return set ? positive(Number(set[1])) : undefined
 }
 
+/**
+ * llama.cpp: the loaded context. A router-mode server needs the model named
+ * and would load it to answer; asking must not load anything.
+ */
 const fromLlamaCpp = async (provider: TwinnyProvider): Promise<number | undefined> => {
-  const props = (await ask(provider, `${originOf(provider)}/props`)) as
+  const query = provider.modelName
+    ? `?model=${encodeURIComponent(provider.modelName)}&autoload=false`
+    : ""
+  const props = (await ask(provider, `${originOf(provider)}/props${query}`)) as
     | { default_generation_settings?: { n_ctx?: unknown } }
     | undefined
   return positive(props?.default_generation_settings?.n_ctx)
