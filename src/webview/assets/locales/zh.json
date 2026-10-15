@@ -67,6 +67,7 @@
   "placeholder": "Twinny有什么能怎么帮助您的吗？",
   "port": "端口",
   "port-placeholder": "输入端口号，例如 '11434'",
+  "preset-demonroute": "一个密钥即可使用开放权重的聊天模型。需要 demonroute.com 的API密钥。",
   "protocol": "协议",
   "provider": "接口提供者",
   "provider-name": "接口提供者名称",

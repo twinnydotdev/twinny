@@ -2,6 +2,10 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.14 · 2026-10-15
+
+Extension release: a **DemonRoute** preset among the hosted chat providers, contributed by [@haterfactory](https://github.com/haterfactory) ([#545](https://github.com/twinnydotdev/twinny/pull/545)). It fills in `api.demonroute.com` over https with `/v1` and `shoukewei/Qwen3.8-27B-OBLITERATED22-AGENT` as the model; any model on your key can be picked instead. Chat only, no autocomplete or embeddings. Its description is translated into every language the sidebar ships.
+
 ## 4.3.13 · 2026-10-15
 
 `twinny-server` release: the admin page's **Buy seats** link goes to [twinny.dev's pricing](https://twinny.dev/#pricing) instead of a Stripe link built into the gateway, so a change of price or checkout needs no new release. Team seats are now $15 a seat a month, billed yearly.
