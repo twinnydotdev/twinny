@@ -6,6 +6,7 @@ import * as vscode from "vscode"
 import { EVENT_NAME } from "../../common/constants"
 import { FileLocation } from "../../common/messaging/protocol"
 import { workspacePathCandidates } from "../chat/context-files"
+import { decodeSymbolRef } from "../chat/symbol-ref"
 import { ExtensionBridge } from "../messaging/bridge"
 
 export class FileHandler {
@@ -79,8 +80,12 @@ export class FileHandler {
    * there are any (a chunk the workspace search used, a pinned selection).
    */
   public async handleOpenFile(target: string | FileLocation) {
-    const location: FileLocation =
-      typeof target === "string" ? { path: target } : target
+    const symbol = typeof target === "string" ? decodeSymbolRef(target) : undefined
+    const location: FileLocation = symbol
+      ? { path: symbol.path, startLine: symbol.line }
+      : typeof target === "string"
+        ? { path: target }
+        : target
     const filePath = location.path
     if (filePath && vscode.workspace.workspaceFolders) {
       const candidates = workspacePathCandidates(

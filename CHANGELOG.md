@@ -2,6 +2,18 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.10 · 2026-10-15
+
+Extension release: `@` mentions in the chat composer list matches as you type, and `@symbol` mentions attach the symbol. `twinny-server` carries the version number only.
+
+- **Matches as you type after `@`.** Typing after `@` (`@useSugg`) lists every match straight away, files, symbols and `@workspace`/`@problems`/`@git`/`@terminal` together, each with its category's icon. A bare `@` still opens the category menu.
+- **Fixed: an `@symbol` mention attached nothing.** Picking a symbol kept its display text (`function · src/app.ts:12`) instead of the symbol it names, so the symbol's code never reached the model. It now carries the file, line and name.
+- **Fixed: clicking an `@symbol` mention in a sent message did nothing.** It now opens the file at the symbol's line.
+
+## 4.3.9 · 2026-10-14
+
+Version number only; no changes from 4.3.8.
+
 ## 4.3.8 · 2026-10-14
 
 Extension and `twinny-server` release: agent mode's changes can be undone from the reply, it follows the project's `AGENTS.md`, it sees the errors its edits cause, and a team's admin can set what it may do. Also a round of fixes from an audit of agent mode, two of them security fixes to the `git` tool.

@@ -37,6 +37,7 @@ const getCategoryIcon = (category: CategoryType): string => {
 
 export interface MentionListProps {
   items: ContextItem[]
+  query: string
   command: (attrs: MentionNodeAttrs) => void
   editor: Editor
   range: Range
@@ -73,8 +74,14 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       return props.items.filter((item) => item.category === selectedCategory)
     }, [props.items, selectedCategory])
 
+    // A typed query lists every match straight away; the category menu is
+    // only for a bare `@`.
+    const isFlat = !selectedCategory && Boolean(props.query)
+    const visibleItems = isFlat ? props.items : categoryItems
+    const showsItems = isFlat || Boolean(selectedCategory)
+
     const selectItem = (index: number) => {
-      if (!selectedCategory) {
+      if (!showsItems) {
         const category = categories[index]
         const isTopLevel = topLevelItems.some(
           (item) => item.category === category
@@ -89,10 +96,11 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
           setSelectedIndex(0)
         }
       } else {
-        const item = categoryItems[index]
+        // Symbols keep their `symbol:` ref in `id`; `path` is display text.
+        const item = visibleItems[index]
         if (item) {
           props.command({
-            id: item.path,
+            id: item.id,
             label: item.name
           })
         }
@@ -100,12 +108,12 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
     }
 
     const upHandler = () => {
-      const items = selectedCategory ? categoryItems : categories
+      const items = showsItems ? visibleItems : categories
       setSelectedIndex((selectedIndex + items.length - 1) % items.length)
     }
 
     const downHandler = () => {
-      const items = selectedCategory ? categoryItems : categories
+      const items = showsItems ? visibleItems : categories
       setSelectedIndex((selectedIndex + 1) % items.length)
     }
 
@@ -156,22 +164,15 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       }
     }))
 
-    if (props.items.every((item) => item.category === "files")) {
-      if (!selectedCategory) {
-        setSelectedCategory("files")
-        setSelectedIndex(0)
-      }
-    }
-
     if (!categories.length) {
       return <div className="item">{t("no-result")}</div>
     }
 
     return (
       <div className={styles.dropdownMenu}>
-        {selectedCategory ? (
+        {showsItems ? (
           <>
-            {categoryItems.map((item, index) => (
+            {visibleItems.map((item, index) => (
               <button
                 className={cx(styles.dropdownItem, {
                   [styles.dropdownSelected]: index === selectedIndex
@@ -179,9 +180,14 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
                 key={index}
                 onClick={() => selectItem(index)}
               >
+                {isFlat && (
+                  <i
+                    className={`codicon codicon-${getCategoryIcon(item.category)}`}
+                  />
+                )}
                 <span className={styles.itemPath}>
                   <span className={styles.itemName}>{item.name}</span>
-                  {item.path !== item.name && (
+                  {item.path && item.path !== item.name && (
                     <span className={styles.itemFullPath}>{item.path}</span>
                   )}
                 </span>
