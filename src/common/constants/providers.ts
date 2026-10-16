@@ -52,8 +52,8 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.OpenWebUI]: "Open WebUI",
   [API_PROVIDERS.Perplexity]: "Perplexity",
   [API_PROVIDERS.Qvac]: "QVAC",
-  [API_PROVIDERS.TwinnyP2P]: "Twinny device (P2P)",
-  [API_PROVIDERS.TwinnyRemote]: "Twinny gateway"
+  [API_PROVIDERS.TwinnyP2P]: "twinny device (P2P)",
+  [API_PROVIDERS.TwinnyRemote]: "twinny gateway"
 }
 
 /**

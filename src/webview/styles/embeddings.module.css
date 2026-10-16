@@ -108,7 +108,7 @@
 
 .progressFill {
   height: 100%;
-  background: var(--tw-accent);
+  background: var(--tw-mark);
   transition: width 0.2s ease;
 }
 
@@ -164,7 +164,7 @@
   justify-content: space-between;
   color: var(--tw-fg-dim);
   font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
+  letter-spacing: var(--tw-track-caps);
   text-transform: uppercase;
 }
 
@@ -205,7 +205,7 @@
 .slider {
   width: 100%;
   margin: 4px 0;
-  accent-color: var(--tw-accent);
+  accent-color: var(--tw-mark);
 }
 
 .actions {

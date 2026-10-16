@@ -5,6 +5,15 @@ export const EXTENSION_NAME = "@ext:rjmacarthy.twinny"
 export const URL_TEAMS = "https://twinny.dev/#teams"
 export const URL_TEAM_TRIAL = "https://twinny.dev/#trial"
 export const TEAM_QUICKSTART_COMMAND = "npx twinny-server quickstart"
+/**
+ * Tool steps one agent reply may take unless \`twinny.chatToolsMaxSteps\`
+ * says otherwise. A change across a few files (search, read each, edit
+ * each, check) takes 15–25; a model going round in circles is stopped
+ * after three repeats, long before this.
+ */
+export const DEFAULT_AGENT_STEPS = 30
+/** The step counts the agent settings offer. */
+export const AGENT_STEP_PRESETS = [12, 20, 30, 40]
 export const ASSISTANT = "assistant"
 export const USER = "user"
 export const TWINNY = "twinny"

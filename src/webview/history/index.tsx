@@ -99,6 +99,13 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
     const isDeleting = confirmingDelete === id
     const preview = firstUserLine(conversation)
     const count = conversation.messages?.length || 0
+    const title = titleOf(conversation)
+    // A title made from the first message says what its preview would.
+    const sameAsTitle = (a: string, b: string) => {
+      const [x, y] = [a, b].map((text) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim())
+      return !!x && !!y && (x.startsWith(y.slice(0, 24)) || y.startsWith(x.slice(0, 24)))
+    }
+    const showPreview = !!preview && !sameAsTitle(title, preview)
 
     return (
       <li
@@ -143,14 +150,14 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
             >
               <span className={styles.rowTitle}>
                 {isActive && <i className="codicon codicon-circle-filled" />}
-                {titleOf(conversation)}
+                <span className={styles.rowTitleText}>{title}</span>
               </span>
               <span className={styles.rowMeta}>
                 {t("history-messages", { count })}
                 {conversation.updatedAt
                   ? ` · ${formatRelativeTime(conversation.updatedAt)}`
                   : ""}
-                {preview ? ` · ${preview}` : ""}
+                {showPreview ? ` · ${preview}` : ""}
               </span>
             </button>
             <div className={styles.rowActions}>

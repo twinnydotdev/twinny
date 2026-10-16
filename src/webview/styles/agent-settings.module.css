@@ -7,16 +7,17 @@
   position: absolute;
   bottom: calc(100% + 6px);
   left: var(--tw-pad);
+  right: var(--tw-pad);
   z-index: 6;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: min(300px, calc(100% - 2 * var(--tw-pad)));
+  /* As wide as the input it opens from, up to a comfortable line. */
+  max-width: 420px;
   padding: 8px 10px 10px;
   background: var(--tw-bg);
   border: 1px solid var(--tw-rule);
-  font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
+  font-size: var(--tw-fs-sm);
 }
 
 .head {

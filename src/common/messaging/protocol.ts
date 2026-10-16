@@ -362,6 +362,13 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyToolApproval]: Channel<{ id: string; run: boolean; always?: boolean }>
   /** Stop the command a running tool step is waiting on, and only that. */
   [EVENT_NAME.twinnyToolStop]: Channel<{ id: string }>
+  /**
+   * A message queued while an agent reply works, offered for the model to
+   * read at its next step; without `text`, the offer is taken back. One
+   * the model reads comes back as a `said` tool step with the id
+   * `said.<id>`; one it never reached stays queued.
+   */
+  [EVENT_NAME.twinnySteer]: Channel<{ id: string; text?: string }>
   /** The agent's settings in VS Code's settings editor. */
   [EVENT_NAME.twinnyOpenAgentSettings]: Channel
   /** A file an agent reply changed, beside what it was before the reply. */

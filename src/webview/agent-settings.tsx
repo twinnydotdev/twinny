@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import cx from "classnames"
 
-import { EVENT_NAME, GLOBAL_STORAGE_KEY } from "../common/constants"
+import { AGENT_STEP_PRESETS, DEFAULT_AGENT_STEPS, EVENT_NAME, GLOBAL_STORAGE_KEY } from "../common/constants"
 import type { TeamAgentPolicy } from "../common/team"
 
 import { StorageType, useStorageContext } from "./hooks/useStorageContext"
@@ -10,8 +10,8 @@ import { bridge, emit } from "./messaging"
 
 import styles from "./styles/agent-settings.module.css"
 
-/** Steps a reply may take, offered as presets; 12 is the default. */
-export const STEP_PRESETS = [8, 12, 20, 30]
+/** Steps a reply may take, offered as presets; `DEFAULT_AGENT_STEPS` is the default. */
+export const STEP_PRESETS = AGENT_STEP_PRESETS
 
 /** The presets, with the user's own number among them when they set another in their settings. */
 const stepChoices = (current: number) =>
@@ -103,7 +103,7 @@ export const AgentSettings = ({ team, autoRun, setAutoRun, onClose }: AgentSetti
   const [edits, setEdits] = useSetting<string>("chatToolsEdits", "apply")
   const [commands, setCommands] = useSetting<string>("chatToolsCommands", "ask")
   const [runIn, setRunIn] = useSetting<string>("chatToolsCommandsRunIn", "background")
-  const [maxSteps, setMaxSteps] = useSetting<number>("chatToolsMaxSteps", 12)
+  const [maxSteps, setMaxSteps] = useSetting<number>("chatToolsMaxSteps", DEFAULT_AGENT_STEPS)
   const { context: always, setContext: setAlways } = useStorageContext<string[]>(
     StorageType.Global,
     GLOBAL_STORAGE_KEY.alwaysRunCommands

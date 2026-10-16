@@ -154,13 +154,25 @@ const CONTEXT_NEARLY_FULL = 0.8
  * context the conversation now takes. Old conversations have no meta and
  * show nothing.
  */
-const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () => void }) => {
+const ReplyFooter = ({
+  meta,
+  onContinue,
+  actions
+}: {
+  meta: ReplyMeta
+  onContinue?: () => void
+  /** The reply's copy and regenerate, at the line's end. */
+  actions?: React.ReactNode
+}) => {
   const { t } = useTranslation()
-  const parts: string[] = []
-  if (meta.durationMs !== undefined) parts.push(formatDuration(meta.durationMs))
+  const parts: { text: string; title?: string }[] = []
+  if (meta.durationMs !== undefined) parts.push({ text: formatDuration(meta.durationMs) })
   if (meta.completionTokens && meta.durationMs) {
     const perSecond = meta.completionTokens / (meta.durationMs / 1000)
-    parts.push(t("reply-tokens-per-second", { count: meta.completionTokens, rate: perSecond.toFixed(1) }))
+    parts.push({
+      text: t("reply-tokens-per-second", { count: meta.completionTokens, rate: perSecond.toFixed(1) }),
+      title: t("reply-tokens-title", { count: meta.completionTokens })
+    })
   }
   const title = [meta.provider, meta.model].filter(Boolean).join(" · ")
   const used = meta.promptTokens
@@ -174,7 +186,9 @@ const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () =>
         </span>
       )}
       {parts.map((part) => (
-        <span key={part}>{part}</span>
+        <span key={part.text} title={part.title}>
+          {part.text}
+        </span>
       ))}
       {!!used && (
         <span
@@ -191,14 +205,21 @@ const ReplyFooter = ({ meta, onContinue }: { meta: ReplyMeta; onContinue?: () =>
         </span>
       )}
       {meta.stopped && <span className={styles.replyStopped}>{t("reply-stopped")}</span>}
+      {meta.outOfSteps && !meta.stopped && <span className={styles.replyStopped}>{t("reply-out-of-steps")}</span>}
       {!!meta.withheld?.length && <WithheldBadge withheld={meta.withheld} />}
       {!!meta.instructions?.length && <InstructionsBadge files={meta.instructions} />}
       {onContinue && (
-        <button type="button" className={styles.replyContinue} onClick={onContinue} title={t("reply-continue-title")}>
+        <button
+          type="button"
+          className={styles.replyContinue}
+          onClick={onContinue}
+          title={t(meta.outOfSteps && !meta.stopped ? "reply-continue-steps-title" : "reply-continue-title")}
+        >
           <span className="codicon codicon-debug-continue" aria-hidden="true" />
           {t("reply-continue")}
         </button>
       )}
+      {actions && <span className={styles.replyActions}>{actions}</span>}
     </div>
   )
 }
@@ -579,6 +600,71 @@ export const Message: React.FC<MessageProps> = ({
   )
 
   const conversationLength = messages?.length || 0
+  // A reply with a footer keeps its actions at the end of it; anything else floats them over its corner.
+  const footerActions = message.role === ASSISTANT && !!message.meta && !editing
+
+  const options = (
+    <div className={styles.messageOptions}>
+      <VSCodeButton
+        title={t("copy-code")}
+        onClick={() => {
+          navigator.clipboard.writeText(messageContent)
+          showToast(t("copied-to-clipboard"))
+        }}
+        appearance="icon"
+      >
+        <span className="codicon codicon-copy"></span>
+      </VSCodeButton>
+      {editing && !isAssistant && (
+        <>
+          <VSCodeButton
+            title={t("cancel-edit")}
+            appearance="icon"
+            onClick={handleToggleCancel}
+          >
+            <span className="codicon codicon-close" />
+          </VSCodeButton>
+          <VSCodeButton
+            title={t("save-edit")}
+            appearance="icon"
+            onClick={handleToggleSave}
+          >
+            <span className="codicon codicon-check" />
+          </VSCodeButton>
+        </>
+      )}
+      {!editing && !isAssistant && (
+        <>
+          <VSCodeButton
+            disabled={isLoading}
+            title={t("edit-message")}
+            appearance="icon"
+            onClick={handleToggleEditing}
+          >
+            <span className="codicon codicon-edit" />
+          </VSCodeButton>
+          <VSCodeButton
+            disabled={isLoading || conversationLength <= 2}
+            title={t("delete-message")}
+            appearance="icon"
+            onClick={handleDelete}
+          >
+            <span className="codicon codicon-trash" />
+          </VSCodeButton>
+        </>
+      )}
+      {!editing && isAssistant && (
+        <VSCodeButton
+          disabled={isLoading}
+          title={t("regenerate-message")}
+          appearance="icon"
+          onClick={handleRegenerate}
+        >
+          <span className="codicon codicon-sync" />
+        </VSCodeButton>
+      )}
+    </div>
+  )
 
   useEffect(() => {
     if (editor) editorRef.current = editor
@@ -591,7 +677,7 @@ export const Message: React.FC<MessageProps> = ({
       className={
         message.role === ASSISTANT
           ? styles.message
-          : `${styles.message} ${styles.userMessage}`
+          : `${styles.message} ${styles.userMessage}${index === 0 ? ` ${styles.firstMessage}` : ""}`
       }
     >
       {Toast}
@@ -612,66 +698,7 @@ export const Message: React.FC<MessageProps> = ({
           )}
           {message.role === ASSISTANT ? TWINNY : YOU}
         </span>
-        <div className={styles.messageOptions}>
-          <VSCodeButton
-            title={t("copy-code")}
-            onClick={() => {
-              navigator.clipboard.writeText(messageContent)
-              showToast(t("copied-to-clipboard"))
-            }}
-            appearance="icon"
-          >
-            <span className="codicon codicon-copy"></span>
-          </VSCodeButton>
-          {editing && !isAssistant && (
-            <>
-              <VSCodeButton
-                title={t("cancel-edit")}
-                appearance="icon"
-                onClick={handleToggleCancel}
-              >
-                <span className="codicon codicon-close" />
-              </VSCodeButton>
-              <VSCodeButton
-                title={t("save-edit")}
-                appearance="icon"
-                onClick={handleToggleSave}
-              >
-                <span className="codicon codicon-check" />
-              </VSCodeButton>
-            </>
-          )}
-          {!editing && !isAssistant && (
-            <>
-              <VSCodeButton
-                disabled={isLoading}
-                title={t("edit-message")}
-                appearance="icon"
-                onClick={handleToggleEditing}
-              >
-                <span className="codicon codicon-edit" />
-              </VSCodeButton>
-              <VSCodeButton
-                disabled={isLoading || conversationLength <= 2}
-                title={t("delete-message")}
-                appearance="icon"
-                onClick={handleDelete}
-              >
-                <span className="codicon codicon-trash" />
-              </VSCodeButton>
-            </>
-          )}
-          {!editing && isAssistant && (
-            <VSCodeButton
-              disabled={isLoading}
-              title={t("regenerate-message")}
-              appearance="icon"
-              onClick={handleRegenerate}
-            >
-              <span className="codicon codicon-sync" />
-            </VSCodeButton>
-          )}
-        </div>
+        {!footerActions && options}
       </div>
       {message.role === ASSISTANT && (
         <>
@@ -700,7 +727,7 @@ export const Message: React.FC<MessageProps> = ({
               onError={showToast}
             />
           )}
-          {message.meta && <ReplyFooter meta={message.meta} onContinue={onContinue} />}
+          {message.meta && <ReplyFooter meta={message.meta} onContinue={onContinue} actions={footerActions ? options : undefined} />}
         </>
       ) : (
         <Collapsible>

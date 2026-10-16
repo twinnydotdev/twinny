@@ -75,7 +75,20 @@ interface QueuedMessage {
   text: string
   mentions: MentionType[]
   images: ImageAttachment[]
+  /**
+   * Offered to the agent reply that is working, for the model to read at
+   * its next step; sent as a turn of its own if the reply ends first.
+   */
+  steer?: boolean
 }
+
+/** A message's text with its line breaks, as the agent is handed it mid-reply. */
+const steeringText = (input: string) =>
+  cheerio
+    .load(input.replace(/<br\s*\/?>/g, "\n"))
+    .root()
+    .text()
+    .trim()
 
 interface ChatProps {
   fullScreen?: boolean
@@ -114,6 +127,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
   )
   const [isBottom, setIsBottom] = useState(false)
   const { agentMode, toggleAgentMode, agentModeTeamOff, teamAgentRules } = useAgentMode()
+  const agentModeRef = useRef(agentMode)
+  agentModeRef.current = agentMode
   const { autoRun, autoRunAvailable, toggleAutoRun, setAutoRun } = useAutoRun(teamAgentRules)
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false)
   const closeAgentSettings = useCallback(() => setAgentSettingsOpen(false), [])
@@ -255,6 +270,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
     queuedRef.current = next
     setQueued(next)
   }
+
+  // A queued message the model has read is in the reply now, no longer
+  // waiting. Taken as the steps arrive, ahead of the reply's end, which
+  // sends what is still queued.
+  useServerEvent(EVENT_NAME.twinnyToolSteps, (incoming) => {
+    const read = new Set((incoming ?? []).filter((step) => step.said).map((step) => step.id))
+    if (!read.size) return
+    const left = queuedRef.current.filter((message) => !read.has(`said.${message.id}`))
+    if (left.length !== queuedRef.current.length) updateQueue(left)
+  })
 
   /* Queued messages back in the composer, after anything already typed there. */
   const restoreQueue = () => {
@@ -576,7 +601,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
     rememberPrompt(html)
 
     if (generatingRef.current) {
-      updateQueue([...queuedRef.current, message])
+      // In agent mode the model can read it between steps; one that brings
+      // files or images waits for a turn of its own, where those are added.
+      const steer = agentModeRef.current && !message.mentions.length && !message.images.length
+      updateQueue([...queuedRef.current, { ...message, steer }])
+      if (steer) emit(EVENT_NAME.twinnySteer, { id: message.id, text: steeringText(input) })
       return
     }
     sendRef.current(message)
@@ -584,7 +613,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
 
   /*
    * A stopped reply is picked up by asking for the rest. The transcript
-   * shows a short "Continue"; the model is told not to start over.
+   * shows a short "Continue"; the model is told not to start over. One that
+   * ran out of tool steps goes back to the task, with what its tools did
+   * in the notes this turn carries.
    */
   const handleContinue = useCallback(() => {
     if (generatingRef.current || chatDisabled) return
@@ -593,14 +624,18 @@ export const Chat = (props: ChatProps): JSX.Element => {
     clearSearchReport()
     clearToolSteps()
     setMessages((prev) => {
+      const last = prev?.[prev.length - 1]
+      const outOfSteps = !!last?.meta?.outOfSteps && !last.meta.stopped
       const updatedMessages: ChatCompletionMessage[] = [
         ...(prev || []),
         {
           role: USER,
           content: t("reply-continue"),
-          prompt:
-            "Continue exactly where your last reply stopped. " +
-            "Do not repeat anything you already wrote."
+          prompt: outOfSteps
+            ? "Carry on with the task from where your last reply got to, using the tools again as you need them. " +
+              "Do not redo steps that already worked."
+            : "Continue exactly where your last reply stopped. " +
+              "Do not repeat anything you already wrote."
         }
       ]
       saveLastConversation({ ...conversation, messages: updatedMessages })
@@ -1099,6 +1134,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
             {!isBottom && messages.length > 0 && (
               <VSCodeButton
                 appearance="icon"
+                className={styles.scrollDown}
                 onClick={scrollToBottom}
                 title={t("scroll-to-bottom")}
               >
@@ -1125,16 +1161,22 @@ export const Chat = (props: ChatProps): JSX.Element => {
             <ol className={styles.queue} aria-label={t("queued-title")}>
               {queued.map((message) => (
                 <li key={message.id} className={styles.queued}>
-                  <span className={styles.queuedLabel}>{t("queued")}</span>
+                  <span
+                    className={styles.queuedLabel}
+                    title={message.steer ? t("queued-steer-title") : undefined}
+                  >
+                    {t(message.steer ? "queued-steer" : "queued")}
+                  </span>
                   <span className={styles.queuedText} title={message.text}>
                     {message.text}
                   </span>
                   <button
                     type="button"
                     className={styles.queuedRemove}
-                    onClick={() =>
+                    onClick={() => {
+                      if (message.steer) emit(EVENT_NAME.twinnySteer, { id: message.id })
                       updateQueue(queuedRef.current.filter((entry) => entry.id !== message.id))
-                    }
+                    }}
                     title={t("queued-remove")}
                     aria-label={t("queued-remove")}
                   >

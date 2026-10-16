@@ -167,18 +167,28 @@ const Step = ({ step }: { step: ToolStepView }) => {
   )
 }
 
+/** A message the user sent while the reply worked, where the model read it. */
+const Said = ({ step }: { step: ToolStepView }) => {
+  const { t } = useTranslation()
+  return (
+    <li className={styles.said}>
+      <span className={styles.saidWho}>{t("tool-said")}</span>
+      <span className={styles.saidText}>{step.summary}</span>
+    </li>
+  )
+}
+
 /**
  * The tools the model used for a stretch of a reply, a line each. A
  * line opens to what the tool was given and what came back; a command
- * waiting for the user shows Run and Skip in place.
+ * waiting for the user shows Run and Skip in place. What the user said
+ * along the way sits among them, where the model read it.
  */
 export const ToolSteps = ({ steps }: { steps?: ToolStepView[] }) => {
   if (!steps?.length) return null
   return (
     <ol className={styles.panel}>
-      {steps.map((step) => (
-        <Step key={step.id} step={step} />
-      ))}
+      {steps.map((step) => (step.said ? <Said key={step.id} step={step} /> : <Step key={step.id} step={step} />))}
     </ol>
   )
 }

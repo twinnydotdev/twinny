@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url"
 const require = createRequire(import.meta.url)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const { resolveInferenceProvider } = require(path.join(root, "out/extension/inference"))
-const { withTools } = require(path.join(root, "out/extension/tools/loop"))
+const { withTools, DEFAULT_MAX_STEPS } = require(path.join(root, "out/extension/tools/loop"))
 const { workspaceTools } = require(path.join(root, "out/extension/tools/workspace"))
 
 const args = process.argv.slice(2)
@@ -138,7 +138,7 @@ for (const mode of editing ? [] : modes) {
         correct: expected.test(answer),
         steps: r.steps.length,
         parseErrors: r.steps.filter((s) => s.parseError).length,
-        hitCap: r.requests > 12,
+        hitCap: r.requests > DEFAULT_MAX_STEPS,
         fellBack: r.fallbacks.length > 0,
         maxChars: r.maxChars,
         promptTokens: r.promptTokens,
@@ -313,7 +313,7 @@ if (editing) {
             steps: r.steps.length,
             parseErrors: r.steps.filter((s) => s.parseError).length,
             failedTools: r.steps.filter((s) => / failed · /.test(s.summary)).length,
-            hitCap: r.requests > 12,
+            hitCap: r.requests > DEFAULT_MAX_STEPS,
             fellBack: r.fallbacks.length > 0,
             maxChars: r.maxChars,
             promptTokens: r.promptTokens,

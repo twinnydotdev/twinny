@@ -76,11 +76,13 @@
   white-space: nowrap;
 }
 
-.summary code {
-  color: var(--tw-fg-dim);
-  font-family: var(--tw-font);
-  background: none;
+/* Quieter than inline code in the reply: a step is a line of record, not prose. */
+.step .summary code {
   padding: 0;
+  background: none !important;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-mono);
+  font-size: var(--tw-fs-xs) !important;
 }
 
 .chevron {
@@ -91,7 +93,7 @@
 
 .running .glyph,
 .waiting .glyph {
-  color: var(--tw-accent);
+  color: var(--tw-fg);
 }
 
 .failed .glyph {
@@ -121,7 +123,7 @@
   padding: 4px 8px;
   background: var(--tw-surface);
   color: var(--tw-fg-dim);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -152,11 +154,12 @@
   overflow-wrap: anywhere;
 }
 
-.args code {
-  color: var(--tw-code);
-  font-family: var(--tw-font);
-  background: none;
+.step .args code {
   padding: 0;
+  background: none !important;
+  color: var(--tw-code);
+  font-family: var(--tw-mono);
+  font-size: inherit !important;
 }
 
 .args pre,
@@ -167,7 +170,7 @@
   overflow: auto;
   background: var(--tw-surface);
   color: var(--tw-code);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
   line-height: 1.5;
   white-space: pre-wrap;
@@ -179,7 +182,7 @@
 }
 
 .command {
-  border-left: 2px solid var(--tw-accent);
+  border-left: 2px solid var(--tw-mark);
 }
 
 /* Highlighted code: the highlighter sets colours, the step sets size. */
@@ -201,7 +204,7 @@
   border: 0;
   background: none;
   color: var(--tw-link);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
   letter-spacing: normal;
   text-align: left;
@@ -274,7 +277,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--tw-code);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   background: none;
   padding: 0;
 }
@@ -286,7 +289,7 @@
   max-height: 280px;
   overflow: auto;
   background: var(--tw-surface);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
   line-height: 1.5;
 }
@@ -309,7 +312,7 @@
 }
 
 .diff-hunk {
-  color: var(--tw-accent);
+  color: var(--tw-mark);
 }
 
 .diff-meta {
@@ -338,12 +341,12 @@
 }
 
 .run {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--tw-primary-bg);
+  color: var(--tw-primary-fg);
 }
 
 .run:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--tw-primary-hover);
 }
 
 .skip {
@@ -399,4 +402,29 @@
   color: var(--tw-fg-faint);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
+}
+
+/* The user's own words, sent mid-reply: set apart from the tools by weight, not colour. */
+.said {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0;
+  padding: 0;
+  font-size: var(--tw-fs-sm);
+  line-height: 18px;
+}
+
+.saidWho {
+  flex-shrink: 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+}
+
+.saidText {
+  min-width: 0;
+  color: var(--tw-fg-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

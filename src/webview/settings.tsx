@@ -96,7 +96,7 @@ export const Settings = () => {
       </div>
 
       <div className={styles.resetButton}>
-        <VSCodeButton onClick={handleClearSelection}>
+        <VSCodeButton appearance="secondary" onClick={handleClearSelection}>
           {t("clear")}
         </VSCodeButton>
       </div>

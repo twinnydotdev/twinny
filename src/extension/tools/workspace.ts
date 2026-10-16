@@ -132,6 +132,7 @@ const definitionPattern = (name: string) => {
 
 const listDir = (view: WorkspaceView): Tool => ({
   name: "list_dir",
+  readOnly: true,
   description: "The files and folders in a directory.",
   parameters: [{ name: "path", description: "The directory; the workspace root by default.", optional: true }],
   async run({ path: dir }) {
@@ -151,6 +152,7 @@ const listDir = (view: WorkspaceView): Tool => ({
 
 const readFile = (view: WorkspaceView): Tool => ({
   name: "read_file",
+  readOnly: true,
   description: `A file's lines, numbered; at most ${MAX_READ_LINES} at a time, so ask for a range in long files.`,
   parameters: [
     { name: "path", description: "The file." },
@@ -187,6 +189,7 @@ const readFile = (view: WorkspaceView): Tool => ({
 
 const grep = (view: WorkspaceView): Tool => ({
   name: "grep",
+  readOnly: true,
   description:
     "Lines matching a regular expression, across the workspace or under one directory, grouped by file (`12:` is a match, `12-` a line beside one). An all-lowercase pattern ignores case.",
   parameters: [
@@ -312,6 +315,7 @@ const grep = (view: WorkspaceView): Tool => ({
 
 const findSymbol = (view: WorkspaceView): Tool => ({
   name: "find_symbol",
+  readOnly: true,
   description: "Where a function, class, method, type or variable is defined.",
   parameters: [{ name: "name", description: "The symbol's name, exactly as written in code." }],
   async run({ name }, context) {
@@ -404,7 +408,7 @@ const editFile = (view: WorkspaceView, sink: EditSink): Tool => ({
     const text = await view.text(absolute)
     if (text === undefined) throw new ToolInputError(`${rel} is binary or too large to edit.`)
     const plan = planReplacement(text, find, replace)
-    if (typeof plan === "string") throw new ToolInputError(`${rel}: ${plan}.`)
+    if (typeof plan === "string") throw new ToolInputError(`${rel}: ${plan}${/[.\n]$/.test(plan) ? "" : "."}`)
     const lines =
       plan.startLine === plan.endLine ? `${plan.startLine + 1}` : `${plan.startLine + 1}–${plan.endLine + 1}`
     const outcome = await sink.edit(absolute, plan)
@@ -517,6 +521,7 @@ const runCommand = (sink: CommandSink): Tool => ({
 
 const searchCode = (view: WorkspaceView, index: CodeSearch): Tool => ({
   name: "search_code",
+  readOnly: true,
   description:
     "Find code by what it does, described in plain words (\"where retries are scheduled\", \"how the token is refreshed\"). Searches the workspace's embeddings index; use grep instead for an exact name.",
   guidance:
@@ -643,10 +648,13 @@ export const workspaceTools = (
         return withFolderInstructions(call, await tool.run(call.args, context))
       } catch (error) {
         // Whatever goes wrong inside a tool is the model's to read and work
-        // around; it never ends the reply.
-        const message = (error instanceof Error ? error.message : String(error)).split("\n")[0]
+        // around; it never ends the reply. A refusal of the model's input is
+        // given whole (it may show the lines to use instead); anything else,
+        // and the step's summary, keeps to the first line.
+        const full = error instanceof Error ? error.message : String(error)
+        const message = full.split("\n")[0]
         return error instanceof ToolInputError
-          ? { output: message, summary: `${call.name} failed · ${message}`, failed: true }
+          ? { output: full, summary: `${call.name} failed · ${message}`, failed: true }
           : { output: `${call.name} could not run: ${message}`, summary: `${call.name} failed · ${message}`, failed: true }
       }
     }

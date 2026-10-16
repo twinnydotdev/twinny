@@ -126,6 +126,11 @@ export interface ToolStepView {
   noAlways?: boolean
   /** A waiting call to an MCP server's tool (`server/tool`): Always run keeps the tool, not the call. */
   mcpTool?: string
+  /**
+   * Not a tool: a message the user sent while the reply worked, which the
+   * model read at this point; `summary` is what they wrote.
+   */
+  said?: boolean
 }
 
 /** What twinny knows about how one reply was produced. */
@@ -145,6 +150,8 @@ export interface ReplyMeta {
   contextWindow?: number
   /** The user stopped it before the model finished. */
   stopped?: boolean
+  /** Agent mode used every tool step the reply had, so the work may be unfinished. */
+  outOfSteps?: boolean
   /**
    * Credentials the secret shield replaced with placeholders before the
    * request left the machine: kinds and counts, never the values.

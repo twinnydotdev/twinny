@@ -52,8 +52,9 @@ const MessageItem = memo(
     const isAgentMessage = message?.role === "assistant"
     const isLastMessage = index === messages?.length - 1
     const messageKey = `${message?.role}-0`
+    // A reply the user stopped, or one that used every tool step it had.
     const canContinue =
-      isAgentMessage && isLastMessage && !isLoading && !!message.meta?.stopped
+      isAgentMessage && isLastMessage && !isLoading && !!(message.meta?.stopped || message.meta?.outOfSteps)
 
     return (
       <>

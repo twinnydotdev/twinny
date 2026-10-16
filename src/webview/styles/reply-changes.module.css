@@ -53,7 +53,7 @@
 .counts {
   display: inline-flex;
   gap: 6px;
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -90,7 +90,7 @@
   border: 0;
   background: none;
   color: var(--tw-fg-dim);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: inherit;
   text-align: left;
   text-overflow: ellipsis;

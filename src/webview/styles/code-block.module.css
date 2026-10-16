@@ -10,9 +10,9 @@ pre {
   border: 1px solid var(--tw-rule);
   background: var(--tw-surface) !important;
   overflow-x: auto;
-  font-family: var(--tw-font) !important;
-  font-size: var(--tw-fs-sm) !important;
-  line-height: 1.55 !important;
+  font-family: var(--tw-mono) !important;
+  font-size: var(--tw-fs-mono) !important;
+  line-height: 1.5 !important;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -20,8 +20,8 @@ pre {
 pre code,
 pre code span,
 pre code * {
-  font-family: var(--tw-font) !important;
-  font-size: var(--tw-fs-sm) !important;
+  font-family: var(--tw-mono) !important;
+  font-size: var(--tw-fs-mono) !important;
   background: transparent !important;
   white-space: pre-wrap !important;
   word-break: break-word !important;
@@ -35,9 +35,10 @@ pre code * {
   container-type: inline-size;
 }
 
+/* The light highlighter style draws its own frame inline; the block's frame is the only one. */
 .codeBlock pre {
   margin: 0 !important;
-  border: none;
+  border: none !important;
 }
 
 /*
@@ -54,12 +55,11 @@ pre code * {
   gap: 8px;
   min-height: 24px;
   padding: 0 4px 0 10px;
-  border-bottom: 1px solid var(--tw-rule);
+  border-bottom: 1px solid var(--tw-rule-soft);
   background: var(--tw-bg);
   color: var(--tw-fg-faint);
   font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
 }
 
 .codeLang {
@@ -67,7 +67,7 @@ pre code * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-transform: lowercase;
+  font-family: var(--tw-mono);
   user-select: none;
 }
 
@@ -98,8 +98,6 @@ pre code * {
   color: var(--tw-fg-dim);
   font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
-  text-transform: lowercase;
   white-space: nowrap;
   cursor: pointer;
   outline: none;
@@ -113,8 +111,8 @@ pre code * {
   color: var(--tw-fg);
 }
 
-/* Words go first when the block is too narrow to carry them. */
-@container (max-width: 260px) {
+/* Words go first when the block is too narrow to carry them all. */
+@container (max-width: 340px) {
   .actionLabel {
     display: none;
   }

@@ -16,7 +16,7 @@
  * Wrap the client `resolveInferenceProvider` returns, so tool results go
  * through the secret shield like the rest of the conversation.
  */
-import { API_PROVIDERS, ASSISTANT, OPEN_AI_COMPATIBLE_PROVIDERS, SYSTEM, USER } from "../../common/constants"
+import { API_PROVIDERS, ASSISTANT, DEFAULT_AGENT_STEPS, OPEN_AI_COMPATIBLE_PROVIDERS, SYSTEM, USER } from "../../common/constants"
 import { HOSTED_PROVIDERS } from "../../common/provider-validation"
 import {
   ChatChunk,
@@ -39,6 +39,7 @@ import {
   findToolCall,
   FoundCall,
   nameArguments,
+  parseLenientJson,
   ToolCall,
   toolDefinition,
   toolInstructions,
@@ -46,11 +47,14 @@ import {
 } from "./protocol"
 import { ToolResult, WorkspaceTools } from "./workspace"
 
-export const DEFAULT_MAX_STEPS = 12
+export const DEFAULT_MAX_STEPS = DEFAULT_AGENT_STEPS
 /** Calls run from one native reply; a model that fans out wider is told which were left. */
 const MAX_CALLS_PER_REPLY = 8
 /** A result keeps at least this much of its output, whatever comes ahead of it. */
 const MIN_RESULT_CHARS = 1000
+/** Calls repeated in one reply, or requests in a row of calls that cannot be read, before the model is asked to answer. */
+const MAX_REPEATED_CALLS = 3
+const MAX_UNREADABLE_IN_A_ROW = 3
 
 export type ToolMode = "native" | "text"
 
@@ -148,6 +152,15 @@ export interface ToolLoopOptions {
   /** Called when old results were trimmed so the next request fits. */
   onTrim?(results: number, estimatedTokens: number): void
   /**
+   * Asked before each request after the first: messages the user sent
+   * while the reply was working, handed over (and so taken) for the
+   * model to read before its next step. A message never asked for, because
+   * the model answered first, stays the host's to send as a turn of its own.
+   */
+  steering?(): string[]
+  /** Called when the reply ended because it used every tool step it had, with the work maybe unfinished. */
+  onOutOfSteps?(): void
+  /**
    * Called when the reply ends, however it ends, with the calls made and
    * what they returned, cut to size: kept with the reply so the next turn
    * still has them. Undefined when no tool ran.
@@ -205,6 +218,14 @@ const withClosingPrompt = (messages: ChatMessage[]): ChatMessage[] => {
 
 const stepLine = (summary: string) => `> ${summary}\n\n`
 
+/** How messages the user sent mid-reply reach the model, in its next request. */
+export const steeringMessage = (said: string[]) =>
+  [
+    `While you were working, the user wrote${said.length > 1 ? " these messages" : ""}:`,
+    ...said.map((text) => `\n${text}`),
+    "\nTake that into account and carry on."
+  ].join("\n")
+
 /**
  * A reply with its tool calls taken out, for the last request, whose
  * calls are never run: the text before the first call, and each piece
@@ -239,22 +260,56 @@ const refusesReasoningEffort = (error: unknown) =>
 const cancelled = (reason?: unknown) =>
   new InferenceError("cancelled", "The request was cancelled.", { cause: reason })
 
-/** Native arguments as the tools take them, or why they could not be read. */
-const parseArguments = (call: ChatToolCall): ToolCall | string => {
+/**
+ * Native arguments as the tools take them, or why they could not be read.
+ * A server that passes the model's JSON on as it was written (llama.cpp,
+ * vLLM) passes on its slips too, and they are mended the same way as in
+ * a text call.
+ */
+const parseArguments = (call: ChatToolCall): ToolCall | { error: string; detail?: string } => {
   if (!call.arguments.trim()) return { name: call.name, args: {} }
+  const parsed = parseLenientJson(call.arguments)
+  if ("error" in parsed) return { error: "the arguments were not valid JSON", detail: parsed.error }
+  const { value } = parsed
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { error: "the arguments were not an object" }
+  return {
+    name: call.name,
+    args: Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
+    )
+  }
+}
+
+/** Characters of an unreadable call quoted back to the model, so it can see what went wrong. */
+const MAX_QUOTED_CALL = 600
+
+/**
+ * What the model is told about a call it wrote that could not be read:
+ * why, in the parser's words when it had some, what it wrote, and the
+ * form that works.
+ */
+export const unreadableCallMessage = (pending: { error?: string; detail?: string; written?: string }, native: boolean) => {
+  const why = `Your tool call could not be read: ${pending.error}${pending.detail ? ` (${pending.detail})` : ""}.`
+  const written = pending.written?.trim()
+  const quoted = written
+    ? `\nYou wrote:\n~~~\n${written.length > MAX_QUOTED_CALL ? `${written.slice(0, MAX_QUOTED_CALL)}… (${written.length - MAX_QUOTED_CALL} more characters)` : written}\n~~~`
+    : ""
+  const form = native
+    ? ""
+    : "\nWrite it exactly like this, as JSON, with line breaks inside strings written as \\n:\n```tool\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/index.ts\"}}\n```"
+  return `${why}${quoted}${form}`
+}
+
+/** Whether `text` is JSON as written, or empty (no arguments). */
+const strictJson = (text: string) => {
+  if (!text.trim()) return true
   try {
-    const parsed = JSON.parse(call.arguments)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "the arguments were not an object"
-    return {
-      name: call.name,
-      args: Object.fromEntries(
-        Object.entries(parsed as Record<string, unknown>)
-          .filter(([, v]) => v !== undefined && v !== null)
-          .map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
-      )
-    }
+    JSON.parse(text)
+    return true
   } catch {
-    return "the arguments were not valid JSON"
+    return false
   }
 }
 
@@ -313,6 +368,9 @@ interface PendingCall {
   raw?: ChatToolCall
   call?: ToolCall
   error?: string
+  /** What the parser said, and what the model wrote, when the call could not be read. */
+  detail?: string
+  written?: string
 }
 
 /** A result in the conversation, so it can be trimmed later. */
@@ -323,6 +381,8 @@ interface ResultSlot {
   trimmed: boolean
   /** A folder's instructions ahead of the output: kept when the output is trimmed. */
   preface?: string
+  /** What follows the result in its message (the user's words mid-reply, in text mode): kept when it is trimmed. */
+  after?: string
 }
 
 class ToolLoop {
@@ -332,12 +392,24 @@ class ToolLoop {
   private _results: ResultSlot[] = []
   /** Everything yielded so far, for spacing the step lines. */
   private _shown = ""
-  /** Each call and what it returned, for the next turn's notes. */
-  private _record: { name: string; args: Record<string, string>; output: string }[] = []
+  /** Each call and what it returned, and what the user said along the way, for the next turn's notes. */
+  private _record: ({ name: string; args: Record<string, string>; output: string } | { said: string })[] = []
   private _plan?: ContextPlan
   private readonly _estimator = new TokenEstimator()
   private readonly _usage: ToolLoopUsage = {}
   private _flattened = false
+  /**
+   * Read-only calls answered so far, by name and arguments, since the
+   * workspace last changed: one asked again gets a pointer to its result
+   * rather than the same output twice.
+   */
+  private readonly _answered = new Map<string, { summary: string; slot?: ResultSlot }>()
+  /** Calls not run because they repeated one already answered. */
+  private _repeats = 0
+  /** Requests in a row whose every call could not be read. */
+  private _unreadable = 0
+  /** Set when the model goes round in circles: the next request asks for its answer. */
+  private _stuck = false
 
   constructor(
     private readonly _client: InferenceClient,
@@ -377,7 +449,8 @@ class ToolLoop {
     // Set once a tool's result says to answer now (an edit waits for review).
     let settled = false
     for (let step = 0; ; step++) {
-      const last = settled || step >= maxSteps
+      if (step > 0) this.steer()
+      const last = settled || this._stuck || step >= maxSteps
       const native = this._mode === "native"
       // The last request offers nothing to call, so the model answers.
       const tools = native && !last ? definitions : undefined
@@ -454,6 +527,7 @@ class ToolLoop {
             this._flattened = true
             this._messages = flattenToolHistory(this._messages)
             this._results = []
+            this._answered.clear()
             this._mode = "text"
             step--
             continue
@@ -489,11 +563,14 @@ class ToolLoop {
           yield this.show(
             settled
               ? "The change is waiting in the editor for you to accept or reject."
-              : last
-                ? "I ran out of tool steps for this reply before I could finish. Ask me to continue and I will carry on from here."
-                : "The model finished without writing a reply; the steps above show what it did."
+              : this._stuck
+                ? "I was going round in circles with the same tool calls, so I stopped there; the steps above show what I tried."
+                : last
+                  ? "I ran out of tool steps for this reply before I could finish. Continue, and I will carry on from here."
+                  : "The model finished without writing a reply; the steps above show what it did."
           )
         }
+        if (last && !settled && !this._stuck && step >= maxSteps) this._options.onOutOfSteps?.()
         const usage = this._usage.promptTokens || this._usage.completionTokens ? { ...this._usage } : undefined
         if (usage || finishReason) {
           yield { content: "", ...(usage ? { usage } : {}), ...(finishReason ? { finishReason } : {}) }
@@ -508,21 +585,36 @@ class ToolLoop {
       const proseEnd = markup ? markup.start : written.length
       if (proseEnd > reply.shown) yield this.show(written.slice(reply.shown, proseEnd))
       const results: ToolResult[] = []
+      /** Each call's key among the answered ones, when it is a read worth keeping. */
+      const keys: (string | undefined)[] = []
       for (const [i, pending] of calls.entries()) {
         const id = `${step}.${i}`
         const name = pending.call?.name ?? pending.raw?.name ?? "unknown"
         this._options.onToolStart?.({ id, name, args: pending.call?.args ?? {} })
-        const ran: ToolResult = pending.call
-          ? await this.runCall(pending.call, outer)
-          : {
-              output:
-                `Your tool call could not be read: ${pending.error}.` +
-                (native
-                  ? ""
-                  : " Write it exactly like this, as JSON:\n```tool\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"src/index.ts\"}}\n```"),
+        const key = pending.call ? this.answerKey(pending.call) : undefined
+        // Anything that may change the workspace makes every earlier read stale.
+        if (pending.call && !key) this._answered.clear()
+        const earlier = key ? this._answered.get(key) : undefined
+        // A result trimmed out of the context is gone from the model's view, and is run again.
+        const repeated = earlier && !earlier.slot?.trimmed ? earlier : undefined
+        if (repeated) this._repeats++
+        const ran: ToolResult = !pending.call
+          ? {
+              output: unreadableCallMessage(pending, native),
               summary: `tool call not understood · ${pending.error}`,
               failed: true
             }
+          : repeated
+            ? {
+                output:
+                  `You already called ${name} with these same arguments in this reply, and nothing in the workspace has changed since, ` +
+                  "so it was not run again: its result is above. Use that, or try something different.",
+                summary: `${repeated.summary} · repeated, not run again`
+              }
+            : await this.runCall(pending.call, outer)
+        // A read that failed (a search that ran out of time, a language
+        // server still starting) is worth trying again, so it is not kept.
+        keys.push(repeated || ran.failed ? undefined : key)
         const left = (reply.toolCalls?.length ?? 0) - calls.length
         const note =
           left > 0 && i === calls.length - 1
@@ -561,9 +653,49 @@ class ToolLoop {
           yield this.show(`${gapAfter(this._shown)}${stepLine(result.summary)}`)
         }
       }
-      this.remember(calls, results, reply.text, found, step)
+      const slots = this.remember(calls, results, reply.text, found, step)
+      keys.forEach((key, i) => {
+        if (key) this._answered.set(key, { summary: results[i].summary, slot: slots[i] })
+      })
+      this._unreadable = calls.every((pending) => !pending.call) ? this._unreadable + 1 : 0
+      // A small model that keeps asking for what it has, or keeps writing
+      // calls that cannot be read, is not getting anywhere with more steps.
+      if (this._repeats >= MAX_REPEATED_CALLS || this._unreadable >= MAX_UNREADABLE_IN_A_ROW) this._stuck = true
       settled = results.some((result) => result.final)
     }
+  }
+
+  /** A read-only call by its name and arguments, so the same one asked twice is known; undefined for any other call. */
+  private answerKey(call: ToolCall): string | undefined {
+    if (!this._workspace.tools.find((tool) => tool.name === call.name)?.readOnly) return undefined
+    const args = Object.entries(call.args)
+      .map(([name, value]) => [name, value.trim()])
+      .filter(([, value]) => value)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    return JSON.stringify([call.name, args])
+  }
+
+  /**
+   * What the user sent while the reply worked, put where the model reads
+   * it next: a turn of its own after native results, the end of the user
+   * turn that carries a text-mode result. It goes in the notes too, so the
+   * next turn knows what was asked along the way.
+   */
+  private steer() {
+    const said = (this._options.steering?.() ?? []).map((text) => text.trim()).filter(Boolean)
+    if (!said.length) return
+    const message = steeringMessage(said)
+    const at = this._messages.length - 1
+    const final = this._messages[at]
+    if (this._mode === "text" && final?.role === USER && typeof final.content === "string") {
+      this._messages[at] = { ...final, content: `${final.content}\n\n${message}` }
+      // The result it follows may be trimmed later; what the user said is not.
+      const slot = this._results.find((result) => result.message === at)
+      if (slot) slot.after = `${slot.after ?? ""}\n\n${message}`
+    } else {
+      this._messages.push({ role: USER, content: message })
+    }
+    for (const text of said) this._record.push({ said: text })
   }
 
   /** A tool's result, or a cancellation the moment the user stops the reply: no tool is waited on past that. */
@@ -633,7 +765,9 @@ class ToolLoop {
   private trim(slot: ResultSlot) {
     const message = this._messages[slot.message]
     if (!message) return
-    const text = textOf(message.content)
+    const whole = textOf(message.content)
+    const after = slot.after && whole.endsWith(slot.after) ? slot.after : ""
+    const text = whole.slice(0, whole.length - after.length)
     const output = message.role === "tool" ? text : text.replace(/^<tool_result[^>]*>\n/, "").replace(/\n<\/tool_result>$/, "")
     // Instructions hold for the whole reply, so they outlast the output they came with.
     const { preface } = slot
@@ -642,7 +776,7 @@ class ToolLoop {
         ? `${preface}\n\n${trimmedResult(output.slice(preface.length).trimStart())}`
         : trimmedResult(output)
     this._messages[slot.message] = (
-      message.role === "tool" ? { ...message, content: kept } : { ...message, content: toolResultMessage(slot.name, kept) }
+      message.role === "tool" ? { ...message, content: kept } : { ...message, content: toolResultMessage(slot.name, kept) + after }
     ) as ChatMessage
     slot.trimmed = true
   }
@@ -652,8 +786,10 @@ class ToolLoop {
     if (!this._record.length) return undefined
     const budget = this._plan?.notesChars ?? 6000
     const each = Math.max(200, Math.min(1200, Math.floor(budget / this._record.length) - 100))
-    const blocks = this._record.map(
-      ({ name, args, output }) => `${name} ${clipTo(JSON.stringify(args), 240)}\n${clipTo(output, each)}`
+    const blocks = this._record.map((entry) =>
+      "said" in entry
+        ? `The user, while you worked: ${clipTo(entry.said, each)}`
+        : `${entry.name} ${clipTo(JSON.stringify(entry.args), 240)}\n${clipTo(entry.output, each)}`
     )
     // The latest calls say where the work stands; when not all fit, they stay.
     while (blocks.length > 1 && blocks.join("\n\n").length > budget) blocks.shift()
@@ -669,14 +805,18 @@ class ToolLoop {
     return (toolCalls ?? []).slice(0, MAX_CALLS_PER_REPLY).map((raw) => {
       const call = parseArguments(raw)
       // What goes back to the server must parse there too: fluency.js and
-      // Ollama both read the arguments as JSON.
-      return typeof call === "string" ? { raw: { ...raw, arguments: "{}" }, error: call } : { raw, call }
+      // Ollama both read the arguments as JSON, so mended ones go back mended.
+      if ("error" in call) {
+        return { raw: { ...raw, arguments: "{}" }, error: call.error, detail: call.detail, written: raw.arguments }
+      }
+      return { raw: strictJson(raw.arguments) ? raw : { ...raw, arguments: JSON.stringify(call.args) }, call }
     })
   }
 
   private textCall(found: FoundCall | undefined, reply: { text: string }, step: number): PendingCall[] {
     if (!found) return []
     if (found.call) found.call = nameArguments(found.call, this._workspace.tools)
+    const unread = found.call ? {} : { detail: found.detail, written: reply.text.slice(found.start, found.end) }
     if (this._mode === "native") {
       // Carried on as a native call, so the conversation stays in one form.
       reply.text = reply.text.slice(0, found.start).trimEnd()
@@ -685,11 +825,11 @@ class ToolLoop {
         name: found.call?.name ?? "unknown",
         arguments: JSON.stringify(found.call?.args ?? {})
       }
-      return [{ raw, call: found.call, error: found.error }]
+      return [{ raw, call: found.call, error: found.error, ...unread }]
     }
     // Only what the model wrote up to the end of its call goes back to it.
     reply.text = reply.text.slice(0, found.end)
-    return [{ call: found.call, error: found.error }]
+    return [{ call: found.call, error: found.error, ...unread }]
   }
 
   /** The reply that made the calls, and their results, join the conversation. */
@@ -699,7 +839,7 @@ class ToolLoop {
     text: string,
     found: FoundCall | undefined,
     step: number
-  ) {
+  ): ResultSlot[] {
     const slot = (name: string, preface?: string): ResultSlot => ({
       message: this._messages.length,
       step,
@@ -707,6 +847,7 @@ class ToolLoop {
       trimmed: false,
       ...(preface ? { preface } : {})
     })
+    const slots: ResultSlot[] = []
     if (this._mode === "native") {
       this._messages.push({
         role: ASSISTANT,
@@ -720,16 +861,19 @@ class ToolLoop {
         }))
       } as ChatMessage)
       calls.forEach(({ raw }, i) => {
-        this._results.push(slot(raw!.name, results[i].preface))
+        slots.push(slot(raw!.name, results[i].preface))
         this._messages.push({ role: "tool", tool_call_id: raw!.id, content: results[i].output } as ChatMessage)
       })
-      return
+      this._results.push(...slots)
+      return slots
     }
     const name = calls[0].call?.name ?? "error"
     // A call read before its closing marker arrived is recorded closed.
     this._messages.push({ role: ASSISTANT, content: found?.unclosed ? `${text.trimEnd()}\n${found.unclosed}` : text })
-    this._results.push(slot(name, results[0].preface))
+    slots.push(slot(name, results[0].preface))
+    this._results.push(...slots)
     this._messages.push({ role: USER, content: toolResultMessage(name, results[0].output) })
+    return slots
   }
 }
 

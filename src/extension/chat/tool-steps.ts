@@ -98,6 +98,12 @@ export class ToolSteps {
     })
   }
 
+  /** A message the user sent mid-reply, shown where the model read it. */
+  public said(id: string, text: string) {
+    this._steps = [...this._steps, { id: `said.${id}`, name: "said", summary: text, status: "done", said: true }]
+    this.send()
+  }
+
   /** How to stop the running step's command alone; its step gets a stop button. */
   public stoppable(stop: () => void) {
     const step = [...this._steps].reverse().find((s) => s.status === "running")

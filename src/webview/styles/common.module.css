@@ -62,5 +62,5 @@
 .dropdownMenu button.dropdownSelected {
   color: var(--tw-fg);
   background: var(--tw-surface);
-  box-shadow: inset 2px 0 0 var(--tw-accent);
+  box-shadow: inset 2px 0 0 var(--tw-mark);
 }

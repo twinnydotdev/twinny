@@ -50,6 +50,7 @@ export const EVENT_NAME = {
   twinnyTextSelection: "twinny-text-selection",
   twinnyToolApproval: "twinny-tool-approval",
   twinnyToolStop: "twinny-tool-stop",
+  twinnySteer: "twinny-steer",
   twinnyOpenChange: "twinny-open-change",
   twinnyUndoChanges: "twinny-undo-changes",
   twinnyOpenAgentSettings: "twinny-open-agent-settings",

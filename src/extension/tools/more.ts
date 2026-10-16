@@ -78,6 +78,7 @@ const globWords = (glob: string) =>
 
 export const findFiles = (view: WorkspaceView): Tool => ({
   name: "find_files",
+  readOnly: true,
   description:
     "Files and folders whose path matches a glob, e.g. **/*.test.ts or src/**/index.*; a pattern without / matches the name anywhere. Folders end in /.",
   parameters: [{ name: "pattern", description: "A glob." }],
@@ -225,6 +226,7 @@ export const git = (view: WorkspaceView): Tool => {
 
   return {
     name: "git",
+    readOnly: true,
     description:
       "Run a read-only git command in the workspace: status, diff, log, show, blame, branch (listing), shortlog, ls-files, rev-parse. No approval needed; nothing is changed.",
     guidance: "Use git to see what changed (git diff, git status) or the history of a file (git log -p -- path) before you edit.",
@@ -349,6 +351,7 @@ export const diagnostics = (view: WorkspaceView, editor: EditorSink): Tool => ({
 
 export const findReferences = (view: WorkspaceView, editor: EditorSink): Tool => ({
   name: "find_references",
+  readOnly: true,
   description: "Every place a function, class, variable or type is used, from the language server; exact, unlike grep.",
   parameters: SYMBOL_PARAMETERS,
   async run({ path: file, symbol, line }) {
@@ -364,6 +367,7 @@ export const findReferences = (view: WorkspaceView, editor: EditorSink): Tool =>
 
 export const goToDefinition = (view: WorkspaceView, editor: EditorSink): Tool => ({
   name: "go_to_definition",
+  readOnly: true,
   description: "Where the symbol used at a place is defined, from the language server; follows imports.",
   parameters: SYMBOL_PARAMETERS,
   async run({ path: file, symbol, line }) {

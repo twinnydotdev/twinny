@@ -104,7 +104,7 @@
 
 .crtGlyph {
   color: var(--tw-fg-faint);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: 18px;
   line-height: 1;
 }
@@ -115,10 +115,10 @@
   margin: 0;
   max-width: 100%;
   color: var(--tw-fg);
-  font-family: var(--tw-font);
-  font-size: var(--tw-fs);
+  /* The typing reveal steps a character at a time, which needs fixed-width letters. */
+  font-family: var(--tw-mono);
+  font-size: var(--tw-fs-mono);
   font-weight: 600;
-  letter-spacing: var(--tw-track);
   text-transform: none;
 }
 
@@ -188,7 +188,7 @@
 .crtModel {
   max-width: 100%;
   color: var(--tw-code);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
   white-space: nowrap;
@@ -227,12 +227,28 @@
  * time, so it collapses to a hairline rather than reserving a bar of space.
  */
 .chatOptions {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-height: 22px;
   padding: 0 var(--tw-pad);
+}
+
+/* Floats over the foot of the transcript, centred, only while it is scrolled up. */
+.scrollDown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  border: 1px solid var(--tw-rule);
+  background: var(--tw-bg);
+}
+
+.scrollDown::part(control) {
+  opacity: 0.8;
 }
 
 .chatOptions > div {
@@ -250,7 +266,6 @@
 
 .composer {
   position: relative;
-  border-top: 1px solid var(--tw-rule);
 }
 
 /*
@@ -314,7 +329,7 @@
   border: 1px solid var(--tw-rule);
   border-radius: 3px;
   color: var(--tw-fg);
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
   line-height: 1.6;
   white-space: nowrap;
@@ -365,18 +380,21 @@
   opacity: 0.7;
 }
 
+/* The input is a framed field inset from the edges; focus firms its frame. */
 .chatBox {
   position: relative;
   container-type: inline-size;
   display: flex;
   align-items: stretch;
+  margin: 0 var(--tw-pad);
+  border: 1px solid var(--tw-rule);
   cursor: text;
-  background: var(--tw-bg);
-  transition: background 0.12s ease;
+  background: var(--tw-surface);
+  transition: border-color 0.12s ease;
 }
 
 .chatBox:focus-within {
-  background: var(--tw-surface);
+  border-color: var(--tw-fg-faint);
 }
 
 .chatBoxDisabled {
@@ -389,10 +407,13 @@
 }
 
 /* The prompt glyph is the one place colour is spent. */
+/* The ornament chevron runs heavy in a UI font: half size, centred on the first line. */
 .prompt {
   flex: 0 0 auto;
-  padding: 6px 0 0 var(--tw-pad);
+  padding: 5px 0 0 9px;
   color: var(--tw-fg-faint);
+  font-size: 9px;
+  line-height: calc(var(--tw-fs) * var(--tw-lh));
   user-select: none;
   transition: color 0.12s ease;
 }
@@ -412,7 +433,7 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 6px 8px 28px;
+  padding: 5px 8px 24px;
   border: none;
   background: transparent;
   color: var(--tw-fg);
@@ -453,10 +474,11 @@
   color: var(--vscode-errorForeground);
 }
 
+/* Lined up with the input above it. */
 .footer {
   display: flex;
   align-items: center;
-  border-top: 1px solid var(--tw-rule-soft);
+  padding: 0 calc(var(--tw-pad) - 8px) 2px;
   container-type: inline-size;
 }
 
@@ -510,9 +532,9 @@
  */
 .modeSwitches {
   position: absolute;
-  bottom: 7px;
-  left: var(--tw-pad);
-  max-width: calc(100% - var(--tw-pad) - 64px);
+  bottom: 4px;
+  left: 6px;
+  max-width: calc(100% - 6px - 64px);
   display: flex;
   align-items: center;
   gap: 4px;

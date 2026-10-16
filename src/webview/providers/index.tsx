@@ -518,7 +518,7 @@ export const Providers = ({ onDone }: ProvidersProps) => {
         <>
           <div className={styles.teamEntry}>
             <span>
-              <strong>Using Twinny with your team?</strong>
+              <strong>Using twinny with your team?</strong>
               <br />
               Open the invite link your admin sent, or connect here with the
               gateway address.

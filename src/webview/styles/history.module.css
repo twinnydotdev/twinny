@@ -8,10 +8,11 @@
 }
 
 .count {
-  padding: 0 6px;
+  padding: 0 5px;
   border: 1px solid var(--tw-rule);
   color: var(--tw-fg-dim);
   font-weight: 400;
+  line-height: 16px;
   letter-spacing: 0;
 }
 
@@ -63,7 +64,7 @@
   color: var(--tw-fg-faint);
   font-size: var(--tw-fs-xs);
   font-weight: 600;
-  letter-spacing: var(--tw-track);
+  letter-spacing: var(--tw-track-caps);
   text-transform: uppercase;
 }
 
@@ -84,7 +85,7 @@
 }
 
 .rowActive {
-  border-left: 2px solid var(--tw-accent);
+  border-left: 2px solid var(--tw-mark);
   margin-left: -8px;
   padding-left: 6px;
 }
@@ -121,6 +122,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+/* The words themselves, so a long title ends in an ellipsis rather than mid-letter. */
+.rowTitleText {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -129,7 +136,7 @@
 .rowTitle .codicon {
   flex-shrink: 0;
   font-size: 8px !important;
-  color: var(--tw-accent);
+  color: var(--tw-mark);
 }
 
 .rowMeta {
@@ -140,15 +147,22 @@
   font-size: var(--tw-fs-sm);
 }
 
+/*
+ * Folded to nothing until the row is pointed at or tabbed into, so a title
+ * has the whole width the rest of the time. Zero width, not display: none,
+ * which would take the buttons out of the tab order.
+ */
 .rowActions {
   display: flex;
   flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
   opacity: 0;
-  transition: opacity 0.12s ease;
 }
 
 .row:hover .rowActions,
 .row:focus-within .rowActions {
+  width: auto;
   opacity: 1;
 }
 

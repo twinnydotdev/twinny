@@ -14,7 +14,7 @@ import { ToolSteps } from "../../extension/chat/tool-steps"
 import { ChatChunk, ChatRequest, InferenceClient } from "../../extension/inference"
 import { planReplacement } from "../../extension/tools/edit"
 import { toolModeFor, withTools } from "../../extension/tools/loop"
-import { displayableLength, findToolCall, nameArguments } from "../../extension/tools/protocol"
+import { displayableLength, findToolCall, nameArguments, repairJson } from "../../extension/tools/protocol"
 import { workspaceTools } from "../../extension/tools/workspace"
 import { replyParts } from "../../webview/reply-parts"
 
@@ -76,7 +76,26 @@ test("reads the fenced form, and bare JSON only when it ends the reply with argu
 })
 
 test("a call that cannot be read says why", () => {
-  assert.match(findToolCall("<tool_call>{name: grep}</tool_call>")?.error ?? "", /not valid JSON/)
+  const found = findToolCall("<tool_call>{name: grep}</tool_call>")
+  assert.match(found?.error ?? "", /not valid JSON/)
+  assert.ok(found?.detail, "with what the parser said")
+})
+
+test("JSON written loosely is mended before it is refused", () => {
+  // A whole file's content with its line breaks and tabs left raw, the way small models write it.
+  const raw = "```tool\n{\"name\": \"create_file\", \"arguments\": {\"path\": \"a.ts\", \"content\": \"export const a = 1\n\tconst re = /\\d+/\n\"}}\n```"
+  assert.deepStrictEqual(findToolCall(raw)?.call, {
+    name: "create_file",
+    args: { path: "a.ts", content: "export const a = 1\n\tconst re = /\\d+/\n" }
+  })
+  assert.deepStrictEqual(findToolCall("```tool\n{name: \"grep\", arguments: {pattern: \"foo\",},}\n```")?.call, {
+    name: "grep",
+    args: { pattern: "foo" }
+  })
+  assert.strictEqual(repairJson("{\"a\": \"x\\\"y\", \"b\": [1, 2,]}"), "{\"a\": \"x\\\"y\", \"b\": [1, 2]}", "escaped quotes stay")
+  assert.strictEqual(repairJson("{\"a\": \"1,}\"}"), "{\"a\": \"1,}\"}", "nothing inside a string is taken for structure")
+  assert.deepStrictEqual(JSON.parse(repairJson("{\"path\": \"C:\\users\\me\", \"e\": \"\\u00e9\"}")), { path: "C:\\users\\me", e: "é" })
+  assert.match(findToolCall("```tool\n{\"name\": \"grep\", \"arguments\": {\"pattern\": 'x'}}\n```")?.error ?? "", /not valid JSON/)
 })
 
 test("holds back a tail that may become a call, and nothing else", () => {
@@ -305,7 +324,7 @@ test("planReplacement finds text once, tolerates pasted line numbers and indenta
     text: `  "default": 20000,\n  "description": "${"x".repeat(300)}"`
   })
   assert.match(planReplacement(long, "\"default\": 16000,", `"default": 1,\n"y${"x".repeat(9)}…`) as string, /cut short/)
-  assert.match(planReplacement(file, "missing()", "x") as string, /not in the file/)
+  assert.match(planReplacement(file, "missing()", "x") as string, /^find is not in the file; read the lines again/)
   assert.match(planReplacement(file, "", "x") as string, /find is empty/)
   assert.match(planReplacement(file, "run()", "run()") as string, /nothing would change/)
   assert.strictEqual(
@@ -650,4 +669,65 @@ test("a step is never put inside a code block, and a stray fence does not move i
   assert.strictEqual(where(notClose, notClose.indexOf("let")), notClose.indexOf("\nafter"))
   // Outside any fence the step stays put.
   assert.strictEqual(where("Plain text. More text.", 11), 11)
+})
+
+test("a find that misses shows the nearest lines as they are now, and where they differ", async () => {
+  const file = [
+    "import { a } from \"./a\"",
+    "",
+    "export function total(items: number[]) {",
+    "  let sum = 0",
+    "  for (const item of items) sum += item",
+    "  return sum",
+    "}",
+    "",
+    "export const unrelated = true"
+  ].join("\n")
+  const miss = planReplacement(file, "  let sum = 0\n  for (const item of items) sum += item * 2\n  return sum", "x") as string
+  assert.strictEqual(
+    miss,
+    [
+      "find is not in the file. The nearest match is lines 4–6, where line 5 is `for (const item of items) sum += item` but find has `for (const item of items) sum += item * 2`. As they are now:",
+      "3: export function total(items: number[]) {",
+      "4:   let sum = 0",
+      "5:   for (const item of items) sum += item",
+      "6:   return sum",
+      "7: }",
+      "Copy the lines exactly as they are, without the line numbers. To add new code rather than change what is there, put the existing lines it goes next to in find, and those same lines with the new code in replace."
+    ].join("\n")
+  )
+  // A look-alike block (a sibling function, or the new code itself) is not offered as the place to edit.
+  const twins = "export function add(a: number, b: number) {\n  // Adds them.\n  return a + b\n}\n"
+  const sub = planReplacement(twins, "export function sub(a: number, b: number) {\n  // Subtracts them.\n  return a - b\n}", "x") as string
+  assert.ok(!sub.includes("nearest match"), sub)
+  assert.match(sub, /To add new code rather than change what is there/)
+  assert.match(planReplacement(file, "something else entirely()", "x") as string, /^find is not in the file; read the lines again/, "nothing near enough")
+
+  // The tool hands the model the whole refusal, not its first line.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-tools-"))
+  fs.writeFileSync(path.join(root, "sum.ts"), file)
+  const tools = workspaceTools(root, [], {
+    edits: { mode: "apply", edit: async () => ({ ok: true, message: "Applied." }), create: async () => ({ ok: true, message: "Created." }) }
+  })
+  const result = await tools.run({ name: "edit_file", args: { path: "sum.ts", find: "  let sum = 1", replace: "  let sum = 2" } })
+  assert.ok(result.failed)
+  assert.match(result.output, /^sum\.ts: find is not in the file\. The nearest match is line 4, where line 4 is `let sum = 0` but find has `let sum = 1`\. As they are now:\n3: export function total/)
+  assert.match(result.output, /with the new code in replace\.$/)
+  assert.strictEqual(result.summary, "edit_file failed · sum.ts: find is not in the file. The nearest match is line 4, where line 4 is `let sum = 0` but find has `let sum = 1`. As they are now:")
+})
+
+test("a message the user sent mid-reply shows among the steps where the model read it", () => {
+  const sent: ToolStepView[][] = []
+  const steps = new ToolSteps((list) => sent.push(list))
+  steps.start({ id: "0.0", name: "read_file", args: { path: "a.ts" } })
+  steps.said("q1", "Look in b.ts instead.")
+  assert.deepStrictEqual(sent[sent.length - 1][1], {
+    id: "said.q1",
+    name: "said",
+    summary: "Look in b.ts instead.",
+    status: "done",
+    said: true
+  })
+  steps.settle()
+  assert.strictEqual(steps.steps[1].status, "done", "settling a stopped reply leaves what was said alone")
 })

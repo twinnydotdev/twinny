@@ -231,7 +231,21 @@ test("arguments that are not JSON go back to the server as an empty object, with
   await collect(withTools(client, workspaceTools(root), { mode: "native" }).chat(ask("Read.")))
   const [, , assistant, result] = requests[1].messages as unknown as Array<Record<string, unknown>>
   assert.deepStrictEqual((assistant.tool_calls as Array<{ function: unknown }>)[0].function, { name: "read_file", arguments: "{}" })
-  assert.strictEqual(result.content, "Your tool call could not be read: the arguments were not valid JSON.")
+  assert.match(String(result.content), /^Your tool call could not be read: the arguments were not valid JSON \(.+\)\.\nYou wrote:\n~~~\n\{path: a\.ts\n~~~$/)
+})
+
+test("native arguments with the slips small models make are mended, not refused", async () => {
+  const root = workspace({ "a.ts": "x\n" })
+  const { client, requests } = scripted([
+    { calls: [{ id: "1", name: "read_file", arguments: "{path: \"a.ts\",}" }] },
+    "Read it."
+  ])
+  const steps: ToolStep[] = []
+  await collect(withTools(client, workspaceTools(root), { mode: "native", onStep: (step) => steps.push(step) }).chat(ask("Read.")))
+  assert.strictEqual(steps[0].parseError, undefined)
+  assert.strictEqual(steps[0].summary, "read `a.ts:1–1`")
+  const assistant = requests[1].messages[2] as unknown as { tool_calls: Array<{ function: { arguments: string } }> }
+  assert.strictEqual(assistant.tool_calls[0].function.arguments, "{\"path\":\"a.ts\"}", "the conversation carries the mended arguments")
 })
 
 test("an error that names tools after tools have run is the reply's error, not a restart in text", async () => {
@@ -538,4 +552,182 @@ test("a teammate's computer hands back its model's tool calls, and nothing shape
     chunk: { content: "", finishReason: "stop", toolCalls: calls }
   })
   assert.throws(() => frame({ content: "", toolCalls: [{ id: "a", name: "x", arguments: {} }] }), /toolCalls/)
+})
+
+test("a text call that cannot be read is quoted back with what the parser said", async () => {
+  const root = workspace({ "a.ts": "x\n" })
+  const { client, requests } = scripted(["```tool\n{\"name\": \"read_file\", \"arguments\": {\"path\": 'a.ts'}}\n```", "Done."])
+  await collect(withTools(client, workspaceTools(root), { mode: "text" }).chat(ask("Read.")))
+  const result = String(requests[1].messages[requests[1].messages.length - 1].content)
+  assert.match(result, /could not be read: the call was not valid JSON \(.+\)\./)
+  // Read as far as the object went: the stream is cut there, before the closing fence.
+  assert.ok(result.includes("You wrote:\n~~~\n```tool\n{\"name\": \"read_file\", \"arguments\": {\"path\": 'a.ts'}}\n~~~"), result)
+  assert.match(result, /line breaks inside strings written as \\n/)
+})
+
+test("a call repeated with nothing changed in between is answered with a pointer, not run again", async () => {
+  const root = workspace({ "a.ts": "one\n", "b.ts": "two\n" })
+  const { client, requests } = scripted([
+    { calls: [read("1", "a.ts")] },
+    { calls: [{ id: "2", name: "read_file", arguments: JSON.stringify({ path: " a.ts " }) }] },
+    { calls: [read("3", "b.ts")] },
+    "Both read."
+  ])
+  const steps: ToolStep[] = []
+  const tools = workspaceTools(root)
+  let runs = 0
+  const counting: WorkspaceTools = { ...tools, run: (call, context) => (runs++, tools.run(call, context)) }
+  await collect(withTools(client, counting, { mode: "native", onStep: (step) => steps.push(step) }).chat(ask("Read.")))
+  assert.strictEqual(runs, 2, "the repeat never reached the tool")
+  assert.strictEqual(steps[1].summary, "read `a.ts:1–1` · repeated, not run again")
+  const repeat = requests[2].messages[requests[2].messages.length - 1]
+  assert.match(String(repeat.content), /^You already called read_file with these same arguments in this reply/)
+  assert.ok(requests[3].tools, "one repeat is not enough to stop the reply's tools")
+})
+
+test("a read after a change runs again, and so does one whose result was trimmed away", async () => {
+  const root = workspace({ "a.ts": "one\n" })
+  const edits = {
+    mode: "apply" as const,
+    edit: async (file: string) => {
+      fs.writeFileSync(file, "two\n")
+      return { ok: true, message: "Applied." }
+    },
+    create: async () => ({ ok: true, message: "Created." })
+  }
+  const { client } = scripted([
+    { calls: [read("1", "a.ts")] },
+    { calls: [{ id: "2", name: "edit_file", arguments: JSON.stringify({ path: "a.ts", find: "one", replace: "two" }) }] },
+    { calls: [read("3", "a.ts")] },
+    "Changed."
+  ])
+  const steps: ToolStep[] = []
+  await collect(withTools(client, workspaceTools(root, [], { edits }), { mode: "native", onStep: (step) => steps.push(step) }).chat(ask("Change.")))
+  assert.strictEqual(steps[2].summary, "read `a.ts:1–1`")
+  assert.match(steps[2].output, /1: two/)
+
+  const body = Array.from({ length: 60 }, (_, i) => `const value${i} = "${"x".repeat(30)}"`).join("\n")
+  const big = workspace({ "a.ts": body, "b.ts": body, "c.ts": body })
+  const again = scripted([
+    { calls: [read("1", "a.ts")] },
+    { calls: [read("2", "b.ts")] },
+    { calls: [read("3", "c.ts")] },
+    { calls: [read("4", "a.ts")] },
+    "Read."
+  ])
+  const later: ToolStep[] = []
+  await collect(
+    withTools(again.client, workspaceTools(big), { mode: "native", contextWindow: () => 4096, onStep: (step) => later.push(step) }).chat(
+      ask("Read.")
+    )
+  )
+  assert.ok(!later[3].summary.includes("repeated"), "a.ts was trimmed out of the context, so it is read again")
+})
+
+test("a model going round in circles is asked for its answer instead of using up every step", async () => {
+  const root = workspace({ "a.ts": "one\n" })
+  const { client, requests } = scripted([
+    { calls: [read("1", "a.ts")] },
+    { calls: [read("2", "a.ts")] },
+    { calls: [read("3", "a.ts")] },
+    { calls: [read("4", "a.ts")] },
+    "It says one."
+  ])
+  let outOfSteps = 0
+  const { text } = await collect(
+    withTools(client, workspaceTools(root), { mode: "native", stepLines: false, onOutOfSteps: () => outOfSteps++ }).chat(ask("Read."))
+  )
+  assert.strictEqual(requests.length, 5)
+  assert.strictEqual(requests[4].tools, undefined, "after three repeats the next request offers no tools")
+  assert.match(String(requests[4].messages[requests[4].messages.length - 1].content), /out of tool calls/)
+  assert.strictEqual(text, "It says one.")
+  assert.strictEqual(outOfSteps, 0, "going round in circles is not running out of steps")
+
+  const unreadable = scripted(["```tool\n{oops}\n```", "```tool\n{oops}\n```", "```tool\n{oops}\n```", ""])
+  const { text: said } = await collect(
+    withTools(unreadable.client, workspaceTools(root), { mode: "text", stepLines: false }).chat(ask("Read."))
+  )
+  assert.strictEqual(unreadable.requests.length, 4, "three unreadable calls in a row, then the answer")
+  assert.match(said, /going round in circles/)
+})
+
+test("using every step is reported, so the chat can offer to continue", async () => {
+  const root = workspace({ "a.ts": "one\n", "b.ts": "two\n" })
+  const { client } = scripted([{ calls: [read("1", "a.ts")] }, { calls: [read("2", "b.ts")] }, ""])
+  let outOfSteps = 0
+  const { text } = await collect(
+    withTools(client, workspaceTools(root), { mode: "native", maxSteps: 2, stepLines: false, onOutOfSteps: () => outOfSteps++ }).chat(
+      ask("Read.")
+    )
+  )
+  assert.strictEqual(outOfSteps, 1)
+  assert.match(text, /ran out of tool steps .* Continue, and I will carry on/)
+
+  const early = scripted([{ calls: [read("1", "a.ts")] }, "Done."])
+  let reported = 0
+  await collect(withTools(early.client, workspaceTools(root), { mode: "native", maxSteps: 2, onOutOfSteps: () => reported++ }).chat(ask("Read.")))
+  assert.strictEqual(reported, 0)
+})
+
+test("what the user sends mid-reply reaches the model at its next step, and the next turn's notes", async () => {
+  const root = workspace({ "a.ts": "one\n", "b.ts": "two\n" })
+  const waiting = ["Look in b.ts instead."]
+  let asked = 0
+  let notes: string | undefined
+  const steering = () => (asked++, waiting.splice(0))
+  const { client, requests } = scripted([{ calls: [read("1", "a.ts")] }, { calls: [read("2", "b.ts")] }, "b.ts says two."])
+  await collect(
+    withTools(client, workspaceTools(root), { mode: "native", steering, onNotes: (n) => (notes = n) }).chat(ask("Read a.ts."))
+  )
+  assert.strictEqual(asked, 2, "asked before each request after the first")
+  const second = requests[1].messages
+  assert.deepStrictEqual(second.slice(-2).map((m) => m.role), ["tool", "user"])
+  assert.strictEqual(
+    second[second.length - 1].content,
+    "While you were working, the user wrote:\n\nLook in b.ts instead.\n\nTake that into account and carry on."
+  )
+  assert.strictEqual(requests[2].messages.filter((m) => m.role === "user").length, 2, "said once, kept in the conversation")
+  assert.match(notes ?? "", /The user, while you worked: Look in b\.ts instead\./)
+
+  const text = scripted(["```tool\n{\"name\": \"read_file\", \"arguments\": {\"path\": \"a.ts\"}}\n```", "Done."])
+  const queue = ["Also check b.ts.", "And be brief."]
+  await collect(withTools(text.client, workspaceTools(root), { mode: "text", steering: () => queue.splice(0) }).chat(ask("Read.")))
+  const last = text.requests[1].messages[text.requests[1].messages.length - 1]
+  assert.strictEqual(last.role, "user")
+  assert.match(
+    String(last.content),
+    /^<tool_result name="read_file">[\s\S]*<\/tool_result>\n\nWhile you were working, the user wrote these messages:\n\nAlso check b\.ts\.\n\nAnd be brief\.\n\nTake that/
+  )
+})
+
+test("what the user said mid-reply in text mode outlasts the result it followed being trimmed", async () => {
+  const body = Array.from({ length: 60 }, (_, i) => `const value${i} = "${"x".repeat(30)}"`).join("\n")
+  const root = workspace({ "a.ts": body, "b.ts": body, "c.ts": body, "d.ts": body })
+  const readCall = (file: string) => "```tool\n" + JSON.stringify({ name: "read_file", arguments: { path: file } }) + "\n```"
+  const { client, requests } = scripted([readCall("a.ts"), readCall("b.ts"), readCall("c.ts"), readCall("d.ts"), "All read."])
+  const waiting = ["Only the constants matter."]
+  let trims = 0
+  await collect(
+    withTools(client, workspaceTools(root), {
+      mode: "text",
+      contextWindow: () => 4096,
+      steering: () => waiting.splice(0),
+      onTrim: (n) => (trims += n)
+    }).chat(ask("Read them."))
+  )
+  assert.ok(trims > 0, "the first result was trimmed")
+  const first = String(requests[requests.length - 1].messages[3].content)
+  assert.match(first, /^<tool_result name="read_file">\n[\s\S]*trimmed to save context[\s\S]*<\/tool_result>\n\nWhile you were working, the user wrote:\n\nOnly the constants matter\./)
+})
+
+test("a read that failed is tried again rather than pointed back to", async () => {
+  const root = workspace({ "a.ts": "one\n" })
+  const { client } = scripted([
+    { calls: [read("1", "missing.ts")] },
+    { calls: [read("2", "missing.ts")] },
+    "Not there."
+  ])
+  const steps: ToolStep[] = []
+  await collect(withTools(client, workspaceTools(root), { mode: "native", onStep: (step) => steps.push(step) }).chat(ask("Read.")))
+  assert.ok(steps[1].failed && !steps[1].summary.includes("repeated"), steps[1].summary)
 })

@@ -17,6 +17,9 @@ import zhHK from "./assets/locales/zh-HK.json"
 
 i18n.use(initReactI18next).init({
   fallbackLng: "en",
+  // React escapes what it renders; escaping here as well showed a branch
+  // like `feat/x` as `feat&#x2F;x`.
+  interpolation: { escapeValue: false },
   resources: {
     de: { translation: de },
     en: { translation: en },

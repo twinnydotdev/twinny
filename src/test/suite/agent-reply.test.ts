@@ -211,4 +211,81 @@ suite("Agent reply, end to end", function () {
       chat.dispose()
     }
   })
+
+  test("a message sent mid-reply reaches the model at its next step; using every step says so in the reply", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-agent-steer-"))
+    fs.writeFileSync(path.join(root, "a.ts"), "export const a = 1\n")
+    fs.writeFileSync(path.join(root, "b.ts"), "export const b = 2\n")
+    const settings = vscode.workspace.getConfiguration("twinny")
+    await settings.update("chatToolsMaxSteps", 4, vscode.ConfigurationTarget.Global)
+    const model = new ScriptedModel([
+      call("read_file", { path: "a.ts" }),
+      call("read_file", { path: "b.ts" }),
+      call("list_dir", {}),
+      call("find_files", { pattern: "*.ts" }),
+      "a is 1 and b is 2; I ran out of steps before checking the rest."
+    ])
+    providerRegistry.register("scripted-agent", { id: "scripted-agent", create: () => model })
+    const stored: Record<string, unknown> = {
+      [ACTIVE_CHAT_PROVIDER_STORAGE_KEY]: provider,
+      [`${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.agentMode}`]: true
+    }
+    const context = {
+      globalState: { get: (key: string) => stored[key], update: async () => undefined },
+      workspaceState: { get: () => undefined, update: async () => undefined },
+      subscriptions: []
+    } as unknown as vscode.ExtensionContext
+    const chatRef: { current?: ChatIn } = {}
+    const emitted: { type: string; data: unknown }[] = []
+    let offered = false
+    const bridge = {
+      emit: (type: string, data: unknown) => {
+        emitted.push({ type, data })
+        // The user types while the first read runs.
+        if (type === EVENT_NAME.twinnyToolSteps && !offered && (data as ToolStepView[]).length) {
+          offered = true
+          chatRef.current?.steer("q1", "Look at b.ts too.")
+          chatRef.current?.steer("q2", "Never mind this one.")
+          chatRef.current?.steer("q2")
+        }
+      }
+    } as unknown as ExtensionBridge
+    const chat = new ChatIn(new GenerationTracker(), undefined, context, bridge, undefined)
+    chatRef.current = chat
+    chat.root = root
+    // Offered with no agent reply working: never taken by the next one.
+    chat.steer("q0", "Too early.")
+    try {
+      await chat.completion([{ role: "user", content: "What are a and b?" } as ChatCompletionMessage])
+      const sent = model.requests.map((request) => JSON.stringify(request.messages))
+      assert.ok(!sent[1].includes("Too early.") && !sent[1].includes("Never mind"), sent[1])
+      assert.match(String(model.requests[1].messages.at(-1)?.content), /While you were working, the user wrote:\n\nLook at b\.ts too\./)
+      assert.ok(!sent[0].includes("Look at b.ts"), "not before the step it arrived during")
+
+      const steps = emitted.filter((e) => e.type === EVENT_NAME.twinnyToolSteps).pop()?.data as ToolStepView[]
+      assert.deepStrictEqual(
+        steps.map((s) => [s.name, s.said ?? false]),
+        [
+          ["read_file", false],
+          ["said", true],
+          ["read_file", false],
+          ["list_dir", false],
+          ["find_files", false]
+        ]
+      )
+      assert.strictEqual(steps[1].id, "said.q1")
+      const added = emitted.filter((e) => e.type === EVENT_NAME.twinnyAddMessage).pop()?.data as ChatCompletionMessage
+      assert.strictEqual(added.meta?.outOfSteps, true)
+      assert.match(added.toolNotes ?? "", /The user, while you worked: Look at b\.ts too\./)
+
+      // Once the reply is over, an offer stays the webview's to send as a turn.
+      chat.steer("q3", "Late.")
+      model.requests = []
+      await chat.completion([{ role: "user", content: "Again?" } as ChatCompletionMessage])
+      assert.ok(!JSON.stringify(model.requests.map((r) => r.messages)).includes("Late."))
+    } finally {
+      chat.dispose()
+      await settings.update("chatToolsMaxSteps", undefined, vscode.ConfigurationTarget.Global)
+    }
+  })
 })

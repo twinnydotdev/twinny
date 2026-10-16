@@ -248,6 +248,7 @@ export class BaseProvider {
       [EVENT_NAME.twinnyStopGeneration]: () => this.destroyStream(),
       [EVENT_NAME.twinnyToolApproval]: ({ id, run, always }) => this.chat?.answerToolApproval(id, run, always),
       [EVENT_NAME.twinnyToolStop]: ({ id }) => this.chat?.stopToolStep(id),
+      [EVENT_NAME.twinnySteer]: ({ id, text }) => this.chat?.steer(id, text),
       [EVENT_NAME.twinnyOpenChange]: ({ id, path }) => void this.chat?.openChange(id, path),
       [EVENT_NAME.twinnyOpenAgentSettings]: () =>
         void vscode.commands.executeCommand("workbench.action.openSettings", "twinny.chatTools"),

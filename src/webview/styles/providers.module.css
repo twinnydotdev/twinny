@@ -108,7 +108,7 @@
 }
 
 .cardActive {
-  border-color: var(--tw-accent-soft, var(--tw-accent));
+  border-color: var(--tw-fg-faint);
 }
 
 .cardMain {
@@ -141,7 +141,7 @@
 }
 
 .cardSelect[aria-pressed="true"] {
-  color: var(--tw-accent);
+  color: var(--tw-mark);
 }
 
 .cardText {
@@ -169,29 +169,45 @@
   text-transform: none;
 }
 
+/* The check beside the card already says it is in use: the word only confirms it. */
 .cardBadge {
   flex-shrink: 0;
-  padding: 0 5px;
-  border: 1px solid var(--tw-accent-soft, var(--tw-accent));
-  color: var(--tw-accent);
+  color: var(--tw-fg-faint);
   font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
+  font-weight: 400;
+  letter-spacing: var(--tw-track-caps);
   text-transform: uppercase;
 }
 
+/* Model and host: names from the machine, in its face. */
 .cardSummary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--tw-fg-dim);
-  font-size: var(--tw-fs-sm);
+  font-family: var(--tw-mono);
+  font-size: var(--tw-fs-xs);
 }
 
+/*
+ * Test, edit, copy and delete fold to nothing until the card is pointed at
+ * or tabbed into, so its words have the width; zero width keeps them in
+ * the tab order, as display: none would not.
+ */
 .cardActions {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   gap: 0;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.card:hover .cardActions,
+.card:focus-within .cardActions {
+  width: auto;
+  opacity: 1;
 }
 
 .confirmRow,
@@ -269,7 +285,7 @@
   color: var(--tw-fg-faint);
   font-size: var(--tw-fs-xs);
   font-weight: 600;
-  letter-spacing: var(--tw-track);
+  letter-spacing: var(--tw-track-caps);
   text-transform: uppercase;
 }
 
@@ -305,6 +321,8 @@
   width: 24px;
   height: 24px;
   opacity: 0.85;
+  /* Makers' marks keep their shape and lose their colour, like everything else here. */
+  filter: grayscale(1);
 }
 
 .presetLogo svg {
@@ -441,6 +459,10 @@
   gap: 1px;
 }
 
+.welcomeActions .linkButton {
+  align-self: center;
+}
+
 .welcomeActions {
   display: flex;
   flex-wrap: wrap;
@@ -475,7 +497,7 @@
 .field label {
   color: var(--tw-fg-dim);
   font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
+  letter-spacing: var(--tw-track-caps);
   text-transform: uppercase;
 }
 
@@ -546,7 +568,7 @@
 .endpointLabel {
   color: var(--tw-fg-faint);
   font-size: var(--tw-fs-xs);
-  letter-spacing: var(--tw-track);
+  letter-spacing: var(--tw-track-caps);
   text-transform: uppercase;
 }
 
@@ -626,7 +648,7 @@
 
 .providerSelectorProvider > .codicon {
   flex-shrink: 0;
-  padding-left: 10px;
+  padding-left: 8px;
   font-size: 13px !important;
   color: var(--tw-fg-faint);
 }
@@ -668,6 +690,12 @@
 /* A narrow column shrinks the control, chevron included, and cuts the name short. */
 .providerSelector vscode-dropdown::part(control) {
   min-width: 0;
+}
+
+/* The model's name is the machine's, in its face. */
+.providerSelector > div:not(.providerSelectorProvider) vscode-dropdown::part(control),
+.providerSelector > div:not(.providerSelectorProvider) vscode-text-field::part(control) {
+  font-family: var(--tw-mono);
 }
 
 .providerSelector vscode-dropdown::part(selected-value) {
@@ -713,7 +741,7 @@
 }
 
 .deviceState-online {
-  color: var(--vscode-testing-iconPassed, var(--tw-accent));
+  color: var(--vscode-testing-iconPassed, var(--tw-fg));
 }
 
 .deviceState-connecting {
@@ -758,7 +786,7 @@
   align-items: center;
   gap: 8px;
   font-size: var(--tw-fs-sm);
-  letter-spacing: var(--tw-track);
+  letter-spacing: var(--tw-track-caps);
   text-transform: uppercase;
 }
 
@@ -777,7 +805,7 @@
   padding: 6px 8px;
   border: 1px dashed var(--tw-rule);
   background: var(--tw-surface);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs);
   color: var(--tw-code);
   word-break: break-all;
@@ -889,7 +917,7 @@
   border: 1px dashed var(--tw-rule);
   background: transparent;
   color: var(--tw-fg-dim);
-  font-family: var(--tw-font);
+  font-family: var(--tw-mono);
   font-size: var(--tw-fs-sm);
   cursor: pointer;
   transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
@@ -908,8 +936,8 @@
 
 .jobChip-active {
   border-style: solid;
-  border-color: var(--tw-accent-soft, var(--tw-accent));
-  color: var(--tw-accent);
+  border-color: var(--tw-fg-faint);
+  color: var(--tw-mark);
 }
 
 .jobChipModel {
@@ -926,37 +954,45 @@
   opacity: 0.8;
 }
 /* Team onboarding shares the host editor's theme and works in narrow sidebars. */
+/* The two ways into team use, as quiet framed notes with their action under the words. */
 .teamEntry {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid var(--vscode-widget-border);
-  border-radius: 5px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--tw-rule);
 }
 .teamEntry span {
-  color: var(--vscode-descriptionForeground);
-  font-size: 12px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  line-height: 1.5;
 }
 .teamEntry strong {
-  color: var(--vscode-foreground);
+  display: inline-block;
+  margin-bottom: 2px;
+  color: var(--tw-fg);
+  font-size: var(--tw-fs);
+  font-weight: 600;
 }
 .teamEntry code {
-  font-family: var(--vscode-editor-font-family);
-  font-size: 11px;
-  color: var(--vscode-foreground);
+  font-family: var(--tw-mono);
+  font-size: var(--tw-fs-xs);
+  color: var(--tw-fg);
 }
 .teamSetUpLink {
   flex: none;
-  padding: 4px 11px;
-  border: 1px solid var(--vscode-button-secondaryBackground);
-  border-radius: 2px;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  font-size: 13px;
+  padding: 2px 10px;
+  border: 1px solid var(--tw-rule);
+  background: transparent;
+  color: var(--tw-fg);
+  font-size: var(--tw-fs-sm);
+  line-height: 20px;
   text-decoration: none;
+}
+.teamSetUpLink:hover {
+  background: var(--tw-surface);
+  color: var(--tw-fg);
 }
 .teamSetUpLink:hover {
   background: var(--vscode-button-secondaryHoverBackground);
@@ -1045,7 +1081,7 @@
 }
 .teamConsent input {
   flex-shrink: 0;
-  accent-color: var(--vscode-button-background);
+  accent-color: var(--tw-mark);
 }
 .teamActions {
   display: flex;
@@ -1061,7 +1097,7 @@
 }
 .teamPolicy {
   border: 1px solid var(--vscode-widget-border);
-  border-left: 3px solid var(--vscode-button-background);
+  border-left: 3px solid var(--tw-mark);
   border-radius: 5px;
   padding: 12px;
   margin: 12px 0;
@@ -1085,7 +1121,7 @@
   align-items: center;
   justify-content: space-between;
   border: 1px solid var(--vscode-widget-border);
-  border-left: 3px solid var(--vscode-button-background);
+  border-left: 3px solid var(--tw-mark);
   border-radius: 5px;
   padding: 10px 12px;
   margin: 12px 0;
@@ -1121,7 +1157,7 @@
   line-height: 1.5;
 }
 .shareHint code {
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--tw-mono);
   user-select: all;
 }
 .shareError {
@@ -1178,7 +1214,7 @@
   color: var(--tw-fg-faint);
 }
 .pluginList button:hover .codicon {
-  color: var(--tw-accent);
+  color: var(--tw-mark);
 }
 .pluginName {
   flex-shrink: 0;

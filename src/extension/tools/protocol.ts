@@ -30,6 +30,8 @@ export interface FoundCall {
   end: number
   call?: ToolCall
   error?: string
+  /** What the JSON parser said about a call it could not read, for the model to fix its next one. */
+  detail?: string
   /** The closing marker, when the call was read before the model wrote it. */
   unclosed?: string
 }
@@ -191,23 +193,94 @@ export const nameArguments = (call: ToolCall, tools: ToolSpec[]): ToolCall => {
   return { name: call.name, args }
 }
 
-const parseJsonCall = (body: string): ToolCall | string => {
-  const json = body.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(json)
-  } catch {
-    return parseCallSyntax(json) ?? "the call was not valid JSON"
+const ESCAPES = new Set(["\"", "\\", "/", "b", "f", "n", "r", "t", "u"])
+
+/**
+ * JSON as small models write it, made strict: line breaks and tabs left
+ * raw inside strings (a whole file's `content`), `\d` and other escapes
+ * JSON has no word for (kept as the backslash and letter they were),
+ * keys without quotes, and a comma before a closing bracket. Strings in
+ * single quotes and bare values are past saving.
+ */
+export const repairJson = (text: string): string => {
+  let out = ""
+  let inString = false
+  /** The last character outside a string that was not whitespace: a key can follow `{` or `,`. */
+  let last = ""
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (inString) {
+      if (char === "\\") {
+        const next = text[i + 1] ?? ""
+        // `\u` is an escape only with its four hex digits: `C:\users` is a path.
+        const valid = next === "u" ? /^[0-9a-fA-F]{4}$/.test(text.slice(i + 2, i + 6)) : ESCAPES.has(next)
+        out += valid ? `\\${next}` : `\\\\${next}`
+        i++
+      } else if (char === "\"") {
+        inString = false
+        out += char
+      } else if (char === "\n") out += "\\n"
+      else if (char === "\r") out += "\\r"
+      else if (char === "\t") out += "\\t"
+      else if (char < " ") out += `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
+      else out += char
+      continue
+    }
+    if (/\s/.test(char)) {
+      out += char
+      continue
+    }
+    if (char === ",") {
+      let next = i + 1
+      while (next < text.length && /\s/.test(text[next])) next++
+      if (text[next] === "}" || text[next] === "]") continue
+    }
+    const key = last === "{" || last === "," ? /^([A-Za-z_$][\w$]*)(\s*:)/.exec(text.slice(i, i + 200)) : null
+    if (key) {
+      out += `"${key[1]}"${key[2]}`
+      i += key[0].length - 1
+      last = ":"
+      continue
+    }
+    if (char === "\"") inString = true
+    out += char
+    last = char
   }
-  const { name, arguments: args, parameters, args: short, input, params } = (parsed ?? {}) as Record<string, unknown>
-  if (typeof name !== "string" || !name) return "the call had no \"name\""
+  return out
+}
+
+/** `JSON.parse`, and again after `repairJson` when the strict form fails; the first error when neither reads it. */
+export const parseLenientJson = (text: string): { value: unknown } | { error: string } => {
+  try {
+    return { value: JSON.parse(text) }
+  } catch (error) {
+    try {
+      return { value: JSON.parse(repairJson(text)) }
+    } catch {
+      return { error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+}
+
+const parseJsonCall = (body: string): ToolCall | { error: string; detail?: string } => {
+  const json = body.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")
+  const parsed = parseLenientJson(json)
+  if ("error" in parsed) {
+    return parseCallSyntax(json) ?? { error: "the call was not valid JSON", detail: parsed.error }
+  }
+  const { name, arguments: args, parameters, args: short, input, params } = (parsed.value ?? {}) as Record<string, unknown>
+  if (typeof name !== "string" || !name) return { error: "the call had no \"name\"" }
   // `arguments` as asked; the other keys are what other tool formats taught the model.
   return { name, args: asArgs(args ?? parameters ?? short ?? input ?? params ?? {}) ?? {} }
 }
 
-const parseFunctionCall = (body: string): ToolCall | string => {
+/** A parsed call, or what is wrong with it, in the shape `FoundCall` keeps. */
+const outcome = (parsed: ToolCall | { error: string; detail?: string }): Pick<FoundCall, "call" | "error" | "detail"> =>
+  "error" in parsed ? parsed : { call: parsed }
+
+const parseFunctionCall = (body: string): ToolCall | { error: string } => {
   const name = body.match(/<function=([\w.-]+)>/)?.[1]
-  if (!name) return "the call had no function name"
+  if (!name) return { error: "the call had no function name" }
   const args: Record<string, string> = {}
   for (const match of body.matchAll(/<parameter=([\w.-]+)>\n?([\s\S]*?)\n?<\/parameter>/g)) {
     args[match[1]] = match[2]
@@ -241,7 +314,7 @@ const trailingJsonCall = (text: string): FoundCall | undefined => {
     const body = trimmed.slice(start)
     if (!/"(arguments|parameters)"\s*:/.test(body)) return undefined
     const call = parseJsonCall(body)
-    return typeof call === "string" ? undefined : { start, end: trimmed.length, call }
+    return "error" in call ? undefined : { start, end: trimmed.length, call }
   }
   return undefined
 }
@@ -277,7 +350,7 @@ export const findToolCall = (text: string, ended = false): FoundCall | undefined
       end: jsonEnd + (closing ? closing[0].length : 0),
       ...(closing ? {} : { unclosed: closer })
     }
-    return typeof parsed === "string" ? { ...found, error: parsed } : { ...found, call: parsed }
+    return { ...found, ...outcome(parsed) }
   }
 
   const closeAt = text.indexOf(closer, bodyStart)
@@ -288,7 +361,7 @@ export const findToolCall = (text: string, ended = false): FoundCall | undefined
     ? parseFunctionCall(inner)
     : parseJsonCall(inner.slice(opener.opener.length).replace(/(<\/tool_call>|```)$/, ""))
   const found = { start: opener.index, end, ...(closeAt === -1 ? { unclosed: closer } : {}) }
-  return typeof parsed === "string" ? { ...found, error: parsed } : { ...found, call: parsed }
+  return { ...found, ...outcome(parsed) }
 }
 
 export interface ToolParameter {
@@ -304,6 +377,12 @@ export interface ToolSpec {
   parameters: ToolParameter[]
   /** A sentence for the system prompt on when and how to use the tool. */
   guidance?: string
+  /**
+   * Only reads the workspace: the same call gives the same result until
+   * something changes it, so the loop need not run it twice in a row.
+   * Live editor state (diagnostics, the open file) is not.
+   */
+  readOnly?: boolean
   /**
    * The arguments' JSON schema as the tool's maker wrote it (an MCP
    * server's), sent as it is to providers with native tool-calling;

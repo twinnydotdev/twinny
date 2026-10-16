@@ -92,6 +92,87 @@ const restoreCutLines = (replace: string, original: string[]): string | undefine
 const CUT_LINE_REFUSAL =
   "replace has a line cut short with … that is not in find; leave long lines you do not change out of find and replace"
 
+const NOT_FOUND = "find is not in the file; read the lines again and copy them exactly, without the line numbers"
+
+/** Small models put new code in find; this is what they need to hear instead. */
+const TO_ADD =
+  "To add new code rather than change what is there, put the existing lines it goes next to in find, and those same lines with the new code in replace."
+
+/** Lines of `find` scored when looking for the nearest match; a file this long is not searched for one. */
+const MAX_HINT_FIND_LINES = 12
+const MAX_HINT_FILE_LINES = 20_000
+/** How alike, on average, the nearest lines must be to `find` to be worth showing. */
+const MIN_LIKENESS = 0.6
+const MAX_HINT_LINE_CHARS = 200
+
+/** A line's character pairs, whitespace around it aside, counted: for a cheap measure of likeness. */
+const pairsOf = (line: string) => {
+  const text = line.trim()
+  const pairs = new Map<string, number>()
+  for (let i = 0; i < text.length - 1; i++) {
+    const pair = text.slice(i, i + 2)
+    pairs.set(pair, (pairs.get(pair) ?? 0) + 1)
+  }
+  return { text, pairs, size: Math.max(0, text.length - 1) }
+}
+
+/** How alike two lines are, from 0 to 1: the share of character pairs they have in common. */
+const likeness = (a: ReturnType<typeof pairsOf>, b: ReturnType<typeof pairsOf>) => {
+  if (a.text === b.text) return 1
+  if (!a.size || !b.size) return 0
+  const [small, large] = a.pairs.size <= b.pairs.size ? [a, b] : [b, a]
+  let shared = 0
+  for (const [pair, count] of small.pairs) shared += Math.min(count, large.pairs.get(pair) ?? 0)
+  return (2 * shared) / (a.size + b.size)
+}
+
+const clipped = (line: string) => (line.length > MAX_HINT_LINE_CHARS ? `${line.slice(0, MAX_HINT_LINE_CHARS)}…` : line)
+
+const hintLine = (number: number, line: string) => `${number}: ${clipped(line)}`
+
+/**
+ * Where the file comes closest to `find`, as the refusal tells the model:
+ * the lines as they are now, numbered as `read_file` numbers them, and the
+ * first one that differs. A model's `find` usually misses by a line it
+ * remembered wrong or the file changed under it, and this saves it reading
+ * the file again. Undefined when nothing is near enough to help.
+ */
+const nearestLines = (lines: string[], wanted: string[]): string | undefined => {
+  const compared = wanted.slice(0, MAX_HINT_FIND_LINES)
+  if (lines.length > MAX_HINT_FILE_LINES || wanted.length > lines.length) return undefined
+  const want = compared.map(pairsOf)
+  const filled = want.filter((line) => line.text)
+  if (!filled.length) return undefined
+  const have = lines.map(pairsOf)
+  let best = { start: -1, score: 0 }
+  for (let start = 0; start + wanted.length <= lines.length; start++) {
+    let total = 0
+    for (let i = 0; i < compared.length; i++) {
+      if (want[i].text) total += likeness(have[start + i], want[i])
+    }
+    const score = total / filled.length
+    if (score > best.score) best = { start, score }
+  }
+  if (best.start < 0 || best.score < MIN_LIKENESS) return undefined
+  const { start } = best
+  const end = start + wanted.length - 1
+  // A slip is a line or two remembered wrong. Where many lines differ, the
+  // block is something else that looks alike (a sibling function, often the
+  // new code the model meant to add), and pointing at it invites an edit there.
+  const different = wanted.filter((line, i) => line.trim() && !sameLine(lines[start + i], line)).length
+  if (different > Math.max(1, Math.floor(filled.length / 3))) return undefined
+  const differs = wanted.findIndex((line, i) => !sameLine(lines[start + i], line))
+  const where =
+    differs === -1
+      ? ""
+      : `, where line ${start + differs + 1} is \`${clipped(lines[start + differs].trim())}\` but find has \`${clipped(wanted[differs].trim())}\``
+  const shown = lines
+    .slice(Math.max(0, start - 1), Math.min(lines.length, end + 2))
+    .map((line, i) => hintLine(Math.max(0, start - 1) + i + 1, line))
+  const span = start === end ? `line ${start + 1}` : `lines ${start + 1}–${end + 1}`
+  return `The nearest match is ${span}${where}. As they are now:\n${shown.join("\n")}`
+}
+
 /**
  * The lines to rewrite for replacing `find` with `replace` in `content`,
  * or why it cannot be done, worded for the model to fix its next call.
@@ -140,7 +221,10 @@ export const planReplacement = (
     return `find matches ${loose.length} places; include more of the surrounding lines so it matches once`
   }
   if (!loose.length) {
-    return "find is not in the file; read the lines again and copy them exactly, without the line numbers"
+    const nearest = nearestLines(lines, wanted)
+    return nearest
+      ? `find is not in the file. ${nearest}\nCopy the lines exactly as they are, without the line numbers. ${TO_ADD}`
+      : `${NOT_FOUND}. ${TO_ADD}`
   }
   const startLine = loose[0]
   const endLine = startLine + wanted.length - 1

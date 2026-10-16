@@ -105,6 +105,13 @@ export class Chat extends Base {
   )
   /** A typed message's context is being gathered; its reply has not started. */
   private _preparing = false
+  /**
+   * Messages the user queued while an agent reply works, offered for the
+   * model to read at its next step. Only taken while that reply runs: one
+   * offered too late stays the webview's, to send as a turn of its own.
+   */
+  private _steering: { id: string; text: string }[] = []
+  private _steerable = false
   /** Aborted when this chat goes: the commands it started end with it. */
   private readonly _lifetime = new AbortController()
   private readonly _generations: GenerationTracker
@@ -226,6 +233,23 @@ export class Chat extends Base {
   /** The stop button on a running command: ends it, and the reply carries on. */
   public stopToolStep(id: string) {
     this._steps.stop(id)
+  }
+
+  /** A queued message offered to the agent reply that is working (`text`), or taken back. */
+  public steer(id: string, text?: string) {
+    this._steering = this._steering.filter((entry) => entry.id !== id)
+    if (text?.trim() && this._steerable) this._steering.push({ id, text: text.trim() })
+  }
+
+  /** The messages on offer, handed to the model now and shown in the steps where it read them. */
+  private takeSteering(): string[] {
+    const taken = this._steering
+    this._steering = []
+    for (const { id, text } of taken) {
+      this._steps.said(id, text)
+      logger.info(`Chat tools · the user's message reached the model mid-reply (${formatCount(text.length)} chars)`)
+    }
+    return taken.map(({ text }) => text)
   }
 
   public dispose() {
@@ -499,15 +523,19 @@ export class Chat extends Base {
     let tracked: ReplyChanges | undefined
     let changed: ReplyChangesView | undefined
     const usage: ToolLoopUsage = {}
+    let outOfSteps = false
     // Asked now, so the reply can say how much of the context it used.
     void contextWindowOf(provider)
+    this._steering = []
+    this._steerable = !!view
     const reply = await this._generation.generate(
       view
         ? this.toolsClient(provider, view, {
             onNotes: (notes) => (toolNotes = notes),
             onUsage: (counted) => Object.assign(usage, counted),
             onTools: (tools) => (instructionFiles = () => tools.instructionFiles?.() ?? []),
-            onChanges: (changes) => (tracked = changes)
+            onChanges: (changes) => (tracked = changes),
+            onOutOfSteps: () => (outOfSteps = true)
           })
         : resolveInferenceProvider(provider),
       { model: provider.modelName, messages: this._conversation },
@@ -536,11 +564,15 @@ export class Chat extends Base {
             ...(instructions.length ? { instructions } : {}),
             ...(usage.promptTokens ? { promptTokens: usage.promptTokens } : {}),
             ...(usage.completionTokens ? { completionTokens: usage.completionTokens } : {}),
-            ...(contextWindow ? { contextWindow } : {})
+            ...(contextWindow ? { contextWindow } : {}),
+            ...(outOfSteps ? { outOfSteps: true } : {})
           }
         }
       }
-    )
+    ).finally(() => {
+      this._steerable = false
+      this._steering = []
+    })
     if (reply) {
       this._conversation = [
         ...this._conversation,
@@ -564,6 +596,7 @@ export class Chat extends Base {
       onUsage(usage: ToolLoopUsage): void
       onTools(tools: WorkspaceTools): void
       onChanges(changes: ReplyChanges): void
+      onOutOfSteps(): void
     }
   ) {
     this._steps.reset()
@@ -627,6 +660,8 @@ export class Chat extends Base {
         return told ?? assumedContextWindow(provider)
       },
       stepLines: false,
+      steering: () => this.takeSteering(),
+      onOutOfSteps: hooks.onOutOfSteps,
       onNotes: hooks.onNotes,
       onUsage: hooks.onUsage,
       onRequest: (chars, step, mode, tokens) =>

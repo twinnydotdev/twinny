@@ -21,16 +21,20 @@
 .checkboxGroup {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  margin: 0.2rem 0;
-  padding: 0.5rem 0;
+  gap: 2px;
+  margin: 0;
+  padding: 4px 0;
 }
 
 .checkboxItem {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0;
+  padding: 0;
+}
+
+.checkboxItem vscode-checkbox {
+  margin: 0;
 }
 
 .checkboxItem label {
