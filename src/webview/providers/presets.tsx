@@ -124,10 +124,10 @@ export const PRESETS: ProviderPreset[] = [
     API_PROVIDERS.Anthropic,
     "Anthropic",
     <SvgAnthropic />,
-    "claude-sonnet-4-20250514"
+    "claude-sonnet-4-6"
   ),
   hosted(API_PROVIDERS.Deepseek, "DeepSeek", <SvgDeepseek />, "deepseek-chat"),
-  hosted(API_PROVIDERS.Gemini, "Gemini", <SvgGemini />, "gemini-2.5-pro-preview-05-06"),
+  hosted(API_PROVIDERS.Gemini, "Gemini", <SvgGemini />, "gemini-3.1-pro-preview"),
   hosted(API_PROVIDERS.Groq, "Groq", <SvgGroq />, "llama-3.3-70b-versatile"),
   hosted(API_PROVIDERS.Mistral, "Mistral", <SvgMistral />, "mistral-small-latest"),
   hosted(API_PROVIDERS.OpenRouter, "OpenRouter", <SvgOpenRouter />, "openai/gpt-4.1"),
