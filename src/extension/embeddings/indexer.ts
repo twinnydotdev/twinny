@@ -368,7 +368,8 @@ export class WorkspaceIndexer {
     const manifest = this._db.manifest
     try {
       const stats = await fs.promises.stat(file)
-      if (stats.size === 0 || stats.size > MAX_FILE_BYTES) return false
+      if (stats.size === 0) return this.removeFile(file)
+      if (stats.size > MAX_FILE_BYTES) return false
       const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(file))!
       const result = await this.embedFile(
         {
