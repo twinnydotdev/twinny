@@ -31,9 +31,11 @@ import {
 import { GatewayConfiguration } from "./configuration"
 import { DATA_FORMAT, DataFormatError, openDataDir } from "./data-format"
 import { DEFAULT_DEMO } from "./demo"
+import { DEFAULT_CONFIG_FILE } from "./init"
 import { invitesFileFor,InviteStore } from "./invites"
 import { KeyStore } from "./keys"
 import { describePlan, LicenseStore } from "./license"
+import { describeLocated, locateConfig, rememberConfig, searchedPlaces } from "./locate"
 import { createGatewayLog, GatewayLog, LogFormat } from "./log"
 import { GatewayMetrics } from "./metrics"
 import { PeerRegistry } from "./peers"
@@ -47,7 +49,7 @@ import {
   HEALTH_PATH
 } from "./server"
 import { teamPoolAdapter } from "./team-pool"
-import { decorateBanner, prettyLogLine, Tui } from "./tui"
+import { BannerPrinter, prettyLogLine, Tui } from "./tui"
 import { UsageRecorder } from "./usage"
 import { SERVER_VERSION } from "./version"
 
@@ -69,9 +71,11 @@ export const EXIT_CODE = {
 
 export const SERVE_HELP = `Twinny gateway — serve configured models to Twinny extensions over HTTP.
 
-Usage: twinny-server serve --config <file> [options]
+Usage: twinny-server serve [--config <file>] [options]
 
-  -c, --config <file>   The gateway configuration (JSON). Required.
+  -c, --config <file>   The gateway configuration (JSON). Without it:
+                        $TWINNY_CONFIG, ./${DEFAULT_CONFIG_FILE}, the one
+                        served last, then ~/${DEFAULT_CONFIG_FILE}
   -p, --port <number>   Listen on this port instead of the configuration's
       --host <address>  Listen on this address instead of the configuration's
       --demo            Public demo: the admin page opens read-only without a
@@ -99,7 +103,8 @@ See docs/gateway.md for the configuration format and a quickstart.
 `
 
 export interface ServeArgs {
-  config: string
+  /** Absent: the configuration is looked for (see `locateConfig`). */
+  config?: string
   port?: number
   host?: string
   demo?: boolean
@@ -163,12 +168,8 @@ export const parseServeArgs = (argv: string[]): ServeArgs | "help" => {
         )
     }
   }
-  if (!config)
-    throw new Error(
-      "A configuration file is required: twinny-server serve --config <file>"
-    )
   return {
-    config,
+    ...(config !== undefined ? { config } : {}),
     ...(port !== undefined ? { port } : {}),
     ...(host !== undefined ? { host } : {}),
     ...(demo ? { demo } : {})
@@ -184,6 +185,8 @@ export interface ServeIo {
   log?: GatewayLog
   /** How log lines are rendered when `log` is not supplied; the machine format by default. */
   logFormat?: LogFormat
+  /** Called with the configuration once the gateway listens, so a bare `twinny-server` finds it next time. */
+  remember?: (configFile: string) => void
 }
 
 /**
@@ -194,11 +197,18 @@ export interface ServeIo {
 export const defaultServeIo = (): ServeIo => {
   const tui = new Tui()
   const prettyLog = tui.colour && !!process.stderr.isTTY
+  // On a colour terminal the banner is laid out for reading; stderr waits
+  // for it, so a log line never lands in the middle.
+  const banner = tui.colour && process.stdout.isTTY ? new BannerPrinter(tui) : undefined
   return {
-    out: (line) => process.stdout.write(`${decorateBanner(tui, line)}\n`),
-    err: (line) => process.stderr.write(`${line}\n`),
+    out: banner ? (line) => banner.out(line) : (line) => process.stdout.write(`${line}\n`),
+    err: (line) => {
+      banner?.flush()
+      process.stderr.write(`${line}\n`)
+    },
     env: process.env,
     signals: process,
+    remember: (configFile) => rememberConfig(configFile),
     logFormat: prettyLog
       ? (level, fields) => prettyLogLine(tui, level, fields)
       : undefined
@@ -254,6 +264,15 @@ export const runServe = async (
     io.out(SERVE_HELP)
     return EXIT_CODE.ok
   }
+  const located = args.config ? undefined : locateConfig(process.cwd(), io.env)
+  const configFile = args.config ?? located?.file
+  if (!configFile) {
+    io.err("No gateway configuration found. Looked for:")
+    for (const place of searchedPlaces()) io.err(`  - ${place}`)
+    io.err("")
+    io.err("Set one up with: twinny-server quickstart   (or pass --config <file>)")
+    return EXIT_CODE.config
+  }
 
   // Where to listen can come from the process, so one configuration serves
   // several instances behind a reverse proxy.
@@ -297,7 +316,7 @@ export const runServe = async (
       }
     })
     providerRegistry.register(TEAM_PROVIDER_KIND, teamPoolAdapter(peers))
-    config = loadGatewayConfig(args.config, providerRegistry.providerIds())
+    config = loadGatewayConfig(configFile, providerRegistry.providerIds())
     // The data directory is checked before any store opens: an older layout
     // is migrated first, a newer one is never touched.
     const opened = openDataDir(path.dirname(config.auth.keysFile), {
@@ -321,7 +340,7 @@ export const runServe = async (
     usage = new UsageRecorder(config.usage.dir, config.usage.retentionDays)
     usage.start()
     const configuration = new GatewayConfiguration(
-      args.config,
+      configFile,
       config,
       routes,
       io.env
@@ -367,7 +386,7 @@ export const runServe = async (
           ...(backend.kind ? { kind: backend.kind } : {})
         })),
       paths: {
-        configFile: args.config,
+        configFile,
         dataDir: path.dirname(config.auth.keysFile),
         keysFile: config.auth.keysFile,
         licenseFile: config.auth.licenseFile,
@@ -408,6 +427,7 @@ export const runServe = async (
     if (error instanceof GatewayConfigError) {
       io.err(`Cannot start the gateway (${error.code}):`)
       for (const problem of error.problems) io.err(`  - ${problem}`)
+      if (located) io.err(describeLocated(located))
       return codeForConfigError(error)
     }
     if (error instanceof DataFormatError) {
@@ -433,7 +453,9 @@ export const runServe = async (
       : EXIT_CODE.failure
   }
 
+  io.remember?.(configFile)
   io.out(`Twinny gateway ${SERVER_VERSION} listening on ${address.url}`)
+  io.out(`  config:   ${path.resolve(configFile)}`)
   for (const line of describeConfig(config)) io.out(line)
   io.out(`  health:   ${address.url}${HEALTH_PATH}`)
   io.out(

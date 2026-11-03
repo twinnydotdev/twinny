@@ -92,15 +92,21 @@ const spawnCli = (args: string[], env: Record<string, string | undefined>) => {
   fs.mkdirSync(home, { recursive: true })
   const merged: Record<string, string | undefined> = { ...process.env, ELECTRON_RUN_AS_NODE: "1", HOME: home, USERPROFILE: home, ...env }
   for (const key of Object.keys(merged)) if (merged[key] === undefined) delete merged[key]
+  // In the scratch directory too, so a twinny.gateway.json where the tests run is never picked up.
   return cp.spawn(node, [CLI, ...args], {
+    cwd: scratch,
     env: merged as NodeJS.ProcessEnv,
     stdio: ["ignore", "pipe", "pipe"]
   })
 }
 
 const startGateway = (configFile: string, env: Record<string, string | undefined> = {}): Promise<Gateway> =>
+  startGatewayWith(["serve", "--config", configFile], env)
+
+/** Any command line that ends up serving: a bare `twinny-server`, serve without --config, … */
+const startGatewayWith = (args: string[], env: Record<string, string | undefined> = {}): Promise<Gateway> =>
   new Promise((resolve, reject) => {
-    const child = spawnCli(["serve", "--config", configFile], { TWINNY_GATEWAY_TOKEN: TOKEN, ...env })
+    const child = spawnCli(args, { TWINNY_GATEWAY_TOKEN: TOKEN, ...env })
     const gateway: Gateway = {
       port: 0,
       url: "",
@@ -660,12 +666,46 @@ suite("Gateway process: startup failures", function () {
   test("--help prints usage and exits 0", async () => {
     const result = await runCli(["serve", "--help"])
     assert.strictEqual(result.code, 0)
-    assert.match(result.stdout, /twinny-server serve --config/)
+    assert.match(result.stdout, /twinny-server serve \[--config <file>\]/)
     const top = await runCli(["--help"])
     assert.strictEqual(top.code, 0)
     assert.match(top.stdout, /npx twinny-server quickstart/)
     const version = await runCli(["--version"])
     assert.match(version.stdout.trim(), /^\d+\.\d+\.\d+$/)
+  })
+
+  test("without --config the configuration is looked for, remembered once served, and its absence explained", async () => {
+    // HOME is the scratch home, so the memory file is the test's own.
+    const remembered = path.join(scratch, "home", ".twinny", "twinny-server.json")
+    fs.rmSync(remembered, { force: true })
+    const none = await runCli([], { TWINNY_CONFIG: undefined })
+    assert.strictEqual(none.code, 2, "off a terminal a bare twinny-server never writes a gateway")
+    assert.match(none.stderr, /No gateway configuration found/)
+    assert.match(none.stderr, /twinny-server quickstart/)
+    assert.strictEqual((await runCli(["serve"], { TWINNY_CONFIG: undefined })).code, 2)
+
+    const file = writeConfig("located", configFor(11434, {}, "located"))
+    const named = await startGatewayWith([], { TWINNY_CONFIG: file })
+    try {
+      assert.ok(named.stdout.includes(`config:   ${file}`), named.stdout)
+    } finally {
+      await named.stop()
+    }
+    assert.strictEqual((JSON.parse(fs.readFileSync(remembered, "utf8")) as { config: string }).config, file)
+
+    // Next time nothing names it: serve flags alone start the one served last.
+    const again = await startGatewayWith(["--port", "0"], { TWINNY_CONFIG: undefined })
+    try {
+      assert.ok(again.stdout.includes(`config:   ${file}`), again.stdout)
+    } finally {
+      await again.stop()
+    }
+    const broken = writeConfig("located-broken", "{")
+    fs.writeFileSync(remembered, JSON.stringify({ config: broken }))
+    const bad = await runCli(["keys", "list"], { TWINNY_CONFIG: undefined })
+    assert.strictEqual(bad.code, 2)
+    assert.match(bad.stderr, /not valid JSON[\s\S]*\(the one served last\); pass --config/)
+    fs.rmSync(remembered, { force: true })
   })
 
   test("a data directory written by a newer server stops startup with exit 6; a fresh one is marked", async () => {

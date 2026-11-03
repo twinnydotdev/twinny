@@ -57,8 +57,8 @@ export interface GatewayLog {
   error(fields: Fields): void
 }
 
-/** Turns the allow-listed, cleaned fields into one line. */
-export type LogFormat = (level: string, fields: Array<[string, string]>) => string
+/** Turns the allow-listed, cleaned fields into one line; `undefined` leaves the event out (the terminal view only). */
+export type LogFormat = (level: string, fields: Array<[string, string]>) => string | undefined
 
 /** The machine format: ISO time, level, `name=value` pairs. */
 export const machineLogLine: LogFormat = (level, fields) =>
@@ -75,7 +75,8 @@ export const createGatewayLog = (
       if (value === undefined) continue
       kept.push([name, clean(value)])
     }
-    write(redact(format(level, kept)))
+    const line = format(level, kept)
+    if (line !== undefined) write(redact(line))
   }
   return {
     info: (fields) => emit("info", fields),

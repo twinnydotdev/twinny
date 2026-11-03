@@ -1787,7 +1787,8 @@ export class GatewayServer {
         "Content-Length": Buffer.byteLength(html),
         "Cache-Control": "no-store",
         "Content-Security-Policy":
-          "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:"
+          // Fonts are inlined in the stylesheet as data: URLs, like the icons.
+          "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; font-src data:"
       })
       res.end(html)
       return
