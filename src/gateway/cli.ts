@@ -1,6 +1,7 @@
 /**
  * `twinny-server`: the Twinny inference gateway as an npm package.
  *
+ *   twinny-server                          start this machine's gateway, or set one up
  *   twinny-server quickstart               config + admin key + serve, in one go
  *   twinny-server init [file]              write a starter configuration
  *   twinny-server serve --config <file>    run the gateway
@@ -14,18 +15,23 @@ import { messageOf } from "../common/errors"
 import { runInvites, runKeys, runLicense, runRecordings, runUsage } from "./admin"
 import { runBackup } from "./backup-cli"
 import { INIT_HELP, runInit } from "./init"
-import { runQuickstart, runReset } from "./quickstart"
+import { isServeFlag, runDefault, runQuickstart, runReset } from "./quickstart"
 import { defaultServeIo, EXIT_CODE, runServe, SERVE_HELP } from "./serve"
 import { SERVER_VERSION as VERSION } from "./version"
 
 export const HELP = `twinny-server ${VERSION} — serve your models to Twinny extensions on other machines.
 
-Usage: twinny-server <command> [options]
+Usage: twinny-server [command] [options]
+
+  twinny-server            Start the gateway this machine has; on a terminal with
+                           none yet, set one up first (quickstart). The configuration
+                           is $TWINNY_CONFIG, ./twinny.gateway.json, the one served
+                           last, or ~/twinny.gateway.json, in that order.
 
 Commands:
   quickstart [--fresh]     Write the configuration, make an admin key and serve, in one go
   init [file]              Write a starter configuration (default: ./twinny.gateway.json)
-  serve --config <file>    Start the gateway
+  serve [--config <file>]  Start the gateway; never sets one up
                            (--port, --host: where to listen; --demo: a public, read-only demo)
   reset --yes              Remove keys, licence, usage and recordings (--all: the configuration too)
   keys create <name>       Make an access key for a developer (shown once)
@@ -40,7 +46,7 @@ Commands:
   --help                   Show this help
 
 Quick start (on the machine with the models):
-  npx twinny-server quickstart
+  npx twinny-server quickstart      (or just: npx twinny-server)
 
 It prints an admin key once and the admin page address. Sign in there and
 invite developers from People: each gets a link that opens VS Code and
@@ -58,6 +64,7 @@ export const main = async (argv: string[]): Promise<number> => {
     case "serve":
       return runServe(rest)
     case "quickstart":
+    case "--quickstart":
       return runQuickstart(rest, defaultServeIo())
     case "reset":
       return runReset(rest, { out, err })
@@ -95,15 +102,16 @@ export const main = async (argv: string[]): Promise<number> => {
       out(VERSION)
       return EXIT_CODE.ok
     case undefined:
+      return runDefault([], defaultServeIo())
     case "--help":
     case "-h":
+    case "help":
       out(HELP)
-      return command === undefined ? EXIT_CODE.config : EXIT_CODE.ok
+      return EXIT_CODE.ok
     default:
-      // `twinny-server --config x` is a common slip; treat it as serve.
-      if (command === "--config" || command === "-c" || command.startsWith("--config=")) {
-        return runServe(argv)
-      }
+      // `twinny-server --port 9000`, `twinny-server --config x`: serve options
+      // without the word serve start this machine's gateway with them.
+      if (isServeFlag(command)) return runDefault(argv, defaultServeIo())
       err(`Unknown command "${command}". Try: twinny-server --help`)
       return EXIT_CODE.config
   }
