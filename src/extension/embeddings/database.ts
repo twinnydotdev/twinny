@@ -1,4 +1,5 @@
 import type * as lancedb from "@lancedb/lancedb"
+import { randomUUID } from "crypto"
 import fs from "fs"
 import path from "path"
 
@@ -80,6 +81,7 @@ const loadLance = () => (lanceModule ??= import("@lancedb/lancedb"))
 export class EmbeddingDatabase {
   private _db: lancedb.Connection | null = null
   private _manifest: IndexManifest | null = null
+  private _manifestWrite: Promise<void> = Promise.resolve()
 
   constructor(private readonly _dbPath: string) {}
 
@@ -118,11 +120,23 @@ export class EmbeddingDatabase {
   }
 
   public async saveManifest(manifest: IndexManifest) {
+    // Callers share and mutate this object across awaited indexing work.
+    // Keep that reference; snapshot only the bytes submitted for persistence.
     this._manifest = manifest
-    await fs.promises.mkdir(this._dbPath, { recursive: true })
-    const tmp = `${this.manifestPath}.tmp`
-    await fs.promises.writeFile(tmp, JSON.stringify(manifest))
-    await fs.promises.rename(tmp, this.manifestPath)
+    const snapshot = JSON.stringify(manifest)
+    const write = this._manifestWrite.then(async () => {
+      await fs.promises.mkdir(this._dbPath, { recursive: true })
+      const tmp = `${this.manifestPath}.${randomUUID()}.tmp`
+      try {
+        await fs.promises.writeFile(tmp, snapshot, { flag: "wx" })
+        await fs.promises.rename(tmp, this.manifestPath)
+      } finally {
+        await fs.promises.rm(tmp, { force: true }).catch(() => undefined)
+      }
+    })
+    // The caller sees its failure, but the next queued save can still run.
+    this._manifestWrite = write.catch(() => undefined)
+    await write
   }
 
   /** Whether anything has been indexed. */
