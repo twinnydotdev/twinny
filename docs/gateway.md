@@ -68,6 +68,13 @@ to change there. To wipe a gateway and start again, stop it and run
 `quickstart --fresh` (or `reset --yes --all`; see
 [Starting over](#starting-over)).
 
+Later, `twinny-server` with no command starts that gateway again from any
+directory. Without `--config`, `serve`, `keys`, `usage` and the other
+commands look for `$TWINNY_CONFIG`, then `./twinny.gateway.json`, then the
+configuration served last (remembered in `~/.twinny/twinny-server.json`),
+then `~/twinny.gateway.json`. Finding none, a bare `twinny-server` on a
+terminal runs the quickstart; off a terminal it exits with `2`.
+
 1. Have a backend running. The starter configuration uses Ollama on its
    default port:
 

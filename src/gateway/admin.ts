@@ -25,11 +25,13 @@ import {
   DEFAULT_RECORDING,
   DEFAULT_USAGE,
   GatewayConfigError,
-  loadGatewayConfig
+  loadGatewayConfig,
+  TEAM_PROVIDER_KIND
 } from "./config"
 import { INVITE_TTL_MS, invitesFileFor,InviteStore } from "./invites"
 import { KeyStore } from "./keys"
 import { describePlan, LicenseStore } from "./license"
+import { describeLocated, locateConfig } from "./locate"
 import { EXIT_CODE } from "./serve"
 import { parseSince, summarizeUsage, UsageTotals } from "./usage"
 
@@ -109,6 +111,10 @@ const takeConfig = (argv: string[]): { rest: string[]; paths: Paths } => {
       rest.push(arg)
     }
   }
+  // Without --config, the configuration a bare `twinny-server` would start,
+  // so a key is made in the keys file that gateway reads. Help needs none.
+  const located = configFile || rest.includes("--help") || rest.includes("-h") ? undefined : locateConfig()
+  if (located) configFile = located.file
   if (!configFile) {
     return {
       rest,
@@ -120,7 +126,15 @@ const takeConfig = (argv: string[]): { rest: string[]; paths: Paths } => {
       }
     }
   }
-  const config = loadGatewayConfig(configFile, providerRegistry.providerIds())
+  let config
+  try {
+    config = loadGatewayConfig(configFile, [...providerRegistry.providerIds(), TEAM_PROVIDER_KIND])
+  } catch (error) {
+    if (located && error instanceof GatewayConfigError) {
+      throw new GatewayConfigError(error.code, [...error.problems, describeLocated(located)])
+    }
+    throw error
+  }
   return {
     rest,
     paths: {

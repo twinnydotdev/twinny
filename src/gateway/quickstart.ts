@@ -33,6 +33,7 @@ import { candidatesFor, describeCandidate, describeModel, DiscoveredServer, disc
 import { applyBackendOption, DEFAULT_CONFIG_FILE, PLACEHOLDER_MODELS, starterConfig, starterModels, StarterOptions } from "./init"
 import { KEY_NAME_PATTERN, KeyStore } from "./keys"
 import { LicenseStore } from "./license"
+import { locateConfig, tildify } from "./locate"
 import { codeForConfigError, EXIT_CODE, runServe, ServeIo } from "./serve"
 import { Choice, Tui, TuiCancelled } from "./tui"
 import { SERVER_VERSION } from "./version"
@@ -338,10 +339,50 @@ const chooseModels = async (tui: Tui, starter: StarterOptions, yes: boolean): Pr
       ...others.map((m) => ({ label: m, hint: describeModel(m) || "unlikely for this", value: m as string | undefined })),
       { label: "Skip for now", hint: `keeps the placeholder ${PLACEHOLDER_MODELS[role]}; change it on the admin page`, value: undefined }
     ]
-    tui.line(`    ${tui.c.dim(ROLE_WHY[role])}`)
-    pick[role] = await tui.select(ROLE_LABEL[role], choices, 0)
+    pick[role] = await tui.select(ROLE_LABEL[role], choices, 0, ROLE_WHY[role])
   }
   return { pick, server }
+}
+
+/** Serve options a bare `twinny-server` passes through: `twinny-server --port 9000`. */
+const SERVE_FLAG = /^(--config|-c|--port|-p|--host|--demo)(=|$)/
+
+/** Whether a top-level argument belongs to serve rather than naming a command. */
+export const isServeFlag = (arg: string): boolean => SERVE_FLAG.test(arg)
+
+/** Whether a configuration's keys file holds an admin key; `undefined` when the file cannot be read (serve explains). */
+const hasAdminKey = (configFile: string): boolean | undefined => {
+  try {
+    const config = loadGatewayConfig(configFile, KNOWN_PROVIDERS())
+    return KeyStore.open(config.auth.keysFile).active().some((key) => key.admin)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * `twinny-server` with no command: start the gateway this machine has, or
+ * set one up. The configuration is found the way `locateConfig` says; with
+ * none on a terminal, quickstart runs (discover, write, admin key, serve).
+ * A configuration without an admin key goes through quickstart too, so the
+ * admin page can be opened. Off a terminal nothing is written: a service
+ * that cannot find its file should fail, not invent a gateway.
+ */
+export const runDefault = async (argv: string[], io: ServeIo, cwd = process.cwd(), tui: Tui = new Tui()): Promise<number> => {
+  if (argv.some((arg) => arg === "--config" || arg === "-c" || arg.startsWith("--config="))) return runServe(argv, io)
+  const located = locateConfig(cwd, io.env)
+  if (located) {
+    if (tui.interactive && argv.length === 0 && hasAdminKey(located.file) === false) {
+      return runQuickstart(["--config", located.file], io, cwd, tui, { reason: "This gateway has no admin key yet, so this makes one for the admin page." })
+    }
+    // serve finds the same file, and says which it was if it cannot start.
+    return runServe(argv, io)
+  }
+  if (tui.interactive && argv.length === 0) {
+    return runQuickstart([], io, cwd, tui, { reason: "No gateway configuration yet, so this sets one up. Next time, twinny-server starts it." })
+  }
+  // runServe says where it looked and what to run.
+  return runServe(argv, io)
 }
 
 /**
@@ -349,7 +390,13 @@ const chooseModels = async (tui: Tui, starter: StarterOptions, yes: boolean): Pr
  * `runServe`; the key is printed before the server banner so it is the
  * first thing on screen.
  */
-export const runQuickstart = async (argv: string[], io: ServeIo, cwd = process.cwd(), tui: Tui = new Tui()): Promise<number> => {
+export const runQuickstart = async (
+  argv: string[],
+  io: ServeIo,
+  cwd = process.cwd(),
+  tui: Tui = new Tui(),
+  { reason }: { reason?: string } = {}
+): Promise<number> => {
   let args: QuickstartArgs | "help"
   try {
     args = parseQuickstartArgs(argv, cwd)
@@ -361,15 +408,17 @@ export const runQuickstart = async (argv: string[], io: ServeIo, cwd = process.c
     io.out(QUICKSTART_HELP)
     return EXIT_CODE.ok
   }
-  const shown = path.relative(cwd, args.configFile) || args.configFile
+  const relative = path.relative(cwd, args.configFile)
+  const shown = relative && !relative.startsWith("..") ? relative : tildify(args.configFile)
   const c = tui.c
 
   try {
-    tui.title(`twinny-server ${SERVER_VERSION}`, "quickstart")
+    tui.title(`twinny-server ${SERVER_VERSION}`, reason ? "setup" : "quickstart")
+    if (reason) tui.step("info", reason)
     if (args.fresh) wipe(filesFor(args.configFile), true, io)
 
     if (fs.existsSync(args.configFile)) {
-      tui.step("ok", `Loading ${shown}`, args.configFile)
+      tui.step("ok", `Loading ${shown}`)
       if (args.starter.host || args.starter.backend) {
         tui.step("info", "--host and --backend only apply when the configuration is written; edit the file instead.")
       }
@@ -383,7 +432,7 @@ export const runQuickstart = async (argv: string[], io: ServeIo, cwd = process.c
       tui.step(
         "ok",
         `Wrote ${shown}`,
-        `${args.configFile} ${tui.g.bullet} ${models.length} aliases: ${models.map((m) => `${m.alias} (${m.capabilities.join("/")})`).join(", ")}`
+        `${tildify(args.configFile)} ${tui.g.bullet} ${models.length} aliases: ${models.map((m) => `${m.alias} (${m.capabilities.join("/")})`).join(", ")}`
       )
       if (found && placeholders.length) {
         tui.step("info", `Placeholder model names kept for ${placeholders.join(", ")}; change them on the admin page under Providers & models.`)
@@ -400,7 +449,7 @@ export const runQuickstart = async (argv: string[], io: ServeIo, cwd = process.c
         .map(([name, p]) => `${name}: ${p.provider}${p.apiHostname ? ` at ${p.apiHostname}${p.apiPort ? `:${p.apiPort}` : ""}` : ""}`)
         .join(", ")
     )
-    tui.step("ok", "Keys, usage and licence", `${path.dirname(config.auth.keysFile)} (keys.json, usage/, license)`)
+    tui.step("ok", "Keys, usage and licence", `${tildify(path.dirname(config.auth.keysFile))} (keys.json, usage/, license)`)
     const keys = KeyStore.open(config.auth.keysFile)
     const admins = keys.active().filter((key) => key.admin)
     if (admins.length) {
@@ -413,12 +462,15 @@ export const runQuickstart = async (argv: string[], io: ServeIo, cwd = process.c
       const name = args.admin ?? (args.yes ? defaultAdminName() : await tui.input("Admin key name", defaultAdminName(), validate))
       const { key, record } = keys.create(name, { admin: true })
       io.out("")
-      io.out(`Admin key for "${record.name}" (shown once; only its hash is kept in ${keys.file}):`)
+      io.out(`Admin key for "${record.name}" (shown once; only its hash is kept in ${tildify(keys.file)}):`)
       io.out("")
       tui.box([c.bold(c.accent(key)), "", c.dim("Shown once. Sign in to the admin page with it, and keep it somewhere safe.")], "Admin key")
       io.out("")
     }
-    const address = `http://${config.listen.host === "0.0.0.0" ? "<this machine>" : config.listen.host}:${config.listen.port || "<port>"}`
+    // Where serve will listen: TWINNY_HOST and TWINNY_PORT win over the file, as they do there.
+    const host = io.env.TWINNY_HOST?.trim() || config.listen.host
+    const port = io.env.TWINNY_PORT?.trim() || config.listen.port
+    const address = `http://${host === "0.0.0.0" ? "<this machine>" : host}:${port || "<port>"}`
     tui.line(`  ${c.bold("Next")}`)
     tui.line(`    1. Open ${c.accent(`${address}/admin`)} and sign in with the admin key.`)
     tui.line(`    2. Check ${c.bold("Providers & models")}: the backend should say answering, and the team defaults name real models.`)

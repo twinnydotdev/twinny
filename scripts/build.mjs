@@ -103,7 +103,18 @@ const lanceGlibcCheck = {
     logLevel: "silent"
   })
   const adminJs = adminUi.outputFiles[0]?.text ?? ""
-  const adminCss = fs.readFileSync("src/gateway/ui/styles.css", "utf8")
+  // Geist and IBM Plex Mono (SIL OFL 1.1, src/gateway/ui/fonts), inlined as
+  // data: URLs so the page still makes no request beyond the gateway's API.
+  const font = (file) =>
+    `url(data:font/woff2;base64,${fs.readFileSync(`src/gateway/ui/fonts/${file}`).toString("base64")}) format("woff2")`
+  const fontFaces = [
+    `@font-face{font-family:"Geist";font-style:normal;font-weight:100 900;font-display:swap;src:${font("geist-latin-wght.woff2")}}`,
+    ...[400, 500, 600].map(
+      (weight) =>
+        `@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:${weight};font-display:swap;src:${font(`ibm-plex-mono-latin-${weight}.woff2`)}}`
+    )
+  ].join("\n")
+  const adminCss = `${fontFaces}\n${fs.readFileSync("src/gateway/ui/styles.css", "utf8")}`
 
   const serverConfig = {
     bundle: true,

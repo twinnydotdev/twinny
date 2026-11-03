@@ -950,7 +950,7 @@ export const ConfigurationPanel = ({
                         {saved.kinds.find((kind) => kind.id === provider.provider)
                           ?.label ?? provider.provider}
                       </td>
-                      <td className="muted">
+                      <td className="muted mono">
                         {host
                           ? `${
                               provider.apiProtocol ??
@@ -1115,10 +1115,10 @@ export const ConfigurationPanel = ({
                         <span className="entity-name">{model.alias}</span>
                       </td>
                       <td>
-                        {model.model}
+                        <span className="mono">{model.model}</span>
                         {model.contextWindow ? <div className="muted" style={{ fontSize: 11 }}>{fmt(model.contextWindow)} token context</div> : null}
                       </td>
-                      <td className="muted">{model.provider}</td>
+                      <td className="muted mono">{model.provider}</td>
                       <td>
                         {model.capabilities.map((capability) => {
                           const isDefault = defaultsFor(model.alias).includes(capability)

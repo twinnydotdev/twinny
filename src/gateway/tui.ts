@@ -58,11 +58,12 @@ export const palette = (colour: boolean): Palette =>
     ? {
         bold: wrap(1, 22),
         dim: wrap(2, 22),
-        accent: wrap(36, 39),
+        // twinny green, as on the admin page.
+        accent: wrap(32, 39),
         good: wrap(32, 39),
         bad: wrap(31, 39),
         warn: wrap(33, 39),
-        info: wrap(34, 39),
+        info: wrap(2, 22),
         underline: wrap(4, 24)
       }
     : { bold: plain, dim: plain, accent: plain, good: plain, bad: plain, warn: plain, info: plain, underline: plain }
@@ -151,7 +152,7 @@ export class Tui {
    * Pick one entry with the arrow keys (or j/k), Enter to confirm, Esc or
    * Ctrl-C to cancel. Without a terminal the initial choice is returned.
    */
-  public async select<T>(question: string, choices: Array<Choice<T>>, initial = 0): Promise<T> {
+  public async select<T>(question: string, choices: Array<Choice<T>>, initial = 0, why?: string): Promise<T> {
     if (!choices.length) throw new Error(`No choices for "${question}".`)
     let index = Math.min(Math.max(initial, 0), choices.length - 1)
     if (!this.interactive) {
@@ -159,9 +160,12 @@ export class Tui {
       return choices[index].value
     }
     const { stdin } = this._streams
+    // The question, what it is for, then the list; all of it folds into one line once answered.
+    const height = choices.length + 1 + (why ? 1 : 0)
     const render = (first: boolean) => {
-      if (!first) this.write(up(choices.length + 1))
-      this.line(`  ${this.c.accent("?")} ${this.c.bold(question)}`)
+      if (!first) this.write(up(height))
+      this.line(`${CLEAR}  ${this.c.accent("?")} ${this.c.bold(question)}  ${this.c.dim("↑↓ to move, Enter to pick")}`)
+      if (why) this.line(`${CLEAR}    ${this.c.dim(why)}`)
       choices.forEach((choice, i) => {
         const on = i === index
         const label = on ? this.c.accent(choice.label) : choice.label
@@ -198,9 +202,9 @@ export class Tui {
       stdin.on("data", onData)
     })
     // Collapse the list into one settled line.
-    this.write(up(choices.length + 1))
-    for (let i = 0; i <= choices.length; i++) this.line(CLEAR)
-    this.write(up(choices.length + 1))
+    this.write(up(height))
+    for (let i = 0; i < height; i++) this.line(CLEAR)
+    this.write(up(height))
     this.step("ok", question, choices[answer].label)
     return choices[answer].value
   }
@@ -284,47 +288,193 @@ export class Spinner {
 /*  Serve output                                                              */
 /* -------------------------------------------------------------------------- */
 
-/** Colours the serve banner on a terminal; the text itself is unchanged. */
-export const decorateBanner = (tui: Tui, line: string): string => {
-  if (!tui.colour) return line
-  const listening = /^(Twinny gateway )(\S+ )?(listening on )(\S+)(.*)$/.exec(line)
-  if (listening) {
-    return `${tui.c.bold(listening[1])}${listening[2] ? tui.c.dim(listening[2]) : ""}${tui.c.bold(listening[3])}${tui.c.accent(tui.c.underline(listening[4]))}${listening[5]}`
+/** `/home/me/x` → `~/x` inside a value, for showing only. */
+const tildeIn = (text: string, home: string | undefined): string => {
+  if (!home || home === "/") return text
+  return text
+    .split(home)
+    .map((part, i) => (i === 0 ? part : `${/^($|[/\s),])/.test(part) ? "~" : home}${part}`))
+    .join("")
+}
+
+/** The order fields are shown in on a terminal; the rest follow in arrival order. */
+const PRIMARY = ["admin", "models", "access", "plan", "demo", "pooling", "recording"]
+const SECONDARY = ["limits", "config", "data", "usage", "health", "protocol"]
+const LABEL: Record<string, string> = { admin: "Admin page", models: "Models", access: "Access", plan: "Plan", demo: "Demo", pooling: "Pooling", recording: "Recording", limits: "Limits", config: "Config", data: "Data", usage: "Usage", health: "Health", protocol: "Protocol" }
+const LABEL_WIDTH = 12
+
+/**
+ * The serve banner, laid out for a person at a terminal. The gateway prints
+ * it as plain `  name: value` lines (what pipes, logs and tests read); here
+ * they are held until the banner is complete, then shown grouped: the
+ * address and what people need first, the plumbing dimmed below, notes
+ * last. Lines that are not banner lines pass straight through, after the
+ * banner. Off a colour terminal, use the lines as they are.
+ */
+export class BannerPrinter {
+  private _held: Array<[string, string]> | undefined
+  private _header: { version: string; url: string } | undefined
+  private _flushTimer: NodeJS.Immediate | undefined
+
+  constructor(
+    private readonly _tui: Tui,
+    private readonly _home: string | undefined = process.env.HOME
+  ) {}
+
+  /** One line the gateway printed to stdout. */
+  public out(line: string): void {
+    const header = /^Twinny gateway (\S+) listening on (\S+)$/.exec(line)
+    if (header) {
+      this.flush()
+      this._header = { version: header[1], url: header[2] }
+      this._held = []
+      // Everything after the header is printed in the same tick; a slow
+      // caller still gets the banner on the next one.
+      this._flushTimer = setImmediate(() => this.flush())
+      this._flushTimer.unref?.()
+      return
+    }
+    const field = /^ {2}([a-z]+):\s+(.*)$/.exec(line)
+    if (field && this._held) {
+      this._held.push([field[1], field[2]])
+      return
+    }
+    this.flush()
+    if (field?.[1] === "backend") {
+      this._tui.line(this._backend(field[2]))
+      return
+    }
+    if (field?.[1] === "note") {
+      this._tui.line(`  ${this._tui.c.warn(this._tui.g.warn)} ${tildeIn(field[2], this._home)}`)
+      return
+    }
+    this._tui.line(line)
   }
-  const field = /^( {2})(\w+:)(\s+)(.*)$/.exec(line)
-  if (!field) return line
-  let value = field[4]
-  if (field[2] === "admin:") value = value.replace(/^(\S+)/, (url) => tui.c.accent(tui.c.underline(url)))
-  else if (field[2] === "backend:") value = / answers /.test(value) ? tui.c.good(value) : /not answering/.test(value) ? tui.c.bad(value) : value
-  else if (field[2] === "note:") value = tui.c.warn(value)
-  else if (field[2] === "plan:" && /expir|grace|no seat/i.test(value)) value = tui.c.warn(value)
-  return `${field[1]}${tui.c.dim(field[2])}${field[3]}${value}`
+
+  /** Before anything else reaches the screen (a log line on stderr), the banner goes first. */
+  public flush(): void {
+    if (this._flushTimer) clearImmediate(this._flushTimer)
+    this._flushTimer = undefined
+    const held = this._held
+    const header = this._header
+    this._held = undefined
+    this._header = undefined
+    if (!held || !header) return
+    const { c, g } = this._tui
+    const value = (name: string) => held.find(([n]) => n === name)?.[1]
+    const row = (name: string, text: string, dim = false) => {
+      const label = (LABEL[name] ?? name.charAt(0).toUpperCase() + name.slice(1)).padEnd(LABEL_WIDTH)
+      this._tui.line(`  ${c.dim(label)}${dim ? c.dim(text) : text}`)
+    }
+    const protocol = value("protocol")?.split(" at ")[0]
+    this._tui.line("")
+    this._tui.line(`  ${c.bold("twinny-server")} ${c.dim(header.version)}`)
+    this._tui.line(`  ${c.good("●")} ${c.bold("Listening")} on ${c.bold(c.underline(header.url))}${protocol ? c.dim(`  ${g.bullet} ${protocol}`) : ""}`)
+    this._tui.line("")
+
+    const shown = new Set<string>(["protocol", "note"])
+    const notes = held.filter(([n]) => n === "note").map(([, v]) => v)
+    for (const name of PRIMARY) {
+      const text = value(name)
+      if (text === undefined) continue
+      shown.add(name)
+      row(name, this._primary(name, text))
+    }
+    for (const [name, text] of held) {
+      if (shown.has(name) || SECONDARY.includes(name)) continue
+      shown.add(name)
+      row(name, tildeIn(text, this._home))
+    }
+    const rest = SECONDARY.filter((name) => !shown.has(name) && value(name) !== undefined)
+    if (rest.length) this._tui.line("")
+    for (const name of rest) row(name, tildeIn(value(name) ?? "", this._home), true)
+    if (notes.length) this._tui.line("")
+    for (const note of notes) this._tui.line(`  ${c.warn(g.warn)} ${tildeIn(note, this._home)}`)
+    this._tui.line("")
+  }
+
+  private _primary(name: string, text: string): string {
+    const { c, g } = this._tui
+    const sep = c.dim(` ${g.bullet} `)
+    if (name === "admin") {
+      const match = /^(\S+)\s*(?:\((.*)\))?$/.exec(text)
+      return match ? `${c.accent(c.bold(c.underline(match[1])))}${match[2] ? c.dim(`  ${match[2]}`) : ""}` : text
+    }
+    if (name === "models") {
+      // `3 aliases (chat: chat, coder: fim, embed: embeddings)`
+      const list = /\((.*)\)$/.exec(text)?.[1]
+      if (!list) return text
+      return list
+        .split(", ")
+        .map((entry) => {
+          const [alias, caps] = entry.split(": ")
+          return caps ? `${alias} ${c.dim(caps)}` : alias
+        })
+        .join(sep)
+    }
+    if (name === "plan") return /expir|grace|no seat|invalid/i.test(text) ? c.warn(text) : text.split(", ").join(sep)
+    if (name === "recording") return tildeIn(text, this._home).replace(/ · /g, sep)
+    return tildeIn(text, this._home)
+  }
+
+  private _backend(text: string): string {
+    const { c, g } = this._tui
+    const answers = /^(\S+) answers \((\d+) ms\)$/.exec(text)
+    if (answers) return `  ${c.good(g.ok)} ${c.bold(answers[1])} answers ${c.dim(`in ${answers[2]} ms`)}`
+    const down = /^(\S+) is not answering (.*)$/.exec(text)
+    if (down) return `  ${c.bad(g.bad)} ${c.bold(down[1])} is not answering ${c.dim(down[2])}`
+    return `  ${c.dim(g.info)} ${text}`
+  }
+}
+
+/** Events the terminal banner shows already; the machine log keeps them. */
+const BANNER_EVENTS = new Set(["gateway.started", "backend.probe"])
+
+const OUTCOME_MARK = (tui: Tui, outcome: string): string =>
+  /^(ok|true)$/.test(outcome) ? tui.c.good(tui.g.ok) : outcome === "cancelled" ? tui.c.dim("○") : tui.c.bad(tui.g.bad)
+
+const duration = (ms: string): string => {
+  const n = Number(ms)
+  if (!Number.isFinite(n)) return ms
+  return n < 1000 ? `${n} ms` : `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)} s`
 }
 
 /**
- * A log line for people rather than log shippers: local time, a coloured
- * level, the event in bold, the fields dimmed, and the outcome of a request
- * coloured by how it went. Same fields as the machine format, same order.
+ * A log line for people rather than log shippers: local time, then the
+ * event. A request reads as one row (outcome, route, alias, who, how long);
+ * anything else as the event and its fields, dimmed. Warnings and errors
+ * say so in colour. Same fields as the machine format, same order, except
+ * the startup events the banner shows already.
  */
-export const prettyLogLine = (tui: Tui, level: string, fields: Array<[string, string]>): string => {
+export const prettyLogLine = (tui: Tui, level: string, fields: Array<[string, string]>): string | undefined => {
   const c = tui.c
-  const now = new Date()
-  const time = c.dim(now.toTimeString().slice(0, 8))
-  const tag = level === "error" ? c.bad("error") : level === "warn" ? c.warn("warn ") : c.info("info ")
-  let event = ""
+  const time = c.dim(new Date().toTimeString().slice(0, 8))
+  const get = (name: string) => fields.find(([n]) => n === name)?.[1]
+  const event = get("event") ?? ""
+  // The banner already says these, a line above.
+  if (level === "info" && BANNER_EVENTS.has(event)) return undefined
+  const tag = level === "error" ? `${c.bad("error")} ` : level === "warn" ? `${c.warn("warn")} ` : ""
+  if (event === "request" && get("outcome")) {
+    const outcome = get("outcome") ?? ""
+    const route = (get("route") ?? "").padEnd(10)
+    const alias = (get("alias") ?? "").padEnd(10)
+    const who = (get("key") ?? "").padEnd(14)
+    const took = duration(get("ms") ?? "").padStart(7)
+    const skip = new Set(["event", "outcome", "route", "alias", "key", "ms", "id"])
+    const extra = fields
+      .filter(([name]) => !skip.has(name))
+      .map(([name, value]) => (name === "kind" || name === "status") && outcome !== "ok" ? c.bad(value) : c.dim(`${name}=${value}`))
+    return `  ${time}  ${tag}${OUTCOME_MARK(tui, outcome)} ${route} ${alias} ${c.dim(who)} ${took}  ${extra.join(" ")}`.trimEnd()
+  }
   const rest: string[] = []
   for (const [name, value] of fields) {
-    if (name === "event") {
-      event = value
-      continue
-    }
-    let shown = value
+    if (name === "event") continue
     if (name === "outcome" || name === "ok") {
-      shown = /^(ok|true)$/.test(value) ? c.good(value) : /^(cancelled)$/.test(value) ? c.warn(value) : c.bad(value)
-      rest.push(`${c.dim(`${name}=`)}${shown}`)
+      rest.push(`${c.dim(`${name}=`)}${/^(ok|true)$/.test(value) ? c.good(value) : value === "cancelled" ? c.dim(value) : c.bad(value)}`)
       continue
     }
     rest.push(c.dim(`${name}=${value}`))
   }
-  return `${time} ${tag} ${c.bold(event.padEnd(16))} ${rest.join(" ")}`.trimEnd()
+  const name = level === "info" ? c.dim(event.padEnd(18)) : c.bold(event.padEnd(18))
+  return `  ${time}  ${tag}${name} ${rest.join(" ")}`.trimEnd()
 }

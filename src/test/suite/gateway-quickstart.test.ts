@@ -12,7 +12,9 @@ import { Readable, Writable } from "stream"
 
 import { candidatesFor, describeModel, discoverServers, parseBackendOption, pickModels } from "../../gateway/discover"
 import { applyBackendOption, starterConfig, starterModels, StarterOptions } from "../../gateway/init"
-import { palette, Tui, visibleLength } from "../../gateway/tui"
+import { locateConfig, rememberConfig, rememberedConfig, tildify } from "../../gateway/locate"
+import { isServeFlag } from "../../gateway/quickstart"
+import { BannerPrinter, palette, prettyLogLine, Tui, visibleLength } from "../../gateway/tui"
 
 import { Backend, startBackend } from "./support/backend"
 
@@ -28,6 +30,48 @@ const MODELS = [
   "all-minilm:latest",
   "deepseek-r1:70b"
 ]
+
+suite("finding the configuration when none is named", () => {
+  let root: string
+  setup(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "twinny-locate-"))
+  })
+  teardown(() => fs.rmSync(root, { recursive: true, force: true }))
+
+  test("TWINNY_CONFIG, then this directory, then the one served last, then the home directory", () => {
+    const home = path.join(root, "home")
+    const here = path.join(root, "here")
+    const away = path.join(root, "away")
+    for (const dir of [home, here, away]) fs.mkdirSync(dir, { recursive: true })
+    const write = (dir: string) => {
+      const file = path.join(dir, "twinny.gateway.json")
+      fs.writeFileSync(file, "{}")
+      return file
+    }
+    assert.strictEqual(locateConfig(here, {}, home), undefined)
+    const inHome = write(home)
+    assert.deepStrictEqual(locateConfig(here, {}, home), { file: inHome, source: "home" })
+    const served = write(away)
+    rememberConfig(served, home)
+    assert.strictEqual(rememberedConfig(home), served)
+    assert.deepStrictEqual(locateConfig(here, {}, home), { file: served, source: "remembered" })
+    const local = write(here)
+    assert.deepStrictEqual(locateConfig(here, {}, home), { file: local, source: "cwd" })
+    // Named is named, even before it exists: serve then says it cannot read it.
+    assert.deepStrictEqual(locateConfig(here, { TWINNY_CONFIG: "other.json" }, home), { file: path.join(here, "other.json"), source: "env" })
+    // A remembered file that has gone is passed over.
+    fs.rmSync(served)
+    fs.rmSync(local)
+    assert.deepStrictEqual(locateConfig(here, {}, home), { file: inHome, source: "home" })
+    assert.strictEqual(tildify(path.join(home, "x", "y.json"), home), path.join("~", "x", "y.json"))
+    assert.strictEqual(tildify("/elsewhere/y.json", home), "/elsewhere/y.json")
+  })
+
+  test("serve options at the top level start the gateway; anything else is a command", () => {
+    for (const arg of ["--config", "-c", "--config=x.json", "--port", "-p", "--port=0", "--host", "--host=0.0.0.0", "--demo"]) assert.ok(isServeFlag(arg), arg)
+    for (const arg of ["--help", "--version", "--quickstart", "--configs", "keys"]) assert.ok(!isServeFlag(arg), arg)
+  })
+})
 
 suite("quickstart model discovery", () => {
   test("ranks models by what the name says about them", () => {
@@ -105,6 +149,40 @@ suite("quickstart model discovery", () => {
     assert.match(text, /✓ Wrote a file 3 aliases/)
     assert.match(text, /╭─ Admin key ─+╮\n {2}│ {2}tsk_abc +│\n/)
     assert.ok(!text.includes(ESC), "no escape codes without a TTY")
+  })
+
+  test("on a colour terminal the serve banner is grouped, home paths shortened and notes last; other lines wait for it", () => {
+    const out: string[] = []
+    const tui = new Tui({
+      stdin: Object.assign(new Readable({ read() {} }), { isTTY: false }) as never,
+      stdout: Object.assign(new Writable({ write(chunk: Buffer, _e: string, cb: () => void) { out.push(chunk.toString()); cb() } }), { isTTY: true }) as never,
+      env: { FORCE_COLOR: "1" }
+    })
+    const banner = new BannerPrinter(tui, "/home/me")
+    for (const line of [
+      "Twinny gateway 9.9.9 listening on http://127.0.0.1:8765",
+      "  config:   /home/me/twinny.gateway.json",
+      "  protocol: twinny/v1 at /twinny/v1",
+      "  models:   2 aliases (chat: chat, coder: fim)",
+      "  admin:    http://127.0.0.1:8765/admin (admin keys)",
+      "  note:     the shared token is still accepted",
+      "  access:   1 active key"
+    ])
+      banner.out(line)
+    assert.strictEqual(out.join(""), "", "held until the banner is complete")
+    banner.flush() // what a log line on stderr does first
+    banner.out("  backend:  local answers (3 ms)")
+    const text = out.join("").replace(new RegExp(`${ESC}\\[[0-9;]*m`, "g"), "")
+    assert.match(text, /twinny-server 9\.9\.9\n {2}● Listening on http:\/\/127\.0\.0\.1:8765 {2}· twinny\/v1\n/)
+    const at = (needle: string) => text.indexOf(needle)
+    assert.ok(at("Admin page") < at("Models") && at("Models") < at("Access") && at("Access") < at("Config"), text)
+    assert.ok(at("Config") < at("! the shared token") && at("! the shared token") < at("✓ local answers in 3 ms"), text)
+    assert.match(text, /Models {6}chat chat · coder fim\n/)
+    assert.ok(text.includes("~/twinny.gateway.json") && !text.includes("/home/me"), text)
+
+    assert.strictEqual(prettyLogLine(tui, "info", [["event", "gateway.started"]]), undefined, "the banner says it already")
+    const request = prettyLogLine(tui, "info", [["event", "request"], ["id", "r1"], ["key", "alice"], ["route", "chat"], ["alias", "chat"], ["outcome", "ok"], ["ms", "1500"]]) ?? ""
+    assert.match(request.replace(new RegExp(`${ESC}\\[[0-9;]*m`, "g"), ""), /✓ chat +chat +alice +1\.5 s$/)
   })
 
   suite("against a fake Ollama", () => {
