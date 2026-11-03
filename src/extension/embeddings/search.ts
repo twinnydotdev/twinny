@@ -114,7 +114,8 @@ export class WorkspaceSearch {
     private readonly _db: EmbeddingDatabase,
     private readonly _embedder: Embedder,
     private readonly _reranker: Reranker,
-    private readonly _parse: FileParser = parseWithTreeSitter
+    private readonly _parse: FileParser = parseWithTreeSitter,
+    private readonly _includesFile: (file: string) => boolean = () => true
   ) {}
 
   /** Whether a search can return anything right now. */
@@ -141,14 +142,16 @@ export class WorkspaceSearch {
     const vector = await this.embedQuery(text, notes)
     progress({ stage: "retrieving" })
     const keywords = keywordQuery(text)
-    const focus = (options.focus ?? []).slice(0, FOCUS_FILE_LIMIT)
+    const focus = (options.focus ?? []).filter(this._includesFile).slice(0, FOCUS_FILE_LIMIT)
     const lists = await Promise.all([
       vector ? this._db.vectorSearch(vector, RETRIEVE_LIMIT) : [],
       this._db.textSearch(keywords, RETRIEVE_LIMIT),
       vector && focus.length ? this._db.vectorSearch(vector, FOCUS_LIMIT, focus) : [],
       focus.length ? this._db.textSearch(keywords, FOCUS_LIMIT, focus) : []
     ])
-    const candidates = fuseRankings(lists).slice(0, RERANK_LIMIT)
+    const candidates = fuseRankings(lists)
+      .filter((candidate) => this._includesFile(candidate.file))
+      .slice(0, RERANK_LIMIT)
     if (!candidates.length) return { ...empty, note: notes[0] }
 
     progress({ stage: "reranking", candidates: candidates.length })

@@ -1,5 +1,4 @@
 import fs from "fs"
-import os from "os"
 import path from "path"
 import * as vscode from "vscode"
 
@@ -8,13 +7,13 @@ import { messageOf } from "../../common/errors"
 import { logger } from "../../common/logger"
 import { TwinnyProvider } from "../../common/types"
 import { resolveProviderEndpoint } from "../providers/endpoint"
-import { sanitizeWorkspaceName } from "../utils"
 
 import { EmbeddingDatabase } from "./database"
 import { Embedder } from "./embedder"
 import { WorkspaceIndexer } from "./indexer"
 import { Reranker } from "./reranker"
 import { WorkspaceSearch } from "./search"
+import { workspaceIndexPath } from "./storage"
 
 export { Hit, SearchOptions } from "./search"
 
@@ -54,7 +53,10 @@ export class WorkspaceIndex implements vscode.Disposable {
     )
     this.reranker = new Reranker()
     this.indexer = new WorkspaceIndexer(_context, this.db, this.embedder)
-    this.search = new WorkspaceSearch(this.db, this.embedder, this.reranker)
+    this.search = new WorkspaceSearch(
+      this.db, this.embedder, this.reranker, undefined,
+      (file) => path.isAbsolute(file) && !!vscode.workspace.getWorkspaceFolder(vscode.Uri.file(file))
+    )
 
     this._disposables.push(
       this._changed,
@@ -74,7 +76,7 @@ export class WorkspaceIndex implements vscode.Disposable {
   }
 
   /**
-   * Opens the index for the current workspace under ~/.twinny. Returns
+   * Opens an isolated index for the current workspace. Returns
    * nothing when there is no workspace or the store cannot be opened; the
    * rest of the extension must still come up, only the embeddings tab goes
    * without.
@@ -82,12 +84,13 @@ export class WorkspaceIndex implements vscode.Disposable {
   public static async open(
     context: vscode.ExtensionContext
   ): Promise<WorkspaceIndex | undefined> {
-    const workspaceName = sanitizeWorkspaceName(vscode.workspace.name)
-    if (!workspaceName) return undefined
+    const dbPath = workspaceIndexPath(
+      context.storageUri, vscode.workspace.workspaceFile, vscode.workspace.workspaceFolders
+    )
+    if (!dbPath) return undefined
     try {
-      const dbDir = path.join(os.homedir(), ".twinny/embeddings")
-      if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
-      const index = new WorkspaceIndex(context, path.join(dbDir, workspaceName))
+      fs.mkdirSync(dbPath, { recursive: true })
+      const index = new WorkspaceIndex(context, dbPath)
       await index.db.connect()
       return index
     } catch (error) {
