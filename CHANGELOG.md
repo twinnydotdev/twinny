@@ -2,6 +2,17 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.16 · 2026-11-03
+
+Extension and `twinny-server` release: `twinny-server` starts without `--config`, its admin page and start-up screen are redone, and three fixes to the embeddings index were contributed by [@DivyamTalwar](https://github.com/DivyamTalwar).
+
+- **`twinny-server` on its own starts the gateway.** Without `--config` it uses the first configuration it finds: `$TWINNY_CONFIG`, then `./twinny.gateway.json`, then the one it served last (remembered in `~/.twinny/twinny-server.json`), then `~/twinny.gateway.json`. If it finds none and is run in a terminal, it runs setup and then serves. A configuration with no admin key runs setup to make one. Run outside a terminal, it lists the places it looked and exits with code 2, without writing anything. `--port`, `--host` and `--demo` work without `serve`, and `serve` and the admin commands (`keys`, `usage`, `license` and the rest) use the same lookup. `quickstart` and `reset` still use the current directory. If the configuration it found is broken, the error names the file and says why it was chosen ([#562](https://github.com/twinnydotdev/twinny/pull/562)).
+- **A clearer start-up screen.** In a colour terminal the banner shows the admin URL, models and access first, then limits and paths, and how long each backend took to answer. Request lines in the log are shorter. Output to a file or pipe is unchanged except for a new `config:` line naming the file in use.
+- **A new look for the admin page.** Black surfaces, rounded cards, pill badges and sentence-case labels, in Geist at 14px with IBM Plex Mono for code. Both fonts are embedded in the page. twinny green marks live status, links, focus and the selected item. Plugin logos keep their brand colours.
+- **Fixed: one workspace's index showing up in another.** Folders with the same name, or names that sanitize to the same string, shared one embeddings database. Each index is now keyed by the workspace's full URI and its set of root folders, and kept in VS Code's storage for that workspace. Old indexes are left on disk but not reused, so each workspace is indexed once more after updating. Results from a folder that is no longer in the workspace are dropped before reranking ([#555](https://github.com/twinnydotdev/twinny/pull/555)).
+- **Fixed: emptied files stayed searchable.** Saving an indexed file with nothing in it now removes its chunks from the index, as a full indexing run already did ([#554](https://github.com/twinnydotdev/twinny/pull/554)).
+- **Fixed: index saves failing with `ENOENT`.** Index manifest saves made at the same moment shared one temporary file. They now queue, each with a temporary file of its own ([#556](https://github.com/twinnydotdev/twinny/pull/556)).
+
 ## 4.3.15 · 2026-10-16
 
 Extension release: a reworked sidebar, agent mode that can be steered while it works, and better handling of small local models.
