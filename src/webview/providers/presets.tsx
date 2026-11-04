@@ -144,6 +144,13 @@ export const PRESETS: ProviderPreset[] = [
     "shoukewei/Qwen3.8-27B-OBLITERATED22-AGENT",
     "chat"
   ),
+  hosted(
+    API_PROVIDERS.UberLLM,
+    "UberLLM",
+    codicon("plug"),
+    "deepseek/deepseek-v4.1-flash",
+    "chat"
+  ),
   hosted(API_PROVIDERS.Cohere, "Cohere", <SvgCohere />, "command-r-plus"),
   hosted(
     API_PROVIDERS.Perplexity,
