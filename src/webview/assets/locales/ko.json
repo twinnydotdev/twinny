@@ -68,6 +68,7 @@
   "port": "포트",
   "port-placeholder": "포트 번호를 입력하세요 예: '11434'",
   "preset-demonroute": "하나의 키로 오픈 웨이트 채팅 모델을 사용할 수 있습니다. demonroute.com의 API 키가 필요합니다.",
+  "preset-uberllm": "하나의 선불 키로 GPT, Claude, Gemini, DeepSeek 등의 모델을 사용할 수 있습니다. uberllm.dev의 API 키가 필요합니다.",
   "protocol": "프로토콜",
   "provider": "제공자",
   "provider-name": "제공자 이름",

@@ -9,6 +9,7 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   LlamaCpp: "llamacpp",
   OpenAICompatible: "openai-compatible",
   Qvac: "qvac",
+  UberLLM: "uberllm",
   /** Another machine's Ollama, reached over an encrypted peer-to-peer link. */
   TwinnyP2P: "twinny-p2p"
 }
@@ -53,7 +54,8 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.Perplexity]: "Perplexity",
   [API_PROVIDERS.Qvac]: "QVAC",
   [API_PROVIDERS.TwinnyP2P]: "twinny device (P2P)",
-  [API_PROVIDERS.TwinnyRemote]: "twinny gateway"
+  [API_PROVIDERS.TwinnyRemote]: "twinny gateway",
+  [API_PROVIDERS.UberLLM]: "UberLLM"
 }
 
 /**
