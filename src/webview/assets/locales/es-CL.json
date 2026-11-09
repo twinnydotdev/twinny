@@ -68,6 +68,7 @@
   "port": "Puerto",
   "port-placeholder": "Ingrese un número de puerto e.g '11434'",
   "preset-demonroute": "Modelos de chat de pesos abiertos con una sola llave. Requiere una llave API de demonroute.com.",
+  "preset-standardcompute": "Envía cada solicitud de chat al modelo habilitado más económico que pueda manejarla, con respaldo automático. Requiere una llave API de standardcompute.com.",
   "protocol": "Protocolo",
   "provider": "Proveedor",
   "provider-name": "Nombre del Proveedor",
