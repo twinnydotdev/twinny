@@ -23,7 +23,7 @@ import { createSign } from "node:crypto"
 import { noAnswer, timeoutSignal } from "../../common/deadline"
 import { messageOf } from "../../common/errors"
 
-import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, MAX_FILES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
+import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, isTokenRefused, MAX_FILES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
 import {
   GatewayPlugin,
   json,
@@ -459,12 +459,15 @@ export class GitHubForge implements Forge {
       try {
         data = await this.graphql(pullsQuery(true), variables, token, signal, what)
       } catch (error) {
-        if (signal.aborted || !(error instanceof PluginError) || error.status !== 502) throw error
+        if (signal.aborted || !(error instanceof PluginError) || error.status !== 502 || isTokenRefused(error)) throw error
         // The host would not answer the richer query (scopes, an older
-        // Enterprise); take what it gives and stop asking for more.
+        // Enterprise); take what it gives and stop asking for more. Only
+        // once the plain query has gone through: when both fail (the rate
+        // limit, an outage) the richer query was not the problem, and
+        // remembering it would hide approvals until the server restarts.
+        data = await this.graphql(pullsQuery(false), variables, token, signal, what)
         this._context.log.warn({ event: "plugin.github-plain-listing", reason: repo.fullName, message: error.message })
         this._plainListing.add(repo.id)
-        data = await this.graphql(pullsQuery(false), variables, token, signal, what)
       }
     }
     const repository = rec(data.repository)

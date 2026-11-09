@@ -159,13 +159,17 @@ export class CompletionProvider
     context: InlineCompletionContext,
     token: CancellationToken
   ): Promise<InlineCompletionItem[] | undefined> {
+    // Not an editor the user types in, so it must not stop the request in
+    // flight for one. The Output panel showing twinny's own log is such a
+    // document: each debug line written mid-request asked again and
+    // aborted it (#559).
+    if (IGNORED_SCHEMES.has(document.uri.scheme)) return
     // Invalidate even when this invocation returns early or uses the cache.
     this.abortCompletion()
     if (token.isCancellationRequested) return
     const provider = this.getFimProvider()
     if (!this.config.get<boolean>("enabled", true) || !provider) return
 
-    if (IGNORED_SCHEMES.has(document.uri.scheme)) return
     if (!this.isLanguageEnabled(document.languageId)) return
 
     const isManualTrigger =

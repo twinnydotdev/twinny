@@ -2,6 +2,16 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.17 · 2026-11-09
+
+Extension and `twinny-server` release: current models for hosted providers, completions no longer cancelled by twinny's own log, and two fixes to the GitHub plugin page.
+
+- **Current models for hosted providers.** fluency.js 1.0.33 brings the model lists up to date, so current Gemini models, Mistral Large 4 and Claude Haiku 5.5 are accepted; until now twinny refused them before any request was sent ([#546](https://github.com/twinnydotdev/twinny/issues/546)). Retired model names are no longer accepted: a provider saved with one shows "Invalid 'model' field" and needs a model picked from the list.
+- **Fixed: hosted presets defaulting to retired models.** New providers start with `claude-sonnet-5-5` (Anthropic), `gemini-3.8-flash` (Gemini), `deepseek-flash` (DeepSeek), `command-a-plus-05-2026` (Cohere) and `sonar` (Perplexity) ([#547](https://github.com/twinnydotdev/twinny/issues/547)).
+- **Fixed: completions cancelled while the twinny log is open.** With the Output panel showing twinny's log, each debug line written during a request asked for a completion in the panel and cancelled the one in the editor, so suggestions rarely appeared with debug logging on ([#559](https://github.com/twinnydotdev/twinny/issues/559)).
+- **Fixed: the pull request table's open link hidden off to the right.** Long branch names made the table wider than the page, so it scrolled sideways even on wide screens and the **open ↗** column was cut off. Branch names now wrap, and the last column of the pull request and issue tables stays in view when a narrow window still makes them scroll.
+- **Fixed: "waiting for me" empty after an expired GitHub token.** One sync with a refused token made the GitHub plugin stop asking for reviewers and approvals on that repository until the server restarted, so after the token was replaced, "waiting for me" matched nothing and the approval counts were gone. Only a host that refuses the reviewer detail itself is now listed without it.
+
 ## 4.3.16 · 2026-11-03
 
 Extension and `twinny-server` release: `twinny-server` starts without `--config`, its admin page and start-up screen are redone, and three fixes to the embeddings index were contributed by [@DivyamTalwar](https://github.com/DivyamTalwar).

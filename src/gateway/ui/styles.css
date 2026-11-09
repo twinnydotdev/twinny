@@ -600,7 +600,9 @@ table.pulls th, table.pulls td { padding-top: 8px; padding-bottom: 8px; }
 table.pulls .entity-name { line-height: 1.4; }
 table.pulls .entity-name .tag { margin-right: 4px; vertical-align: 2px; }
 .pull-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 3px; }
-.pull-sub .pull-ref, .pull-sub .pull-branches { white-space: nowrap; }
+.pull-sub .pull-ref { white-space: nowrap; }
+/* Long branch names break, so the first column can give way before the table has to scroll. */
+.pull-sub .pull-branches code { overflow-wrap: anywhere; }
 .pull-tags { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 5px; }
 .pull-tags .tag { margin: 0; }
 .pull-sub .pull-branches code { color: var(--accent); }
@@ -618,6 +620,11 @@ tr.pull-row.needs-me:hover td { background: color-mix(in srgb, var(--warn) 9%, t
 table.pulls td.size { font-variant-numeric: tabular-nums; }
 table.pulls .open-link { font-size: 13px; color: var(--ink-2); text-decoration: none; white-space: nowrap; padding: 2px 6px; border: 1px solid transparent; border-radius: var(--r); }
 table.pulls .open-link:hover, table.pulls .open-link:focus-visible { color: var(--accent); border-color: var(--line); outline: none; }
+/* The last column (open ↗, triage) stays in view when a narrow window makes the table scroll. Its tints mix with the panel, not transparent, so nothing shows through. */
+table.pulls th:last-child, table.pulls td.actions { position: sticky; right: 0; background: var(--panel); }
+tr.pull-row:hover td.actions, tr.pull-row:focus-visible td.actions { background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+tr.pull-row.needs-me td.actions { background: color-mix(in srgb, var(--warn) 4%, var(--panel)); }
+tr.pull-row.needs-me:hover td.actions { background: color-mix(in srgb, var(--warn) 9%, var(--panel)); }
 @media (max-width: 640px) {
   .filter.sort { flex-basis: 100%; }
   .filter.sort select { flex: 1; max-width: none; }
