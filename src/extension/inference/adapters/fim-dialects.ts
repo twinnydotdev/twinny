@@ -119,7 +119,6 @@ export function createStreamRequestBodyFim(
   const maxTokens = options.numPredictFim > 0 ? options.numPredictFim : undefined
 
   switch (provider) {
-    case API_PROVIDERS.OpenAICompatible:
     case API_PROVIDERS.OpenWebUI:
     case API_PROVIDERS.Ollama:
     case API_PROVIDERS.TwinnyP2P:
@@ -136,6 +135,7 @@ export function createStreamRequestBodyFim(
           ...(stop ? { stop } : {})
         }
       }
+    case API_PROVIDERS.OpenAICompatible:
     case API_PROVIDERS.LMStudio:
       return {
         model: options.model,
