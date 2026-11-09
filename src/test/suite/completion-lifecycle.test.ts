@@ -49,4 +49,39 @@ suite("Completion lifecycle", () => {
       }
     })
   }
+
+  test("a log line in the Output panel does not stop the request in flight (#559)", async () => {
+    const context = { globalState: { get: () => ({ id: "test", modelName: "test" }) } } as unknown as vscode.ExtensionContext
+    const provider = new CompletionProvider(
+      new GenerationTracker(),
+      new FileInteractionCache(),
+      {} as TemplateProvider,
+      context
+    )
+    let requests = 0
+    Object.assign(provider, {
+      config: {
+        get(key: string, fallback: unknown) {
+          if (key === "enabled" || key === "autoSuggestEnabled") return true
+          if (key === "debounceWait") return 20
+          return fallback
+        }
+      },
+      async complete() { requests++; return undefined }
+    })
+    const document = await vscode.workspace.openTextDocument({ content: "const value = " })
+    // The Output panel's document, as VS Code hands it over when twinny's log grows.
+    const output = { uri: vscode.Uri.parse("output:extension-output-twinny"), languageId: "log" } as vscode.TextDocument
+    const source = new vscode.CancellationTokenSource()
+    const context0 = { triggerKind: vscode.InlineCompletionTriggerKind.Automatic, selectedCompletionInfo: undefined }
+    try {
+      const pending = provider.provideInlineCompletionItems(document, new vscode.Position(0, 14), context0, source.token)
+      await provider.provideInlineCompletionItems(output, new vscode.Position(0, 0), context0, source.token)
+      await pending
+      assert.strictEqual(requests, 1)
+    } finally {
+      source.dispose()
+      provider.dispose()
+    }
+  })
 })

@@ -130,10 +130,10 @@ export const PRESETS: ProviderPreset[] = [
     API_PROVIDERS.Anthropic,
     "Anthropic",
     <SvgAnthropic />,
-    "claude-sonnet-4-20250514"
+    "claude-sonnet-5-5"
   ),
-  hosted(API_PROVIDERS.Deepseek, "DeepSeek", <SvgDeepseek />, "deepseek-chat"),
-  hosted(API_PROVIDERS.Gemini, "Gemini", <SvgGemini />, "gemini-2.5-pro-preview-05-06"),
+  hosted(API_PROVIDERS.Deepseek, "DeepSeek", <SvgDeepseek />, "deepseek-flash"),
+  hosted(API_PROVIDERS.Gemini, "Gemini", <SvgGemini />, "gemini-3.8-flash"),
   hosted(API_PROVIDERS.Groq, "Groq", <SvgGroq />, "llama-3.3-70b-versatile"),
   hosted(API_PROVIDERS.Mistral, "Mistral", <SvgMistral />, "mistral-small-latest"),
   hosted(API_PROVIDERS.OpenRouter, "OpenRouter", <SvgOpenRouter />, "openai/gpt-4.1"),
@@ -144,12 +144,12 @@ export const PRESETS: ProviderPreset[] = [
     "shoukewei/Qwen3.8-27B-OBLITERATED22-AGENT",
     "chat"
   ),
-  hosted(API_PROVIDERS.Cohere, "Cohere", <SvgCohere />, "command-r-plus"),
+  hosted(API_PROVIDERS.Cohere, "Cohere", <SvgCohere />, "command-a-plus-05-2026"),
   hosted(
     API_PROVIDERS.Perplexity,
     "Perplexity",
     <SvgPerplexity />,
-    "llama-3.1-sonar-small-128k-online"
+    "sonar"
   ),
   // fim
   local(API_PROVIDERS.Ollama, "fim", "", FIM_TEMPLATE_FORMAT.automatic),
