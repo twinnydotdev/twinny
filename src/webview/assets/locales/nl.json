@@ -68,6 +68,7 @@
   "port": "Poort",
   "port-placeholder": "Voer een poortnummer in bijv. '11434'",
   "preset-demonroute": "Chatmodellen met open gewichten via één sleutel. Vereist een API sleutel van demonroute.com.",
+  "preset-standardcompute": "Stuurt elk chatverzoek naar het goedkoopste ingeschakelde model dat het aankan, met automatische terugval. Vereist een API sleutel van standardcompute.com.",
   "protocol": "Protocol",
   "provider": "Provider",
   "provider-name": "Provider naam",
