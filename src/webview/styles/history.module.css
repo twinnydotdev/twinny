@@ -9,11 +9,13 @@
 
 .count {
   padding: 0 5px;
-  border: 1px solid var(--tw-rule);
   color: var(--tw-fg-dim);
   font-weight: 400;
   line-height: 16px;
   letter-spacing: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tw-fill-strong);
 }
 
 .toolbar {
@@ -38,6 +40,7 @@
 
 .confirmBanner {
   border: 1px solid var(--vscode-editorWarning-foreground, var(--tw-rule));
+  border-radius: var(--tw-radius);
 }
 
 .confirmRow {
@@ -77,17 +80,17 @@
 }
 
 .row {
-  border-bottom: 1px solid var(--tw-rule-soft);
+  margin: 0 -8px 2px;
+  padding: 4px 8px;
+  border-radius: var(--tw-radius);
 }
 
 .row:hover {
-  background: var(--tw-surface);
+  background: var(--tw-fill);
 }
 
 .rowActive {
-  border-left: 2px solid var(--tw-mark);
-  margin-left: -8px;
-  padding-left: 6px;
+  background: var(--tw-fill-strong);
 }
 
 .rowMain {
@@ -190,6 +193,7 @@
   font-family: var(--tw-font);
   font-size: var(--tw-fs);
   cursor: pointer;
+  border-radius: var(--tw-radius);
 }
 
 .empty:hover {

@@ -14,9 +14,11 @@
   gap: 6px;
   /* As wide as the input it opens from, up to a comfortable line. */
   max-width: 420px;
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
   background: var(--tw-bg);
-  border: 1px solid var(--tw-rule);
+  border: 1px solid var(--tw-rule-soft);
+  border-radius: var(--tw-radius-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
   font-size: var(--tw-fs-sm);
 }
 
@@ -72,9 +74,9 @@
 }
 
 .choice {
-  padding: 1px 6px;
+  padding: 2px 9px;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: 999px;
   background: none;
   color: var(--tw-fg-faint);
   font: inherit;
@@ -90,8 +92,7 @@
 
 .chosen,
 .chosen:hover:not(:disabled) {
-  border-color: var(--tw-rule);
-  background: color-mix(in srgb, var(--tw-fg) 8%, transparent);
+  background: var(--tw-fill-strong);
   color: var(--tw-fg);
 }
 

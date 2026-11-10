@@ -187,6 +187,17 @@ export class ReviewStore {
     )
   }
 
+  /** Whether the pull's current commit has had its review, finished or failed. */
+  public hasTried(pull: PullSummary, repoId: string): boolean {
+    return this._reviews.some(
+      (review) =>
+        review.repoId === repoId &&
+        review.number === pull.number &&
+        review.headSha === pull.headSha &&
+        (review.status === "done" || review.status === "failed")
+    )
+  }
+
   public brief(repoId: string, pull: PullSummary): ReviewBrief | undefined {
     const review = this.latest(repoId, pull.number)
     return (

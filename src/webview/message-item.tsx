@@ -10,6 +10,8 @@ interface MessageListProps {
   message: ChatCompletionMessage
   messages: ChatCompletionMessage[]
   completion?: ChatCompletionMessage | null
+  /** The row of the reply in progress, which comes after the messages: the typing indicator, then the reply as it streams. */
+  pending?: boolean
   /** The workspace search for the reply in progress, shown under it. */
   context?: WorkspaceSearchReport
   /** The tool steps of the reply in progress, shown above it. */
@@ -37,6 +39,7 @@ const MessageItem = memo(
     message,
     messages,
     completion,
+    pending,
     context,
     steps,
     isLoading,
@@ -55,6 +58,28 @@ const MessageItem = memo(
     // A reply the user stopped, or one that used every tool step it had.
     const canContinue =
       isAgentMessage && isLastMessage && !isLoading && !!(message.meta?.stopped || message.meta?.outOfSteps)
+
+    if (pending) {
+      // Never an empty row: Virtuoso measures nothing as an error.
+      return completion ? (
+        <Message
+          key={`completion-${messageKey}`}
+          isAssistant={true}
+          message={completion}
+          context={context}
+          steps={steps}
+          index={index}
+          isLoading={isLoading}
+          messages={messages}
+          onDelete={handleDeleteMessage}
+          onEdit={handleEditMessage}
+          onRegenerate={handleRegenerateMessage}
+          onDeleteImage={handleDeleteImage}
+        />
+      ) : (
+        <TypingIndicator context={context} steps={steps} />
+      )
+    }
 
     return (
       <>
@@ -86,25 +111,6 @@ const MessageItem = memo(
             onContinue={canContinue ? handleContinue : undefined}
             onChangesUpdate={handleChangesUpdate}
           />
-        )}
-        {completion && isLastMessage && (
-          <Message
-            key={`completion-${messageKey}`}
-            isAssistant={true}
-            message={completion}
-            context={context}
-            steps={steps}
-            index={index}
-            isLoading={isLoading}
-            messages={messages}
-            onDelete={handleDeleteMessage}
-            onEdit={handleEditMessage}
-            onRegenerate={handleRegenerateMessage}
-            onDeleteImage={handleDeleteImage}
-          />
-        )}
-        {isLoading && !completion && isLastMessage && (
-          <TypingIndicator context={context} steps={steps} />
         )}
       </>
     )

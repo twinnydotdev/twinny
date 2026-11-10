@@ -214,10 +214,101 @@
   }
 }
 
+/* What the model's server says about it: where it runs, then what it holds and whether it is in memory. */
+.crtFacts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  line-height: 1.5;
+  animation: crt-fade 0.4s ease-out 1.3s both;
+}
+
+.crtChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.crtChip,
+.crtLoad {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tw-fill);
+  color: var(--tw-fg-dim);
+  font: inherit;
+  letter-spacing: var(--tw-track);
+  white-space: nowrap;
+}
+
+.crtChipError {
+  color: var(--vscode-errorForeground, var(--tw-fg));
+  cursor: help;
+}
+
+.crtLoad {
+  background: var(--tw-primary-bg);
+  color: var(--tw-primary-fg);
+  cursor: pointer;
+}
+
+.crtLoad:hover {
+  background: var(--tw-primary-hover);
+}
+
+/* Three first questions about the open file. */
+.starters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  animation: crt-fade 0.4s ease-out 1.5s both;
+}
+
+.starter {
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--tw-fg) 12%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.starter:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--tw-fill-strong);
+  color: var(--tw-fg);
+}
+
+.starter:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .crtTyped,
   .crtCursor,
-  .crtLine {
+  .crtLine,
+  .crtFacts,
+  .starters {
     animation: none;
   }
 }
@@ -243,8 +334,10 @@
   left: 50%;
   z-index: 3;
   transform: translateX(-50%);
-  border: 1px solid var(--tw-rule);
+  border: 1px solid var(--tw-rule-soft);
+  border-radius: 999px;
   background: var(--tw-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .scrollDown::part(control) {
@@ -280,9 +373,11 @@
   z-index: 5;
   max-height: 60vh;
   overflow-y: auto;
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
   background: var(--tw-bg);
-  border: 1px solid var(--tw-rule);
+  border: 1px solid var(--tw-rule-soft);
+  border-radius: var(--tw-radius-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
   font-size: var(--tw-fs-sm);
 }
 
@@ -325,9 +420,10 @@
 }
 
 .shortcuts kbd {
-  padding: 0 4px;
-  border: 1px solid var(--tw-rule);
-  border-radius: 3px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--tw-radius-sm);
+  background: var(--tw-fill-strong);
   color: var(--tw-fg);
   font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
@@ -335,9 +431,17 @@
   white-space: nowrap;
 }
 
-.shortcutsHint {
+/* The model's state and the keys hint, at the far end of the footer. */
+.footerEnd {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
   margin-left: auto;
+  padding-left: 8px;
+}
+
+.shortcutsHint {
+  flex-shrink: 0;
   padding: 0 var(--tw-pad);
   background: none;
   border: 0;
@@ -380,21 +484,24 @@
   opacity: 0.7;
 }
 
-/* The input is a framed field inset from the edges; focus firms its frame. */
+/* The input is a rounded, filled field inset from the edges; focus lifts its ground and draws a soft ring. */
 .chatBox {
   position: relative;
   container-type: inline-size;
   display: flex;
   align-items: stretch;
   margin: 0 var(--tw-pad);
-  border: 1px solid var(--tw-rule);
+  border: 1px solid color-mix(in srgb, var(--tw-fg) 8%, transparent);
+  border-radius: 12px;
   cursor: text;
-  background: var(--tw-surface);
-  transition: border-color 0.12s ease;
+  background: var(--tw-fill);
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
 }
 
 .chatBox:focus-within {
-  border-color: var(--tw-fg-faint);
+  border-color: color-mix(in srgb, var(--tw-fg) 22%, transparent);
 }
 
 .chatBoxDisabled {
@@ -406,26 +513,30 @@
   pointer-events: none;
 }
 
-/* The prompt glyph is the one place colour is spent. */
-/* The ornament chevron runs heavy in a UI font: half size, centred on the first line. */
+/* A small, quiet chevron ahead of the draft; doubled in agent mode. No glow. */
 .prompt {
   flex: 0 0 auto;
-  padding: 5px 0 0 9px;
+  padding: 10px 0 0 12px;
   color: var(--tw-fg-faint);
-  font-size: 9px;
+  font-size: 7px;
   line-height: calc(var(--tw-fs) * var(--tw-lh));
   user-select: none;
   transition: color 0.12s ease;
 }
 
 .chatBox:focus-within .prompt {
-  color: var(--tw-cursor);
+  color: var(--tw-fg-dim);
 }
 
+/*
+ * The switches and buttons sit in a strip under the editor, outside what
+ * scrolls, so a tall draft or a pasted image never runs beneath them.
+ */
 .editorWrap {
   flex: 1 1 auto;
   min-width: 0;
   max-height: 40vh;
+  margin-bottom: 34px;
   overflow-y: auto;
 }
 
@@ -433,7 +544,7 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 5px 8px 24px;
+  padding: 9px 12px 2px;
   border: none;
   background: transparent;
   color: var(--tw-fg);
@@ -463,22 +574,76 @@
 
 .chatButtons {
   position: absolute;
-  bottom: 4px;
-  right: 6px;
+  bottom: 6px;
+  right: 8px;
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.stopButton {
-  color: var(--vscode-errorForeground);
+/* Send, and stop in its place while a reply is being written: the one solid thing in the composer. */
+.sendButton {
+  margin-left: 4px;
+}
+
+vscode-button.sendButton[appearance="icon"]::part(control) {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--tw-primary-bg);
+  color: var(--tw-primary-fg);
+  opacity: 1;
+}
+
+vscode-button.sendButton[appearance="icon"]:hover::part(control) {
+  background: var(--tw-primary-hover);
+}
+
+vscode-button.sendButton[appearance="icon"][disabled]::part(control) {
+  opacity: 0.3;
+}
+
+.sendButton {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+}
+
+vscode-button.sendButton[appearance="icon"]::part(control) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 0;
+  line-height: 1;
+}
+
+/* The glyph fills the disc and centres itself, whatever the font's own bearings. */
+.sendButton :global(.codicon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 11px !important;
+  line-height: 1;
+}
+
+/* Stop is a drawn square: the font's stop glyph sits off the middle of its box. */
+.stopButton :global(.codicon)::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: currentColor;
 }
 
 /* Lined up with the input above it. */
 .footer {
   display: flex;
   align-items: center;
-  padding: 0 calc(var(--tw-pad) - 8px) 2px;
+  padding: 4px calc(var(--tw-pad) - 8px) 2px;
   container-type: inline-size;
 }
 
@@ -508,9 +673,8 @@
 
 .agent .prompt,
 .agent:focus-within .prompt {
-  color: var(--tw-agent);
+  color: var(--tw-fg-dim);
   letter-spacing: -0.12em;
-  text-shadow: 0 0 6px color-mix(in srgb, var(--tw-agent) 60%, transparent);
 }
 
 .agentBusy .prompt {
@@ -532,9 +696,9 @@
  */
 .modeSwitches {
   position: absolute;
-  bottom: 4px;
-  left: 6px;
-  max-width: calc(100% - 6px - 64px);
+  bottom: 6px;
+  left: 8px;
+  max-width: calc(100% - 8px - 72px);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -558,8 +722,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 1px 6px 1px 4px;
-  border-radius: 3px;
+  height: 20px;
+  padding: 0 8px 0 7px;
+  border-radius: 999px;
   background: none;
   border: 0;
   color: var(--tw-fg-faint);
@@ -568,10 +733,14 @@
   letter-spacing: var(--tw-track);
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
 }
 
 .agentToggle:hover {
   color: var(--tw-fg-dim);
+  background: color-mix(in srgb, var(--tw-fg) 6%, transparent);
 }
 
 .agentDot {
@@ -579,9 +748,7 @@
   height: 6px;
   border: 1px solid currentColor;
   border-radius: 50%;
-  transition:
-    background 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .agentToggle:disabled {
@@ -591,7 +758,7 @@
 .agentToggleOn,
 .agentToggleOn:hover {
   color: var(--tw-agent);
-  background: color-mix(in srgb, var(--tw-agent) 12%, transparent);
+  background: color-mix(in srgb, var(--tw-agent) 10%, transparent);
 }
 
 .agentToggle :global(.codicon) {
@@ -601,7 +768,6 @@
 .agentToggleOn .agentDot {
   background: var(--tw-agent);
   border-color: var(--tw-agent);
-  box-shadow: 0 0 6px var(--tw-agent);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -212,9 +212,21 @@ export class GatewayServer {
           this.crashed(req, res, error)
         )
     )
-    this._server.on("upgrade", (req, socket, head) =>
-      this.handleUpgrade(req, socket as import("node:net").Socket, head)
-    )
+    this._server.on("upgrade", (req, socket, head) => {
+      // Node hands the socket over with no error listener of its own: a
+      // caller who resets the connection while being refused would
+      // otherwise bring the whole gateway down.
+      socket.on("error", () => socket.destroy())
+      try {
+        this.handleUpgrade(req, socket as import("node:net").Socket, head)
+      } catch (error) {
+        socket.destroy()
+        this._options.log.error({
+          event: "peer.crashed",
+          message: error instanceof Error ? error.message : String(error)
+        })
+      }
+    })
     this._gate = new InferenceGate({
       limits: _options.config.limits,
       config: () => this.config,
@@ -428,11 +440,12 @@ export class GatewayServer {
       res.end(text)
       return
     }
-    const since = url.searchParams.get("since")
     const limit = Number(url.searchParams.get("limit") ?? 200)
+    const since = this.sinceOf(url, res)
+    if (since === false) return
     sendJson(res, 200, {
       entries: audit.query({
-        ...(since ? { since: parseSince(since, new Date()) } : {}),
+        ...(since ? { since } : {}),
         ...(url.searchParams.get("actor") ? { actor: url.searchParams.get("actor") as string } : {}),
         ...(url.searchParams.get("action") ? { action: url.searchParams.get("action") as string } : {}),
         limit: Number.isFinite(limit) ? Math.min(Math.max(1, limit), 1000) : 200
@@ -713,7 +726,13 @@ export class GatewayServer {
             })
             return
           }
-          sendJson(res, 200, summarizeUsage(usage.dir, since, now, pricingOf(this.config)))
+          const summary = summarizeUsage(usage.dir, since, now, pricingOf(this.config))
+          // The same length of time just before, so the page can say how the period compares.
+          if (url.searchParams.get("compare") === "previous") {
+            const before = new Date(since.getTime() - (now.getTime() - since.getTime()))
+            summary.previous = summarizeUsage(usage.dir, before, since, pricingOf(this.config)).total
+          }
+          sendJson(res, 200, summary)
           return
         }
         case "keys": {
@@ -865,6 +884,18 @@ export class GatewayServer {
       )
       return
     }
+    // A demo's visitor and its hour-long guests are strangers: none of them
+    // gets to answer the team's prompts.
+    if (auth.visitor || this._seats.isGuest(auth.principal)) {
+      refuse(
+        403,
+        new InferenceError(
+          "authentication",
+          "A demo key cannot share a computer; use a personal gateway key."
+        )
+      )
+      return
+    }
     if (this._draining) {
       refuse(
         503,
@@ -887,6 +918,18 @@ export class GatewayServer {
     }
     const connection = acceptUpgrade(req, socket, head)
     peers.attach(connection, auth.principal)
+  }
+
+  /** The `since` a listing was asked for, nothing when it was not; a period that cannot be read is answered 400, and false comes back. */
+  private sinceOf(url: URL, res: http.ServerResponse): Date | undefined | false {
+    const since = url.searchParams.get("since")
+    if (!since) return undefined
+    try {
+      return parseSince(since, new Date())
+    } catch (error) {
+      sendMessage(res, 400, error instanceof Error ? error.message : String(error))
+      return false
+    }
   }
 
   /**
@@ -932,8 +975,9 @@ export class GatewayServer {
       }
       query.outcome = outcome
     }
-    const since = url.searchParams.get("since")
-    if (since) query.since = parseSince(since, new Date())
+    const since = this.sinceOf(url, res)
+    if (since === false) return
+    if (since) query.since = since
     const before = url.searchParams.get("before")
     if (before) query.before = before
     const search = url.searchParams.get("q")
@@ -2090,7 +2134,9 @@ export class GatewayServer {
       this._options.metrics?.request({
         key: principal,
         route: capability,
-        alias: outcome.alias,
+        // A name nobody serves is the caller's to choose: as a label, each
+        // new one would be a series kept for good.
+        alias: outcome.alias && this.routes.providerOf(outcome.alias) ? outcome.alias : "unknown",
         outcome: outcome.outcome,
         status: outcome.status,
         ms,

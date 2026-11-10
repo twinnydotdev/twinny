@@ -1,5 +1,5 @@
 .pending {
-  padding: 12px var(--tw-pad) 14px calc(var(--tw-pad) + var(--tw-gutter));
+  padding: 12px var(--tw-pad) 14px;
   user-select: none;
 }
 
@@ -24,6 +24,7 @@
 .cursor {
   width: 7px;
   height: 13px;
+  border-radius: 2px;
   background: var(--tw-cursor);
   animation: blink 1.05s steps(1, end) infinite;
 }

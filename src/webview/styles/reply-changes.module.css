@@ -1,12 +1,13 @@
 /*
- * The files a reply changed, under it: the tool steps' idiom (a left rule,
- * small type, nothing boxed), with git's added and removed counts, and
- * undo as a quiet word that brightens on hover.
+ * The files a reply changed, under it: a soft card in small type, with
+ * git's added and removed counts, and undo as a quiet word that brightens
+ * on hover.
  */
 .panel {
-  margin: 10px 0 0;
-  padding: 0 0 0 10px;
-  border-left: 1px solid var(--tw-rule);
+  margin: 12px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--tw-radius);
+  background: var(--tw-surface);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
 }
@@ -120,7 +121,7 @@
   margin: 0 0 0 auto;
   padding: 0 6px;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: var(--tw-radius-sm);
   background: transparent;
   color: var(--tw-fg-faint);
   font: inherit;

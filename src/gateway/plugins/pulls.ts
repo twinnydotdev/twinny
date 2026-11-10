@@ -171,16 +171,17 @@ export class PullsPlugin implements PluginInstance {
   }
 
   public start(): void {
-    void this.syncAll().then(() => this.autoReview())
+    const round = () => void this.syncAll().then(() => this.autoReview()).catch((error) => this.autoFailed(error))
+    round()
     if (this._intervalMs > 0) {
       this._timer = setInterval(
-        () => void this.syncAll().then(() => this.autoReview()),
+        round,
         this._intervalMs
       )
       this._timer.unref()
       // Between syncs, a review that waited for the models to go idle gets its chance.
       this._reviewTimer = setInterval(
-        () => void this.autoReview(),
+        () => this.kickAutoReview(),
         Math.min(REVIEW_TICK_MS, this._intervalMs)
       )
       this._reviewTimer.unref()
@@ -222,7 +223,8 @@ export class PullsPlugin implements PluginInstance {
   public reviewAlias(): string | undefined {
     const set = this.store.settings().reviewAlias
     const aliases = this._reviewer.aliases()
-    return typeof set === "string" && set ? set : aliases[0]
+    // One that was removed or renamed since it was picked is no longer a choice.
+    return typeof set === "string" && set && aliases.includes(set) ? set : aliases[0]
   }
 
   /**
@@ -241,12 +243,13 @@ export class PullsPlugin implements PluginInstance {
       .repos()
       .filter((repo) => repo.autoReview)
       .flatMap((repo) => (this._state.get(repo.id)?.pulls ?? []).map((pull) => ({ repo, pull })))
-      .filter(({ repo, pull }) => !pull.draft && !this.reviews.hasCurrent(pull, repo.id) && !this._reviewer.isReviewing(repo.id, pull.number))
+      // One try per commit: a review that failed waits for a push or for someone to ask, not for the next tick.
+      .filter(({ repo, pull }) => !pull.draft && !this.reviews.hasTried(pull, repo.id) && !this._reviewer.isReviewing(repo.id, pull.number))
       .sort((a, b) => Date.parse(b.pull.updatedAt) - Date.parse(a.pull.updatedAt))
     const next = due[0]
     if (next) {
       this._autoReviewing = this.runReview(next.repo, next.pull, alias, "auto")
-        .then(() => undefined)
+        .then(() => undefined, (error) => this.autoFailed(error))
         .finally(() => {
           this._autoReviewing = undefined
         })
@@ -261,11 +264,27 @@ export class PullsPlugin implements PluginInstance {
       .sort((a, b) => Date.parse(b.issue.updatedAt) - Date.parse(a.issue.updatedAt))[0]
     if (!issueDue) return Promise.resolve()
     this._autoReviewing = this.runTriage(issueDue.repo, issueDue.issue, alias, "auto")
-      .then(() => undefined)
+      .then(() => undefined, (error) => this.autoFailed(error))
       .finally(() => {
         this._autoReviewing = undefined
       })
     return this._autoReviewing
+  }
+
+  private kickAutoReview() {
+    try {
+      void this.autoReview().catch((error) => this.autoFailed(error))
+    } catch (error) {
+      this.autoFailed(error)
+    }
+  }
+
+  /** Background work nobody is waiting on: what went wrong is logged, and never the process's to die of. */
+  private autoFailed(error: unknown) {
+    this._context.log.warn({
+      event: "plugin.auto-review-failed",
+      reason: error instanceof Error ? error.message : String(error)
+    })
   }
 
   private async runTriage(repo: RepoRecord, issue: IssueSummary, alias: string, requestedBy: string): Promise<TriageRecord> {
@@ -609,7 +628,7 @@ export class PullsPlugin implements PluginInstance {
           key: request.principal,
           reason: `${repo.fullName} autoReview=${updated.autoReview === true} autoPost=${updated.autoPost === true}`
         })
-        if (body.autoReview === true || body.autoTriage === true) void this.autoReview()
+        if (body.autoReview === true || body.autoTriage === true) this.kickAutoReview()
         return json({ repo: this.view(updated) })
       }
       const issueMatch = /^issues\/([1-9][0-9]{0,8})(\/triage(?:\/post)?)?$/.exec(rest)
@@ -632,6 +651,8 @@ export class PullsPlugin implements PluginInstance {
           if (!record || record.status !== "done") throw new PluginError("There is no finished triage to post.", 409)
           const signal = withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)
           let updated: TriageRecord = { ...record }
+          // As with reviews: the token's account speaks for the team, so a developer posts the reply once.
+          if (request.member && body.reply !== false && record.repliedAt) throw new PluginError("This reply is already on the host.", 409)
           if (body.reply !== false && record.reply && this._forge.commentIssue) {
             const text = typeof body.replyText === "string" && body.replyText.trim() ? body.replyText.trim() : record.reply
             await this._forge.commentIssue(repo, number, `${text}\n\n---\n_Triaged by twinny-server with \`${record.alias}\`._`, signal)

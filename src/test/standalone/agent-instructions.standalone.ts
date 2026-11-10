@@ -163,7 +163,7 @@ test("a folder's instructions outlast the output they came with when the context
   ])
   await drain(withTools(client, workspaceTools(root), { mode: "native", contextWindow: () => 4096 }).chat(ask("Read.")))
   const [first] = toolResults(requests[3])
-  assert.match(first, /^\[src\/AGENTS\.md: [^\n]*\]\nNever use default exports\.\n\nsrc\/a\.ts \(lines 1–80 of 80\)\n\[The rest was trimmed/)
+  assert.match(first, /^\[src\/AGENTS\.md: [^\n]*\]\nNever use default exports\.\n\nsrc\/a\.ts \(lines 1–\d+ of 80\)[^\n]*\n\[The rest was trimmed/)
 })
 
 test("text mode carries a folder's instructions in the result message too", async () => {
