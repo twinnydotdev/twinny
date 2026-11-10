@@ -76,7 +76,7 @@ Issues e pull requests são bem-vindos no [GitHub](https://github.com/twinnydotd
 
 ## Apoie o twinny
 
-O twinny é gratuito e de código aberto. Se ele se paga, uma licença de equipe é a melhor forma de apoiar. Doações também são bem-vindas. Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
+O twinny é gratuito e de código aberto. Se ele se paga, [comprar uma licença](https://twinny.dev/#pricing) é a melhor forma de apoiar.
 
 ## Licença
 
