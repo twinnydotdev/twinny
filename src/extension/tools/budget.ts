@@ -81,8 +81,119 @@ export const fitResult = (output: string, maxChars: number): string =>
     ? output
     : `${cutToLine(output, maxChars)}\n… cut to fit the model's context (${output.length - maxChars} more characters); ask for less at a time`
 
-/** What stands in for a result trimmed out of the conversation: its first line, so the model knows what it was. */
-export const trimmedResult = (output: string): string => {
-  const first = output.split("\n", 1)[0].slice(0, 160)
-  return `${first}\n[The rest was trimmed to save context. Run the tool again if you need it.]`
+/** A result this short is left as it is: what would stand in for it is no shorter. */
+export const MIN_TRIMMABLE_CHARS = 500
+
+const TRIMMED_NOTE = "[The rest was trimmed to save context. Run the tool again if you need it.]"
+
+/**
+ * What stands in for a result trimmed out of the conversation: the tool's
+ * own digest of it (what was read and what is defined there, where a
+ * search matched, how a command ended), or its first line, so the model
+ * knows what it was and where to look again.
+ */
+export const trimmedResult = (output: string, digest?: string): string => {
+  const kept = digest?.trim() ? digest.trim().slice(0, 500) : output.split("\n", 1)[0].slice(0, 160)
+  return `${kept}\n${TRIMMED_NOTE}`
+}
+
+/** A turn of the conversation, as far as fitting it goes. */
+interface Turn {
+  role: string
+  content?: unknown
+}
+
+const turnText = (content: unknown): string =>
+  typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content.map((part) => (part && typeof part === "object" && (part as { type?: string }).type === "text" ? String((part as { text?: unknown }).text ?? "") : "")).join("\n")
+      : ""
+
+/** Earlier turns are folded this many messages at a time, so the folded conversation reads the same for several turns running and a local server keeps its cache of it. */
+const FOLD_BLOCK = 8
+/** The share of the request limit the conversation may take before its oldest turns are folded, and what folding brings it down to. */
+const HISTORY_SHARE = 0.55
+const HISTORY_TARGET = 0.35
+const MAX_FOLD_CHARS = 1600
+
+const oneLine = (text: string, max: number) => {
+  const flat = text.replace(/```[\s\S]*?(```|$)/g, " (code) ").replace(/\s+/g, " ").trim()
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat
+}
+
+export const FOLD_HEADER = "[Earlier in this conversation, left out to fit the model's context:"
+
+/** Folded turns in brief: what was asked and how each answer began, the latest kept when not all fit. */
+const foldedText = (folded: Turn[]): string => {
+  const lines = folded
+    .map((turn) => {
+      const text = oneLine(turnText(turn.content), turn.role === "user" ? 160 : 200)
+      return text ? `- ${turn.role === "user" ? "The user" : "You"}: ${text}` : ""
+    })
+    .filter(Boolean)
+  let dropped = 0
+  while (lines.length > 2 && lines.join("\n").length > MAX_FOLD_CHARS) {
+    lines.shift()
+    dropped++
+  }
+  return [FOLD_HEADER, ...(dropped ? [`(${dropped} older messages not listed)`] : []), ...lines, "]"].join("\n")
+}
+
+/**
+ * A conversation too long for the model's context, with its oldest turns
+ * folded into a few lines at the head of the first turn kept. A server
+ * sent more than it holds cuts from the front itself, where the system
+ * prompt or the first turns are, and re-reads everything left on each
+ * request; folded here, the system prompt and the newest turns stay whole
+ * and the prefix stays the same from turn to turn. The system prompt and
+ * the last message are never folded. Returns the messages untouched when
+ * they fit.
+ */
+export const compactHistory = <T extends Turn>(
+  messages: T[],
+  plan: ContextPlan,
+  tokens: (chars: number) => number = (chars) => Math.ceil(chars / DEFAULT_CHARS_PER_TOKEN)
+): { messages: T[]; folded: number } => {
+  const sizes = messages.map((message) => turnText(message.content).length)
+  const total = sizes.reduce((sum, size) => sum + size, 0)
+  if (tokens(total) <= plan.limit * HISTORY_SHARE) return { messages, folded: 0 }
+  const first = messages[0]?.role === "system" ? 1 : 0
+  const lastIndex = messages.length - 1
+  let left = total
+  let cut = first
+  // Fold whole blocks from the front until what is left is comfortably inside.
+  let whole = true
+  while (cut < lastIndex && tokens(left) > plan.limit * HISTORY_TARGET) {
+    const next = Math.min(lastIndex, cut + FOLD_BLOCK)
+    // The last block would leave no turn but the new one: it goes a turn
+    // at a time instead, and only as far as it must.
+    if (lastIndex - next < 2) {
+      whole = false
+      break
+    }
+    for (let i = cut; i < next; i++) left -= sizes[i]
+    cut = next
+  }
+  while (!whole && cut < lastIndex && tokens(left) > plan.limit * HISTORY_SHARE) {
+    const next = Math.min(lastIndex, cut + 2)
+    for (let i = cut; i < next; i++) left -= sizes[i]
+    cut = next
+  }
+  // The first turn kept is a user's, so the roles still take turns.
+  while (cut < lastIndex && messages[cut].role !== "user") {
+    left -= sizes[cut]
+    cut++
+  }
+  if (cut <= first) return { messages, folded: 0 }
+  const note = foldedText(messages.slice(first, cut))
+  const head = messages[cut]
+  const merged = (
+    typeof head.content === "string"
+      ? { ...head, content: `${note}\n\n${head.content}` }
+      : Array.isArray(head.content)
+        ? { ...head, content: [{ type: "text", text: note }, ...head.content] }
+        : head
+  ) as T
+  return { messages: [...messages.slice(0, first), merged, ...messages.slice(cut + 1)], folded: cut - first }
 }

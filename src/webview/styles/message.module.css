@@ -1,8 +1,7 @@
 /*
- * A transcript, not a chat of bubbles: the user's turn carries a rule down
- * its left edge, the reply runs flush beneath it, and whitespace does the
- * rest. Who said what is plain from the shape, so the names are for screen
- * readers.
+ * The user's turn is a soft filled block; the reply runs flush beneath it
+ * on the page itself, and whitespace does the rest. Who said what is plain
+ * from the shape, so the names are for screen readers.
  */
 .message {
   position: relative;
@@ -13,26 +12,25 @@
 }
 
 .userMessage {
-  margin-top: 8px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  padding-left: calc(var(--tw-pad) + var(--tw-gutter));
+  margin-top: 10px;
+  padding: 14px calc(var(--tw-pad) + 12px);
+  /* Its ground is drawn behind it and stays inside it. */
+  isolation: isolate;
 }
 
 .userMessage::before {
   content: "";
   position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: var(--tw-pad);
-  width: 2px;
-  background: var(--tw-fg-faint);
+  inset: 6px var(--tw-pad);
+  z-index: -1;
+  border-radius: var(--tw-radius-lg);
+  background: var(--tw-fill);
 }
 
 /* On the user's turn, the actions sit just above its first line rather than over the words. */
 .userMessage .messageRole {
-  top: -14px;
-  right: var(--tw-pad);
+  top: -12px;
+  right: calc(var(--tw-pad) + 4px);
 }
 
 /*
@@ -107,8 +105,10 @@
   display: flex;
   align-items: center;
   gap: 0;
-  border: 1px solid var(--tw-rule);
+  border: 1px solid var(--tw-rule-soft);
+  border-radius: var(--tw-radius);
   background: var(--tw-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
@@ -123,9 +123,10 @@
 
 .thinkingSection {
   margin-bottom: 12px;
-  padding-left: 10px;
-  border-left: 1px solid var(--tw-rule);
-  color: var(--tw-fg-faint);
+  padding: 6px 10px;
+  border-radius: var(--tw-radius);
+  background: var(--tw-surface);
+  color: var(--tw-fg-dim);
   font-size: var(--tw-fs-sm);
 }
 
@@ -235,11 +236,28 @@
   font-size: var(--tw-fs-sm);
 }
 
+.message table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border-radius: var(--tw-radius);
+  background: var(--tw-surface);
+}
+
 .message th,
 .message td {
-  padding: 4px 8px;
-  border: 1px solid var(--tw-rule-soft);
+  padding: 5px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--tw-rule-soft);
   text-align: left;
+}
+
+.message tr:last-child td {
+  border-bottom: 0;
+}
+
+.message th {
+  background: var(--tw-fill);
 }
 
 .message th {
@@ -249,8 +267,9 @@
 
 /* Inline code: the editor's face on a faint ground, so it reads apart from the prose. */
 .message :not(pre) > code {
-  padding: 0.1em 0.3em;
-  background: var(--tw-rule-soft) !important;
+  padding: 0.1em 0.35em;
+  border-radius: var(--tw-radius-sm);
+  background: var(--tw-fill) !important;
   color: var(--tw-code);
   font-family: var(--tw-mono);
   font-size: var(--tw-fs-mono) !important;
@@ -262,7 +281,7 @@
   max-width: 100%;
   height: auto;
   margin: 8px 0;
-  border: 1px solid var(--tw-rule);
+  border-radius: var(--tw-radius);
 }
 
 .imageGallery {
@@ -277,7 +296,8 @@
   display: inline-block;
   width: 120px;
   height: 120px;
-  border: 1px solid var(--tw-rule);
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   overflow: hidden;
 }
 
@@ -291,9 +311,10 @@
 /* Inline editor shown when a user message is being edited. */
 .tiptap {
   width: 100%;
-  padding: 8px;
-  border: 1px solid var(--tw-rule);
-  background: var(--tw-surface);
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-bg);
   color: var(--tw-fg);
   font-family: var(--tw-font);
   font-size: var(--tw-fs);
@@ -376,10 +397,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 6px;
-  border: 1px solid var(--tw-rule);
-  border-radius: 2px;
-  background: transparent;
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tw-fill-strong);
   color: var(--vscode-foreground);
   font: inherit;
   cursor: pointer;

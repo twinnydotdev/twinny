@@ -1,15 +1,14 @@
-/*
- * The @-mention autocomplete popup. Square, hairline framed, no shadow —
- * it should read as a completion list, not a floating card.
- */
+/* The @-mention autocomplete popup: a rounded list that floats over the composer. */
 .dropdownMenu {
   display: flex;
   flex-direction: column;
   max-height: 280px;
   min-width: 240px;
-  padding: 2px;
+  padding: 4px;
   background: var(--vscode-dropdown-background, var(--tw-bg));
-  border: 1px solid var(--tw-rule);
+  border: 1px solid var(--tw-rule-soft);
+  border-radius: var(--tw-radius);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
   overflow-y: auto;
 }
 
@@ -18,8 +17,9 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 4px 6px;
+  padding: 4px 8px;
   border: none;
+  border-radius: var(--tw-radius-sm);
   background: transparent;
   color: var(--tw-fg-dim);
   font-family: var(--tw-font);
@@ -61,6 +61,5 @@
 
 .dropdownMenu button.dropdownSelected {
   color: var(--tw-fg);
-  background: var(--tw-surface);
-  box-shadow: inset 2px 0 0 var(--tw-mark);
+  background: var(--tw-fill-strong);
 }

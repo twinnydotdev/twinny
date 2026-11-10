@@ -58,10 +58,12 @@
 
 .sectionCount {
   padding: 0 6px;
-  border: 1px solid var(--tw-rule);
   color: var(--tw-fg-dim);
   font-size: var(--tw-fs-xs);
   font-weight: 400;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tw-fill-strong);
 }
 
 .sectionBlurb {
@@ -89,26 +91,32 @@
   border: 1px dashed var(--tw-rule);
   color: var(--tw-fg-dim);
   transition: color 0.12s ease, border-color 0.12s ease;
+  border-radius: var(--tw-radius);
 }
 
 .emptySection:hover,
 .emptySection:focus-visible {
   color: var(--tw-fg);
   border-color: var(--tw-fg-faint);
+  background: var(--tw-surface);
   outline: none;
 }
 
 .card {
-  border: 1px solid var(--tw-rule);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
 .card:hover {
-  background: var(--tw-surface);
+  background: var(--tw-fill-strong);
 }
 
+/* The one in use: a firmer ground and a soft ring, no line to compete with the text. */
 .cardActive {
-  border-color: var(--tw-fg-faint);
+  border-color: var(--tw-rule);
+  background: var(--tw-fill-strong);
 }
 
 .cardMain {
@@ -229,6 +237,7 @@
 
 .confirmBanner {
   border: 1px solid var(--vscode-editorWarning-foreground, var(--tw-rule));
+  border-radius: var(--tw-radius);
 }
 
 /* Test outcome, under a card or the form. */
@@ -263,6 +272,7 @@
 .providerForm .testResult {
   border: 1px solid currentColor;
   border-top-width: 1px;
+  border-radius: var(--tw-radius);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -301,7 +311,9 @@
   gap: 10px;
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--tw-rule);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   text-align: left;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
@@ -388,7 +400,9 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px 14px 16px;
-  border: 1px solid var(--tw-rule);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 
 .welcome h4 {
@@ -442,7 +456,9 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--tw-rule);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 
 .welcomeServer > .codicon:first-child {
@@ -560,9 +576,9 @@
   align-items: baseline;
   gap: 4px 10px;
   padding: 8px 10px;
-  border-left: 2px solid var(--tw-rule);
-  background: var(--tw-surface);
   font-size: var(--tw-fs-sm);
+  border-radius: var(--tw-radius-sm);
+  background: var(--tw-fill);
 }
 
 .endpointLabel {
@@ -753,8 +769,9 @@
   flex-direction: column;
   gap: 10px;
   padding: 10px 12px 12px;
-  border: 1px solid var(--tw-rule);
-  background: var(--tw-surface);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 
 .pairForm .sectionBlurb {
@@ -810,6 +827,7 @@
   color: var(--tw-code);
   word-break: break-all;
   user-select: all;
+  border-radius: var(--tw-radius-sm);
 }
 
 .pairingCode p {
@@ -914,13 +932,14 @@
   max-width: 100%;
   min-width: 0;
   padding: 2px 8px;
-  border: 1px dashed var(--tw-rule);
-  background: transparent;
   color: var(--tw-fg-dim);
   font-family: var(--tw-mono);
   font-size: var(--tw-fs-sm);
   cursor: pointer;
   transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tw-fill-strong);
 }
 
 .jobChip:hover,
@@ -961,7 +980,9 @@
   align-items: flex-start;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid var(--tw-rule);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 .teamEntry span {
   color: var(--tw-fg-dim);
@@ -989,6 +1010,7 @@
   font-size: var(--tw-fs-sm);
   line-height: 20px;
   text-decoration: none;
+  border-radius: var(--tw-radius);
 }
 .teamSetUpLink:hover {
   background: var(--tw-surface);
@@ -1025,6 +1047,7 @@
   background: var(--vscode-input-background);
   border: 1px solid var(--vscode-input-border, transparent);
   font: inherit;
+  border-radius: var(--tw-radius-sm);
 }
 .teamField input:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);
@@ -1051,10 +1074,11 @@
   list-style: none;
 }
 .teamRoles li {
-  border: 1px solid var(--vscode-widget-border);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   padding: 12px;
   margin-bottom: 10px;
-  border-radius: 5px;
   overflow-wrap: anywhere;
 }
 .teamRoles p {
@@ -1096,9 +1120,10 @@
   margin: 18px 0;
 }
 .teamPolicy {
-  border: 1px solid var(--vscode-widget-border);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   border-left: 3px solid var(--tw-mark);
-  border-radius: 5px;
   padding: 12px;
   margin: 12px 0;
 }
@@ -1110,8 +1135,9 @@
 .cardBlocked {
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
-  border: 1px solid var(--vscode-widget-border);
-  border-radius: 3px;
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   padding: 1px 6px;
 }
 .teamBanner {
@@ -1120,9 +1146,10 @@
   gap: 8px 16px;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid var(--vscode-widget-border);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   border-left: 3px solid var(--tw-mark);
-  border-radius: 5px;
   padding: 10px 12px;
   margin: 12px 0;
 }
@@ -1142,8 +1169,9 @@
   padding: 10px 16px;
   font-size: 28px;
   letter-spacing: 0.12em;
-  border: 1px solid var(--vscode-widget-border);
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   user-select: all;
 }
 

@@ -109,8 +109,18 @@ export interface RemoteRequestOutcome {
 }
 
 
-const readBody = (req: IncomingMessage, maxBytes: number): Promise<unknown> =>
+const readBody = (req: IncomingMessage, maxBytes: number, signal?: AbortSignal): Promise<unknown> =>
   new Promise((resolve, reject) => {
+    // A body that never arrives (a length promised and nothing sent) is
+    // ended by the request's deadline like anything else, or its place
+    // among the running requests would be held for good.
+    const onAbort = () => reject(signal?.reason ?? new Error("aborted"))
+    if (signal?.aborted) {
+      onAbort()
+      return
+    }
+    signal?.addEventListener("abort", onAbort, { once: true })
+    req.once("end", () => signal?.removeEventListener("abort", onAbort))
     const chunks: Buffer[] = []
     let size = 0
     let overflowed = false
@@ -161,7 +171,7 @@ const sendError = (res: ServerResponse, error: InferenceError): number => {
  * or drained, or at once when the response is gone (the caller's abort
  * handling takes over from there).
  */
-const writeLine = (res: ServerResponse, value: unknown): Promise<void> =>
+const writeLine = (res: ServerResponse, value: unknown, signal?: AbortSignal): Promise<void> =>
   new Promise((resolve) => {
     if (res.destroyed || res.writableEnded) {
       resolve()
@@ -174,10 +184,19 @@ const writeLine = (res: ServerResponse, value: unknown): Promise<void> =>
     const done = () => {
       res.removeListener("drain", done)
       res.removeListener("close", done)
+      signal?.removeEventListener("abort", stalled)
       resolve()
+    }
+    // A reader that stopped reading but kept the socket open never drains:
+    // at the deadline the response is dropped rather than waited on.
+    const stalled = () => {
+      done()
+      res.destroy()
     }
     res.once("drain", done)
     res.once("close", done)
+    if (signal?.aborted) stalled()
+    else signal?.addEventListener("abort", stalled, { once: true })
   })
 
 export const handleRemoteRequest = async (
@@ -278,9 +297,12 @@ const runInference = async (
 
   let body: unknown
   try {
-    body = await readBody(req, options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)
+    body = await readBody(req, options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES, controller.signal)
   } catch (error) {
     const failure = terminalError(error, controller.signal)
+    // What was promised of the body may never come: once the refusal is
+    // written the connection goes, rather than being kept for the rest.
+    if (controller.signal.aborted) res.once("finish", () => req.destroy())
     return fail({ outcome: failure.kind === "cancelled" ? "cancelled" : "error", error: failure, kind: failure.kind })
   }
 
@@ -302,7 +324,7 @@ const runInference = async (
         })
         res.flushHeaders()
       }
-      await writeLine(res, chunk)
+      await writeLine(res, chunk, controller.signal)
     }
   })
 
