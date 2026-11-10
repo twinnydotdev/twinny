@@ -25,6 +25,7 @@ Extension and `twinny-server`: agent mode gets more out of small local models, t
 - **Fixed: a removed review model stopping the gateway.** A review alias that no longer exists falls back to the first chat model, and background reviews that fail are logged. A failed automatic review is tried once per commit, not every minute.
 - **Other gateway fixes.** A bad `since` on the audit and recordings lists answers 400; request metrics no longer grow a series per unknown model name; the SSO landing page shows provider errors as text, and one address cannot fill the sign-in list; GitLab notes cannot run quick actions such as `/approve`; backups leave out shared-context clones and skip paths too long for an archive; GitHub issues are found on repositories with many open pull requests; developers post a triage reply once.
 - **Supporting twinny means buying a licence.** The READMEs, the GitHub sponsor button and the [Support twinny](https://docs.twinny.dev/reference/support/) page point to [twinny.dev's pricing](https://twinny.dev/#pricing) in place of donation addresses.
+- **A Personal licence: $29 once.** One person gets policy, recording and plugins on their own gateway, with the free five seats, for good. Buy it at [twinny.dev](https://twinny.dev/#pricing); see [Licensing and seats](https://docs.twinny.dev/teams/licensing/).
 
 ## 4.3.17 · 2026-11-09
 
