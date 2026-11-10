@@ -2,6 +2,10 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.19 · 2026-11-10
+
+`twinny-server` release: a Personal licence holds the gateway to its one key, in place of the free five; removing it brings the five back. A licence that does not expire says "for good" instead of a date.
+
 ## 4.3.18 · 2026-11-10
 
 Extension and `twinny-server`: agent mode gets more out of small local models, the chat follows a reply as it is written, the sidebar has a softer look, and the gateway has fixes from an audit.
@@ -24,6 +28,8 @@ Extension and `twinny-server`: agent mode gets more out of small local models, t
 - **Fixed: `limits.maxOutputTokens` bypassed by a `maxTokens` of zero or less.**
 - **Fixed: a removed review model stopping the gateway.** A review alias that no longer exists falls back to the first chat model, and background reviews that fail are logged. A failed automatic review is tried once per commit, not every minute.
 - **Other gateway fixes.** A bad `since` on the audit and recordings lists answers 400; request metrics no longer grow a series per unknown model name; the SSO landing page shows provider errors as text, and one address cannot fill the sign-in list; GitLab notes cannot run quick actions such as `/approve`; backups leave out shared-context clones and skip paths too long for an archive; GitHub issues are found on repositories with many open pull requests; developers post a triage reply once.
+- **Supporting twinny means buying a licence.** The READMEs, the GitHub sponsor button and the [Support twinny](https://docs.twinny.dev/reference/support/) page point to [twinny.dev's pricing](https://twinny.dev/#pricing) in place of donation addresses.
+- **A Personal licence: $29 once.** One person gets policy, recording and plugins on their own gateway, with one key that works on all their machines, for good. Gateways from 4.3.19 hold a Personal licence to that one key. Buy it at [twinny.dev](https://twinny.dev/#pricing); see [Licensing and seats](https://docs.twinny.dev/teams/licensing/).
 
 ## 4.3.17 · 2026-11-09
 

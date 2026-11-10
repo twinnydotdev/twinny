@@ -55,7 +55,7 @@ Isso encontra o seu servidor de modelos, escreve uma configuração, cria uma ch
 - **Gravação** (licença): mantenha prompts e respostas no gateway, com aviso a cada desenvolvedor, exportados como dados de treinamento.
 - **Operação**: um log de auditoria encadeado por hash de cada mudança administrativa, chaves de administrador somente leitura, métricas para o Prometheus, custos por desenvolvedor quando um modelo tem preço, uma fila de requisições para uma GPU compartilhada, Docker e um chart Helm.
 
-Gratuito para cinco desenvolvedores, para sempre. Uma licença comprada com cartão adiciona assentos e ativa política, gravação e plugins; é verificada localmente e o gateway nunca liga para casa. Veja o [guia de equipes](https://docs.twinny.dev/teams/overview/), [licenciamento e assentos](https://docs.twinny.dev/teams/licensing/) e a referência do operador em [docs/gateway.md](docs/gateway.md).
+Gratuito para cinco desenvolvedores, para sempre. Uma licença comprada com cartão adiciona assentos e ativa política, gravação e plugins; é verificada localmente e o gateway nunca liga para casa. Trabalha sozinho? A **Personal** custa $29 uma vez: os mesmos recursos no seu próprio gateway, para sempre. Veja o [guia de equipes](https://docs.twinny.dev/teams/overview/), [licenciamento e assentos](https://docs.twinny.dev/teams/licensing/) e a referência do operador em [docs/gateway.md](docs/gateway.md).
 
 ## Estrutura do repositório
 
@@ -76,7 +76,7 @@ Issues e pull requests são bem-vindos no [GitHub](https://github.com/twinnydotd
 
 ## Apoie o twinny
 
-O twinny é gratuito e de código aberto. Se ele se paga, uma licença de equipe é a melhor forma de apoiar. Doações também são bem-vindas. Bitcoin: `1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
+O twinny é gratuito e de código aberto. Se ele se paga, [comprar uma licença](https://twinny.dev/#pricing) é a melhor forma de apoiar: a Personal custa $29 uma vez.
 
 ## Licença
 

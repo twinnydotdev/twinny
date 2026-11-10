@@ -53,7 +53,7 @@ npx twinny-server quickstart
 - **请求记录**（需许可证）：把提示词和回复保存在网关上，向每位开发者披露，可导出为训练数据。
 - **运维**：每次管理变更都写入哈希链式审计日志、只读管理员密钥、Prometheus 指标、模型设有价格时按开发者统计成本、共享 GPU 的请求队列、Docker 和 Helm chart。
 
-五位开发者以内永久免费。刷卡购买的许可证增加席位并开启策略、记录和插件；在本地校验，网关从不回连。见[团队指南](https://docs.twinny.dev/teams/overview/)、[许可与席位](https://docs.twinny.dev/teams/licensing/)，以及 [docs/gateway.md](docs/gateway.md) 中的运维参考。
+五位开发者以内永久免费。刷卡购买的许可证增加席位并开启策略、记录和插件；在本地校验，网关从不回连。个人开发者可一次性 $29 购买 **Personal**：在自己的网关上永久使用同样的功能。见[团队指南](https://docs.twinny.dev/teams/overview/)、[许可与席位](https://docs.twinny.dev/teams/licensing/)，以及 [docs/gateway.md](docs/gateway.md) 中的运维参考。
 
 ## 仓库结构
 
@@ -74,7 +74,7 @@ npx twinny-server quickstart
 
 ## 支持 twinny
 
-twinny 免费且开源。如果它对你有用，购买团队许可证是最好的支持方式。也欢迎捐赠。比特币：`1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
+twinny 免费且开源。如果它对你有用，[购买许可证](https://twinny.dev/#pricing)是最好的支持方式：Personal 一次性 $29。
 
 ## 许可证
 
