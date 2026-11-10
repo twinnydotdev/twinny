@@ -74,7 +74,7 @@ npx twinny-server quickstart
 
 ## 支持 twinny
 
-twinny 免费且开源。如果它对你有用，购买团队许可证是最好的支持方式。也欢迎捐赠。比特币：`1PVavNkMmBmUz8nRYdnVXiTgXrAyaxfehj`
+twinny 免费且开源。如果它对你有用，[购买许可证](https://twinny.dev/#pricing)是最好的支持方式。
 
 ## 许可证
 
