@@ -9,6 +9,7 @@ import {
   TEAM_PLUGINS_EVENT_NAME,
   TEAM_SHARE_EVENT_NAME
 } from "../constants"
+import type { ModelStatus, StarterKind } from "../model-status"
 import type { DiscoveredServer } from "../provider-discovery"
 import type {
   TeamApplyRequest,
@@ -332,6 +333,12 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyGetContextItems]: Channel
   [EVENT_NAME.twinnyGetGitChanges]: Channel
   [EVENT_NAME.twinnyGetModels]: Channel<void, ModelCatalogue>
+  /** Where the chat model runs, whether it is loaded and how much it holds. */
+  [EVENT_NAME.twinnyModelStatus]: Channel<void, ModelStatus | null>
+  /** Loads the chat model on its local server; answers with its status once it is. */
+  [EVENT_NAME.twinnyWarmModel]: Channel<void, ModelStatus | null>
+  /** A first question about the open file or selection, from the empty chat. */
+  [EVENT_NAME.twinnyStarter]: Channel<StarterKind>
   [EVENT_NAME.twinnyGetWorkspaceContext]: Channel<{ key: string }, ContextValue>
   [EVENT_NAME.twinnyGlobalContext]: Channel<{ key: string }, ContextValue>
   [EVENT_NAME.twinnyHideBackButton]: Channel

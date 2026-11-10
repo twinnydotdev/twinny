@@ -1,0 +1,99 @@
+/* The model's state in the composer's footer: quiet until there is something to say. */
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  white-space: nowrap;
+}
+
+.cold {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  margin: 0;
+  padding: 0 7px 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tw-fill);
+  color: var(--tw-fg-dim);
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+button.cold {
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+button.cold:hover:not(:disabled) {
+  background: var(--tw-fill-strong);
+  color: var(--tw-fg);
+}
+
+button.cold:disabled {
+  cursor: default;
+}
+
+.hollow,
+.spin {
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.spin {
+  border-right-color: transparent;
+  animation: model-spin 0.8s linear infinite;
+}
+
+@keyframes model-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.track,
+.arc {
+  fill: none;
+  stroke-width: 2;
+}
+
+.track {
+  stroke: color-mix(in srgb, var(--tw-fg) 16%, transparent);
+}
+
+.arc {
+  stroke: currentColor;
+  transition: stroke-dasharray 0.2s ease;
+}
+
+.filling {
+  color: var(--tw-fg);
+}
+
+/* The one warning in the footer: the message will not fit. */
+.over {
+  color: var(--vscode-editorWarning-foreground, var(--tw-fg));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

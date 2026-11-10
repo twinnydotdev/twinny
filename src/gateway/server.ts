@@ -726,7 +726,13 @@ export class GatewayServer {
             })
             return
           }
-          sendJson(res, 200, summarizeUsage(usage.dir, since, now, pricingOf(this.config)))
+          const summary = summarizeUsage(usage.dir, since, now, pricingOf(this.config))
+          // The same length of time just before, so the page can say how the period compares.
+          if (url.searchParams.get("compare") === "previous") {
+            const before = new Date(since.getTime() - (now.getTime() - since.getTime()))
+            summary.previous = summarizeUsage(usage.dir, before, since, pricingOf(this.config)).total
+          }
+          sendJson(res, 200, summary)
           return
         }
         case "keys": {

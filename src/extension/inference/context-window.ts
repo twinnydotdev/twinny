@@ -38,10 +38,10 @@ const known = new Map<string, Known>()
 const keyOf = (provider: TwinnyProvider) =>
   [provider.provider, provider.apiHostname ?? "", provider.apiPort ?? "", provider.modelName].join("|")
 
-const originOf = (provider: TwinnyProvider) =>
+export const originOf = (provider: TwinnyProvider) =>
   getProviderOrigin({ ...provider, apiHostname: provider.apiHostname || "localhost" })
 
-const ask = async (provider: TwinnyProvider, url: string, body?: unknown): Promise<unknown> => {
+export const ask = async (provider: TwinnyProvider, url: string, body?: unknown): Promise<unknown> => {
   const { signal, done } = deadline(ASK_TIMEOUT_MS)
   try {
     const response = await fetch(url, {
@@ -65,7 +65,7 @@ const positive = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined
 
 /** `llama3` and `llama3:latest` are one model to Ollama. */
-const sameOllamaModel = (a: string, b: string) => {
+export const sameOllamaModel = (a: string, b: string) => {
   const tagged = (name: string) => (name.includes(":") ? name : `${name}:latest`)
   return tagged(a) === tagged(b)
 }

@@ -11,6 +11,7 @@ import cx from "classnames"
 import { v4 as uuidv4 } from "uuid"
 
 import { ASSISTANT, EVENT_NAME, USER } from "../common/constants"
+import { contextFit } from "../common/model-status"
 import {
   AnyContextItem,
   ChatCompletionMessage,
@@ -25,6 +26,7 @@ import { useAutoRun } from "./hooks/useAutoRun"
 import { useAutosizeTextArea } from "./hooks/useAutosizeTextArea"
 import { useComposerSuggestions } from "./hooks/useComposerSuggestions"
 import { useConversationHistory } from "./hooks/useConversationHistory"
+import { useModelStatus } from "./hooks/useModelStatus"
 import { useProviders } from "./hooks/useProviders"
 import { useSelection } from "./hooks/useSelection"
 import { useSuggestion } from "./hooks/useSuggestion"
@@ -38,6 +40,7 @@ import { GhostText } from "./ghost-text"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
 import { emit, useServerEvent } from "./messaging"
+import { ModelState } from "./model-state"
 import { Shortcuts } from "./shortcuts"
 import { Suggestions } from "./suggestions"
 import { answerToolStep } from "./tool-steps"
@@ -110,6 +113,17 @@ export const Chat = (props: ChatProps): JSX.Element => {
   // until one is set; the empty transcript says where to set it.
   const { chatProvider, ready: providersReady } = useProviders()
   const chatDisabled = providersReady && !chatProvider
+  const model = useModelStatus(chatProvider, isLoading)
+  const [draftChars, setDraftChars] = useState(0)
+  /** The conversation as the server last counted it; before any count, its length. */
+  const conversationTokens = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const meta = messages[i].meta
+      if (meta?.promptTokens) return meta.promptTokens + (meta.completionTokens ?? 0)
+    }
+    return Math.round(messages.reduce((chars, message) => chars + (message.content?.length ?? 0), 0) / 3.5)
+  }, [messages])
+  const fit = contextFit(conversationTokens, draftChars, model.status?.contextWindow)
   const [completion, setCompletion] = useState<ChatCompletionMessage | null>()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { contextItems, removeContextItem } = useWorkspaceContext()
@@ -917,7 +931,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
         })
       ],
       // Typing into a recalled prompt makes it the draft.
-      onUpdate: () => {
+      onUpdate: ({ editor }) => {
+        setDraftChars(editor.getText().length)
         recallIndexRef.current = -1
         lastEscapeRef.current = 0
         if (showShortcutsRef.current) setShortcuts(false)
@@ -1226,7 +1241,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
         )}
         <div className={styles.transcript}>
           {messages.length === 0 ? (
-            <EmptyChat />
+            <EmptyChat
+              status={model.status}
+              warming={model.warming}
+              onWarm={model.warm}
+              disabled={!!generatingRef.current}
+            />
           ) : (
             <Virtuoso
               style={{ height: "100%" }}
@@ -1430,6 +1450,16 @@ export const Chat = (props: ChatProps): JSX.Element => {
           </form>
           <div className={styles.footer}>
             <ProviderSelect />
+            <span className={styles.footerEnd}>
+              <ModelState
+                status={model.status}
+                fit={fit}
+                model={chatProvider?.modelName}
+                warming={model.warming}
+                onWarm={model.warm}
+                hideLoad={messages.length === 0}
+              />
+            </span>
             <button
               type="button"
               className={styles.shortcutsHint}

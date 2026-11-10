@@ -19,6 +19,7 @@ import {
 } from "../../common/types"
 import { Chat } from "../chat"
 import { ConversationHistory } from "../chat/conversation-history"
+import { runStarter } from "../chat/starters"
 import { searchSymbols } from "../chat/symbols"
 import { WorkspaceIndex } from "../embeddings"
 import { EmbeddingService } from "../embeddings/service"
@@ -211,6 +212,11 @@ export class BaseProvider {
           TWINNY_COMMAND_NAME.generateCommitMessage
         ),
       [EVENT_NAME.twinnyGetModels]: () => models as unknown as ModelCatalogue,
+      [EVENT_NAME.twinnyModelStatus]: async () => (await this.chat?.modelStatus()) ?? null,
+      [EVENT_NAME.twinnyWarmModel]: async () => (await this.chat?.warmModel()) ?? null,
+      [EVENT_NAME.twinnyStarter]: (kind) => {
+        if (this.chat) void runStarter(this.chat, kind)
+      },
       [EVENT_NAME.twinnyGlobalContext]: ({ key }) =>
         this.readGlobalContext(key),
       [EVENT_NAME.twinnyGetWorkspaceContext]: ({ key }) =>

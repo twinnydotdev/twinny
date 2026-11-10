@@ -1105,6 +1105,11 @@ suite("Gateway process: identity, status, admin page, per-key limits", function 
     const usage = (await (await get("/twinny/v1/admin/usage?since=1h", adminKey)).json()) as { total: { requests: number }; byDay: unknown[] }
     assert.ok(typeof usage.total.requests === "number")
     assert.ok(Array.isArray(usage.byDay))
+    assert.ok(!("previous" in usage), "the period before is only summed when asked for")
+    const compared = (await (await get("/twinny/v1/admin/usage?since=1h&compare=previous", adminKey)).json()) as {
+      previous?: { requests: number }
+    }
+    assert.strictEqual(compared.previous?.requests, 0, "nothing was asked in the hour before")
     assert.strictEqual((await get("/twinny/v1/admin/usage?since=soon", adminKey)).status, 400)
   })
 

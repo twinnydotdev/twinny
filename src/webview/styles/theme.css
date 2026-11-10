@@ -291,11 +291,14 @@ vscode-button::part(content) {
   pointer-events: none;
 }
 
+/* A thumbnail: small enough to leave the draft and the composer's buttons in view. */
 .imageContainer {
   position: relative;
   display: inline-block;
-  width: 120px;
-  height: 120px;
+  width: 64px;
+  height: 64px;
+  margin: 0 4px 4px 0;
+  vertical-align: bottom;
   border-radius: var(--tw-radius);
   background: var(--tw-fill);
   overflow: hidden;
@@ -315,10 +318,11 @@ vscode-button::part(content) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
   background: var(--tw-bg);
-  border: 1px solid var(--tw-rule);
+  border: 0;
   color: var(--tw-fg-dim);
   cursor: pointer;
   z-index: 2;

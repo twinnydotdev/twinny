@@ -83,7 +83,7 @@ export class ModelWarmer {
   }
 }
 
-const sendWarmUp = async (provider: TwinnyProvider, keepAlive?: string) => {
+export const sendWarmUp = async (provider: TwinnyProvider, keepAlive?: string) => {
   const abort = new AbortController()
   const timeout = setTimeout(() => abort.abort(), WARM_TIMEOUT_MS)
   try {

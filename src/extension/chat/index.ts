@@ -15,6 +15,7 @@ import {
 } from "../../common/constants"
 import { formatCount, logger } from "../../common/logger"
 import type { ComposerTurn } from "../../common/messaging/protocol"
+import type { ModelStatus } from "../../common/model-status"
 import type { TeamAgentPolicy } from "../../common/team"
 import { currentTeamPolicy, currentTeamState } from "../../common/team-policy"
 import { kebabToSentence } from "../../common/text"
@@ -24,6 +25,7 @@ import {
   ReplyChangesView,
   TwinnyProvider
 } from "../../common/types"
+import { shouldWarm } from "../completion/warm-up"
 import type { ChatEditMode } from "../edit/service"
 import { WorkspaceSearch } from "../embeddings/search"
 import { GenerationRun, GenerationTracker } from "../generations"
@@ -33,9 +35,10 @@ import {
   contextWindowOf,
   knownContextWindow
 } from "../inference/context-window"
+import { modelStatusOf, rememberLoad } from "../inference/model-status"
 import { ExtensionBridge } from "../messaging/bridge"
 import { Base } from "../providers/base"
-import { describeProviderError, stripThinking } from "../providers/errors"
+import { describeProviderError, describeProviderErrorPlain, stripThinking } from "../providers/errors"
 import { TemplateProvider } from "../templates/provider"
 import { compactHistory, planContext, SMALL_CONTEXT_TOKENS } from "../tools/budget"
 import { DEFAULT_MAX_STEPS, ToolLoopUsage, toolModeFor, withTools } from "../tools/loop"
@@ -68,6 +71,11 @@ import { buildChatTurn } from "./turn"
 const TEMPLATES_WITH_RAG = ["explain"]
 /** Room for a sentence of the composer's grey text, and no more. */
 const SUGGESTION_MAX_TOKENS = 32
+/** A model that has not loaded by now is not going to: the server is stuck or out of memory. */
+const LOAD_TIMEOUT_MS = 5 * 60_000
+
+const loadKey = (provider: TwinnyProvider) =>
+  [provider.provider, provider.apiHostname ?? "", provider.apiPort ?? "", provider.modelName].join("|")
 /** Whether the team's rules leave the developer's MCP servers to agent mode. */
 const mcpAllowed = (team: TeamAgentPolicy | undefined) => team?.commands !== "off" && team?.mcp !== "off"
 
@@ -90,6 +98,9 @@ export class Chat extends Base {
   private _conversation: ChatCompletionMessage[] = []
   private readonly _backgroundRuns = new Set<GenerationRun>()
   private _suggestion?: GenerationRun
+  /** Models twinny is loading at the user's request, and why the last load of one failed. */
+  private readonly _loading = new Set<string>()
+  private readonly _loadErrors = new Map<string, string>()
   private readonly _bridge: ExtensionBridge
   private readonly _context: ChatContextBuilder
   private readonly _generation: ChatGeneration
@@ -450,6 +461,60 @@ export class Chat extends Base {
       new Promise<void>((resolve) => (timer = setTimeout(resolve, POLICY_REFRESH_WAIT_MS)))
     ])
     clearTimeout(timer)
+  }
+
+  /** Where the chat model runs, whether its server has it loaded, how much it holds. */
+  public async modelStatus(): Promise<ModelStatus | null> {
+    const provider = this.getProvider()
+    if (!provider?.modelName) return null
+    const key = loadKey(provider)
+    const status = await modelStatusOf(provider, shouldWarm(provider))
+    if (this._loading.has(key) && !status.loaded) return { ...status, loading: true }
+    const failed = this._loadErrors.get(key)
+    return failed && !status.loaded ? { ...status, loadError: failed } : status
+  }
+
+  /**
+   * Starts loading the chat model on its local server, so the first reply
+   * does not wait for it, and answers at once: a large model takes longer
+   * to load than a request from the chat may wait. The chat asks for the
+   * status again until it is loaded. The load is a one-token chat request,
+   * sent the way a real message is, so the server loads the model exactly
+   * as the first message would.
+   */
+  public async warmModel(): Promise<ModelStatus | null> {
+    const provider = this.getProvider()
+    if (!provider?.modelName) return null
+    const key = loadKey(provider)
+    if (shouldWarm(provider) && !this._loading.has(key)) {
+      this._loadErrors.delete(key)
+      this._loading.add(key)
+      const started = Date.now()
+      const abort = new AbortController()
+      const timer = setTimeout(() => abort.abort(), LOAD_TIMEOUT_MS)
+      void readText(
+        resolveInferenceProvider(provider).chat(
+          { model: provider.modelName, messages: [{ role: USER, content: "Hi" }], maxTokens: 1, temperature: 0, think: false },
+          { signal: abort.signal }
+        )
+      )
+        .then(() => {
+          rememberLoad(provider, Date.now() - started)
+          logger.debug(`Loaded ${provider.modelName} in ${Date.now() - started}ms`)
+        })
+        .catch((error) => {
+          const message = abort.signal.aborted
+            ? `${provider.modelName} did not load within ${LOAD_TIMEOUT_MS / 60_000} minutes.`
+            : describeProviderErrorPlain(error, provider)
+          this._loadErrors.set(key, message)
+          logger.error(`Loading ${provider.modelName} failed: ${message}`)
+        })
+        .finally(() => {
+          clearTimeout(timer)
+          this._loading.delete(key)
+        })
+    }
+    return this.modelStatus()
   }
 
   /** Common preamble: clear the stop flag, tell the webview the language. */
