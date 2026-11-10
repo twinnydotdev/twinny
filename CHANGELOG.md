@@ -2,6 +2,10 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.19 · 2026-11-10
+
+`twinny-server` release: a Personal licence holds the gateway to its one key, in place of the free five; removing it brings the five back. A licence that does not expire says "for good" instead of a date.
+
 ## 4.3.18 · 2026-11-10
 
 Extension and `twinny-server`: agent mode gets more out of small local models, the chat follows a reply as it is written, the sidebar has a softer look, and the gateway has fixes from an audit.

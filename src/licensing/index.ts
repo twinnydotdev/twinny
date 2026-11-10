@@ -21,6 +21,7 @@ export {
 export {
   decodeLicenseToken,
   describeLicense,
+  isLifetime,
   LICENSE_TOKEN_PREFIX,
   LicenseClaims,
   LicenseError,
