@@ -386,6 +386,7 @@ export const goToDefinition = (view: WorkspaceView, editor: EditorSink): Tool =>
 
 export const renameSymbol = (view: WorkspaceView, editor: EditorSink): Tool => ({
   name: "rename_symbol",
+  acts: true,
   description: "Rename a function, class, variable or type everywhere it is used, through the language server. Better than editing each use.",
   parameters: [...SYMBOL_PARAMETERS.slice(0, 2), { name: "new_name", description: "The new name." }, SYMBOL_PARAMETERS[2]],
   async run({ path: file, symbol, new_name, line }) {
@@ -434,6 +435,7 @@ export const editorContext = (view: WorkspaceView, editor: EditorSink): Tool => 
 
 export const deleteFile = (view: WorkspaceView, ops: FileOpsSink): Tool => ({
   name: "delete_file",
+  acts: true,
   description: "Delete a file in the workspace.",
   parameters: [{ name: "path", description: "The file to delete." }],
   async run({ path: file }) {
@@ -450,6 +452,7 @@ export const deleteFile = (view: WorkspaceView, ops: FileOpsSink): Tool => ({
 
 export const moveFile = (view: WorkspaceView, ops: FileOpsSink): Tool => ({
   name: "move_file",
+  acts: true,
   description:
     "Move or rename a file; missing folders are made. Imports of it elsewhere are not rewritten for you: find them with find_references or grep and fix them.",
   parameters: [

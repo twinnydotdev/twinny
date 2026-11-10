@@ -233,6 +233,9 @@ interface CachedToken {
   expiresAt: number
 }
 
+/** Pages of the issue list read to find a repository's issues among its pull requests. */
+const MAX_ISSUE_PAGES = 4
+
 export class GitHubForge implements Forge {
   private readonly _installations = new Map<string, number>()
   private readonly _tokens = new Map<number, CachedToken>()
@@ -537,13 +540,20 @@ export class GitHubForge implements Forge {
 
   public async listIssues(repo: RepoRecord, signal: AbortSignal): Promise<IssueSummary[]> {
     const token = await this.tokenFor(repo, signal)
-    const answer = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/issues?state=open&per_page=${MAX_PULLS_PER_REPO}&sort=updated`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT },
-      signal
-    })
-    return arr(await readJson(answer, `Listing issues of ${repo.fullName}`))
-      .map((entry) => rec(entry))
-      .filter((issue) => !issue.pull_request)
+    // GitHub lists pull requests among the issues, so a page may hold few
+    // issues or none: a busy repository's are a page or two further on.
+    const found: Record<string, unknown>[] = []
+    for (let page = 1; page <= MAX_ISSUE_PAGES && found.length < MAX_PULLS_PER_REPO; page++) {
+      const answer = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/issues?state=open&per_page=${MAX_PULLS_PER_REPO}&sort=updated&page=${page}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT },
+        signal
+      })
+      const entries = arr(await readJson(answer, `Listing issues of ${repo.fullName}`)).map((entry) => rec(entry))
+      found.push(...entries.filter((issue) => !issue.pull_request))
+      if (entries.length < MAX_PULLS_PER_REPO) break
+    }
+    return found
+      .slice(0, MAX_PULLS_PER_REPO)
       .map((issue) => ({
         repo: repo.fullName,
         number: num(issue.number) ?? 0,

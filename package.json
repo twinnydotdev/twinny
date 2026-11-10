@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.17",
+  "version": "4.3.18",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -725,6 +725,13 @@
           "minimum": 4,
           "maximum": 40,
           "markdownDescription": "How many tool steps one agent reply may take before the model is asked to answer with what it has (with `#twinny.chatTools#` on). More lets a capable model finish longer tasks in one reply; each step is another request to the model.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsTasks": {
+          "order": 20,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Let the model keep a task list for work with several parts (with `#twinny.chatTools#` on). The list shows in the reply as it is ticked off, and is put back in front of the model when a reply runs out of steps or the next turn begins.",
           "scope": "machine"
         },
         "twinny.chatToolsCommandsRunIn": {

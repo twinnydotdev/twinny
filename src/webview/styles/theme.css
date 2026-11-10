@@ -6,7 +6,9 @@
  *
  * The palette is derived from the user's VS Code theme rather than hard-coded,
  * so a light theme stays readable. The look comes from the shape of things —
- * hairlines, square corners, no shadows, greys — not from a fixed colour.
+ * soft filled surfaces, rounded corners, room to breathe, greys — not from a
+ * fixed colour. Things are set apart by a ground a shade off the page, not
+ * by a line drawn round them.
  *
  * Two faces: VS Code's own UI font for everything people read (replies,
  * labels, buttons, settings), and the editor's font for what is code — code
@@ -31,6 +33,11 @@
   --tw-pad: 12px;
   --tw-gutter: 14px;
 
+  /* Corners: controls, cards, and the large blocks (the composer, a user's turn). */
+  --tw-radius-sm: 4px;
+  --tw-radius: 6px;
+  --tw-radius-lg: 10px;
+
   --tw-bg: var(--vscode-editor-background);
   --tw-fg: var(--vscode-foreground);
 
@@ -40,6 +47,9 @@
   --tw-rule: var(--vscode-editorWidget-border);
   --tw-rule-soft: var(--vscode-editorWidget-border);
   --tw-surface: var(--vscode-editorWidget-background);
+  /* Grounds for things that stand apart: a card, and one a step stronger (hover, a user's turn). */
+  --tw-fill: var(--vscode-editorWidget-background);
+  --tw-fill-strong: var(--vscode-list-hoverBackground);
   /*
    * No invented palette. Each of these is the token VS Code itself uses for
    * that exact job, so every colour in the UI is one the active theme already
@@ -71,6 +81,8 @@
     --tw-rule: color-mix(in srgb, var(--vscode-foreground) 14%, transparent);
     --tw-rule-soft: color-mix(in srgb, var(--vscode-foreground) 7%, transparent);
     --tw-surface: color-mix(in srgb, var(--vscode-foreground) 4%, transparent);
+    --tw-fill: color-mix(in srgb, var(--vscode-foreground) 6%, transparent);
+    --tw-fill-strong: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
     --tw-accent-soft: color-mix(in srgb, var(--tw-accent) 45%, transparent);
     --tw-link-soft: color-mix(in srgb, var(--tw-link) 40%, transparent);
     --tw-primary-hover: color-mix(in srgb, var(--vscode-foreground) 82%, var(--vscode-editor-background));
@@ -99,7 +111,7 @@ body {
   color: var(--tw-fg);
 }
 
-/* Thin, square, unobtrusive. */
+/* Thin, rounded, unobtrusive. */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -112,7 +124,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--tw-rule);
-  border-radius: 0;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -131,9 +143,8 @@ a:hover {
 }
 
 /*
- * The toolkit web components render their own rounded chrome. Square the
- * corners and put them on the same font as everything else; their colours and
- * weights are VS Code's own and are left alone.
+ * The toolkit web components get the same corners and font as everything
+ * else; their colours and weights are VS Code's own and are left alone.
  */
 vscode-button::part(control),
 vscode-dropdown::part(control),
@@ -142,7 +153,7 @@ vscode-text-field::part(control),
 vscode-text-area::part(control),
 vscode-badge::part(control),
 vscode-checkbox::part(control) {
-  border-radius: 0;
+  border-radius: var(--tw-radius-sm);
   font-family: var(--tw-font);
 }
 
@@ -242,6 +253,13 @@ vscode-button::part(content) {
   cursor: pointer;
 }
 
+.mention {
+  padding: 0 3px;
+  border-bottom: 0;
+  border-radius: var(--tw-radius-sm);
+  background: var(--tw-fill);
+}
+
 .mention:hover {
   background: var(--tw-surface);
 }
@@ -278,7 +296,8 @@ vscode-button::part(content) {
   display: inline-block;
   width: 120px;
   height: 120px;
-  border: 1px solid var(--tw-rule);
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   overflow: hidden;
 }
 

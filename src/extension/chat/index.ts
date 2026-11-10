@@ -37,7 +37,7 @@ import { ExtensionBridge } from "../messaging/bridge"
 import { Base } from "../providers/base"
 import { describeProviderError, stripThinking } from "../providers/errors"
 import { TemplateProvider } from "../templates/provider"
-import { SMALL_CONTEXT_TOKENS } from "../tools/budget"
+import { compactHistory, planContext, SMALL_CONTEXT_TOKENS } from "../tools/budget"
 import { DEFAULT_MAX_STEPS, ToolLoopUsage, toolModeFor, withTools } from "../tools/loop"
 import type { McpToolSpec } from "../tools/mcp"
 import { WorkspaceView } from "../tools/view"
@@ -538,7 +538,8 @@ export class Chat extends Base {
             onOutOfSteps: () => (outOfSteps = true)
           })
         : resolveInferenceProvider(provider),
-      { model: provider.modelName, messages: this._conversation },
+      // The agent's loop fits a long conversation to the context itself; a plain reply is fitted here.
+      { model: provider.modelName, messages: view ? this._conversation : this.fitted(provider) },
       provider,
       prefix,
       {
@@ -580,6 +581,17 @@ export class Chat extends Base {
       ]
     }
     return reply
+  }
+
+  /** The conversation, with its oldest turns folded into a few lines when it has outgrown the model's context. */
+  private fitted(provider: TwinnyProvider): ChatCompletionMessage[] {
+    const window = knownContextWindow(provider) ?? assumedContextWindow(provider)
+    if (!window) return this._conversation
+    const { messages, folded } = compactHistory(this._conversation, planContext(window))
+    if (folded) {
+      logger.info(`Chat · folded ${folded} older messages into a summary to fit the model's ${formatCount(window)}-token context`)
+    }
+    return messages
   }
 
   /**
@@ -660,6 +672,9 @@ export class Chat extends Base {
         return told ?? assumedContextWindow(provider)
       },
       stepLines: false,
+      tasks: this.config.get<boolean>("chatToolsTasks", true),
+      onCompact: (messages) =>
+        logger.info(`Chat tools · folded ${messages} older messages into a summary to fit the model's context`),
       steering: () => this.takeSteering(),
       onOutOfSteps: hooks.onOutOfSteps,
       onNotes: hooks.onNotes,

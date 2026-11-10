@@ -4,6 +4,7 @@ import cx from "classnames"
 
 import { EVENT_NAME } from "../common/constants"
 import { ToolStepView } from "../common/types"
+import { parseTasks, TASKS_TOOL_NAME, tasksProgress } from "../extension/tools/tasks"
 
 import { emit } from "./messaging"
 import { Code, ToolOutput } from "./tool-output"
@@ -179,6 +180,32 @@ const Said = ({ step }: { step: ToolStepView }) => {
 }
 
 /**
+ * The model's list of steps as it stood at this point: what is done
+ * ticked, what is next marked, the rest waiting. Only the latest one in a
+ * stretch is laid out; an earlier one is a line like any other step.
+ */
+const Tasks = ({ step, live }: { step: ToolStepView; live: boolean }) => {
+  const tasks = parseTasks(step.args?.tasks)
+  if (!tasks) return <Step step={step} />
+  const next = tasks.findIndex((task) => !task.done)
+  return (
+    <li className={styles.tasks}>
+      <div className={styles.tasksHead}>{tasksProgress(tasks)}</div>
+      <ul className={styles.taskList}>
+        {tasks.map((task, i) => (
+          <li key={i} className={cx(styles.task, task.done && styles.taskDone, live && i === next && styles.taskNext)}>
+            <span className={styles.glyph} aria-hidden="true">
+              <span className={cx("codicon", task.done ? "codicon-check" : i === next && live ? "codicon-arrow-small-right" : "codicon-circle-small")} />
+            </span>
+            <span className={styles.taskText}>{task.text}</span>
+          </li>
+        ))}
+      </ul>
+    </li>
+  )
+}
+
+/**
  * The tools the model used for a stretch of a reply, a line each. A
  * line opens to what the tool was given and what came back; a command
  * waiting for the user shows Run and Skip in place. What the user said
@@ -186,9 +213,21 @@ const Said = ({ step }: { step: ToolStepView }) => {
  */
 export const ToolSteps = ({ steps }: { steps?: ToolStepView[] }) => {
   if (!steps?.length) return null
+  const isList = (step: ToolStepView) => step.name === TASKS_TOOL_NAME && step.status === "done"
+  const latest = [...steps].reverse().find(isList)
+  // While the reply still works, the step after the last tick is the one in hand.
+  const live = steps.some((step) => step.status === "running" || step.status === "waiting")
   return (
     <ol className={styles.panel}>
-      {steps.map((step) => (step.said ? <Said key={step.id} step={step} /> : <Step key={step.id} step={step} />))}
+      {steps.map((step) =>
+        step.said ? (
+          <Said key={step.id} step={step} />
+        ) : step === latest ? (
+          <Tasks key={step.id} step={step} live={live} />
+        ) : (
+          <Step key={step.id} step={step} />
+        )
+      )}
     </ol>
   )
 }

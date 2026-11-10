@@ -129,11 +129,12 @@ test("old results are trimmed, oldest first, when the next request would not fit
     request.messages.filter((m) => m.role === "tool").map((m) => String(m.content))
   const last = results(requests[4])
   assert.strictEqual(last.length, 4, "every call keeps its result message, so the conversation stays well formed")
-  assert.strictEqual(
+  assert.match(
     last[0],
-    "a.ts (lines 1–60 of 60)\n[The rest was trimmed to save context. Run the tool again if you need it.]"
+    /^a\.ts \(lines 1–\d+ of 60\); defined there \(line\): value0 \(1\), value1 \(2\)[^\n]*\n\[The rest was trimmed to save context\. Run the tool again if you need it\.\]$/,
+    "what stands in for it says what was read and what is defined there"
   )
-  assert.match(last[3], /^d\.ts \(lines 1–60 of 60\)\n1: const value0/, "the newest result is whole")
+  assert.match(last[3], /^d\.ts \(lines 1–\d+ of 60\)\n1: const value0/, "the newest result is whole")
   assert.ok(last[3].length <= plan.resultChars + 120, "and held to its share of the context")
   // Without a known context nothing is trimmed.
   const untrimmed = scripted([{ calls: [read("1", "a.ts")] }, { calls: [read("2", "b.ts")] }, "Done."])

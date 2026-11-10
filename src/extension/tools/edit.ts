@@ -236,3 +236,118 @@ export const planReplacement = (
   if (edited === original) return "replace is the same as find; nothing would change"
   return { startLine, endLine, original, text: edited }
 }
+
+/** One change to a file, as `edit_file` takes it: by its text, everywhere that text is, or by its lines. */
+export interface EditRequest {
+  find?: string
+  replace: string
+  /** Every place `find` is, rather than the one. */
+  all?: boolean
+  /** Lines to rewrite, from 1 and inclusive, in place of `find`. */
+  startLine?: number
+  endLine?: number
+}
+
+/** Lines `start`–`end` (from 1, inclusive) rewritten as `rawReplace`; nothing for `rawReplace` removes them. */
+export const planLines = (content: string, start: number, end: number, rawReplace: string): Replacement | string => {
+  const lines = content.replace(/\r\n/g, "\n").split("\n")
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
+    return "start_line and end_line must be line numbers from read_file, with end_line not before start_line"
+  }
+  if (end > lines.length) return `the file has only ${lines.length} lines`
+  const original = lines.slice(start - 1, end).join("\n")
+  const text = withoutLineNumbers(rawReplace.replace(/\r\n/g, "\n")).replace(/\n+$/, "")
+  if (text === original) return "replace is the same as those lines; nothing would change"
+  return { startLine: start - 1, endLine: end - 1, original, text }
+}
+
+/** `text` with every place `find` is replaced, and how many there were: exact text first, then whole lines with whitespace aside. */
+const replaceEvery = (text: string, find: string, replace: string): { text: string; count: number } => {
+  const exact = text.split(find)
+  if (exact.length > 1) return { text: exact.join(replace), count: exact.length - 1 }
+  const lines = text.split("\n")
+  const wanted = find.split("\n")
+  const out: string[] = []
+  let count = 0
+  for (let i = 0; i < lines.length; ) {
+    if (i + wanted.length <= lines.length && wanted.every((line, j) => sameLine(lines[i + j], line))) {
+      out.push(matchIndentation(replace, lines.slice(i, i + wanted.length).join("\n")))
+      i += wanted.length
+      count++
+    } else {
+      out.push(lines[i++])
+    }
+  }
+  return { text: out.join("\n"), count }
+}
+
+const withLines = (text: string, plan: Replacement) => {
+  const lines = text.split("\n")
+  lines.splice(plan.startLine, plan.endLine - plan.startLine + 1, ...(plan.text === "" ? [] : plan.text.split("\n")))
+  return lines.join("\n")
+}
+
+/**
+ * Several changes to one file as the single stretch of lines they come
+ * to, made in order, each against the file as the ones before left it.
+ * All or nothing: one that cannot be made refuses the lot, saying which.
+ * `count` is how many places changed.
+ */
+export const planEdits = (content: string, edits: EditRequest[]): (Replacement & { count: number }) | string => {
+  const before = content.replace(/\r\n/g, "\n")
+  if (!edits.length) return "there were no edits to make"
+  // One change by its text keeps the plan as it always was: the lines `find` covers.
+  if (edits.length === 1 && !edits[0].all) {
+    const [only] = edits
+    const plan =
+      only.startLine !== undefined
+        ? planLines(before, only.startLine, only.endLine ?? only.startLine, only.replace)
+        : planReplacement(before, only.find ?? "", only.replace)
+    return typeof plan === "string" ? plan : { ...plan, count: 1 }
+  }
+  let text = before
+  let count = 0
+  for (const [index, edit] of edits.entries()) {
+    const which = edits.length > 1 ? `edit ${index + 1} of ${edits.length}: ` : ""
+    if (edit.startLine !== undefined) {
+      return `${which}start_line and end_line cannot be used with replace_all or in a list of edits; use find`
+    }
+    const find = trimBlankEdges(withoutLineNumbers((edit.find ?? "").replace(/\r\n/g, "\n")))
+    if (!find.trim()) return `${which}find is empty; it must be text already in the file`
+    if (edit.all) {
+      const replace = withoutLineNumbers(edit.replace.replace(/\r\n/g, "\n")).replace(/\n+$/, "")
+      if (replace === find) return `${which}replace is the same as find; nothing would change`
+      const every = replaceEvery(text, find, replace)
+      if (!every.count) return `${which}${NOT_FOUND}`
+      text = every.text
+      count += every.count
+      continue
+    }
+    const plan = planReplacement(text, edit.find ?? "", edit.replace)
+    if (typeof plan === "string") return `${which}${plan}${edits.length > 1 ? "\nNone of the edits were made." : ""}`
+    text = withLines(text, plan)
+    count++
+  }
+  if (text === before) return "nothing would change"
+  // The stretch of lines that differ, start to end.
+  const was = before.split("\n")
+  const now = text.split("\n")
+  let head = 0
+  while (head < was.length && head < now.length && was[head] === now[head]) head++
+  let tail = 0
+  while (tail < was.length - head && tail < now.length - head && was[was.length - 1 - tail] === now[now.length - 1 - tail]) tail++
+  // Lines only added: the plan still rewrites a line, the one they follow (or come before).
+  if (head + tail === was.length) {
+    if (head > 0) head--
+    else tail--
+  }
+  const startLine = head
+  const endLine = was.length - 1 - tail
+  return {
+    startLine,
+    endLine,
+    original: was.slice(startLine, endLine + 1).join("\n"),
+    text: now.slice(startLine, now.length - tail).join("\n"),
+    count
+  }
+}

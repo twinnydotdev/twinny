@@ -126,6 +126,113 @@ export const Chat = (props: ChatProps): JSX.Element => {
     () => getThinkingMessage(String(completionRef.current?.content ?? "")).message
   )
   const [isBottom, setIsBottom] = useState(false)
+  /*
+   * Following the reply as it grows is done here, not by Virtuoso's
+   * `followOutput`: that follows a growing last row only for a moment after
+   * each render and only on a change of its at-bottom state, so one jump
+   * of a tall code block leaves it behind for good. Here every change in
+   * the transcript's height, while following, pins the scroller to its
+   * end; scrolling up lets go, and coming back to the end takes hold again.
+   */
+  const [scroller, setScroller] = useState<HTMLElement | null>(null)
+  const followRef = useRef(true)
+  const [following, setFollowingState] = useState(true)
+  const lastTopRef = useRef(0)
+  /** Until when the end is still held after a reply stops, while its last rows settle. */
+  const settleUntilRef = useRef(0)
+  const setFollowing = useCallback((follow: boolean) => {
+    followRef.current = follow
+    setFollowingState(follow)
+  }, [])
+  const pinToEnd = useCallback(() => {
+    if (!scroller) return
+    scroller.scrollTop = scroller.scrollHeight
+    lastTopRef.current = scroller.scrollTop
+  }, [scroller])
+
+  useEffect(() => {
+    if (!scroller) return
+    // Only the reader lets go. The list moves the scroller itself as rows
+    // are measured, so a scroll up counts only just after a wheel, a touch,
+    // a key, or while the scrollbar is held.
+    let intent = 0
+    let dragging = false
+    let repin = 0
+    const meant = () => (intent = Date.now())
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) meant()
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (["ArrowUp", "PageUp", "Home"].includes(event.key)) meant()
+    }
+    const onDown = (event: MouseEvent) => {
+      // A press on the scroller itself, not on what is in it, is on its scrollbar.
+      if (event.target === scroller) dragging = true
+    }
+    const onUp = () => {
+      if (dragging) meant()
+      dragging = false
+    }
+    const onScroll = () => {
+      const gap = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+      const byReader = dragging || Date.now() - intent < 500
+      if (byReader && scroller.scrollTop < lastTopRef.current - 1 && gap > 24) setFollowing(false)
+      else if (gap <= 24 && !followRef.current) setFollowing(true)
+      lastTopRef.current = scroller.scrollTop
+      // The list also moves the scroller with no change of height (making
+      // up for a row it measured): while following, that is put right too.
+      if (gap > 1 && followRef.current && !byReader && !repin) {
+        repin = requestAnimationFrame(() => {
+          repin = 0
+          onResize()
+        })
+      }
+    }
+    const onResize = () => {
+      if (!followRef.current) return
+      if (!generatingRef.current && Date.now() > settleUntilRef.current) return
+      scroller.scrollTop = scroller.scrollHeight
+      lastTopRef.current = scroller.scrollTop
+    }
+    // A transcript just opened starts at its end. (Virtuoso's own
+    // `initialTopMostItemIndex` keeps scrolling back to the top of that row
+    // for as long as rows are still being measured, which a reply that
+    // starts streaming at once never lets finish.)
+    settleUntilRef.current = Date.now() + 1000
+    onResize()
+    const observer = new ResizeObserver(onResize)
+    observer.observe(scroller)
+    // Rows not rendered are the list's padding, so its border box is the transcript's whole height.
+    const list = scroller.querySelector("[data-testid=virtuoso-item-list]")
+    if (list) observer.observe(list, { box: "border-box" })
+    scroller.addEventListener("scroll", onScroll, { passive: true })
+    scroller.addEventListener("wheel", onWheel, { passive: true })
+    scroller.addEventListener("touchmove", meant, { passive: true })
+    scroller.addEventListener("keydown", onKey)
+    scroller.addEventListener("mousedown", onDown)
+    window.addEventListener("mouseup", onUp)
+    return () => {
+      cancelAnimationFrame(repin)
+      observer.disconnect()
+      scroller.removeEventListener("scroll", onScroll)
+      scroller.removeEventListener("wheel", onWheel)
+      scroller.removeEventListener("touchmove", meant)
+      scroller.removeEventListener("keydown", onKey)
+      scroller.removeEventListener("mousedown", onDown)
+      window.removeEventListener("mouseup", onUp)
+    }
+  }, [scroller, setFollowing])
+
+  // A reply starting (a message sent, regenerated, edited, continued) takes
+  // the reader to it; one ending is held to its end while it settles.
+  useEffect(() => {
+    if (isLoading) {
+      setFollowing(true)
+      requestAnimationFrame(pinToEnd)
+    } else {
+      settleUntilRef.current = Date.now() + 1000
+    }
+  }, [isLoading, pinToEnd, setFollowing])
   const { agentMode, toggleAgentMode, agentModeTeamOff, teamAgentRules } = useAgentMode()
   const agentModeRef = useRef(agentMode)
   agentModeRef.current = agentMode
@@ -523,6 +630,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [setShortcuts])
 
   const scrollTranscript = useCallback((direction: -1 | 1) => {
+    if (direction < 0) setFollowing(false)
     virtuosoRef.current?.scrollBy({
       top: direction * window.innerHeight * 0.6
     })
@@ -748,6 +856,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
   useEffect(() => {
     if (conversation?.id) setMessages(conversation.messages || [])
     if (queuedRef.current.length) updateQueue([])
+    setFollowing(true)
+    settleUntilRef.current = Date.now() + 1000
   }, [conversation?.id])
 
   const { suggestion, filePaths } = useSuggestion()
@@ -1000,11 +1110,13 @@ export const Chat = (props: ChatProps): JSX.Element => {
   )
 
   const scrollToBottom = useCallback(() => {
+    setFollowing(true)
     virtuosoRef.current?.scrollTo({
       top: Infinity,
       behavior: "auto"
     })
-  }, [])
+    pinToEnd()
+  }, [pinToEnd, setFollowing])
 
   const renderContextItem = useCallback(
     (item: AnyContextItem) => {
@@ -1046,10 +1158,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [handleOpenFile, removeContextItem]
   )
 
+  // The reply in progress is a row of its own, after the messages: when it
+  // ends, the finished message takes that row's place and nothing moves.
+  const pending = isLoading || !!completion
   const itemContent = useCallback(
     (index: number) => (
       <MessageItem
         key={`message-list-${index}`}
+        pending={index >= messages.length}
         completion={completion}
         context={searchReport}
         steps={toolSteps}
@@ -1060,9 +1176,9 @@ export const Chat = (props: ChatProps): JSX.Element => {
         handleRegenerateMessage={handleRegenerateMessage}
         handleContinue={handleContinue}
         handleChangesUpdate={handleChangesUpdate}
-        index={index}
+        index={Math.min(index, messages.length - 1)}
         isLoading={isLoading}
-        message={messages[index]}
+        message={messages[Math.min(index, messages.length - 1)]}
         messages={messages}
       />
     ),
@@ -1113,11 +1229,10 @@ export const Chat = (props: ChatProps): JSX.Element => {
             <EmptyChat />
           ) : (
             <Virtuoso
-              followOutput
               style={{ height: "100%" }}
               ref={virtuosoRef}
-              data={messages}
-              initialTopMostItemIndex={messages?.length}
+              scrollerRef={(element) => setScroller(element instanceof HTMLElement ? element : null)}
+              totalCount={messages.length + (pending ? 1 : 0)}
               defaultItemHeight={800}
               itemContent={itemContent}
               atBottomThreshold={20}
@@ -1131,7 +1246,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
         )}
         <div className={styles.chatOptions}>
           <div>
-            {!isBottom && messages.length > 0 && (
+            {!isBottom && messages.length > 0 && !(following && isLoading) && (
               <VSCodeButton
                 appearance="icon"
                 className={styles.scrollDown}
@@ -1291,7 +1406,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
                   <VSCodeButton
                     appearance="icon"
                     role="button"
-                    className={styles.stopButton}
+                    className={cx(styles.sendButton, styles.stopButton)}
                     onClick={handleStopGeneration}
                     title={t("stop-generation-esc")}
                     aria-label={t("stop-generation")}
@@ -1303,10 +1418,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
                     appearance="icon"
                     role="button"
                     disabled={chatDisabled}
+                    className={styles.sendButton}
                     onClick={handleSubmitForm}
                     title={t("send")}
                   >
-                    <span className="codicon codicon-send"></span>
+                    <span className="codicon codicon-arrow-up"></span>
                   </VSCodeButton>
                 )}
               </div>

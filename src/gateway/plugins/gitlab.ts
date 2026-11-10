@@ -161,6 +161,27 @@ const countDiff = (diff: string): { additions: number; deletions: number } => {
   return { additions, deletions }
 }
 
+/**
+ * A note's text with nothing GitLab would run: a line that starts with a
+ * slash command (`/approve`, `/close`, `/label ~x`) is a quick action when
+ * the token's account posts it, and what a model writes about a pull is
+ * steered by the pull. Outside code blocks the slash is escaped, which
+ * reads the same and does nothing.
+ */
+export const withoutQuickActions = (body: string): string => {
+  let fenced = false
+  return body
+    .split("\n")
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) {
+        fenced = !fenced
+        return line
+      }
+      return fenced ? line : line.replace(/^(\s*)\/(?=[a-z_]+\b)/i, "$1\\/")
+    })
+    .join("\n")
+}
+
 export class GitLabForge implements Forge {
   public readonly noun = "Merge request"
 
@@ -296,7 +317,7 @@ export class GitLabForge implements Forge {
 
   public async commentIssue(repo: RepoRecord, number: number, body: string, signal: AbortSignal): Promise<{ url?: string }> {
     const note = await readJson(
-      await this._context.fetch(`${this.project(repo)}/issues/${number}/notes`, { method: "POST", headers: { ...this.headers(repo), "Content-Type": "application/json" }, body: JSON.stringify({ body }), signal }),
+      await this._context.fetch(`${this.project(repo)}/issues/${number}/notes`, { method: "POST", headers: { ...this.headers(repo), "Content-Type": "application/json" }, body: JSON.stringify({ body: withoutQuickActions(body) }), signal }),
       `Replying on ${repo.fullName}#${number}`
     )
     const id = num(note.id)
@@ -316,7 +337,7 @@ export class GitLabForge implements Forge {
       await this._context.fetch(`${this.project(repo)}/merge_requests/${pull.number}/notes`, {
         method: "POST",
         headers: { ...this.headers(repo), "Content-Type": "application/json" },
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body: withoutQuickActions(body) }),
         signal
       }),
       what
