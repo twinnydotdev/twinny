@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.20 · 2026-11-11
+
+Extension: completions from a local model come back sooner, most of all on slower hardware.
+
+- **The model's server reuses more of each completion prompt.** A local server keeps its work on a prompt for as long as the next one begins the same way. The window of code before the cursor used to slide down a line with every new line typed, so each new line had the whole prompt read again; it now moves in steps of about twenty lines. Context files keep their order from one request to the next, and the definitions shown with a completion stay while the cursor is in the same part of a file, where they used to change line by line. With CodeLlama 7B on an RTX 3090 Ti, reading the prompt on a new line went from about 185 ms to 30 ms; on a laptop or a CPU the same saving is seconds. llama.cpp is now told to keep its prompt cache (`cache_prompt`), for servers too old to do so unasked.
+- **The next completion is ready when you accept one.** While a suggestion is on screen, the model is asked for the completion on the line after it. Accept the suggestion, or type it out, press Enter, and the next one shows at once, without the pause and the wait for the model. It is dropped the moment you go somewhere else. Only local model servers (Ollama, LM Studio, llama.cpp) are asked ahead of time, never a hosted API or a team gateway. Turn it off with `twinny.prefetchNextCompletion`.
+
 ## 4.3.19 · 2026-11-10
 
 `twinny-server` release: a Personal licence holds the gateway to its one key, in place of the free five; removing it brings the five back. A licence that does not expire says "for good" instead of a date.

@@ -64,7 +64,7 @@ export interface LastSuggestion extends PrefixSuffix {
 }
 
 /** How much of the old prefix/suffix must still match to count as the same spot. */
-const ANCHOR_LENGTH = 500
+export const ANCHOR_LENGTH = 500
 /** Below this the anchor is too generic to trust (unless the prefix itself is tiny). */
 const MIN_ANCHOR_LENGTH = 30
 
@@ -72,7 +72,7 @@ const MIN_ANCHOR_LENGTH = 30
  * The prefix window slides forward a line at a time as the user types
  * newlines, so drop leading lines from the anchor until it fits.
  */
-const endsWithAnchor = (head: string, anchor: string): boolean => {
+export const endsWithAnchor = (head: string, anchor: string): boolean => {
   // A suggestion made at the very start of a file has nothing to anchor to:
   // it applies only while the cursor is still there.
   if (anchor.length === 0) return head.length === 0

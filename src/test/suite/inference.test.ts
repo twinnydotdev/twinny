@@ -362,6 +362,14 @@ suite("Inference layer", function () {
           new TemplateProvider(undefined),
           contextWith({ [ACTIVE_FIM_PROVIDER_STORAGE_KEY]: config })
         )
+        // One request per completion is what is counted below.
+        const settings = provider.config
+        Object.assign(provider, {
+          config: {
+            get: (key: string, fallback?: unknown) =>
+              key === "prefetchNextCompletion" ? false : settings.get(key, fallback)
+          }
+        })
         const source = new vscode.CancellationTokenSource()
         try {
           const items = await provider.provideInlineCompletionItems(

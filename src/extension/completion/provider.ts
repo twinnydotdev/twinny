@@ -1,6 +1,7 @@
 import {
   CancellationToken,
   Disposable,
+  EndOfLine,
   ExtensionContext,
   InlineCompletionContext,
   InlineCompletionItem,
@@ -50,7 +51,7 @@ import {
 } from "../utils"
 
 import { cache, getSuggestionContinuation, LastSuggestion } from "./cache"
-import { DefinitionContext } from "./definitions"
+import { DefinitionContext, TOTAL_CHARS as DEFINITION_CHARS } from "./definitions"
 import { FileInteractionCache } from "./file-interaction"
 import {
   getFimChat,
@@ -64,9 +65,11 @@ import { CompletionFormatter } from "./formatter"
 import { getImportedFiles } from "./imports"
 import { LspContext } from "./lsp-context"
 import { getNodeAtPosition, getParser } from "./parser"
+import { prefetchProgress, textToNextLine } from "./prefetch"
 import { RecentEdits } from "./recent-edits"
+import { HeldDefinitions, StableOrder } from "./stable-context"
 import { CompletionStream } from "./stream"
-import { ModelWarmer } from "./warm-up"
+import { ModelWarmer, shouldWarm } from "./warm-up"
 
 /** Everything one inline-completion request needs, kept off the instance. */
 interface CompletionRequest {
@@ -96,6 +99,33 @@ interface CompletionRequest {
   token: CancellationToken
 }
 
+/** Where a suggestion was shown and what it was made from: enough to ask for the one after it. */
+interface Shown {
+  id: number
+  document: TextDocument
+  scope: string
+  provider: TwinnyProvider
+  prefixSuffix: PrefixSuffix
+  lineBefore: string
+  lineAfter: string
+  selected?: SelectedCompletionInfo
+  contextFiles: FimContextFile[]
+}
+
+/** The completion for the line after the suggestion on screen, asked for ahead of the user. */
+interface Prefetch {
+  document: TextDocument
+  scope: string
+  /** The document around the cursor when the suggestion showed. */
+  origin: PrefixSuffix
+  /** What the document gains on the way to where this was made for. */
+  added: string
+  contextFiles: FimContextFile[]
+  abort: AbortController
+  /** The model's raw completion; empty when it had nothing or was stopped. */
+  result: Promise<string>
+}
+
 /** Editors that are not code: output panes, search results, terminals. */
 const IGNORED_SCHEMES = new Set([
   "output",
@@ -115,6 +145,9 @@ export class CompletionProvider
   private _lastSuggestion: LastSuggestion | undefined
   private _lspContext = new LspContext()
   private _recentEdits = new RecentEdits()
+  private _contextOrder = new StableOrder()
+  private _heldDefinitions = new HeldDefinitions()
+  private _prefetch: Prefetch | undefined
   private _requestId = 0
   private _generations: GenerationTracker
   private _templateProvider: TemplateProvider
@@ -151,6 +184,7 @@ export class CompletionProvider
     super.dispose()
     this._windowState.dispose()
     this._recentEdits.dispose()
+    this.dropPrefetch()
   }
 
   public async provideInlineCompletionItems(
@@ -178,6 +212,7 @@ export class CompletionProvider
       return
     }
 
+    const version = document.version
     let prefixSuffix = getPrefixSuffix(
       this.config.get<number>("contextLength", 100),
       document,
@@ -239,13 +274,31 @@ export class CompletionProvider
       return
     }
 
+    const ahead = selected ? undefined : this.prefetchFor(document, prefixSuffix, scope)
+    if (ahead) {
+      const id = this._requestId
+      const waited = logger.timer()
+      const raw = await ahead.result
+      if (id !== this._requestId || token.isCancellationRequested || document.version !== version) return
+      if (this._prefetch === ahead) this._prefetch = undefined
+      const formatted = raw && this.format(raw, document, position)
+      if (formatted) {
+        logger.info(`FIM #${id} served from the prefetch · waited ${waited()} · ${formatted.length} chars`)
+        return this.show(formatted, {
+          id, document, scope, provider, prefixSuffix, lineBefore, lineAfter,
+          contextFiles: ahead.contextFiles
+        }, cacheScope, position)
+      }
+      logger.debug(`FIM #${id} prefetch had nothing usable; asking afresh`)
+    }
+
     // Mid-word the model would only finish the word; with the widget open
     // the highlighted item already does that and the request starts after it.
     if (!selected && getIsMiddleOfWord(document, position)) return
 
     const request: CompletionRequest = {
       id: this._requestId,
-      version: document.version,
+      version,
       scope,
       cacheScope,
       document,
@@ -313,7 +366,12 @@ export class CompletionProvider
       this.getPrompt(request)
     ])
     if (!prepared || this.isStale(request)) return
-    const { prompt, context } = prepared
+    const { prompt, context, contextFiles } = prepared
+    // This request needs the model now; an answer being made for
+    // somewhere the user did not go must not hold it up.
+    if (this._prefetch && !this.onTheWay(this._prefetch, document, prefixSuffix, request.scope)) {
+      this.dropPrefetch()
+    }
     logger.info(
       `FIM #${request.id} → ${provider.modelName} · ${where} · ` +
         `prompt ${formatCount(prompt.length)} chars`
@@ -413,15 +471,12 @@ export class CompletionProvider
       return
     }
 
-    const editor = window.activeTextEditor
-    if (!editor || editor.document !== document) {
+    if (window.activeTextEditor?.document !== document) {
       logger.debug(outcome("dropped, editor changed"))
       return
     }
 
-    const formatted = new CompletionFormatter(editor, position).format(
-      completion
-    )
+    const formatted = this.format(completion, document, position)
 
     const lines = formatted.split("\n").length
     logger.info(
@@ -438,12 +493,162 @@ export class CompletionProvider
 
     if (!formatted) return
 
-    if (this.config.get<boolean>("completionCacheEnabled")) {
-      cache.setCache(prefixSuffix, formatted, request.cacheScope)
-    }
+    return this.show(formatted, {
+      id: request.id,
+      document,
+      scope: request.scope,
+      provider,
+      prefixSuffix,
+      lineBefore: request.lineBefore,
+      lineAfter: request.lineAfter,
+      selected: request.selected,
+      contextFiles
+    }, request.cacheScope, position)
+  }
 
-    this._lastSuggestion = { ...prefixSuffix, completion: formatted, scope: request.scope }
-    return this.toInlineCompletion(formatted, position, request.selected)
+  /** A raw completion fitted to the text around the cursor; empty when nothing of it is worth showing. */
+  private format(completion: string, document: TextDocument, position: Position) {
+    const editor = window.activeTextEditor
+    if (!editor || editor.document !== document) return ""
+    return new CompletionFormatter(editor, position).format(completion)
+  }
+
+  /** Hands a suggestion to the editor, remembers it for typing through, and asks for the one after it. */
+  private show(formatted: string, shown: Shown, cacheScope: string, position: Position) {
+    if (this.config.get<boolean>("completionCacheEnabled")) {
+      cache.setCache(shown.prefixSuffix, formatted, cacheScope)
+    }
+    this._lastSuggestion = { ...shown.prefixSuffix, completion: formatted, scope: shown.scope }
+    this.prefetchAfter(shown, formatted)
+    return this.toInlineCompletion(formatted, position, shown.selected)
+  }
+
+  /**
+   * Whether the completion for the next line is worth asking for ahead of
+   * the user. Only of a model on this machine or this network, whose idle
+   * time is free: a hosted API bills the request, and a team's gateway
+   * would spend a shared GPU on answers most of which are never used.
+   */
+  private prefetches(shown: Shown) {
+    return (
+      this.config.get<boolean>("prefetchNextCompletion", true) &&
+      this.config.get<boolean>("enableSubsequentCompletions", true) &&
+      shouldWarm(shown.provider) &&
+      !shown.selected &&
+      // Text after the cursor stays on the line when Enter is pressed.
+      shown.lineAfter === ""
+    )
+  }
+
+  private prefetchAfter(shown: Shown, formatted: string) {
+    const { document, prefixSuffix } = shown
+    // A suggestion shown part of the way to the line a prefetch was made
+    // for (just after the last one was accepted, say) does not replace
+    // it: Enter is still the likelier next key.
+    const standing = this._prefetch
+    if (
+      standing &&
+      standing.document === document &&
+      standing.scope === shown.scope &&
+      (prefetchProgress(standing.origin, standing.added, prefixSuffix) ?? 0) > 0
+    ) {
+      return
+    }
+    this.dropPrefetch()
+    if (!this.prefetches(shown)) return
+    const options = window.activeTextEditor?.document === document ? window.activeTextEditor.options : undefined
+    const indentUnit = options?.insertSpaces === false ? "\t" : " ".repeat(Number(options?.tabSize) || 2)
+    const added = textToNextLine(
+      shown.lineBefore,
+      formatted,
+      indentUnit,
+      document.eol === EndOfLine.CRLF ? "\r\n" : "\n"
+    )
+    const next: PrefixSuffix = { prefix: prefixSuffix.prefix + added, suffix: prefixSuffix.suffix }
+    const abort = new AbortController()
+    const prefetch: Prefetch = {
+      document,
+      scope: shown.scope,
+      origin: prefixSuffix,
+      added,
+      contextFiles: shown.contextFiles,
+      abort,
+      result: this.runPrefetch(shown, next, added.slice(added.lastIndexOf("\n") + 1), abort)
+    }
+    this._prefetch = prefetch
+  }
+
+  /** The model's raw completion for a place the cursor is not at yet. Never throws; off the status bar. */
+  private async runPrefetch(
+    shown: Shown,
+    prefixSuffix: PrefixSuffix,
+    indent: string,
+    abort: AbortController
+  ): Promise<string> {
+    const { document, provider } = shown
+    const elapsed = logger.timer()
+    const timeout = setTimeout(() => abort.abort(), FIM_STREAM_TIMEOUT_MS)
+    let stream: CompletionStream | undefined
+    try {
+      // The same context, in the same order, as the request before: the
+      // server has read all of it and most of the prefix already.
+      const prepared = await this.renderPrompt(provider, document, prefixSuffix, shown.contextFiles)
+      if (!prepared || abort.signal.aborted) return ""
+      const stopWords = getStopWords(provider.modelName, provider.fimTemplate)
+      stream = new CompletionStream({
+        stopWords,
+        // An empty line is where a block gets written.
+        multiline: this.config.get<boolean>("multilineCompletionsEnabled", true),
+        maxLines: this.config.get<number>("maxLines", 40),
+        textBeforeCursor: indent,
+        textAfterCursor: "",
+        suffixFirstLine: this.getFirstNonBlankLine(prefixSuffix.suffix),
+        unwrapFences: isChatFimFormat(provider.modelName, provider.fimTemplate),
+        wordFragment: ""
+      })
+      logger.debug(`FIM prefetch → ${provider.modelName} · the line after #${shown.id}`)
+      this._warmer.touch(provider)
+      const chunks = resolveInferenceProvider(provider).fim(
+        this.buildFimRequest(prepared.prompt, provider, stopWords, prefixSuffix, "", prepared.context),
+        { signal: abort.signal }
+      )
+      for await (const chunk of chunks) {
+        if (stream.push(chunk.text).done) break
+      }
+      const completion = stream.finish()
+      logger.debug(`FIM prefetch ← ${elapsed()} · ${completion.length} chars`)
+      return completion
+    } catch (error) {
+      if (!isCancelled(error)) {
+        logger.debug(`FIM prefetch failed: ${describeProviderErrorPlain(error, provider)}`)
+      }
+      return ""
+    } finally {
+      clearTimeout(timeout)
+      // Stopped early or not, the server is told to stop generating.
+      abort.abort()
+    }
+  }
+
+  /** Whether the document is at, or still on the way to, the place a prefetch was made for. */
+  private onTheWay(prefetch: Prefetch, document: TextDocument, current: PrefixSuffix, scope?: string) {
+    if (prefetch.document !== document) return false
+    if (scope !== undefined && prefetch.scope !== scope) return false
+    return prefetchProgress(prefetch.origin, prefetch.added, current) !== undefined
+  }
+
+  /** The prefetch made for exactly this place, if there is one. */
+  private prefetchFor(document: TextDocument, current: PrefixSuffix, scope: string) {
+    const prefetch = this._prefetch
+    if (!prefetch || prefetch.document !== document || prefetch.scope !== scope) return undefined
+    return prefetchProgress(prefetch.origin, prefetch.added, current) === prefetch.added.length
+      ? prefetch
+      : undefined
+  }
+
+  private dropPrefetch() {
+    this._prefetch?.abort.abort()
+    this._prefetch = undefined
   }
 
   /**
@@ -591,8 +796,6 @@ export class CompletionProvider
           suffix: request.prefixSuffix.suffix
         }
       : request.prefixSuffix
-    const languageId = document.languageId
-    const fileName = workspace.asRelativePath(document.uri)
 
     const wantsContext =
       this.config.get<boolean>("fileContextEnabled") || provider.repositoryLevel
@@ -601,7 +804,7 @@ export class CompletionProvider
       request.position.line - (prefixSuffix.prefix.split("\n").length - 1),
       request.position.line + (prefixSuffix.suffix.split("\n").length - 1)
     ]
-    const [contextFiles, definitions, lspContext] = await Promise.all([
+    const [files, definitions, lspContext] = await Promise.all([
       wantsContext ? this.getContextFiles(document) : Promise.resolve([]),
       wantsLsp
         ? this._definitions.get(document, request.position, visibleLines, request.token)
@@ -614,11 +817,20 @@ export class CompletionProvider
     // hole matters most, so the broader file windows come first, then what
     // the user just changed, then the definitions of the names being used
     // and the signature at the cursor.
+    const offered = [...files]
     if (this.config.get<boolean>("recentEditsEnabled", true)) {
       const recent = this._recentEdits.get(document, request.position.line)
-      if (recent) contextFiles.push(recent)
+      if (recent) offered.push(recent)
     }
-    contextFiles.push(...definitions)
+    if (wantsLsp) {
+      offered.push(
+        ...this._heldDefinitions.hold(request.scope, request.position.line, definitions, DEFINITION_CHARS)
+      )
+    }
+    // Whatever was sent with the request before keeps its place, so the
+    // server reads again only from the first block that is new. What the
+    // language server says about the cursor changes most, and stays last.
+    const contextFiles = this._contextOrder.arrange(request.scope, offered)
     if (lspContext) {
       contextFiles.push({ name: "IntelliSense context", text: lspContext })
     }
@@ -632,35 +844,18 @@ export class CompletionProvider
       )
     }
 
-    if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
-      const context = contextFiles
-        .map((file) => `// File: ${file.name}\n${file.text}`)
-        .join("\n\n")
-      const template = await this._templateProvider.readTemplate<FimTemplateData>(
-        "fim",
-        {
-          prefix: prefixSuffix.prefix,
-          suffix: prefixSuffix.suffix,
-          context,
-          fileName: document.uri.fsPath,
-          language: languageId
-        }
-      )
-      if (template) {
-        return {
-          prompt: template,
-          context: {
-            language: languageId,
-            fileName,
-            repoName: sanitizeWorkspaceName(workspace.name) || "untitled",
-            prefix: prefixSuffix.prefix,
-            suffix: prefixSuffix.suffix,
-            files: contextFiles
-          } as FimStructuredContext
-        }
-      }
-    }
+    return this.renderPrompt(provider, document, prefixSuffix, contextFiles)
+  }
 
+  /** The prompt for a place in a document, in the model's own FIM dialect. */
+  private async renderPrompt(
+    provider: TwinnyProvider,
+    document: TextDocument,
+    prefixSuffix: PrefixSuffix,
+    contextFiles: FimContextFile[]
+  ): Promise<{ prompt: string; context: FimStructuredContext; contextFiles: FimContextFile[] }> {
+    const languageId = document.languageId
+    const fileName = workspace.asRelativePath(document.uri)
     const repoName = sanitizeWorkspaceName(workspace.name) || "untitled"
     const context: FimStructuredContext = {
       language: languageId,
@@ -670,6 +865,23 @@ export class CompletionProvider
       suffix: prefixSuffix.suffix,
       files: contextFiles
     }
+
+    if (provider.fimTemplate === FIM_TEMPLATE_FORMAT.custom) {
+      const template = await this._templateProvider.readTemplate<FimTemplateData>(
+        "fim",
+        {
+          prefix: prefixSuffix.prefix,
+          suffix: prefixSuffix.suffix,
+          context: contextFiles
+            .map((file) => `// File: ${file.name}\n${file.text}`)
+            .join("\n\n"),
+          fileName: document.uri.fsPath,
+          language: languageId
+        }
+      )
+      if (template) return { prompt: template, context, contextFiles }
+    }
+
     const templateArgs = {
       contextFiles,
       prefixSuffix,
@@ -679,20 +891,12 @@ export class CompletionProvider
       repoName
     }
 
-    if (provider.repositoryLevel) {
-      return {
-        prompt: getFimTemplateRepositoryLevel(
-          templateArgs,
-          provider.modelName,
-          provider.fimTemplate
-        ),
-        context
-      }
-    }
-
     return {
-      prompt: getFimPrompt(provider.modelName, provider.fimTemplate, templateArgs),
-      context
+      prompt: provider.repositoryLevel
+        ? getFimTemplateRepositoryLevel(templateArgs, provider.modelName, provider.fimTemplate)
+        : getFimPrompt(provider.modelName, provider.fimTemplate, templateArgs),
+      context,
+      contextFiles
     }
   }
 
@@ -710,5 +914,24 @@ export class CompletionProvider
       this._run.abort()
     }
     this._run = null
+    this.checkPrefetch()
+  }
+
+  /**
+   * Lets go of the prefetch once the cursor is somewhere it does not lead
+   * to. Accepting the suggestion moves the cursor too, and typing it out
+   * changes the document: both are on the way, and keep it.
+   */
+  private checkPrefetch() {
+    const prefetch = this._prefetch
+    if (!prefetch) return
+    const editor = window.activeTextEditor
+    if (editor?.document !== prefetch.document) return this.dropPrefetch()
+    const current = getPrefixSuffix(
+      this.config.get<number>("contextLength", 100),
+      editor.document,
+      editor.selection.active
+    )
+    if (!this.onTheWay(prefetch, editor.document, current)) this.dropPrefetch()
   }
 }

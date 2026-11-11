@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.19",
+  "version": "4.3.20",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -607,6 +607,12 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Load the completion model when VS Code starts or regains focus, so the first completion does not wait for a cold model. Only for local model servers (Ollama, LM Studio, llama.cpp); hosted APIs are never called."
+        },
+        "twinny.prefetchNextCompletion": {
+          "order": 17,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "While a suggestion is on screen, ask the model for the completion on the line after it, so that accepting the suggestion and pressing Enter shows the next one at once. Only for local model servers (Ollama, LM Studio, llama.cpp); hosted APIs and team gateways are never asked ahead of time."
         },
         "twinny.ollamaUseTls": {
           "order": 18,

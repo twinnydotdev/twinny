@@ -21,7 +21,7 @@ const MAX_IDENTIFIERS = 4
 const SCAN_LINES = 3
 /** Characters one definition may take, and all of them together. */
 const DEFINITION_CHARS = 1000
-const TOTAL_CHARS = 2500
+export const TOTAL_CHARS = 2500
 /** Lines shown from a definition when its file has no grammar or is huge. */
 const FALLBACK_LINES = 8
 /** Files past this many lines are not parsed on a keystroke. */

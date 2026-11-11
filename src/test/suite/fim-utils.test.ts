@@ -172,6 +172,7 @@ suite("FIM utilities", () => {
         model: "m",
         prompt: "p",
         stream: true,
+        cache_prompt: true,
         temperature: 0.1,
         max_tokens: 128,
         stop: options.stop
@@ -303,6 +304,38 @@ suite("FIM utilities", () => {
       const top = getPrefixSuffix(10, document, new vscode.Position(1, 0))
       assert.strictEqual(top.prefix, "line 0\n")
       assert.strictEqual(top.suffix.split("\n").length, 10)
+    })
+
+    test("the window holds still while lines are typed, so the prompt begins the same way", async () => {
+      const lines = Array.from({ length: 400 }, (_, i) => `const value${i} = compute(${i})`)
+      const document = await openDocument(lines.join("\n"))
+      const starts = new Set<string>()
+      let reused = 0
+      let previous = ""
+      // The cursor at the end of each of forty lines in turn, as when a
+      // block is written top to bottom.
+      for (let line = 200; line < 240; line++) {
+        const { prefix } = getPrefixSuffix(100, document, endOfLine(document, line))
+        const asked = line - 85
+        const first = Number(/^const value(\d+)/.exec(prefix)?.[1])
+        assert.ok(first <= asked && first > asked - 21, `line ${line} starts at ${first}`)
+        starts.add(prefix.slice(0, prefix.indexOf("\n")))
+        if (previous && prefix.startsWith(previous)) reused++
+        previous = prefix
+      }
+      assert.ok(starts.size <= 3, `the window moved ${starts.size} times in 40 lines`)
+      assert.ok(reused >= 37, `only ${reused} of 39 prefixes began with the one before`)
+    })
+
+    test("over the character limit the window still moves a step at a time", async () => {
+      const lines = Array.from({ length: 200 }, (_, i) => `// ${i} ${"x".repeat(400)}`)
+      const document = await openDocument(lines.join("\n"))
+      const first = (line: number) =>
+        Number(/^\/\/ (\d+)/.exec(getPrefixSuffix(100, document, endOfLine(document, line)).prefix)?.[1])
+      const a = first(150)
+      assert.ok(150 - a < 30, "cut to fit the limit")
+      assert.strictEqual(a % 21, 0)
+      assert.strictEqual(first(151), a)
     })
   })
 })

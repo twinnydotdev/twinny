@@ -28,6 +28,8 @@ export interface RequestOptionsOllama extends RequestBodyBase {
 
 export interface StreamBodyOpenAI extends RequestBodyBase {
   max_tokens?: number
+  /** llama.cpp: reuse the evaluated prompt of the request before. */
+  cache_prompt?: boolean
 }
 
 export type FimRequestBody = RequestBodyBase | RequestOptionsOllama | StreamBodyOpenAI
@@ -165,6 +167,9 @@ export function createStreamRequestBodyFim(
         ...(options.model ? { model: options.model } : {}),
         prompt,
         stream: true,
+        // Keep the work done on the part of the prompt the next request
+        // repeats. Newer servers do so unasked; older ones need telling.
+        cache_prompt: true,
         temperature: options.temperature,
         max_tokens: maxTokens,
         stop

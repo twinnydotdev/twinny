@@ -10,6 +10,7 @@
  *   node scripts/eval-agent.mjs [model] --context 8192      (plan for a context this small)
  *   node scripts/eval-agent.mjs [model] --out .claude/eval/out-base   (another build, to compare)
  *   node scripts/eval-agent.mjs [model] --json results.json
+ *   node scripts/eval-agent.mjs [model] --keep failures/   (each failed attempt's calls and diff, to read)
  *
  * Compare two builds on the same model with the same --runs; one run of a
  * task swings too much to read anything into.
@@ -41,6 +42,8 @@ const runs = Number(flag("runs", "1"))
 const modes = flag("only", "native,text").split(",")
 const wanted = flag("tasks", "")
 const jsonFile = flag("json", "")
+/** Where failed attempts are written out in full, when given. */
+const keepDir = flag("keep", "") && path.resolve(flag("keep", ""))
 
 const provider = {
   id: "eval",
@@ -476,6 +479,24 @@ const commandRunner = (dir, ran) => ({
   }
 })
 
+/** A failed attempt written out for reading: every call with its result, then what the project ended up as. */
+const keepFailure = (task, mode, dir, steps, why, text) => {
+  fs.mkdirSync(keepDir, { recursive: true })
+  let diff = ""
+  try {
+    execFileSync("git", ["add", "-A"], { cwd: dir })
+    diff = execFileSync("git", ["diff", "--cached"], { cwd: dir }).toString()
+  } catch (error) {
+    diff = String(error)
+  }
+  const calls = steps.map(
+    (step, i) =>
+      `### ${i + 1}. ${step.name ?? "?"}${step.failed ? " (failed)" : ""}\n${JSON.stringify(step.args ?? {})}\n\n${String(step.output ?? "").slice(0, 1500)}`
+  )
+  const file = path.join(keepDir, `${task.id}-${mode}-${Date.now()}.md`)
+  fs.writeFileSync(file, [`# ${task.id} [${mode}]: ${why.join("; ")}`, ...calls, "## Reply", text, "## Diff", diff].join("\n\n"))
+}
+
 const attempt = async (task, mode) => {
   const dir = makeProject()
   const steps = []
@@ -512,6 +533,7 @@ const attempt = async (task, mode) => {
   const seconds = (Date.now() - started) / 1000
   const answer = text.split("\n").filter((line) => !line.startsWith("> ")).join("\n")
   const why = task.answer ? (task.answer.test(answer) ? [] : ["wrong answer"]) : task.check(dir)
+  if (why.length && keepDir) keepFailure(task, mode, dir, steps, why, text)
   fs.rmSync(dir, { recursive: true, force: true })
   return {
     task: task.id,

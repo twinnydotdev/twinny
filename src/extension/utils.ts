@@ -65,6 +65,15 @@ export const getIsMiddleOfWord = (
   return /\w/.test(charBefore) && /\w/.test(charAfter)
 }
 
+/**
+ * How many lines the prefix window's first line moves at a time. The model
+ * server reuses its work on a prompt for as long as the prompt begins the
+ * same way; a window that slid down one line with every new line typed
+ * began differently each time, and the whole prompt was read again.
+ */
+export const prefixWindowStep = (numLinesPrefix: number) =>
+  Math.max(1, Math.floor(numLinesPrefix / 4))
+
 export const getPrefixSuffix = (
   numLines: number,
   document: TextDocument,
@@ -86,12 +95,20 @@ export const getPrefixSuffix = (
     numLinesSuffix = numLinesToEnd
   }
 
-  const prefixRange = new Range(
-    Math.max(0, currentLine - numLinesPrefix),
-    0,
-    currentLine,
-    position.character
-  )
+  // The window starts on a step boundary at or above the line asked for,
+  // so it holds still while the cursor moves down through a step's worth
+  // of lines. The prefix is never shorter than asked, and up to one step
+  // longer.
+  const step = prefixWindowStep(numLinesPrefix)
+  let firstLine = Math.floor(Math.max(0, currentLine - numLinesPrefix) / step) * step
+  const prefixFrom = (line: number) =>
+    document.getText(new Range(line, 0, currentLine, position.character))
+  let prefix = prefixFrom(firstLine)
+  // Over the character limit, whole steps go, for the same reason.
+  while (prefix.length > FIM_MAX_PREFIX_CHARS && firstLine + step <= currentLine) {
+    firstLine += step
+    prefix = prefixFrom(firstLine)
+  }
   const suffixRange = new Range(
     currentLine,
     position.character,
@@ -100,7 +117,7 @@ export const getPrefixSuffix = (
   )
 
   return {
-    prefix: trimToLineBoundary(document.getText(prefixRange), FIM_MAX_PREFIX_CHARS, "start"),
+    prefix: trimToLineBoundary(prefix, FIM_MAX_PREFIX_CHARS, "start"),
     suffix: trimToLineBoundary(document.getText(suffixRange), FIM_MAX_SUFFIX_CHARS, "end")
   }
 }
