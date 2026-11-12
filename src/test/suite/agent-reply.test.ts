@@ -13,7 +13,12 @@ import * as os from "os"
 import * as path from "path"
 import * as vscode from "vscode"
 
-import { ACTIVE_CHAT_PROVIDER_STORAGE_KEY, EVENT_NAME, GLOBAL_STORAGE_KEY } from "../../common/constants"
+import {
+  ACTIVE_CHAT_PROVIDER_STORAGE_KEY,
+  EVENT_NAME,
+  GLOBAL_STORAGE_KEY,
+  INFERENCE_PROVIDERS_STORAGE_KEY
+} from "../../common/constants"
 import { ChatCompletionMessage, ReplyChangesView, ToolStepView, TwinnyProvider } from "../../common/types"
 import { Chat } from "../../extension/chat/index"
 import { GenerationTracker } from "../../extension/generations"
@@ -286,6 +291,41 @@ suite("Agent reply, end to end", function () {
     } finally {
       chat.dispose()
       await settings.update("chatToolsMaxSteps", undefined, vscode.ConfigurationTarget.Global)
+    }
+  })
+
+  test("the composer's sentence suggestions ask the model chosen for them, else the chat model", async () => {
+    const model = new ScriptedModel(["can you run the tests again?", "can you run the tests again?", "can you run the tests again?"])
+    providerRegistry.register("scripted-agent", { id: "scripted-agent", create: () => model })
+    const composerKey = `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.composerSettings}`
+    const stored: Record<string, unknown> = {
+      [ACTIVE_CHAT_PROVIDER_STORAGE_KEY]: provider,
+      [INFERENCE_PROVIDERS_STORAGE_KEY]: {
+        scripted: provider,
+        small: { ...provider, id: "small", label: "Small", modelName: "small-model" }
+      }
+    }
+    const context = {
+      globalState: { get: (key: string) => stored[key], update: async () => undefined },
+      workspaceState: { get: () => undefined, update: async () => undefined },
+      subscriptions: []
+    } as unknown as vscode.ExtensionContext
+    const chat = new ChatIn(new GenerationTracker(), undefined, context, { emit: () => undefined } as unknown as ExtensionBridge, undefined)
+    try {
+      const first = await chat.suggestDraft("can you run ", [])
+      assert.strictEqual(first.text, "the tests again?")
+      assert.strictEqual(first.model, "scripted-model", "the answer names who was asked")
+      assert.strictEqual(model.requests[0].model, "scripted-model", "no choice: the chat model")
+
+      stored[composerKey] = { model: { providerId: "small", modelName: "tiny-model" } }
+      await chat.suggestDraft("can you run ", [])
+      assert.strictEqual(model.requests[1].model, "tiny-model", "the model chosen for the chosen provider")
+
+      stored[composerKey] = { model: { providerId: "removed", modelName: "tiny-model" } }
+      await chat.suggestDraft("can you run ", [])
+      assert.strictEqual(model.requests[2].model, "scripted-model", "a provider no longer in the list: the chat model")
+    } finally {
+      chat.dispose()
     }
   })
 })

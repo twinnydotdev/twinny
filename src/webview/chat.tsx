@@ -10,7 +10,12 @@ import * as cheerio from "cheerio"
 import cx from "classnames"
 import { v4 as uuidv4 } from "uuid"
 
-import { ASSISTANT, EVENT_NAME, USER } from "../common/constants"
+import {
+  composerFontSizeOf,
+  ComposerSettings as ComposerSettingsValue,
+  suggestionSourceOf
+} from "../common/composer-settings"
+import { ASSISTANT, EVENT_NAME, GLOBAL_STORAGE_KEY, USER } from "../common/constants"
 import { contextFit } from "../common/model-status"
 import {
   AnyContextItem,
@@ -29,17 +34,19 @@ import { useConversationHistory } from "./hooks/useConversationHistory"
 import { useModelStatus } from "./hooks/useModelStatus"
 import { useProviders } from "./hooks/useProviders"
 import { useSelection } from "./hooks/useSelection"
+import { StorageType, useStorageContext } from "./hooks/useStorageContext"
 import { useSuggestion } from "./hooks/useSuggestion"
 import { useToolSteps } from "./hooks/useToolSteps"
 import { useWorkspaceContext } from "./hooks/useWorkspaceContext"
 import { useWorkspaceSearch } from "./hooks/useWorkspaceSearch"
 import { ProviderSelect } from "./providers/provider-select"
 import AgentSettings from "./agent-settings"
+import ComposerSettings from "./composer-settings"
 import { EmptyChat } from "./empty-chat"
 import { GhostText } from "./ghost-text"
 import { createCustomImageExtension } from "./image-extension"
 import MessageItem from "./message-item"
-import { emit, useServerEvent } from "./messaging"
+import { bridge, emit, useServerEvent } from "./messaging"
 import { ModelState } from "./model-state"
 import { Shortcuts } from "./shortcuts"
 import { Suggestions } from "./suggestions"
@@ -253,6 +260,25 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const { autoRun, autoRunAvailable, toggleAutoRun, setAutoRun } = useAutoRun(teamAgentRules)
   const [agentSettingsOpen, setAgentSettingsOpen] = useState(false)
   const closeAgentSettings = useCallback(() => setAgentSettingsOpen(false), [])
+
+  // The composer's own settings: one global value, so a change shows at once.
+  const { context: storedComposer, setContext: setComposerSettings } = useStorageContext<ComposerSettingsValue>(
+    StorageType.Global,
+    GLOBAL_STORAGE_KEY.composerSettings
+  )
+  const composerSettings = useMemo(() => storedComposer ?? {}, [storedComposer])
+  // `twinny.chatSuggestions` off still means off, until a source is chosen here.
+  const [suggestionsSetting, setSuggestionsSetting] = useState(true)
+  useEffect(() => {
+    bridge
+      .request(EVENT_NAME.twinnyGetConfigValue, { key: "chatSuggestions" })
+      .then(({ value }) => setSuggestionsSetting(value !== false))
+      .catch(() => undefined)
+  }, [])
+  const suggestionSource = suggestionSourceOf(composerSettings, suggestionsSetting)
+  const composerFontSize = composerFontSizeOf(composerSettings)
+  const [composerSettingsOpen, setComposerSettingsOpen] = useState(false)
+  const closeComposerSettings = useCallback(() => setComposerSettingsOpen(false), [])
 
   const { conversation, saveLastConversation, setActiveConversation } =
     useConversationHistory()
@@ -573,6 +599,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const setShortcuts = useCallback((open: boolean) => {
     showShortcutsRef.current = open
     setShowShortcuts(open)
+    // One sheet at a time above the composer.
+    if (open) {
+      setAgentSettingsOpen(false)
+      setComposerSettingsOpen(false)
+    }
   }, [])
 
   /* The draft goes into the prompt history, so the up arrow brings it back. */
@@ -881,11 +912,12 @@ export const Chat = (props: ChatProps): JSX.Element => {
     [JSON.stringify(filePaths)]
   )
 
-  const { updateSuggestion } = useComposerSuggestions({
+  const { updateSuggestion, suggestionStatus } = useComposerSuggestions({
     editorRef,
     messages,
     promptHistoryRef,
-    busyRef: generatingRef
+    busyRef: generatingRef,
+    source: suggestionSource
   })
   // The editor keeps the handlers it was made with; this one changes.
   const updateSuggestionRef = useRef(updateSuggestion)
@@ -1292,6 +1324,15 @@ export const Chat = (props: ChatProps): JSX.Element => {
           {agentMode && agentSettingsOpen && (
             <AgentSettings team={teamAgentRules} autoRun={autoRun} setAutoRun={setAutoRun} onClose={closeAgentSettings} />
           )}
+          {composerSettingsOpen && (
+            <ComposerSettings
+              settings={composerSettings}
+              source={suggestionSource}
+              status={suggestionStatus}
+              onChange={setComposerSettings}
+              onClose={closeComposerSettings}
+            />
+          )}
           {!!queued.length && (
             <ol className={styles.queue} aria-label={t("queued-title")}>
               {queued.map((message) => (
@@ -1341,6 +1382,8 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 [styles.agent]: agentMode
               })}
               title={chatDisabled ? t("chat-disabled-no-provider") : undefined}
+              // The draft, its grey suggestion and the chevron beside it all take their size from this.
+              style={composerFontSize ? ({ "--tw-fs": `${composerFontSize}px` } as React.CSSProperties) : undefined}
               onMouseDown={handleComposerMouseDown}
             >
               <input
@@ -1404,7 +1447,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
                     data-agent-settings-toggle
                     aria-expanded={agentSettingsOpen}
                     className={cx(styles.agentToggle, { [styles.agentToggleOn]: agentSettingsOpen })}
-                    onClick={() => setAgentSettingsOpen((open) => !open)}
+                    onClick={() => {
+                      setComposerSettingsOpen(false)
+                      setShortcuts(false)
+                      setAgentSettingsOpen((open) => !open)
+                    }}
                     title={t("agent-settings-title")}
                     aria-label={t("agent-settings-title")}
                   >
@@ -1413,6 +1460,21 @@ export const Chat = (props: ChatProps): JSX.Element => {
                 )}
               </div>
               <div className={styles.chatButtons}>
+                <VSCodeButton
+                  appearance="icon"
+                  role="button"
+                  data-composer-settings-toggle
+                  aria-expanded={composerSettingsOpen}
+                  onClick={() => {
+                    setAgentSettingsOpen(false)
+                    setShortcuts(false)
+                    setComposerSettingsOpen((open) => !open)
+                  }}
+                  title={t("composer-settings-title")}
+                  aria-label={t("composer-settings-title")}
+                >
+                  <span className="codicon codicon-text-size" />
+                </VSCodeButton>
                 <VSCodeButton
                   appearance="icon"
                   role="button"

@@ -58,7 +58,10 @@
 
 .label {
   min-width: 0;
+  overflow: hidden;
   color: var(--tw-fg-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .choices,
@@ -125,4 +128,34 @@
 .more {
   align-self: flex-start;
   margin-top: 2px;
+}
+
+/* A pick from a list, or a name typed, set like the choices beside it. */
+.select {
+  flex: 0 1 200px;
+  min-width: 0;
+  max-width: 60%;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill-strong);
+  color: var(--tw-fg);
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+.select:focus-visible {
+  outline: 1px solid var(--tw-fg-faint);
+}
+
+.select option {
+  background: var(--vscode-dropdown-background, var(--tw-bg));
+  color: var(--vscode-dropdown-foreground, var(--tw-fg));
+}
+
+/* What is in force, said under the rows that decide it. */
+.note {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  overflow-wrap: anywhere;
 }

@@ -2,6 +2,16 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.21 · 2026-11-12
+
+Extension: the grey suggestions in the chat composer work the way a mail composer's do, show when they are being written, and have settings of their own.
+
+- **Suggestions from the first message, in the middle of a word too.** A short pause anywhere in a message asks a model for the rest of it. Until now it was asked only once a conversation had a reply, only after a space, and after a longer pause, so in practice it rarely showed. A word left half typed is finished as part of the sentence ("how do I cen" → "ter a div?"), and nothing is offered once a sentence has ended.
+- **Three dots while a suggestion is being written.** They sit after the cursor from the moment the model is asked until its guess shows.
+- **Composer settings.** The text-size button beside Send opens a sheet like the agent's: suggestions off, words only, sentences only or both; which provider and model writes the sentences, the chat model unless another is picked; and the size of the text typed, 12 to 16px. Under the model it says which one is asked and how the last ask went: how long it took, that it gave nothing usable, or why it failed. A choice made there takes the place of `twinny.chatSuggestions`.
+- **The next word is no longer guessed.** After a space the composer used to offer the word that most often followed the last one. It was noise beside a sentence; words already begun are still finished.
+- **Fixed: a suggestion could repeat the whole message.** A model that mended a typo while reading the draft back had its entire reply shown as the suggestion. The suggestion is now placed by the draft's last words, and dropped when it cannot be placed.
+
 ## 4.3.20 · 2026-11-11
 
 Extension: completions from a local model come back sooner, most of all on slower hardware.

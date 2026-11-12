@@ -2,7 +2,8 @@ import os from "os"
 import path from "path"
 import { ExtensionContext, workspace } from "vscode"
 
-import { cleanModelSuggestion, composerSuggestionMessages } from "../../common/composer-predict"
+import { cleanModelSuggestion, composerSuggestionMessages, suggestionDraft } from "../../common/composer-predict"
+import { ComposerSettings, suggestionProviderFor } from "../../common/composer-settings"
 import {
   API_PROVIDERS,
   ASSISTANT,
@@ -14,7 +15,7 @@ import {
   WEBUI_TABS
 } from "../../common/constants"
 import { formatCount, logger } from "../../common/logger"
-import type { ComposerTurn } from "../../common/messaging/protocol"
+import type { ComposerSuggestion, ComposerTurn } from "../../common/messaging/protocol"
 import type { ModelStatus } from "../../common/model-status"
 import type { TeamAgentPolicy } from "../../common/team"
 import { currentTeamPolicy, currentTeamState } from "../../common/team-policy"
@@ -38,7 +39,9 @@ import {
 import { modelStatusOf, rememberLoad } from "../inference/model-status"
 import { ExtensionBridge } from "../messaging/bridge"
 import { Base } from "../providers/base"
+import { resolveProviderEndpoint } from "../providers/endpoint"
 import { describeProviderError, describeProviderErrorPlain, stripThinking } from "../providers/errors"
+import { ProviderStore } from "../providers/store"
 import { TemplateProvider } from "../templates/provider"
 import { compactHistory, planContext, SMALL_CONTEXT_TOKENS } from "../tools/budget"
 import { DEFAULT_MAX_STEPS, ToolLoopUsage, toolModeFor, withTools } from "../tools/loop"
@@ -404,36 +407,45 @@ export class Chat extends Base {
   /**
    * The rest of the message the user is typing, as the model guesses it
    * from the last few turns, for the composer's grey text. A newer call
-   * cancels the one before; any failure is just no guess.
+   * cancels the one before. The answer names the model asked and how long
+   * it took, and a failure says why, so the composer can show it.
    */
-  public async suggestDraft(draft: string, recent: ComposerTurn[]): Promise<string> {
+  public async suggestDraft(draft: string, recent: ComposerTurn[]): Promise<ComposerSuggestion> {
     this._suggestion?.abort()
-    const provider = this.getProvider()
-    if (!provider || !draft.trim()) return ""
+    if (!this.getProvider() || !draft.trim()) return { text: "" }
+    const started = Date.now()
     const run = this._generations.start("completion")
     this._backgroundRuns.add(run)
     this._suggestion = run
+    // The run is in place before the provider is looked up, so a newer call cancels this one.
+    let provider: TwinnyProvider | undefined
 
     try {
+      provider = await this.suggestionProvider()
+      if (!provider || run.signal.aborted) return { text: "" }
       const reply = await readText(
         resolveInferenceProvider(provider).chat(
           {
             model: provider.modelName,
             messages: composerSuggestionMessages(draft, recent),
-            maxTokens: SUGGESTION_MAX_TOKENS,
+            // The guess says the draft again before going on from it.
+            maxTokens: SUGGESTION_MAX_TOKENS + Math.ceil(suggestionDraft(draft).length / 3),
             temperature: 0,
             think: false
           },
           { signal: run.signal }
         )
       )
-      if (run.signal.aborted) return ""
-      return cleanModelSuggestion(draft, stripThinking(reply))
-    } catch (error) {
-      if (!isCancelled(error)) {
-        logger.debug(`Composer suggestion failed: ${describeProviderError(error, provider)}`)
+      if (run.signal.aborted) return { text: "" }
+      return {
+        text: cleanModelSuggestion(draft, stripThinking(reply)),
+        model: provider.modelName,
+        ms: Date.now() - started
       }
-      return ""
+    } catch (error) {
+      if (!provider || isCancelled(error)) return { text: "" }
+      logger.debug(`Composer suggestion failed: ${describeProviderError(error, provider)}`)
+      return { text: "", model: provider.modelName, error: describeProviderErrorPlain(error, provider) }
     } finally {
       run.finish()
       this._backgroundRuns.delete(run)
@@ -444,6 +456,23 @@ export class Chat extends Base {
   /* ------------------------------------------------------------------------ */
   /*  Internals                                                                */
   /* ------------------------------------------------------------------------ */
+
+  /**
+   * Who writes the composer's sentence suggestions: the provider and model
+   * picked in the composer's settings (stored the way the webview stores
+   * global values), or the chat provider when none is, or it has gone.
+   */
+  private async suggestionProvider(): Promise<TwinnyProvider | undefined> {
+    const chat = this.getProvider()
+    const choice = this.context?.globalState.get<ComposerSettings>(
+      `${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.composerSettings}`
+    )?.model
+    if (!choice || !this.context) return chat
+    const providers = await new ProviderStore(this.context).getProviders().catch(() => undefined)
+    const chosen = suggestionProviderFor(chat, providers, choice)
+    // The chat provider already has its address; one from the list does not.
+    return chosen === chat ? chat : resolveProviderEndpoint(chosen)
+  }
 
   /**
    * Re-reads the team's policy (at most once a minute, by the provider

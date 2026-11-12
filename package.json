@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.20",
+  "version": "4.3.21",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -646,7 +646,7 @@
           "order": 19,
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Shows grey text ahead of the cursor in the chat composer; `Tab` accepts it and `Ctrl+→` accepts a word of it. It finishes words from what you have typed before, as a phone keyboard does, and once a conversation has an exchange, a pause after a word asks the chat model for the rest of the message given the last few turns. No requests are made while a reply is coming."
+          "markdownDescription": "Shows grey text ahead of the cursor in the chat composer; `Tab` accepts it and `Ctrl+→` accepts a word of it. It finishes words from what you have typed before, and a short pause anywhere in a message asks a model for the rest of it, given the last few turns; three dots after the cursor show while it is asked. No requests are made while a reply is coming. The composer's settings (the text-size button beside Send) choose words, sentences or both, which model writes the sentences, and the size of the text; a choice made there takes the place of this setting."
         },
         "twinny.chatTools": {
           "order": 20,

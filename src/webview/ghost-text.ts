@@ -7,6 +7,8 @@ declare module "@tiptap/core" {
     ghostText: {
       /** Grey text after the end of the draft, or none for an empty string. */
       setGhostText: (text: string) => ReturnType
+      /** Shows, or puts away, the mark that a model is being asked for one. */
+      setGhostPending: (pending: boolean) => ReturnType
       /** Puts the grey text into the draft. */
       acceptGhostText: (part?: "all" | "word") => ReturnType
     }
@@ -14,6 +16,7 @@ declare module "@tiptap/core" {
 }
 
 export const GhostTextKey = new PluginKey<string>("ghostText")
+export const GhostPendingKey = new PluginKey<boolean>("ghostPending")
 
 /** The ghost shown now, or an empty string. */
 export const ghostTextOf = (state: Parameters<typeof GhostTextKey.getState>[0]) =>
@@ -40,6 +43,12 @@ export const GhostText = Extension.create({
         (text) =>
         ({ tr, dispatch }) => {
           dispatch?.(tr.setMeta(GhostTextKey, text).setMeta("addToHistory", false))
+          return true
+        },
+      setGhostPending:
+        (pending) =>
+        ({ tr, dispatch }) => {
+          dispatch?.(tr.setMeta(GhostPendingKey, pending).setMeta("addToHistory", false))
           return true
         },
       acceptGhostText:
@@ -100,6 +109,37 @@ export const GhostText = Extension.create({
                 return span
               },
               { side: 1, key: `ghost:${ghost}` }
+            )
+            return DecorationSet.create(doc, [widget])
+          }
+        }
+      }),
+      // Three quiet dots after the cursor (and any grey text) while a model is asked.
+      new Plugin<boolean>({
+        key: GhostPendingKey,
+        state: {
+          init: () => false,
+          apply(tr, pending) {
+            const set = tr.getMeta(GhostPendingKey)
+            if (typeof set === "boolean") return set
+            return tr.docChanged || tr.selectionSet ? false : pending
+          }
+        },
+        props: {
+          decorations(state) {
+            const { selection, doc } = state
+            if (!GhostPendingKey.getState(state) || !selection.empty) return null
+            if (selection.from !== doc.content.size - 1) return null
+            const widget = Decoration.widget(
+              selection.from,
+              () => {
+                const span = document.createElement("span")
+                span.className = "ghostPending"
+                span.setAttribute("aria-hidden", "true")
+                for (let i = 0; i < 3; i++) span.appendChild(document.createElement("i"))
+                return span
+              },
+              { side: 2, key: "ghost-pending" }
             )
             return DecorationSet.create(doc, [widget])
           }

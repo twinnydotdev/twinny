@@ -572,6 +572,45 @@
   user-select: none;
 }
 
+/* A model is being asked for the rest: three dots breathing in turn, grey as the text they stand for. */
+.tiptap :global(.ghostPending) {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 4px;
+  vertical-align: baseline;
+  pointer-events: none;
+  user-select: none;
+}
+
+.tiptap :global(.ghostPending i) {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--tw-fg-dim);
+  opacity: 0.25;
+  animation: ghostPending 0.9s ease-in-out infinite;
+}
+
+.tiptap :global(.ghostPending i:nth-child(2)) {
+  animation-delay: 0.15s;
+}
+
+.tiptap :global(.ghostPending i:nth-child(3)) {
+  animation-delay: 0.3s;
+}
+
+@keyframes ghostPending {
+  0%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tiptap :global(.ghostPending i) {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 .chatButtons {
   position: absolute;
   bottom: 6px;
