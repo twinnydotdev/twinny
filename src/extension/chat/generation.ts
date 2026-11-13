@@ -136,6 +136,7 @@ export class ChatGeneration {
           if (chunk.usage?.promptTokens) {
             meta.promptTokens = chunk.usage.promptTokens
           }
+          if (chunk.finishReason) meta.cutOff = chunk.finishReason === "length"
           text += chunk.content
           this._bridge.emit(EVENT_NAME.twinnyOnCompletion, {
             content: text.trimStart() || " ",
