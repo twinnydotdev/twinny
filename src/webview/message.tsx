@@ -205,6 +205,7 @@ const ReplyFooter = ({
         </span>
       )}
       {meta.stopped && <span className={styles.replyStopped}>{t("reply-stopped")}</span>}
+      {meta.cutOff && !meta.stopped && <span className={styles.replyStopped}>{t("reply-cut-off")}</span>}
       {meta.outOfSteps && !meta.stopped && <span className={styles.replyStopped}>{t("reply-out-of-steps")}</span>}
       {!!meta.withheld?.length && <WithheldBadge withheld={meta.withheld} />}
       {!!meta.instructions?.length && <InstructionsBadge files={meta.instructions} />}
@@ -213,7 +214,13 @@ const ReplyFooter = ({
           type="button"
           className={styles.replyContinue}
           onClick={onContinue}
-          title={t(meta.outOfSteps && !meta.stopped ? "reply-continue-steps-title" : "reply-continue-title")}
+          title={t(
+            meta.outOfSteps && !meta.stopped
+              ? "reply-continue-steps-title"
+              : meta.cutOff && !meta.stopped
+                ? "reply-continue-cut-off-title"
+                : "reply-continue-title"
+          )}
         >
           <span className="codicon codicon-debug-continue" aria-hidden="true" />
           {t("reply-continue")}
