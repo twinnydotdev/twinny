@@ -150,6 +150,8 @@ export interface ReplyMeta {
   contextWindow?: number
   /** The user stopped it before the model finished. */
   stopped?: boolean
+  /** The model hit its output limit mid-reply, so the reply may end part-way. */
+  cutOff?: boolean
   /** Agent mode used every tool step the reply had, so the work may be unfinished. */
   outOfSteps?: boolean
   /**
