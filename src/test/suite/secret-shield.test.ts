@@ -70,6 +70,25 @@ suite("Secret shield", () => {
     assert.strictEqual(shield.withheld, false)
   })
 
+  test("a secret-named variable assigned code is not a secret (#575)", () => {
+    const shield = new SecretShield()
+    const code = [
+      "secret_number = random.randint(1, 10)",
+      "secret = random.randint(1, 10)",
+      "tokenizer = Tokenizer(\"gpt-4\")",
+      "token = tokens[index]",
+      "password = settings.password",
+      "api_key = load_key() # from disk"
+    ].join("\n")
+    assert.strictEqual(shield.redact(code), code)
+    assert.strictEqual(shield.withheld, false)
+    // An environment file still is one: quoted, commented, CRLF.
+    assert.strictEqual(
+      shield.redact("API_TOKEN = 'Xk9pLq2vR7mZ' # prod\r\nexport DB_PASSWORD=Tr0ub4dor&3x\r\n"),
+      "API_TOKEN = 'REDACTED_ENV_SECRET_1' # prod\r\nexport DB_PASSWORD=REDACTED_ENV_SECRET_2\r\n"
+    )
+  })
+
   test("restore puts real values back, even split across chunks", () => {
     const shield = new SecretShield()
     shield.redact(`key ${GITHUB}`)

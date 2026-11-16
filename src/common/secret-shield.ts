@@ -50,6 +50,12 @@ const PLACEHOLDER_VALUE =
 const looksReal = (secret: string) =>
   !PLACEHOLDER_VALUE.test(secret) && entropy(secret) >= 3
 
+/**
+ * An unquoted value that is code and not a credential: a call or an index
+ * (`random.randint(1,`, `tokens[0]`), or a dotted name (`config.apiKey`).
+ */
+const CODE_VALUE = /[()[\]]|^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/
+
 const SECRET_NAME =
   "(?:api[_-]?key|apikey|secret|token|password|passwd|pwd|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token|credentials?)"
 
@@ -97,15 +103,17 @@ const DETECTORS: Detector[] = [
     accept: (secret) => !PLACEHOLDER_VALUE.test(secret)
   },
   {
-    // PASSWORD=hunter2hunter2 in a .env file or a shell export.
+    // PASSWORD=hunter2hunter2 in a .env file or a shell export. The value
+    // has to be the rest of the line, bar a comment: in `secret_number =
+    // random.randint(1, 10)` the name says secret and the value is code.
     id: "env-secret",
     label: "Secret in an environment file",
     pattern: new RegExp(
-      `^(\\s*(?:export\\s+)?[A-Za-z0-9_]*${SECRET_NAME}[A-Za-z0-9_]*\\s*=\\s*["']?)([^\\s"'#]{8,})(["']?)`,
+      `^(\\s*(?:export\\s+)?[A-Za-z0-9_]*${SECRET_NAME}[A-Za-z0-9_]*\\s*=\\s*["']?)([^\\s"'#]{8,})(["']?)(?=[ \\t\\r]*(?:#[^\\n]*)?$)`,
       "gim"
     ),
     around: true,
-    accept: looksReal
+    accept: (secret) => looksReal(secret) && !CODE_VALUE.test(secret)
   },
   {
     // apiKey: "…", "client_secret": "…", password = '…' in code or JSON.
