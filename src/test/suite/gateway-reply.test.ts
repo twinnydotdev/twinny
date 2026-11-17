@@ -5,10 +5,12 @@
  * and the bounds on a JSON body read in.
  */
 import * as assert from "assert"
+import { createHash } from "crypto"
 import * as http from "http"
 import type { AddressInfo } from "net"
 
 import { InferenceError } from "../../extension/inference/errors"
+import { adminPageHeaders, adminPageHtml } from "../../gateway/admin-page"
 import {
   MAX_JSON_BODY_BYTES,
   readJsonBody,
@@ -122,5 +124,26 @@ suite("Gateway replies", () => {
     assert.strictEqual(message(await read("{nope")), "The request body is not JSON.")
     assert.strictEqual(message(await read("{\"a\":\"bbbbbbbb\"}", 8)), "The request body is too large.")
     assert.strictEqual(MAX_JSON_BODY_BYTES, 16 * 1024)
+  })
+
+  test("the admin page runs only its own script, hashed, and a real gateway's page cannot be framed", () => {
+    const html = adminPageHtml()
+    const headers = adminPageHeaders()
+    const csp = headers["Content-Security-Policy"]
+    assert.ok(!/script-src[^;]*unsafe-inline/.test(csp), csp)
+    assert.match(csp, /default-src 'none'/)
+    assert.match(csp, /frame-ancestors 'none'/)
+    assert.match(csp, /base-uri 'none'/)
+    assert.strictEqual(headers["X-Content-Type-Options"], "nosniff")
+    assert.strictEqual(headers["Referrer-Policy"], "no-referrer")
+    assert.strictEqual(headers["X-Frame-Options"], "DENY")
+    // The hash the policy names is the hash of the script the page carries (none in an unbundled build).
+    const script = /<script>([\s\S]*)<\/script>/.exec(html)?.[1]
+    if (script) assert.ok(csp.includes(`'sha256-${createHash("sha256").update(script, "utf8").digest("base64")}'`))
+    else assert.match(csp, /script-src 'none'/)
+    // The demo is shown inside the site's own page.
+    const demo = adminPageHeaders({ demo: true })
+    assert.ok(!demo["Content-Security-Policy"].includes("frame-ancestors"))
+    assert.strictEqual(demo["X-Frame-Options"], undefined)
   })
 })

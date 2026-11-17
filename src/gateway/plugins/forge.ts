@@ -31,7 +31,8 @@ export const MAX_FILES = 200
 /** A patch longer than this is cut and marked so. */
 export const MAX_PATCH_CHARS = 60_000
 /** `owner/name`, or `group/sub/project` on GitLab. */
-export const FULL_NAME_PATTERN = /^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)+$/
+/** `owner/name` (deeper on GitLab). A segment of only dots is refused: it would climb the API's path. */
+export const FULL_NAME_PATTERN = /^(?!\.+(?:\/|$))[A-Za-z0-9_.-]+(\/(?!\.+(?:\/|$))[A-Za-z0-9_.-]+)+$/
 
 
 export type CheckState = "success" | "failure" | "pending" | "none"
@@ -184,6 +185,8 @@ export interface RepoView {
   pulls: PullSummary[]
   /** The latest review per pull number, without its text. */
   reviews: Record<number, ReviewBrief>
+  /** The pulls a model is reviewing right now, by number. */
+  reviewing: number[]
 }
 
 export interface PullDetail extends PullContent {
@@ -194,6 +197,8 @@ export interface PullDetail extends PullContent {
 export interface PullPage extends PullDetail {
   review?: ReviewRecord
   reviewing: boolean
+  /** When the review now running started, for a page that opens partway through. */
+  reviewingSince?: string
 }
 
 /** How a host is talked to. Instances live as long as the plugin runs. */
@@ -233,8 +238,17 @@ export interface Forge {
   listLabels?(repo: RepoRecord, signal: AbortSignal): Promise<string[]>
   commentIssue?(repo: RepoRecord, number: number, body: string, signal: AbortSignal): Promise<{ url?: string }>
   labelIssue?(repo: RepoRecord, number: number, labels: string[], signal: AbortSignal): Promise<void>
+  /**
+   * An image the description of pull or issue `number` embeds, fetched by
+   * the gateway so the page need load nothing from outside. Nothing when
+   * that description holds no image at `url`: the route is not a way to
+   * fetch whatever a caller names.
+   */
+  image?(repo: RepoRecord, number: number, url: string, signal: AbortSignal): Promise<ForgeImage | undefined>
   /** Host-specific state for the page (e.g. the GitHub App), never secrets. */
   status(): unknown
+  /** The host's address changed: drop whatever was issued by the old one. */
+  hostChanged?(): void
   /** Host-specific routes under `api/`, after the shared ones did not match. */
   handle?(request: PluginRequest): Promise<PluginResponse | undefined>
 }
@@ -538,6 +552,38 @@ export const cutPatch = (patch: string | undefined): Pick<PullFile, "patch" | "t
   return { patch: patch.slice(0, MAX_PATCH_CHARS), truncated: true }
 }
 
+/** The most of a diff read from a host: past this a pull is too large to show or review whole. */
+export const MAX_DIFF_BYTES = 8 * 1024 * 1024
+
+/**
+ * A text answer read up to `limit` bytes, then dropped. The size of a
+ * diff is its author's choice; the rest of the plugin caps files and
+ * patches only after the text is in memory.
+ */
+export const readTextCapped = async (response: Response, limit: number): Promise<{ text: string; cut: boolean }> => {
+  const reader = response.body?.getReader()
+  // No stream to meter (a stubbed answer): take the text and cut it after.
+  if (!reader) {
+    const whole = await response.text()
+    return whole.length > limit ? { text: whole.slice(0, limit), cut: true } : { text: whole, cut: false }
+  }
+  const decoder = new TextDecoder()
+  let text = ""
+  let read = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    read += value.byteLength
+    if (read > limit) {
+      text += decoder.decode(value.subarray(0, value.byteLength - (read - limit)), { stream: true })
+      await reader.cancel().catch(() => undefined)
+      return { text, cut: true }
+    }
+    text += decoder.decode(value, { stream: true })
+  }
+  return { text: text + decoder.decode(), cut: false }
+}
+
 /** An `https://host` origin for a self-hosted instance; the path is dropped. */
 export const cleanBaseUrl = (value: string): string => {
   let url: URL
@@ -551,6 +597,15 @@ export const cleanBaseUrl = (value: string): string => {
   return url.origin
 }
 
+/** Whether two addresses are on one origin; an address that does not parse is on none. */
+export const sameOrigin = (a: string, b: string): boolean => {
+  try {
+    return new URL(a).origin === new URL(b).origin
+  } catch {
+    return false
+  }
+}
+
 /** The origin a plugin talks to: its setting, or the public host. */
 export const baseUrlOf = (store: RepoStore, fallback: string): string => {
   const set = store.settings().baseUrl
@@ -562,6 +617,39 @@ const tokenRefused = new WeakSet<Error>()
 export const isTokenRefused = (error: unknown): boolean => error instanceof Error && tokenRefused.has(error)
 
 /** Reads a JSON answer, turning HTTP failures into a message the page can show. */
+/** An image as the page will show it. */
+export interface ForgeImage {
+  type: string
+  data: Buffer
+}
+
+/** The largest image handed to the page; a bigger one stays a link. */
+export const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+/** What the page shows inline. SVG is left out: it is a document, not a picture. */
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"])
+
+/** Reads an image answer, refusing what is not a picture or is too large. */
+export const readImage = async (response: Response, what: string): Promise<ForgeImage> => {
+  if (!response.ok) throw new PluginError(`${what} failed: the host answered ${response.status}.`, 502)
+  const type = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase()
+  if (!IMAGE_TYPES.has(type)) throw new PluginError(`${what}: the host sent ${type || "no type"}, not an image the page shows.`, 415)
+  if (Number(response.headers.get("content-length") ?? 0) > MAX_IMAGE_BYTES) throw new PluginError(`${what}: the image is larger than the page shows inline.`, 413)
+  const chunks: Buffer[] = []
+  let size = 0
+  const reader = response.body?.getReader()
+  while (reader) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > MAX_IMAGE_BYTES) {
+      await reader.cancel().catch(() => undefined)
+      throw new PluginError(`${what}: the image is larger than the page shows inline.`, 413)
+    }
+    chunks.push(Buffer.from(value))
+  }
+  return { type, data: Buffer.concat(chunks) }
+}
+
 export const readJson = async (
   response: Response,
   what: string

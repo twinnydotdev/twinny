@@ -90,7 +90,7 @@ export const SortHeader = <K extends string>({ column, sort, onSort, children, t
   return (
     <th className={`sortable ${on ? "on" : ""} ${className ?? ""}`} aria-sort={on ? (sort.dir === "asc" ? "ascending" : "descending") : "none"} title={title}>
       <button type="button" onClick={() => onSort(column)}>
-        {children}
+        {typeof children === "string" ? cap(children) : children}
         <span className="sort-mark" aria-hidden="true">
           {on ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}
         </span>
@@ -98,6 +98,15 @@ export const SortHeader = <K extends string>({ column, sort, onSort, children, t
     </th>
   )
 }
+
+/** "last updated" → "Last updated": labels are written lower-case and shown in sentence case. */
+export const cap = (text: string): string => (text ? text[0].toUpperCase() + text.slice(1) : text)
+
+const Chevron = () => (
+  <svg className="filter-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M1 1l4 4 4-4" />
+  </svg>
+)
 
 interface FilterSelectProps {
   label: string
@@ -108,19 +117,60 @@ interface FilterSelectProps {
   any?: string
 }
 
-/** A toolbar select that reads as "label: value" and lights when set. */
+/**
+ * A filter as a quiet button that names itself, and a filled chip naming
+ * its value once set, with a cross that clears it. The picker is the
+ * browser's own select, laid invisibly over the face.
+ */
 export const FilterSelect = ({ label, value, onChange, options, any }: FilterSelectProps) => (
-  <label className={`filter ${value ? "on" : ""}`}>
-    <span>{label}</span>
+  <span className={`filter ${value ? "on" : ""}`}>
+    <span className="filter-face" aria-hidden="true">
+      <span className="filter-name">{cap(label)}</span>
+      {value && <span className="filter-value">{options.find((option) => option.value === value)?.label ?? value}</span>}
+      {!value && <Chevron />}
+    </span>
     <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
-      {any !== undefined && <option value="">{any}</option>}
+      {any !== undefined && <option value="">{cap(any)}</option>}
       {options.map((option) => (
         <option key={option.value} value={option.value}>
-          {option.label}
+          {option.value ? option.label : cap(option.label)}
         </option>
       ))}
     </select>
-  </label>
+    {value && (
+      <button type="button" className="filter-clear" onClick={() => onChange("")} title={`Clear ${label}`} aria-label={`Clear ${label}`}>
+        ×
+      </button>
+    )}
+  </span>
+)
+
+interface SortPickerProps<K extends string> {
+  sorts: Array<{ key: K; label: string }>
+  sort: Sort<K>
+  onKey: (key: K) => void
+  onFlip: () => void
+  label?: string
+}
+
+/** What the list is ordered by, and a button that turns it round. */
+export const SortPicker = <K extends string>({ sorts, sort, onKey, onFlip, label = "Order by" }: SortPickerProps<K>) => (
+  <span className="filter sort">
+    <span className="filter-face" aria-hidden="true">
+      <span className="filter-value">{cap(sorts.find((entry) => entry.key === sort.key)?.label ?? sort.key)}</span>
+      <Chevron />
+    </span>
+    <select value={sort.key} onChange={(e) => onKey(e.target.value as K)} aria-label={label}>
+      {sorts.map((entry) => (
+        <option key={entry.key} value={entry.key}>
+          {cap(entry.label)}
+        </option>
+      ))}
+    </select>
+    <button type="button" className="dir" onClick={onFlip} title={sort.dir === "asc" ? "Ascending; click for descending" : "Descending; click for ascending"} aria-label={sort.dir === "asc" ? "Ascending" : "Descending"}>
+      {sort.dir === "asc" ? "↑" : "↓"}
+    </button>
+  </span>
 )
 
 /** Distinct, sorted values for a select. */

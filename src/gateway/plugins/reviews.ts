@@ -34,10 +34,16 @@ export const ASK_MAX_TOKENS = 2_000
 export const ASK_TIMEOUT_MS = 5 * 60_000
 /** Characters a question may have. */
 const QUESTION_LIMIT = 4_000
+/** Characters of selected code a question may carry. */
+const QUOTE_LIMIT = 6_000
 /** Earlier turns a question carries; older ones are kept on the record but left out of the prompt. */
 const THREAD_CONTEXT_TURNS = 20
 /** Reviews kept per plugin; the oldest go first. */
 const MAX_REVIEWS = 1_000
+/** Turns kept on one review's thread; the oldest go first. */
+const MAX_THREAD_TURNS = 100
+/** Reviews that may run at once. Each holds a model slot for minutes, and anyone the plugin is shared with can ask. */
+export const MAX_CONCURRENT_REVIEWS = 2
 
 export interface ReviewRecord {
   repoId: string
@@ -75,6 +81,33 @@ export interface ReviewTurn {
   ms?: number
   /** Why the answer ends early, when it does. */
   cutShort?: string
+  /** The code the question is about, when it was asked of a selection in the diff. */
+  quote?: ReviewQuote
+}
+
+/** Lines picked out of a file's diff, with their +/- signs. */
+export interface ReviewQuote {
+  path: string
+  text: string
+  /** First and last line, numbered as in the new file (the old one for removed lines). */
+  startLine?: number
+  endLine?: number
+}
+
+const isLine = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0 && value < 10_000_000
+
+/** A quote as sent or stored: a path and some code, or nothing. Throws nothing; too much code is cut. */
+export const parseQuote = (value: unknown): ReviewQuote | undefined => {
+  if (!isRecord(value) || typeof value.path !== "string" || typeof value.text !== "string") return undefined
+  const path = value.path.trim().slice(0, 500)
+  const text = value.text.replace(/\s+$/, "")
+  if (!path || !text.trim()) return undefined
+  return {
+    path,
+    text: text.length > QUOTE_LIMIT ? `${text.slice(0, QUOTE_LIMIT)}\n[selection cut here]` : text,
+    ...(isLine(value.startLine) ? { startLine: value.startLine } : {}),
+    ...(isLine(value.endLine) ? { endLine: value.endLine } : {})
+  }
 }
 
 /** What a listing carries per pull, to mark it without the text. */
@@ -105,7 +138,8 @@ const parseThread = (entries: unknown[]): ReviewTurn[] =>
             at: entry.at,
             ...(typeof entry.by === "string" ? { by: entry.by } : {}),
             ...(typeof entry.ms === "number" ? { ms: entry.ms } : {}),
-            ...(typeof entry.cutShort === "string" ? { cutShort: entry.cutShort } : {})
+            ...(typeof entry.cutShort === "string" ? { cutShort: entry.cutShort } : {}),
+            ...(parseQuote(entry.quote) ? { quote: parseQuote(entry.quote) } : {})
           }
         ]
       : []
@@ -211,8 +245,28 @@ export class ReviewStore {
     )
   }
 
-  /** Keeps a review, replacing any earlier one of the same pull and commit. */
-  public put(review: ReviewRecord): void {
+  /** The review kept for exactly this pull and commit, if any. */
+  public of(repoId: string, number: number, headSha: string): ReviewRecord | undefined {
+    return this._reviews.find((entry) => entry.repoId === repoId && entry.number === number && entry.headSha === headSha)
+  }
+
+  /**
+   * Keeps a review, replacing any earlier one of the same pull and commit.
+   * That the commit's review was posted outlives the replacement: reviewing
+   * again must not hand back a post that was already spent.
+   */
+  public put(incoming: ReviewRecord): void {
+    const before = this.of(incoming.repoId, incoming.number, incoming.headSha)
+    const review: ReviewRecord =
+      before?.postedAt && !incoming.postedAt
+        ? {
+            ...incoming,
+            postedAt: before.postedAt,
+            ...(before.postedAs ? { postedAs: before.postedAs } : {}),
+            ...(before.postedUrl ? { postedUrl: before.postedUrl } : {}),
+            ...(before.postedBy ? { postedBy: before.postedBy } : {})
+          }
+        : incoming
     this._reviews = this._reviews.filter(
       (entry) =>
         !(
@@ -272,11 +326,37 @@ One line: "Approve", "Request changes" or "Comment", then why in one sentence.
 
 Be specific and brief. Do not repeat the diff back. Do not praise.`
 
-/** The prompt for a pull: description first, then patches until the budget runs out. */
-export const reviewMessages = (
+/**
+ * A question is not a request for a review. Asked under the review's
+ * prompt, a model writes the review again; so questions get their own.
+ */
+const ASK_SYSTEM_PROMPT = `You are a senior engineer answering a teammate's questions about a pull request. You see the description and the diff, then a review of it that was written earlier, then the conversation so far.
+
+Answer the question that was asked, and only that. Be direct and brief: start with the answer, then the reasoning if it is needed. Point at the file and line when it helps, and quote code in fenced blocks.
+
+Do not write another review. Do not use the review's headings (Summary, Issues, Suggestions, Verdict) unless you are asked for them. If the answer is not in what you can see, say so rather than guess.`
+
+/** Said again after the question: a small model follows what it read last. */
+const ASK_REMINDER = "(Answer this question directly. Do not write another review, and do not use the review's section headings.)"
+
+/** A question as the model reads it: the selected code first, when there is some. */
+export const questionContent = (text: string, quote?: ReviewQuote, last = false): string => {
+  const lines = quote?.startLine ? (quote.endLine && quote.endLine !== quote.startLine ? `, lines ${quote.startLine}–${quote.endLine}` : `, line ${quote.startLine}`) : ""
+  const about = quote ? `About this part of the diff of \`${quote.path}\`${lines}:\n\n\`\`\`diff\n${quote.text}\n\`\`\`\n\n` : ""
+  return `${about}${text}${last ? `\n\n${ASK_REMINDER}` : ""}`
+}
+
+/** The prompt for a review: its instructions, then the pull. */
+export const reviewMessages = (detail: PullDetail, noun: string): ChatMessage[] => [
+  { role: "system", content: SYSTEM_PROMPT },
+  { role: "user", content: pullContext(detail, noun) }
+]
+
+/** A pull as a model reads it: description first, then patches until the budget runs out. */
+export const pullContext = (
   detail: PullDetail,
   noun: string
-): ChatMessage[] => {
+): string => {
   const { pull } = detail
   const description = detail.body.trim()
   const head = [
@@ -314,10 +394,7 @@ export const reviewMessages = (
     budget -= cost
   }
   if (left > 0) parts.push(`(${left} more changed files not shown)`)
-  return [
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: `${head}\n\n${parts.join("\n\n")}` }
-  ]
+  return `${head}\n\n${parts.join("\n\n")}`
 }
 
 /**
@@ -342,8 +419,8 @@ export interface ReviewJob {
 
 /** Runs reviews through the gateway's models, one at a time. */
 export class Reviewer {
-  private readonly _running = new Set<string>()
-  private _busy = false
+  /** What is running now, by `repo#number` (a review) or `repo#number:ask` (a question), with when it started. */
+  private readonly _running = new Map<string, number>()
 
   constructor(
     private readonly _store: ReviewStore,
@@ -363,13 +440,19 @@ export class Reviewer {
     return this._running.has(`${repoId}#${number}`)
   }
 
-  /** Whether a background review may start now: nothing else running, developers idle. */
-  public idle(): boolean {
-    return !this._busy && (this._inference?.active() ?? 1) === 0
+  /** When the review of this pull now running started, if one is. */
+  public reviewingSince(repoId: string, number: number): number | undefined {
+    return this._running.get(`${repoId}#${number}`)
   }
 
+  /** Whether a background review may start now: nothing else running, developers idle. */
+  public idle(): boolean {
+    return !this.busy && (this._inference?.active() ?? 1) === 0
+  }
+
+  /** Busy while anything runs: two pulls asked for at once overlap, and the first to finish must not free the idle loop. */
   public get busy(): boolean {
-    return this._busy
+    return this._running.size > 0
   }
 
   public async review(job: ReviewJob, signal: AbortSignal): Promise<ReviewRecord> {
@@ -395,9 +478,14 @@ export class Reviewer {
         `No chat model is served as "${job.alias}". Pick a review model on the plugin's page.`,
         409
       )
-    this._running.add(key)
-    this._busy = true
+    const reviews = [...this._running.keys()].filter((entry) => !entry.endsWith(":ask")).length
+    if (reviews >= MAX_CONCURRENT_REVIEWS)
+      throw new PluginError(
+        `${reviews} reviews are running already. Ask again when one finishes.`,
+        429
+      )
     const started = this._now()
+    this._running.set(key, started)
     const base = {
       repoId: job.repoId,
       number: job.pull.number,
@@ -434,8 +522,7 @@ export class Reviewer {
                   : "The model answered nothing. Check the alias on Providers & models, and that the model is loaded."
             })
       }
-      this._store.put(review)
-      return review
+      return this.keep(review)
     } catch (error) {
       const review: ReviewRecord = {
         ...base,
@@ -445,12 +532,21 @@ export class Reviewer {
         text: "",
         error: messageOf(error)
       }
-      this._store.put(review)
-      return review
+      return this.keep(review)
     } finally {
       this._running.delete(key)
-      this._busy = false
     }
+  }
+
+  /**
+   * Stores a finished run. A failure never replaces a finished review of
+   * the same commit (with its thread and where it was posted): the caller
+   * still gets the failure to show.
+   */
+  private keep(review: ReviewRecord): ReviewRecord {
+    if (review.status === "failed" && this._store.of(review.repoId, review.number, review.headSha)?.status === "done") return review
+    this._store.put(review)
+    return this._store.of(review.repoId, review.number, review.headSha) ?? review
   }
 
   /**
@@ -459,12 +555,12 @@ export class Reviewer {
    * keeps the exchange on the review. Throws when the question cannot be
    * taken; a model failure is an error too, and leaves the thread as it was.
    */
-  public async ask(job: ReviewJob, question: string, signal: AbortSignal): Promise<ReviewRecord> {
+  public async ask(job: ReviewJob, question: string, signal: AbortSignal, quote?: ReviewQuote): Promise<ReviewRecord> {
     const inference = this._inference
     if (!inference)
       throw new PluginError("This gateway offers plugins no models, so nothing can answer.", 503)
     const asked = question.trim()
-    if (!asked) throw new PluginError("Ask something about the review.", 400)
+    if (!asked) throw new PluginError("Ask something first.", 400)
     if (asked.length > QUESTION_LIMIT)
       throw new PluginError(`Keep a question under ${QUESTION_LIMIT.toLocaleString("en-US")} characters.`, 400)
     const review = this._store.latest(job.repoId, job.pull.number)
@@ -477,17 +573,17 @@ export class Reviewer {
       throw new PluginError("An earlier question is still being answered.", 409)
     if (!inference.chatAliases().includes(job.alias))
       throw new PluginError(`No chat model is served as "${job.alias}". Pick a review model on the plugin's page.`, 409)
-    this._running.add(`${key}:ask`)
-    this._busy = true
     const started = this._now()
+    this._running.set(`${key}:ask`, started)
     try {
       const detail = await job.detail()
       const earlier = (review.thread ?? []).slice(-THREAD_CONTEXT_TURNS)
       const messages: ChatMessage[] = [
-        ...reviewMessages(detail, job.noun),
+        { role: "system", content: ASK_SYSTEM_PROMPT },
+        { role: "user", content: pullContext(detail, job.noun) },
         { role: "assistant", content: review.text },
-        ...earlier.map((turn): ChatMessage => ({ role: turn.role, content: turn.text })),
-        { role: "user", content: asked }
+        ...earlier.map((turn): ChatMessage => ({ role: turn.role, content: turn.role === "user" ? questionContent(turn.text, turn.quote) : turn.text })),
+        { role: "user", content: questionContent(asked, quote, true) }
       ]
       const { text, thought, cut } = await this.generate(
         inference,
@@ -506,25 +602,25 @@ export class Reviewer {
           502
         )
       const now = new Date(this._now()).toISOString()
-      const updated: ReviewRecord = {
-        ...review,
-        thread: [
-          ...(review.thread ?? []),
-          { role: "user", text: asked, at: now, by: job.requestedBy },
-          {
-            role: "assistant",
-            text: answer,
-            at: now,
-            ms: this._now() - started,
-            ...(cut ? { cutShort: cutShortNotice("answer", ASK_MAX_TOKENS, thought) } : {})
-          }
-        ]
-      }
+      // The record as it is now, not as it was minutes ago: it may have been posted while the model wrote.
+      const current = this._store.of(review.repoId, review.number, review.headSha)
+      const basis = current && current.createdAt === review.createdAt ? current : review
+      const turns: ReviewTurn[] = [
+        ...(basis.thread ?? []),
+        { role: "user", text: asked, at: now, by: job.requestedBy, ...(quote ? { quote } : {}) },
+        {
+          role: "assistant",
+          text: answer,
+          at: now,
+          ms: this._now() - started,
+          ...(cut ? { cutShort: cutShortNotice("answer", ASK_MAX_TOKENS, thought) } : {})
+        }
+      ]
+      const updated: ReviewRecord = { ...basis, thread: turns.slice(-MAX_THREAD_TURNS) }
       this._store.put(updated)
       return updated
     } finally {
       this._running.delete(`${key}:ask`)
-      this._busy = false
     }
   }
 

@@ -11,14 +11,10 @@ import type { PluginSummary } from "../plugins/host"
 
 import { api, ApiError } from "./api"
 import { PluginIcon, PluginPage } from "./plugins"
+import { navigate, splitRoute, useRoute } from "./route"
 
 const VIEW_PREFIX = "plugin:"
 
-/** The plugin the URL names, so a link can point at one. */
-const openedInHash = (): string | undefined => {
-  const hash = location.hash.replace(/^#/, "")
-  return hash.startsWith(VIEW_PREFIX) ? hash.slice(VIEW_PREFIX.length) : undefined
-}
 
 interface MemberAppProps {
   apiKey: string
@@ -30,16 +26,10 @@ interface MemberAppProps {
 export const MemberApp = ({ apiKey, who, onSignOut }: MemberAppProps) => {
   const [plugins, setPlugins] = useState<PluginSummary[] | null>(null)
   const [error, setError] = useState<string | undefined>()
-  const [opened, setOpenedState] = useState<string | undefined>(openedInHash)
-
-  const setOpened = useCallback((id: string) => {
-    setOpenedState(id)
-    try {
-      history.replaceState(null, "", `#${VIEW_PREFIX}${id}`)
-    } catch {
-      // Nothing to remember.
-    }
-  }, [])
+  // The address names the plugin (and, after a "/", a place inside it), so Back and Forward move between them.
+  const routeView = splitRoute(useRoute()).view
+  const opened = routeView.startsWith(VIEW_PREFIX) ? routeView.slice(VIEW_PREFIX.length) : undefined
+  const setOpened = useCallback((id: string) => navigate(`${VIEW_PREFIX}${id}`), [])
 
   const load = useCallback(async () => {
     try {

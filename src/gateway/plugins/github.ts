@@ -23,7 +23,7 @@ import { createSign } from "node:crypto"
 import { noAnswer, timeoutSignal } from "../../common/deadline"
 import { messageOf } from "../../common/errors"
 
-import { arr, baseUrlOf, CheckState, cutPatch, Forge, IssueSummary, isTokenRefused, MAX_FILES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
+import { arr, baseUrlOf, CheckState, cutPatch, Forge, ForgeImage, IssueSummary, isTokenRefused, MAX_FILES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, MergeState, num, PullApprovals, PullCheck, PullContent, PullFile, PullSummary, readImage, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, str } from "./forge"
 import {
   GatewayPlugin,
   json,
@@ -40,6 +40,8 @@ const USER_AGENT = "twinny-server"
 const JWT_TTL_S = 9 * 60
 /** Installation tokens live an hour; renew this long before the end. */
 const TOKEN_MARGIN_MS = 5 * 60_000
+/** GitHub signs an attachment's address for five minutes; a description is rendered again before that. */
+const BODY_IMAGES_MS = 3 * 60_000
 
 /**
  * The pulls query, with or without the reviewer detail. The detail asks
@@ -241,6 +243,13 @@ export class GitHubForge implements Forge {
   private readonly _tokens = new Map<number, CachedToken>()
   /** Repositories whose host refused the reviewer detail; listed plainly from then on. */
   private readonly _plainListing = new Set<string>()
+
+  /** Installation ids and tokens belong to the host that issued them: none is offered to another. */
+  public hostChanged(): void {
+    this._installations.clear()
+    this._tokens.clear()
+    this._plainListing.clear()
+  }
 
   public readonly noun = "Pull request"
 
@@ -484,6 +493,61 @@ export class GitHubForge implements Forge {
     )
   }
 
+  /** Each description's images as GitHub renders them, kept for as long as its signed addresses last. */
+  private readonly _bodyImages = new Map<string, { at: number; images: Promise<Array<{ src: string; canonical?: string }>> }>()
+
+  /**
+   * The images in a description, from GitHub's own rendering of it. That
+   * is where an attachment on a private repository gets an address that
+   * can be fetched: a signed one, good for a few minutes.
+   */
+  private async bodyImages(repo: RepoRecord, number: number, signal: AbortSignal): Promise<Array<{ src: string; canonical?: string }>> {
+    const token = await this.tokenFor(repo, signal)
+    const response = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/issues/${number}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.full+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT },
+      signal
+    })
+    const html = str((await readJson(response, `Reading the images of ${repo.fullName}#${number}`)).body_html)
+    const attribute = (tag: string, name: string): string | undefined => {
+      const match = new RegExp(`\\s${name}\\s*=\\s*"([^"]*)"`, "i").exec(tag)
+      return match ? match[1].replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">") : undefined
+    }
+    return (html.match(/<img\b[^>]*>/gi) ?? []).flatMap((tag) => {
+      const src = attribute(tag, "src")
+      const canonical = attribute(tag, "data-canonical-src")
+      return src ? [{ src, ...(canonical ? { canonical } : {}) }] : []
+    })
+  }
+
+  public async image(repo: RepoRecord, number: number, url: string, signal: AbortSignal): Promise<ForgeImage | undefined> {
+    const key = `${repo.id}:${number}`
+    let entry = this._bodyImages.get(key)
+    if (!entry || Date.now() - entry.at > BODY_IMAGES_MS) {
+      entry = { at: Date.now(), images: this.bodyImages(repo, number, signal) }
+      this._bodyImages.set(key, entry)
+      entry.images.catch(() => this._bodyImages.delete(key))
+      if (this._bodyImages.size > 200) this._bodyImages.delete(this._bodyImages.keys().next().value as string)
+    }
+    const images = await entry.images
+    // An attachment's signed address carries the same id as the one written in the description.
+    const asset = /\/assets\/([0-9a-f]{8}-[0-9a-f-]{27})(?:[/?#]|$)/i.exec(url)?.[1]
+    const found = images.find((image) => image.canonical === url || image.src === url) ?? (asset ? images.find((image) => image.src.includes(asset)) : undefined)
+    if (!found) return undefined
+    let target: URL
+    try {
+      target = new URL(found.src)
+    } catch {
+      return undefined
+    }
+    // GitHub's own hosts only, and never with the token: the signed address is the credential.
+    const own = new URL(this.baseUrl)
+    const onHost = target.host === own.host && target.protocol === own.protocol
+    const onGitHub = target.protocol === "https:" && (target.hostname.endsWith(`.${own.hostname}`) || target.hostname.endsWith(".githubusercontent.com"))
+    if (!onHost && !onGitHub) return undefined
+    const response = await this._context.fetch(target.href, { headers: { Accept: "image/*", "User-Agent": USER_AGENT }, signal })
+    return readImage(response, `Reading an image of ${repo.fullName}#${number}`)
+  }
+
   public async pullContent(
     repo: RepoRecord,
     number: number,
@@ -614,7 +678,8 @@ export class GitHubForge implements Forge {
     const response = await this._context.fetch(`${this.restUrl}/repos/${repo.fullName}/pulls/${pull.number}/reviews`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT, "Content-Type": "application/json" },
-      body: JSON.stringify({ body, event: as === "approve" ? "APPROVE" : as === "request-changes" ? "REQUEST_CHANGES" : "COMMENT" }),
+      // A verdict is pinned to the commit that was reviewed: a push in between leaves it there. A comment goes wherever the pull is.
+      body: JSON.stringify({ body, event: as === "approve" ? "APPROVE" : as === "request-changes" ? "REQUEST_CHANGES" : "COMMENT", ...(as !== "comment" && pull.headSha ? { commit_id: pull.headSha } : {}) }),
       signal
     })
     const answer = await readJson(response, `Posting the review on ${repo.fullName}#${pull.number}`)

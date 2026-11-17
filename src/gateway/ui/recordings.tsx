@@ -808,12 +808,16 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
     void loadMore()
   }, [grouped, data, paging, loading])
 
+  // The recording asked for last: a slower answer for an earlier click must not replace it.
+  const wanted = useRef<string | undefined>()
   const show = useCallback(
     async (id: string) => {
+      wanted.current = id
       try {
-        setOpen(await api<RecordingRecord>(`/twinny/v1/admin/recordings/${id}`, apiKey))
+        const record = await api<RecordingRecord>(`/twinny/v1/admin/recordings/${id}`, apiKey)
+        if (wanted.current === id) setOpen(record)
       } catch (e) {
-        setError(messageOf(e))
+        if (wanted.current === id) setError(messageOf(e))
       }
     },
     [apiKey]
@@ -840,7 +844,10 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
       } else if (e.key === "ArrowUp" || e.key === "k") {
         e.preventDefault()
         step(-1)
-      } else if (e.key === "Escape") setOpen(null)
+      } else if (e.key === "Escape") {
+        wanted.current = undefined
+        setOpen(null)
+      }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
@@ -1078,7 +1085,10 @@ export const RecordingsPanel = ({ apiKey, features }: { apiKey: string; features
         {!data?.nextBefore && rows.length > 0 && <div className="hint">Click a row to open it. ↑ ↓ move between records, Esc closes.</div>}
       </section>
 
-      {open && <RecordPanel record={open} index={openIndex} total={visible.length} onStep={step} onClose={() => setOpen(null)} />}
+      {open && <RecordPanel record={open} index={openIndex} total={visible.length} onStep={step} onClose={() => {
+            wanted.current = undefined
+            setOpen(null)
+          }} />}
 
       {data && <RecordingSettings apiKey={apiKey} summary={data.summary} licensed={licensed} onSaved={() => void load()} />}
     </>

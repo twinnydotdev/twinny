@@ -5,7 +5,7 @@
  * head commit, approvals from the pull's participants, the diff from
  * the pull's own diff route.
  */
-import { arr, baseUrlOf, CheckState, Forge, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str, tokenProbe } from "./forge"
+import { arr, baseUrlOf, CheckState, Forge, MAX_DIFF_BYTES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, readTextCapped, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, sameOrigin, splitUnifiedDiff, str, tokenProbe } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
 import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
@@ -72,7 +72,9 @@ export class BitbucketForge implements Forge {
     while (next && names.length < MAX_LISTED_REPOS) {
       const answer: Record<string, unknown> = await readJson(await this._context.fetch(next, { headers: this.headers(tokenProbe(token)), signal }), "Listing what the token can read")
       names.push(...arr(answer.values).map((entry) => str(rec(entry).full_name)).filter(Boolean))
-      next = str(answer.next) || undefined
+      // The next page is an address the answer names: follow it only back to the API, since the token goes with it.
+      const following = str(answer.next)
+      next = following && sameOrigin(following, this.apiUrl) ? following : undefined
     }
     return names.slice(0, MAX_LISTED_REPOS)
   }
@@ -176,7 +178,8 @@ export class BitbucketForge implements Forge {
       signal
     })
     if (!response.ok) throw new PluginError(`${what} (diff): status ${response.status}.`, 502)
-    const { files, moreFiles } = splitUnifiedDiff(await response.text())
+    // Cut mid-file at the cap: the files before it are whole, the last one shows as far as it got.
+    const { files, moreFiles } = splitUnifiedDiff((await readTextCapped(response, MAX_DIFF_BYTES)).text)
     return { body: str(rec(pull.summary).raw, str(pull.description)), files, moreFiles }
   }
 }

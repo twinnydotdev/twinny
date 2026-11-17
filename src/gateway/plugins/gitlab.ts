@@ -169,15 +169,28 @@ const countDiff = (diff: string): { additions: number; deletions: number } => {
  * reads the same and does nothing.
  */
 export const withoutQuickActions = (body: string): string => {
-  let fenced = false
+  // A fence as Markdown reads one: at most three spaces in, three or more
+  // of one character, no backtick after a backtick fence, and closed only
+  // by the same character at least as long. Anything looser would let a
+  // line that merely looks like a fence switch the escaping off.
+  let fence: { char: string; length: number } | undefined
   return body
     .split("\n")
     .map((line) => {
-      if (/^\s*(```|~~~)/.test(line)) {
-        fenced = !fenced
-        return line
+      const mark = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line)
+      if (mark) {
+        const [, run, rest] = mark
+        if (!fence) {
+          if (run[0] === "~" || !rest.includes("`")) {
+            fence = { char: run[0], length: run.length }
+            return line
+          }
+        } else if (run[0] === fence.char && run.length >= fence.length && !rest.trim()) {
+          fence = undefined
+          return line
+        }
       }
-      return fenced ? line : line.replace(/^(\s*)\/(?=[a-z_]+\b)/i, "$1\\/")
+      return fence ? line : line.replace(/^(\s*)\/(?=[a-z_]+\b)/i, "$1\\/")
     })
     .join("\n")
 }
@@ -344,7 +357,16 @@ export class GitLabForge implements Forge {
     )
     // GitLab has approvals but no "request changes": that stays a note.
     if (as === "approve")
-      await readJson(await this._context.fetch(`${this.project(repo)}/merge_requests/${pull.number}/approve`, { method: "POST", headers: this.headers(repo), signal }), `${what} (approve)`)
+      // With the commit named, GitLab refuses the approval if the branch moved since.
+      await readJson(
+        await this._context.fetch(`${this.project(repo)}/merge_requests/${pull.number}/approve`, {
+          method: "POST",
+          headers: { ...this.headers(repo), "Content-Type": "application/json" },
+          body: JSON.stringify(pull.headSha ? { sha: pull.headSha } : {}),
+          signal
+        }),
+        `${what} (approve)`
+      )
     const id = num(note.id)
     return { url: id !== undefined ? `${pull.url}#note_${id}` : pull.url }
   }

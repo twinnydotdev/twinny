@@ -14,9 +14,10 @@
  *   POST   api/repos/<id>/sync
  *   POST   api/sync
  *   GET    api/repos/<id>/pulls/<n>    → one pull with its description and files
+ *   GET    api/repos/<id>/pulls/<n>/review        → { reviewing, reviewingSince?, review? }, no request to the host
  *   POST   api/repos/<id>/pulls/<n>/review        → review it with the gateway's model
  *   POST   api/repos/<id>/pulls/<n>/review/post   { as }
- *   POST   api/repos/<id>/pulls/<n>/review/ask    { question } → an answer kept on the review's thread
+ *   POST   api/repos/<id>/pulls/<n>/review/ask    { question, selection? } → an answer kept on the review's thread
  *   GET    api/repos/<id>/issues/<n>              → one issue with its body and triage
  *   POST   api/repos/<id>/issues/<n>/triage[/post]
  *   PUT    api/settings { baseUrl?, me?, reviewAlias? }
@@ -65,9 +66,11 @@ import {
 } from "./host"
 import {
   ASK_TIMEOUT_MS,
+  parseQuote,
   REVIEW_TIMEOUT_MS,
   Reviewer,
   ReviewPostAs,
+  ReviewQuote,
   ReviewRecord,
   ReviewStore
 } from "./reviews"
@@ -88,10 +91,15 @@ export const MEMBER_ROUTES: readonly MemberRoute[] = [
   { method: "PUT", path: /^me$/ },
   { method: "POST", path: new RegExp(`^${REPO}/sync$`) },
   { method: "GET", path: new RegExp(`^${REPO}/pulls/${NUMBER}$`) },
+  { method: "GET", path: new RegExp(`^${REPO}/pulls/${NUMBER}/review$`) },
   { method: "POST", path: new RegExp(`^${REPO}/pulls/${NUMBER}/review(?:/post|/ask)?$`) },
+  { method: "GET", path: new RegExp(`^${REPO}/image$`) },
   { method: "GET", path: new RegExp(`^${REPO}/issues/${NUMBER}$`) },
   { method: "POST", path: new RegExp(`^${REPO}/issues/${NUMBER}/triage(?:/post)?$`) }
 ]
+
+/** How long an edited triage reply may be. */
+const MAX_REPLY_CHARS = 20_000
 
 /** How long a token's label may be. */
 const MAX_LABEL = 80
@@ -331,7 +339,7 @@ export class PullsPlugin implements PluginInstance {
     requestedBy: string
   ): Promise<ReviewRecord> {
     const signal = withTimeout(this._stopped.signal, REVIEW_TIMEOUT_MS)
-    let review = await this._reviewer.review(
+    const review = await this._reviewer.review(
       {
         repoId: repo.id,
         pull,
@@ -354,10 +362,8 @@ export class PullsPlugin implements PluginInstance {
       ...(review.error ? { message: review.error } : {})
     })
     const label = `${repo.fullName}${this._forge.noun === "Merge request" ? "!" : "#"}${pull.number}`
-    if (review.status === "done" && repo.autoPost) {
-      // Straight to the host as a comment; a failure stays on the review, not on the review run.
-      review = await this.postReview(repo, pull, review, "comment", "auto").catch(() => review)
-    }
+    // A review stays on the gateway. `autoPost` saved on a repository by an
+    // earlier version is not honoured: nothing is written to the host unasked.
     if (review.status === "done") {
       const verdict = verdictOf(review.text)
       const changes = verdict === "request changes"
@@ -385,7 +391,7 @@ export class PullsPlugin implements PluginInstance {
   }
 
   /** A question about the pull's latest review, answered by the model that reviews. */
-  private async askReview(repo: RepoRecord, pull: PullSummary, question: string, requestedBy: string): Promise<ReviewRecord> {
+  private async askReview(repo: RepoRecord, pull: PullSummary, question: string, requestedBy: string, quote?: ReviewQuote): Promise<ReviewRecord> {
     const alias = this.reviewAlias()
     if (!alias)
       throw new PluginError(
@@ -406,7 +412,8 @@ export class PullsPlugin implements PluginInstance {
         detail: async () => ({ pull, ...(await this._forge.pullContent(repo, pull.number, signal)) })
       },
       question,
-      signal
+      signal,
+      quote
     )
     this._context.log.info({
       event: "plugin.review-asked",
@@ -454,7 +461,8 @@ export class PullsPlugin implements PluginInstance {
           const brief = this.reviews.brief(repo.id, pull)
           return brief ? [[pull.number, brief]] : []
         })
-      )
+      ),
+      reviewing: (state?.pulls ?? []).filter((pull) => this._reviewer.isReviewing(repo.id, pull.number)).map((pull) => pull.number)
     }
   }
 
@@ -613,6 +621,17 @@ export class PullsPlugin implements PluginInstance {
       const repo = this.store.get(repoMatch[1])
       if (!repo) return notFound("No such repository.")
       const rest = repoMatch[2] ?? ""
+      // An image a description embeds, for the page to show without loading anything from outside itself.
+      if (rest === "image" && method === "GET") {
+        const number = Number(request.query.get("number"))
+        const url = request.query.get("url") ?? ""
+        if (!Number.isSafeInteger(number) || number < 1 || !url || url.length > 2048) return notFound()
+        const known = this.pull(repo.id, number) !== undefined || (this._state.get(repo.id)?.issues ?? []).some((issue) => issue.number === number)
+        if (!known || !this._forge.image) return notFound("No such image.")
+        const image = await this._forge.image(repo, number, url, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS))
+        if (!image) return notFound("No such image.")
+        return json({ type: image.type, data: image.data.toString("base64") })
+      }
       if (rest === "" && method === "PUT") {
         const body = await request.body()
         if ("tokenId" in body) return this.moveRepo(request, repo, body.tokenId)
@@ -654,7 +673,10 @@ export class PullsPlugin implements PluginInstance {
           // As with reviews: the token's account speaks for the team, so a developer posts the reply once.
           if (request.member && body.reply !== false && record.repliedAt) throw new PluginError("This reply is already on the host.", 409)
           if (body.reply !== false && record.reply && this._forge.commentIssue) {
-            const text = typeof body.replyText === "string" && body.replyText.trim() ? body.replyText.trim() : record.reply
+            // An admin may edit the reply; a developer posts what the model wrote, since the token's account says it.
+            const edited = !request.member && typeof body.replyText === "string" ? body.replyText.trim() : ""
+            if (edited.length > MAX_REPLY_CHARS) throw new PluginError(`Keep a reply under ${MAX_REPLY_CHARS.toLocaleString("en-US")} characters.`, 400)
+            const text = edited || record.reply
             await this._forge.commentIssue(repo, number, `${text}\n\n---\n_Triaged by twinny-server with \`${record.alias}\`._`, signal)
             updated = { ...updated, reply: text, repliedAt: new Date(this._context.now()).toISOString() }
           }
@@ -695,6 +717,8 @@ export class PullsPlugin implements PluginInstance {
         const wantsPost = pullMatch[2] === "/review/post"
         const wantsAsk = pullMatch[2] === "/review/ask"
         const wantsApprove = pullMatch[2] === "/approve"
+        // Where a review stands, from memory alone: a page waiting on one asks every few seconds, and must not cost the host a request each time.
+        if (wantsReview && method === "GET") return json(this.reviewState(repo.id, number))
         if (wantsReview || wantsPost || wantsAsk || wantsApprove ? method !== "POST" : method !== "GET") return notFound()
         let pull = this.pull(repo.id, number)
         if (!pull) {
@@ -710,6 +734,14 @@ export class PullsPlugin implements PluginInstance {
           // The token's account may count towards branch protection: a developer posts comments, once.
           if (request.member && as !== "comment") throw new PluginError("Only an admin can post a review as an approval or a change request.", 403)
           if (request.member && review.postedAt) throw new PluginError("This review is already on the host.", 409)
+          // A verdict belongs to the commit the model read. Posted after a push it would approve code nobody reviewed.
+          // Asked of the host now, not of a listing up to five minutes old.
+          if (as !== "comment") {
+            await this.syncOne(repo)
+            pull = this.pull(repo.id, number) ?? pull
+          }
+          if (as !== "comment" && review.headSha !== pull.headSha)
+            throw new PluginError(`This review is of ${review.headSha.slice(0, 7)} and the ${this._forge.noun.toLowerCase()} has moved to ${pull.headSha.slice(0, 7)}. Review the new commit first, or post it as a comment.`, 409)
           const posted = await this.postReview(repo, pull, review, as, request.principal)
           return json({ review: posted })
         }
@@ -721,7 +753,7 @@ export class PullsPlugin implements PluginInstance {
         if (wantsAsk) {
           const body = await request.body()
           const question = typeof body.question === "string" ? body.question : ""
-          const review = await this.askReview(repo, pull, question, request.principal)
+          const review = await this.askReview(repo, pull, question, request.principal, parseQuote(body.selection))
           return json({ review })
         }
         if (wantsReview) {
@@ -741,13 +773,8 @@ export class PullsPlugin implements PluginInstance {
           number,
           withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)
         )
-        const page: PullPage = {
-          pull,
-          ...content,
-          reviewing: this._reviewer.isReviewing(repo.id, number)
-        }
-        const review = this.reviews.latest(repo.id, number)
-        if (review) page.review = review
+        // Read after the host answered: a review that landed meanwhile is on the page.
+        const page: PullPage = { pull, ...content, ...this.reviewState(repo.id, number) }
         return json(page)
       }
       return notFound()
@@ -758,9 +785,12 @@ export class PullsPlugin implements PluginInstance {
       let hostChanged = false
       if ("baseUrl" in body) {
         const baseUrl = typeof body.baseUrl === "string" ? body.baseUrl.trim() : ""
+        const before = typeof settings.baseUrl === "string" ? settings.baseUrl : undefined
         if (baseUrl) settings.baseUrl = cleanBaseUrl(baseUrl)
         else delete settings.baseUrl
-        hostChanged = true
+        hostChanged = settings.baseUrl !== before
+        // Every saved token is sent to the new host from the next sync on: that is worth a line of its own.
+        if (hostChanged) this._context.log.warn({ event: "plugin.host-changed", key: request.principal, reason: `${before ?? "default"} → ${typeof settings.baseUrl === "string" ? settings.baseUrl : "default"}` })
       }
       if ("me" in body) {
         const me = cleanUsername(body.me)
@@ -776,6 +806,7 @@ export class PullsPlugin implements PluginInstance {
       }
       this.store.setSettings(settings)
       if (hostChanged) {
+        this._forge.hostChanged?.()
         this._state.clear()
         void this.syncAll()
       }
@@ -826,13 +857,27 @@ export class PullsPlugin implements PluginInstance {
     }
   }
 
+  /** The latest review of a pull and whether one is running now. */
+  private reviewState(repoId: string, number: number): Pick<PullPage, "review" | "reviewing" | "reviewingSince"> {
+    const since = this._reviewer.reviewingSince(repoId, number)
+    const review = this.reviews.latest(repoId, number)
+    return {
+      reviewing: since !== undefined,
+      ...(since !== undefined ? { reviewingSince: new Date(since).toISOString() } : {}),
+      ...(review ? { review } : {})
+    }
+  }
+
   /** Sends a finished review to the host and remembers where it went. */
   private async postReview(repo: RepoRecord, pull: PullSummary, review: ReviewRecord, as: ReviewPostAs, by: string): Promise<ReviewRecord> {
     const hash = this._forge.noun === "Merge request" ? "!" : "#"
     const body = `${review.text.trim()}\n\n---\n_Reviewed by twinny-server with \`${review.alias}\`${review.headSha ? ` at ${review.headSha.slice(0, 7)}` : ""}._`
     try {
       const posted = await this._forge.postReview(repo, pull, body, as, withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS))
-      const updated: ReviewRecord = { ...review, postedAt: new Date(this._context.now()).toISOString(), postedAs: as, postedBy: by, ...(posted.url ? { postedUrl: posted.url } : {}) }
+      // The record as it is now: a question may have been answered on its thread while the host took the post.
+      const current = this.reviews.of(review.repoId, review.number, review.headSha)
+      const basis = current && current.createdAt === review.createdAt ? current : review
+      const updated: ReviewRecord = { ...basis, postedAt: new Date(this._context.now()).toISOString(), postedAs: as, postedBy: by, ...(posted.url ? { postedUrl: posted.url } : {}) }
       this.reviews.put(updated)
       this._context.log.info({ event: "plugin.review-posted", key: by, reason: `${repo.fullName}${hash}${pull.number}`, message: as })
       this._context.events?.emit({
@@ -917,6 +962,8 @@ export class PullsPlugin implements PluginInstance {
       candidate,
       withTimeout(this._stopped.signal, REQUEST_TIMEOUT_MS)
     )
+    // The host's spelling becomes part of every later request's path: hold it to the same shape as what was typed.
+    if (!FULL_NAME_PATTERN.test(canonical)) throw new PluginError(`The host named this repository "${canonical.slice(0, 120)}", which is not a name the plugin can use.`, 502)
     if (canonical !== fullName && this.store.byName(canonical))
       throw new PluginError(`${canonical} is already watched.`, 409)
     if (pasted) {
