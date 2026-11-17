@@ -24,7 +24,7 @@ const stepChoices = (current: number) =>
  * settings; the panel shows a change at once rather than waiting for the
  * round trip.
  */
-const useSetting = <T,>(key: string, fallback: T): [T, (value: T) => void] => {
+export const useSetting = <T,>(key: string, fallback: T): [T, (value: T) => void] => {
   const [value, setValue] = useState<T>(fallback)
   useEffect(() => {
     bridge
@@ -50,7 +50,7 @@ interface Choice<T> {
   locked?: string
 }
 
-const Choices = <T extends string | number>({
+export const Choices = <T extends string | number>({
   label,
   value,
   choices,
@@ -81,6 +81,31 @@ const Choices = <T extends string | number>({
     </span>
   </div>
 )
+
+/** Escape, or a click outside the sheet and the button that opens it, puts a sheet away. */
+export const useDismiss = (
+  panel: React.RefObject<HTMLElement>,
+  toggle: string,
+  onClose: () => void
+) => {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.stopPropagation()
+      onClose()
+    }
+    const onPointer = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!panel.current?.contains(target) && !target?.closest(`[${toggle}]`)) onClose()
+    }
+    window.addEventListener("keydown", onKey, true)
+    window.addEventListener("mousedown", onPointer)
+    return () => {
+      window.removeEventListener("keydown", onKey, true)
+      window.removeEventListener("mousedown", onPointer)
+    }
+  }, [onClose, panel, toggle])
+}
 
 interface AgentSettingsProps {
   /** What the connected team's policy allows, if it sets agent rules. */
@@ -115,24 +140,7 @@ export const AgentSettings = ({ team, autoRun, setAutoRun, onClose }: AgentSetti
   const [mcpServers] = useSetting<Record<string, unknown>>("chatToolsMcpServers", {})
   const servers = Object.keys(mcpServers ?? {}).length
 
-  // Escape or a click elsewhere puts it away.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return
-      event.stopPropagation()
-      onClose()
-    }
-    const onPointer = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null
-      if (!panel.current?.contains(target) && !target?.closest("[data-agent-settings-toggle]")) onClose()
-    }
-    window.addEventListener("keydown", onKey, true)
-    window.addEventListener("mousedown", onPointer)
-    return () => {
-      window.removeEventListener("keydown", onKey, true)
-      window.removeEventListener("mousedown", onPointer)
-    }
-  }, [onClose])
+  useDismiss(panel, "data-agent-settings-toggle", onClose)
 
   const teamSays = t("agent-settings-team")
   const commandsOff = team?.commands === "off" || commands === "off"

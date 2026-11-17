@@ -1,13 +1,11 @@
 /*
- * The tools behind a reply, a line each, in the same idiom as the
- * workspace search panel: a left rule, small type, nothing boxed. A line
- * opens to its input and output; a command waiting for the user is the one
- * thing that asks for attention.
+ * The tools behind a reply, a line each, in small type with nothing round
+ * them. A line opens to its input and output on a soft ground; a command
+ * waiting for the user is a card, the one thing that asks for attention.
  */
 .panel {
-  margin: -2px 0 10px;
-  padding: 0 0 0 10px;
-  border-left: 1px solid var(--tw-rule);
+  margin: 0 0 10px;
+  padding: 0;
   list-style: none;
   font-size: var(--tw-fs-xs);
 }
@@ -35,7 +33,8 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--tw-fg-faint);
+  /* Readable at a glance: a step is what the agent did, not a footnote. */
+  color: var(--tw-fg-dim);
   font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);
   letter-spacing: var(--tw-track);
@@ -51,7 +50,7 @@
 
 .row:not(:disabled):hover,
 .row:focus-visible {
-  color: var(--tw-fg-dim);
+  color: var(--tw-fg);
   outline: none;
 }
 
@@ -80,7 +79,7 @@
 .step .summary code {
   padding: 0;
   background: none !important;
-  color: var(--tw-fg-dim);
+  color: color-mix(in srgb, var(--tw-fg) 82%, transparent);
   font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs) !important;
 }
@@ -112,16 +111,23 @@
 .detail,
 .approval {
   margin: 2px 0 6px 20px;
-  padding: 0 0 0 10px;
-  border-left: 1px solid var(--tw-rule-soft);
+  padding: 0;
+}
+
+.approval {
+  margin: 6px 0 8px;
+  padding: 10px 12px;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 
 .detailLabel,
 /* The tail of a command still running, under its line. */
 .live {
   margin: 2px 0 4px 20px;
-  padding: 4px 8px;
-  background: var(--tw-surface);
+  padding: 6px 10px;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   color: var(--tw-fg-dim);
   font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
@@ -165,10 +171,11 @@
 .args pre,
 .output {
   margin: 0;
-  padding: 6px 8px;
+  padding: 8px 10px;
   max-height: 240px;
   overflow: auto;
-  background: var(--tw-surface);
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   color: var(--tw-code);
   font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
@@ -182,7 +189,14 @@
 }
 
 .command {
-  border-left: 2px solid var(--tw-mark);
+  overflow: hidden;
+  border-radius: var(--tw-radius-sm);
+  background: var(--tw-bg);
+}
+
+.command pre {
+  margin: 0 !important;
+  background: transparent !important;
 }
 
 /* Highlighted code: the highlighter sets colours, the step sets size. */
@@ -240,8 +254,9 @@
 .located {
   max-height: 240px;
   overflow: auto;
-  padding: 4px 8px;
-  background: var(--tw-surface);
+  padding: 6px 10px;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 
 .locatedFile + .locatedFile {
@@ -331,11 +346,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 10px;
+  padding: 3px 12px;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: var(--tw-radius);
   font-family: var(--tw-font);
-  font-size: var(--tw-fs-xs);
+  font-size: var(--tw-fs-sm);
   line-height: 18px;
   cursor: pointer;
 }
@@ -350,13 +365,12 @@
 }
 
 .skip {
-  background: transparent;
-  border-color: var(--tw-rule);
-  color: var(--tw-fg-dim);
+  background: var(--tw-fill-strong);
+  color: var(--tw-fg);
 }
 
 .skip:hover {
-  color: var(--tw-fg);
+  background: color-mix(in srgb, var(--tw-fg) 16%, transparent);
 }
 
 .run:focus-visible,
@@ -379,7 +393,7 @@
   height: 20px;
   padding: 0;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--tw-radius-sm);
   background: transparent;
   color: var(--tw-fg-faint);
   cursor: pointer;
@@ -427,4 +441,54 @@
   color: var(--tw-fg-dim);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* The model's own list of steps: ticked, in hand, waiting. Greys only. */
+.tasks {
+  margin: 4px 0;
+  padding: 0;
+}
+
+.tasksHead {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  letter-spacing: var(--tw-track);
+  line-height: 20px;
+}
+
+.taskList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--tw-fg-dim);
+  font-size: var(--tw-fs-sm);
+  line-height: 20px;
+}
+
+.task .glyph {
+  height: 20px;
+}
+
+.taskText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.taskDone {
+  color: var(--tw-fg-faint);
+}
+
+.taskNext {
+  color: var(--tw-fg);
+}
+
+/* Inside a reply every list item gets a dash; these have their own marks. */
+.taskList > .task::before {
+  content: none;
 }

@@ -307,7 +307,7 @@ const App = () => {
     try {
       const [status, usage, keys, store] = await Promise.all([
         api<RemoteStatus>("/twinny/v1/status", key),
-        api<UsageSummary>(`/twinny/v1/admin/usage?since=${period}`, key),
+        api<UsageSummary>(`/twinny/v1/admin/usage?since=${period}&compare=previous`, key),
         api<KeysResponse>("/twinny/v1/admin/keys", key),
         // An older gateway has no plugins; the store is then empty.
         api<{ plugins: PluginSummary[]; licensed: boolean }>("/twinny/v1/admin/plugins", key).catch(() => ({ plugins: [] as PluginSummary[], licensed: false }))

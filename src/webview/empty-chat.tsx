@@ -3,9 +3,11 @@ import { useTranslation } from "react-i18next"
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react"
 
 import { EVENT_NAME } from "../common/constants"
+import { ModelStatus, shortTokens, STARTERS } from "../common/model-status"
 
 import { useProviders } from "./hooks/useProviders"
 import { emit } from "./messaging"
+import { useLoadedLabel } from "./model-state"
 
 import styles from "./styles/chat.module.css"
 
@@ -14,11 +16,25 @@ import styles from "./styles/chat.module.css"
  * the pane flickers up, the title types itself out under a block cursor,
  * then the line naming the provider and model fades in. It says where a
  * reply will come from; or, with nothing set, where to fix that.
+ *
+ * Under that, what the model's server says about it (how much it holds,
+ * whether it is in memory) and three first questions about the open file.
  */
-export const EmptyChat = () => {
+export const EmptyChat = ({
+  status,
+  warming,
+  onWarm,
+  disabled
+}: {
+  status: ModelStatus | null
+  warming: boolean
+  onWarm: () => void
+  disabled?: boolean
+}) => {
   const { t } = useTranslation()
   const { chatProvider, ready } = useProviders()
   const title = t("empty-chat-title")
+  const loaded = useLoadedLabel(status)
 
   return (
     <div className={styles.emptyChat}>
@@ -65,6 +81,59 @@ export const EmptyChat = () => {
                 </VSCodeButton>
               </>
             )}
+          </div>
+        )}
+
+        {ready && chatProvider && status && (status.contextWindow || loaded) && (
+          <div className={styles.crtFacts}>
+            {(status.contextWindow || loaded) && (
+              <span className={styles.crtChips}>
+                {status.contextWindow && (
+                  <span
+                    className={styles.crtChip}
+                    title={t("model-context-title", { window: status.contextWindow.toLocaleString() })}
+                  >
+                    {t("model-context", { window: shortTokens(status.contextWindow) })}
+                  </span>
+                )}
+                {loaded && (
+                  <span
+                    className={styles.crtChip}
+                    title={
+                      status.loaded === false ? t("model-not-loaded-title", { model: chatProvider.modelName }) : undefined
+                    }
+                  >
+                    {warming ? t("model-loading") : loaded}
+                  </span>
+                )}
+                {status.loadError && !warming && (
+                  <span className={`${styles.crtChip} ${styles.crtChipError}`} title={status.loadError}>
+                    {t("model-load-failed")}
+                  </span>
+                )}
+                {status.canLoad && !warming && (
+                  <button type="button" className={styles.crtLoad} onClick={onWarm}>
+                    {t("model-load")}
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
+        )}
+
+        {ready && chatProvider && (
+          <div className={styles.starters} title={t("starters-title")}>
+            {STARTERS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className={styles.starter}
+                disabled={disabled}
+                onClick={() => emit(EVENT_NAME.twinnyStarter, kind)}
+              >
+                {t(`starter-${kind}`)}
+              </button>
+            ))}
           </div>
         )}
       </div>

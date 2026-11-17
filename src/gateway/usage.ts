@@ -158,6 +158,12 @@ export interface UsageDay {
   requests: number
   /** Requests that day per key. */
   byKey: Record<string, number>
+  /** Requests that day that failed. */
+  failed: number
+  /** Prompt and output tokens counted that day. */
+  tokens: number
+  /** Time spent answering that day, in milliseconds. */
+  ms: number
 }
 
 /** Per million tokens, in the summary's currency. */
@@ -179,6 +185,8 @@ export interface UsageSummary {
   byPeer: Record<string, UsageTotals>
   /** Only days with records, oldest first. */
   byDay: UsageDay[]
+  /** The totals of the period of the same length just before this one, when asked for. */
+  previous?: UsageTotals
 }
 
 const emptyTotals = (): UsageTotals => ({
@@ -312,6 +320,7 @@ export const summarizeUsage = (
     byDay: []
   }
   const days = new Map<string, UsageDay>()
+  const dayTotals = new Map<string, UsageTotals>()
   const runs = new Map<string, Runs>()
   const runsOf = (bucket: string): Runs => {
     let open = runs.get(bucket)
@@ -327,12 +336,22 @@ export const summarizeUsage = (
     add((perKey[model] ??= emptyTotals()), record, runsOf(`key-model:${record.key}|${model}`), prices)
     if (record.peer)
       add((summary.byPeer[record.peer] ??= emptyTotals()), record, runsOf(`peer:${record.peer}`), prices)
-    if (!counts) continue
     const day = record.ts.slice(0, 10)
-    const entry = days.get(day) ?? { day, requests: 0, byKey: {} }
+    let totals = dayTotals.get(day)
+    if (!totals) dayTotals.set(day, (totals = emptyTotals()))
+    add(totals, record, runsOf(`day:${day}`), prices)
+    if (!counts) continue
+    const entry = days.get(day) ?? { day, requests: 0, byKey: {}, failed: 0, tokens: 0, ms: 0 }
     entry.requests++
     entry.byKey[record.key] = (entry.byKey[record.key] ?? 0) + 1
     days.set(day, entry)
+  }
+  for (const entry of days.values()) {
+    const totals = dayTotals.get(entry.day)
+    if (!totals) continue
+    entry.failed = totals.failed
+    entry.tokens = totals.promptTokens + totals.completionTokens
+    entry.ms = totals.ms
   }
   summary.byDay = [...days.values()].sort((a, b) => a.day.localeCompare(b.day))
   return summary

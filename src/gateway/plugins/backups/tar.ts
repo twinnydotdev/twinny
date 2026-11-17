@@ -35,6 +35,16 @@ const splitName = (name: string): { name: string; prefix: string } => {
   throw new Error(`"${name}" is too long for a tar entry.`)
 }
 
+/** Whether a name fits a tar entry; one that does not is left out of an archive rather than failing it. */
+export const fitsTarName = (name: string): boolean => {
+  try {
+    splitName(name)
+    return true
+  } catch {
+    return false
+  }
+}
+
 const header = (entry: TarEntry): Buffer => {
   const block = Buffer.alloc(BLOCK)
   const { name, prefix } = splitName(entry.name)

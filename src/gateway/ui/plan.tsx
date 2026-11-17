@@ -61,7 +61,7 @@ export const PlanPage = ({ plan, onInstall, onRemove, onNavigate }: PlanPageProp
     <>
       <div className="page-title">
         <h2>Plan &amp; licence</h2>
-        <p>Seats are active keys. A licence raises the limit and switches on team features.</p>
+        <p>Seats are active keys. A licence sets the limit and switches on team features.</p>
       </div>
       {notice && <div className="success-bar">{notice}</div>}
       {error && <div className="error-bar">{error}</div>}
@@ -74,7 +74,8 @@ export const PlanPage = ({ plan, onInstall, onRemove, onNavigate }: PlanPageProp
           </div>
           <div className="plan-headline">
             {plan.org ? plan.org : "Free plan"}
-            {plan.expiresAt && (
+            {plan.lifetime && <span className="muted"> · for good</span>}
+            {plan.expiresAt && !plan.lifetime && (
               <span className={`muted ${left < 30 ? "revoked" : ""}`}>
                 {" "}
                 · {left < 0 ? `expired ${plural(-left, "day")} ago` : left === 0 ? "expires today" : `${plural(left, "day")} left`}
@@ -84,7 +85,7 @@ export const PlanPage = ({ plan, onInstall, onRemove, onNavigate }: PlanPageProp
           <p className={attention ? "plan-note attention" : "plan-note"}>{plan.message}</p>
           <div className="meter-row">
             <span className="meter-label">
-              <b>{fmt(plan.used)}</b> of <b>{fmt(plan.seats)}</b> seats used
+              <b>{fmt(plan.used)}</b> of <b>{fmt(plan.seats)}</b> {plan.seats === 1 ? "seat" : "seats"} used
             </span>
             <span className={`meter ${seatsBad ? "bad" : share >= 90 ? "warn" : ""}`}>
               <span className="meter-fill" style={{ width: `${share}%` }} />
@@ -108,7 +109,7 @@ export const PlanPage = ({ plan, onInstall, onRemove, onNavigate }: PlanPageProp
             {plan.expiresAt && (
               <>
                 <dt>Valid until</dt>
-                <dd>{plan.expiresAt.slice(0, 10)}</dd>
+                <dd>{plan.lifetime ? "For good" : plan.expiresAt.slice(0, 10)}</dd>
               </>
             )}
             {plan.email && (

@@ -10,7 +10,7 @@
  * there are more keys than seats, so a lapse never locks the operator
  * out: the admin key made on day one is the first one seated.
  */
-import { LicenseClaims } from "./format"
+import { isLifetime, LicenseClaims } from "./format"
 
 /** Active keys a gateway may have without a licence. */
 export const FREE_SEATS = 5
@@ -42,6 +42,8 @@ export interface Entitlements {
   org?: string
   licenseId?: string
   expiresAt?: string
+  /** The licence is for good: `expiresAt` is 2099 or later, which is the issuer's "never". */
+  lifetime?: boolean
   email?: string
   /** For `invalid`: why. For the others, a one-line account for a banner. */
   message: string
@@ -76,12 +78,14 @@ export const entitlementsFor = (license: LicenseInput | undefined, now = new Dat
     org: claims.org,
     licenseId: claims.id,
     expiresAt: claims.expiresAt,
+    ...(isLifetime(claims.expiresAt) ? { lifetime: true } : {}),
     ...(claims.email ? { email: claims.email } : {}),
     features: claims.features ?? []
   }
-  // The first five seats are free for everyone, so a licence can only add
-  // to them: a token for fewer never takes a team below the free plan.
-  const seats = Math.max(FREE_SEATS, claims.seats)
+  // While a licence applies, its seat count is the limit, with no floor. A
+  // licence for fewer seats than the free five (Personal, one seat) trades
+  // them for its features; removing the licence brings the free five back.
+  const seats = claims.seats
   const seatWord = `${seats} seat${seats === 1 ? "" : "s"}`
   if (t < issued) {
     return free("invalid", `The licence for ${claims.org} is not valid until ${claims.issuedAt.slice(0, 10)}; the free plan applies until then.`, base)
@@ -99,7 +103,9 @@ export const entitlementsFor = (license: LicenseInput | undefined, now = new Dat
     return {
       status: "licensed",
       seats,
-      message: `Licensed to ${claims.org}: ${seatWord} until ${claims.expiresAt.slice(0, 10)}.`,
+      message: isLifetime(claims.expiresAt)
+        ? `Licensed to ${claims.org}: ${seatWord}, for good.`
+        : `Licensed to ${claims.org}: ${seatWord} until ${claims.expiresAt.slice(0, 10)}.`,
       ...base
     }
   }

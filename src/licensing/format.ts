@@ -188,6 +188,18 @@ export const verifyLicenseToken = (token: string, trustedKeys: ReadonlyArray<str
   throw new LicenseError("bad-signature", "The licence signature does not match; the token was altered or was not issued by Twinny.")
 }
 
+/**
+ * A licence bought once carries an expiry so far off that it is not one:
+ * the token format has no "never", so the issuer writes the end of 2099.
+ * Anything from that year on is shown as "for good" rather than as a date.
+ */
+const LIFETIME_FROM = Date.UTC(2099, 0, 1)
+
+export const isLifetime = (expiresAt: string | undefined): boolean =>
+  expiresAt !== undefined && Date.parse(expiresAt) >= LIFETIME_FROM
+
 /** A token as it should be shown in logs: the id and org only, never the signature. */
 export const describeLicense = (claims: LicenseClaims): string =>
-  `${claims.org} (${claims.id}, ${claims.seats} seat${claims.seats === 1 ? "" : "s"}, until ${claims.expiresAt.slice(0, 10)})`
+  `${claims.org} (${claims.id}, ${claims.seats} seat${claims.seats === 1 ? "" : "s"}, ${
+    isLifetime(claims.expiresAt) ? "for good" : `until ${claims.expiresAt.slice(0, 10)}`
+  })`

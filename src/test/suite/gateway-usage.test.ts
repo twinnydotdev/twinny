@@ -49,6 +49,10 @@ suite("gateway usage summary", () => {
     assert.strictEqual(summary.byKeyAndModel.alice.embed.indexing.runs, 2)
     assert.strictEqual(summary.byDay[0].requests, 4)
     assert.deepStrictEqual(summary.byDay[0].byKey, { alice: 3, bob: 1 })
+    // The day carries what the page charts: time spent, failures, tokens.
+    assert.strictEqual(summary.byDay[0].ms, summary.total.ms)
+    assert.strictEqual(summary.byDay[0].failed, 0)
+    assert.strictEqual(summary.byDay[0].tokens, summary.total.promptTokens + summary.total.completionTokens)
     // A run's duration is its calls' added up.
     assert.strictEqual(summary.byKey.bob.ms, 100)
     assert.strictEqual(summary.byKey.alice.ms, 500 + 31 * 100)

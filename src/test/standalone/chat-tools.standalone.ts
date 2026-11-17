@@ -247,7 +247,7 @@ test("native calls go out as tools and come back as tool messages; the last requ
     shown,
     "> looked up `ModelWarmer` · 1 definition\n\n> read `src/warmer.ts:1–1`\n\n> tool call not understood · the arguments were not valid JSON\n\nIn src/warmer.ts:1."
   )
-  assert.deepStrictEqual(requests[0].tools?.map((t) => t.name), ["list_dir", "find_files", "read_file", "grep", "find_symbol"])
+  assert.deepStrictEqual(requests[0].tools?.map((t) => t.name), ["list_dir", "find_files", "read_file", "grep", "find_symbol", "update_tasks"])
   assert.doesNotMatch(requests[0].messages[0].content as string, /```tool/)
   const second = requests[1].messages
   assert.deepStrictEqual(
@@ -350,7 +350,7 @@ test("edit_file plans against the open buffer and hands the change to the sink",
     name: "edit_file",
     args: { path: "src/warmer.ts", find: "unsaved() {}", replace: "saved() {}" }
   })
-  assert.strictEqual(result.output, "Applied.")
+  assert.match(result.output, /^Applied\.\nLines 1–\d are now:\n1: /, "the lines as they are now come back with it")
   assert.strictEqual(result.summary, "edited `src/warmer.ts:2`")
   assert.ok(!result.final)
   assert.deepStrictEqual(edited, [{ file: path.join(root, "src", "warmer.ts"), startLine: 1, text: "  saved() {}" }])

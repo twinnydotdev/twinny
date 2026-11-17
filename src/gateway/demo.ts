@@ -96,7 +96,8 @@ export const capOutputTokens = (
 ): RemoteRouteTarget => {
   const cap = <T extends { maxTokens?: number }>(request: T): T => ({
     ...request,
-    maxTokens: Math.min(request.maxTokens ?? max, max)
+    // Zero or less means "no limit" to most servers, which is the one thing a cap must not pass on.
+    maxTokens: request.maxTokens !== undefined && request.maxTokens > 0 ? Math.min(request.maxTokens, max) : max
   })
   const client: InferenceClient = Object.create(target.client)
   client.fim = (request, options) => target.client.fim(cap(request), options)

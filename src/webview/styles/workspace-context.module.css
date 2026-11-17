@@ -1,13 +1,11 @@
 /*
  * The workspace search behind a reply. One quiet line under the "twinny"
- * label; the sources unfold beneath it on request. Same idiom as the
- * thinking section: a left rule, small tracked type, nothing boxed.
+ * label; the sources unfold beneath it on request. Small type, nothing
+ * round it, like the tool steps.
  */
 .panel {
   position: relative;
-  margin: -2px 0 10px;
-  padding-left: 10px;
-  border-left: 1px solid var(--tw-rule);
+  margin: 0 0 10px;
   font-size: var(--tw-fs-sm);
 }
 
@@ -360,13 +358,14 @@
   display: flex;
   flex-direction: column;
   margin: 3px 0 0;
-  padding: 0 0 0 10px;
-  border-left: 1px solid var(--tw-rule-soft);
+  padding: 6px 10px;
   color: var(--tw-fg-dim);
   font-family: var(--tw-mono);
   font-size: var(--tw-fs-xs);
   line-height: 1.5;
   overflow: hidden;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 
 .previewLine {

@@ -13,6 +13,7 @@ import { BitbucketForge } from "../../gateway/plugins/bitbucket"
 import { discordPayload } from "../../gateway/plugins/discord"
 import { splitUnifiedDiff } from "../../gateway/plugins/forge"
 import { GiteaForge } from "../../gateway/plugins/gitea"
+import { withoutQuickActions } from "../../gateway/plugins/gitlab"
 import type { PluginContext } from "../../gateway/plugins/host"
 import { PullsPlugin } from "../../gateway/plugins/pulls"
 import { teamsPayload } from "../../gateway/plugins/teams"
@@ -62,6 +63,16 @@ const context = (name: string): PluginContext => {
   return { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now }
 }
 const req = (method: string, route: string, body: Record<string, unknown> = {}) => ({ method, path: route, query: new URLSearchParams(), body: async () => body, principal: "op" })
+
+suite("GitLab notes", () => {
+  test("a line that would run as a quick action is escaped, except inside a code block", () => {
+    const body = "Looks fine.\n/approve\n  /label ~bug\nsee src/a.ts and /etc/hosts\n```sh\n/close\n```\n/merge"
+    assert.strictEqual(
+      withoutQuickActions(body),
+      "Looks fine.\n\\/approve\n  \\/label ~bug\nsee src/a.ts and /etc/hosts\n```sh\n/close\n```\n\\/merge"
+    )
+  })
+})
 
 suite("Unified diff splitter", () => {
   test("one entry per file with status, rename and counts", () => {

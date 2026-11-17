@@ -247,7 +247,10 @@ suite("Demo helpers and serve flags", () => {
     call.fim({ maxTokens: 4000 })
     call.chat({})
     call.chat({ maxTokens: 64 })
-    assert.deepStrictEqual(seen, [256, 256, 64])
+    // Zero or less means "no limit" to most servers: the cap stands in for it.
+    call.chat({ maxTokens: -1 })
+    call.fim({ maxTokens: 0 })
+    assert.deepStrictEqual(seen, [256, 256, 64, 256, 256])
     assert.strictEqual(capped.client.id, "fake")
   })
 

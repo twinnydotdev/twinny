@@ -21,7 +21,7 @@ import { SERVER_VERSION } from "../../version"
 import type { GatewayPaths } from "../host"
 
 import { decryptArchive, encryptArchive, isEncryptedArchive } from "./crypto"
-import { packTar, TarEntry, unpackTar } from "./tar"
+import { fitsTarName, packTar, TarEntry, unpackTar } from "./tar"
 
 export interface ManifestFile {
   path: string
@@ -114,6 +114,8 @@ const snapshotSqlite = (file: string): Buffer => {
 export const collectFiles = (paths: GatewayPaths, includeRecordings: boolean): TarEntry[] => {
   const entries: TarEntry[] = []
   const add = (name: string, file: string) => {
+    // A path too long for a tar entry is left out; the rest of the backup is worth more than it.
+    if (!fitsTarName(name)) return
     let data: Buffer
     let stat: fs.Stats
     try {
@@ -135,6 +137,8 @@ export const collectFiles = (paths: GatewayPaths, includeRecordings: boolean): T
     (usageInside !== undefined && (rel === usageInside || rel.startsWith(`${usageInside}/`))) ||
     (recordingsInside !== undefined && (rel === recordingsInside || rel.startsWith(`${recordingsInside}/`))) ||
     (rel.startsWith("plugins/backups/") && rel !== "plugins/backups/settings.json") ||
+    // Clones the shared-context plugin can fetch again, and the index built from them: large, and not the team's data.
+    rel.startsWith("plugins/context/repos/") ||
     rel.endsWith(".tmp") ||
     isSqliteSidecar(rel)
   ))

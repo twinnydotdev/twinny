@@ -29,6 +29,7 @@ export interface PlanSummary {
   org?: string
   licenseId?: string
   expiresAt?: string
+  lifetime?: boolean
   email?: string
   message: string
 }

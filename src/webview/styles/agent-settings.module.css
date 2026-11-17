@@ -14,9 +14,11 @@
   gap: 6px;
   /* As wide as the input it opens from, up to a comfortable line. */
   max-width: 420px;
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
   background: var(--tw-bg);
-  border: 1px solid var(--tw-rule);
+  border: 1px solid var(--tw-rule-soft);
+  border-radius: var(--tw-radius-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
   font-size: var(--tw-fs-sm);
 }
 
@@ -56,7 +58,10 @@
 
 .label {
   min-width: 0;
+  overflow: hidden;
   color: var(--tw-fg-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .choices,
@@ -72,9 +77,9 @@
 }
 
 .choice {
-  padding: 1px 6px;
+  padding: 2px 9px;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: 999px;
   background: none;
   color: var(--tw-fg-faint);
   font: inherit;
@@ -90,8 +95,7 @@
 
 .chosen,
 .chosen:hover:not(:disabled) {
-  border-color: var(--tw-rule);
-  background: color-mix(in srgb, var(--tw-fg) 8%, transparent);
+  background: var(--tw-fill-strong);
   color: var(--tw-fg);
 }
 
@@ -124,4 +128,34 @@
 .more {
   align-self: flex-start;
   margin-top: 2px;
+}
+
+/* A pick from a list, or a name typed, set like the choices beside it. */
+.select {
+  flex: 0 1 200px;
+  min-width: 0;
+  max-width: 60%;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill-strong);
+  color: var(--tw-fg);
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+.select:focus-visible {
+  outline: 1px solid var(--tw-fg-faint);
+}
+
+.select option {
+  background: var(--vscode-dropdown-background, var(--tw-bg));
+  color: var(--vscode-dropdown-foreground, var(--tw-fg));
+}
+
+/* What is in force, said under the rows that decide it. */
+.note {
+  color: var(--tw-fg-faint);
+  font-size: var(--tw-fs-xs);
+  overflow-wrap: anywhere;
 }

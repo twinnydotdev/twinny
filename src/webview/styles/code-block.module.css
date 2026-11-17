@@ -1,14 +1,14 @@
 /*
- * Code blocks are the one place the transcript is allowed extra weight: a
- * hairline frame and a slightly lifted ground, no radius, no shadow. The
- * header strip (language + actions) is part of the frame, not a float above
- * it, so the buttons always have a home and never drift.
+ * A code block is a card: a ground a shade off the page, rounded, with no
+ * line round it. The header strip (language + actions) is part of the card,
+ * not a float above it, so the buttons always have a home and never drift.
  */
 pre {
   margin: 12px 0;
   padding: 10px 12px;
-  border: 1px solid var(--tw-rule);
-  background: var(--tw-surface) !important;
+  border: 0;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill) !important;
   overflow-x: auto;
   font-family: var(--tw-mono) !important;
   font-size: var(--tw-fs-mono) !important;
@@ -30,9 +30,14 @@ pre code * {
 .codeBlock {
   position: relative;
   margin: 12px 0;
-  border: 1px solid var(--tw-rule);
-  background: var(--tw-surface);
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
   container-type: inline-size;
+}
+
+.codeBlock pre {
+  border-radius: 0 0 var(--tw-radius) var(--tw-radius);
+  background: transparent !important;
 }
 
 /* The light highlighter style draws its own frame inline; the block's frame is the only one. */
@@ -53,10 +58,11 @@ pre code * {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 24px;
-  padding: 0 4px 0 10px;
-  border-bottom: 1px solid var(--tw-rule-soft);
-  background: var(--tw-bg);
+  min-height: 28px;
+  padding: 0 6px 0 12px;
+  border-radius: var(--tw-radius) var(--tw-radius) 0 0;
+  /* Opaque, since it rides over the code while a long block scrolls past. */
+  background: color-mix(in srgb, var(--vscode-foreground) 9%, var(--tw-bg));
   color: var(--tw-fg-faint);
   font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);
@@ -122,9 +128,13 @@ pre code * {
   }
 }
 
+.action {
+  border-radius: var(--tw-radius-sm);
+}
+
 .action:hover {
   color: var(--tw-fg);
-  background: var(--tw-surface);
+  background: var(--tw-fill-strong);
 }
 
 .action:focus-visible {

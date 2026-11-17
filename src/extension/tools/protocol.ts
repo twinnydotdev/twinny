@@ -364,11 +364,36 @@ export const findToolCall = (text: string, ended = false): FoundCall | undefined
   return { ...found, ...outcome(parsed) }
 }
 
+/**
+ * A call written as code in an ordinary fenced block, by a model copying
+ * the look of the conversation so far (replies full of ```js blocks):
+ *
+ *     ```js
+ *     edit_file({"path": "a.ts", "find": "x", "replace": "y"})
+ *     ```
+ *
+ * Read only once the reply has ended, only from its last block, and only
+ * when the block is nothing but a call to one of the tools by name, so
+ * code the model is showing the user is never run as one.
+ */
+export const findFencedCall = (text: string, toolNames: ReadonlySet<string>): FoundCall | undefined => {
+  const blocks = [...text.matchAll(/```[\w-]*\n([\s\S]*?)\n?```/g)]
+  const last = blocks[blocks.length - 1]
+  if (!last || last.index === undefined) return undefined
+  const body = last[1].trim()
+  const name = /^([A-Za-z_][\w.-]*)\s*[({]/.exec(body)?.[1]
+  if (!name || !toolNames.has(name)) return undefined
+  const call = parseCallSyntax(body)
+  return call ? { start: last.index, end: last.index + last[0].length, call } : undefined
+}
+
 export interface ToolParameter {
   name: string
   description: string
   optional?: boolean
-  type?: "string" | "integer"
+  type?: "string" | "integer" | "boolean"
+  /** The argument's own JSON schema, when it is more than one value (a list). */
+  schema?: Record<string, unknown>
 }
 
 export interface ToolSpec {
@@ -383,6 +408,11 @@ export interface ToolSpec {
    * Live editor state (diagnostics, the open file) is not.
    */
   readOnly?: boolean
+  /**
+   * Changes the workspace or runs something in it: what a reply did, as
+   * opposed to what it looked at, and kept on record as such.
+   */
+  acts?: boolean
   /**
    * The arguments' JSON schema as the tool's maker wrote it (an MCP
    * server's), sent as it is to providers with native tool-calling;
@@ -406,7 +436,7 @@ export const toolDefinition = (tool: ToolSpec) => ({
   parameters: tool.schema ?? {
     type: "object",
     properties: Object.fromEntries(
-      tool.parameters.map((p) => [p.name, { type: p.type ?? "string", description: p.description }])
+      tool.parameters.map((p) => [p.name, { ...(p.schema ?? { type: p.type ?? "string" }), description: p.description }])
     ),
     required: tool.parameters.filter((p) => !p.optional).map((p) => p.name)
   }

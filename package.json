@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.16",
+  "version": "4.3.21",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -608,6 +608,12 @@
           "default": true,
           "markdownDescription": "Load the completion model when VS Code starts or regains focus, so the first completion does not wait for a cold model. Only for local model servers (Ollama, LM Studio, llama.cpp); hosted APIs are never called."
         },
+        "twinny.prefetchNextCompletion": {
+          "order": 17,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "While a suggestion is on screen, ask the model for the completion on the line after it, so that accepting the suggestion and pressing Enter shows the next one at once. Only for local model servers (Ollama, LM Studio, llama.cpp); hosted APIs and team gateways are never asked ahead of time."
+        },
         "twinny.ollamaUseTls": {
           "order": 18,
           "type": "boolean",
@@ -640,7 +646,7 @@
           "order": 19,
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Shows grey text ahead of the cursor in the chat composer; `Tab` accepts it and `Ctrl+→` accepts a word of it. It finishes words from what you have typed before, as a phone keyboard does, and once a conversation has an exchange, a pause after a word asks the chat model for the rest of the message given the last few turns. No requests are made while a reply is coming."
+          "markdownDescription": "Shows grey text ahead of the cursor in the chat composer; `Tab` accepts it and `Ctrl+→` accepts a word of it. It finishes words from what you have typed before, and a short pause anywhere in a message asks a model for the rest of it, given the last few turns; three dots after the cursor show while it is asked. No requests are made while a reply is coming. The composer's settings (the text-size button beside Send) choose words, sentences or both, which model writes the sentences, and the size of the text; a choice made there takes the place of this setting."
         },
         "twinny.chatTools": {
           "order": 20,
@@ -725,6 +731,13 @@
           "minimum": 4,
           "maximum": 40,
           "markdownDescription": "How many tool steps one agent reply may take before the model is asked to answer with what it has (with `#twinny.chatTools#` on). More lets a capable model finish longer tasks in one reply; each step is another request to the model.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsTasks": {
+          "order": 20,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Let the model keep a task list for work with several parts (with `#twinny.chatTools#` on). The list shows in the reply as it is ticked off, and is put back in front of the model when a reply runs out of steps or the next turn begins.",
           "scope": "machine"
         },
         "twinny.chatToolsCommandsRunIn": {
@@ -832,7 +845,7 @@
     "classnames": "^2.5.1",
     "dompurify": "^3.2.3",
     "fastest-levenshtein": "^1.0.16",
-    "fluency.js": "^1.0.31",
+    "fluency.js": "^1.0.33",
     "fuse.js": "^7.0.0",
     "handlebars": "^4.7.8",
     "handlebars-loader": "^1.7.3",

@@ -31,11 +31,12 @@ import {
 } from "../inference"
 import { hostedTakesTools } from "../inference/adapters/fluency"
 
-import { ContextPlan, fitResult, planContext, TokenEstimator, trimmedResult } from "./budget"
+import { compactHistory, ContextPlan, fitResult, MIN_TRIMMABLE_CHARS, planContext, TokenEstimator, trimmedResult } from "./budget"
 import { instructionsSection } from "./instructions"
 import {
   displayableLength,
   FINAL_ANSWER_PROMPT,
+  findFencedCall,
   findToolCall,
   FoundCall,
   nameArguments,
@@ -43,8 +44,9 @@ import {
   ToolCall,
   toolDefinition,
   toolInstructions,
-  toolResultMessage
-} from "./protocol"
+  toolResultMessage,
+  ToolSpec} from "./protocol"
+import { parseTasks, renderTasks, sameTasks, Task, TASKS_TOOL, TASKS_TOOL_NAME, tasksProgress } from "./tasks"
 import { ToolResult, WorkspaceTools } from "./workspace"
 
 export const DEFAULT_MAX_STEPS = DEFAULT_AGENT_STEPS
@@ -151,6 +153,15 @@ export interface ToolLoopOptions {
   onFallback?(reason: string, what: "tools" | "reasoning-effort"): void
   /** Called when old results were trimmed so the next request fits. */
   onTrim?(results: number, estimatedTokens: number): void
+  /** Called when the conversation was too long for the context and its oldest messages were folded into a few lines. */
+  onCompact?(messages: number): void
+  /**
+   * Whether the model gets `update_tasks`, to keep a list of steps for
+   * work with several parts. On by default.
+   */
+  tasks?: boolean
+  /** Called with the list each time the model writes or updates it. */
+  onTasks?(tasks: Task[]): void
   /**
    * Asked before each request after the first: messages the user sent
    * while the reply was working, handed over (and so taken) for the
@@ -209,12 +220,15 @@ const withToolPrompt = (messages: ChatMessage[], section: string): ChatMessage[]
  * some servers refuse two user turns in a row; as a turn of its own after
  * a native tool result.
  */
-const withClosingPrompt = (messages: ChatMessage[]): ChatMessage[] => {
+const withClosingPrompt = (messages: ChatMessage[], prompt: string): ChatMessage[] => {
   const final = messages[messages.length - 1]
   return final?.role === USER && typeof final.content === "string"
-    ? [...messages.slice(0, -1), { ...final, content: `${final.content}\n\n${FINAL_ANSWER_PROMPT}` }]
-    : [...messages, { role: USER, content: FINAL_ANSWER_PROMPT }]
+    ? [...messages.slice(0, -1), { ...final, content: `${final.content}\n\n${prompt}` }]
+    : [...messages, { role: USER, content: prompt }]
 }
+
+/** What a reply did, as the record has it, at most this many lines of it. */
+const MAX_LEDGER_LINES = 20
 
 const stepLine = (summary: string) => `> ${summary}\n\n`
 
@@ -381,6 +395,8 @@ interface ResultSlot {
   trimmed: boolean
   /** A folder's instructions ahead of the output: kept when the output is trimmed. */
   preface?: string
+  /** The tool's own account of the result, which stands in for it when trimmed. */
+  digest?: string
   /** What follows the result in its message (the user's words mid-reply, in text mode): kept when it is trimmed. */
   after?: string
 }
@@ -410,6 +426,12 @@ class ToolLoop {
   private _unreadable = 0
   /** Set when the model goes round in circles: the next request asks for its answer. */
   private _stuck = false
+  /** The workspace's tools and the loop's own. */
+  private readonly _tools: ToolSpec[]
+  /** The model's list of steps, once it has written one. */
+  private _tasks: Task[] = []
+  /** What the reply did (edits, files made or moved, commands), a line each, in order. */
+  private readonly _acted: string[] = []
 
   constructor(
     private readonly _client: InferenceClient,
@@ -418,6 +440,7 @@ class ToolLoop {
   ) {
     this._mode = _options.mode ?? "text"
     this._effort = _options.reasoningEffort
+    this._tools = _options.tasks === false ? _workspace.tools : [..._workspace.tools, TASKS_TOOL]
   }
 
   async *run(request: ChatRequest, options?: InferenceOptions): AsyncGenerator<ChatChunk> {
@@ -432,18 +455,82 @@ class ToolLoop {
   }
 
   private prompt(request: ChatRequest) {
-    const { tools, orientation, instructions } = this._workspace
+    const { orientation, instructions } = this._workspace
     return withToolPrompt(
       request.messages,
-      [toolInstructions(tools, orientation, this._mode === "native"), ...(instructions ? [instructionsSection(instructions)] : [])].join("\n\n")
+      [toolInstructions(this._tools, orientation, this._mode === "native"), ...(instructions ? [instructionsSection(instructions)] : [])].join("\n\n")
     )
+  }
+
+  /**
+   * The request with a conversation that has outgrown the model's context
+   * folded at its old end, so the system prompt, the tools and the newest
+   * turns all reach the model whole.
+   */
+  private async compacted(request: ChatRequest, definitionChars: number): Promise<ChatRequest> {
+    const plan = await this.plan()
+    if (!plan) return request
+    const extra = charsOf(this.prompt({ ...request, messages: [] })) + (this._mode === "native" ? definitionChars : 0)
+    const { messages, folded } = compactHistory(request.messages, plan, (chars) => this._estimator.tokens(chars + extra))
+    if (!folded) return request
+    this._options.onCompact?.(folded)
+    return { ...request, messages }
+  }
+
+  private async plan(): Promise<ContextPlan | undefined> {
+    let window: number | undefined
+    try {
+      window = await this._options.contextWindow?.()
+    } catch {
+      window = undefined
+    }
+    this._plan = window && window > 0 ? planContext(window) : undefined
+    return this._plan
+  }
+
+  /** The closing request's instruction, with what the record says was done and what the model's list still has open. */
+  private closingPrompt() {
+    const open = this._tasks.filter((task) => !task.done)
+    return [
+      FINAL_ANSWER_PROMPT,
+      ...(this._acted.length
+        ? [`What you did in this reply, from the record:\n${this._acted.slice(-MAX_LEDGER_LINES).map((line) => `- ${line}`).join("\n")}`]
+        : []),
+      ...(open.length ? [`Still open on your list:\n${renderTasks(open)}`] : [])
+    ].join("\n\n")
+  }
+
+  /** The model's list, written or updated: kept, shown to the user, and answered with what is next. */
+  private updateTasks(call: ToolCall): ToolResult {
+    const tasks = parseTasks(call.args.tasks ?? Object.values(call.args)[0])
+    if (!tasks) {
+      return {
+        output: "update_tasks needs the list: one step per line, `[ ] step` or `[x] step`.",
+        summary: "tasks · no list given",
+        failed: true
+      }
+    }
+    const unchanged = sameTasks(tasks, this._tasks)
+    if (unchanged) this._repeats++
+    this._tasks = tasks
+    this._options.onTasks?.(tasks)
+    const next = tasks.find((task) => !task.done)
+    return {
+      output: unchanged
+        ? `The list is the same as before. ${next ? `Do the next step now: ${next.text}` : "Every step is done: tell the user what you did."}`
+        : next
+          ? `Saved (${tasksProgress(tasks)}). Next: ${next.text}`
+          : `Saved. All ${tasks.length} steps are done: check your work if you have not, then tell the user what you did.`,
+      summary: `tasks · ${tasksProgress(tasks)}`
+    }
   }
 
   private async *steps(request: ChatRequest, options?: InferenceOptions): AsyncGenerator<ChatChunk> {
     const maxSteps = this._options.maxSteps ?? DEFAULT_MAX_STEPS
     const outer = options?.signal
-    const definitions = this._workspace.tools.map(toolDefinition)
+    const definitions = this._tools.map(toolDefinition)
     const definitionChars = JSON.stringify(definitions).length
+    request = await this.compacted(request, definitionChars)
     this._messages = this.prompt(request)
 
     // Set once a tool's result says to answer now (an edit waits for review).
@@ -454,10 +541,10 @@ class ToolLoop {
       const native = this._mode === "native"
       // The last request offers nothing to call, so the model answers.
       const tools = native && !last ? definitions : undefined
-      const closing = last && !settled
+      const closing = last && !settled ? this.closingPrompt() : undefined
 
-      await this.fit((tools ? definitionChars : 0) + (closing ? FINAL_ANSWER_PROMPT.length : 0))
-      const sent = closing ? withClosingPrompt(this._messages) : this._messages
+      await this.fit((tools ? definitionChars : 0) + (closing?.length ?? 0))
+      const sent = closing ? withClosingPrompt(this._messages, closing) : this._messages
       const promptChars = charsOf(sent) + (tools ? definitionChars : 0)
       this._options.onRequest?.(promptChars, step, this._mode, this._estimator.tokens(promptChars))
 
@@ -543,6 +630,8 @@ class ToolLoop {
 
       const nativeCalls = native && !last ? this.nativeCalls(reply.toolCalls) : []
       if (!nativeCalls.length) found ??= findToolCall(reply.text, true)
+      // A model that has taken up the conversation's own way of showing code writes its call in a ```js block.
+      if (!nativeCalls.length && !last) found ??= findFencedCall(reply.text, new Set(this._tools.map((tool) => tool.name)))
       // What the model wrote, before a text call is cut out of it for the
       // conversation: the prose ahead of the call is shown from this.
       const written = reply.text
@@ -591,9 +680,13 @@ class ToolLoop {
         const id = `${step}.${i}`
         const name = pending.call?.name ?? pending.raw?.name ?? "unknown"
         this._options.onToolStart?.({ id, name, args: pending.call?.args ?? {} })
-        const key = pending.call ? this.answerKey(pending.call) : undefined
+        const listing = pending.call?.name === TASKS_TOOL_NAME && this._tools.includes(TASKS_TOOL)
+        const key = pending.call && !listing ? this.answerKey(pending.call) : undefined
         // Anything that may change the workspace makes every earlier read stale.
-        if (pending.call && !key) this._answered.clear()
+        if (pending.call && !key && !listing) this._answered.clear()
+        // Calls made together share a result's room, so the next request
+        // has all of them rather than trimming the ones just asked for.
+        const share = this._plan ? Math.max(MIN_RESULT_CHARS, Math.floor(this._plan.resultChars / calls.length)) : undefined
         const earlier = key ? this._answered.get(key) : undefined
         // A result trimmed out of the context is gone from the model's view, and is run again.
         const repeated = earlier && !earlier.slot?.trimmed ? earlier : undefined
@@ -611,7 +704,12 @@ class ToolLoop {
                   "so it was not run again: its result is above. Use that, or try something different.",
                 summary: `${repeated.summary} · repeated, not run again`
               }
-            : await this.runCall(pending.call, outer)
+            : listing
+              ? this.updateTasks(pending.call)
+              : await this.runCall(pending.call, outer, share)
+        if (pending.call && !repeated && !ran.failed && this._tools.find((tool) => tool.name === name)?.acts) {
+          this._acted.push(ran.summary)
+        }
         // A read that failed (a search that ran out of time, a language
         // server still starting) is worth trying again, so it is not kept.
         keys.push(repeated || ran.failed ? undefined : key)
@@ -621,11 +719,7 @@ class ToolLoop {
             ? `\n(${left} more ${left === 1 ? "call" : "calls"} in the same reply ${left === 1 ? "was" : "were"} not run; make ${left === 1 ? "it" : "them"} again if still needed.)`
             : ""
         const { preface } = ran
-        // Calls made together share a result's room, so the next request
-        // has all of them rather than trimming the ones just asked for.
-        const room = this._plan
-          ? Math.max(MIN_RESULT_CHARS, Math.floor(this._plan.resultChars / calls.length) - (preface?.length ?? 0))
-          : undefined
+        const room = share ? Math.max(MIN_RESULT_CHARS, share - (preface?.length ?? 0)) : undefined
         const result: ToolResult = {
           ...ran,
           output: (room ? fitResult(ran.output, room) : ran.output) + note || "(no output)"
@@ -667,7 +761,7 @@ class ToolLoop {
 
   /** A read-only call by its name and arguments, so the same one asked twice is known; undefined for any other call. */
   private answerKey(call: ToolCall): string | undefined {
-    if (!this._workspace.tools.find((tool) => tool.name === call.name)?.readOnly) return undefined
+    if (!this._tools.find((tool) => tool.name === call.name)?.readOnly) return undefined
     const args = Object.entries(call.args)
       .map(([name, value]) => [name, value.trim()])
       .filter(([, value]) => value)
@@ -699,8 +793,8 @@ class ToolLoop {
   }
 
   /** A tool's result, or a cancellation the moment the user stops the reply: no tool is waited on past that. */
-  private async runCall(call: ToolCall, signal?: AbortSignal): Promise<ToolResult> {
-    const work = this._workspace.run(call, { signal })
+  private async runCall(call: ToolCall, signal?: AbortSignal, roomChars?: number): Promise<ToolResult> {
+    const work = this._workspace.run(call, { signal, ...(roomChars ? { roomChars } : {}) })
     if (!signal) return work
     work.catch(() => undefined)
     if (signal.aborted) throw cancelled(signal.reason)
@@ -732,14 +826,7 @@ class ToolLoop {
    * last, until it is comfortably inside.
    */
   private async fit(extraChars: number) {
-    let window: number | undefined
-    try {
-      window = await this._options.contextWindow?.()
-    } catch {
-      window = undefined
-    }
-    this._plan = window && window > 0 ? planContext(window) : undefined
-    const plan = this._plan
+    const plan = await this.plan()
     if (!plan) return
     const estimate = () => this._estimator.tokens(charsOf(this._messages) + extraChars)
     if (estimate() <= plan.limit) return
@@ -754,6 +841,9 @@ class ToolLoop {
       for (const slot of this._results) {
         if (slot.trimmed || !eligible(slot)) continue
         if (estimate() <= plan.target) break
+        // A short result (an edit made, a command's exit code) is the record
+        // of the work, and trimming it would free nothing.
+        if (textOf(this._messages[slot.message]?.content).length < MIN_TRIMMABLE_CHARS) continue
         this.trim(slot)
         trimmed++
       }
@@ -773,8 +863,8 @@ class ToolLoop {
     const { preface } = slot
     const kept =
       preface && output.startsWith(preface)
-        ? `${preface}\n\n${trimmedResult(output.slice(preface.length).trimStart())}`
-        : trimmedResult(output)
+        ? `${preface}\n\n${trimmedResult(output.slice(preface.length).trimStart(), slot.digest)}`
+        : trimmedResult(output, slot.digest)
     this._messages[slot.message] = (
       message.role === "tool" ? { ...message, content: kept } : { ...message, content: toolResultMessage(slot.name, kept) + after }
     ) as ChatMessage
@@ -784,7 +874,13 @@ class ToolLoop {
   /** The calls made and what they returned, cut to a size worth carrying into the next turn. */
   private notes(): string | undefined {
     if (!this._record.length) return undefined
-    const budget = this._plan?.notesChars ?? 6000
+    // What was done and what the list still holds come first and whole:
+    // they are what the next turn most needs, and they are short.
+    const head = [
+      ...(this._tasks.length ? [`Your task list (${tasksProgress(this._tasks)}):\n${renderTasks(this._tasks)}`] : []),
+      ...(this._acted.length ? [`What that reply did:\n${this._acted.slice(-MAX_LEDGER_LINES).map((line) => `- ${line}`).join("\n")}`] : [])
+    ].join("\n\n")
+    const budget = Math.max(600, (this._plan?.notesChars ?? 6000) - head.length)
     const each = Math.max(200, Math.min(1200, Math.floor(budget / this._record.length) - 100))
     const blocks = this._record.map((entry) =>
       "said" in entry
@@ -793,7 +889,7 @@ class ToolLoop {
     )
     // The latest calls say where the work stands; when not all fit, they stay.
     while (blocks.length > 1 && blocks.join("\n\n").length > budget) blocks.shift()
-    return clipTo(blocks.join("\n\n"), budget)
+    return [...(head ? [head] : []), clipTo(blocks.join("\n\n"), budget)].join("\n\n")
   }
 
   private show(content: string): ChatChunk {
@@ -815,7 +911,7 @@ class ToolLoop {
 
   private textCall(found: FoundCall | undefined, reply: { text: string }, step: number): PendingCall[] {
     if (!found) return []
-    if (found.call) found.call = nameArguments(found.call, this._workspace.tools)
+    if (found.call) found.call = nameArguments(found.call, this._tools)
     const unread = found.call ? {} : { detail: found.detail, written: reply.text.slice(found.start, found.end) }
     if (this._mode === "native") {
       // Carried on as a native call, so the conversation stays in one form.
@@ -840,12 +936,13 @@ class ToolLoop {
     found: FoundCall | undefined,
     step: number
   ): ResultSlot[] {
-    const slot = (name: string, preface?: string): ResultSlot => ({
+    const slot = (name: string, result: ToolResult): ResultSlot => ({
       message: this._messages.length,
       step,
       name,
       trimmed: false,
-      ...(preface ? { preface } : {})
+      ...(result.preface ? { preface: result.preface } : {}),
+      ...(result.digest ? { digest: result.digest } : {})
     })
     const slots: ResultSlot[] = []
     if (this._mode === "native") {
@@ -861,7 +958,7 @@ class ToolLoop {
         }))
       } as ChatMessage)
       calls.forEach(({ raw }, i) => {
-        slots.push(slot(raw!.name, results[i].preface))
+        slots.push(slot(raw!.name, results[i]))
         this._messages.push({ role: "tool", tool_call_id: raw!.id, content: results[i].output } as ChatMessage)
       })
       this._results.push(...slots)
@@ -870,7 +967,7 @@ class ToolLoop {
     const name = calls[0].call?.name ?? "error"
     // A call read before its closing marker arrived is recorded closed.
     this._messages.push({ role: ASSISTANT, content: found?.unclosed ? `${text.trimEnd()}\n${found.unclosed}` : text })
-    slots.push(slot(name, results[0].preface))
+    slots.push(slot(name, results[0]))
     this._results.push(...slots)
     this._messages.push({ role: USER, content: toolResultMessage(name, results[0].output) })
     return slots

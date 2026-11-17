@@ -19,8 +19,9 @@
 
 .card {
   padding: 10px 12px 12px;
-  border: 1px solid var(--tw-rule);
-  background: var(--tw-surface);
+  border: 1px solid transparent;
+  border-radius: var(--tw-radius);
+  background: var(--tw-fill);
 }
 
 .cardHeader,
@@ -149,6 +150,7 @@
   padding: 10px 12px;
   border: 1px dashed var(--tw-rule);
   color: var(--tw-fg-dim);
+  border-radius: var(--tw-radius);
 }
 
 .field {

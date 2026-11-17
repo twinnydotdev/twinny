@@ -156,7 +156,14 @@ export class PeerRegistry extends EventEmitter {
   /** Starts the ping/verify ticker. Idempotent. */
   public start(): void {
     if (this._ticker) return
-    this._ticker = setInterval(() => this.tick(), this._options.pingIntervalMs ?? PEER_PING_INTERVAL_MS)
+    this._ticker = setInterval(() => {
+      // A key file that cannot be read this once must not end the process; the next tick asks again.
+      try {
+        this.tick()
+      } catch {
+        /* keep the timer going */
+      }
+    }, this._options.pingIntervalMs ?? PEER_PING_INTERVAL_MS)
     this._ticker.unref?.()
   }
 

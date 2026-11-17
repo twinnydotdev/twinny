@@ -55,6 +55,9 @@ export const EVENT_NAME = {
   twinnyUndoChanges: "twinny-undo-changes",
   twinnyOpenAgentSettings: "twinny-open-agent-settings",
   twinnyToolSteps: "twinny-tool-steps",
+  twinnyModelStatus: "twinny-model-status",
+  twinnyWarmModel: "twinny-warm-model",
+  twinnyStarter: "twinny-starter",
   twinnyUpdateContextItems: "twinny-update-context-items",
   twinnyWorkspaceSearch: "twinny-workspace-search"
 } as const

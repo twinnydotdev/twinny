@@ -2,6 +2,62 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.21 · 2026-11-12
+
+Extension: the grey suggestions in the chat composer work the way a mail composer's do, show when they are being written, and have settings of their own.
+
+- **Suggestions from the first message, in the middle of a word too.** A short pause anywhere in a message asks a model for the rest of it. Until now it was asked only once a conversation had a reply, only after a space, and after a longer pause, so in practice it rarely showed. A word left half typed is finished as part of the sentence ("how do I cen" → "ter a div?"), and nothing is offered once a sentence has ended.
+- **Three dots while a suggestion is being written.** They sit after the cursor from the moment the model is asked until its guess shows.
+- **Composer settings.** The text-size button beside Send opens a sheet like the agent's: suggestions off, words only, sentences only or both; which provider and model writes the sentences, the chat model unless another is picked; and the size of the text typed, 12 to 16px. Under the model it says which one is asked and how the last ask went: how long it took, that it gave nothing usable, or why it failed. A choice made there takes the place of `twinny.chatSuggestions`.
+- **The next word is no longer guessed.** After a space the composer used to offer the word that most often followed the last one. It was noise beside a sentence; words already begun are still finished.
+- **Fixed: a suggestion could repeat the whole message.** A model that mended a typo while reading the draft back had its entire reply shown as the suggestion. The suggestion is now placed by the draft's last words, and dropped when it cannot be placed.
+
+## 4.3.20 · 2026-11-11
+
+Extension: completions from a local model come back sooner, most of all on slower hardware.
+
+- **The model's server reuses more of each completion prompt.** A local server keeps its work on a prompt for as long as the next one begins the same way. The window of code before the cursor used to slide down a line with every new line typed, so each new line had the whole prompt read again; it now moves in steps of about twenty lines. Context files keep their order from one request to the next, and the definitions shown with a completion stay while the cursor is in the same part of a file, where they used to change line by line. With CodeLlama 7B on an RTX 3090 Ti, reading the prompt on a new line went from about 185 ms to 30 ms; on a laptop or a CPU the same saving is seconds. llama.cpp is now told to keep its prompt cache (`cache_prompt`), for servers too old to do so unasked.
+- **The next completion is ready when you accept one.** While a suggestion is on screen, the model is asked for the completion on the line after it. Accept the suggestion, or type it out, press Enter, and the next one shows at once, without the pause and the wait for the model. It is dropped the moment you go somewhere else. Only local model servers (Ollama, LM Studio, llama.cpp) are asked ahead of time, never a hosted API or a team gateway. Turn it off with `twinny.prefetchNextCompletion`.
+
+## 4.3.19 · 2026-11-10
+
+`twinny-server` release: a Personal licence holds the gateway to its one key, in place of the free five; removing it brings the five back. A licence that does not expire says "for good" instead of a date.
+
+## 4.3.18 · 2026-11-10
+
+Extension and `twinny-server`: agent mode gets more out of small local models, the chat follows a reply as it is written, the sidebar has a softer look, and the gateway has fixes from an audit.
+
+- **Long conversations fit the model's context.** When a conversation outgrows the context the model is loaded with, its oldest turns are folded into a few lines at the start, so the system prompt, the tools and the newest turns reach the model whole. Until now the server cut the conversation itself, and a local model at the end of a long chat lost the task it had just been given. Folding goes in blocks, so the start of the conversation stays the same for several turns and a local server keeps its cache of it. Plain chat is fitted the same way.
+- **Reads sized to the context.** `read_file` returns as much of a file as the context has room for (150 lines at 8k, up to 500 at 32k and above) in place of 150 lines whatever the model, so a file is read in one request more often. Where a read stops, it lists what is defined further down with line numbers, so the next read goes straight there.
+- **Trimmed results leave a digest.** When old tool results are trimmed to make room, a read keeps what it read and what is defined there, a search keeps where it matched, and a command keeps how it ended. Short results, such as an edit made, are no longer trimmed at all.
+- **`edit_file` does more in one call.** `replace_all` changes every place the text is; `edits` takes a list of changes to one file; `start_line` and `end_line` rewrite lines by number, refused with the current lines when the file changed since it was read. A finished edit returns the lines as they now are, so the next edit needs no read. An edit to a file the model has not read, with text that is nowhere in it, gets the file back in place of advice.
+- **A task list for longer work.** The model can keep a list of steps with `update_tasks`. It shows in the reply, ticked off as it goes, and is put back in front of the model when a reply runs out of steps or the next turn begins. Turn it off with `twinny.chatToolsTasks`.
+- **A record of what a reply did.** The edits, files and commands of a reply are kept as a short list: it is given to the model when a reply runs out of steps, so its summary matches what happened, and it heads the notes the next turn starts from.
+- **Tool calls written in a code block are run.** A model without native tool calling that writes its call inside an ordinary fenced block, instead of the format it was asked for, used to end the reply with nothing done. The call is now read from the block when it names a known tool.
+- **Fixed: the chat not following a reply as it is written.** The transcript fell behind during long code blocks and jumped back up when the reply ended. It now stays at the end until you scroll up, and stays where you are once you do.
+- **The chat says what the model's server knows, before you send.** The composer's footer shows a gauge once the conversation and the draft take a quarter of what the model is loaded to hold, says so from 80%, and warns when the message will not fit. When a local model is not in memory, a **Load model** button loads it in the background so the first reply does not wait; Ollama and LM Studio say whether it is.
+- **A first screen with something to do.** The empty chat shows the context the model is loaded with and whether it is in memory and on the GPU, and offers three first questions (**Explain this file**, **Find bugs**, **Write tests**) about the open file or the selection, cut to what the model's context holds.
+- **A softer sidebar.** Rounded corners and filled surfaces in place of outlined boxes across the chat, providers, history and embeddings tabs: user messages are a soft block, code blocks and approvals are cards, the composer is a rounded field with a solid send button, and tool steps are easier to read.
+- **A livelier Overview on the admin page.** Each tile shows how the period compares with the one before and draws its days as a line. The chart switches between requests, tokens and failures, and pointing at a day shows who asked, how many failed, the tokens and the average latency. The usage API gains per-day failures, tokens and time, and `compare=previous` for the totals of the period before.
+- **Fixed: a refused WebSocket upgrade could stop `twinny-server`.** A caller that reset the connection while its upgrade was being refused ended the process; no key was needed.
+- **Fixed: stalled requests holding the gateway's request slots.** A request whose body never arrived, or whose reader stopped reading, was not ended by the request deadline and kept its slot.
+- **Fixed: demo keys joining the team pool.** A demo's visitor and guest keys can no longer connect as a shared computer.
+- **Fixed: `limits.maxOutputTokens` bypassed by a `maxTokens` of zero or less.**
+- **Fixed: a removed review model stopping the gateway.** A review alias that no longer exists falls back to the first chat model, and background reviews that fail are logged. A failed automatic review is tried once per commit, not every minute.
+- **Other gateway fixes.** A bad `since` on the audit and recordings lists answers 400; request metrics no longer grow a series per unknown model name; the SSO landing page shows provider errors as text, and one address cannot fill the sign-in list; GitLab notes cannot run quick actions such as `/approve`; backups leave out shared-context clones and skip paths too long for an archive; GitHub issues are found on repositories with many open pull requests; developers post a triage reply once.
+- **Supporting twinny means buying a licence.** The READMEs, the GitHub sponsor button and the [Support twinny](https://docs.twinny.dev/reference/support/) page point to [twinny.dev's pricing](https://twinny.dev/#pricing) in place of donation addresses.
+- **A Personal licence: $29 once.** One person gets policy, recording and plugins on their own gateway, with one key that works on all their machines, for good. Gateways from 4.3.19 hold a Personal licence to that one key. Buy it at [twinny.dev](https://twinny.dev/#pricing); see [Licensing and seats](https://docs.twinny.dev/teams/licensing/).
+
+## 4.3.17 · 2026-11-09
+
+Extension and `twinny-server` release: current models for hosted providers, completions no longer cancelled by twinny's own log, and two fixes to the GitHub plugin page.
+
+- **Current models for hosted providers.** fluency.js 1.0.33 brings the model lists up to date, so current Gemini models, Mistral Large 4 and Claude Haiku 5.5 are accepted; until now twinny refused them before any request was sent ([#546](https://github.com/twinnydotdev/twinny/issues/546)). Retired model names are no longer accepted: a provider saved with one shows "Invalid 'model' field" and needs a model picked from the list.
+- **Fixed: hosted presets defaulting to retired models.** New providers start with `claude-sonnet-5-5` (Anthropic), `gemini-3.8-flash` (Gemini), `deepseek-flash` (DeepSeek), `command-a-plus-05-2026` (Cohere) and `sonar` (Perplexity) ([#547](https://github.com/twinnydotdev/twinny/issues/547)).
+- **Fixed: completions cancelled while the twinny log is open.** With the Output panel showing twinny's log, each debug line written during a request asked for a completion in the panel and cancelled the one in the editor, so suggestions rarely appeared with debug logging on ([#559](https://github.com/twinnydotdev/twinny/issues/559)).
+- **Fixed: the pull request table's open link hidden off to the right.** Long branch names made the table wider than the page, so it scrolled sideways even on wide screens and the **open ↗** column was cut off. Branch names now wrap, and the last column of the pull request and issue tables stays in view when a narrow window still makes them scroll.
+- **Fixed: "waiting for me" empty after an expired GitHub token.** One sync with a refused token made the GitHub plugin stop asking for reviewers and approvals on that repository until the server restarted, so after the token was replaced, "waiting for me" matched nothing and the approval counts were gone. Only a host that refuses the reviewer detail itself is now listed without it.
+
 ## 4.3.16 · 2026-11-03
 
 Extension and `twinny-server` release: `twinny-server` starts without `--config`, its admin page and start-up screen are redone, and three fixes to the embeddings index were contributed by [@DivyamTalwar](https://github.com/DivyamTalwar).

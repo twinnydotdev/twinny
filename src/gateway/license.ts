@@ -159,7 +159,9 @@ export const describePlan = (summary: LicenseSummary): string => {
     case "free":
       return `Free plan, ${seats}`
     case "licensed":
-      return `${summary.org}, ${seats}, licence until ${summary.expiresAt?.slice(0, 10)}`
+      return summary.lifetime
+        ? `${summary.org}, ${seats}, licensed for good`
+        : `${summary.org}, ${seats}, licence until ${summary.expiresAt?.slice(0, 10)}`
     case "expiring":
       return `${summary.org}, ${seats}, licence expires ${summary.expiresAt?.slice(0, 10)}: renew soon`
     case "grace":

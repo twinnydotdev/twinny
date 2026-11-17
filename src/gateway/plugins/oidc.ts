@@ -36,6 +36,8 @@ import {
 
 const STATE_TTL_MS = 10 * 60_000
 const MAX_PENDING = 500
+/** Sign-ins one address may have waiting: a whole office behind one proxy fits; a loop that would fill the list does not. */
+const MAX_PENDING_PER_ADDRESS = 40
 const KEEP_SIGNINS = 50
 const FETCH_TIMEOUT_MS = 15_000
 
@@ -81,6 +83,8 @@ interface Pending {
   nonce: string
   createdAt: number
   redirectUri: string
+  /** Who started it, so one address cannot fill the list for everyone. */
+  from: string
 }
 
 const DEFAULT_SETTINGS: OidcSettings = {
@@ -118,8 +122,17 @@ export const readOidcSettings = (file: string): OidcSettings => {
   }
 }
 
-/** The page shown after the provider sends the browser back: opens VS Code, with a link in case it does not. */
-const landingHtml = (title: string, body: string, link?: string): string => `<!doctype html>
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+
+/**
+ * The page shown after the provider sends the browser back: opens VS Code,
+ * with a link in case it does not. `text` is shown as text: some of it
+ * (a provider's error, a name from a claim) is whatever the caller sent.
+ */
+const landingHtml = (title: string, text: string, link?: string): string => landingPage(escapeHtml(title), escapeHtml(text), link)
+
+const landingPage = (title: string, body: string, link?: string): string => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
 <style>html,body{margin:0;background:#0d1012;color:#d7dee2;font:15px/1.5 ui-monospace,Menlo,Consolas,monospace}main{max-width:560px;margin:12vh auto;padding:24px;background:#131719;border:1px solid #1f2629;border-radius:8px}h1{font-size:18px;margin:0 0 8px}h1 span{color:#23d18b}p{color:#8b979d}a{color:#23d18b}a.button{display:inline-block;margin-top:10px;padding:8px 14px;background:#23d18b;color:#0d1012;border-radius:5px;text-decoration:none;font-weight:600}</style>
 ${link ? `<meta http-equiv="refresh" content="1;url=${link.replace(/"/g, "&quot;")}">` : ""}
@@ -249,13 +262,15 @@ export class OidcPlugin implements PluginInstance {
     if (!this.configured) return { status: 503, html: landingHtml("Sign-in is not set up", "This gateway's admin has not set up SSO yet.") }
     if (request.path === "start" && request.method === "GET") {
       this.prune()
-      if (this._pending.size >= MAX_PENDING) return { status: 429, html: landingHtml("Too many sign-ins", "Too many sign-ins are waiting. Try again in a few minutes.") }
+      const mine = [...this._pending.values()].filter((pending) => pending.from === request.address).length
+      if (this._pending.size >= MAX_PENDING || mine >= MAX_PENDING_PER_ADDRESS)
+        return { status: 429, html: landingHtml("Too many sign-ins", "Too many sign-ins are waiting. Try again in a few minutes.") }
       const discovery = await this.discover()
       const state = randomBytes(24).toString("base64url")
       const verifier = randomBytes(48).toString("base64url")
       const nonce = randomBytes(24).toString("base64url")
       const redirectUri = this.redirectUri(request)
-      this._pending.set(state, { verifier, nonce, createdAt: this._context.now(), redirectUri })
+      this._pending.set(state, { verifier, nonce, createdAt: this._context.now(), redirectUri, from: request.address })
       const url = new URL(discovery.authorization_endpoint)
       url.searchParams.set("response_type", "code")
       url.searchParams.set("client_id", this._settings.clientId)
@@ -329,7 +344,7 @@ export class OidcPlugin implements PluginInstance {
       this._context.log.info({ event: "plugin.oidc-signed-in", key: name, ...(admin ? { admin: true } : {}) })
       this._context.events?.emit({ type: "signin.sso", source: "oidc", level: "info", title: `${name} signed in with SSO`, text: admin ? "As an admin." : "", data: { name, admin } })
       const link = inviteLink(this.publicUrl(request), code_)
-      return { status: 200, html: landingHtml("Signed in", `Welcome, <b>${name}</b>. VS Code is opening to connect you${admin ? " as an admin" : ""}. If it does not, press the button; the link works once and for ten minutes.`, link) }
+      return { status: 200, html: landingPage("Signed in", `Welcome, <b>${escapeHtml(name)}</b>. VS Code is opening to connect you${admin ? " as an admin" : ""}. If it does not, press the button; the link works once and for ten minutes.`, link) }
     }
     return notFound()
   }

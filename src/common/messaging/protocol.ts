@@ -9,6 +9,7 @@ import {
   TEAM_PLUGINS_EVENT_NAME,
   TEAM_SHARE_EVENT_NAME
 } from "../constants"
+import type { ModelStatus, StarterKind } from "../model-status"
 import type { DiscoveredServer } from "../provider-discovery"
 import type {
   TeamApplyRequest,
@@ -67,6 +68,16 @@ export interface ContextValue<T = unknown> {
 export interface ComposerTurn {
   role: string
   content: string
+}
+
+/** A model's guess at the rest of the draft, with who was asked and how it went. */
+export interface ComposerSuggestion {
+  /** Empty when there was no usable guess. */
+  text: string
+  model?: string
+  ms?: number
+  /** Why the request failed, when it did. */
+  error?: string
 }
 
 export interface ChatRequest {
@@ -325,13 +336,19 @@ export interface ClientEvents {
    * The rest of the message being typed, as the chat model guesses it from
    * the last few turns; empty when it has no good guess.
    */
-  [EVENT_NAME.twinnyComposerSuggest]: Channel<{ draft: string; recent: ComposerTurn[] }, string>
+  [EVENT_NAME.twinnyComposerSuggest]: Channel<{ draft: string; recent: ComposerTurn[] }, ComposerSuggestion>
   [EVENT_NAME.twinnyEditDefaultTemplates]: Channel
   [EVENT_NAME.twinnyFileListRequest]: Channel<void, string[]>
   [EVENT_NAME.twinnyGetConfigValue]: Channel<{ key: string }, ConfigValue>
   [EVENT_NAME.twinnyGetContextItems]: Channel
   [EVENT_NAME.twinnyGetGitChanges]: Channel
   [EVENT_NAME.twinnyGetModels]: Channel<void, ModelCatalogue>
+  /** Where the chat model runs, whether it is loaded and how much it holds. */
+  [EVENT_NAME.twinnyModelStatus]: Channel<void, ModelStatus | null>
+  /** Loads the chat model on its local server; answers with its status once it is. */
+  [EVENT_NAME.twinnyWarmModel]: Channel<void, ModelStatus | null>
+  /** A first question about the open file or selection, from the empty chat. */
+  [EVENT_NAME.twinnyStarter]: Channel<StarterKind>
   [EVENT_NAME.twinnyGetWorkspaceContext]: Channel<{ key: string }, ContextValue>
   [EVENT_NAME.twinnyGlobalContext]: Channel<{ key: string }, ContextValue>
   [EVENT_NAME.twinnyHideBackButton]: Channel

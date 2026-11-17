@@ -2,9 +2,11 @@
   position: fixed;
   top: 8px;
   right: 8px;
-  padding: 5px 10px;
-  border: 1px solid var(--tw-rule);
+  padding: 6px 12px;
+  border: 1px solid var(--tw-rule-soft);
+  border-radius: var(--tw-radius);
   background: var(--tw-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   color: var(--tw-fg-dim);
   font-family: var(--tw-font);
   font-size: var(--tw-fs-xs);

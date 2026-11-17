@@ -135,6 +135,8 @@ interface FakeGitHub {
   queries: string[]
   /** When set, a query asking for reviewer detail is refused the way a token short of scopes is. */
   refuseDetail: { on: boolean }
+  /** When set, `ghp_secret` is refused the way an expired token is (401). */
+  expired: { on: boolean }
   close: () => void
 }
 
@@ -200,6 +202,7 @@ const fakeGitHub = async (): Promise<FakeGitHub> => {
   const auths: string[] = []
   const queries: string[] = []
   const refuseDetail = { on: false }
+  const expired = { on: false }
   const verifyJwt = (auth: string): boolean => {
     const [, jwt] = auth.split(" ")
     const [header, payload, signature] = jwt.split(".")
@@ -230,7 +233,7 @@ const fakeGitHub = async (): Promise<FakeGitHub> => {
     if (route === "GET /api/v3/installation/repositories") {
       return auth === "Bearer ghs_installation" ? answer(res, 200, { repositories: [{ full_name: "acme/widgets" }, { full_name: "acme/gadgets" }] }) : answer(res, 401, { message: "Bad credentials" })
     }
-    const readable = auth === "Bearer ghp_secret" || auth === "Bearer ghs_installation"
+    const readable = (auth === "Bearer ghp_secret" && !expired.on) || auth === "Bearer ghs_installation"
     if (!readable) return answer(res, 401, { message: "Bad credentials" })
     if (route === "GET /api/v3/repos/acme/widgets") return answer(res, 200, { full_name: "acme/widgets" })
     if (route === "GET /api/v3/user") return auth === "Bearer ghp_secret" ? answer(res, 200, { login: "alice" }) : answer(res, 403, { message: "Resource not accessible by integration" })
@@ -260,7 +263,7 @@ const fakeGitHub = async (): Promise<FakeGitHub> => {
     answer(res, 404, { message: "Not Found" })
   })
   const url = await listen(server)
-  return { url, publicKey: publicPem, appId, auths, queries, refuseDetail, close: () => server.close(), ...{ privateKey: privateKey.export({ type: "pkcs1", format: "pem" }) as string } } as FakeGitHub & { privateKey: string }
+  return { url, publicKey: publicPem, appId, auths, queries, refuseDetail, expired, close: () => server.close(), ...{ privateKey: privateKey.export({ type: "pkcs1", format: "pem" }) as string } } as FakeGitHub & { privateKey: string }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -555,6 +558,24 @@ suite("GitHub plugin", function () {
 
     const cleared = await request(`${url}${api}/settings`, "PUT", admin, { me: "" })
     assert.deepStrictEqual(cleared.body.me, { name: "alice", detected: "alice" })
+  })
+
+  test("an expired token does not cost the reviewer detail once it is replaced", async () => {
+    const listing = await request(`${url}${api}/`, "GET", admin)
+    const [watched] = listing.body.repos as Array<{ id: string }>
+    github.expired.on = true
+    try {
+      const refused = await request(`${url}${api}/repos/${watched.id}/sync`, "POST", admin)
+      assert.match((refused.body.repo as { error?: string }).error ?? "", /refused/)
+    } finally {
+      github.expired.on = false
+    }
+    github.queries.length = 0
+    const synced = await request(`${url}${api}/repos/${watched.id}/sync`, "POST", admin)
+    const repo = synced.body.repo as { error?: string; pulls: Array<{ approvals?: unknown }> }
+    assert.strictEqual(repo.error, undefined, message(synced))
+    assert.deepStrictEqual(github.queries.map((query) => query.includes("latestOpinionatedReviews")), [true], "the rich query is asked again")
+    assert.ok(repo.pulls[0].approvals, "approvals are back, so waiting-for-me can match")
   })
 
   test("a host that refuses the reviewer detail is listed plainly, once, and stays that way", async () => {

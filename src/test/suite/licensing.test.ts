@@ -22,6 +22,7 @@ import { SeatBook } from "../../gateway/seats"
 import { GatewayServer } from "../../gateway/server"
 import {
   decodeLicenseToken,
+  describeLicense,
   entitlementsFor,
   FREE_SEATS,
   GRACE_DAYS,
@@ -121,13 +122,35 @@ suite("Entitlements", () => {
     assert.strictEqual(early.org, "Acme")
   })
 
-  test("a licence only ever adds to the free five: a token for fewer seats never takes a team below them", () => {
+  test("a licence that runs to 2099 is for good and shows no date", () => {
+    const forever = { ...claims, expiresAt: "2099-12-31T23:59:59.000Z" }
+    const licensed = entitlementsFor({ claims: forever }, at(issued, 10))
+    assert.strictEqual(licensed.status, "licensed")
+    assert.strictEqual(licensed.lifetime, true)
+    assert.strictEqual(licensed.message, "Licensed to Acme: 20 seats, for good.")
+    assert.strictEqual(
+      describePlan({ ...licensed, used: 2, unseated: [] }),
+      "Acme, 2 of 20 seats used, licensed for good"
+    )
+    assert.match(describeLicense(forever), /20 seats, for good\)$/)
+    const dated = entitlementsFor({ claims }, at(issued, 10))
+    assert.strictEqual(dated.lifetime, undefined)
+    assert.match(dated.message, /until 2027-03-01/)
+  })
+
+  test("a one-seat licence holds the gateway to one seat while it applies; the free five return after its grace", () => {
     const small = buildClaims({ org: "Solo", seats: 1, issuedAt: issued, validDays: 365 })
     const licensed = entitlementsFor({ claims: small }, at(issued, 10))
     assert.strictEqual(licensed.status, "licensed")
-    assert.strictEqual(licensed.seats, FREE_SEATS)
-    assert.match(licensed.message, /Licensed to Solo: 5 seats/)
-    assert.strictEqual(entitlementsFor({ claims: small }, at(issued, 365 + 1)).seats, FREE_SEATS, "and in grace")
+    assert.strictEqual(licensed.seats, 1)
+    assert.match(licensed.message, /Licensed to Solo: 1 seat until/)
+    const grace = entitlementsFor({ claims: small }, at(issued, 365 + 1))
+    assert.strictEqual(grace.status, "grace")
+    assert.strictEqual(grace.seats, 1, "and in grace")
+    const expired = entitlementsFor({ claims: small }, at(issued, 365 + GRACE_DAYS + 1))
+    assert.strictEqual(expired.status, "expired")
+    assert.strictEqual(expired.seats, FREE_SEATS, "the free five come back once the grace ends")
+    assert.strictEqual(entitlementsFor({ claims: small }, at(issued, -1)).seats, FREE_SEATS, "and before it is valid")
     assert.strictEqual(entitlementsFor({ claims: buildClaims({ org: "Six", seats: 6, issuedAt: issued, validDays: 365 }) }, at(issued, 10)).seats, 6)
   })
 
@@ -434,6 +457,29 @@ suite("Gateway seats (in process)", function () {
     assert.strictEqual(admin.status, 200, "the admin key made first must keep its seat")
     const sixth = await request(`${url}/twinny/v1/whoami`, "GET", secrets[5])
     assert.strictEqual(sixth.status, 401)
+  })
+
+  test("a one-seat licence seats only the oldest key; removing it lets the others back in", async () => {
+    const personal = issueLicense({ org: "Solo", seats: 1, features: ["policy"] }, signing.privateKeyPem).token
+    const installed = await request(`${url}/twinny/v1/admin/license`, "PUT", secrets[0], { token: personal })
+    assert.strictEqual(installed.status, 200, JSON.stringify(installed.body))
+    assert.strictEqual(installed.body.seats, 1)
+    assert.deepStrictEqual(installed.body.unseated, ["b", "c", "d", "e", "f", "g"])
+
+    const oldest = await request(`${url}/twinny/v1/whoami`, "GET", secrets[0])
+    assert.strictEqual(oldest.status, 200, "the key made first keeps the one seat")
+    const newer = await request(`${url}/twinny/v1/whoami`, "GET", secrets[1])
+    assert.strictEqual(newer.status, 401)
+    assert.match(String((newer.body.error as { message: string }).message), /This gateway key has no seat/)
+    const more = await request(`${url}/twinny/v1/admin/keys`, "POST", secrets[0], { name: "h" })
+    assert.strictEqual(more.status, 409)
+    assert.match(String((more.body.error as { message: string }).message), /licence for Solo allows 1/)
+
+    const removed = await request(`${url}/twinny/v1/admin/license`, "DELETE", secrets[0])
+    assert.strictEqual(removed.status, 200)
+    assert.strictEqual(removed.body.seats, FREE_SEATS)
+    assert.strictEqual((await request(`${url}/twinny/v1/whoami`, "GET", secrets[0])).status, 200)
+    assert.strictEqual((await request(`${url}/twinny/v1/whoami`, "GET", secrets[1])).status, 200, "the free five are back")
   })
 
   test("the team policy is sent only while the licence carries the policy feature", async () => {
