@@ -68,6 +68,7 @@
   "port": "Port",
   "port-placeholder": "Entrez un numéro de port ex. '11434'",
   "preset-demonroute": "Modèles de chat à poids ouverts avec une seule clé. Nécessite une clé API de demonroute.com.",
+  "preset-standardcompute": "Envoie chaque requête de chat au modèle activé le moins cher capable de la traiter, avec repli automatique. Nécessite une clé API de standardcompute.com.",
   "protocol": "Protocole",
   "provider": "Fournisseur",
   "provider-name": "Nom du fournisseur",
