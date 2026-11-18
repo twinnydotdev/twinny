@@ -2,7 +2,7 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
-## Unreleased
+## 4.3.23 · 2026-11-18
 
 Agent mode spends fewer steps looking round, checks its work, finishes its list, and can ask you a question or read a web page. The chat gets a text size and a code size.
 
