@@ -58,6 +58,20 @@ export const parseReadFile = (output: string): FileSlice | undefined => {
   return { path: match[1], startLine: Number(match[2]), code: code.join("\n"), note }
 }
 
+const READ_HEADER = /^.+ \(lines \d+–\d+ of \d+\)$/
+
+/** Each file of a `read_file` result: one, or the several a single call read. */
+export const parseReadFiles = (output: string): FileSlice[] => {
+  const sections: string[][] = []
+  let blank = true
+  for (const line of output.split("\n")) {
+    if (blank && READ_HEADER.test(line)) sections.push([line])
+    else sections[sections.length - 1]?.push(line)
+    blank = !line.trim()
+  }
+  return sections.flatMap((lines) => parseReadFile(lines.join("\n")) ?? [])
+}
+
 export interface CommandRun {
   command: string
   /** "exit code 0", "still running…". */

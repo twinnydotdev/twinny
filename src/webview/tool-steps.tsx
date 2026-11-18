@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import cx from "classnames"
 
 import { EVENT_NAME } from "../common/constants"
+import { groupSteps, isStepGroup, StepGroup } from "../common/tool-step-groups"
 import { ToolStepView } from "../common/types"
 import { parseTasks, TASKS_TOOL_NAME, tasksProgress } from "../extension/tools/tasks"
 
@@ -46,8 +47,12 @@ export const answerToolStep = (step: ToolStepView, how: "run" | "always" | "skip
   emit(EVENT_NAME.twinnyToolApproval, {
     id: step.id,
     run: how !== "skip",
-    ...(how === "always" && step.approval !== "change" && !step.noAlways ? { always: true } : {})
+    ...(how === "always" && step.approval === "command" && !step.noAlways ? { always: true } : {})
   })
+
+/** The user's answer to a question the model asked: one of its choices, or their own words. */
+export const answerToolQuestion = (step: ToolStepView, answer: string) =>
+  emit(EVENT_NAME.twinnyToolApproval, { id: step.id, run: true, answer })
 
 const Step = ({ step }: { step: ToolStepView }) => {
   const { t } = useTranslation()
@@ -73,7 +78,14 @@ const Step = ({ step }: { step: ToolStepView }) => {
         >
           <span className={styles.glyph} aria-hidden="true">
             <span
-              className={cx("codicon", waiting && step.approval === "change" ? "codicon-question" : STATUS_ICON[step.status])}
+              className={cx(
+                "codicon",
+                waiting && (step.approval === "change" || step.approval === "question")
+                  ? "codicon-question"
+                  : waiting && step.approval === "fetch"
+                    ? "codicon-globe"
+                    : STATUS_ICON[step.status]
+              )}
             />
           </span>
           <span className={styles.summary}>
@@ -122,13 +134,38 @@ const Step = ({ step }: { step: ToolStepView }) => {
           </button>
         )}
       </div>
-      {waiting && (
+      {waiting && step.approval === "question" && (
+        <div className={styles.approval}>
+          <div className={styles.approvalLabel}>{t("tool-question-waiting")}</div>
+          <div className={styles.question}>{step.command}</div>
+          <div className={cx(styles.actions, styles.choices)}>
+            {(step.choices ?? []).map((choice) => (
+              <button key={choice} type="button" className={styles.skip} onClick={() => answerToolQuestion(step, choice)}>
+                {choice}
+              </button>
+            ))}
+            <button type="button" className={styles.dismiss} onClick={() => answerToolStep(step, "skip")}>
+              {t("tool-skip")}
+            </button>
+          </div>
+          <div className={styles.keys}>{t("tool-question-keys")}</div>
+        </div>
+      )}
+      {waiting && step.approval !== "question" && (
         <div className={styles.approval}>
           <div className={styles.approvalLabel}>
-            {t(step.approval === "change" ? "tool-change-waiting" : step.mcpTool ? "tool-mcp-waiting" : "tool-command-waiting")}
+            {t(
+              step.approval === "change"
+                ? "tool-change-waiting"
+                : step.approval === "fetch"
+                  ? "tool-fetch-waiting"
+                  : step.mcpTool
+                    ? "tool-mcp-waiting"
+                    : "tool-command-waiting"
+            )}
           </div>
           <div className={styles.command}>
-            {step.approval === "change" || step.mcpTool ? (
+            {step.approval === "change" || step.approval === "fetch" || step.mcpTool ? (
               <pre className={styles.output}>{step.command}</pre>
             ) : (
               <Code code={step.command ?? ""} language="bash" />
@@ -137,9 +174,9 @@ const Step = ({ step }: { step: ToolStepView }) => {
           <div className={styles.actions}>
             <button type="button" className={styles.run} onClick={() => answerToolStep(step, "run")}>
               <span className={cx("codicon", step.approval === "change" ? "codicon-check" : "codicon-play")} aria-hidden="true" />
-              {t(step.approval === "change" ? "tool-apply" : "tool-run")}
+              {t(step.approval === "change" ? "tool-apply" : step.approval === "fetch" ? "tool-fetch" : "tool-run")}
             </button>
-            {step.approval !== "change" && !step.noAlways && (
+            {step.approval === "command" && !step.noAlways && (
               <button
                 type="button"
                 className={styles.skip}
@@ -154,7 +191,15 @@ const Step = ({ step }: { step: ToolStepView }) => {
             </button>
           </div>
           <div className={styles.keys}>
-            {t(step.approval === "change" ? "tool-change-keys" : step.noAlways ? "tool-command-keys-ask" : "tool-command-keys")}
+            {t(
+              step.approval === "change"
+                ? "tool-change-keys"
+                : step.approval === "fetch"
+                  ? "tool-fetch-keys"
+                  : step.noAlways
+                    ? "tool-command-keys-ask"
+                    : "tool-command-keys"
+            )}
           </div>
         </div>
       )}
@@ -163,6 +208,42 @@ const Step = ({ step }: { step: ToolStepView }) => {
         <div className={styles.detail}>
           <ToolOutput step={step} />
         </div>
+      )}
+    </li>
+  )
+}
+
+/**
+ * A run of reads, searches and listings as one line saying how many of
+ * each; it opens to the steps, each of which opens as it always did.
+ */
+const Group = ({ group }: { group: StepGroup }) => {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const summary = [
+    group.files ? t("tool-group-read", { count: group.files }) : "",
+    group.searches ? t("tool-group-search", { count: group.searches }) : "",
+    group.lists ? t("tool-group-list", { count: group.lists }) : ""
+  ]
+    .filter(Boolean)
+    .join(" · ")
+  return (
+    <li className={cx(styles.step, styles.done)}>
+      <div className={styles.head}>
+        <button type="button" className={styles.row} onClick={() => setOpen((prev) => !prev)} aria-expanded={open}>
+          <span className={styles.glyph} aria-hidden="true">
+            <span className="codicon codicon-check-all" />
+          </span>
+          <span className={styles.summary}>{summary}</span>
+          <span className={cx("codicon", open ? "codicon-chevron-up" : "codicon-chevron-down", styles.chevron)} aria-hidden="true" />
+        </button>
+      </div>
+      {open && (
+        <ol className={styles.grouped}>
+          {group.steps.map((step) => (
+            <Step key={step.id} step={step} />
+          ))}
+        </ol>
       )}
     </li>
   )
@@ -209,7 +290,8 @@ const Tasks = ({ step, live }: { step: ToolStepView; live: boolean }) => {
  * The tools the model used for a stretch of a reply, a line each. A
  * line opens to what the tool was given and what came back; a command
  * waiting for the user shows Run and Skip in place. What the user said
- * along the way sits among them, where the model read it.
+ * along the way sits among them, where the model read it. Three or more
+ * finished reads and searches in a row fold into one line.
  */
 export const ToolSteps = ({ steps }: { steps?: ToolStepView[] }) => {
   if (!steps?.length) return null
@@ -219,8 +301,10 @@ export const ToolSteps = ({ steps }: { steps?: ToolStepView[] }) => {
   const live = steps.some((step) => step.status === "running" || step.status === "waiting")
   return (
     <ol className={styles.panel}>
-      {steps.map((step) =>
-        step.said ? (
+      {groupSteps(steps).map((step) =>
+        isStepGroup(step) ? (
+          <Group key={`group-${step.id}`} group={step} />
+        ) : step.said ? (
           <Said key={step.id} step={step} />
         ) : step === latest ? (
           <Tasks key={step.id} step={step} live={live} />

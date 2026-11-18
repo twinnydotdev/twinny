@@ -2,7 +2,7 @@
   "name": "twinny",
   "displayName": "twinny - AI Code Completion and Chat",
   "description": "AI code completion, chat, inline edit and code review on models you run. Private, open source, one gateway for the whole team.",
-  "version": "4.3.21",
+  "version": "4.3.23",
   "icon": "assets/icon.png",
   "keywords": [
     "code-inference",
@@ -737,7 +737,27 @@
           "order": 20,
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Let the model keep a task list for work with several parts (with `#twinny.chatTools#` on). The list shows in the reply as it is ticked off, and is put back in front of the model when a reply runs out of steps or the next turn begins.",
+          "markdownDescription": "Let the model keep a task list for work with several parts (with `#twinny.chatTools#` on). The list shows in the reply as it is ticked off, and is put back in front of the model when a reply runs out of steps or the next turn begins. If the model answers with steps still open after doing some of the work, it is told once and carries on.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsCheckCommand": {
+          "order": 20,
+          "type": "string",
+          "default": "",
+          "markdownDescription": "The project's own check, as one command line: `npm run typecheck`, `cargo check`, `pytest -q`. When an agent reply has changed files and is about to answer without having run it, twinny runs it; if it fails, the output goes back to the model to fix, at most twice in a reply. It runs like any agent command (with `#twinny.chatTools#` on): it asks first unless auto-run is on or you chose Always run for it, and not at all when `#twinny.chatToolsCommands#` is `off`. One set in a workspace's own settings always asks until you choose Always run, whatever auto-run says, since it came with the project. It has two minutes; a check that runs out of time is not held against the changes. Empty runs nothing."
+        },
+        "twinny.chatToolsAsk": {
+          "order": 20,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Let the model ask you a question in the chat when a request can be read two ways (with `#twinny.chatTools#` on). The reply waits on a card with the answers it offers; pick one, write your own in the message box, or skip it and the model goes with its best reading.",
+          "scope": "machine"
+        },
+        "twinny.chatToolsFetch": {
+          "order": 20,
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Let the model read web pages: documentation, an issue, a link you paste (with `#twinny.chatTools#` on). Every address is shown with Fetch and Skip before anything is fetched, a redirect is not followed until you have seen where it goes, the page is read as text, and nothing is sent but the request for it. This is the only agent tool that reaches outside your machine and workspace, which is why each address asks. Turn it off here or in the agent settings in the chat; a workspace cannot turn it on.",
           "scope": "machine"
         },
         "twinny.chatToolsCommandsRunIn": {

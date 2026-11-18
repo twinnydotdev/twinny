@@ -18,6 +18,8 @@ import {
   parseSearchHits,
   replacementDiff
 } from "../../common/tool-output"
+import { groupSteps, isStepGroup } from "../../common/tool-step-groups"
+import { ToolStepView } from "../../common/types"
 import { workspaceTools } from "../../extension/tools/workspace"
 
 test("read_file output comes back as the file slice, with a real tool's output", async () => {
@@ -82,4 +84,58 @@ test("languages come from file names", () => {
     ["a.ts", "b.tsx", "c.py", "Dockerfile", "d.yml", "e.md", "f.unknown", "g"].map(languageForPath),
     ["typescript", "tsx", "python", "docker", "yaml", "markdown", "text", "text"]
   )
+})
+
+test("a run of finished reads and searches folds into one group; anything else stands alone", () => {
+  let n = 0
+  const step = (name: string, extra: Partial<ToolStepView> = {}): ToolStepView => ({
+    id: `s${n++}`,
+    name,
+    summary: name,
+    status: "done",
+    ...extra
+  })
+  const read = (path: string) => step("read_file", { args: { path } })
+  const steps = [
+    read("a.ts"),
+    read("b.ts"),
+    step("grep"),
+    read("a.ts"),
+    step("list_dir"),
+    step("edit_file"),
+    read("c.ts"),
+    step("grep"),
+    step("run_command"),
+    read("d.ts"),
+    read("e.ts"),
+    step("grep", { status: "failed" }),
+    read("f.ts"),
+    read("g.ts"),
+    step("read_file", { args: { path: "h.ts" }, status: "running" })
+  ]
+  const out = groupSteps(steps)
+  const shape = out.map((item) => (isStepGroup(item) ? item.steps.length : item.name))
+  assert.deepStrictEqual(shape, [
+    5,
+    "edit_file",
+    "read_file",
+    "grep",
+    "run_command",
+    "read_file",
+    "read_file",
+    "grep",
+    "read_file",
+    "read_file",
+    "read_file"
+  ])
+  const group = out[0]
+  assert.ok(isStepGroup(group))
+  assert.strictEqual(group.id, "s0")
+  assert.deepStrictEqual([group.files, group.searches, group.lists], [2, 1, 1], "a.ts read twice is one file")
+  // Every step is still there, in order.
+  assert.deepStrictEqual(
+    out.flatMap((item) => (isStepGroup(item) ? item.steps : [item])).map((item) => item.id),
+    steps.map((item) => item.id)
+  )
+  assert.deepStrictEqual(groupSteps([read("a.ts"), step("x", { said: true }), read("b.ts"), read("c.ts")]).length, 4)
 })

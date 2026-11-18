@@ -27,6 +27,7 @@ import { CreatedKey, KeysResponse, PeoplePage } from "./people"
 import { PlanPage } from "./plan"
 import { PluginIcon, PluginPage, PluginsPage } from "./plugins"
 import { RecordingsPanel } from "./recordings"
+import { navigate, splitRoute, useRoute } from "./route"
 import { UsagePage } from "./usage"
 
 type Period = "24h" | "7d" | "30d"
@@ -200,37 +201,31 @@ const App = () => {
   const [error, setError] = useState<string | undefined>()
   const [signInError, setSignInError] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
-  const [view, setViewState] = useState<AdminView>(() => {
+  // The address names the view (and, after a "/", a place inside it), so Back and Forward move between them.
+  const routeView = splitRoute(useRoute()).view
+  const [fallback] = useState<AdminView>(() => {
     try {
-      const hash = location.hash.replace(/^#/, "")
-      if (isView(hash)) return hash
       const remembered = sessionStorage.getItem(VIEW_KEY)
       return isView(remembered) ? remembered : "overview"
     } catch {
       return "overview"
     }
   })
+  const view: AdminView = isView(routeView) ? routeView : fallback
   const [pendingSignIns, setPendingSignIns] = useState(0)
   const [refreshedAt, setRefreshedAt] = useState<number | null>(null)
 
-  // The tab survives a reload and the URL names it, so a link can point at one.
-  const setView = useCallback((next: AdminView) => {
-    setViewState(next)
+  // Each view is a history entry; the last one is also remembered for a tab opened without an address.
+  const setView = useCallback((next: AdminView) => navigate(next), [])
+  useEffect(() => {
+    // An address that names no view (none, or a stale one) settles on the one shown, without an entry of its own.
+    if (!isView(routeView)) navigate(view, { replace: true })
     try {
-      sessionStorage.setItem(VIEW_KEY, next)
-      history.replaceState(null, "", `#${next}`)
+      sessionStorage.setItem(VIEW_KEY, view)
     } catch {
       // Nothing to remember.
     }
-  }, [])
-  useEffect(() => {
-    const onHash = () => {
-      const hash = location.hash.replace(/^#/, "")
-      if (isView(hash)) setViewState(hash)
-    }
-    window.addEventListener("hashchange", onHash)
-    return () => window.removeEventListener("hashchange", onHash)
-  }, [])
+  }, [routeView, view])
 
   const signOut = useCallback(() => {
     try {

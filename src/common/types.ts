@@ -110,10 +110,12 @@ export interface ToolStepView {
   output?: string
   /** `stopped`: the reply was stopped while the tool was running or waiting. */
   status: "running" | "waiting" | "done" | "failed" | "skipped" | "stopped"
-  /** For a step waiting on the user: the command that would run, or the change that would be made. */
+  /** For a step waiting on the user: the command that would run, the change that would be made, the question asked or the address to fetch. */
   command?: string
-  /** What the user is asked to approve: a shell command, or a change with no diff to review (a rename, a delete). */
-  approval?: "command" | "change"
+  /** What the user is asked: to approve a shell command, a change with no diff to review (a rename, a delete) or a web address to fetch, or to answer a question. */
+  approval?: "command" | "change" | "question" | "fetch"
+  /** For a question the model put to the user: answers to pick from. */
+  choices?: string[]
   /**
    * How much of the reply's text (thinking left out) was written when the
    * step started, so the chat shows it at that point in the reply rather
@@ -150,6 +152,8 @@ export interface ReplyMeta {
   contextWindow?: number
   /** The user stopped it before the model finished. */
   stopped?: boolean
+  /** The model hit its output limit mid-reply, so the reply may end part-way. */
+  cutOff?: boolean
   /** Agent mode used every tool step the reply had, so the work may be unfinished. */
   outOfSteps?: boolean
   /**

@@ -2,6 +2,35 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.23 · 2026-11-18
+
+Agent mode spends fewer steps looking round, checks its work, finishes its list, and can ask you a question or read a web page. The chat gets a text size and a code size.
+
+- **Fewer, bigger reads.** `read_file` takes several files in one call (`paths`, up to six). A short file comes whole when a slice of it is asked for, and a narrow slice of a long one comes with the lines round it, so a file is no longer read a few dozen lines at a time, a step for each.
+- **The project's check runs after changes.** Set `twinny.chatToolsCheckCommand` (`npm run typecheck`, `cargo check`) and a reply that changed files runs it before it ends, unless the model already did. A failure goes back to the model to fix, at most twice. It runs like any agent command: asked first unless auto-run is on or you chose Always run for it, and one that came with a workspace's settings always asks.
+- **The task list is finished.** A model that answers with steps of its own list still open, after doing some of the work, is told once and carries on. Renames are steered to one `edit_file` call per file with `replace_all`.
+- **The model can ask you.** With `ask_user` the reply waits on a card with the question and the answers offered; pick one, write your own in the message box and press Enter, or skip it. Turn it off with `twinny.chatToolsAsk`.
+- **Web pages.** The model can read a page as text with `fetch_url`: documentation, an issue, a link you paste. Every address is shown with Fetch and Skip first, and a redirect is handed back rather than followed. Turn it off with `twinny.chatToolsFetch` or in the agent settings; a team turns it off for everyone with `policy.agent.fetch: "off"`.
+- **More in the agent settings.** The gear by the agent switch now has web pages (ask or off), questions (on or off) and the check command, beside changes, commands and steps.
+- **Runs of reads and searches fold into one line.** Three or more finished reads, searches and listings in a row show as "read 9 files · 3 searches", which opens to the steps.
+- **Text size and code size.** The composer's settings set the size of the whole chat (replies, your messages, tool steps, what you type) and, apart from it, of code blocks, tool output and diffs. Code in backticks is set level with the sentence round it.
+- **Fixed:** the `input` and `output` labels of an opened tool step were drawn as boxes.
+
+## 4.3.22 · 2026-11-17
+
+`twinny-server` release: the pull-request plugins' page (GitHub, GitLab, Gitea, Bitbucket) is rebuilt, answers questions about a pull and about selected lines of its diff, no longer posts reviews to the host, and is harder to misuse.
+
+- **Questions are answered, not reviewed again.** A question about a pull was sent under the review's own instructions, so the model wrote the review a second time. Questions now have instructions of their own.
+- **Ask about selected lines.** Select lines in a file's diff and press **Ask about these lines**: the question and its answer sit under that file, and join the pull's thread with the lines quoted. The model gets the lines with their `+`/`-` signs, the path and the line numbers. This needs a finished review of the pull.
+- **A new box to ask in.** One box that grows with the question and names the model that answers; **Enter** sends (it was Ctrl+Enter), **Shift+Enter** starts a new line. The question shows at once with the wait counted under it, and an empty thread offers three questions to start from.
+- **Reviews are no longer posted to the host.** The **post to GitHub** control and the **auto-post** column are gone, and a repository that had auto-post ticked no longer posts anything. The `…/review/post` route remains for scripts.
+- **A review lands on the pull it was asked for.** A review started on one pull could show on whichever pull was open when it finished. Each opened pull now keeps its own state, the list marks a pull as *model reviewing*, and its page shows the review when it lands.
+- **A new look for the page.** Tabs for pull requests, issues and setup; an opened pull takes the whole page, with checks, merge state, reviewers and changes in a rail beside it; rows say their state with signals in place of pills; filters, the drafts switch and the order sit in one bar, each filter a chip that names its value once set.
+- **Ignore pulls that are always there.** The eye on a row puts a pull out of the list and its counts; the **Ignored** switch shows them again. Kept in the browser, per host.
+- **Images in a description.** GitHub attachments show in place, fetched through the gateway, including those of private repositories; other images are linked by name. Raw `<img>` and `<br>` tags in a description are read as what they mean.
+- **Back, Forward and links.** The view, a plugin's tab, an opened pull and an expanded issue are in the address, so the browser's Back and Forward move between them and a copied address opens the same place.
+- **Security.** The admin page runs only its own script, named by hash in its content security policy, and cannot be framed. Links from a host or a model open only if they are http(s). An approval or change request is refused for a commit the model did not read, and is pinned to that commit on GitHub and GitLab. At most two reviews run at once. Diffs from Gitea and Bitbucket are read up to a cap, Bitbucket's next-page address is followed only back to its API, and Slack messages escape titles and model text.
+
 ## 4.3.21 · 2026-11-12
 
 Extension: the grey suggestions in the chat composer work the way a mail composer's do, show when they are being written, and have settings of their own.

@@ -127,6 +127,32 @@ suite("Generation tracker", () => {
     }
   })
 
+  test("a reply the output limit cut off says so, so the chat can offer to continue", async () => {
+    const replies: Record<string, unknown>[] = []
+    const bridge = {
+      emit: (type: string, payload?: Record<string, unknown>) => {
+        if (type === EVENT_NAME.twinnyAddMessage && payload) replies.push(payload)
+      }
+    } as unknown as ExtensionBridge
+    const generation = new ChatGeneration(bridge, new GenerationTracker())
+    const answering = (finishReason?: "stop" | "length") =>
+      ({
+        async *chat() {
+          yield { content: "part one" }
+          yield { content: "", ...(finishReason ? { finishReason } : {}) }
+        }
+      }) as unknown as InferenceClient
+    try {
+      await generation.generate(answering("length"), request, provider)
+      await generation.generate(answering("stop"), request, provider)
+      await generation.generate(answering(), request, provider)
+      const cutOff = replies.map((reply) => (reply.meta as { cutOff?: boolean }).cutOff)
+      assert.deepStrictEqual(cutOff, [true, false, undefined])
+    } finally {
+      generation.dispose()
+    }
+  })
+
   test("stopping one chat keeps the other's run", async () => {
     const tracker = new GenerationTracker()
     const sidebar = new ChatGeneration(stubBridge().bridge, tracker)

@@ -21,10 +21,12 @@ import { LicenseStore } from "../../gateway/license"
 import { createGatewayLog } from "../../gateway/log"
 import { BUNDLED_PLUGINS, PluginContext, PluginError, PluginHost, PluginInstance, pluginsFileFor, PluginStore } from "../../gateway/plugins"
 import { PluginEventBus } from "../../gateway/plugins/events"
-import { Forge, PullPage, readJson, RepoRecord, RepoStore, TokenView } from "../../gateway/plugins/forge"
+import { Forge, FULL_NAME_PATTERN, PullPage, readJson, RepoRecord, RepoStore, TokenView } from "../../gateway/plugins/forge"
 import { appJwt } from "../../gateway/plugins/github"
+import { withoutQuickActions } from "../../gateway/plugins/gitlab"
 import { PullsPlugin } from "../../gateway/plugins/pulls"
 import { REVIEW_PROMPT_BUDGET, reviewMessages, ReviewRecord, ReviewStore, stripThinking } from "../../gateway/plugins/reviews"
+import { slackPayload } from "../../gateway/plugins/slack"
 import { parseTriage, TriageRecord } from "../../gateway/plugins/triage"
 import { buildRouteTable } from "../../gateway/routes"
 import { GatewayServer } from "../../gateway/server"
@@ -195,6 +197,9 @@ const DRAFT_NODE = {
   commits: { nodes: [{ commit: { statusCheckRollup: null } }] }
 }
 
+/** A one-pixel PNG. */
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64")
+
 const fakeGitHub = async (): Promise<FakeGitHub> => {
   const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 })
   const publicPem = publicKey.export({ type: "spki", format: "pem" }) as string
@@ -233,8 +238,24 @@ const fakeGitHub = async (): Promise<FakeGitHub> => {
     if (route === "GET /api/v3/installation/repositories") {
       return auth === "Bearer ghs_installation" ? answer(res, 200, { repositories: [{ full_name: "acme/widgets" }, { full_name: "acme/gadgets" }] }) : answer(res, 401, { message: "Bad credentials" })
     }
+    // An attachment's signed address: the signature is the credential, and a token sent here would be a leak.
+    if (route === "GET /signed/11111111-2222-3333-4444-555555555555.png") {
+      if (auth || url.search !== "?jwt=sig&ned") return answer(res, 403, { message: "Forbidden" })
+      res.writeHead(200, { "Content-Type": "image/png" })
+      return res.end(PNG)
+    }
+    if (route === "GET /signed/page.html") {
+      res.writeHead(200, { "Content-Type": "text/html" })
+      return res.end("<script>alert(1)</script>")
+    }
     const readable = (auth === "Bearer ghp_secret" && !expired.on) || auth === "Bearer ghs_installation"
     if (!readable) return answer(res, 401, { message: "Bad credentials" })
+    if (route === "GET /api/v3/repos/acme/widgets/issues/7") {
+      const self = `http://${req.headers.host}`
+      return answer(res, 200, {
+        body_html: `<p>Before: <a href="${self}/signed/x"><img width="355" alt="Log in" src="${self}/signed/11111111-2222-3333-4444-555555555555.png?jwt=sig&amp;ned"></a> <img src="${self}/signed/page.html" data-canonical-src="https://example.com/page.png"> <img src="https://elsewhere.example/a.png" data-canonical-src="https://elsewhere.example/a.png"></p>`
+      })
+    }
     if (route === "GET /api/v3/repos/acme/widgets") return answer(res, 200, { full_name: "acme/widgets" })
     if (route === "GET /api/v3/user") return auth === "Bearer ghp_secret" ? answer(res, 200, { login: "alice" }) : answer(res, 403, { message: "Resource not accessible by integration" })
     if (route === "GET /api/v3/repos/acme/nothere") return answer(res, 404, { message: "Not Found" })
@@ -616,6 +637,28 @@ suite("GitHub plugin", function () {
     const gone = await request(`${url}${api}/repos/${repo.id}/pulls/77`, "GET", admin)
     assert.strictEqual(gone.status, 404)
     assert.match(message(gone), /no open pull 77/)
+  })
+
+  test("a description's images come through the gateway: only its own, only pictures, and without the token", async () => {
+    const listing = await request(`${url}${api}/`, "GET", admin)
+    const [repo] = listing.body.repos as Array<{ id: string }>
+    const image = (address: string, number = 7) => request(`${url}${api}/repos/${repo.id}/image?number=${number}&url=${encodeURIComponent(address)}`, "GET", admin)
+
+    // Written in the description as an attachment; GitHub's rendering gives the signed address, matched by the attachment's id.
+    const shown = await image("https://github.com/user-attachments/assets/11111111-2222-3333-4444-555555555555")
+    assert.strictEqual(shown.status, 200, message(shown))
+    assert.strictEqual(shown.body.type, "image/png")
+    assert.ok(Buffer.from(shown.body.data as string, "base64").equals(PNG))
+
+    // Not in the description: the route fetches nothing a caller merely names.
+    assert.strictEqual((await image(`${github.url}/api/v3/repos/acme/widgets`)).status, 404)
+    assert.strictEqual((await image("https://github.com/user-attachments/assets/99999999-2222-3333-4444-555555555555")).status, 404)
+    // In the description, but on a host that is not GitHub's.
+    assert.strictEqual((await image("https://elsewhere.example/a.png")).status, 404)
+    // In the description, but not a picture.
+    assert.strictEqual((await image("https://example.com/page.png")).status, 415)
+    // A pull that is not open here.
+    assert.strictEqual((await image("https://github.com/user-attachments/assets/11111111-2222-3333-4444-555555555555", 77)).status, 404)
   })
 
   test("a GitHub App reads repositories without a token of their own", async () => {
@@ -1378,12 +1421,12 @@ suite("Pull-request reviews", function () {
     const listing = await p.handle(req("GET", ""))
     assert.strictEqual((listing.body as { repos: Array<{ reviews: Record<number, { posted?: boolean }> }> }).repos[0].reviews[1].posted, true)
 
-    // Auto-post: the next review goes straight to the host as a comment.
+    // Auto-post saved by an earlier version is not honoured: a review stays on the gateway.
     await p.handle(req("PUT", `repos/${repo.id}`, { autoPost: true }))
     const auto = await p.handle(req("POST", `repos/${repo.id}/pulls/2/review`))
-    assert.strictEqual((auto.body as { review: ReviewRecord }).review.postedAs, "comment")
-    assert.strictEqual((auto.body as { review: ReviewRecord }).review.postedBy, "auto")
-    assert.deepStrictEqual(posts.map((post) => `${post.number}:${post.as}`), ["1:approve", "2:comment"])
+    assert.strictEqual((auto.body as { review: ReviewRecord }).review.status, "done")
+    assert.strictEqual((auto.body as { review: ReviewRecord }).review.postedAt, undefined)
+    assert.deepStrictEqual(posts.map((post) => `${post.number}:${post.as}`), ["1:approve"], "nothing reached the host unasked")
     await p.stop()
   })
 
@@ -1494,6 +1537,7 @@ suite("Pull-request reviews", function () {
     const { inference } = scripted("{\"labels\": [\"bug\"], \"reply\": \"Which version?\"}")
     const posts: string[] = []
     const labelled: string[][] = []
+    const comments: string[] = []
     const dir = path.join(scratch, "member-posting")
     fs.mkdirSync(dir, { recursive: true })
     const p = new PullsPlugin(
@@ -1507,7 +1551,7 @@ suite("Pull-request reviews", function () {
         listIssues: async () => [{ repo: "acme/m", number: 4, title: "Broken", author: "dana", url: "x://4", createdAt: "", updatedAt: "2026-09-19T00:00:00Z", labels: [], comments: 0 }],
         issueBody: async () => "It broke.",
         listLabels: async () => ["bug", "release-blocker"],
-        commentIssue: async () => ({}),
+        commentIssue: async (_repo: unknown, _number: number, text: string) => (comments.push(text), {}),
         labelIssue: async (_repo: unknown, _number: number, labels: string[]) => {
           labelled.push(labels)
         }
@@ -1531,6 +1575,11 @@ suite("Pull-request reviews", function () {
     // An admin may still post it again, as anything.
     await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/post`, { as: "approve" }))
     assert.deepStrictEqual(posts, ["1:comment", "1:approve"])
+    // Reviewing again is not a way to post again: this commit's review is already on the host.
+    await dev("POST", `repos/${repo.id}/pulls/1/review`)
+    const afterAgain = await dev("POST", `repos/${repo.id}/pulls/1/review/post`).catch((e: PluginError) => e)
+    assert.ok(afterAgain instanceof PluginError && afterAgain.status === 409, "still posted once after a second review")
+    assert.strictEqual(posts.length, 2)
 
     await dev("POST", `repos/${repo.id}/issues/4/triage`)
     const triaged = await dev("POST", `repos/${repo.id}/issues/4/triage/post`, { reply: false, labelNames: ["bug", "release-blocker"] })
@@ -1538,7 +1587,171 @@ suite("Pull-request reviews", function () {
     const record = (triaged.body as { triage: TriageRecord }).triage
     assert.deepStrictEqual(record.labels, ["bug"])
     assert.strictEqual(record.postedBy, "alice")
+
+    // The reply a developer posts is the model's, not text of their own, and it goes once even if triaged again.
+    await dev("POST", `repos/${repo.id}/issues/4/triage/post`, { labels: false, replyText: "Buy cheap pills" })
+    assert.strictEqual(comments.length, 1)
+    assert.match(comments[0], /^Which version\?/)
+    await dev("POST", `repos/${repo.id}/issues/4/triage`)
+    const replyAgain = await dev("POST", `repos/${repo.id}/issues/4/triage/post`, { labels: false }).catch((e: PluginError) => e)
+    assert.ok(replyAgain instanceof PluginError && replyAgain.status === 409, "replied once")
+    // An admin may edit the reply, within reason.
+    await p.handle(req("POST", `repos/${repo.id}/issues/4/triage/post`, { labels: false, replyText: "Which version, and which OS?" }))
+    assert.match(comments[1], /^Which version, and which OS\?/)
+    const tooLong = await p.handle(req("POST", `repos/${repo.id}/issues/4/triage/post`, { labels: false, replyText: "x".repeat(20_001) })).catch((e: PluginError) => e)
+    assert.ok(tooLong instanceof PluginError && tooLong.status === 400)
     await p.stop()
+  })
+
+  /** A model that answers only when told to, so two reviews can be held open at once. */
+  const gated = () => {
+    const waiting: Array<() => void> = []
+    const inference = {
+      chatAliases: () => ["coder"],
+      embeddingAliases: () => [],
+      embed: async () => [],
+      active: () => 0,
+      async *chat(_alias: string, messages: ChatMessage[]) {
+        const prompt = messages.map((m) => String(m.content)).join("\n")
+        await new Promise<void>((resolve) => waiting.push(resolve))
+        yield `## Summary\nRead ${/Pull \d+/.exec(prompt)?.[0]}.\n\n## Verdict\nApprove.`
+      }
+    }
+    const until = async (count: number) => {
+      while (waiting.length < count) await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+    return { inference, waiting, until }
+  }
+
+  test("two pulls reviewed at once each get their own review, and a page can ask where one stands without the host", async () => {
+    const { inference, waiting, until } = gated()
+    let contentReads = 0
+    const dir = path.join(scratch, "reviews-overlap")
+    fs.mkdirSync(dir, { recursive: true })
+    const p = new PullsPlugin(
+      { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference },
+      () => {
+        const base = forge({ 1: "aaa", 2: "bbb", 4: "ddd" })()
+        return { ...base, pullContent: async () => (contentReads++, await base.pullContent()) }
+      },
+      0
+    )
+    p.start()
+    const repo = ((await p.handle(req("POST", "repos", { fullName: "acme/two" }))).body as { repo: { id: string } }).repo
+    const first = p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))
+    await until(1)
+    const second = p.handle(req("POST", `repos/${repo.id}/pulls/2/review`))
+    await until(2)
+
+    // Both run; each pull says so for itself, and the listing names them.
+    const state = async (n: number) => (await p.handle(req("GET", `repos/${repo.id}/pulls/${n}/review`))).body as Pick<PullPage, "review" | "reviewing" | "reviewingSince">
+    const reads = contentReads
+    assert.strictEqual((await state(1)).reviewing, true)
+    assert.ok((await state(1)).reviewingSince)
+    assert.strictEqual((await state(2)).reviewing, true)
+    assert.strictEqual((await state(4)).reviewing, false)
+    assert.strictEqual(contentReads, reads, "asking where a review stands reads nothing from the host")
+    const listing = (await p.handle(req("GET", ""))).body as { repos: Array<{ reviewing: number[] }> }
+    assert.deepStrictEqual([...listing.repos[0].reviewing].sort(), [1, 2])
+
+    // A third is refused rather than queued behind minutes of work, and the same pull twice is a conflict.
+    const third = await p.handle(req("POST", `repos/${repo.id}/pulls/4/review`)).catch((e: PluginError) => e)
+    assert.ok(third instanceof PluginError && third.status === 429)
+    const twice = await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`)).catch((e: PluginError) => e)
+    assert.ok(twice instanceof PluginError && twice.status === 409)
+
+    // The second finishes first: the gateway is still busy, and pull 1 has no review yet.
+    waiting[1]()
+    const reviewTwo = ((await second).body as { review: ReviewRecord }).review
+    assert.strictEqual(reviewTwo.number, 2)
+    assert.match(reviewTwo.text, /Read Pull 2\./)
+    assert.strictEqual(((await p.handle(req("GET", ""))).body as { review: { busy: boolean } }).review.busy, true, "busy until the last one ends")
+    assert.strictEqual((await state(1)).review, undefined)
+    assert.strictEqual((await state(2)).review?.number, 2)
+
+    waiting[0]()
+    const reviewOne = ((await first).body as { review: ReviewRecord }).review
+    assert.strictEqual(reviewOne.number, 1)
+    assert.match(reviewOne.text, /Read Pull 1\./)
+    assert.strictEqual(((await p.handle(req("GET", `repos/${repo.id}/pulls/2`))).body as PullPage).review?.headSha, "bbb")
+    assert.strictEqual(((await p.handle(req("GET", ""))).body as { review: { busy: boolean } }).review.busy, false)
+    await p.stop()
+  })
+
+  test("a verdict is posted only for the commit that was reviewed, and a failed run keeps the finished review", async () => {
+    const heads: Record<number, string> = { 1: "aaa" }
+    let fail = false
+    const posts: string[] = []
+    const inference = {
+      chatAliases: () => ["coder"],
+      embeddingAliases: () => [],
+      embed: async () => [],
+      active: () => 0,
+      async *chat() {
+        if (fail) throw new Error("backend is down")
+        yield "## Summary\nFine.\n\n## Verdict\nApprove."
+      }
+    }
+    const dir = path.join(scratch, "reviews-stale-verdict")
+    fs.mkdirSync(dir, { recursive: true })
+    const p = new PullsPlugin(
+      { dataDir: dir, log: createGatewayLog(() => undefined), fetch, now: Date.now, inference },
+      () => ({
+        ...forge(heads)(),
+        postReview: async (_repo: unknown, pull: { headSha: string }, _body: string, as: string) => {
+          posts.push(`${as}@${pull.headSha}`)
+          return {}
+        }
+      }),
+      0
+    )
+    p.start()
+    const repo = ((await p.handle(req("POST", "repos", { fullName: "acme/stale" }))).body as { repo: { id: string } }).repo
+    const done = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))).body as { review: ReviewRecord }).review
+    assert.strictEqual(done.status, "done")
+
+    // The model's backend goes away: the caller hears it, the finished review stays.
+    fail = true
+    const failed = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))).body as { review: ReviewRecord }).review
+    assert.strictEqual(failed.status, "failed")
+    assert.strictEqual(((await p.handle(req("GET", `repos/${repo.id}/pulls/1/review`))).body as PullPage).review?.status, "done")
+    fail = false
+
+    // The author pushes after the review: the approval the model gave is not for this commit.
+    heads[1] = "bbb"
+    await p.handle(req("POST", `repos/${repo.id}/sync`))
+    for (const as of ["approve", "request-changes"]) {
+      const refused = await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/post`, { as })).catch((e: PluginError) => e)
+      assert.ok(refused instanceof PluginError && refused.status === 409, as)
+      assert.match((refused as PluginError).message, /aaa.*bbb/)
+    }
+    assert.deepStrictEqual(posts, [])
+    await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/post`, { as: "comment" }))
+    await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))
+    await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/post`, { as: "approve" }))
+    assert.deepStrictEqual(posts, ["comment@bbb", "approve@bbb"])
+    await p.stop()
+  })
+
+  test("repository names cannot climb the host's API, and Slack shows a title rather than obeying it", () => {
+    for (const name of ["acme/widgets", "group/sub/project", "a.b/c-d_e", "acme/.github"]) assert.ok(FULL_NAME_PATTERN.test(name), name)
+    for (const name of ["../admin", "acme/..", "acme/../other", "./x", "acme/.", "acme", "acme/wid gets", "acme/a?b"]) assert.ok(!FULL_NAME_PATTERN.test(name), name)
+    const event = (title: string, text: string, url: string) => ({ type: "pull.opened", source: "github", level: "info", title, text, url, at: "" }) as never
+    const said = slackPayload(event("New <!channel> <https://evil.example|click>", "by <@U1> & co", "https://github.com/acme/widgets/pull/1")).text
+    assert.ok(!said.includes("<!channel>") && !said.includes("<https://evil.example|click>") && !said.includes("<@U1>"), said)
+    assert.match(said, /<https:\/\/github\.com\/acme\/widgets\/pull\/1\|New &lt;!channel&gt;/)
+    assert.ok(!slackPayload(event("t", "", "javascript:alert(1)")).text.includes("javascript:"))
+  })
+
+  test("GitLab quick actions are escaped even after a line that only looks like a code fence", () => {
+    assert.strictEqual(withoutQuickActions("fine\n/approve"), "fine\n\\/approve")
+    assert.strictEqual(withoutQuickActions("```sh\n/usr/bin/env\n```\n/merge"), "```sh\n/usr/bin/env\n```\n\\/merge")
+    // Inline code that starts a line, and a fence indented into a code block, open nothing.
+    assert.strictEqual(withoutQuickActions("```x``` text\n/approve"), "```x``` text\n\\/approve")
+    assert.strictEqual(withoutQuickActions("    ```\n/approve"), "    ```\n\\/approve")
+    // A shorter or different run does not close the fence that is open.
+    assert.strictEqual(withoutQuickActions("````\n```\n/kept\n````\n/label ~x"), "````\n```\n/kept\n````\n\\/label ~x")
+    assert.strictEqual(withoutQuickActions("~~~\n```\n/kept\n~~~\n/close"), "~~~\n```\n/kept\n~~~\n\\/close")
   })
 
   test("the prompt fits a small context: patches beyond the budget are named, not sent", () => {
@@ -1599,9 +1812,15 @@ suite("Pull-request reviews", function () {
     const asked = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "Why wrap v5?" }))).body as { review: ReviewRecord }).review
     const prompt = calls[1].messages
     assert.strictEqual(prompt[0].role, "system")
-    assert.match(String(prompt[1].content), /Does a thing\./, "the pull is in front of the model")
+    assert.notStrictEqual(prompt[0].content, calls[0].messages[0].content, "a question is not asked under the review's instructions")
+    assert.doesNotMatch(String(prompt[0].content), /exactly these sections/)
+    assert.match(String(prompt[0].content), /Do not write another review/)
+    assert.strictEqual(prompt[1].content, calls[0].messages[1].content, "the pull is in front of the model, as the review saw it")
+    assert.match(String(prompt[1].content), /Does a thing\./)
     assert.deepStrictEqual(prompt[2], { role: "assistant", content: reviewed.text }, "so is the review")
-    assert.deepStrictEqual(prompt[3], { role: "user", content: "Why wrap v5?" })
+    assert.strictEqual(prompt.length, 4)
+    assert.strictEqual(prompt[3].role, "user")
+    assert.match(String(prompt[3].content), /^Why wrap v5\?\n\n\(Answer this question directly\. Do not write another review/, "and the question, with the reminder a small model needs")
     assert.strictEqual(calls[1].options.maxTokens, 2000)
     assert.strictEqual(calls[1].options.think, false)
     assert.strictEqual(asked.thread?.length, 2)
@@ -1611,16 +1830,32 @@ suite("Pull-request reviews", function () {
     assert.ok(asked.cutShort, "the review itself is still marked as cut")
 
     reply = "Yes."
-    const again = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "Is it safe?" }))).body as { review: ReviewRecord }).review
-    assert.deepStrictEqual(calls[2].messages.slice(3), [
+    // Asked of a selection in the diff: the code goes first, and stays with the question.
+    const selection = { path: "src/router.ts", startLine: 12, endLine: 13, text: "+const v5 = wrap(old)\n-const v5 = old", extra: "dropped" }
+    const again = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "Is it safe?", selection }))).body as { review: ReviewRecord }).review
+    const quoted = "About this part of the diff of `src/router.ts`, lines 12–13:\n\n```diff\n+const v5 = wrap(old)\n-const v5 = old\n```\n\nIs it safe?"
+    const second = calls[2].messages.slice(3)
+    assert.deepStrictEqual(second.slice(0, 2), [
       { role: "user", content: "Why wrap v5?" },
-      { role: "assistant", content: "Because the compat layer keeps v5 routes working." },
-      { role: "user", content: "Is it safe?" }
-    ])
+      { role: "assistant", content: "Because the compat layer keeps v5 routes working." }
+    ], "earlier turns go as they were asked, without the reminder")
+    assert.strictEqual(second.length, 3)
+    assert.ok(String(second[2].content).startsWith(`${quoted}\n\n(Answer this question directly.`))
     assert.strictEqual(again.thread?.length, 4)
+    assert.strictEqual(again.thread?.[2].text, "Is it safe?", "the question is kept as it was typed")
+    assert.deepStrictEqual(again.thread?.[2].quote, { path: "src/router.ts", text: selection.text, startLine: 12, endLine: 13 })
     const page = (await p.handle(req("GET", `repos/${repo.id}/pulls/1`))).body as PullPage
     assert.strictEqual(page.review?.thread?.length, 4)
-    assert.strictEqual(ReviewStore.open(path.join(dir, "reviews.json")).latest(repo.id, 1)?.thread?.length, 4, "the thread survives a restart")
+    const kept = ReviewStore.open(path.join(dir, "reviews.json")).latest(repo.id, 1)
+    assert.strictEqual(kept?.thread?.length, 4, "the thread survives a restart")
+    assert.deepStrictEqual(kept?.thread?.[2].quote, again.thread?.[2].quote, "and so does the code a question was about")
+
+    reply = "No."
+    await p.handle(req("POST", `repos/${repo.id}/pulls/1/review/ask`, { question: "Sure?", selection: { path: "", text: "x" } }))
+    const third = calls[3].messages
+    assert.strictEqual(third[5].content, quoted, "a follow-up still carries the code the earlier question was about")
+    assert.match(String(third[7].content), /^Sure\?\n\n\(Answer/, "a selection without a path is no selection")
+    assert.deepStrictEqual(third.map((message) => message.role), ["system", "user", "assistant", "user", "assistant", "user", "assistant", "user"], "turns alternate")
 
     reply = "## Summary\nAll of it.\n\n## Verdict\nApprove."
     const fresh = ((await p.handle(req("POST", `repos/${repo.id}/pulls/1/review`))).body as { review: ReviewRecord }).review

@@ -177,7 +177,7 @@ export class Chat extends Base {
    * Run, Always run or Skip, on a command waiting in the tool steps.
    * Always run keeps that exact command, to run unasked from then on.
    */
-  public answerToolApproval(id: string, run: boolean, always = false) {
+  public answerToolApproval(id: string, run: boolean, always = false, answer?: string) {
     const step = this._steps.steps.find((s) => s.id === id)
     if (run && always && step?.approval === "command" && step.command && !currentTeamPolicy()?.agent?.commands) {
       // An MCP tool is kept by name: its arguments differ from call to call.
@@ -187,7 +187,7 @@ export class Chat extends Base {
       const entry = step.mcpTool ?? normalCommand(step.command)
       if (!kept.includes(entry)) void this.context?.globalState.update(key, [...kept, entry])
     }
-    this._steps.answer(id, run)
+    this._steps.answer(id, run, answer)
   }
 
   /**
@@ -575,12 +575,13 @@ export class Chat extends Base {
    * when the user chose Always run for that exact command. Read for each
    * command, so either holds for the rest of the reply.
    */
-  private commandMode(setting: ChatCommandMode, command: string): "ask" | "allow" {
+  private commandMode(setting: ChatCommandMode, command: string, neverUnasked = false): "ask" | "allow" {
     // A team that asks for every command is asked for every command.
     if (currentTeamPolicy()?.agent?.commands) return "ask"
     const state = this.context?.globalState
     const stored = state?.get<boolean>(`${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.autoRunCommands}`)
-    if (stored ?? setting === "allow") return "allow"
+    // A command a workspace's own settings name is not the model's or the user's: auto-run does not cover it.
+    if (!neverUnasked && (stored ?? setting === "allow")) return "allow"
     const kept = state?.get<string[]>(`${EVENT_NAME.twinnyGlobalContext}-${GLOBAL_STORAGE_KEY.alwaysRunCommands}`)
     return kept?.includes(normalCommand(command)) ? "allow" : "ask"
   }
@@ -710,6 +711,11 @@ export class Chat extends Base {
     const team = currentTeamPolicy()?.agent
     const commandMode = team?.commands === "off" ? "off" : this.config.get<ChatCommandMode>("chatToolsCommands", "ask")
     const editMode = team?.edits === "review" ? "review" : this.config.get<ChatEditMode>("chatToolsEdits", "apply")
+    // The project's check. One that came with the workspace (a cloned repository's settings) is asked
+    // for like a command nobody chose, until the user picks Always run for it.
+    const check = this.config.get<string>("chatToolsCheckCommand", "").trim() || undefined
+    const checkSet = check ? this.config.inspect<string>("chatToolsCheckCommand") : undefined
+    const checkFromWorkspace = checkSet?.workspaceValue !== undefined || checkSet?.workspaceFolderValue !== undefined
     const changes = new ReplyChanges(view.root, openDocumentText)
     hooks.onChanges(changes)
     const approveChange = (detail: string, approval: "command" | "change") =>
@@ -722,7 +728,7 @@ export class Chat extends Base {
         commandMode === "off"
           ? undefined
           : terminalCommands(
-              (command) => this.commandMode(commandMode, command),
+              (command) => this.commandMode(commandMode, command, checkFromWorkspace && command.trim() === check),
               view.root,
               (command) => this._steps.approve(command, "command", { always: !team?.commands }),
               {
@@ -744,7 +750,15 @@ export class Chat extends Base {
           )
         : undefined,
       // A team that takes commands away takes MCP servers too: neither can be undone.
-      mcp: !mcpAllowed(team) || !this._mcp.tools.length ? undefined : this._mcp.sink((detail, tool) => this.approveMcp(detail, tool))
+      mcp: !mcpAllowed(team) || !this._mcp.tools.length ? undefined : this._mcp.sink((detail, tool) => this.approveMcp(detail, tool)),
+      ask: this.config.get<boolean>("chatToolsAsk", true)
+        ? { ask: (question, choices) => this._steps.ask(question, choices) }
+        : undefined,
+      // Every address is put to the user first: a page is the one thing here that leaves the machine.
+      web:
+        team?.fetch !== "off" && this.config.get<boolean>("chatToolsFetch", true)
+          ? { approve: (url) => this._steps.approve(url, "fetch") }
+          : undefined
     })
     hooks.onTools(available)
     let warned = false
@@ -767,6 +781,8 @@ export class Chat extends Base {
       },
       stepLines: false,
       tasks: this.config.get<boolean>("chatToolsTasks", true),
+      // Runs through run_command, so it asks like any command and a team that turns commands off turns it off.
+      check,
       onCompact: (messages) =>
         logger.info(`Chat tools · folded ${messages} older messages into a summary to fit the model's context`),
       steering: () => this.takeSteering(),

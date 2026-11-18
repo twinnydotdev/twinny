@@ -22,6 +22,7 @@ export const sendJson = (
     "Content-Type": "application/json",
     "Content-Length": Buffer.byteLength(text),
     "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
     ...headers
   })
   res.end(text)
@@ -80,7 +81,9 @@ export const sendPlugin = (
       "Content-Length": Buffer.byteLength(answer.html),
       "Cache-Control": "no-store",
       "Content-Security-Policy":
-        "default-src 'none'; style-src 'unsafe-inline'; img-src data:",
+        "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
       ...(answer.headers ?? {})
     })
     res.end(answer.html)

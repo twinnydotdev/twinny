@@ -21,10 +21,14 @@ export interface ComposerSettings {
   model?: SuggestionModelChoice
   /** Pixels; unset for the sidebar's own size. */
   fontSize?: number
+  /** Pixels, for code in the transcript; unset for the sidebar's own size. */
+  codeFontSize?: number
 }
 
 export const COMPOSER_FONT_SIZES = [12, 13, 14, 15, 16]
 export const DEFAULT_COMPOSER_FONT_SIZE = 13
+export const CODE_FONT_SIZES = [11, 12, 13, 14, 15, 16]
+export const DEFAULT_CODE_FONT_SIZE = 12
 
 /** The source in force: the sheet's choice, else what the old on/off setting says. */
 export const suggestionSourceOf = (
@@ -47,6 +51,15 @@ export const composerFontSizeOf = (settings: ComposerSettings | undefined): numb
   return typeof size === "number" && size >= 10 && size <= 24 && size !== DEFAULT_COMPOSER_FONT_SIZE
     ? size
     : undefined
+}
+
+/**
+ * A size for the code in the transcript (blocks, inline code, tool output,
+ * diffs), or undefined for the sidebar's own.
+ */
+export const codeFontSizeOf = (settings: ComposerSettings | undefined): number | undefined => {
+  const size = settings?.codeFontSize
+  return typeof size === "number" && size >= 10 && size <= 24 && size !== DEFAULT_CODE_FONT_SIZE ? size : undefined
 }
 
 interface ProviderLike {

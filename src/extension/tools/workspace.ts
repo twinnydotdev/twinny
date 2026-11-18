@@ -27,6 +27,7 @@ import {
   renameSymbol
 } from "./more"
 import { outlineOf, outlineText } from "./outline"
+import { AskSink, askUser, FetchSink, fetchUrl } from "./outside"
 import { parseLenientJson, ToolCall, ToolSpec } from "./protocol"
 import { clip, linesOf, plural, ToolInputError, WorkspaceView } from "./view"
 
@@ -69,6 +70,12 @@ export interface Tool extends ToolSpec {
 /** Lines of a file read at once when the model's context is small or unknown; a larger one reads more, up to the most. */
 const MAX_READ_LINES = 150
 const MOST_READ_LINES = 500
+/** A file this short comes whole when a slice of it is asked for, and a slice of a longer one is at least this wide, with a few lines of lead-in. */
+const WHOLE_FILE_LINES = 300
+const MIN_SLICE_LINES = 80
+const SLICE_LEAD_LINES = 15
+/** Files read by one call. */
+const MAX_READ_FILES = 6
 /** What a line of code runs to, for turning a result's room into lines. */
 const CHARS_PER_LINE = 45
 /** Lines shown after an edit on each side of the change, and of the change itself. */
@@ -175,60 +182,169 @@ const listDir = (view: WorkspaceView): Tool => ({
   }
 })
 
+/** One file's part of a read: what the model is sent, and how the step tells it. */
+interface FileRead {
+  output: string
+  /** `path:first–last`, or `path` with what went wrong. */
+  label: string
+  digest: string
+  /** Said after the label: `empty`. */
+  note?: string
+  failed?: boolean
+}
+
+/**
+ * A slice of a file, as asked or wider. A model that reads a file a few
+ * dozen lines at a time spends a request on each slice, so a short file
+ * comes whole whatever lines were asked for, and a narrow slice of a long
+ * one comes with the lines round it. Only a slice with an end is widened:
+ * reading on from a line is left as it is.
+ */
+export const widenedRange = (
+  start: number,
+  end: number | undefined,
+  total: number,
+  most: number,
+  fitsWhole: boolean
+): { start: number; end: number; whole: boolean } => {
+  if (end === undefined) return { start, end: total, whole: false }
+  if (total <= Math.min(most, WHOLE_FILE_LINES) && fitsWhole) return { start: 1, end: total, whole: start > 1 || end < total }
+  const span = end - start + 1
+  if (span >= MIN_SLICE_LINES) return { start, end, whole: false }
+  const from = Math.max(1, start - SLICE_LEAD_LINES)
+  return { start: from, end: Math.min(total, Math.max(end, from + MIN_SLICE_LINES - 1)), whole: false }
+}
+
+const readOne = async (
+  view: WorkspaceView,
+  seen: Map<string, string>,
+  file: string,
+  startLine: string | undefined,
+  endLine: string | undefined,
+  room: number | undefined
+): Promise<FileRead> => {
+  const absolute = view.resolve(file, "file")
+  const rel = view.relative(absolute)
+  const text = await view.text(absolute)
+  if (text === undefined) throw new ToolInputError(`${rel} is binary or too large to read.`)
+  const lines = linesOf(text)
+  if (!lines.length) return { output: `${rel} is empty.`, label: rel, note: "empty", digest: `${rel} is empty.` }
+  const first = Math.max(1, Number.parseInt(startLine ?? "", 10) || 1)
+  if (first > lines.length) {
+    throw new ToolInputError(`${rel} has only ${plural(lines.length, "line")}.`)
+  }
+  const endAsked = Number.parseInt(endLine ?? "", 10)
+  // As much as the model's context has room for: a file read whole costs
+  // one request, and one read in parts costs a request for each.
+  const most = room ? Math.min(MOST_READ_LINES, Math.max(MAX_READ_LINES, Math.floor(room / CHARS_PER_LINE))) : MAX_READ_LINES
+  // Kept back for the header and for what is defined below where the read stops.
+  const reserve = room ? Math.min(1200, Math.floor(room / 4)) : 1200
+  const numbered = text.length + lines.length * 6
+  const end0 = endAsked > 0 ? Math.max(first, endAsked) : undefined
+  // A file this reply was already given, and unchanged since, comes as asked:
+  // widening it again would send the same lines a second time.
+  const given = seen.get(absolute) === text
+  const range = given
+    ? { start: first, end: end0 ?? lines.length, whole: false }
+    : widenedRange(first, end0, lines.length, most, !room || numbered <= room - reserve)
+  const start = range.start
+  const asked = range.end
+  const last = Math.min(lines.length, asked, start + most - 1)
+  const rows: string[] = []
+  let used = 0
+  for (let i = start; i <= last; i++) {
+    const row = `${i}: ${clip(lines[i - 1])}`
+    // Room for the lines, less the header and the outline that may follow.
+    if (room && rows.length >= 40 && used + row.length + 1 > room - reserve) break
+    rows.push(row)
+    used += row.length + 1
+  }
+  const end = start + rows.length - 1
+  const stopped = end < Math.min(asked, lines.length)
+  // What is defined in the part not shown, so the next read can go straight to it.
+  const below = stopped ? outlineOf(lines, end, lines.length, 50) : undefined
+  const named = below ? cutToLast(outlineText(below.found), reserve - 200) : undefined
+  const cut = stopped
+    ? `\n… stopped at line ${end} of ${lines.length}; read on with start_line ${end + 1}` +
+      (named?.text ? `\nDefined further down (line): ${named.text}${below?.more || named.cut ? ", …" : ""}` : "")
+    : range.whole
+      ? "\n… that is the whole file: it is short, so it came whole"
+      : ""
+  const header = `${rel} (lines ${start}–${end} of ${lines.length})`
+  const shown = outlineOf(lines, start - 1, end, 15)
+  seen.set(absolute, text)
+  return {
+    output: `${header}\n${rows.join("\n")}${cut}`,
+    label: `${rel}:${start}–${end}`,
+    digest: shown.found.length ? `${header}; defined there (line): ${outlineText(shown.found)}${shown.more ? ", …" : ""}` : header
+  }
+}
+
+/** The files named in a `paths` argument: one a line, or a JSON list, or commas. */
+export const pathsOf = (paths: string | undefined): string[] => {
+  const text = paths?.trim()
+  if (!text) return []
+  if (text.startsWith("[")) {
+    try {
+      const list: unknown = JSON.parse(text)
+      if (Array.isArray(list)) return [...new Set(list.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean))]
+    } catch {
+      // Not JSON after all: read as lines.
+    }
+  }
+  return [...new Set(text.split(/[\n,]/).map((item) => item.trim().replace(/^[-*]\s+/, "").replace(/^["'`]|["'`]$/g, "")).filter(Boolean))]
+}
+
 const readFile = (view: WorkspaceView, seen: Map<string, string>): Tool => ({
   name: "read_file",
   readOnly: true,
-  description: "A file's lines, numbered. A long file comes a part at a time, with what is defined further down; ask for a range to read on.",
+  description:
+    "A file's lines, numbered, or several files at once. A long file comes a part at a time, with what is defined further down; ask for a range to read on.",
+  guidance:
+    "Read a file whole rather than a few lines at a time, and when you need several files, read them in one read_file call with paths: each call is a step, and a reply has only so many.",
   parameters: [
-    { name: "path", description: "The file." },
-    { name: "start_line", description: "First line to read, from 1.", optional: true, type: "integer" },
-    { name: "end_line", description: "Last line to read.", optional: true, type: "integer" }
+    { name: "path", description: "The file.", optional: true },
+    {
+      name: "paths",
+      description: `Several files to read in one call, instead of path: a list, at most ${MAX_READ_FILES}.`,
+      optional: true,
+      schema: { type: "array", items: { type: "string" } }
+    },
+    { name: "start_line", description: "First line to read, from 1 (with path).", optional: true, type: "integer" },
+    { name: "end_line", description: "Last line to read (with path).", optional: true, type: "integer" }
   ],
-  async run({ path: file, start_line, end_line }, context) {
-    if (!file) throw new ToolInputError("read_file needs a path.")
-    const absolute = view.resolve(file, "file")
-    const rel = view.relative(absolute)
-    const text = await view.text(absolute)
-    if (text === undefined) throw new ToolInputError(`${rel} is binary or too large to read.`)
-    const lines = linesOf(text)
-    if (!lines.length) return { output: `${rel} is empty.`, summary: `read \`${rel}\` · empty` }
-    const start = Math.max(1, Number.parseInt(start_line ?? "", 10) || 1)
-    if (start > lines.length) {
-      throw new ToolInputError(`${rel} has only ${plural(lines.length, "line")}.`)
-    }
-    const asked = Math.max(start, Number.parseInt(end_line ?? "", 10) || lines.length)
-    // As much as the model's context has room for: a file read whole costs
-    // one request, and one read in parts costs a request for each.
+  async run({ path: file, paths, start_line, end_line }, context) {
+    const several = pathsOf(paths)
+    const files = [...(file?.trim() ? [file.trim()] : []), ...several.filter((item) => item !== file?.trim())]
+    if (!files.length) throw new ToolInputError("read_file needs a path.")
     const room = context?.roomChars
-    const most = room ? Math.min(MOST_READ_LINES, Math.max(MAX_READ_LINES, Math.floor(room / CHARS_PER_LINE))) : MAX_READ_LINES
-    const last = Math.min(lines.length, asked, start + most - 1)
-    // Kept back for the header and for what is defined below where the read stops.
-    const reserve = room ? Math.min(1200, Math.floor(room / 4)) : 1200
-    const rows: string[] = []
-    let used = 0
-    for (let i = start; i <= last; i++) {
-      const row = `${i}: ${clip(lines[i - 1])}`
-      // Room for the lines, less the header and the outline that may follow.
-      if (room && rows.length >= 40 && used + row.length + 1 > room - reserve) break
-      rows.push(row)
-      used += row.length + 1
+    if (files.length === 1) {
+      const read = await readOne(view, seen, files[0], start_line, end_line, room)
+      return { output: read.output, summary: `read \`${read.label}\`${read.note ? ` · ${read.note}` : ""}`, digest: read.digest }
     }
-    const end = start + rows.length - 1
-    const stopped = end < Math.min(asked, lines.length)
-    // What is defined in the part not shown, so the next read can go straight to it.
-    const below = stopped ? outlineOf(lines, end, lines.length, 50) : undefined
-    const named = below ? cutToLast(outlineText(below.found), reserve - 200) : undefined
-    const cut = stopped
-      ? `\n… stopped at line ${end} of ${lines.length}; read on with start_line ${end + 1}` +
-        (named?.text ? `\nDefined further down (line): ${named.text}${below?.more || named.cut ? ", …" : ""}` : "")
-      : ""
-    const header = `${rel} (lines ${start}–${end} of ${lines.length})`
-    const shown = outlineOf(lines, start - 1, end, 15)
-    seen.set(absolute, text)
+    // Several files share the result's room, so each comes as whole as that allows.
+    const taken = files.slice(0, MAX_READ_FILES)
+    const share = room ? Math.max(1500, Math.floor(room / taken.length)) : undefined
+    const reads: FileRead[] = []
+    for (const item of taken) {
+      try {
+        reads.push(await readOne(view, seen, item, undefined, undefined, share))
+      } catch (error) {
+        const message = (error instanceof Error ? error.message : String(error)).split("\n")[0]
+        reads.push({ output: `${item}: could not be read. ${message}`, label: item, digest: `${item}: could not be read.`, failed: true })
+      }
+    }
+    const left = files.length - taken.length
+    const read = reads.filter((item) => !item.failed)
+    if (!read.length) throw new ToolInputError(reads.map((item) => item.output).join("\n"))
     return {
-      output: `${header}\n${rows.join("\n")}${cut}`,
-      summary: `read \`${rel}:${start}–${end}\``,
-      digest: shown.found.length ? `${header}; defined there (line): ${outlineText(shown.found)}${shown.more ? ", …" : ""}` : header
+      output:
+        reads.map((item) => item.output).join("\n\n") +
+        (left > 0 ? `\n\n(${plural(left, "more file")} not read: at most ${MAX_READ_FILES} in one call. Ask for ${left === 1 ? "it" : "them"} next.)` : ""),
+      summary:
+        `read ${plural(read.length, "file")} · ${read.map((item) => `\`${item.label}\``).join(", ")}` +
+        (reads.length > read.length ? ` · ${reads.length - read.length} not readable` : ""),
+      digest: reads.map((item) => item.digest).join("\n")
     }
   }
 })
@@ -403,7 +519,7 @@ const EDIT_DESCRIPTION = {
 
 const EDIT_GUIDANCE = {
   apply:
-    "When the user asks you to change code, read the lines first, then call edit_file, once per change, until the task is done; use create_file for a new file. Then say briefly what you changed.",
+    "When the user asks you to change code, read the lines first, then call edit_file, once per change, until the task is done; use create_file for a new file. To rename something or change every use of it, grep for the uses first, then change all of them in a file with one edit_file call and replace_all true. Then say briefly what you changed.",
   review:
     "When the user asks you to change code, read the lines first, then call edit_file (or create_file for a new file). The user reviews each change before it is applied, so propose one and say briefly what it does."
 }
@@ -738,6 +854,10 @@ export interface ToolExtras {
   instructions?: boolean
   /** Tools from MCP servers the user set up, and how to call one. */
   mcp?: McpSink
+  /** How to put a question to the user; without it the model has no `ask_user`. */
+  ask?: AskSink
+  /** How web pages are read; without it the model has no `fetch_url`. */
+  web?: FetchSink
 }
 
 /**
@@ -792,6 +912,8 @@ export const workspaceTools = (
     tools.push(moveFile(view, ops), deleteFile(view, ops))
   }
   if (commands) tools.push(runCommand(commands))
+  if (extras.web) tools.push(fetchUrl(extras.web))
+  if (extras.ask) tools.push(askUser(extras.ask))
   for (const spec of extras.mcp?.tools ?? []) tools.push(mcpTool(spec, extras.mcp!))
   const top = view.entries(view.root).map((e) => (e.dir ? `${e.name}/` : e.name))
   const reading = extras.instructions !== false

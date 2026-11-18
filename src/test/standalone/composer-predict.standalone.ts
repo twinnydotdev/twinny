@@ -13,7 +13,7 @@ import {
   suggestionDraft,
   wantsModelSuggestion
 } from "../../common/composer-predict"
-import { composerFontSizeOf, suggestionProviderFor, suggestionSourceOf } from "../../common/composer-settings"
+import { codeFontSizeOf, composerFontSizeOf, suggestionProviderFor, suggestionSourceOf } from "../../common/composer-settings"
 
 test("a partial word is finished from the seed words before anything is typed", () => {
   const model = buildWordModel([])
@@ -138,6 +138,14 @@ test("the composer's text size is only set when it differs from the sidebar's", 
   assert.strictEqual(composerFontSizeOf({ fontSize: 13 }), undefined)
   assert.strictEqual(composerFontSizeOf({ fontSize: 16 }), 16)
   assert.strictEqual(composerFontSizeOf({ fontSize: 400 }), undefined)
+})
+
+test("the code size is only set when it differs from the sidebar's, and apart from the typing size", () => {
+  assert.strictEqual(codeFontSizeOf(undefined), undefined)
+  assert.strictEqual(codeFontSizeOf({ codeFontSize: 12 }), undefined)
+  assert.strictEqual(codeFontSizeOf({ codeFontSize: 15 }), 15)
+  assert.strictEqual(codeFontSizeOf({ codeFontSize: 400 }), undefined)
+  assert.strictEqual(codeFontSizeOf({ fontSize: 16 }), undefined)
 })
 
 test("a guess joins a half-typed word by how it said the draft again", () => {

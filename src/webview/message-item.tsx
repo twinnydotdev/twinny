@@ -55,9 +55,12 @@ const MessageItem = memo(
     const isAgentMessage = message?.role === "assistant"
     const isLastMessage = index === messages?.length - 1
     const messageKey = `${message?.role}-0`
-    // A reply the user stopped, or one that used every tool step it had.
+    // A reply the user stopped, one that used every tool step it had, or one the output limit cut off.
     const canContinue =
-      isAgentMessage && isLastMessage && !isLoading && !!(message.meta?.stopped || message.meta?.outOfSteps)
+      isAgentMessage &&
+      isLastMessage &&
+      !isLoading &&
+      !!(message.meta?.stopped || message.meta?.outOfSteps || message.meta?.cutOff)
 
     if (pending) {
       // Never an empty row: Virtuoso measures nothing as an error.

@@ -134,7 +134,8 @@ test("tools find, read and search, and stay inside the workspace", async () => {
   assert.strictEqual(method.output, "src/warmer.ts:2: public async warm() {")
 
   const read = await tools.run({ name: "read_file", args: { path: "./src/warmer.ts", start_line: "2", end_line: "3" } })
-  assert.match(read.output, /^src\/warmer.ts \(lines 2–3 of 5\)\n2: {3}public async warm\(\) \{\n3: {5}return 1$/)
+  assert.match(read.output, /^src\/warmer.ts \(lines 1–5 of 5\)\n1: export class ModelWarmer \{\n2: {3}public async warm\(\) \{\n3: {5}return 1\n/, "a slice of a short file comes as the whole file")
+  assert.match(read.output, /\n… that is the whole file: it is short, so it came whole$/)
 
   const grep = await tools.run({ name: "grep", args: { pattern: "modelwarmer" } })
   assert.strictEqual(
@@ -245,7 +246,7 @@ test("native calls go out as tools and come back as tool messages; the last requ
   assert.deepStrictEqual(steps, ["native:find_symbol", "native:read_file", "native:grep"])
   assert.strictEqual(
     shown,
-    "> looked up `ModelWarmer` · 1 definition\n\n> read `src/warmer.ts:1–1`\n\n> tool call not understood · the arguments were not valid JSON\n\nIn src/warmer.ts:1."
+    "> looked up `ModelWarmer` · 1 definition\n\n> read `src/warmer.ts:1–5`\n\n> tool call not understood · the arguments were not valid JSON\n\nIn src/warmer.ts:1."
   )
   assert.deepStrictEqual(requests[0].tools?.map((t) => t.name), ["list_dir", "find_files", "read_file", "grep", "find_symbol", "update_tasks"])
   assert.doesNotMatch(requests[0].messages[0].content as string, /```tool/)
@@ -622,7 +623,7 @@ test("the text protocol lists tools without the parentheses that invite function
   const { client, requests } = scripted(["Hi."])
   await collect(withTools(client, workspaceTools(makeWorkspace())).chat({ model: "m", messages: [{ role: "user", content: "Hi" }] }))
   const system = requests[0].messages[0].content as string
-  assert.match(system, /\n- read_file \{path, start_line\?, end_line\?\}: /)
+  assert.match(system, /\n- read_file \{path\?, paths\?, start_line\?, end_line\?\}: /)
   assert.doesNotMatch(system, /\n- \w+\(/)
 })
 

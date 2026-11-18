@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
+  CODE_FONT_SIZES,
   COMPOSER_FONT_SIZES,
   ComposerSettings as Settings,
+  DEFAULT_CODE_FONT_SIZE,
   DEFAULT_COMPOSER_FONT_SIZE,
   suggestionProviderFor,
   SuggestionSource,
@@ -35,7 +37,8 @@ const CHAT_MODEL = ""
 /**
  * The composer's own settings, laid over the foot of the transcript like
  * the agent's: where the grey suggestions come from, which model writes the sentence ones (named, so it is never
- * a guess which one answered), and the size of the text typed. Kept for
+ * a guess which one answered), the size of the text typed and the size of
+ * the code in replies. Kept for
  * every window; each change shows at once.
  */
 export const ComposerSettings = ({ settings, source, status, onChange, onClose }: ComposerSettingsProps) => {
@@ -85,6 +88,10 @@ export const ComposerSettings = ({ settings, source, status, onChange, onClose }
   const sizes = COMPOSER_FONT_SIZES.includes(fontSize)
     ? COMPOSER_FONT_SIZES
     : [...COMPOSER_FONT_SIZES, fontSize].sort((a, b) => a - b)
+  const codeFontSize = settings.codeFontSize ?? DEFAULT_CODE_FONT_SIZE
+  const codeSizes = CODE_FONT_SIZES.includes(codeFontSize)
+    ? CODE_FONT_SIZES
+    : [...CODE_FONT_SIZES, codeFontSize].sort((a, b) => a - b)
 
   return (
     <div ref={panel} className={styles.panel} role="dialog" aria-label={t("composer-settings-title")}>
@@ -198,6 +205,21 @@ export const ComposerSettings = ({ settings, source, status, onChange, onClose }
           label: String(size),
           title: t(
             size === DEFAULT_COMPOSER_FONT_SIZE ? "composer-settings-font-size-default" : "composer-settings-font-size-title",
+            { size }
+          )
+        }))}
+      />
+      <Choices<number>
+        label={t("composer-settings-code-size")}
+        value={codeFontSize}
+        onChange={(size) =>
+          onChange({ ...settings, codeFontSize: size === DEFAULT_CODE_FONT_SIZE ? undefined : size })
+        }
+        choices={codeSizes.map((size) => ({
+          value: size,
+          label: String(size),
+          title: t(
+            size === DEFAULT_CODE_FONT_SIZE ? "composer-settings-code-size-default" : "composer-settings-code-size-title",
             { size }
           )
         }))}

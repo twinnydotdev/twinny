@@ -43,7 +43,7 @@ import { PluginError, PluginHost } from "./plugins/host"
 import { exportLines } from "./recording/export"
 import { Recorder } from "./recording/recorder"
 import type { RecordingQuery, RecordingRoute } from "./recording/store"
-import { adminPageHtml } from "./admin-page"
+import { adminPageHeaders, adminPageHtml } from "./admin-page"
 import { isAgentRequest, OUTDATED_AGENT_CLIENT } from "./agent-rules"
 import type { AuditLog } from "./audit"
 import {
@@ -1826,14 +1826,7 @@ export class GatewayServer {
         return
       }
       const html = adminPageHtml({ demo: !!this._options.demo })
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8",
-        "Content-Length": Buffer.byteLength(html),
-        "Cache-Control": "no-store",
-        "Content-Security-Policy":
-          // Fonts are inlined in the stylesheet as data: URLs, like the icons.
-          "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; font-src data:"
-      })
+      res.writeHead(200, { ...adminPageHeaders({ demo: !!this._options.demo }), "Content-Length": Buffer.byteLength(html) })
       res.end(html)
       return
     }

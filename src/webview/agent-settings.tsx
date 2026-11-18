@@ -137,6 +137,9 @@ export const AgentSettings = ({ team, autoRun, setAutoRun, onClose }: AgentSetti
     StorageType.Global,
     GLOBAL_STORAGE_KEY.alwaysRunMcpTools
   )
+  const [fetchPages, setFetchPages] = useSetting<boolean>("chatToolsFetch", true)
+  const [questions, setQuestions] = useSetting<boolean>("chatToolsAsk", true)
+  const [check] = useSetting<string>("chatToolsCheckCommand", "")
   const [mcpServers] = useSetting<Record<string, unknown>>("chatToolsMcpServers", {})
   const servers = Object.keys(mcpServers ?? {}).length
 
@@ -221,6 +224,39 @@ export const AgentSettings = ({ team, autoRun, setAutoRun, onClose }: AgentSetti
           title: t("agent-settings-steps-title", { count: steps })
         }))}
       />
+      <Choices
+        label={t("agent-settings-fetch")}
+        value={team?.fetch === "off" || !fetchPages ? "off" : "ask"}
+        onChange={(mode) => setFetchPages(mode === "ask")}
+        choices={[
+          {
+            value: "ask",
+            label: t("agent-settings-fetch-ask"),
+            title: t("agent-settings-fetch-ask-title"),
+            ...(team?.fetch === "off" ? { locked: teamSays } : {})
+          },
+          { value: "off", label: t("agent-settings-fetch-off"), title: t("agent-settings-fetch-off-title") }
+        ]}
+      />
+      <Choices
+        label={t("agent-settings-questions")}
+        value={questions ? "on" : "off"}
+        onChange={(mode) => setQuestions(mode === "on")}
+        choices={[
+          { value: "on", label: t("agent-settings-questions-on"), title: t("agent-settings-questions-on-title") },
+          { value: "off", label: t("agent-settings-questions-off"), title: t("agent-settings-questions-off-title") }
+        ]}
+      />
+      {!commandsOff && (
+        <div className={styles.row}>
+          <span className={styles.label} title={t("agent-settings-check-title")}>
+            {check.trim() ? t("agent-settings-check", { command: check.trim() }) : t("agent-settings-check-none")}
+          </span>
+          <button type="button" className={styles.link} onClick={() => emit(EVENT_NAME.twinnyOpenAgentSettings)}>
+            {t(check.trim() ? "agent-settings-check-change" : "agent-settings-check-set")}
+          </button>
+        </div>
+      )}
       {team?.commands !== "off" && team?.mcp !== "off" && (
         <div className={styles.row}>
           <span className={styles.label} title={t("agent-settings-mcp-title")}>

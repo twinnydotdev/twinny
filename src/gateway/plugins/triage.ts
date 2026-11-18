@@ -102,7 +102,15 @@ export class TriageStore {
     )
   }
 
-  public put(record: TriageRecord): void {
+  /** Keeps a triage, replacing the issue's earlier one. That its reply or labels reached the host outlives the replacement. */
+  public put(incoming: TriageRecord): void {
+    const before = this._triages.find((t) => t.repoId === incoming.repoId && t.number === incoming.number)
+    const record: TriageRecord = {
+      ...incoming,
+      ...(before?.repliedAt && !incoming.repliedAt ? { repliedAt: before.repliedAt } : {}),
+      ...(before?.labeledAt && !incoming.labeledAt ? { labeledAt: before.labeledAt } : {}),
+      ...(before?.postedBy && !incoming.postedBy ? { postedBy: before.postedBy } : {})
+    }
     this._triages = this._triages.filter((t) => !(t.repoId === record.repoId && t.number === record.number))
     this._triages.push(record)
     if (this._triages.length > MAX_TRIAGES) this._triages = this._triages.slice(-MAX_TRIAGES)

@@ -4,7 +4,7 @@
  * read with an access token (scope: read on repository). Statuses and
  * reviews come from their own routes; a pull's changes from its `.diff`.
  */
-import { arr, baseUrlOf, CheckState, Forge, IssueSummary, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str, tokenProbe } from "./forge"
+import { arr, baseUrlOf, CheckState, Forge, IssueSummary, MAX_DIFF_BYTES, MAX_LISTED_REPOS, MAX_PULLS_PER_REPO, num, PullCheck, PullContent, PullSummary, readJson, readTextCapped, rec, RepoRecord, RepoStore, ReviewPostAs, ReviewState, rollup, splitUnifiedDiff, str, tokenProbe } from "./forge"
 import { GatewayPlugin, PluginContext, PluginError } from "./host"
 import { MEMBER_ROUTES, PullsPlugin } from "./pulls"
 
@@ -232,7 +232,8 @@ export class GiteaForge implements Forge {
       signal
     })
     if (!response.ok) throw new PluginError(`${what} (diff): status ${response.status}.`, 502)
-    const { files, moreFiles } = splitUnifiedDiff(await response.text())
+    // Cut mid-file at the cap: the files before it are whole, the last one shows as far as it got.
+    const { files, moreFiles } = splitUnifiedDiff((await readTextCapped(response, MAX_DIFF_BYTES)).text)
     return { body: str(pull.body), files, moreFiles }
   }
 }

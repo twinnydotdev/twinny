@@ -494,6 +494,7 @@ One JSON file, passed with `--config`. Every field except `providers` and
 | `policy.agent.commands` | `ask`: every command the agent runs waits for the developer's Run (auto-run and Always run do nothing). `off`: the agent cannot run commands. | developer's choice |
 | `policy.agent.edits` | `review`: every change the agent makes waits in the editor as a diff to accept. | developer's choice |
 | `policy.agent.mcp` | `off`: agent mode uses none of the MCP servers developers set up (`commands: "off"` does this too). | developer's choice |
+| `policy.agent.fetch` | `off`: agent mode reads no web pages, whatever `twinny.chatToolsFetch` says. | developer's choice |
 | `policy.agent.blockedPaths` | Paths, in `.gitignore` syntax from each workspace's root, the agent may not list, read, search, see in git or change. At most 200. | none |
 | `policy.secretShield` | Which backends get prompts with credentials swapped for placeholders: `offMachine` (hosted APIs, other hosts, paired devices, other gateways, the team pool), `always` (every backend) or `off`. Applies on every plan. | `offMachine` |
 | `recording.chat`, `recording.fim`, `recording.embeddings` | Keep the content of these requests. Needs the `recording` licence feature; disclosed to developers. | `false` |
@@ -719,6 +720,8 @@ theirs in force.
 - `mcp: "off"` keeps the MCP servers developers set up
   (`twinny.chatToolsMcpServers`) out of agent mode; with commands asked
   for, every MCP call is asked for too.
+- `fetch: "off"` takes away the agent's reading of web pages
+  (`twinny.chatToolsFetch`, asked for address by address).
 - `blockedPaths` hides paths from every tool the agent has, git included,
   on top of each repository's `.gitignore`. A command the agent runs is
   not held to them; use `commands` for that.
@@ -1512,13 +1515,12 @@ pull-request plugins (GitHub, GitLab, Gitea, Bitbucket) let them do what a
 reviewer does:
 
 - read the pulls and issues, and sync;
-- review a pull now, ask about the review, and post it to the host as a
-  comment, once;
+- review a pull now and ask about it;
 - triage an issue and post the reply and the labels the model suggested;
 - set who they are on the host (**You on GitHub**), which marks the pulls
   waiting for their approval on their page alone.
 
-Adding or removing repositories, tokens, auto-review and auto-post, the
+Adding or removing repositories, tokens, auto-review, the
 GitHub App, the host URL and the review model stay with admins. The
 notifiers (Slack, Discord, Teams), SSO sign-in, shared context and backups
 are for admins only and cannot be shared. A plugin that is off, or a plan
@@ -1569,13 +1571,36 @@ branch and activity (updated today, this week, this month, or quiet for
 change, checks, merge state, review state) that the column headers set
 too. The issues table has the same shape with its own views (not triaged,
 high priority, duplicates, reply pending, triage failed). Filters and
-ordering are remembered per host in the browser. Under the review state
+ordering are remembered per host in the browser. A pull that is always
+there and never yours to act on can be set aside: the eye at the end of
+its row ignores it, which takes it out of the list, the views and the
+counts in that browser only. The **Ignored** switch brings the ignored ones
+back, dimmed, each with the eye that returns it. Under the review state
 each pull shows its approvals as the host reports them: how many it has
 against how many the base branch requires (`1/2 approved`), how many
 reviewers asked for changes, and how many are still to answer; the
 opened pull names them. This detail is only ever asked for with the
 scopes a plain repository token has; a host that refuses it (an older
 GitHub Enterprise, say) is listed without it from then on.
+
+**Getting around.** Where you are is in the page's address: the view
+(`#people`, `#plugin:github`), the section inside a plugin
+(`#plugin:github/issues`, `#plugin:github/setup`) and the pull or issue
+opened there (`#plugin:github/pull/<repository id>/<number>`). Each move
+is a history entry, so the browser's Back leaves a pull for the list it
+was opened from and Forward returns to it, a reload stays where it was,
+and a copied address opens the same pull for anyone signed in who may
+see it.
+
+**Images in a description.** The admin page loads nothing from outside
+the gateway, so a description's images come through it. On GitHub the
+gateway asks for the description as GitHub renders it, takes each
+image's address from there (an attachment on a private repository gets
+a signed one, good for a few minutes) and fetches it from GitHub's own
+hosts without the token. Only images that description holds are
+fetched, only PNG, JPEG, GIF, WebP and AVIF, and none over 8 MB; an
+image elsewhere, or on GitLab, Gitea or Bitbucket, is shown as a link
+that opens it.
 
 **Where you stand.** The page learns who you are on the host from the
 first token it syncs with (or from the *you on GitHub* field under the
@@ -1615,13 +1640,19 @@ through it until it is set up again.
 **Self-hosted.** Set the host URL on the page for GitHub Enterprise
 Server or a self-managed GitLab; the public hosts are the default.
 
-**Reviews by your own models.** A pull's page has **review now**: the
+**Reviews by your own models.** A pull's page has **review with
+<model>**: the
 gateway sends the description and diffs to one of its chat aliases (the
 *review model* on the plugin page; the first chat alias unless chosen)
 and keeps what came back on the server, per pull and commit, in the
 plugin's `reviews.json`. The review shows on the pull's page with the
 model, the time and who asked; a pull that has moved on marks it as
-being for an earlier commit. Posting it to the host is a separate, explicit step (or auto-post).
+being for an earlier commit. It stays on the gateway: the page does not post reviews to the host.
+
+A review runs on the server, not in the page: leave the pull, open
+another, or close the tab, and it carries on. The list marks the pull as
+*model reviewing*, and its page shows the review when it lands. Two
+reviews may run at once; a third is refused until one finishes.
 
 Ticking **auto-review** on a repository reviews its new and updated
 pulls in the background: one at a time, newest first, never drafts, and
@@ -1633,17 +1664,10 @@ what they cost. The prompt carries at most 24k characters of description
 and diff (larger patches are named but left out) and asks for at most
 1,500 tokens back, to suit local models with small contexts.
 
-**Posting a review to the host.** A finished review has **post to
-GitHub** (or GitLab, Gitea, Bitbucket) with a choice of how the host
-should record it: a comment, a change request or an approval. GitHub and
-Gitea take all three as a review; GitLab posts a note and, for an
-approval, approves; Bitbucket posts a comment and, when asked, approves
-or requests changes. The review is posted with a footer naming the model
-and the commit, and the page shows when and where it went. Ticking
-**auto-post** on a repository posts every finished review as a comment
-without anyone pressing the button, which with **auto-review** makes a
-fully automatic first pass on every pull. A `review.posted` event goes
-out for the notifiers.
+**Reviews are not posted to the host.** The page has no control that
+posts a review, and **auto-post** is gone: a repository that had it
+ticked no longer posts anything. The `…/review/post` route below is
+still there for scripts that call it on purpose.
 
 **Issue triage.** On GitHub, GitLab and Gitea the plugin also lists a
 repository's open issues. **Triage** sends one to the review model with
@@ -1657,11 +1681,20 @@ wait for a person. An `issue.triaged` event goes out, marked as a
 warning when the priority is high, so a channel can hear about the
 serious ones.
 
-**Asking about a review.** Under a finished review is a box for
-questions. Each one goes to the review model with the pull, the review
-and the earlier questions in front of it, and the exchange is kept on
-the review as its thread, on the server, until the pull is reviewed
-again. Nothing in the thread is posted to the host.
+**Asking about a pull.** Under a finished review is a box for
+questions, with a few to start from. Each one goes to the review model
+with the pull, the review and the earlier questions in front of it, under
+instructions to answer the question and not to review again. **Enter**
+sends, **Shift+Enter** starts a new line. The exchange is kept on the
+review as its thread, on the server, until the pull is reviewed again.
+
+Lines of a file can be asked about where they are: select them in the
+diff, press **Ask about these lines**, and the question and its answer
+sit under that file. The selected lines go to the model with their
+`+`/`-` signs, the file's path and the line numbers, and the exchange
+joins the pull's thread with the lines quoted. This needs a finished
+review of the pull, and one question is answered at a time. Nothing
+asked or answered is posted to the host.
 
 **Reasoning models.** A model that thinks before answering (Qwen 3 and
 the like) is asked not to. Ollama's OpenAI-compatible route ignores
@@ -1685,8 +1718,8 @@ without a word.
 | `GET /repos/<id>/pulls/<number>` | one pull with its description, files and latest review |
 | `POST /repos/<id>/pulls/<number>/review` | review it now with the review model; answers when the review is done |
 | `POST /repos/<id>/pulls/<number>/review/post` `{ as? }` | post the finished review to the host as `comment` (default), `request-changes` or `approve` |
-| `POST /repos/<id>/pulls/<number>/review/ask` `{ question }` | ask the review model about the finished review; answers with the review, its thread grown by the question and the answer |
-| `PUT /repos/<id>` `{ autoReview?, autoPost?, autoTriage? }` | review new and updated pulls in the background; post every finished review as a comment; triage new issues in the background |
+| `POST /repos/<id>/pulls/<number>/review/ask` `{ question, selection? }` | ask the review model about the pull; `selection` is `{ path, text, startLine?, endLine? }` for lines picked out of a diff. Answers with the review, its thread grown by the question and the answer |
+| `PUT /repos/<id>` `{ autoReview?, autoTriage? }` | review new and updated pulls in the background; triage new issues in the background (`autoPost` is still accepted and does nothing) |
 | `GET /repos/<id>/issues/<number>` | the issue with its body and latest triage |
 | `POST /repos/<id>/issues/<number>/triage` | triage it now with the review model |
 | `POST /repos/<id>/issues/<number>/triage/post` `{ reply?, replyText?, labels?, labelNames? }` | post the reply and/or apply the labels |

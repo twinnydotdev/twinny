@@ -11,6 +11,7 @@ import cx from "classnames"
 import { v4 as uuidv4 } from "uuid"
 
 import {
+  codeFontSizeOf,
   composerFontSizeOf,
   ComposerSettings as ComposerSettingsValue,
   suggestionSourceOf
@@ -50,7 +51,7 @@ import { bridge, emit, useServerEvent } from "./messaging"
 import { ModelState } from "./model-state"
 import { Shortcuts } from "./shortcuts"
 import { Suggestions } from "./suggestions"
-import { answerToolStep } from "./tool-steps"
+import { answerToolQuestion, answerToolStep } from "./tool-steps"
 import { conversationMarkdown } from "./transcript"
 import { CustomKeyMap, getThinkingMessage } from "./utils"
 
@@ -277,6 +278,22 @@ export const Chat = (props: ChatProps): JSX.Element => {
   }, [])
   const suggestionSource = suggestionSourceOf(composerSettings, suggestionsSetting)
   const composerFontSize = composerFontSizeOf(composerSettings)
+  const codeFontSize = codeFontSizeOf(composerSettings)
+  // What is read takes its size from these: the text size sets the prose (and the small type a step or two under
+  // it), the code size sets blocks, tool output and diffs. Code in backticks follows the prose.
+  const transcriptStyle = useMemo(() => {
+    const style: Record<string, string> = {}
+    if (composerFontSize) {
+      style["--tw-fs"] = `${composerFontSize}px`
+      style["--tw-fs-sm"] = `${composerFontSize - 1}px`
+      style["--tw-fs-xs"] = `${composerFontSize - 2}px`
+    }
+    if (codeFontSize) {
+      style["--tw-fs-mono"] = `${codeFontSize}px`
+      style["--tw-fs-mono-sm"] = `${codeFontSize - 1}px`
+    }
+    return Object.keys(style).length ? (style as React.CSSProperties) : undefined
+  }, [composerFontSize, codeFontSize])
   const [composerSettingsOpen, setComposerSettingsOpen] = useState(false)
   const closeComposerSettings = useCallback(() => setComposerSettingsOpen(false), [])
 
@@ -622,6 +639,11 @@ export const Chat = (props: ChatProps): JSX.Element => {
   const approveWaiting = useCallback((how: "run" | "always" | "skip") => {
     const step = waitingStepRef.current
     if (!step) return false
+    // A question is answered with what is written and sent; Enter on nothing leaves it waiting.
+    if (step.approval === "question") {
+      if (how === "skip") answerToolStep(step, "skip")
+      return how !== "always"
+    }
     // Shift+Enter means Always run, which only a command the team lets
     // run unasked has; on a change or such a command it is a new line.
     if (how === "always" && (step.approval !== "command" || step.noAlways)) return false
@@ -740,6 +762,14 @@ export const Chat = (props: ChatProps): JSX.Element => {
       .trim()
 
     if (!text || !input || chatDisabled) return
+
+    // A question the model is waiting on is answered by what is sent, from the key or the button.
+    const asked = waitingStepRef.current
+    if (asked?.approval === "question") {
+      answerToolQuestion(asked, text)
+      editorRef.current?.commands.clearContent()
+      return
+    }
 
     const message: QueuedMessage = {
       id: uuidv4(),
@@ -1271,7 +1301,7 @@ export const Chat = (props: ChatProps): JSX.Element => {
             {contextItems.map(renderContextItem)}
           </div>
         )}
-        <div className={styles.transcript}>
+        <div className={styles.transcript} style={messages.length ? transcriptStyle : undefined}>
           {messages.length === 0 ? (
             <EmptyChat
               status={model.status}

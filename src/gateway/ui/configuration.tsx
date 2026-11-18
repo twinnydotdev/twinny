@@ -772,6 +772,21 @@ export const ConfigurationPanel = ({
               </label>
             ))}
           </fieldset>
+          <fieldset className="policy-rule" disabled={agentRules.off === true}>
+            <legend>Web pages</legend>
+            {([
+              [undefined, "Developer's choice", "Developers may let agent mode read web pages (documentation, an issue). Each address asks first."],
+              ["off", "Off", "Agent mode reads no web pages."]
+            ] as const).map(([mode, title, detail]) => (
+              <label key={mode ?? "own"} className="policy-option">
+                <input type="radio" name="policy-agent-fetch" checked={agentRules.fetch === mode} disabled={locked} onChange={() => setAgentRules((agent) => {
+                  if (mode) agent.fetch = mode
+                  else delete agent.fetch
+                })} />
+                <span><b>{title}</b><small>{detail}</small></span>
+              </label>
+            ))}
+          </fieldset>
           <label className="config-field">
             <span>paths the agent may not touch, one per line</span>
             <textarea rows={3} value={(agentRules.blockedPaths ?? []).join("\n")} disabled={locked || agentRules.off === true} placeholder={"e.g.\n.env*\ninfra/\nsecrets/**"} onChange={(event) => {

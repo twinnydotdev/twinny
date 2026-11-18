@@ -25,7 +25,7 @@ export const policyIsEmpty = (policy: TeamPolicy | undefined): boolean =>
 
 /** Whether the agent rules tighten anything. */
 export const agentPolicyIsEmpty = (agent: TeamAgentPolicy | undefined): boolean =>
-  !agent || (!agent.off && !agent.commands && !agent.edits && !agent.mcp && !agent.blockedPaths?.length)
+  !agent || (!agent.off && !agent.commands && !agent.edits && !agent.mcp && !agent.fetch && !agent.blockedPaths?.length)
 
 const MAX_PATHS_NAMED = 5
 
@@ -38,6 +38,7 @@ export const describeAgentPolicy = (agent: TeamAgentPolicy | undefined): string[
   else if (agent.commands === "ask") lines.push("Agent mode asks before every command it runs.")
   if (agent.edits === "review") lines.push("Every change agent mode makes waits for your review.")
   if (agent.mcp === "off" && agent.commands !== "off") lines.push("Agent mode uses no MCP servers.")
+  if (agent.fetch === "off") lines.push("Agent mode reads no web pages.")
   const paths = agent.blockedPaths ?? []
   if (paths.length) {
     const named = paths.slice(0, MAX_PATHS_NAMED).join(", ")

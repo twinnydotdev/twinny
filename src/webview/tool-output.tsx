@@ -12,7 +12,7 @@ import {
   languageForPath,
   parseCommandRun,
   parseLocatedLines,
-  parseReadFile,
+  parseReadFiles,
   parseSearchHits,
   replacementDiff
 } from "../common/tool-output"
@@ -140,16 +140,23 @@ export const ToolOutput = ({ step }: { step: ToolStepView }) => {
 
   switch (step.name) {
     case "read_file": {
-      const slice = parseReadFile(output)
-      if (!slice) break
-      const endLine = slice.startLine + Math.max(0, slice.code.split("\n").length - 1)
+      const slices = parseReadFiles(output)
+      if (!slices.length) break
       return (
         <>
-          <Label>
-            <FileLink path={slice.path} line={slice.startLine} endLine={endLine} />
-          </Label>
-          <Code code={slice.code} language={languageForPath(slice.path)} startLine={slice.startLine} />
-          {slice.note && <div className={styles.note}>{slice.note}</div>}
+          {slices.map((slice) => (
+            <div key={`${slice.path}:${slice.startLine}`} className={slices.length > 1 ? styles.hit : undefined}>
+              <Label>
+                <FileLink
+                  path={slice.path}
+                  line={slice.startLine}
+                  endLine={slice.startLine + Math.max(0, slice.code.split("\n").length - 1)}
+                />
+              </Label>
+              <Code code={slice.code} language={languageForPath(slice.path)} startLine={slice.startLine} />
+              {slice.note && <div className={styles.note}>{slice.note}</div>}
+            </div>
+          ))}
         </>
       )
     }

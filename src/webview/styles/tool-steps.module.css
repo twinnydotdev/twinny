@@ -15,6 +15,13 @@
   padding: 0;
 }
 
+/* The steps of a folded run, set in under the line that counts them. */
+.grouped {
+  margin: 0 0 4px 20px;
+  padding: 0;
+  list-style: none;
+}
+
 .head {
   display: flex;
   align-items: center;
@@ -81,7 +88,7 @@
   background: none !important;
   color: color-mix(in srgb, var(--tw-fg) 82%, transparent);
   font-family: var(--tw-mono);
-  font-size: var(--tw-fs-xs) !important;
+  font-size: var(--tw-fs-mono-sm) !important;
 }
 
 .chevron {
@@ -121,7 +128,6 @@
   background: var(--tw-fill);
 }
 
-.detailLabel,
 /* The tail of a command still running, under its line. */
 .live {
   margin: 2px 0 4px 20px;
@@ -130,12 +136,13 @@
   background: var(--tw-fill);
   color: var(--tw-fg-dim);
   font-family: var(--tw-mono);
-  font-size: var(--tw-fs-xs);
+  font-size: var(--tw-fs-mono-sm);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
+.detailLabel,
 .approvalLabel {
   margin: 4px 0 2px;
   color: var(--tw-fg-faint);
@@ -165,7 +172,7 @@
   background: none !important;
   color: var(--tw-code);
   font-family: var(--tw-mono);
-  font-size: inherit !important;
+  font-size: var(--tw-fs-mono-sm) !important;
 }
 
 .args pre,
@@ -178,7 +185,7 @@
   background: var(--tw-fill);
   color: var(--tw-code);
   font-family: var(--tw-mono);
-  font-size: var(--tw-fs-xs);
+  font-size: var(--tw-fs-mono-sm);
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -219,7 +226,7 @@
   background: none;
   color: var(--tw-link);
   font-family: var(--tw-mono);
-  font-size: var(--tw-fs-xs);
+  font-size: var(--tw-fs-mono-sm);
   letter-spacing: normal;
   text-align: left;
   cursor: pointer;
@@ -305,7 +312,7 @@
   overflow: auto;
   background: var(--tw-surface);
   font-family: var(--tw-mono);
-  font-size: var(--tw-fs-xs);
+  font-size: var(--tw-fs-mono-sm);
   line-height: 1.5;
 }
 
@@ -353,6 +360,41 @@
   font-size: var(--tw-fs-sm);
   line-height: 18px;
   cursor: pointer;
+}
+
+/* What the model asked, in the reply's own type: it is a sentence to read, not a command. */
+.question {
+  margin: 2px 0 8px;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  line-height: var(--tw-lh);
+  overflow-wrap: anywhere;
+}
+
+.choices {
+  flex-wrap: wrap;
+}
+
+.choices .skip {
+  text-align: left;
+}
+
+/* Skipping a question is the quiet way out, beside the answers. */
+.dismiss {
+  padding: 3px 8px;
+  border: 0;
+  background: none;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-sm);
+  cursor: pointer;
+}
+
+.dismiss:hover,
+.dismiss:focus-visible {
+  color: var(--tw-fg);
+  outline: none;
 }
 
 .run {

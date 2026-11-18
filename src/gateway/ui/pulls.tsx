@@ -4,24 +4,31 @@
  * checks, mergeability and review state, and one pull opened with its
  * description and diffs. Talks only to the plugin's own routes.
  */
-import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { messageOf } from "../../common/errors"
 import type { PullPage, PullSummary, RepoView, TokenView } from "../plugins/forge"
 import type { GitHubStatus } from "../plugins/github"
-import type { ReviewBrief, ReviewRecord } from "../plugins/reviews"
+import type { ReviewBrief, ReviewQuote, ReviewRecord, ReviewTurn } from "../plugins/reviews"
 import type { TriageBrief, TriagePriority, TriageRecord } from "../plugins/triage"
 
 import { api, ApiError } from "./api"
 import { fmt, plural, timeAgo } from "./format"
 import { forgetHostName, hostNameHint, isGitHubDotCom } from "./host-names"
-import { Age, AGE_OPTIONS, distinct, FilterSelect, Sort, SortHeader, sortRows, toggleSort, useStoredState, withinAge } from "./listing"
-import { DiffBlock, MarkdownView } from "./markdown"
+import { ExternalLink, httpUrl } from "./links"
+import { Age, AGE_OPTIONS, cap, distinct, FilterSelect, Sort, SortHeader, SortPicker, sortRows, toggleSort, useStoredState, withinAge } from "./listing"
+import { DiffBlock, ImageLoader, MarkdownView } from "./markdown"
 import { PageSkeleton, PluginIcon } from "./plugins"
+import { backTo, navigate, splitRoute, useRoute } from "./route"
 
 export type PullsHost = "github" | "gitlab" | "gitea" | "bitbucket"
 
-const HOST_NAMES: Record<PullsHost, string> = { github: "GitHub", gitlab: "GitLab", gitea: "Gitea / Forgejo", bitbucket: "Bitbucket" }
+const HOST_NAMES: Record<PullsHost, string> = {
+  github: "GitHub",
+  gitlab: "GitLab",
+  gitea: "Gitea / Forgejo",
+  bitbucket: "Bitbucket"
+}
 
 interface HostWords {
   noun: string
@@ -88,6 +95,25 @@ interface Overview {
   review: ReviewSetup
 }
 
+/** The page's sections; an opened pull replaces them all. */
+type PageTab = "pulls" | "issues" | "setup"
+
+/**
+ * Where in a host's page the address points: its section, and the pull
+ * or issue opened there. `home` is the page's own view ("plugin:github");
+ * an address for some other view, or one that names nothing known, is
+ * the pulls list.
+ */
+const placeIn = (route: string, home: string): { tab: PageTab; pull?: { repoId: string; number: number }; issue?: { repoId: string; number: number } } => {
+  const { view, rest } = splitRoute(route)
+  if (view !== home) return { tab: "pulls" }
+  if (rest === "setup" || rest === "issues") return { tab: rest }
+  const item = /^(pull|issue)\/([0-9a-f]{8})\/([1-9][0-9]{0,8})$/.exec(rest)
+  if (!item) return { tab: "pulls" }
+  const at = { repoId: item[2], number: Number(item[3]) }
+  return item[1] === "pull" ? { tab: "pulls", pull: at } : { tab: "issues", issue: at }
+}
+
 /** The one-click views of the pulls table. */
 type Quick = "all" | "mine" | "ready" | "failing" | "conflicts" | "review" | "approved" | "drafts" | "unreviewed"
 
@@ -112,7 +138,11 @@ const QUICKS = Object.keys(QUICK_LABEL) as Quick[]
 
 type PullSortKey = "updated" | "created" | "title" | "author" | "checks" | "merge" | "review" | "approvals" | "size" | "number"
 
-const PULL_SORTS: Array<{ key: PullSortKey; label: string; natural: "asc" | "desc" }> = [
+const PULL_SORTS: Array<{
+  key: PullSortKey
+  label: string
+  natural: "asc" | "desc"
+}> = [
   { key: "updated", label: "last updated", natural: "desc" },
   { key: "created", label: "opened", natural: "desc" },
   { key: "number", label: "number", natural: "desc" },
@@ -127,9 +157,24 @@ const PULL_SORTS: Array<{ key: PullSortKey; label: string; natural: "asc" | "des
 const naturalOf = <K extends string>(sorts: Array<{ key: K; natural: "asc" | "desc" }>, key: K): "asc" | "desc" => sorts.find((sort) => sort.key === key)?.natural ?? "asc"
 
 /** Worst first, so an ascending sort surfaces what needs a hand. */
-const CHECK_RANK: Record<PullSummary["checks"], number> = { failure: 0, pending: 1, none: 2, success: 3 }
-const MERGE_RANK: Record<PullSummary["mergeable"], number> = { conflicting: 0, blocked: 1, unknown: 2, mergeable: 3 }
-const REVIEW_RANK: Record<PullSummary["review"], number> = { "changes-requested": 0, "review-required": 1, none: 2, approved: 3 }
+const CHECK_RANK: Record<PullSummary["checks"], number> = {
+  failure: 0,
+  pending: 1,
+  none: 2,
+  success: 3
+}
+const MERGE_RANK: Record<PullSummary["mergeable"], number> = {
+  conflicting: 0,
+  blocked: 1,
+  unknown: 2,
+  mergeable: 3
+}
+const REVIEW_RANK: Record<PullSummary["review"], number> = {
+  "changes-requested": 0,
+  "review-required": 1,
+  none: 2,
+  approved: 3
+}
 
 interface PullFilters {
   quick: Quick
@@ -143,7 +188,18 @@ interface PullFilters {
   sort: Sort<PullSortKey>
 }
 
-const DEFAULT_PULL_FILTERS: PullFilters = { quick: "all", repo: "", author: "", label: "", base: "", age: "", drafts: false, sort: { key: "updated", dir: "desc" } }
+const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string")
+
+const DEFAULT_PULL_FILTERS: PullFilters = {
+  quick: "all",
+  repo: "",
+  author: "",
+  label: "",
+  base: "",
+  age: "",
+  drafts: false,
+  sort: { key: "updated", dir: "desc" }
+}
 
 const isPullFilters = (value: unknown): value is PullFilters => {
   if (typeof value !== "object" || value === null) return false
@@ -159,12 +215,6 @@ const isPullFilters = (value: unknown): value is PullFilters => {
   )
 }
 
-const CHECK_LABEL: Record<PullSummary["checks"], string> = {
-  success: "checks pass",
-  failure: "checks fail",
-  pending: "checks running",
-  none: "no checks"
-}
 const CHECK_TONE: Record<PullSummary["checks"], string> = {
   success: "ok",
   failure: "bad",
@@ -209,8 +259,20 @@ const myStance = (pull: PullSummary, me: string | undefined): MyStance | undefin
   return "not-reviewed"
 }
 
-const STANCE_LABEL: Record<MyStance, string> = { yours: "yours", approved: "you approved", changes: "you asked for changes", asked: "your review asked", "not-reviewed": "not reviewed by you" }
-const STANCE_CLASS: Record<MyStance, string> = { yours: "", approved: "reviewed", changes: "failed", asked: "stale", "not-reviewed": "stale" }
+const STANCE_LABEL: Record<MyStance, string> = {
+  yours: "yours",
+  approved: "you approved",
+  changes: "you asked for changes",
+  asked: "your review asked",
+  "not-reviewed": "not reviewed by you"
+}
+const STANCE_CLASS: Record<MyStance, string> = {
+  yours: "",
+  approved: "reviewed",
+  changes: "failed",
+  asked: "stale",
+  "not-reviewed": "stale"
+}
 
 const MyReviewTag = ({ pull, me }: { pull: PullSummary; me?: string }) => {
   const stance = myStance(pull, me)
@@ -276,32 +338,155 @@ const pullSortValue = (pull: PullSummary, key: PullSortKey): string | number | u
   }
 }
 
-const Pill = ({ tone, children, title }: { tone: string; children: React.ReactNode; title?: string }) => (
-  <span className={`pill-s ${tone}`} title={title}>
-    {children}
+const names = (list: string[]): string => (list.length ? list.join(", ") : "nobody")
+
+/* -------------------------------------------------------------------------- */
+/*  Signals: what a pull's state looks like at a glance                       */
+/* -------------------------------------------------------------------------- */
+
+const ICONS = {
+  check: "M3.5 8.5l3 3 6-7",
+  cross: "M4 4l8 8M12 4l-8 8",
+  clock: "M8 4.5V8l2.2 1.6M14 8A6 6 0 1 1 2 8a6 6 0 0 1 12 0z",
+  dash: "M4 8h8",
+  merge: "M5 4.2v7.6M5 5.5c0 3 2.5 4 6 4M5 2.5a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM5 10.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM11 7.9a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z",
+  pull: "M4.5 5.6v4.8M11.5 10.4V7.2a2 2 0 0 0-2-2H8M9.4 3.6L7.8 5.2l1.6 1.6M4.5 2.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM4.5 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM11.5 10.4a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2z",
+  alert: "M8 2.6l5.8 10.2H2.2L8 2.6zM8 6.6v3M8 11.4v.2",
+  lock: "M4.5 7.2h7v5.6h-7zM6 7.2V5.4a2 2 0 0 1 4 0v1.8",
+  out: "M6 3.5h6.5V10M12.2 3.8L4 12",
+  search: "M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM10.7 10.7L14 14",
+  back: "M9.5 3.5L5 8l4.5 4.5",
+  send: "M8 13V3.5M3.8 7.6L8 3.4l4.2 4.2",
+  show: "M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8zM8 6.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6z",
+  hide: "M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8zM8 6.2a1.8 1.8 0 1 0 0 3.6 1.8 1.8 0 0 0 0-3.6zM2.5 2.5l11 11",
+  spark: "M8 2v3M8 11v3M2 8h3M11 8h3M3.8 3.8l2 2M10.2 10.2l2 2M12.2 3.8l-2 2M5.8 10.2l-2 2"
+} as const
+
+const Icon = ({ name, size = 14 }: { name: keyof typeof ICONS; size?: number }) => (
+  <svg className="icon" width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={ICONS[name]} />
+  </svg>
+)
+
+/** A stable hue per name, so the same person is the same colour everywhere. */
+const hueOf = (name: string): number => {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  return hash % 360
+}
+
+/** A person as a coloured initial; `state` rings it with where they stand on a pull. */
+const Avatar = ({ name, state, size = 20 }: { name: string; state?: "approved" | "changes" | "pending"; size?: number }) => (
+  <span
+    className={`avatar ${state ?? ""}`}
+    style={
+      {
+        "--h": hueOf(name.toLowerCase()),
+        width: size,
+        height: size,
+        fontSize: Math.round(size * 0.5)
+      } as React.CSSProperties
+    }
+    title={state ? `${name}: ${state === "approved" ? "approved" : state === "changes" ? "asked for changes" : "asked, not answered"}` : name}
+  >
+    {(name.replace(/[^\p{L}\p{N}]/gu, "")[0] ?? "?").toUpperCase()}
   </span>
 )
 
-const names = (list: string[]): string => (list.length ? list.join(", ") : "nobody")
+/** The one thing a pull most needs, worst first. Every pull is in exactly one. */
+type Health = "failing" | "conflicts" | "ready" | "draft" | "waiting"
+const healthOf = (pull: PullSummary): Health => (pull.draft ? "draft" : pull.checks === "failure" ? "failing" : pull.mergeable === "conflicting" ? "conflicts" : matches(pull, "ready", undefined, undefined) ? "ready" : "waiting")
+const HEALTH_ORDER: Health[] = ["ready", "waiting", "failing", "conflicts", "draft"]
+const HEALTH_LABEL: Record<Health, string> = {
+  ready: "ready to merge",
+  waiting: "waiting on review or checks",
+  failing: "failing checks",
+  conflicts: "conflicts",
+  draft: "draft"
+}
+const HEALTH_ICON: Record<Health, keyof typeof ICONS> = {
+  ready: "check",
+  waiting: "pull",
+  failing: "cross",
+  conflicts: "alert",
+  draft: "pull"
+}
+const HEALTH_QUICK: Record<Health, Quick> = {
+  ready: "ready",
+  waiting: "review",
+  failing: "failing",
+  conflicts: "conflicts",
+  draft: "drafts"
+}
 
-/**
- * "1/2 approved · 1 changes · 2 asked": how far a pull is from the
- * approvals its branch wants, who still has to answer. Nothing when the
- * host gave no detail or nobody is involved yet.
- */
-const Approvals = ({ pull, long }: { pull: PullSummary; long?: boolean }) => {
-  const a = pull.approvals
-  if (!a || (a.approved.length === 0 && a.changes.length === 0 && a.pending.length === 0 && a.required === undefined)) return null
-  const short = shortOfApprovals(pull)
+const CHECK_ICON: Record<PullSummary["checks"], keyof typeof ICONS> = {
+  success: "check",
+  failure: "cross",
+  pending: "clock",
+  none: "dash"
+}
+const MERGE_ICON: Record<PullSummary["mergeable"], keyof typeof ICONS> = {
+  mergeable: "merge",
+  conflicting: "alert",
+  blocked: "lock",
+  unknown: "dash"
+}
 
-  const title = `approved by ${names(a.approved)}${a.required !== undefined ? ` (${a.required} needed)` : ""}\nchanges requested by ${names(a.changes)}\nwaiting for ${names(a.pending)}`
+/** Checks as a strip of segments, one per run, then "2/3". */
+const ChecksSignal = ({ pull }: { pull: PullSummary }) => {
+  if (pull.checks === "none") return <span className="signal quiet">no checks</span>
+  const passed = pull.checkRuns.filter((check) => check.state === "success").length
+  const shown = pull.checkRuns.slice(0, 10)
   return (
-    <span className={`approvals ${long ? "long" : ""}`} title={title}>
-      <span className={a.required !== undefined ? (short ? "warn-text" : "ins-text") : a.approved.length ? "ins-text" : ""}>
-        {a.required !== undefined ? `${fmt(a.approved.length)}/${fmt(a.required)}` : fmt(a.approved.length)} approved{long && a.approved.length ? ` by ${names(a.approved)}` : ""}
+    <span className={`signal ${CHECK_TONE[pull.checks]}`} title={pull.checkRuns.map((check) => `${check.name}: ${check.state}`).join("\n")}>
+      <span className="segments" aria-hidden="true">
+        {shown.map((check, i) => (
+          <i key={i} className={CHECK_TONE[check.state]} />
+        ))}
       </span>
-      {a.changes.length > 0 && <span className="bad-text">{long ? `changes requested by ${names(a.changes)}` : `${fmt(a.changes.length)} changes`}</span>}
-      {a.pending.length > 0 && <span className="muted">{long ? `waiting for ${names(a.pending)}` : `${fmt(a.pending.length)} asked`}</span>}
+      {fmt(passed)}/{fmt(pull.checkRuns.length)}
+    </span>
+  )
+}
+
+const MergeSignal = ({ pull }: { pull: PullSummary }) => (
+  <span className={`signal ${pull.mergeable === "mergeable" ? "calm" : MERGE_TONE[pull.mergeable] || "quiet"}`}>
+    <Icon name={MERGE_ICON[pull.mergeable]} />
+    {pull.mergeable === "unknown" ? "unknown" : MERGE_LABEL[pull.mergeable]}
+  </span>
+)
+
+/** Who reviewed, as faces, then how far the pull is from what its branch wants. */
+const ReviewSignal = ({ pull, compact }: { pull: PullSummary; compact?: boolean }) => {
+  const a = pull.approvals
+  const faces = a ? [...a.approved.map((name) => ({ name, state: "approved" as const })), ...a.changes.map((name) => ({ name, state: "changes" as const })), ...a.pending.map((name) => ({ name, state: "pending" as const }))] : []
+  const detail = a ? `${REVIEW_LABEL[pull.review]}\napproved by ${names(a.approved)}${a.required !== undefined ? ` (${a.required} needed)` : ""}\nchanges requested by ${names(a.changes)}\nwaiting for ${names(a.pending)}` : undefined
+  return (
+    <span className={`signal ${REVIEW_TONE[pull.review] || "quiet"}`} title={detail}>
+      {faces.length > 0 && (
+        <span className="faces">
+          {faces.slice(0, 4).map((face) => (
+            <Avatar key={`${face.state}:${face.name}`} name={face.name} state={face.state} size={18} />
+          ))}
+          {faces.length > 4 && <span className="more">+{faces.length - 4}</span>}
+        </span>
+      )}
+      {a?.required !== undefined ? `${fmt(a.approved.length)}/${fmt(a.required)} ` : ""}
+      {/* In a row the faces and the count say it; the colour and the tooltip carry the word. */}
+      {compact && faces.length > 0 && a?.required !== undefined ? null : REVIEW_LABEL[pull.review]}
+    </span>
+  )
+}
+
+/** Five blocks split by how much was added and removed, as hosts draw it. */
+const DiffStat = ({ additions = 0, deletions = 0 }: { additions?: number; deletions?: number }) => {
+  const total = additions + deletions
+  const added = total === 0 ? 0 : Math.max(additions ? 1 : 0, Math.min(deletions ? 4 : 5, Math.round((additions / total) * 5)))
+  return (
+    <span className="diffstat" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <i key={i} className={total === 0 ? "" : i < added ? "add" : "del"} />
+      ))}
     </span>
   )
 }
@@ -345,7 +530,10 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | undefined>()
   const [confirm, setConfirm] = useState<string | null>(null)
-  const [picker, setPicker] = useState<Array<{ fullName: string; account: string }> | null>(null)
+  const [picker, setPicker] = useState<Array<{
+    fullName: string
+    account: string
+  }> | null>(null)
 
   const run = async (what: string, action: () => Promise<unknown>) => {
     setBusy(what)
@@ -366,7 +554,10 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
     if (!name) return
     void run("add", async () => {
       const body = readsWith === NEW_TOKEN ? { token: token.trim() } : readsWith === APP ? {} : { tokenId: readsWith }
-      const answer = await api<{ repo: RepoView }>(`${base}/repos`, apiKey, { method: "POST", body: { fullName: name, ...body } })
+      const answer = await api<{ repo: RepoView }>(`${base}/repos`, apiKey, {
+        method: "POST",
+        body: { fullName: name, ...body }
+      })
       setFullName("")
       setToken("")
       // A token pasted here is saved now: the next repository can pick it.
@@ -376,13 +567,18 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
 
   const addFromApp = (name: string) =>
     run(`add:${name}`, async () => {
-      await api(`${base}/repos`, apiKey, { method: "POST", body: { fullName: name } })
+      await api(`${base}/repos`, apiKey, {
+        method: "POST",
+        body: { fullName: name }
+      })
       setPicker((list) => list && list.filter((entry) => entry.fullName !== name))
     })
 
   const loadPicker = () =>
     run("picker", async () => {
-      const answer = await api<{ repositories: Array<{ fullName: string; account: string }> }>(`${base}/app/repositories`, apiKey)
+      const answer = await api<{
+        repositories: Array<{ fullName: string; account: string }>
+      }>(`${base}/app/repositories`, apiKey)
       const watched = new Set(overview.repos.map((repo) => repo.fullName.toLowerCase()))
       setPicker(answer.repositories.filter((entry) => !watched.has(entry.fullName.toLowerCase())))
     })
@@ -410,7 +606,6 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                 <th>failing</th>
                 <th>synced</th>
                 <th title="Review new and updated pulls in the background while the models are idle">auto-review</th>
-                <th title="Post every finished review to the host as a comment">auto-post</th>
                 <th title="Triage new issues in the background; replies and labels still wait for a click">auto-triage</th>
                 <th />
               </tr>
@@ -421,9 +616,9 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                 return (
                   <tr key={repo.id} className={repo.error ? "repo-error" : ""}>
                     <td>
-                      <a href={repo.url} target="_blank" rel="noreferrer" className="entity-name">
+                      <ExternalLink href={repo.url} className="entity-name">
                         {repo.fullName}
-                      </a>
+                      </ExternalLink>
                       {repo.error && <div className="repo-problem">{repo.error}</div>}
                     </td>
                     <td>
@@ -432,7 +627,16 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                         value={repo.tokenId ?? APP}
                         disabled={busy !== null}
                         aria-label={`What ${repo.fullName} reads with`}
-                        onChange={(e) => void run(`token:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { tokenId: e.target.value === APP ? null : e.target.value } }))}
+                        onChange={(e) =>
+                          void run(`token:${repo.id}`, () =>
+                            api(`${base}/repos/${repo.id}`, apiKey, {
+                              method: "PUT",
+                              body: {
+                                tokenId: e.target.value === APP ? null : e.target.value
+                              }
+                            })
+                          )
+                        }
                       >
                         {overview.tokens.map((token) => (
                           <option key={token.id} value={token.id}>
@@ -455,16 +659,14 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                         disabled={busy !== null || !overview.review.available}
                         aria-label={`Auto-review ${repo.fullName}`}
                         title={overview.review.available ? undefined : "Reviews are unavailable on this gateway"}
-                        onChange={(e) => void run(`auto:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { autoReview: e.target.checked } }))}
-                      />
-                    </td>
-                    <td className="auto">
-                      <input
-                        type="checkbox"
-                        checked={repo.autoPost}
-                        disabled={busy !== null}
-                        aria-label={`Auto-post reviews of ${repo.fullName}`}
-                        onChange={(e) => void run(`post:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { autoPost: e.target.checked } }))}
+                        onChange={(e) =>
+                          void run(`auto:${repo.id}`, () =>
+                            api(`${base}/repos/${repo.id}`, apiKey, {
+                              method: "PUT",
+                              body: { autoReview: e.target.checked }
+                            })
+                          )
+                        }
                       />
                     </td>
                     <td className="auto">
@@ -474,16 +676,45 @@ const ReposPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPan
                         disabled={busy !== null || !repo.issuesSupported || !overview.review.available}
                         aria-label={`Auto-triage ${repo.fullName}`}
                         title={repo.issuesSupported ? undefined : "This host has no issue tracker the plugin reads"}
-                        onChange={(e) => void run(`triage:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "PUT", body: { autoTriage: e.target.checked } }))}
+                        onChange={(e) =>
+                          void run(`triage:${repo.id}`, () =>
+                            api(`${base}/repos/${repo.id}`, apiKey, {
+                              method: "PUT",
+                              body: { autoTriage: e.target.checked }
+                            })
+                          )
+                        }
                       />
                     </td>
                     <td className="actions">
-                      <button type="button" className="ghost mini" disabled={busy !== null} onClick={() => void run(`sync:${repo.id}`, () => api(`${base}/repos/${repo.id}/sync`, apiKey, { method: "POST" }))}>
+                      <button
+                        type="button"
+                        className="ghost mini"
+                        disabled={busy !== null}
+                        onClick={() =>
+                          void run(`sync:${repo.id}`, () =>
+                            api(`${base}/repos/${repo.id}/sync`, apiKey, {
+                              method: "POST"
+                            })
+                          )
+                        }
+                      >
                         {busy === `sync:${repo.id}` ? "…" : "sync"}
                       </button>{" "}
                       {confirm === repo.id ? (
                         <>
-                          <button type="button" className="danger mini" disabled={busy !== null} onClick={() => void run(`remove:${repo.id}`, () => api(`${base}/repos/${repo.id}`, apiKey, { method: "DELETE" }).then(() => setConfirm(null)))}>
+                          <button
+                            type="button"
+                            className="danger mini"
+                            disabled={busy !== null}
+                            onClick={() =>
+                              void run(`remove:${repo.id}`, () =>
+                                api(`${base}/repos/${repo.id}`, apiKey, {
+                                  method: "DELETE"
+                                }).then(() => setConfirm(null))
+                              )
+                            }
+                          >
                             remove
                           </button>{" "}
                           <button type="button" className="ghost mini" onClick={() => setConfirm(null)}>
@@ -575,8 +806,14 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
   const [error, setError] = useState<string | undefined>()
   const [notice, setNotice] = useState<string | undefined>()
   /** The token whose value is being replaced, or relabelled. */
-  const [replacing, setReplacing] = useState<{ id: string; value: string } | null>(null)
-  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null)
+  const [replacing, setReplacing] = useState<{
+    id: string
+    value: string
+  } | null>(null)
+  const [renaming, setRenaming] = useState<{
+    id: string
+    value: string
+  } | null>(null)
   const [confirm, setConfirm] = useState<string | null>(null)
   const [picker, setPicker] = useState<TokenPickerState | null>(null)
 
@@ -597,20 +834,42 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
 
   const openPicker = (tokenId: string) =>
     run(`pick:${tokenId}`, async () => {
-      const answer = await api<{ repositories: Array<{ fullName: string; watched: boolean }> }>(`${base}/tokens/${tokenId}/repos`, apiKey)
-      setPicker({ tokenId, repositories: answer.repositories, chosen: [], failed: {}, filter: "" })
+      const answer = await api<{
+        repositories: Array<{ fullName: string; watched: boolean }>
+      }>(`${base}/tokens/${tokenId}/repos`, apiKey)
+      setPicker({
+        tokenId,
+        repositories: answer.repositories,
+        chosen: [],
+        failed: {},
+        filter: ""
+      })
     })
 
   const save = (e: FormEvent) => {
     e.preventDefault()
     if (!token.trim()) return
     void run("save", async () => {
-      const answer = await api<{ token: TokenView; existed: boolean }>(`${base}/tokens`, apiKey, { method: "POST", body: { token: token.trim(), ...(label.trim() ? { label: label.trim() } : {}) } })
+      const answer = await api<{ token: TokenView; existed: boolean }>(`${base}/tokens`, apiKey, {
+        method: "POST",
+        body: {
+          token: token.trim(),
+          ...(label.trim() ? { label: label.trim() } : {})
+        }
+      })
       setToken("")
       setLabel("")
       if (overview.canListRepos) {
-        const listed = await api<{ repositories: Array<{ fullName: string; watched: boolean }> }>(`${base}/tokens/${answer.token.id}/repos`, apiKey)
-        setPicker({ tokenId: answer.token.id, repositories: listed.repositories, chosen: [], failed: {}, filter: "" })
+        const listed = await api<{
+          repositories: Array<{ fullName: string; watched: boolean }>
+        }>(`${base}/tokens/${answer.token.id}/repos`, apiKey)
+        setPicker({
+          tokenId: answer.token.id,
+          repositories: listed.repositories,
+          chosen: [],
+          failed: {},
+          filter: ""
+        })
       }
       return answer.existed ? `That token was already saved as ${tokenName(answer.token)}.` : `Saved${answer.token.login ? `: it is ${answer.token.login}` : ""}.`
     })
@@ -629,7 +888,10 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
       let added = 0
       for (const fullName of state.chosen) {
         try {
-          await api(`${base}/repos`, apiKey, { method: "POST", body: { fullName, tokenId: state.tokenId } })
+          await api(`${base}/repos`, apiKey, {
+            method: "POST",
+            body: { fullName, tokenId: state.tokenId }
+          })
           added++
         } catch (e) {
           failed[fullName] = messageOf(e)
@@ -680,7 +942,12 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
                         className="inline-edit"
                         onSubmit={(e) => {
                           e.preventDefault()
-                          void run(`label:${saved.id}`, () => api(`${base}/tokens/${saved.id}`, apiKey, { method: "PUT", body: { label: renaming.value.trim() } }).then(() => setRenaming(null)))
+                          void run(`label:${saved.id}`, () =>
+                            api(`${base}/tokens/${saved.id}`, apiKey, {
+                              method: "PUT",
+                              body: { label: renaming.value.trim() }
+                            }).then(() => setRenaming(null))
+                          )
                         }}
                       >
                         <input value={renaming.value} onChange={(e) => setRenaming({ id: saved.id, value: e.target.value })} aria-label="Label" placeholder="label" autoFocus disabled={busy !== null} />
@@ -713,7 +980,21 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
                           if (replacing.value.trim()) void replace(saved.id, replacing.value)
                         }}
                       >
-                        <input type="password" value={replacing.value} onChange={(e) => setReplacing({ id: saved.id, value: e.target.value })} aria-label="New token" placeholder="new token" autoFocus autoComplete="off" disabled={busy !== null} />
+                        <input
+                          type="password"
+                          value={replacing.value}
+                          onChange={(e) =>
+                            setReplacing({
+                              id: saved.id,
+                              value: e.target.value
+                            })
+                          }
+                          aria-label="New token"
+                          placeholder="new token"
+                          autoFocus
+                          autoComplete="off"
+                          disabled={busy !== null}
+                        />
                         <button type="submit" className="primary mini" disabled={busy !== null || !replacing.value.trim()}>
                           {busy === `replace:${saved.id}` ? "…" : saved.repos ? `replace for ${countOf(saved.repos, words)}` : "replace"}
                         </button>{" "}
@@ -721,7 +1002,18 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
                       </form>
                     ) : confirm === saved.id ? (
                       <>
-                        <button type="button" className="danger mini" disabled={busy !== null} onClick={() => void run(`remove:${saved.id}`, () => api(`${base}/tokens/${saved.id}`, apiKey, { method: "DELETE" }).then(() => setConfirm(null)))}>
+                        <button
+                          type="button"
+                          className="danger mini"
+                          disabled={busy !== null}
+                          onClick={() =>
+                            void run(`remove:${saved.id}`, () =>
+                              api(`${base}/tokens/${saved.id}`, apiKey, {
+                                method: "DELETE"
+                              }).then(() => setConfirm(null))
+                            )
+                          }
+                        >
                           remove
                         </button>{" "}
                         <button type="button" className="ghost mini" onClick={() => setConfirm(null)}>keep</button>
@@ -731,7 +1023,17 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
                         <button type="button" className={saved.refused ? "primary mini" : "ghost mini"} disabled={busy !== null} onClick={() => setReplacing({ id: saved.id, value: "" })}>
                           replace
                         </button>{" "}
-                        <button type="button" className="ghost mini" disabled={busy !== null} onClick={() => setRenaming({ id: saved.id, value: saved.label ?? "" })}>
+                        <button
+                          type="button"
+                          className="ghost mini"
+                          disabled={busy !== null}
+                          onClick={() =>
+                            setRenaming({
+                              id: saved.id,
+                              value: saved.label ?? ""
+                            })
+                          }
+                        >
                           label
                         </button>{" "}
                         {overview.canListRepos && (
@@ -774,7 +1076,12 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
               type="button"
               className="ghost mini"
               disabled={busy !== null || choosable.length === 0}
-              onClick={() => setPicker({ ...picker, chosen: choosable.every((name) => picker.chosen.includes(name)) ? picker.chosen.filter((name) => !choosable.includes(name)) : [...new Set([...picker.chosen, ...choosable])] })}
+              onClick={() =>
+                setPicker({
+                  ...picker,
+                  chosen: choosable.every((name) => picker.chosen.includes(name)) ? picker.chosen.filter((name) => !choosable.includes(name)) : [...new Set([...picker.chosen, ...choosable])]
+                })
+              }
             >
               {choosable.length && choosable.every((name) => picker.chosen.includes(name)) ? "choose none" : `choose all ${fmt(choosable.length)}`}
             </button>
@@ -795,7 +1102,12 @@ const TokensPanel = ({ host, words, overview, base, apiKey, onChanged }: ReposPa
                     type="checkbox"
                     checked={entry.watched || picker.chosen.includes(entry.fullName)}
                     disabled={entry.watched || busy !== null}
-                    onChange={(e) => setPicker({ ...picker, chosen: e.target.checked ? [...picker.chosen, entry.fullName] : picker.chosen.filter((name) => name !== entry.fullName) })}
+                    onChange={(e) =>
+                      setPicker({
+                        ...picker,
+                        chosen: e.target.checked ? [...picker.chosen, entry.fullName] : picker.chosen.filter((name) => name !== entry.fullName)
+                      })
+                    }
                   />
                   <span className="entity-name">{entry.fullName}</span>
                   {entry.watched && <span className="muted">watched</span>}
@@ -881,9 +1193,7 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
                 <>
                   <dt>Install on more</dt>
                   <dd>
-                    <a href={app.installUrl} target="_blank" rel="noreferrer">
-                      {app.installUrl}
-                    </a>
+                    <ExternalLink href={app.installUrl}>{app.installUrl}</ExternalLink>
                   </dd>
                 </>
               )}
@@ -909,7 +1219,14 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
             className="app-form"
             onSubmit={(e) => {
               e.preventDefault()
-              void run(() => api(`${base}/app`, apiKey, { method: "PUT", body: { appId: appId.trim(), privateKey } }).then(() => (setAppId(""), setPrivateKey(""))), "GitHub App checked and saved. Repositories it is installed on can be watched without a token.")
+              void run(
+                () =>
+                  api(`${base}/app`, apiKey, {
+                    method: "PUT",
+                    body: { appId: appId.trim(), privateKey }
+                  }).then(() => (setAppId(""), setPrivateKey(""))),
+                "GitHub App checked and saved. Repositories it is installed on can be watched without a token."
+              )
             }}
           >
             <input placeholder="App ID" value={appId} onChange={(e) => setAppId(e.target.value)} aria-label="App ID" disabled={busy} inputMode="numeric" />
@@ -929,7 +1246,14 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
         className="newkey inline-setting"
         onSubmit={(e) => {
           e.preventDefault()
-          void run(() => api(`${base}/settings`, apiKey, { method: "PUT", body: { baseUrl: baseUrl.trim() } }), "Host saved; everything is syncing again.")
+          void run(
+            () =>
+              api(`${base}/settings`, apiKey, {
+                method: "PUT",
+                body: { baseUrl: baseUrl.trim() }
+              }),
+            "Host saved; everything is syncing again."
+          )
         }}
       >
         <label>
@@ -945,7 +1269,14 @@ const HostPanel = ({ host, words, overview, base, apiKey, onChanged }: HostPanel
         className="newkey inline-setting"
         onSubmit={(e) => {
           e.preventDefault()
-          void run(() => api(`${base}/settings`, apiKey, { method: "PUT", body: { me: me.trim() } }), me.trim() ? `Pulls you have not approved are marked; you are ${me.trim().replace(/^@/, "")}.` : "Username cleared.")
+          void run(
+            () =>
+              api(`${base}/settings`, apiKey, {
+                method: "PUT",
+                body: { me: me.trim() }
+              }),
+            me.trim() ? `Pulls you have not approved are marked; you are ${me.trim().replace(/^@/, "")}.` : "Username cleared."
+          )
         }}
       >
         <label>
@@ -1052,130 +1383,337 @@ const languageOf = (path: string): string => {
   return ext === path.toLowerCase() ? "text" : ext
 }
 
+/** Seconds as the eye reads a wait: `42 s`, `1:05`. */
+const clock = (seconds: number): string => (seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`)
+
 interface PullViewProps {
   detail: PullPage
+  /** Loads the description's images through the gateway. */
+  images?: ImageLoader
   words: HostWords
   host: PullsHost
   review: ReviewSetup
   me?: string
   onBack: () => void
   onReview: () => Promise<void>
-  onPost: (as: "comment" | "request-changes" | "approve") => Promise<void>
   onApprove: () => Promise<void>
-  /** A developer the plugin is shared with: posts a comment, once, and never approves as the token. */
+  /** A developer the plugin is shared with: never approves as the token. */
   member?: boolean
-  onAsk: (question: string) => Promise<void>
+  /** Puts a question to the model, about selected lines when there are some; answers the review with its thread. */
+  onAsk: (question: string, quote?: ReviewQuote) => Promise<ReviewRecord>
 }
 
-/** Questions about a review and the model's answers, with a box for the next one. */
-const ReviewThread = ({ review, noun, canAsk, onAsk }: { review: ReviewRecord; noun: string; canAsk: boolean; onAsk: (question: string) => Promise<void> }) => {
-  const [question, setQuestion] = useState("")
-  const [asking, setAsking] = useState(false)
-  const [error, setError] = useState<string | undefined>()
-  const [elapsed, setElapsed] = useState(0)
+/** Asks, and answers with the model's turn once it is there. Throws what the gateway said when it could not. */
+type Ask = (question: string, quote?: ReviewQuote) => Promise<ReviewTurn | undefined>
+
+/** A question on its way: shown at once, with the wait counted under it. */
+interface PendingAsk {
+  question: string
+  quote?: ReviewQuote
+  started: number
+}
+
+/** "lines 12–18", as a quote's place in its file is said. */
+const linesOf = (quote: ReviewQuote): string => (quote.startLine ? (quote.endLine && quote.endLine !== quote.startLine ? `lines ${fmt(quote.startLine)}–${fmt(quote.endLine)}` : `line ${fmt(quote.startLine)}`) : "selected lines")
+
+/** Seconds since `since`, ticking. */
+const Elapsed = ({ since }: { since: number }) => {
+  const [now, setNow] = useState(Date.now())
   useEffect(() => {
-    if (!asking) return
-    setElapsed(0)
-    const started = Date.now()
-    const timer = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
+    const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [asking])
-  const send = async () => {
-    const asked = question.trim()
-    if (!asked || asking || !canAsk) return
-    setAsking(true)
-    setError(undefined)
-    try {
-      await onAsk(asked)
-      setQuestion("")
-    } catch (e) {
-      setError(messageOf(e))
-    } finally {
-      setAsking(false)
-    }
-  }
-  const thread = review.thread ?? []
+  }, [])
+  return <span className="elapsed">{clock(Math.max(0, Math.round((now - since) / 1000)))}</span>
+}
+
+interface ComposerProps {
+  value: string
+  onChange: (value: string) => void
+  onSend: () => void
+  /** A question is with the model: typing goes on, sending waits. */
+  busy: boolean
+  /** Why nothing can be asked, in place of the placeholder. */
+  off?: string
+  placeholder: string
+  label: string
+  alias?: string
+  /** Takes the keys whenever this changes to something: the box was just opened, or opened on other lines. */
+  focusOn?: unknown
+}
+
+/** One box to ask in: it grows with the question, Enter sends, and it names the model that answers. */
+const Composer = ({ value, onChange, onSend, busy, off, placeholder, label, alias, focusOn }: ComposerProps) => {
+  const box = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, 220)}px`
+  }, [value])
+  useEffect(() => {
+    if (focusOn !== undefined) box.current?.focus({ preventScroll: true })
+  }, [focusOn])
+  const ready = !busy && !off && value.trim() !== ""
   return (
-    <div className="review-thread">
-      {thread.length > 0 && (
-        <div className="turns">
-          {thread.map((turn, index) => (
-            <div key={`${turn.at}:${index}`} className={`turn ${turn.role}`}>
-              <div className="turn-head">
-                <span className="role">{turn.role === "user" ? `asked by ${turn.by ?? "you"}` : `${review.alias}${turn.ms ? ` in ${Math.round(turn.ms / 1000)} s` : ""}`}</span>
-                <span className="muted">{timeAgo(turn.at)}</span>
-              </div>
-              <div className="turn-body">
-                {turn.role === "user" ? <p className="question">{turn.text}</p> : <MarkdownView text={turn.text} />}
-                {turn.cutShort && <div className="cut-short">{turn.cutShort}</div>}
-              </div>
-            </div>
-          ))}
+    <form
+      className={`composer ${off ? "off" : ""}`}
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault()
+        if (ready) onSend()
+      }}
+    >
+      <textarea
+        ref={box}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Enter sends; Shift+Enter, or an input method still composing, does not.
+          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return
+          e.preventDefault()
+          if (ready) onSend()
+        }}
+        rows={1}
+        maxLength={4000}
+        placeholder={off ?? placeholder}
+        aria-label={label}
+        disabled={!!off}
+      />
+      <div className="composer-bar">
+        <span className="composer-hint">
+          <kbd>Enter</kbd> to send, <kbd>Shift</kbd> <kbd>Enter</kbd> for a new line
+        </span>
+        {alias && (
+          <span className="composer-model" title="The model that answers">
+            {alias}
+          </span>
+        )}
+        <button type="submit" className="send" disabled={!ready} title={busy ? "Waiting for the answer" : "Send"} aria-label="Send">
+          <Icon name="send" size={16} />
+        </button>
+      </div>
+    </form>
+  )
+}
+
+/** A conversation with the model: questions on the right, answers on the left, the one being answered last. */
+const AskTurns = ({ turns, alias, pending, showCode = true }: { turns: ReviewTurn[]; alias: string; pending?: PendingAsk; showCode?: boolean }) => {
+  const question = (text: string, quote: ReviewQuote | undefined, key: string, title?: string) => (
+    <div key={key} className="ask-turn user" title={title}>
+      {quote && (
+        <div className="ask-quote">
+          <span className="ask-quote-ref">
+            {quote.path} <span className="muted">{linesOf(quote)}</span>
+          </span>
+          {showCode && <pre>{quote.text}</pre>}
         </div>
       )}
-      <form
-        className="ask-form"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault()
-          void send()
-        }}
-      >
-        <textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault()
-              void send()
-            }
-          }}
-          rows={2}
-          maxLength={4000}
-          placeholder={canAsk ? `Ask ${review.alias} about this review…` : "No model is serving reviews"}
-          aria-label="Ask about this review"
-          disabled={asking || !canAsk}
-        />
-        <div className="review-actions">
-          <button type="submit" className="primary" disabled={asking || !canAsk || !question.trim()}>
-            {asking ? `answering… ${elapsed} s` : "ask"}
-          </button>
-          {error ? <span className="bad-text">{error}</span> : <span className="muted">Ctrl+Enter sends. The model sees the {noun.toLowerCase()}, the review and this thread; nothing here is posted.</span>}
+      <p className="bubble">{text}</p>
+    </div>
+  )
+  return (
+    <div className="ask-turns" aria-live="polite">
+      {turns.map((turn, index) =>
+        turn.role === "user" ? (
+          question(turn.text, turn.quote, `${turn.at}:${index}`, `${turn.by ?? "you"}, ${timeAgo(turn.at)}`)
+        ) : (
+          <div key={`${turn.at}:${index}`} className="ask-turn assistant">
+            <div className="ask-who">
+              <Icon name="spark" size={13} />
+              <span>{alias}</span>
+              <span className="muted" title={turn.at}>
+                {turn.ms ? `${clock(Math.round(turn.ms / 1000))} · ` : ""}
+                {timeAgo(turn.at)}
+              </span>
+            </div>
+            <MarkdownView text={turn.text} />
+            {turn.cutShort && <div className="cut-short">{turn.cutShort}</div>}
+          </div>
+        )
+      )}
+      {pending && question(pending.question, pending.quote, "pending")}
+      {pending && (
+        <div className="ask-turn assistant pending" role="status">
+          <div className="ask-who">
+            <Icon name="spark" size={13} />
+            <span>{alias}</span>
+            <span className="dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="muted">
+              Thinking <Elapsed since={pending.started} />
+            </span>
+          </div>
         </div>
-      </form>
+      )}
     </div>
   )
 }
 
-const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, onApprove, onAsk, member = false }: PullViewProps) => {
+const STARTERS = ["Explain this change", "What could break?", "What should I test?"]
+
+/** The questions asked about a pull and the model's answers, with a box for the next one. */
+const AskThread = ({ review, noun, off, pending, ask }: { review: ReviewRecord; noun: string; off?: string; pending?: PendingAsk; ask: Ask }) => {
+  const [question, setQuestion] = useState("")
+  const [error, setError] = useState<string | undefined>()
+  const send = (text: string) => {
+    const asked = text.trim()
+    if (!asked || pending || off) return
+    setQuestion("")
+    setError(undefined)
+    void ask(asked).catch((e: unknown) => {
+      // The question comes back to the box, unless another was started meanwhile.
+      setQuestion((now) => now || asked)
+      setError(messageOf(e))
+    })
+  }
+  const thread = review.thread ?? []
+  return (
+    <div className="ask">
+      <div className="ask-head">
+        <h4>Ask about this {noun.toLowerCase()}</h4>
+        {thread.length === 0 && !pending && !off && (
+          <span className="starters">
+            {STARTERS.map((starter) => (
+              <button key={starter} type="button" className="starter" onClick={() => send(starter)}>
+                {starter}
+              </button>
+            ))}
+          </span>
+        )}
+      </div>
+      {(thread.length > 0 || pending) && <AskTurns turns={thread} alias={review.alias} pending={pending} />}
+      {error && <div className="error">{error}</div>}
+      <Composer value={question} onChange={setQuestion} onSend={() => send(question)} busy={!!pending} off={off} placeholder="Ask a question, or select lines in a file below" label={`Ask about this ${noun.toLowerCase()}`} alias={review.alias} />
+    </div>
+  )
+}
+
+type PullFile = PullPage["files"][number]
+
+/**
+ * A file's diff. With a review to ask about, lines selected in it can be
+ * asked about there and then: the question and its answer sit under the
+ * diff, and join the pull's thread.
+ */
+const FileDiff = ({ file, alias, off, busy, ask }: { file: PullFile; alias?: string; off?: string; busy: boolean; ask?: Ask }) => {
+  const [quote, setQuote] = useState<ReviewQuote | undefined>()
+  /** The selection has not gone out with a question yet. */
+  const [fresh, setFresh] = useState(false)
+  const [turns, setTurns] = useState<ReviewTurn[]>([])
+  const [waiting, setWaiting] = useState<PendingAsk | undefined>()
+  const [question, setQuestion] = useState("")
+  const [error, setError] = useState<string | undefined>()
+  const dock = useRef<HTMLDivElement>(null)
+  // The box opens under the diff, which may be below the window: bring it up to where the lines were picked.
+  useEffect(() => {
+    if (quote) dock.current?.scrollIntoView({ block: "nearest" })
+  }, [quote])
+  const send = () => {
+    const asked = question.trim()
+    if (!asked || !ask || busy || off) return
+    const carried = fresh ? quote : undefined
+    setQuestion("")
+    setError(undefined)
+    setWaiting({ question: asked, quote: carried, started: Date.now() })
+    void ask(asked, carried)
+      .then((answer) => {
+        setFresh(false)
+        setTurns((before) => [...before, { role: "user", text: asked, at: new Date().toISOString(), ...(carried ? { quote: carried } : {}) }, ...(answer ? [answer] : [])])
+      })
+      .catch((e: unknown) => {
+        setQuestion((now) => now || asked)
+        setError(messageOf(e))
+      })
+      .finally(() => setWaiting(undefined))
+  }
+  return (
+    <DiffBlock
+      patch={file.patch ?? ""}
+      language={languageOf(file.path)}
+      title={
+        <>
+          <span className={`tag file-${file.status}`}>{file.status}</span> {file.previousPath ? `${file.previousPath} → ` : ""}
+          {file.path} <span className="ins-text">+{fmt(file.additions)}</span> <span className="del-text">−{fmt(file.deletions)}</span>
+          {file.truncated && <span className="muted"> · cut at 60k characters</span>}
+        </>
+      }
+      onPick={
+        ask
+          ? (selection) => {
+              setQuote({ path: file.path, ...selection })
+              setFresh(true)
+              setError(undefined)
+            }
+          : undefined
+      }
+      pickLabel="Ask about these lines"
+      footer={
+        quote && (
+          <div className="ask-dock" ref={dock}>
+            <div className="ask-dock-head">
+              <Icon name="spark" size={13} />
+              <span>
+                Ask about <b>{linesOf(quote)}</b>
+              </span>
+              <span className="spacer" />
+              <button
+                type="button"
+                className="ghost mini icon-only"
+                onClick={() => {
+                  setQuote(undefined)
+                  setTurns([])
+                  setError(undefined)
+                }}
+                title="Close"
+                aria-label="Close"
+              >
+                <Icon name="cross" size={12} />
+              </button>
+            </div>
+            {(turns.length > 0 || waiting) && <AskTurns turns={turns} alias={alias ?? "model"} pending={waiting} showCode={false} />}
+            {error && <div className="error">{error}</div>}
+            <Composer value={question} onChange={setQuestion} onSend={send} busy={busy} off={off} placeholder={turns.length ? "Ask a follow-up" : "What do you want to know about these lines?"} label={`Ask about ${linesOf(quote)} of ${file.path}`} alias={alias} focusOn={quote} />
+          </div>
+        )
+      }
+    />
+  )
+}
+
+const PullView = ({ detail, images, words, review, host, me, onBack, onReview, onApprove, onAsk, member = false }: PullViewProps) => {
   const [approving, setApproving] = useState(false)
   const [approveError, setApproveError] = useState<string | undefined>()
-  const [postAs, setPostAs] = useState<"comment" | "request-changes" | "approve">("comment")
-  const [posting, setPosting] = useState(false)
-  const [postError, setPostError] = useState<string | undefined>()
   const { pull } = detail
-  const [reviewing, setReviewing] = useState(detail.reviewing)
+  /** This page asked and is waiting on the answer; `detail.reviewing` is the server saying one runs. */
+  const [waiting, setWaiting] = useState(false)
+  const reviewing = waiting || detail.reviewing
   const [reviewError, setReviewError] = useState<string | undefined>()
   const [elapsed, setElapsed] = useState(0)
-  useEffect(() => setReviewing(detail.reviewing), [detail.reviewing])
+  const since = detail.reviewingSince
   useEffect(() => {
     if (!reviewing) return
-    setElapsed(0)
-    const started = Date.now()
-    const timer = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000)
+    // A review found already running counts from when the server started it.
+    const started = since ? Date.parse(since) : Date.now()
+    const tick = () => setElapsed(Math.max(0, Math.round((Date.now() - started) / 1000)))
+    tick()
+    const timer = setInterval(tick, 1000)
     return () => clearInterval(timer)
-  }, [reviewing])
+  }, [reviewing, since])
   const askReview = async () => {
-    setReviewing(true)
+    setWaiting(true)
     setReviewError(undefined)
     try {
       await onReview()
     } catch (e) {
       setReviewError(messageOf(e))
     } finally {
-      setReviewing(false)
+      setWaiting(false)
     }
   }
-  const stale = detail.review && detail.review.headSha !== pull.headSha
+  const record = detail.review
+  const stale = record && record.headSha !== pull.headSha
   const stance = myStance(pull, me)
   const approve = () => {
     setApproving(true)
@@ -1184,202 +1722,391 @@ const PullView = ({ detail, words, review, host, me, onBack, onReview, onPost, o
       .catch((e: unknown) => setApproveError(messageOf(e)))
       .finally(() => setApproving(false))
   }
+  const canReview = review.available && !!review.alias
+  const cannotReview = !review.available ? "This gateway offers plugins no models" : !review.alias ? "No chat model is served" : undefined
+  /** The one question the gateway takes at a time, whichever box it was asked in. */
+  const [pending, setPending] = useState<PendingAsk | undefined>()
+  const ask: Ask = async (question, quote) => {
+    setPending({ question, quote, started: Date.now() })
+    try {
+      const updated = await onAsk(question, quote)
+      const last = updated.thread?.[updated.thread.length - 1]
+      return last?.role === "assistant" ? last : undefined
+    } finally {
+      setPending(undefined)
+    }
+  }
+  /** There is a finished review to ask about, and nothing is rewriting it. */
+  const askable = record?.status === "done" && !reviewing
   return (
-    <section className="panel record">
-      <div className="section-heading">
-        <h2 className="record-title">
-          <button type="button" className="ghost mini" onClick={onBack}>
-            ← {words.nouns}
-          </button>
+    <section className="panel record pull-view">
+      <div className="record-bar">
+        <button type="button" className="ghost mini back" onClick={onBack}>
+          <Icon name="back" /> {words.nouns}
+        </button>
+        <span className="pull-ref">
+          {pull.repo}
           <b>
-            {pull.repo}
             {words.hash}
             {pull.number}
           </b>
-          <a href={pull.url} target="_blank" rel="noreferrer">
-            open on {HOST_NAMES[host]}
-          </a>
-        </h2>
-        <span className="links">
-          <Pill tone={CHECK_TONE[pull.checks]}>{CHECK_LABEL[pull.checks]}</Pill>
-          <Pill tone={MERGE_TONE[pull.mergeable]}>{MERGE_LABEL[pull.mergeable]}</Pill>
-          <Pill tone={REVIEW_TONE[pull.review]}>{REVIEW_LABEL[pull.review]}</Pill>
-          {!member && stance !== "yours" && stance !== "approved" && (
-            <button type="button" className="primary mini" disabled={approving} onClick={approve} title={`Approve on ${HOST_NAMES[host]} as the repository's token`}>
-              {approving ? "approving…" : "approve"}
-            </button>
-          )}
         </span>
+        <span className="spacer" />
+        <ExternalLink href={pull.url} className="button ghost mini">
+          open on {HOST_NAMES[host]} <Icon name="out" size={12} />
+        </ExternalLink>
+        {!member && stance !== "yours" && stance !== "approved" && (
+          <button type="button" className="primary mini" disabled={approving} onClick={approve} title={`Approve on ${HOST_NAMES[host]} as the repository's token`}>
+            {approving ? "approving…" : "approve"}
+          </button>
+        )}
       </div>
       {approveError && <div className="error">{approveError}</div>}
-      <h3 className="pull-title">
-        {pull.draft && <span className="tag">draft</span>} {pull.title} <MyReviewTag pull={pull} me={me} />
-      </h3>
-      <div className="meta">
-        <span>
-          <span className="meta-k">by</span>
-          {pull.author}
-        </span>
-        <span>
-          <span className="meta-k">branch</span>
-          <code>{pull.headRef}</code> → <code>{pull.baseRef}</code>
-        </span>
-        <span>
-          <span className="meta-k">updated</span>
-          {timeAgo(pull.updatedAt)}
-        </span>
-        {pull.approvals && (
-          <span>
-            <span className="meta-k">approvals</span>
-            <Approvals pull={pull} long />
-          </span>
-        )}
-        {pull.changedFiles !== undefined && (
-          <span>
-            <span className="meta-k">changes</span>
-            {plural(pull.changedFiles, "file")}, <span className="ins-text">+{fmt(pull.additions ?? 0)}</span> <span className="del-text">−{fmt(pull.deletions ?? 0)}</span>
-          </span>
-        )}
-        {pull.labels.length > 0 && (
-          <span>
-            <span className="meta-k">labels</span>
-            {pull.labels.map((label) => (
-              <span key={label} className="tag">
-                {label}
-              </span>
-            ))}
-          </span>
-        )}
-      </div>
 
-      {pull.checkRuns.length > 0 && (
-        <div className="checks">
-          {pull.checkRuns.map((check, i) => (
-            <span key={`${check.name}-${i}`} className={`pill-s ${CHECK_TONE[check.state]}`}>
-              {check.url ? (
-                <a href={check.url} target="_blank" rel="noreferrer">
-                  {check.name}
-                </a>
-              ) : (
-                check.name
+      <header className="pull-head">
+        <h3 className="pull-title">
+          {pull.title}{" "}
+          <span className="number">
+            {words.hash}
+            {pull.number}
+          </span>
+        </h3>
+        <p className="pull-line">
+          <span className={`state ${pull.draft ? "draft" : "open"}`}>
+            <Icon name="pull" />
+            {pull.draft ? "Draft" : "Open"}
+          </span>
+          <span className="person">
+            <Avatar name={pull.author} />
+            <b>{pull.author}</b>
+          </span>
+          wants to merge <code>{pull.headRef}</code> into <code>{pull.baseRef}</code>
+          <span className="dot-sep">updated {timeAgo(pull.updatedAt)}</span>
+          <MyReviewTag pull={pull} me={me} />
+        </p>
+      </header>
+
+      <div className="pull-layout">
+        <div className="pull-col">
+          <div className={`review-card ${reviewing ? "running" : ""}`}>
+            <div className="review-head">
+              <h3>
+                <Icon name="spark" /> Model review
+              </h3>
+              {record && !reviewing && (
+                <span className="review-meta">
+                  <span>{record.alias}</span>
+                  <span title={record.createdAt}>
+                    {timeAgo(record.createdAt)}, in {clock(Math.round(record.ms / 1000))}
+                  </span>
+                  <span>asked by {record.requestedBy}</span>
+                  {stale && <span className="tag stale">for an earlier commit {record.headSha.slice(0, 7)}</span>}
+                  {record.status === "failed" && <span className="tag failed">failed</span>}
+                  {record.cutShort && <span className="tag cut">cut short</span>}
+                  {record.postedAt && (
+                    <span className="tag reviewed">
+                      posted as {record.postedAs?.replace("-", " ")} {timeAgo(record.postedAt)}
+                      {httpUrl(record.postedUrl) && (
+                        <>
+                          {" · "}
+                          <ExternalLink href={record.postedUrl}>view</ExternalLink>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </span>
               )}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <h3 className="sub">Review</h3>
-      {reviewing ? (
-        <div className="review-running" aria-live="polite">
-          <span className="meter">
-            <span className="meter-fill indeterminate" style={{ width: "40%" }} />
-          </span>
-          <span>
-            Reviewing with <b>{review.alias}</b>
-            <span className="muted"> · {elapsed}s · the model is reading the {words.noun}; a minute or two is normal</span>
-          </span>
-        </div>
-      ) : (
-        <div className="review-actions">
-          <button type="button" className={detail.review ? "ghost" : "primary"} disabled={!review.available || !review.alias} onClick={() => void askReview()} title={!review.available ? "This gateway offers plugins no models" : !review.alias ? "No chat model is served" : undefined}>
-            {detail.review ? "review again" : "review now"}
-          </button>
-          {review.alias && <span className="muted">with {review.alias}</span>}
-          {reviewError && <span className="bad-text">{reviewError}</span>}
-        </div>
-      )}
-      {detail.review ? (
-        <>
-          <div className="review-meta">
-            <span>
-              <span className="meta-k">by</span>
-              {detail.review.alias}
-            </span>
-            <span>
-              <span className="meta-k">when</span>
-              {timeAgo(detail.review.createdAt)}, in {Math.round(detail.review.ms / 1000)} s
-            </span>
-            <span>
-              <span className="meta-k">asked by</span>
-              {detail.review.requestedBy}
-            </span>
-            {stale && <span className="tag stale">for an earlier commit {detail.review.headSha.slice(0, 7)}</span>}
-            {detail.review.status === "failed" && <span className="tag failed">failed</span>}
-            {detail.review.cutShort && <span className="tag cut">cut short</span>}
-            {detail.review.postedAt && (
-              <span className="tag reviewed">
-                posted as {detail.review.postedAs?.replace("-", " ")} {timeAgo(detail.review.postedAt)}
-                {detail.review.postedUrl && (
-                  <>
-                    {" · "}
-                    <a href={detail.review.postedUrl} target="_blank" rel="noreferrer">
-                      view
-                    </a>
-                  </>
-                )}
-              </span>
+              <span className="spacer" />
+              {!reviewing && (
+                <button type="button" className={record ? "ghost mini" : "primary"} disabled={!canReview} onClick={() => void askReview()} title={cannotReview}>
+                  {record ? (stale ? "review this commit" : "review again") : `review with ${review.alias ?? "a model"}`}
+                </button>
+              )}
+            </div>
+            {reviewing && (
+              <div className="review-running" role="status">
+                <span className="meter" aria-hidden="true">
+                  <span className="meter-fill indeterminate" style={{ width: "40%" }} />
+                </span>
+                <span>
+                  <b>{review.alias ?? "The model"}</b> is reading the {words.noun} <span className="elapsed">{clock(elapsed)}</span>
+                  <span className="muted"> · a minute or two is normal. It carries on if you leave; the review will be here when you come back.</span>
+                </span>
+              </div>
+            )}
+            {reviewError && <div className="error">{reviewError}</div>}
+            {record ? (
+              <>
+                {record.cutShort && <div className="cut-short">{record.cutShort}</div>}
+                {record.status === "failed" ? <div className="error">{record.error}</div> : <MarkdownView text={record.text} className={`review-body ${reviewing ? "superseded" : ""}`} />}
+                {askable && <AskThread review={record} noun={words.noun} off={canReview ? undefined : "No model is serving reviews"} pending={pending} ask={ask} />}
+              </>
+            ) : (
+              !reviewing && <p className="review-none">{cannotReview ? `${cannotReview}, so nothing can review this.` : `No model has read this ${words.noun} yet.`}</p>
             )}
           </div>
-          {detail.review.status === "done" && !(member && detail.review.postedAt) && (
-            <div className="review-actions">
-              {member ? (
-                <span className="muted">as a comment</span>
-              ) : (
-                <select value={postAs} onChange={(e) => setPostAs(e.target.value as typeof postAs)} disabled={posting} aria-label="Post as">
-                  <option value="comment">as a comment</option>
-                  <option value="request-changes">requesting changes</option>
-                  <option value="approve">approving</option>
-                </select>
-              )}
-              <button
-                type="button"
-                className={detail.review.postedAt ? "ghost" : "primary"}
-                disabled={posting}
-                onClick={() => {
-                  setPosting(true)
-                  setPostError(undefined)
-                  void onPost(postAs)
-                    .catch((e: unknown) => setPostError(messageOf(e)))
-                    .finally(() => setPosting(false))
-                }}
-              >
-                {posting ? "posting…" : detail.review.postedAt ? `post again to ${HOST_NAMES[host]}` : `post to ${HOST_NAMES[host]}`}
-              </button>
-              {postError && <span className="bad-text">{postError}</span>}
-            </div>
+
+          <h3 className="sub">Description</h3>
+          {detail.body.trim() ? <MarkdownView text={detail.body} className="pull-body" images={images} /> : <div className="empty">No description.</div>}
+
+          <h3 className="sub">
+            Files <span className="count">{fmt(detail.files.length)}</span>
+          </h3>
+          <div className="turns">
+            {detail.files.map((file) => (
+              <FileDiff key={`${file.status}:${file.path}`} file={file} alias={record?.alias} off={canReview ? undefined : "No model is serving reviews"} busy={!!pending} ask={askable && canReview ? ask : undefined} />
+            ))}
+            {detail.moreFiles > 0 && <div className="empty">{plural(detail.moreFiles, "more file")} not shown.</div>}
+          </div>
+        </div>
+
+        <aside className="pull-rail" aria-label={`State of this ${words.noun}`}>
+          <section>
+            <h4>
+              Checks
+              <ChecksSignal pull={pull} />
+            </h4>
+            {pull.checkRuns.length > 0 && (
+              <ul className="rail-list">
+                {pull.checkRuns.map((check, i) => (
+                  <li key={`${check.name}-${i}`} className={CHECK_TONE[check.state]} title={check.state}>
+                    <Icon name={CHECK_ICON[check.state]} />
+                    <ExternalLink href={check.url}>{check.name}</ExternalLink>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section>
+            <h4>
+              Merge
+              <MergeSignal pull={pull} />
+            </h4>
+          </section>
+          <section>
+            <h4>
+              Reviewers
+              <span className={`signal ${REVIEW_TONE[pull.review] || "quiet"}`}>
+                {pull.approvals?.required !== undefined ? `${fmt(pull.approvals.approved.length)}/${fmt(pull.approvals.required)} ` : ""}
+                {REVIEW_LABEL[pull.review]}
+              </span>
+            </h4>
+            {pull.approvals && pull.approvals.approved.length + pull.approvals.changes.length + pull.approvals.pending.length > 0 && (
+              <ul className="rail-list people">
+                {pull.approvals.approved.map((name) => (
+                  <li key={`a:${name}`}>
+                    <Avatar name={name} state="approved" />
+                    {name}
+                    <span className="ins-text">approved</span>
+                  </li>
+                ))}
+                {pull.approvals.changes.map((name) => (
+                  <li key={`c:${name}`}>
+                    <Avatar name={name} state="changes" />
+                    {name}
+                    <span className="bad-text">changes</span>
+                  </li>
+                ))}
+                {pull.approvals.pending.map((name) => (
+                  <li key={`p:${name}`}>
+                    <Avatar name={name} state="pending" />
+                    {name}
+                    <span className="muted">asked</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          {pull.changedFiles !== undefined && (
+            <section>
+              <h4>
+                Changes
+                <span className="signal quiet">
+                  <span className="ins-text">+{fmt(pull.additions ?? 0)}</span> <span className="del-text">−{fmt(pull.deletions ?? 0)}</span>
+                  <DiffStat additions={pull.additions} deletions={pull.deletions} />
+                </span>
+              </h4>
+              <p className="rail-note">
+                {plural(pull.changedFiles, "file")} at <code>{pull.headSha.slice(0, 7)}</code>
+              </p>
+            </section>
           )}
-          {detail.review.cutShort && <div className="cut-short">{detail.review.cutShort}</div>}
-          {detail.review.status === "failed" ? <div className="error">{detail.review.error}</div> : <MarkdownView text={detail.review.text} className="review-body" />}
-          {detail.review.status === "done" && !reviewing && <ReviewThread review={detail.review} noun={words.noun} canAsk={review.available && !!review.alias} onAsk={onAsk} />}
-        </>
-      ) : (
-        !reviewing && <div className="empty">Not reviewed yet.</div>
-      )}
-
-      <h3 className="sub">Description</h3>
-      {detail.body.trim() ? <MarkdownView text={detail.body} className="pull-body" /> : <div className="empty">No description.</div>}
-
-      <h3 className="sub">
-        Files <span className="count">{fmt(detail.files.length)}</span>
-      </h3>
-      <div className="turns">
-        {detail.files.map((file) => (
-          <DiffBlock
-            key={`${file.status}:${file.path}`}
-            patch={file.patch ?? ""}
-            language={languageOf(file.path)}
-            title={
-              <>
-                <span className={`tag file-${file.status}`}>{file.status}</span> {file.previousPath ? `${file.previousPath} → ` : ""}
-                {file.path} <span className="ins-text">+{fmt(file.additions)}</span> <span className="del-text">−{fmt(file.deletions)}</span>
-                {file.truncated && <span className="muted"> · cut at 60k characters</span>}
-              </>
-            }
-          />
-        ))}
-        {detail.moreFiles > 0 && <div className="empty">{plural(detail.moreFiles, "more file")} not shown.</div>}
+          {pull.labels.length > 0 && (
+            <section>
+              <h4>Labels</h4>
+              <div className="rail-tags">
+                {pull.labels.map((label) => (
+                  <span key={label} className="tag label">
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+        </aside>
       </div>
     </section>
+  )
+}
+
+/** How often an opened pull asks whether a review running on the server has landed. */
+const REVIEW_POLL_MS = 3000
+
+interface OpenedPullProps {
+  /** The pull's route on the plugin: `<base>/repos/<id>/pulls/<n>`. */
+  path: string
+  apiKey: string
+  words: HostWords
+  host: PullsHost
+  review: ReviewSetup
+  me?: string
+  member: boolean
+  onBack: () => void
+  /** Something the listing shows moved: a review landed, was posted, the pull was approved. */
+  onChanged: () => Promise<void>
+}
+
+/** Loads a description's images through the gateway: `repoPath` is the repository's API path, `number` the pull or issue. */
+const useImages = (apiKey: string, repoPath: string | undefined, number: number | undefined): ImageLoader | undefined =>
+  useMemo(
+    () =>
+      repoPath && number
+        ? async (url: string) => {
+            const image = await api<{ type: string; data: string }>(`${repoPath}/image?number=${number}&url=${encodeURIComponent(url)}`, apiKey)
+            return `data:${image.type};base64,${image.data}`
+          }
+        : undefined,
+    [apiKey, repoPath, number]
+  )
+
+/**
+ * One opened pull: its page and everything done to it. The panel mounts
+ * one per pull (keyed by repository and number), so an answer that comes
+ * back after the reader moved on (a review takes minutes) lands in a
+ * component that is gone and never on the pull opened since.
+ */
+const OpenedPull = ({ path, apiKey, words, host, review, me, member, onBack, onChanged }: OpenedPullProps) => {
+  const images = useImages(apiKey, path.replace(/\/pulls\/[0-9]+$/, ""), Number(/[0-9]+$/.exec(path)?.[0]))
+  const [detail, setDetail] = useState<PullPage | null>(null)
+  const [error, setError] = useState<string | undefined>()
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
+
+  const refresh = useCallback(async (): Promise<PullPage> => {
+    const answer = await api<PullPage>(path, apiKey)
+    if (alive.current) {
+      setDetail(answer)
+      setError(undefined)
+    }
+    return answer
+  }, [path, apiKey])
+
+  useEffect(() => {
+    refresh().catch((e: unknown) => {
+      if (alive.current) setError(messageOf(e))
+    })
+  }, [refresh])
+
+  // A review this page is not waiting on (started before a reload, from
+  // another tab, by the idle loop, or left behind when the reader went back
+  // to the list): ask until it lands.
+  const reviewing = detail?.reviewing ?? false
+  useEffect(() => {
+    if (!reviewing) return
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return
+      api<Pick<PullPage, "review" | "reviewing" | "reviewingSince">>(`${path}/review`, apiKey)
+        .then((answer) => {
+          // Replaced whole, so a `reviewingSince` that is gone does not linger.
+          if (alive.current)
+            setDetail((current) =>
+              current
+                ? {
+                    ...current,
+                    review: answer.review,
+                    reviewing: answer.reviewing,
+                    reviewingSince: answer.reviewingSince
+                  }
+                : current
+            )
+          if (!answer.reviewing) void onChanged()
+        })
+        .catch(() => undefined)
+    }, REVIEW_POLL_MS)
+    return () => clearInterval(timer)
+  }, [reviewing, path, apiKey, onChanged])
+
+  /** Applies an answer to this pull's page, unless the page is gone. */
+  const patch = (change: Partial<PullPage>) => {
+    if (alive.current) setDetail((current) => (current ? { ...current, ...change } : current))
+  }
+
+  if (!detail)
+    return (
+      <section className="panel record">
+        <div className="record-bar">
+          <button type="button" className="ghost mini back" onClick={onBack}>
+            ← {words.nouns}
+          </button>
+        </div>
+        {error ? (
+          <div className="error">{error}</div>
+        ) : (
+          <div className="skeleton-rows" aria-busy="true" aria-label={`Loading the ${words.noun}`}>
+            <span className="skeleton" style={{ width: "50%", height: 22, marginTop: 10 }} />
+            <span className="skeleton" style={{ width: "70%", height: 12 }} />
+            <span className="skeleton" style={{ width: "100%", height: 120, marginTop: 8 }} />
+            <span className="skeleton" style={{ width: "100%", height: 180 }} />
+          </div>
+        )}
+      </section>
+    )
+
+  return (
+    <PullView
+      detail={detail}
+      images={images}
+      words={words}
+      host={host}
+      member={member}
+      review={review}
+      me={me}
+      onBack={onBack}
+      onReview={async () => {
+        try {
+          const answer = await api<{ review: ReviewRecord }>(`${path}/review`, apiKey, { method: "POST" })
+          // A failed run does not replace a finished review of the same commit: say why, keep what is there.
+          const kept = detail.review
+          if (answer.review.status === "failed" && kept?.status === "done" && kept.headSha === answer.review.headSha) {
+            patch({ reviewing: false })
+            throw new Error(answer.review.error || "The review failed.")
+          }
+          patch({ review: answer.review, reviewing: false })
+        } catch (e) {
+          // The request can be lost (a proxy's timeout, a sleeping laptop)
+          // while the server reviews on: then the page waits for it instead.
+          const now = await refresh().catch(() => undefined)
+          if (!now?.reviewing) throw e
+          return
+        }
+        void onChanged()
+      }}
+      onApprove={async () => {
+        const answer = await api<{ pull: PullSummary }>(`${path}/approve`, apiKey, { method: "POST" })
+        patch({ pull: answer.pull })
+        void onChanged()
+      }}
+      onAsk={async (question, quote) => {
+        const answer = await api<{ review: ReviewRecord }>(`${path}/review/ask`, apiKey, { method: "POST", body: { question, ...(quote ? { selection: quote } : {}) } })
+        patch({ review: answer.review })
+        return answer.review
+      }}
+    />
   )
 }
 
@@ -1396,7 +2123,10 @@ const ReviewsPanel = ({ words, overview, base, apiKey, onChanged }: { words: Hos
     setBusy(true)
     setError(undefined)
     try {
-      await api(`${base}/settings`, apiKey, { method: "PUT", body: { reviewAlias: alias } })
+      await api(`${base}/settings`, apiKey, {
+        method: "PUT",
+        body: { reviewAlias: alias }
+      })
       await onChanged()
     } catch (e) {
       setError(messageOf(e))
@@ -1437,8 +2167,16 @@ const ReviewsPanel = ({ words, overview, base, apiKey, onChanged }: { words: Hos
 /*  Issues and triage                                                         */
 /* -------------------------------------------------------------------------- */
 
-const PRIORITY_TONE: Record<string, string> = { high: "bad", medium: "warn", low: "" }
-const PRIORITY_RANK: Record<TriagePriority, number> = { high: 0, medium: 1, low: 2 }
+const PRIORITY_TONE: Record<string, string> = {
+  high: "bad",
+  medium: "warn",
+  low: ""
+}
+const PRIORITY_RANK: Record<TriagePriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2
+}
 
 type IssueView = "all" | "untriaged" | "high" | "duplicates" | "unanswered" | "failed"
 
@@ -1474,7 +2212,11 @@ const issueMatches = (brief: TriageBrief | undefined, view: IssueView): boolean 
 
 type IssueSortKey = "updated" | "created" | "number" | "title" | "author" | "comments" | "priority"
 
-const ISSUE_SORTS: Array<{ key: IssueSortKey; label: string; natural: "asc" | "desc" }> = [
+const ISSUE_SORTS: Array<{
+  key: IssueSortKey
+  label: string
+  natural: "asc" | "desc"
+}> = [
   { key: "updated", label: "last updated", natural: "desc" },
   { key: "created", label: "opened", natural: "desc" },
   { key: "number", label: "number", natural: "desc" },
@@ -1493,7 +2235,14 @@ interface IssueFilters {
   sort: Sort<IssueSortKey>
 }
 
-const DEFAULT_ISSUE_FILTERS: IssueFilters = { view: "all", repo: "", author: "", label: "", age: "", sort: { key: "updated", dir: "desc" } }
+const DEFAULT_ISSUE_FILTERS: IssueFilters = {
+  view: "all",
+  repo: "",
+  author: "",
+  label: "",
+  age: "",
+  sort: { key: "updated", dir: "desc" }
+}
 
 const isIssueFilters = (value: unknown): value is IssueFilters => {
   if (typeof value !== "object" || value === null) return false
@@ -1509,15 +2258,39 @@ const isIssueFilters = (value: unknown): value is IssueFilters => {
 }
 
 const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host: PullsHost; overview: Overview; base: string; apiKey: string; review: ReviewSetup; onChanged: () => Promise<void> }) => {
-  const [open, setOpen] = useState<{ repoId: string; number: number } | null>(null)
-  const [detail, setDetail] = useState<{ body: string; triage: TriageRecord | null } | null>(null)
+  // The expanded issue is in the address too: Back folds it away.
+  const home = `plugin:${host}`
+  const place = placeIn(useRoute(), home)
+  const openRepo = place.issue?.repoId
+  const openNumber = place.issue?.number
+  const open = useMemo(() => (openRepo && openNumber ? { repoId: openRepo, number: openNumber } : null), [openRepo, openNumber])
+  const setOpen = (next: { repoId: string; number: number } | null) => (next ? navigate(`${home}/issue/${next.repoId}/${next.number}`) : backTo(`${home}/issues`))
+  const images = useImages(apiKey, open ? `${base}/repos/${open.repoId}` : undefined, open?.number)
+  // The issue expanded now, for answers that come back after the reader opened another one.
+  const openNow = useRef(open)
+  openNow.current = open
+  const isOpen = (repoId: string, number: number) => openNow.current?.repoId === repoId && openNow.current.number === number
+  const [detail, setDetail] = useState<{
+    body: string
+    triage: TriageRecord | null
+  } | null>(null)
   const [reply, setReply] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | undefined>()
   const [filters, setFilters] = useStoredState<IssueFilters>(`twinny-server.issues.${host}`, DEFAULT_ISSUE_FILTERS, isIssueFilters)
   const [search, setSearch] = useState("")
   const repos = overview.repos.filter((repo) => repo.issuesSupported)
-  const all = useMemo(() => repos.flatMap((repo) => repo.issues.map((issue) => ({ repo, issue, triage: repo.triage[issue.number] as TriageBrief | undefined }))), [repos])
+  const all = useMemo(
+    () =>
+      repos.flatMap((repo) =>
+        repo.issues.map((issue) => ({
+          repo,
+          issue,
+          triage: repo.triage[issue.number] as TriageBrief | undefined
+        }))
+      ),
+    [repos]
+  )
   const narrowed = useMemo(() => {
     const needle = search.trim().toLowerCase()
     return all
@@ -1558,7 +2331,11 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
   const labels = useMemo(() => distinct(all.flatMap(({ issue }) => issue.labels)), [all])
   const filtering = filters.view !== "all" || Boolean(filters.repo || filters.author || filters.label || filters.age || search.trim())
   const set = <K extends keyof IssueFilters>(key: K, value: IssueFilters[K]) => setFilters((current) => ({ ...current, [key]: value }))
-  const sortBy = (key: IssueSortKey) => setFilters((current) => ({ ...current, sort: toggleSort(current.sort, key, naturalOf(ISSUE_SORTS, key)) }))
+  const sortBy = (key: IssueSortKey) =>
+    setFilters((current) => ({
+      ...current,
+      sort: toggleSort(current.sort, key, naturalOf(ISSUE_SORTS, key))
+    }))
 
   useEffect(() => {
     if (!open) {
@@ -1594,15 +2371,18 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
   const triage = (repoId: string, number: number) =>
     run(`triage:${repoId}:${number}`, async () => {
       const answer = await api<{ triage: TriageRecord }>(`${base}/repos/${repoId}/issues/${number}/triage`, apiKey, { method: "POST" })
-      if (open?.repoId === repoId && open.number === number) {
+      if (isOpen(repoId, number)) {
         setDetail((current) => (current ? { ...current, triage: answer.triage } : current))
         setReply(answer.triage.reply)
       }
     })
   const post = (repoId: string, number: number, what: "reply" | "labels") =>
     run(`post:${what}`, async () => {
-      const answer = await api<{ triage: TriageRecord }>(`${base}/repos/${repoId}/issues/${number}/triage/post`, apiKey, { method: "POST", body: what === "reply" ? { labels: false, replyText: reply } : { reply: false } })
-      setDetail((current) => (current ? { ...current, triage: answer.triage } : current))
+      const answer = await api<{ triage: TriageRecord }>(`${base}/repos/${repoId}/issues/${number}/triage/post`, apiKey, {
+        method: "POST",
+        body: what === "reply" ? { labels: false, replyText: reply } : { reply: false }
+      })
+      if (isOpen(repoId, number)) setDetail((current) => (current ? { ...current, triage: answer.triage } : current))
     })
 
   if (repos.length === 0) return null
@@ -1623,48 +2403,73 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
       {error && <div className="error">{error}</div>}
       {all.length > 0 && (
         <>
-          <div className="toolbar">
-            <span className="chips" role="group" aria-label="View">
-              {ISSUE_VIEWS.map((entry) => (
-                <button key={entry} type="button" className={filters.view === entry ? "on" : ""} onClick={() => set("view", entry)} title={ISSUE_VIEW_TITLE[entry]}>
-                  {ISSUE_VIEW_LABEL[entry]}
-                  <span className="chip-count">{fmt(counts[entry])}</span>
-                </button>
-              ))}
-            </span>
-            <input type="search" className="search" placeholder="title, author, label or number" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search issues" />
+          <div className="views" role="group" aria-label="View">
+            {ISSUE_VIEWS.map((entry) => (
+              <button key={entry} type="button" className={filters.view === entry ? "on" : ""} aria-pressed={filters.view === entry} onClick={() => set("view", entry)} title={ISSUE_VIEW_TITLE[entry]}>
+                {cap(ISSUE_VIEW_LABEL[entry])}
+                <span className="chip-count">{fmt(counts[entry])}</span>
+              </button>
+            ))}
           </div>
           <div className="toolbar filters">
-            {repos.length > 1 && <FilterSelect label="repository" value={filters.repo} onChange={(value) => set("repo", value)} any="every repository" options={repos.map((repo) => ({ value: repo.id, label: repo.fullName }))} />}
-            <FilterSelect label="author" value={filters.author} onChange={(value) => set("author", value)} any="anyone" options={authors.map((author) => ({ value: author, label: author }))} />
-            {labels.length > 0 && <FilterSelect label="label" value={filters.label} onChange={(value) => set("label", value)} any="any label" options={labels.map((label) => ({ value: label, label }))} />}
-            <FilterSelect label="activity" value={filters.age} onChange={(value) => set("age", value as Age)} options={AGE_OPTIONS} />
+            <label className="search-box">
+              <Icon name="search" />
+              <input type="search" placeholder="Search issues…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search issues by title, author, label or number" />
+            </label>
+            <div className="filter-group">
+              {repos.length > 1 && (
+                <FilterSelect
+                  label="repository"
+                  value={filters.repo}
+                  onChange={(value) => set("repo", value)}
+                  any="every repository"
+                  options={repos.map((repo) => ({
+                    value: repo.id,
+                    label: repo.fullName
+                  }))}
+                />
+              )}
+              <FilterSelect
+                label="author"
+                value={filters.author}
+                onChange={(value) => set("author", value)}
+                any="anyone"
+                options={authors.map((author) => ({
+                  value: author,
+                  label: author
+                }))}
+              />
+              {labels.length > 0 && <FilterSelect label="label" value={filters.label} onChange={(value) => set("label", value)} any="any label" options={labels.map((label) => ({ value: label, label }))} />}
+              <FilterSelect label="activity" value={filters.age} onChange={(value) => set("age", value as Age)} options={AGE_OPTIONS} />
+            </div>
+            <span className="spacer" />
             {filtering && (
               <button
                 type="button"
                 className="link"
                 onClick={() => {
-                  setFilters((current) => ({ ...DEFAULT_ISSUE_FILTERS, sort: current.sort }))
+                  setFilters((current) => ({
+                    ...DEFAULT_ISSUE_FILTERS,
+                    sort: current.sort
+                  }))
                   setSearch("")
                 }}
               >
-                clear filters
+                Clear
               </button>
             )}
-            <span className="spacer" />
-            <label className="filter sort">
-              <span>order by</span>
-              <select value={filters.sort.key} onChange={(e) => set("sort", { key: e.target.value as IssueSortKey, dir: naturalOf(ISSUE_SORTS, e.target.value as IssueSortKey) })} aria-label="Order issues by">
-                {ISSUE_SORTS.map((entry) => (
-                  <option key={entry.key} value={entry.key}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="ghost mini dir" onClick={() => set("sort", { ...filters.sort, dir: filters.sort.dir === "asc" ? "desc" : "asc" })} title={filters.sort.dir === "asc" ? "Ascending; click for descending" : "Descending; click for ascending"} aria-label={filters.sort.dir === "asc" ? "Ascending" : "Descending"}>
-                {filters.sort.dir === "asc" ? "↑" : "↓"}
-              </button>
-            </label>
+            <SortPicker
+              sorts={ISSUE_SORTS}
+              sort={filters.sort}
+              onKey={(key) => set("sort", { key, dir: naturalOf(ISSUE_SORTS, key) })}
+              onFlip={() =>
+                set("sort", {
+                  ...filters.sort,
+                  dir: filters.sort.dir === "asc" ? "desc" : "asc"
+                })
+              }
+              label="Order issues by"
+            />
           </div>
         </>
       )}
@@ -1711,7 +2516,12 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
                           ))}
                         </div>
                       </td>
-                      <td>{issue.author}</td>
+                      <td>
+                        <span className="person">
+                          <Avatar name={issue.author} />
+                          {issue.author}
+                        </span>
+                      </td>
                       <td>
                         {!brief ? (
                           <span className="muted">–</span>
@@ -1750,10 +2560,8 @@ const IssuesPanel = ({ host, overview, base, apiKey, review, onChanged }: { host
                             </div>
                           ) : (
                             <div className="issue-open">
-                              <a href={issue.url} target="_blank" rel="noreferrer">
-                                open #{issue.number} on the host
-                              </a>
-                              {detail.body.trim() ? <MarkdownView text={detail.body} className="pull-body" /> : <div className="empty">No description.</div>}
+                              <ExternalLink href={issue.url}>open #{issue.number} on the host</ExternalLink>
+                              {detail.body.trim() ? <MarkdownView text={detail.body} className="pull-body" images={images} /> : <div className="empty">No description.</div>}
                               {detail.triage?.status === "done" && (
                                 <div className="triage-box">
                                   <div className="review-meta">
@@ -1834,9 +2642,18 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
   const [error, setError] = useState<string | undefined>()
   const [filters, setFilters] = useStoredState<PullFilters>(`twinny-server.pulls.${host}`, DEFAULT_PULL_FILTERS, isPullFilters)
   const [search, setSearch] = useState("")
-  const [opened, setOpened] = useState<{ repoId: string; number: number } | null>(null)
-  const [detail, setDetail] = useState<PullPage | null>(null)
-  const [detailError, setDetailError] = useState<string | undefined>()
+  // Pulls this browser has set aside ("<repo id>:<number>"): out of the list and every count until shown again.
+  const [ignored, setIgnored] = useStoredState<string[]>(`twinny-server.pulls.${host}.ignored`, [], isStrings)
+  const [showIgnored, setShowIgnored] = useState(false)
+  // The section and the opened pull live in the address, so Back leaves a pull for the list and a link can point at one.
+  const home = `plugin:${host}`
+  const place = placeIn(useRoute(), home)
+  const openedRepo = place.pull?.repoId
+  const openedNumber = place.pull?.number
+  const opened = useMemo(() => (openedRepo && openedNumber ? { repoId: openedRepo, number: openedNumber } : null), [openedRepo, openedNumber])
+  const setOpened = (next: { repoId: string; number: number } | null) => (next ? navigate(`${home}/pull/${next.repoId}/${next.number}`) : backTo(home))
+  const tab = place.tab
+  const setTab = (next: PageTab) => navigate(next === "pulls" ? home : `${home}/${next}`)
   const [syncing, setSyncing] = useState(false)
 
   const load = useCallback(async () => {
@@ -1849,33 +2666,18 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
     }
   }, [base, apiKey])
 
+  // A review in flight changes the list within seconds; otherwise a minute is often enough.
+  const reviewingNow = overview?.repos.some((repo) => repo.reviewing.length > 0) ?? false
   useEffect(() => {
-    void load()
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void load()
-    }, 60_000)
+    const timer = setInterval(
+      () => {
+        if (document.visibilityState === "visible") void load()
+      },
+      reviewingNow ? 5_000 : 60_000
+    )
     return () => clearInterval(timer)
-  }, [load])
-
-  useEffect(() => {
-    if (!opened) {
-      setDetail(null)
-      return
-    }
-    let cancelled = false
-    setDetail(null)
-    setDetailError(undefined)
-    api<PullPage>(`${base}/repos/${opened.repoId}/pulls/${opened.number}`, apiKey)
-      .then((answer) => {
-        if (!cancelled) setDetail(answer)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setDetailError(messageOf(e))
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [opened, base, apiKey])
+  }, [load, reviewingNow])
+  useEffect(() => void load(), [load])
 
   const syncAll = async () => {
     setSyncing(true)
@@ -1889,19 +2691,39 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
     }
   }
 
-  const all = useMemo(() => overview?.repos.flatMap((repo) => repo.pulls.map((pull) => ({ repo, pull, brief: repo.reviews[pull.number] as ReviewBrief | undefined }))) ?? [], [overview])
+  const everything = useMemo(
+    () =>
+      overview?.repos.flatMap((repo) =>
+        repo.pulls.map((pull) => ({
+          repo,
+          pull,
+          brief: repo.reviews[pull.number] as ReviewBrief | undefined,
+          key: `${repo.id}:${pull.number}`
+        }))
+      ) ?? [],
+    [overview]
+  )
+  const ignoredKeys = useMemo(() => new Set(ignored), [ignored])
+  const all = useMemo(() => everything.filter(({ key }) => !ignoredKeys.has(key)), [everything, ignoredKeys])
+  const ignoredCount = everything.length - all.length
+  const withIgnored = showIgnored && ignoredCount > 0
+  // The switch goes when the last ignored pull is taken back; so does what it was set to.
+  useEffect(() => {
+    if (ignoredCount === 0) setShowIgnored(false)
+  }, [ignoredCount])
+  const ignore = (key: string, on: boolean) => setIgnored((current) => (on ? [...current.filter((entry) => entry !== key), key] : current.filter((entry) => entry !== key)))
 
   /** Everything but the quick view and the drafts switch, so the chip counts say what each view would show. */
   const narrowedWithDrafts = useMemo(() => {
     const needle = search.trim().toLowerCase()
-    return all
+    return (withIgnored ? everything : all)
       .filter(({ repo }) => !filters.repo || repo.id === filters.repo)
       .filter(({ pull }) => !filters.author || pull.author === filters.author)
       .filter(({ pull }) => !filters.label || pull.labels.includes(filters.label))
       .filter(({ pull }) => !filters.base || pull.baseRef === filters.base)
       .filter(({ pull }) => withinAge(pull.updatedAt, filters.age))
       .filter(({ pull }) => !needle || pull.title.toLowerCase().includes(needle) || pull.author.toLowerCase().includes(needle) || String(pull.number) === needle || pull.headRef.toLowerCase().includes(needle) || pull.labels.some((label) => label.toLowerCase().includes(needle)))
-  }, [all, filters.repo, filters.author, filters.label, filters.base, filters.age, search])
+  }, [all, everything, withIgnored, filters.repo, filters.author, filters.label, filters.base, filters.age, search])
   const narrowed = useMemo(() => (filters.drafts ? narrowedWithDrafts : narrowedWithDrafts.filter(({ pull }) => !pull.draft)), [narrowedWithDrafts, filters.drafts])
 
   const me = overview?.me.name
@@ -1925,10 +2747,14 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
   const authors = useMemo(() => distinct(all.map(({ pull }) => pull.author)), [all])
   const labels = useMemo(() => distinct(all.flatMap(({ pull }) => pull.labels)), [all])
   const bases = useMemo(() => distinct(all.map(({ pull }) => pull.baseRef)), [all])
-  const filtering = filters.quick !== "all" || filters.drafts || Boolean(filters.repo || filters.author || filters.label || filters.base || filters.age || search.trim())
+  const filtering = filters.quick !== "all" || filters.drafts || withIgnored || Boolean(filters.repo || filters.author || filters.label || filters.base || filters.age || search.trim())
   const hiddenDrafts = filters.drafts || filters.quick === "drafts" ? 0 : narrowedWithDrafts.filter(({ pull }) => pull.draft).length
   const set = <K extends keyof PullFilters>(key: K, value: PullFilters[K]) => setFilters((current) => ({ ...current, [key]: value }))
-  const sortBy = (key: PullSortKey) => setFilters((current) => ({ ...current, sort: toggleSort(current.sort, key, naturalOf(PULL_SORTS, key)) }))
+  const sortBy = (key: PullSortKey) =>
+    setFilters((current) => ({
+      ...current,
+      sort: toggleSort(current.sort, key, naturalOf(PULL_SORTS, key))
+    }))
 
   if (!overview)
     return error ? (
@@ -1945,20 +2771,69 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
       />
     )
 
+  const title = (
+    <div className="page-title">
+      <h2 className="plugin-name">
+        <PluginIcon id={host} size={22} />
+        {HOST_NAMES[host]}
+      </h2>
+      <p>
+        Open {words.nouns} on the {words.repoNoun === "project" ? "projects" : "repositories"} this gateway watches, synced every five minutes.{" "}
+        <button type="button" className="link" onClick={() => void syncAll()} disabled={syncing}>
+          {syncing ? "syncing…" : "sync now"}
+        </button>
+      </p>
+    </div>
+  )
+
+  // An opened pull is the page: nothing above or below competes with it.
+  if (opened)
+    return (
+      <>
+        {title}
+        {error && <div className="error-bar">{error}</div>}
+        <OpenedPull
+          key={`${opened.repoId}:${opened.number}`}
+          path={`${base}/repos/${opened.repoId}/pulls/${opened.number}`}
+          apiKey={apiKey}
+          words={words}
+          host={host}
+          member={member}
+          review={overview.review}
+          me={me}
+          onBack={() => {
+            setOpened(null)
+            void load()
+          }}
+          onChanged={load}
+        />
+      </>
+    )
+
+  const issueCount = overview.repos.reduce((sum, repo) => sum + (repo.issuesSupported ? repo.issues.length : 0), 0)
+  const hasIssues = overview.repos.some((repo) => repo.issuesSupported)
+  const troubled = overview.repos.filter((repo) => repo.error || repo.tokenRefused).length
+  // Nothing watched yet: the only useful place is where a repository is added.
+  const shown: PageTab = !member && overview.repos.length === 0 ? "setup" : (tab === "issues" && !hasIssues) || (tab === "setup" && member) ? "pulls" : tab
+  const show = (quick: Quick) => {
+    setTab("pulls")
+    set("quick", quick)
+  }
+  // Every open pull in exactly one bucket, so the bar adds up to all of them.
+  const buckets = HEALTH_ORDER.map((health) => ({
+    health,
+    count: all.filter(({ pull }) => healthOf(pull) === health).length
+  })).filter((bucket) => bucket.count > 0)
+  const stat = (label: string, value: number, quick: Quick, tone = "") => (
+    <button type="button" className={`stat ${value ? tone : ""} ${shown === "pulls" && filters.quick === quick ? "on" : ""}`} onClick={() => show(quick)} title={`Show ${quick === "all" ? `every open ${words.noun}` : QUICK_LABEL[quick]}`}>
+      <span className="value">{fmt(value)}</span>
+      <span className="label">{label}</span>
+    </button>
+  )
+
   return (
     <>
-      <div className="page-title">
-        <h2 className="plugin-name">
-          <PluginIcon id={host} size={22} />
-          {HOST_NAMES[host]}
-        </h2>
-        <p>
-          Open {words.nouns} on the {words.repoNoun === "project" ? "projects" : "repositories"} this gateway watches, synced every five minutes.{" "}
-          <button type="button" className="link" onClick={() => void syncAll()} disabled={syncing}>
-            {syncing ? "syncing…" : "sync now"}
-          </button>
-        </p>
-      </div>
+      {title}
       {error && <div className="error-bar">{error}</div>}
       {meNotice && (
         <div className="success-bar with-close">
@@ -1970,137 +2845,140 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
       )}
       {member && !overview.me.name && <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} asking onSaved={setMeNotice} />}
 
-      <div className="tiles">
-        <div className="tile">
-          <div className="label">{words.repoNoun === "project" ? "projects" : "repositories"}</div>
-          <div className="value">{fmt(overview.repos.length)}</div>
+      <section className="pipeline" aria-label={`Open ${words.nouns} at a glance`}>
+        <div className="stats">
+          {stat(`open ${words.nouns}`, totals.all, "all")}
+          {stat("ready to merge", totals.ready, "ready", "ok")}
+          {stat("awaiting review", totals.review, "review", "warn")}
+          {stat("failing checks", totals.failing, "failing", "bad")}
+          {stat("conflicts", totals.conflicts, "conflicts", "bad")}
         </div>
-        <div className="tile">
-          <div className="label">open {words.nouns}</div>
-          <div className="value">{fmt(totals.all)}</div>
-        </div>
-        <div className={`tile ${totals.failing ? "bad" : ""}`}>
-          <div className="label">failing checks</div>
-          <div className="value">{fmt(totals.failing)}</div>
-        </div>
-        <div className={`tile ${totals.conflicts ? "bad" : ""}`}>
-          <div className="label">conflicts</div>
-          <div className="value">{fmt(totals.conflicts)}</div>
-        </div>
-        <div className="tile">
-          <div className="label">awaiting review</div>
-          <div className="value">{fmt(totals.review)}</div>
-        </div>
-        <div className={`tile ${totals.ready ? "attention" : ""}`}>
-          <div className="label">ready to merge</div>
-          <div className="value">{fmt(totals.ready)}</div>
-        </div>
+        {buckets.length > 0 && (
+          <div className="pipeline-bar" role="group" aria-label="Share of each state">
+            {buckets.map(({ health, count }) => (
+              <button key={health} type="button" className={health} style={{ flexGrow: count }} onClick={() => show(HEALTH_QUICK[health])} title={`${fmt(count)} ${HEALTH_LABEL[health]}`} aria-label={`${fmt(count)} ${HEALTH_LABEL[health]}`} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="tabs" role="tablist" aria-label={`${HOST_NAMES[host]} sections`}>
+        <button type="button" role="tab" aria-selected={shown === "pulls"} className={shown === "pulls" ? "on" : ""} onClick={() => setTab("pulls")}>
+          {words.nouns[0].toUpperCase() + words.nouns.slice(1)}
+          <span className="tab-count">{fmt(totals.all)}</span>
+        </button>
+        {hasIssues && (
+          <button type="button" role="tab" aria-selected={shown === "issues"} className={shown === "issues" ? "on" : ""} onClick={() => setTab("issues")}>
+            Issues
+            <span className="tab-count">{fmt(issueCount)}</span>
+          </button>
+        )}
+        {!member && (
+          <button type="button" role="tab" aria-selected={shown === "setup"} className={shown === "setup" ? "on" : ""} onClick={() => setTab("setup")} title={troubled ? `${countOf(troubled, words)} cannot sync` : undefined}>
+            Setup
+            {troubled > 0 ? <span className="tab-count bad">{fmt(troubled)}</span> : <span className="tab-count">{fmt(overview.repos.length)}</span>}
+          </button>
+        )}
+        {overview.review.busy && (
+          <span className="tabs-status" role="status">
+            <i className="pulse" />
+            {overview.review.alias ?? "a model"} is reviewing
+          </span>
+        )}
       </div>
 
-      {opened ? (
-        detail ? (
-          <PullView
-            detail={detail}
-            words={words}
-            host={host}
-            member={member}
-            review={overview.review}
-            me={me}
-            onBack={() => setOpened(null)}
-            onReview={async () => {
-              const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review`, apiKey, { method: "POST" })
-              setDetail((current) => (current ? { ...current, review: answer.review, reviewing: false } : current))
-              void load()
-            }}
-            onPost={async (as) => {
-              const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review/post`, apiKey, { method: "POST", body: { as } })
-              setDetail((current) => (current ? { ...current, review: answer.review } : current))
-              void load()
-            }}
-            onApprove={async () => {
-              const answer = await api<{ pull: PullSummary }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/approve`, apiKey, { method: "POST" })
-              setDetail((current) => (current ? { ...current, pull: answer.pull } : current))
-              void load()
-            }}
-            onAsk={async (question) => {
-              const answer = await api<{ review: ReviewRecord }>(`${base}/repos/${opened.repoId}/pulls/${opened.number}/review/ask`, apiKey, { method: "POST", body: { question } })
-              setDetail((current) => (current ? { ...current, review: answer.review } : current))
-            }}
-          />
-        ) : (
-          <section className="panel">
-            <button type="button" className="ghost mini" onClick={() => setOpened(null)}>
-              ← {words.nouns}
-            </button>
-            {detailError ? (
-              <div className="error">{detailError}</div>
-            ) : (
-              <div className="skeleton-rows" aria-busy="true" aria-label={`Loading the ${words.noun}`}>
-                <span className="skeleton" style={{ width: "50%", height: 18, marginTop: 10 }} />
-                <span className="skeleton" style={{ width: "70%", height: 12 }} />
-                <span className="skeleton" style={{ width: "100%", height: 120, marginTop: 8 }} />
-                <span className="skeleton" style={{ width: "100%", height: 180 }} />
-              </div>
-            )}
-          </section>
-        )
-      ) : (
+      {shown === "pulls" && (
         <section className="panel">
-          <div className="section-heading">
-            <h2>
-              Open {words.nouns}
-              <span className="count">{fmt(pulls.length)}</span>
-            </h2>
-          </div>
-          <div className="toolbar">
-            <span className="chips" role="group" aria-label="View">
-              {QUICKS.filter((entry) => entry !== "mine" || me !== undefined).map((entry) => (
-                <button key={entry} type="button" className={filters.quick === entry ? "on" : ""} onClick={() => set("quick", entry)} title={entry === "mine" ? `${QUICK_TITLE.mine} (you are ${me})` : QUICK_TITLE[entry]}>
-                  {QUICK_LABEL[entry]}
-                  <span className="chip-count">{fmt(counts[entry])}</span>
-                </button>
-              ))}
-            </span>
-            <input type="search" className="search" placeholder="title, author, branch, label or number" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search" />
+          <div className="views" role="group" aria-label="View">
+            {QUICKS.filter((entry) => entry !== "mine" || me !== undefined).map((entry) => (
+              <button key={entry} type="button" className={filters.quick === entry ? "on" : ""} aria-pressed={filters.quick === entry} onClick={() => set("quick", entry)} title={entry === "mine" ? `${QUICK_TITLE.mine} (you are ${me})` : QUICK_TITLE[entry]}>
+                {cap(QUICK_LABEL[entry])}
+                <span className="chip-count">{fmt(counts[entry])}</span>
+              </button>
+            ))}
           </div>
           <div className="toolbar filters">
-            {overview.repos.length > 1 && <FilterSelect label={words.repoNoun} value={filters.repo} onChange={(value) => set("repo", value)} any={`every ${words.repoNoun}`} options={overview.repos.map((repo) => ({ value: repo.id, label: repo.fullName }))} />}
-            <FilterSelect label="author" value={filters.author} onChange={(value) => set("author", value)} any="anyone" options={authors.map((author) => ({ value: author, label: author }))} />
-            {labels.length > 0 && <FilterSelect label="label" value={filters.label} onChange={(value) => set("label", value)} any="any label" options={labels.map((label) => ({ value: label, label }))} />}
-            {bases.length > 1 && <FilterSelect label="into" value={filters.base} onChange={(value) => set("base", value)} any="any branch" options={bases.map((base) => ({ value: base, label: base }))} />}
-            <FilterSelect label="activity" value={filters.age} onChange={(value) => set("age", value as Age)} options={AGE_OPTIONS} />
-            <button type="button" className={`mini toggle ${filters.drafts ? "on" : "ghost"}`} onClick={() => set("drafts", !filters.drafts)} aria-pressed={filters.drafts} title={filters.drafts ? "Drafts are in the list; click to hide them" : "Drafts are hidden; click to show them"}>
-              {filters.drafts ? "drafts shown" : `drafts hidden${hiddenDrafts ? ` · ${fmt(hiddenDrafts)}` : ""}`}
-            </button>
+            <label className="search-box">
+              <Icon name="search" />
+              <input type="search" placeholder={`Search ${words.nouns}…`} value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search by title, author, branch, label or number" />
+            </label>
+            <div className="filter-group">
+              {overview.repos.length > 1 && (
+                <FilterSelect
+                  label={words.repoNoun}
+                  value={filters.repo}
+                  onChange={(value) => set("repo", value)}
+                  any={`every ${words.repoNoun}`}
+                  options={overview.repos.map((repo) => ({
+                    value: repo.id,
+                    label: repo.fullName
+                  }))}
+                />
+              )}
+              <FilterSelect
+                label="author"
+                value={filters.author}
+                onChange={(value) => set("author", value)}
+                any="anyone"
+                options={authors.map((author) => ({
+                  value: author,
+                  label: author
+                }))}
+              />
+              {labels.length > 0 && <FilterSelect label="label" value={filters.label} onChange={(value) => set("label", value)} any="any label" options={labels.map((label) => ({ value: label, label }))} />}
+              {bases.length > 1 && <FilterSelect label="into" value={filters.base} onChange={(value) => set("base", value)} any="any branch" options={bases.map((base) => ({ value: base, label: base }))} />}
+              <FilterSelect label="activity" value={filters.age} onChange={(value) => set("age", value as Age)} options={AGE_OPTIONS} />
+              <button type="button" role="switch" className="toggle" aria-checked={filters.drafts} onClick={() => set("drafts", !filters.drafts)} title={filters.drafts ? "Drafts are in the list; click to hide them" : "Drafts are hidden; click to show them"}>
+                Drafts
+                {hiddenDrafts > 0 && <span className="chip-count">{fmt(hiddenDrafts)}</span>}
+              </button>
+              {ignoredCount > 0 && (
+                <button type="button" role="switch" className="toggle" aria-checked={withIgnored} onClick={() => setShowIgnored(!withIgnored)} title={withIgnored ? "Ignored ones are in the list, dimmed; click to hide them" : "Ignored in this browser; click to show them and take any back"}>
+                  Ignored
+                  <span className="chip-count">{fmt(ignoredCount)}</span>
+                </button>
+              )}
+            </div>
+            <span className="spacer" />
             {filtering && (
               <button
                 type="button"
                 className="link"
                 onClick={() => {
-                  setFilters((current) => ({ ...DEFAULT_PULL_FILTERS, sort: current.sort }))
+                  setFilters((current) => ({
+                    ...DEFAULT_PULL_FILTERS,
+                    sort: current.sort
+                  }))
                   setSearch("")
+                  setShowIgnored(false)
                 }}
               >
-                clear filters
+                Clear
               </button>
             )}
-            <span className="spacer" />
-            <label className="filter sort">
-              <span>order by</span>
-              <select value={filters.sort.key} onChange={(e) => set("sort", { key: e.target.value as PullSortKey, dir: naturalOf(PULL_SORTS, e.target.value as PullSortKey) })} aria-label="Order by">
-                {PULL_SORTS.map((entry) => (
-                  <option key={entry.key} value={entry.key}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-              <button type="button" className="ghost mini dir" onClick={() => set("sort", { ...filters.sort, dir: filters.sort.dir === "asc" ? "desc" : "asc" })} title={filters.sort.dir === "asc" ? "Ascending; click for descending" : "Descending; click for ascending"} aria-label={filters.sort.dir === "asc" ? "Ascending" : "Descending"}>
-                {filters.sort.dir === "asc" ? "↑" : "↓"}
-              </button>
-            </label>
+            <SortPicker
+              sorts={PULL_SORTS}
+              sort={filters.sort}
+              onKey={(key) => set("sort", { key, dir: naturalOf(PULL_SORTS, key) })}
+              onFlip={() =>
+                set("sort", {
+                  ...filters.sort,
+                  dir: filters.sort.dir === "asc" ? "desc" : "asc"
+                })
+              }
+              label="Order by"
+            />
           </div>
           {pulls.length === 0 ? (
-            <div className="empty">{all.length === 0 ? `No open ${words.nouns}.` : hiddenDrafts && narrowedWithDrafts.length === hiddenDrafts ? `Only drafts (${fmt(hiddenDrafts)}), and drafts are hidden.` : "Nothing matches these filters."}</div>
+            <div className="empty">
+              {everything.length === 0
+                ? `No open ${words.nouns}.`
+                : all.length === 0
+                  ? `Every open ${words.noun} is ignored (${fmt(ignoredCount)}). Switch Ignored on to see them.`
+                  : hiddenDrafts && narrowedWithDrafts.length === hiddenDrafts
+                    ? `Only drafts (${fmt(hiddenDrafts)}), and drafts are hidden.`
+                    : "Nothing matches these filters."}
+            </div>
           ) : (
             <div className="scroll">
               <table className="pulls">
@@ -2108,9 +2986,6 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
                   <tr>
                     <SortHeader column="title" sort={filters.sort} onSort={sortBy}>
                       {words.noun}
-                    </SortHeader>
-                    <SortHeader column="author" sort={filters.sort} onSort={sortBy}>
-                      author
                     </SortHeader>
                     <SortHeader column="size" sort={filters.sort} onSort={sortBy} className="num" title="Lines added and removed">
                       size
@@ -2131,34 +3006,53 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
                   </tr>
                 </thead>
                 <tbody>
-                  {pulls.map(({ repo, pull }) => (
-                    <tr key={`${repo.id}:${pull.number}`} className={`pull-row ${waitingForMe(pull, me) ? "needs-me" : ""}`} onClick={() => setOpened({ repoId: repo.id, number: pull.number })} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setOpened({ repoId: repo.id, number: pull.number })}>
+                  {pulls.map(({ repo, pull, key }) => (
+                    <tr
+                      key={key}
+                      className={`pull-row ${waitingForMe(pull, me) ? "needs-me" : ""} ${ignoredKeys.has(key) ? "ignored" : ""}`}
+                      onClick={() => setOpened({ repoId: repo.id, number: pull.number })}
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === "Enter" && setOpened({ repoId: repo.id, number: pull.number })}
+                    >
                       <td>
-                        <div className="entity-name">
-                          {pull.draft && <span className="tag">draft</span>} {pull.title}
-                        </div>
-                        <div className="key-id muted pull-sub">
-                          <span className="pull-ref">
-                            {overview.repos.length > 1 ? `${repo.fullName} ` : ""}
-                            {words.hash}
-                            {pull.number}
+                        <div className="pull-cell">
+                          <span className={`health ${healthOf(pull)}`} title={HEALTH_LABEL[healthOf(pull)]}>
+                            <Icon name={HEALTH_ICON[healthOf(pull)]} size={15} />
                           </span>
-                          <span className="pull-branches">
-                            <code>{pull.headRef}</code> → <code>{pull.baseRef}</code>
-                          </span>
-                        </div>
-                        {(myStance(pull, me) !== undefined || pull.labels.length > 0) && (
-                          <div className="pull-tags">
-                            <MyReviewTag pull={pull} me={me} />
-                            {pull.labels.map((label) => (
-                              <span key={label} className="tag">
-                                {label}
+                          <div className="pull-main">
+                            <div className="pull-name">
+                              {pull.title}
+                              {pull.draft && <span className="tag">draft</span>}
+                              <MyReviewTag pull={pull} me={me} />
+                              {pull.labels.map((label) => (
+                                <span key={label} className="tag label">
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="pull-sub">
+                              <span className="pull-ref">
+                                {overview.repos.length > 1 ? `${repo.fullName} ` : ""}
+                                {words.hash}
+                                {pull.number}
                               </span>
-                            ))}
+                              <span className="person">
+                                <Avatar name={pull.author} size={16} />
+                                {pull.author}
+                              </span>
+                              <span className="pull-branches" title={`${pull.headRef} → ${pull.baseRef}`}>
+                                {pull.headRef} <span className="arrow">→</span> {pull.baseRef}
+                              </span>
+                              {repo.reviewing.includes(pull.number) && (
+                                <span className="reviewing-now" role="status">
+                                  <i className="pulse" />
+                                  model reviewing
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </td>
-                      <td>{pull.author}</td>
                       <td className="num size" title={pull.changedFiles !== undefined ? plural(pull.changedFiles, "file changed", "files changed") : undefined}>
                         {pull.changedFiles === undefined ? (
                           <span className="muted">–</span>
@@ -2169,24 +3063,30 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
                         )}
                       </td>
                       <td>
-                        <Pill tone={CHECK_TONE[pull.checks]} title={pull.checkRuns.map((check) => `${check.name}: ${check.state}`).join("\n")}>
-                          {pull.checks === "none" ? "none" : `${fmt(pull.checkRuns.filter((check) => check.state === "success").length)}/${fmt(pull.checkRuns.length)}`}
-                        </Pill>
+                        <ChecksSignal pull={pull} />
                       </td>
                       <td>
-                        <Pill tone={MERGE_TONE[pull.mergeable]}>{MERGE_LABEL[pull.mergeable]}</Pill>
+                        <MergeSignal pull={pull} />
                       </td>
                       <td>
-                        <Pill tone={REVIEW_TONE[pull.review]}>{REVIEW_LABEL[pull.review]}</Pill>
-                        <Approvals pull={pull} />
+                        <ReviewSignal pull={pull} compact />
                       </td>
-                      <td className="muted" title={`updated ${pull.updatedAt}\nopened ${pull.createdAt}`}>
+                      <td className="when" title={`updated ${pull.updatedAt}\nopened ${pull.createdAt}`}>
                         {timeAgo(pull.updatedAt)}
                       </td>
-                      <td className="actions" onClick={(e) => e.stopPropagation()}>
-                        <a href={pull.url} target="_blank" rel="noreferrer" className="open-link" title={`Open ${words.hash}${pull.number} on ${HOST_NAMES[host]}`} onKeyDown={(e) => e.stopPropagation()}>
-                          open ↗
-                        </a>
+                      <td className="actions" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                        {ignoredKeys.has(key) ? (
+                          <button type="button" className="row-action on" onClick={() => ignore(key, false)} title="Ignored; click to put it back in the list" aria-label={`Stop ignoring ${words.hash}${pull.number}`}>
+                            <Icon name="show" />
+                          </button>
+                        ) : (
+                          <button type="button" className="row-action" onClick={() => ignore(key, true)} title="Ignore: keep it out of the list and the counts in this browser" aria-label={`Ignore ${words.hash}${pull.number}`}>
+                            <Icon name="hide" />
+                          </button>
+                        )}
+                        <ExternalLink href={pull.url} className="open-link" title={`Open ${words.hash}${pull.number} on ${HOST_NAMES[host]}`} aria-label={`Open ${words.hash}${pull.number} on ${HOST_NAMES[host]}`} onKeyDown={(e) => e.stopPropagation()}>
+                          <Icon name="out" />
+                        </ExternalLink>
                       </td>
                     </tr>
                   ))}
@@ -2197,10 +3097,9 @@ export const PullsPanel = ({ host, apiKey, member = false }: { host: PullsHost; 
         </section>
       )}
 
-      <IssuesPanel host={host} overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />
-      {member ? (
-        overview.me.name ? <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} onSaved={setMeNotice} /> : null
-      ) : (
+      {shown === "issues" && <IssuesPanel host={host} overview={overview} base={base} apiKey={apiKey} review={overview.review} onChanged={load} />}
+      {member && shown === "pulls" && overview.me.name && <MePanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} onSaved={setMeNotice} />}
+      {shown === "setup" && (
         <>
           <ReposPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
           <TokensPanel host={host} words={words} overview={overview} base={base} apiKey={apiKey} onChanged={load} />
