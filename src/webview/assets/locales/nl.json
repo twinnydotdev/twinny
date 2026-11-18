@@ -68,6 +68,7 @@
   "port": "Poort",
   "port-placeholder": "Voer een poortnummer in bijv. '11434'",
   "preset-demonroute": "Chatmodellen met open gewichten via één sleutel. Vereist een API sleutel van demonroute.com.",
+  "preset-uberllm": "GPT, Claude, Gemini, DeepSeek en andere modellen via één prepaid sleutel. Vereist een API sleutel van uberllm.dev.",
   "protocol": "Protocol",
   "provider": "Provider",
   "provider-name": "Provider naam",

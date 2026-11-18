@@ -68,6 +68,7 @@
   "port": "Port",
   "port-placeholder": "Geben Sie eine Portnummer ein, z.B. '11434'",
   "preset-demonroute": "Chat-Modelle mit offenen Gewichten über einen einzigen Schlüssel. Benötigt einen API-Schlüssel von demonroute.com.",
+  "preset-uberllm": "GPT, Claude, Gemini, DeepSeek und weitere Modelle über einen einzigen Prepaid-Schlüssel. Benötigt einen API-Schlüssel von uberllm.dev.",
   "protocol": "Protokoll",
   "provider": "Anbieter",
   "provider-name": "Anbietername",

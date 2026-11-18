@@ -68,6 +68,7 @@
   "port": "Порт",
   "port-placeholder": "Введите номер порта, например '11434'",
   "preset-demonroute": "Чат-модели с открытыми весами по одному ключу. Нужен API ключ с demonroute.com.",
+  "preset-uberllm": "GPT, Claude, Gemini, DeepSeek и другие модели по одному предоплаченному ключу. Нужен API ключ с uberllm.dev.",
   "protocol": "Протокол",
   "provider": "Провайдер",
   "provider-name": "Имя провайдера",
