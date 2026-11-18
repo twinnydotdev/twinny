@@ -25,6 +25,8 @@
   --tw-fs-xs: 11px;
   /* Monospace runs large beside the UI font; code is set a step down to match. */
   --tw-fs-mono: 12px;
+  /* Code in a line of record (tool steps, their output, diffs): a step under the code in a reply. */
+  --tw-fs-mono-sm: 11px;
   --tw-lh: 1.55;
   /* Letter-spacing is for capitals only: lowercase text keeps the font's own. */
   --tw-track: 0;

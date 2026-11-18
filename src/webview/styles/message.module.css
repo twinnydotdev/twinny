@@ -276,6 +276,29 @@
   overflow-wrap: anywhere;
 }
 
+/*
+ * A monospace face draws taller letters than the UI font at the same size,
+ * so code in backticks looked a size up from the sentence round it. Where
+ * the engine can, the prose hands its own x-height down and inline code is
+ * set at the prose's size: the letters then stand as tall as their
+ * neighbours, whatever the two fonts are. Blocks keep their own size.
+ */
+@supports (font-size-adjust: from-font) {
+  .message > :is(p, ul, ol, blockquote, table, h1, h2, h3, h4, h5, h6),
+  .messageContent {
+    font-size-adjust: from-font;
+  }
+
+  .message :not(pre) > code {
+    font-size: 1em !important;
+  }
+
+  .message pre,
+  .message pre * {
+    font-size-adjust: none;
+  }
+}
+
 .messageContent img {
   display: block;
   max-width: 100%;

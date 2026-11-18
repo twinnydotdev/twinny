@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import cx from "classnames"
 
 import { EVENT_NAME } from "../common/constants"
+import { groupSteps, isStepGroup, StepGroup } from "../common/tool-step-groups"
 import { ToolStepView } from "../common/types"
 import { parseTasks, TASKS_TOOL_NAME, tasksProgress } from "../extension/tools/tasks"
 
@@ -168,6 +169,42 @@ const Step = ({ step }: { step: ToolStepView }) => {
   )
 }
 
+/**
+ * A run of reads, searches and listings as one line saying how many of
+ * each; it opens to the steps, each of which opens as it always did.
+ */
+const Group = ({ group }: { group: StepGroup }) => {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const summary = [
+    group.files ? t("tool-group-read", { count: group.files }) : "",
+    group.searches ? t("tool-group-search", { count: group.searches }) : "",
+    group.lists ? t("tool-group-list", { count: group.lists }) : ""
+  ]
+    .filter(Boolean)
+    .join(" · ")
+  return (
+    <li className={cx(styles.step, styles.done)}>
+      <div className={styles.head}>
+        <button type="button" className={styles.row} onClick={() => setOpen((prev) => !prev)} aria-expanded={open}>
+          <span className={styles.glyph} aria-hidden="true">
+            <span className="codicon codicon-check-all" />
+          </span>
+          <span className={styles.summary}>{summary}</span>
+          <span className={cx("codicon", open ? "codicon-chevron-up" : "codicon-chevron-down", styles.chevron)} aria-hidden="true" />
+        </button>
+      </div>
+      {open && (
+        <ol className={styles.grouped}>
+          {group.steps.map((step) => (
+            <Step key={step.id} step={step} />
+          ))}
+        </ol>
+      )}
+    </li>
+  )
+}
+
 /** A message the user sent while the reply worked, where the model read it. */
 const Said = ({ step }: { step: ToolStepView }) => {
   const { t } = useTranslation()
@@ -209,7 +246,8 @@ const Tasks = ({ step, live }: { step: ToolStepView; live: boolean }) => {
  * The tools the model used for a stretch of a reply, a line each. A
  * line opens to what the tool was given and what came back; a command
  * waiting for the user shows Run and Skip in place. What the user said
- * along the way sits among them, where the model read it.
+ * along the way sits among them, where the model read it. Three or more
+ * finished reads and searches in a row fold into one line.
  */
 export const ToolSteps = ({ steps }: { steps?: ToolStepView[] }) => {
   if (!steps?.length) return null
@@ -219,8 +257,10 @@ export const ToolSteps = ({ steps }: { steps?: ToolStepView[] }) => {
   const live = steps.some((step) => step.status === "running" || step.status === "waiting")
   return (
     <ol className={styles.panel}>
-      {steps.map((step) =>
-        step.said ? (
+      {groupSteps(steps).map((step) =>
+        isStepGroup(step) ? (
+          <Group key={`group-${step.id}`} group={step} />
+        ) : step.said ? (
           <Said key={step.id} step={step} />
         ) : step === latest ? (
           <Tasks key={step.id} step={step} live={live} />
