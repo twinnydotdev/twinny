@@ -252,7 +252,7 @@ export class BaseProvider {
           .update(key, value, vscode.ConfigurationTarget.Global),
       [EVENT_NAME.twinnySidebarReady]: () => this._sidebarReadyHandler?.(),
       [EVENT_NAME.twinnyStopGeneration]: () => this.destroyStream(),
-      [EVENT_NAME.twinnyToolApproval]: ({ id, run, always }) => this.chat?.answerToolApproval(id, run, always),
+      [EVENT_NAME.twinnyToolApproval]: ({ id, run, always, answer }) => this.chat?.answerToolApproval(id, run, always, answer),
       [EVENT_NAME.twinnyToolStop]: ({ id }) => this.chat?.stopToolStep(id),
       [EVENT_NAME.twinnySteer]: ({ id, text }) => this.chat?.steer(id, text),
       [EVENT_NAME.twinnyOpenChange]: ({ id, path }) => void this.chat?.openChange(id, path),

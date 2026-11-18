@@ -92,6 +92,8 @@ export interface TeamAgentPolicy {
   edits?: "review"
   /** `off`: agent mode uses none of the developer's MCP servers. */
   mcp?: "off"
+  /** `off`: agent mode reads no web pages, whatever the developer set. */
+  fetch?: "off"
   /**
    * Paths the agent may not list, read, search or change, in `.gitignore`
    * syntax, on top of what each repository's `.gitignore` hides.

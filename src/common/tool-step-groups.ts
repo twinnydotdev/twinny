@@ -35,13 +35,24 @@ export interface StepGroup {
 export const lookKindOf = (step: ToolStepView): LookKind | undefined =>
   step.status === "done" && !step.said ? LOOK_KINDS[step.name] : undefined
 
+/** The files a read step read: its path, or each of the several one call took. */
+const filesRead = (step: ToolStepView): string[] => {
+  const one = step.args?.path?.trim()
+  const several = (step.args?.paths ?? "")
+    .split(/[\n,]/)
+    .map((item) => item.replace(/["'`[\]]/g, "").trim())
+    .filter(Boolean)
+  const files = [...(one ? [one] : []), ...several]
+  return files.length ? files : [step.id]
+}
+
 const groupOf = (steps: ToolStepView[]): StepGroup => {
   const kinds = steps.map(lookKindOf)
   const reads = steps.filter((_, i) => kinds[i] === "read")
   return {
     id: steps[0].id,
     steps,
-    files: new Set(reads.map((step) => step.args?.path?.trim() || step.id)).size,
+    files: new Set(reads.flatMap((step) => filesRead(step))).size,
     searches: kinds.filter((kind) => kind === "search").length,
     lists: kinds.filter((kind) => kind === "list").length
   }

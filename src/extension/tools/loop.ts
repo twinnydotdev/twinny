@@ -57,6 +57,12 @@ const MIN_RESULT_CHARS = 1000
 /** Calls repeated in one reply, or requests in a row of calls that cannot be read, before the model is asked to answer. */
 const MAX_REPEATED_CALLS = 3
 const MAX_UNREADABLE_IN_A_ROW = 3
+/** Times one reply runs the project's check after its changes: a model that cannot make it pass is not held for ever. */
+const MAX_CHECKS = 2
+/** Characters of a failing check's output given back to the model. */
+const MAX_CHECK_OUTPUT = 4000
+/** The tool the check runs through, so it is asked, shown and stopped like any command. */
+const COMMAND_TOOL = "run_command"
 
 export type ToolMode = "native" | "text"
 
@@ -163,6 +169,14 @@ export interface ToolLoopOptions {
   /** Called with the list each time the model writes or updates it. */
   onTasks?(tasks: Task[]): void
   /**
+   * The project's own check (a type check, the tests), as a command line.
+   * When the model answers after changing files and has not run it since,
+   * the loop runs it through `run_command` (so it asks like any command),
+   * and a failure goes back to the model to fix before the reply ends.
+   * Nothing runs when the workspace has no `run_command`.
+   */
+  check?: string
+  /**
    * Asked before each request after the first: messages the user sent
    * while the reply was working, handed over (and so taken) for the
    * model to read before its next step. A message never asked for, because
@@ -231,6 +245,22 @@ const withClosingPrompt = (messages: ChatMessage[], prompt: string): ChatMessage
 const MAX_LEDGER_LINES = 20
 
 const stepLine = (summary: string) => `> ${summary}\n\n`
+
+/** What the model is told when the project's check fails after its changes. */
+export const failedCheckMessage = (command: string, output: string) =>
+  [
+    `The project's check (\`${command}\`) ran after your changes and failed:`,
+    output.length > MAX_CHECK_OUTPUT ? `… ${output.slice(-MAX_CHECK_OUTPUT)}` : output,
+    "Fix what your changes broke, then stop. If the failure was there before your changes, leave it and say so."
+  ].join("\n\n")
+
+/** What the model is told when it answers with steps of its own list still open. */
+export const openTasksMessage = (open: Task[]) =>
+  [
+    `Your task list still has ${open.length === 1 ? "an open step" : "open steps"}:`,
+    renderTasks(open),
+    "Carry on with the next one now. If they are done or no longer needed, update the list first, then tell the user what you did."
+  ].join("\n\n")
 
 /** How messages the user sent mid-reply reach the model, in its next request. */
 export const steeringMessage = (said: string[]) =>
@@ -432,6 +462,11 @@ class ToolLoop {
   private _tasks: Task[] = []
   /** What the reply did (edits, files made or moved, commands), a line each, in order. */
   private readonly _acted: string[] = []
+  /** Files were changed since the project's check last ran. */
+  private _unchecked = false
+  private _checks = 0
+  /** The model was told once that its list has open steps. */
+  private _nudged = false
 
   constructor(
     private readonly _client: InferenceClient,
@@ -648,6 +683,16 @@ class ToolLoop {
         } else if (written.length > reply.shown) {
           yield this.show(written.slice(reply.shown))
         }
+        // Not over yet: the project's check fails after the changes, or the
+        // model's own list still has steps open. It is told, and carries on.
+        const more = last ? undefined : await this.beforeEnding(written, step, promptChars, outer)
+        if (more) {
+          if (written.trim()) this._messages.push({ role: ASSISTANT, content: written })
+          this.say(more)
+          const gap = gapAfter(this._shown)
+          if (gap) yield this.show(gap)
+          continue
+        }
         if (!this._shown.trim() && this._record.length) {
           yield this.show(
             settled
@@ -709,6 +754,9 @@ class ToolLoop {
               : await this.runCall(pending.call, outer, share)
         if (pending.call && !repeated && !ran.failed && this._tools.find((tool) => tool.name === name)?.acts) {
           this._acted.push(ran.summary)
+          // The model running the check itself, and passing, counts as the check.
+          if (name !== COMMAND_TOOL) this._unchecked = true
+          else if (this._options.check && pending.call.args.command?.trim() === this._options.check.trim()) this._unchecked = false
         }
         // A read that failed (a search that ran out of time, a language
         // server still starting) is worth trying again, so it is not kept.
@@ -759,6 +807,46 @@ class ToolLoop {
     }
   }
 
+  /**
+   * Asked when the model answers with steps to spare: what it should read
+   * before the reply may end, if anything. The project's check, run after
+   * changes it has not been run on, and failing; else, once, the open
+   * steps of the model's own list after work was done on it. A reply that
+   * ends by asking the user something is left to ask it.
+   */
+  private async beforeEnding(written: string, step: number, promptChars: number, signal?: AbortSignal): Promise<string | undefined> {
+    const command = this._options.check?.trim()
+    if (command && this._unchecked && this._checks < MAX_CHECKS && this._workspace.tools.some((tool) => tool.name === COMMAND_TOOL)) {
+      this._checks++
+      this._unchecked = false
+      const id = `${step}.check${this._checks}`
+      const args = { command }
+      this._options.onToolStart?.({ id, name: COMMAND_TOOL, args })
+      const result = await this.runCall({ name: COMMAND_TOOL, args }, signal)
+      this._record.push({ name: COMMAND_TOOL, args, output: clipTo(result.output, MAX_CHECK_OUTPUT) })
+      this._options.onStep?.({
+        id,
+        index: step,
+        mode: this._mode,
+        name: COMMAND_TOOL,
+        args,
+        summary: result.summary,
+        output: result.output,
+        failed: result.failed,
+        promptChars
+      })
+      // Only a check that ran and said no: one skipped, stopped or out of time says nothing about the changes.
+      if (result.failed && /\n\(exit code [1-9]\d*\)/.test(result.output)) return failedCheckMessage(command, result.output)
+      if (!result.failed) this._acted.push(result.summary)
+    }
+    const open = this._tasks.filter((task) => !task.done)
+    if (open.length && !this._nudged && this._acted.length && !/\?\s*$/.test(written.trim())) {
+      this._nudged = true
+      return openTasksMessage(open)
+    }
+    return undefined
+  }
+
   /** A read-only call by its name and arguments, so the same one asked twice is known; undefined for any other call. */
   private answerKey(call: ToolCall): string | undefined {
     if (!this._tools.find((tool) => tool.name === call.name)?.readOnly) return undefined
@@ -778,18 +866,27 @@ class ToolLoop {
   private steer() {
     const said = (this._options.steering?.() ?? []).map((text) => text.trim()).filter(Boolean)
     if (!said.length) return
-    const message = steeringMessage(said)
+    this.say(steeringMessage(said))
+    for (const text of said) this._record.push({ said: text })
+  }
+
+  /**
+   * Something for the model to read before its next request, as the user's
+   * side of the conversation: a turn of its own, or the end of the user
+   * turn the conversation stops on (a text-mode result), since some servers
+   * refuse two user turns in a row.
+   */
+  private say(message: string) {
     const at = this._messages.length - 1
     const final = this._messages[at]
-    if (this._mode === "text" && final?.role === USER && typeof final.content === "string") {
+    if (final?.role === USER && typeof final.content === "string") {
       this._messages[at] = { ...final, content: `${final.content}\n\n${message}` }
-      // The result it follows may be trimmed later; what the user said is not.
+      // The result it follows may be trimmed later; what was said after it is not.
       const slot = this._results.find((result) => result.message === at)
       if (slot) slot.after = `${slot.after ?? ""}\n\n${message}`
     } else {
       this._messages.push({ role: USER, content: message })
     }
-    for (const text of said) this._record.push({ said: text })
   }
 
   /** A tool's result, or a cancellation the moment the user stops the reply: no tool is waited on past that. */

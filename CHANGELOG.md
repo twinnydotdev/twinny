@@ -2,6 +2,20 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## Unreleased
+
+Agent mode spends fewer steps looking round, checks its work, finishes its list, and can ask you a question or read a web page. The chat gets a text size and a code size.
+
+- **Fewer, bigger reads.** `read_file` takes several files in one call (`paths`, up to six). A short file comes whole when a slice of it is asked for, and a narrow slice of a long one comes with the lines round it, so a file is no longer read a few dozen lines at a time, a step for each.
+- **The project's check runs after changes.** Set `twinny.chatToolsCheckCommand` (`npm run typecheck`, `cargo check`) and a reply that changed files runs it before it ends, unless the model already did. A failure goes back to the model to fix, at most twice. It runs like any agent command: asked first unless auto-run is on or you chose Always run for it, and one that came with a workspace's settings always asks.
+- **The task list is finished.** A model that answers with steps of its own list still open, after doing some of the work, is told once and carries on. Renames are steered to one `edit_file` call per file with `replace_all`.
+- **The model can ask you.** With `ask_user` the reply waits on a card with the question and the answers offered; pick one, write your own in the message box and press Enter, or skip it. Turn it off with `twinny.chatToolsAsk`.
+- **Web pages.** The model can read a page as text with `fetch_url`: documentation, an issue, a link you paste. Every address is shown with Fetch and Skip first, and a redirect is handed back rather than followed. Turn it off with `twinny.chatToolsFetch` or in the agent settings; a team turns it off for everyone with `policy.agent.fetch: "off"`.
+- **More in the agent settings.** The gear by the agent switch now has web pages (ask or off), questions (on or off) and the check command, beside changes, commands and steps.
+- **Runs of reads and searches fold into one line.** Three or more finished reads, searches and listings in a row show as "read 9 files · 3 searches", which opens to the steps.
+- **Text size and code size.** The composer's settings set the size of the whole chat (replies, your messages, tool steps, what you type) and, apart from it, of code blocks, tool output and diffs. Code in backticks is set level with the sentence round it.
+- **Fixed:** the `input` and `output` labels of an opened tool step were drawn as boxes.
+
 ## 4.3.22 · 2026-11-17
 
 `twinny-server` release: the pull-request plugins' page (GitHub, GitLab, Gitea, Bitbucket) is rebuilt, answers questions about a pull and about selected lines of its diff, no longer posts reviews to the host, and is harder to misuse.

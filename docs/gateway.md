@@ -494,6 +494,7 @@ One JSON file, passed with `--config`. Every field except `providers` and
 | `policy.agent.commands` | `ask`: every command the agent runs waits for the developer's Run (auto-run and Always run do nothing). `off`: the agent cannot run commands. | developer's choice |
 | `policy.agent.edits` | `review`: every change the agent makes waits in the editor as a diff to accept. | developer's choice |
 | `policy.agent.mcp` | `off`: agent mode uses none of the MCP servers developers set up (`commands: "off"` does this too). | developer's choice |
+| `policy.agent.fetch` | `off`: agent mode reads no web pages, whatever `twinny.chatToolsFetch` says. | developer's choice |
 | `policy.agent.blockedPaths` | Paths, in `.gitignore` syntax from each workspace's root, the agent may not list, read, search, see in git or change. At most 200. | none |
 | `policy.secretShield` | Which backends get prompts with credentials swapped for placeholders: `offMachine` (hosted APIs, other hosts, paired devices, other gateways, the team pool), `always` (every backend) or `off`. Applies on every plan. | `offMachine` |
 | `recording.chat`, `recording.fim`, `recording.embeddings` | Keep the content of these requests. Needs the `recording` licence feature; disclosed to developers. | `false` |
@@ -719,6 +720,8 @@ theirs in force.
 - `mcp: "off"` keeps the MCP servers developers set up
   (`twinny.chatToolsMcpServers`) out of agent mode; with commands asked
   for, every MCP call is asked for too.
+- `fetch: "off"` takes away the agent's reading of web pages
+  (`twinny.chatToolsFetch`, asked for address by address).
 - `blockedPaths` hides paths from every tool the agent has, git included,
   on top of each repository's `.gitignore`. A command the agent runs is
   not held to them; use `commands` for that.

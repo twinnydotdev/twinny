@@ -40,7 +40,7 @@ const startSummary = ({ name, args }: ToolStart) => {
 
 export class ToolSteps {
   private _steps: ToolStepView[] = []
-  private readonly _waiting = new Map<string, (run: boolean) => void>()
+  private readonly _waiting = new Map<string, (run: boolean, answer?: string) => void>()
   private readonly _skipped = new Set<string>()
   private readonly _stoppers = new Map<string, () => void>()
   private readonly _stopped = new Set<string>()
@@ -92,6 +92,7 @@ export class ToolSteps {
       status,
       command: undefined,
       approval: undefined,
+      choices: undefined,
       noAlways: undefined,
       mcpTool: undefined,
       stoppable: undefined
@@ -146,7 +147,7 @@ export class ToolSteps {
    */
   public approve(
     detail: string,
-    approval: "command" | "change" = "command",
+    approval: "command" | "change" | "fetch" = "command",
     options: { always?: boolean; mcpTool?: string } = {}
   ): Promise<boolean> {
     const step = [...this._steps].reverse().find((s) => s.status === "running")
@@ -166,13 +167,38 @@ export class ToolSteps {
     })
   }
 
-  /** The user's Run or Skip, from the webview. */
-  public answer(id: string, run: boolean) {
+  /**
+   * Hold the running step on a question the model asked, with the answers
+   * it offered. Resolves with what the user picked or wrote; undefined if
+   * they skip it, stop the reply, or a new one starts.
+   */
+  public ask(question: string, choices: string[]): Promise<string | undefined> {
+    const step = [...this._steps].reverse().find((s) => s.status === "running")
+    if (!step) return Promise.resolve(undefined)
+    this.update(step.id, { status: "waiting", command: question, approval: "question", ...(choices.length ? { choices } : {}) })
+    return new Promise((resolve) => {
+      this._waiting.set(step.id, (run, answer) => {
+        const said = run ? answer?.trim() : undefined
+        if (!said) this._skipped.add(step.id)
+        resolve(said || undefined)
+      })
+    })
+  }
+
+  /** The user's Run or Skip, or their answer to a question, from the webview. */
+  public answer(id: string, run: boolean, answer?: string) {
     const resolve = this._waiting.get(id)
     if (!resolve) return
     this._waiting.delete(id)
-    this.update(id, { status: "running", command: undefined, approval: undefined, noAlways: undefined, mcpTool: undefined })
-    resolve(run)
+    this.update(id, {
+      status: "running",
+      command: undefined,
+      approval: undefined,
+      choices: undefined,
+      noAlways: undefined,
+      mcpTool: undefined
+    })
+    resolve(run, answer)
   }
 
   /** Stopping the reply skips whatever is waiting. */
@@ -190,7 +216,7 @@ export class ToolSteps {
     if (!this._steps.some((step) => step.status === "running" || step.status === "waiting")) return
     this._steps = this._steps.map((step) =>
       step.status === "running" || step.status === "waiting"
-        ? { ...step, status: "stopped" as const, command: undefined, approval: undefined, stoppable: undefined }
+        ? { ...step, status: "stopped" as const, command: undefined, approval: undefined, choices: undefined, stoppable: undefined }
         : step
     )
     this.send()

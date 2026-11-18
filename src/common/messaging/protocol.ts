@@ -374,9 +374,10 @@ export interface ClientEvents {
   [EVENT_NAME.twinnyTextSelection]: Channel<void, string>
   /**
    * The user's answer to a command waiting in the tool steps; `always`
-   * runs that same command without asking from then on.
+   * runs that same command without asking from then on, and `answer` is
+   * what they said to a question the model asked.
    */
-  [EVENT_NAME.twinnyToolApproval]: Channel<{ id: string; run: boolean; always?: boolean }>
+  [EVENT_NAME.twinnyToolApproval]: Channel<{ id: string; run: boolean; always?: boolean; answer?: string }>
   /** Stop the command a running tool step is waiting on, and only that. */
   [EVENT_NAME.twinnyToolStop]: Channel<{ id: string }>
   /**

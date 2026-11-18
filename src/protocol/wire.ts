@@ -548,6 +548,10 @@ export const parseTeamAgentPolicy = (input: unknown): TeamAgentPolicy | undefine
     if (typeof input.mcp !== "string") return undefined
     agent.mcp = "off"
   }
+  if (input.fetch !== undefined && input.fetch !== null) {
+    if (typeof input.fetch !== "string") return undefined
+    agent.fetch = "off"
+  }
   if (input.blockedPaths !== undefined) {
     const paths = input.blockedPaths
     if (!Array.isArray(paths) || paths.length > MAX_BLOCKED_PATHS || !paths.every((p) => typeof p === "string")) {

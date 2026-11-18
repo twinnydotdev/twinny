@@ -656,7 +656,7 @@ export const parseGatewayConfig = (
         const agent = input.policy.agent
         if (!isRecord(agent)) problems.add("policy.agent must be an object.")
         else {
-          problems.unknownKeys("policy.agent", agent, ["off", "commands", "edits", "mcp", "blockedPaths"])
+          problems.unknownKeys("policy.agent", agent, ["off", "commands", "edits", "mcp", "fetch", "blockedPaths"])
           const rules: TeamAgentPolicy = {}
           if (agent.off !== undefined) {
             if (typeof agent.off !== "boolean") problems.add("policy.agent.off must be true or false.")
@@ -674,6 +674,10 @@ export const parseGatewayConfig = (
           if (agent.mcp !== undefined && agent.mcp !== null) {
             if (agent.mcp !== "off") problems.add("policy.agent.mcp must be off.")
             else rules.mcp = "off"
+          }
+          if (agent.fetch !== undefined && agent.fetch !== null) {
+            if (agent.fetch !== "off") problems.add("policy.agent.fetch must be off.")
+            else rules.fetch = "off"
           }
           if (agent.blockedPaths !== undefined) {
             const paths = agent.blockedPaths

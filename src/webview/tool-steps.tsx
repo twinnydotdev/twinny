@@ -47,8 +47,12 @@ export const answerToolStep = (step: ToolStepView, how: "run" | "always" | "skip
   emit(EVENT_NAME.twinnyToolApproval, {
     id: step.id,
     run: how !== "skip",
-    ...(how === "always" && step.approval !== "change" && !step.noAlways ? { always: true } : {})
+    ...(how === "always" && step.approval === "command" && !step.noAlways ? { always: true } : {})
   })
+
+/** The user's answer to a question the model asked: one of its choices, or their own words. */
+export const answerToolQuestion = (step: ToolStepView, answer: string) =>
+  emit(EVENT_NAME.twinnyToolApproval, { id: step.id, run: true, answer })
 
 const Step = ({ step }: { step: ToolStepView }) => {
   const { t } = useTranslation()
@@ -74,7 +78,14 @@ const Step = ({ step }: { step: ToolStepView }) => {
         >
           <span className={styles.glyph} aria-hidden="true">
             <span
-              className={cx("codicon", waiting && step.approval === "change" ? "codicon-question" : STATUS_ICON[step.status])}
+              className={cx(
+                "codicon",
+                waiting && (step.approval === "change" || step.approval === "question")
+                  ? "codicon-question"
+                  : waiting && step.approval === "fetch"
+                    ? "codicon-globe"
+                    : STATUS_ICON[step.status]
+              )}
             />
           </span>
           <span className={styles.summary}>
@@ -123,13 +134,38 @@ const Step = ({ step }: { step: ToolStepView }) => {
           </button>
         )}
       </div>
-      {waiting && (
+      {waiting && step.approval === "question" && (
+        <div className={styles.approval}>
+          <div className={styles.approvalLabel}>{t("tool-question-waiting")}</div>
+          <div className={styles.question}>{step.command}</div>
+          <div className={cx(styles.actions, styles.choices)}>
+            {(step.choices ?? []).map((choice) => (
+              <button key={choice} type="button" className={styles.skip} onClick={() => answerToolQuestion(step, choice)}>
+                {choice}
+              </button>
+            ))}
+            <button type="button" className={styles.dismiss} onClick={() => answerToolStep(step, "skip")}>
+              {t("tool-skip")}
+            </button>
+          </div>
+          <div className={styles.keys}>{t("tool-question-keys")}</div>
+        </div>
+      )}
+      {waiting && step.approval !== "question" && (
         <div className={styles.approval}>
           <div className={styles.approvalLabel}>
-            {t(step.approval === "change" ? "tool-change-waiting" : step.mcpTool ? "tool-mcp-waiting" : "tool-command-waiting")}
+            {t(
+              step.approval === "change"
+                ? "tool-change-waiting"
+                : step.approval === "fetch"
+                  ? "tool-fetch-waiting"
+                  : step.mcpTool
+                    ? "tool-mcp-waiting"
+                    : "tool-command-waiting"
+            )}
           </div>
           <div className={styles.command}>
-            {step.approval === "change" || step.mcpTool ? (
+            {step.approval === "change" || step.approval === "fetch" || step.mcpTool ? (
               <pre className={styles.output}>{step.command}</pre>
             ) : (
               <Code code={step.command ?? ""} language="bash" />
@@ -138,9 +174,9 @@ const Step = ({ step }: { step: ToolStepView }) => {
           <div className={styles.actions}>
             <button type="button" className={styles.run} onClick={() => answerToolStep(step, "run")}>
               <span className={cx("codicon", step.approval === "change" ? "codicon-check" : "codicon-play")} aria-hidden="true" />
-              {t(step.approval === "change" ? "tool-apply" : "tool-run")}
+              {t(step.approval === "change" ? "tool-apply" : step.approval === "fetch" ? "tool-fetch" : "tool-run")}
             </button>
-            {step.approval !== "change" && !step.noAlways && (
+            {step.approval === "command" && !step.noAlways && (
               <button
                 type="button"
                 className={styles.skip}
@@ -155,7 +191,15 @@ const Step = ({ step }: { step: ToolStepView }) => {
             </button>
           </div>
           <div className={styles.keys}>
-            {t(step.approval === "change" ? "tool-change-keys" : step.noAlways ? "tool-command-keys-ask" : "tool-command-keys")}
+            {t(
+              step.approval === "change"
+                ? "tool-change-keys"
+                : step.approval === "fetch"
+                  ? "tool-fetch-keys"
+                  : step.noAlways
+                    ? "tool-command-keys-ask"
+                    : "tool-command-keys"
+            )}
           </div>
         </div>
       )}

@@ -362,6 +362,41 @@
   cursor: pointer;
 }
 
+/* What the model asked, in the reply's own type: it is a sentence to read, not a command. */
+.question {
+  margin: 2px 0 8px;
+  color: var(--tw-fg);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs);
+  line-height: var(--tw-lh);
+  overflow-wrap: anywhere;
+}
+
+.choices {
+  flex-wrap: wrap;
+}
+
+.choices .skip {
+  text-align: left;
+}
+
+/* Skipping a question is the quiet way out, beside the answers. */
+.dismiss {
+  padding: 3px 8px;
+  border: 0;
+  background: none;
+  color: var(--tw-fg-dim);
+  font-family: var(--tw-font);
+  font-size: var(--tw-fs-sm);
+  cursor: pointer;
+}
+
+.dismiss:hover,
+.dismiss:focus-visible {
+  color: var(--tw-fg);
+  outline: none;
+}
+
 .run {
   background: var(--tw-primary-bg);
   color: var(--tw-primary-fg);
