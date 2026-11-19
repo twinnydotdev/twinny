@@ -76,7 +76,7 @@ export const prefixWindowStep = (numLinesPrefix: number) =>
 
 export const getPrefixSuffix = (
   numLines: number,
-  document: TextDocument,
+  document: Pick<TextDocument, "lineCount" | "getText">,
   position: Position,
   contextRatio = [0.85, 0.15]
 ): PrefixSuffix => {
