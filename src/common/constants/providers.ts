@@ -2,6 +2,7 @@ export const OPEN_AI_COMPATIBLE_PROVIDERS = {
   LiteLLM: "litellm",
   Deepseek: "deepseek",
   DemonRoute: "demonroute",
+  TrustedRouter: "trustedrouter",
   LMStudio: "lmstudio",
   Oobabooga: "oobabooga",
   OpenWebUI: "openwebui",
@@ -52,6 +53,7 @@ export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   [API_PROVIDERS.OpenWebUI]: "Open WebUI",
   [API_PROVIDERS.Perplexity]: "Perplexity",
   [API_PROVIDERS.Qvac]: "QVAC",
+  [API_PROVIDERS.TrustedRouter]: "TrustedRouter",
   [API_PROVIDERS.TwinnyP2P]: "twinny device (P2P)",
   [API_PROVIDERS.TwinnyRemote]: "twinny gateway"
 }

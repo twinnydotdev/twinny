@@ -158,6 +158,9 @@ const ENDPOINT_DEFAULTS: Record<
   [API_PROVIDERS.DemonRoute]: {
     chat: { apiHostname: "api.demonroute.com", apiProtocol: "https", apiPath: "/v1" }
   },
+  [API_PROVIDERS.TrustedRouter]: {
+    chat: { apiHostname: "api.trustedrouter.com", apiProtocol: "https", apiPath: "/v1" }
+  },
   [API_PROVIDERS.OpenRouter]: {
     fim: { apiHostname: "openrouter.ai", apiProtocol: "https", apiPath: "/api/v1/completions" }
   },
