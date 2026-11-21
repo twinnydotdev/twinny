@@ -21,11 +21,13 @@ import {
   GLOBAL_STORAGE_KEY,
   TEAM_NUDGE_STORAGE_KEY,
   TWINNY_COMMAND_NAME,
+  URL_SUPPORT,
   URL_TEAMS,
   WEBUI_TABS
 } from "./common/constants"
 import { messageOf } from "./common/errors"
 import { formatMs, logger } from "./common/logger"
+import { dueNudge, NudgeState } from "./common/nudge"
 import { getLineBreakCount } from "./common/text"
 import { ContextItem, SelectionContextItem } from "./common/types"
 import { ChatGPTPlanSession } from "./extension/chatgpt-plan/session"
@@ -653,21 +655,32 @@ export async function activate(context: ExtensionContext) {
 }
 
 /**
- * Once, after two weeks of use on a machine that is not connected to a team:
- * one message saying the gateway exists. Either button ends it for good; so
- * does dismissing it, since the date is recorded before it shows.
+ * Once each, on a machine that is not connected to a team: after two weeks, a
+ * message saying the gateway exists; after a month, one asking for support.
+ * Any answer ends that message for good, since it is recorded before it shows.
+ * Nothing here touches the network unless a button is chosen.
  */
-const TEAM_NUDGE_AFTER_MS = 14 * 24 * 60 * 60 * 1000
 const teamNudge = async (context: ExtensionContext) => {
   const store = context.globalState
-  const state = store.get<{ since: number; shown?: boolean }>(TEAM_NUDGE_STORAGE_KEY)
+  const state = store.get<NudgeState>(TEAM_NUDGE_STORAGE_KEY)
   if (!state) {
     await store.update(TEAM_NUDGE_STORAGE_KEY, { since: Date.now() })
     return
   }
-  if (state.shown || Date.now() - state.since < TEAM_NUDGE_AFTER_MS) return
-  if (new TeamPolicyStore(store).get()) return
-  await store.update(TEAM_NUDGE_STORAGE_KEY, { ...state, shown: true })
+  const now = Date.now()
+  const due = dueNudge(state, now, !!new TeamPolicyStore(store).get())
+  if (!due) return
+  if (due === "support") {
+    await store.update(TEAM_NUDGE_STORAGE_KEY, { ...state, supportShown: true })
+    const answer = await window.showInformationMessage(
+      "Twinny has been on this machine for a month. It is free and MIT. If it earns its keep, a $29 licence, paid once, is the best way to support it.",
+      "Support twinny",
+      "No thanks"
+    )
+    if (answer === "Support twinny") void vscode.env.openExternal(vscode.Uri.parse(URL_SUPPORT))
+    return
+  }
+  await store.update(TEAM_NUDGE_STORAGE_KEY, { ...state, shown: true, shownAt: now })
   const choice = await window.showInformationMessage(
     "Twinny has been on this machine for a couple of weeks. Using it with a team? One command sets up a gateway with a key per developer, usage and policy; free for five.",
     "See how",

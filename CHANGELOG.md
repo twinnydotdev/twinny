@@ -2,6 +2,12 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.24 · 2026-11-21
+
+Extension release. `twinny-server` is unchanged.
+
+- **One note asking for support.** After a month on a machine that is not connected to a team, twinny says once that a $29 licence, paid once, is the best way to support it. It never appears within two weeks of the team notice, and makes no network request unless you choose **Support twinny**.
+
 ## 4.3.23 · 2026-11-18
 
 Agent mode spends fewer steps looking round, checks its work, finishes its list, and can ask you a question or read a web page. The chat gets a text size and a code size.

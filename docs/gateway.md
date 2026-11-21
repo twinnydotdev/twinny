@@ -1469,7 +1469,7 @@ Store** on the admin page lists what this build carries; **switch on**
 starts a plugin at once and adds it to the side navigation, **switch off**
 stops it. The choice is kept in `plugins.json`, so it survives a restart.
 
-Plugins are a licence feature (`plugins`, on every Team and Enterprise
+Plugins are a licence feature (`plugins`, on every paid
 licence). Without it the store still lists them but nothing can be
 switched on, and plugins that were on stop until a licence is installed;
 their switch is kept, so a renewed licence brings them straight back.

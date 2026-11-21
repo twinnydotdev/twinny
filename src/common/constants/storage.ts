@@ -19,7 +19,7 @@ export const P2P_TRUSTED_PEERS_STORAGE_KEY = "twinny.p2p.trusted-peers"
 export const TEAM_SHARE_STORAGE_KEY = "twinny.teamShare"
 /** Plugin ids already announced, per gateway, so a share is announced once. */
 export const TEAM_PLUGINS_SEEN_STORAGE_KEY = "twinny.teamPluginsSeen"
-/** When this installation first ran and whether the one-time team notice has been shown. */
+/** When this installation first ran and which one-time notices (team, support) have been shown. */
 export const TEAM_NUDGE_STORAGE_KEY = "twinny.teamNudge"
 
 export const GLOBAL_STORAGE_KEY = {
