@@ -4,6 +4,7 @@ export const EXTENSION_NAME = "@ext:rjmacarthy.twinny"
 /** The team gateway's page on the website: what it is, the quick start, pricing and the trial. */
 export const URL_TEAMS = "https://twinny.dev/#teams"
 export const URL_TEAM_TRIAL = "https://twinny.dev/#trial"
+export const URL_SUPPORT = "https://twinny.dev/#pricing"
 export const TEAM_QUICKSTART_COMMAND = "npx twinny-server quickstart"
 /**
  * Tool steps one agent reply may take unless \`twinny.chatToolsMaxSteps\`
