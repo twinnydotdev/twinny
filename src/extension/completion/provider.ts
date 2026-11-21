@@ -1,5 +1,6 @@
 import {
   CancellationToken,
+  commands,
   Disposable,
   EndOfLine,
   ExtensionContext,
@@ -72,6 +73,17 @@ import { HeldDefinitions, StableOrder } from "./stable-context"
 import { CompletionStream } from "./stream"
 import { ModelWarmer, shouldWarm } from "./warm-up"
 
+/** How many lines a suggestion may run to, when the user asked for one or the other. */
+export type SuggestionLines = "single" | "multi"
+
+/** A suggestion asked for by command, and the place it was asked for. */
+interface AskedLines {
+  document: TextDocument
+  version: number
+  position: Position
+  lines: SuggestionLines
+}
+
 /** Everything one inline-completion request needs, kept off the instance. */
 interface CompletionRequest {
   id: number
@@ -96,6 +108,11 @@ interface CompletionRequest {
    * that item were already accepted and the result is returned with it.
    */
   selected?: SelectedCompletionInfo
+  /**
+   * One line or several, when a command asked for it; otherwise the
+   * settings and the code round the cursor decide.
+   */
+  lines?: SuggestionLines
   provider: TwinnyProvider
   token: CancellationToken
 }
@@ -141,6 +158,7 @@ export class CompletionProvider
 {
   private _run: GenerationRun | null = null
   private _acceptedLastCompletion = false
+  private _askedLines: AskedLines | undefined
   private _definitions = new DefinitionContext()
   private _fileInteractionCache: FileInteractionCache
   private _lastSuggestion: LastSuggestion | undefined
@@ -199,6 +217,7 @@ export class CompletionProvider
     // document: each debug line written mid-request asked again and
     // aborted it (#559).
     if (IGNORED_SCHEMES.has(document.uri.scheme)) return
+    const lines = this.takeAskedLines(document, position, context)
     // Invalidate even when this invocation returns early or uses the cache.
     this.abortCompletion()
     if (token.isCancellationRequested) return
@@ -245,12 +264,12 @@ export class CompletionProvider
       this.config.get("numPredictFim", 512),
       this.config.get("temperature", 0.2)
     ])
-    const cacheScope = JSON.stringify([scope, document.version])
-    const continuation = getSuggestionContinuation(
-      this._lastSuggestion,
-      prefixSuffix,
-      scope
-    )
+    const cacheScope = JSON.stringify([scope, document.version, lines ?? null])
+    // The suggestion on screen, or the one made ahead, may be the other
+    // length: a command asking for one has the model asked afresh.
+    const continuation = lines
+      ? undefined
+      : getSuggestionContinuation(this._lastSuggestion, prefixSuffix, scope)
     if (continuation) {
       logger.debug("FIM served from the previous suggestion (typed through)")
       return this.toInlineCompletion(continuation, position, selected)
@@ -271,7 +290,7 @@ export class CompletionProvider
       return
     }
 
-    const ahead = selected ? undefined : this.prefetchFor(document, prefixSuffix, scope)
+    const ahead = selected || lines ? undefined : this.prefetchFor(document, prefixSuffix, scope)
     if (ahead) {
       const id = this._requestId
       const waited = logger.timer()
@@ -307,6 +326,7 @@ export class CompletionProvider
         ? (lineBefore.match(/[\w$]+$/)?.[0] ?? "")
         : "",
       selected,
+      lines,
       provider,
       token
     }
@@ -317,6 +337,47 @@ export class CompletionProvider
     }
 
     return this.complete(request)
+  }
+
+  /**
+   * Asks the editor for a suggestion at the cursor of one line, or of
+   * several up to `twinny.maxLines`, whatever
+   * `twinny.multilineCompletionsEnabled` and the code round the cursor
+   * would choose.
+   */
+  public async suggest(lines: SuggestionLines) {
+    const editor = window.activeTextEditor
+    if (!editor) return
+    const { document, selection } = editor
+    this._askedLines = {
+      document,
+      version: document.version,
+      position: selection.active,
+      lines
+    }
+    await commands.executeCommand("editor.action.inlineSuggest.trigger")
+  }
+
+  /**
+   * The length a command asked for, if this is the request it set off:
+   * one the user invoked, at the place and the version it was asked for.
+   * Taken once, so the next suggestion is the settings' again.
+   */
+  private takeAskedLines(
+    document: TextDocument,
+    position: Position,
+    context: InlineCompletionContext
+  ): SuggestionLines | undefined {
+    const asked = this._askedLines
+    if (!asked || context.triggerKind !== InlineCompletionTriggerKind.Invoke) {
+      return undefined
+    }
+    this._askedLines = undefined
+    return asked.document === document &&
+      asked.version === document.version &&
+      asked.position.isEqual(position)
+      ? asked.lines
+      : undefined
   }
 
   /**
@@ -371,7 +432,8 @@ export class CompletionProvider
 
     if (this.isStale(request)) return
     const [node, prepared] = await Promise.all([
-      this.getNodeAtCursor(document, position),
+      // Only the settings' choice of length looks at the code round the cursor.
+      request.lines ? null : this.getNodeAtCursor(document, position),
       this.getPrompt(request)
     ])
     if (!prepared || this.isStale(request)) return
@@ -383,19 +445,22 @@ export class CompletionProvider
     }
     logger.info(
       `FIM #${request.id} → ${provider.modelName} · ${where} · ` +
-        `prompt ${formatCount(prompt.length)} chars`
+        `prompt ${formatCount(prompt.length)} chars` +
+        (request.lines ? ` · ${request.lines === "multi" ? "several lines" : "one line"} asked for` : "")
     )
 
     const stopWords = getStopWords(provider.modelName, provider.fimTemplate)
-    const multiline = getShouldUseMultiline({
-      document,
-      position,
-      node,
-      multilineEnabled: this.config.get<boolean>(
-        "multilineCompletionsEnabled",
-        true
-      )
-    })
+    const multiline = request.lines
+      ? request.lines === "multi"
+      : getShouldUseMultiline({
+          document,
+          position,
+          node,
+          multilineEnabled: this.config.get<boolean>(
+            "multilineCompletionsEnabled",
+            true
+          )
+        })
     const stream = new CompletionStream({
       stopWords,
       multiline,

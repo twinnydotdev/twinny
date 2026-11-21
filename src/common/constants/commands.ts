@@ -31,6 +31,8 @@ export const TWINNY_COMMAND_NAME = {
   setUpTeam: "twinny.setUpTeam",
   statusBarMenu: "twinny.statusBarMenu",
   stopGeneration: "twinny.stopGeneration",
+  suggestLine: "twinny.suggestLine",
+  suggestLines: "twinny.suggestLines",
   templateCompletion: "twinny.templateCompletion",
   templates: "twinny.templates",
   addFileToContext: "twinny.addFileToContext",
