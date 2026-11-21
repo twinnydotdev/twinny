@@ -64,6 +64,7 @@ import {
 import { CompletionFormatter } from "./formatter"
 import { getImportedFiles } from "./imports"
 import { LspContext } from "./lsp-context"
+import { getNotebookText } from "./notebook"
 import { getNodeAtPosition, getParser } from "./parser"
 import { prefetchProgress, textToNextLine } from "./prefetch"
 import { RecentEdits } from "./recent-edits"
@@ -213,11 +214,7 @@ export class CompletionProvider
     }
 
     const version = document.version
-    let prefixSuffix = getPrefixSuffix(
-      this.config.get<number>("contextLength", 100),
-      document,
-      position
-    )
+    let prefixSuffix = this.getPrefixSuffix(document, position)
     const lineText = document.lineAt(position.line).text
     let lineBefore = lineText.slice(0, position.character)
     let lineAfter = lineText.slice(position.character)
@@ -320,6 +317,18 @@ export class CompletionProvider
     }
 
     return this.complete(request)
+  }
+
+  /**
+   * The code round the cursor the model is shown. In a notebook cell the
+   * window runs on into the cells above and below it.
+   */
+  private getPrefixSuffix(document: TextDocument, position: Position) {
+    const numLines = this.config.get<number>("contextLength", 100)
+    const notebook = getNotebookText(document, position)
+    return notebook
+      ? getPrefixSuffix(numLines, notebook.document, notebook.position)
+      : getPrefixSuffix(numLines, document, position)
   }
 
   private isLanguageEnabled(languageId: string) {
@@ -927,11 +936,7 @@ export class CompletionProvider
     if (!prefetch) return
     const editor = window.activeTextEditor
     if (editor?.document !== prefetch.document) return this.dropPrefetch()
-    const current = getPrefixSuffix(
-      this.config.get<number>("contextLength", 100),
-      editor.document,
-      editor.selection.active
-    )
+    const current = this.getPrefixSuffix(editor.document, editor.selection.active)
     if (!this.onTheWay(prefetch, editor.document, current)) this.dropPrefetch()
   }
 }
