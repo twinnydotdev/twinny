@@ -355,6 +355,9 @@ export class CompletionProvider
       position: selection.active,
       lines
     }
+    // The editor keeps a suggestion it has for this place and asks nobody;
+    // without this, the other length could not replace the one on screen.
+    await commands.executeCommand("editor.action.inlineSuggest.hide")
     await commands.executeCommand("editor.action.inlineSuggest.trigger")
   }
 

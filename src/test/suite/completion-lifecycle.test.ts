@@ -294,6 +294,46 @@ suite("Completion lifecycle", () => {
       }
     })
 
+    test("the other length can be asked for while a suggestion is showing", async function () {
+      this.timeout(10000)
+      const reply = ".filter(Boolean)\n  .length"
+      const { completions, editor, tearDown } = await setUp(
+        Array(8).fill(reply),
+        API_PROVIDERS.Ollama,
+        "const total = items\nconst count = items\n"
+      )
+      const shown: string[] = []
+      let arrived: () => void = () => undefined
+      const registration = vscode.languages.registerInlineCompletionItemProvider({ pattern: "**" }, {
+        async provideInlineCompletionItems(document, at, context, token) {
+          const items = await completions.provideInlineCompletionItems(document, at, context, token)
+          if (context.triggerKind === vscode.InlineCompletionTriggerKind.Invoke) {
+            shown.push(textOf(items))
+            arrived()
+          }
+          return items
+        }
+      })
+      const next = () => Promise.race([
+        new Promise<void>((resolve) => (arrived = resolve)),
+        new Promise<void>((resolve) => setTimeout(resolve, 2500))
+      ])
+      try {
+        editor.selection = new vscode.Selection(0, 19, 0, 19)
+        let waiting = next()
+        await completions.suggest("single")
+        await waiting
+        waiting = next()
+        await completions.suggest("multi")
+        await waiting
+        assert.deepStrictEqual(shown, [".filter(Boolean)", reply])
+      } finally {
+        registration.dispose()
+        await vscode.commands.executeCommand("editor.action.inlineSuggest.hide")
+        await tearDown()
+      }
+    })
+
     test("the asked length is for the request it sets off, at the place it was asked", async () => {
       const reply = ".filter(Boolean)\n  .length"
       const { completions, editor, ask, tearDown } = await setUp(
