@@ -2,6 +2,13 @@
 
 What changed in each release of the twinny extension and `twinny-server`. The gateway is built from the same tree and carries the extension's version number. Newest first. A shorter, feature-by-feature version with links to the documentation is at [What's new](https://docs.twinny.dev/reference/whats-new/).
 
+## 4.3.25 · 2026-11-21
+
+Extension release: autocomplete reads the whole notebook, and you can ask for one line or several. `twinny-server` is unchanged.
+
+- **Completions in a notebook see the cells round them.** The code cells in the same language are read as one file, so a cell's suggestions know the imports, data and helpers from the cells above it. Markdown and cells in another language are left out. Contributed by [@officialasishkumar](https://github.com/officialasishkumar).
+- **Ask for one line or several.** **Twinny - Suggest one line** and **Twinny - Suggest several lines** get a suggestion of that length at the cursor, whatever the settings would choose, and replace one already showing. They have no default keys; bind them in Keyboard Shortcuts. Contributed by [@officialasishkumar](https://github.com/officialasishkumar).
+
 ## 4.3.24 · 2026-11-21
 
 Extension release. `twinny-server` is unchanged.
