@@ -334,6 +334,12 @@ export async function activate(context: ExtensionContext) {
       const chat = await requireChat()
       if (chat) await fixTerminalError(chat, terminalHistory)
     }),
+    commands.registerCommand(TWINNY_COMMAND_NAME.suggestLine, () =>
+      completionProvider.suggest("single")
+    ),
+    commands.registerCommand(TWINNY_COMMAND_NAME.suggestLines, () =>
+      completionProvider.suggest("multi")
+    ),
     languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
       completionProvider

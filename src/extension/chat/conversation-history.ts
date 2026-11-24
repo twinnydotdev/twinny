@@ -42,7 +42,7 @@ export class ConversationHistory extends Base {
         // belongs to the one left, and is not kept in this one. The chat
         // hears of the switch first, so nothing it queued for the old
         // conversation is sent when the reply stops.
-        const active = this.context?.globalState.get<Conversation>(ACTIVE_CONVERSATION_STORAGE_KEY)
+        const active = this.context?.workspaceState.get<Conversation>(ACTIVE_CONVERSATION_STORAGE_KEY)
         const leaving = this._chatService.replying && conversation?.id !== active?.id
         this.setActiveConversation(conversation)
         if (leaving) this._chatService.discardReply()
@@ -93,7 +93,7 @@ export class ConversationHistory extends Base {
   }
 
   resetConversation() {
-    this.context?.globalState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
+    this.context?.workspaceState.update(ACTIVE_CONVERSATION_STORAGE_KEY, undefined)
     this.setActiveConversation(undefined)
   }
 
@@ -122,7 +122,7 @@ export class ConversationHistory extends Base {
       ...conversations,
       [id]: renamed
     })
-    const active = this.context?.globalState.get<Conversation>(
+    const active = this.context?.workspaceState.get<Conversation>(
       ACTIVE_CONVERSATION_STORAGE_KEY
     )
     if (active?.id === id) {
@@ -132,8 +132,14 @@ export class ConversationHistory extends Base {
     }
   }
 
+  /**
+   * The open conversation belongs to this window's workspace. The list of
+   * conversations is shared, but with the open one in global state too, a
+   * reply saved in one window went into the conversation another window
+   * had opened since.
+   */
   setActiveConversation(conversation: Conversation | undefined) {
-    this.context?.globalState.update(
+    this.context?.workspaceState.update(
       ACTIVE_CONVERSATION_STORAGE_KEY,
       conversation
     )
@@ -148,7 +154,7 @@ export class ConversationHistory extends Base {
 
   getActiveConversation() {
     const conversation: Conversation | undefined =
-      this.context?.globalState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
+      this.context?.workspaceState.get(ACTIVE_CONVERSATION_STORAGE_KEY)
 
     this.setActiveConversation(conversation)
     return conversation
@@ -162,7 +168,7 @@ export class ConversationHistory extends Base {
     this.context?.globalState.update(CONVERSATION_STORAGE_KEY, {
       ...conversations
     })
-    const active = this.context?.globalState.get<Conversation>(
+    const active = this.context?.workspaceState.get<Conversation>(
       ACTIVE_CONVERSATION_STORAGE_KEY
     )
     if (active?.id === conversation.id) {
