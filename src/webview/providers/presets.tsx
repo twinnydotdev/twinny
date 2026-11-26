@@ -145,8 +145,8 @@ export const PRESETS: ProviderPreset[] = [
     "chat"
   ),
   hosted(
-    API_PROVIDERS.UberLLM,
-    "UberLLM",
+    API_PROVIDERS.MartLLM,
+    "MartLLM",
     codicon("plug"),
     "deepseek/deepseek-v4.1-flash",
     "chat"
