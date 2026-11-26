@@ -27,15 +27,24 @@ import {
 import { StreamResponse, usageFromResponse } from "./fim-dialects"
 import { logRequest } from "./json-stream"
 
-/** fluency.js routes every local server through its OpenAI-compatible client. */
+/**
+ * The open-ended handler also speaks Mistral's native chat protocol without
+ * the bundled Mistral model allowlist. HostedInferenceProvider supplies its
+ * fixed native address; the provider kind still controls parameter policy.
+ */
 export const getFluencyProvider = (provider: TwinnyProvider): LLMProvider =>
-  (isOpenAICompatibleProvider(provider.provider)
+  (provider.provider === API_PROVIDERS.Mistral || isOpenAICompatibleProvider(provider.provider)
     ? API_PROVIDERS.OpenAICompatible
     : provider.provider) as LLMProvider
 
 /** Some hosted models refuse `stream: true`; the catalogue says which. */
 export const supportsStreaming = (provider: TwinnyProvider): boolean => {
   const entry = catalogue[provider.provider as keyof typeof catalogue]
+  // Try native streaming for unknown Mistral IDs. Preserve the catalogue's
+  // policy for known models instead of treating an unknown ID as blocking.
+  const knownModels: unknown = entry?.models
+  if (provider.provider === API_PROVIDERS.Mistral &&
+    (!Array.isArray(knownModels) || !knownModels.includes(provider.modelName))) return true
   const streaming = entry?.supportsStreaming
   return Array.isArray(streaming) ? streaming.includes(provider.modelName) : true
 }
@@ -94,10 +103,14 @@ type ChatParameters = Pick<ChatRequest, "maxTokens" | "temperature" | "think" | 
  * Ollama's OpenAI-style route honours (it ignores a `think` field there,
  * checked against 0.33). Only Ollama gets it for now: OpenAI refuses
  * `none` for models that do not reason, and other servers vary.
+ * fluency's native Mistral handler halves its shared temperature scale;
+ * preserve that conversion when using the open-ended handler as well.
  */
 const requestParameters = (provider: TwinnyProvider, request: ChatParameters) => ({
   ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
-  ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+  ...(request.temperature !== undefined ? {
+    temperature: provider.provider === API_PROVIDERS.Mistral ? request.temperature / 2 : request.temperature
+  } : {}),
   ...(request.think === false && provider.provider === API_PROVIDERS.Ollama ? { reasoning_effort: "none" as const } : {}),
   ...(request.reasoningEffort && provider.provider === API_PROVIDERS.OpenAI
     ? { reasoning_effort: request.reasoningEffort }
@@ -121,15 +134,16 @@ type ToolCallDelta = {
 /**
  * Streamed tool calls arrive in pieces keyed by `index`: the id and name
  * once, the arguments as fragments (Ollama sends each call whole; llama.cpp,
- * vLLM and LM Studio split them).
+ * vLLM and LM Studio split them). Mistral's native handler used array
+ * positions for missing indexes; preserve that fallback for its fragments.
  */
-const toolCallCollector = () => {
+const toolCallCollector = (positionalIndexes = false) => {
   const calls: { id: string; name: string; arguments: string }[] = []
   return {
     add(deltas: unknown) {
       if (!Array.isArray(deltas)) return
-      for (const delta of deltas as ToolCallDelta[]) {
-        const index = delta.index ?? calls.length
+      for (const [position, delta] of (deltas as ToolCallDelta[]).entries()) {
+        const index = delta.index ?? (positionalIndexes ? position : calls.length)
         const call = (calls[index] ??= { id: "", name: "", arguments: "" })
         if (delta.id) call.id = delta.id
         if (delta.function?.name) call.name += delta.function.name
@@ -156,6 +170,17 @@ const reasoningOf = (delta: unknown): string | undefined => {
   const part = delta as { reasoning?: unknown; reasoning_content?: unknown; thinking?: unknown }
   const text = part.reasoning ?? part.reasoning_content ?? part.thinking
   return typeof text === "string" && text ? text : undefined
+}
+
+/** Mistral can return text parts; never stringify a content-part object. */
+const mistralTextContent = (content: unknown): string => {
+  if (typeof content === "string") return content
+  if (!Array.isArray(content)) return ""
+  return content.map((part: unknown) => {
+    if (!part || typeof part !== "object") return ""
+    const { type, text } = part as { type?: unknown; text?: unknown }
+    return type === "text" && typeof text === "string" ? text : ""
+  }).join("")
 }
 
 /** One server, as far as what it accepts goes. */
@@ -232,7 +257,9 @@ export const buildBlockingRequest = (
   messages: ChatMessage[],
   parameters: ChatParameters = {}
 ): CompletionNonStreaming<LLMProvider> => ({
-  messages: parsableToolArguments(flattenTextContent(messages.filter((m) => m.role !== "system"))),
+  messages: parsableToolArguments(flattenTextContent(
+    provider.provider === API_PROVIDERS.Mistral ? messages : messages.filter((m) => m.role !== "system")
+  )),
   model: provider.modelName,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   provider: getFluencyProvider(provider) as any,
@@ -278,10 +305,11 @@ export async function* fluencyChat(
       refusedStreamOptions.add(serverKey(config))
       return client.chat.completions.create(buildStreamingRequest(config, messages, request))
     })
-    const toolCalls = toolCallCollector()
+    const toolCalls = toolCallCollector(config.provider === API_PROVIDERS.Mistral)
     for await (const part of parts) {
       if (options?.signal?.aborted) break
-      const delta = part.choices[0]?.delta?.content
+      const rawContent = part.choices[0]?.delta?.content
+      const delta = config.provider === API_PROVIDERS.Mistral ? mistralTextContent(rawContent) : rawContent
       toolCalls.add((part.choices[0]?.delta as { tool_calls?: unknown } | undefined)?.tool_calls)
       const reasoning = reasoningOf(part.choices[0]?.delta)
       const usage = usageFromResponse(part as unknown as { usage?: StreamResponse["usage"] })
@@ -304,7 +332,8 @@ export async function* fluencyChat(
   const body = buildBlockingRequest(config, messages, request)
   logRequest(`${config.provider}/chat.completions`, body)
   const result = await client.chat.completions.create(body)
-  const content = result.choices[0]?.message?.content
+  const rawContent = result.choices[0]?.message?.content
+  const content = config.provider === API_PROVIDERS.Mistral ? mistralTextContent(rawContent) : rawContent
   const usage = usageFromResponse(result as unknown as { usage?: StreamResponse["usage"] })
   const finishReason = finishReasonOf(result.choices[0]?.finish_reason)
   const toolCalls = toolCallCollector()
