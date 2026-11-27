@@ -68,6 +68,7 @@
   "port": "Porta",
   "port-placeholder": "Inserisci un numero di porta es. '11434'",
   "preset-demonroute": "Modelli di chat a pesi aperti con un'unica chiave. Richiede una chiave API di demonroute.com.",
+  "preset-llmtr": "Gateway compatibile con OpenAI per GPT, Claude, Gemini, Qwen e altri, con un'unica chiave. Richiede una chiave API di llmtr.com.",
   "protocol": "Protocollo",
   "provider": "Provider",
   "provider-name": "Nome provider",

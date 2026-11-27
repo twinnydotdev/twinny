@@ -68,6 +68,7 @@
   "port": "Puerto",
   "port-placeholder": "Ingrese un número de puerto e.g '11434'",
   "preset-demonroute": "Modelos de chat de pesos abiertos con una sola llave. Requiere una llave API de demonroute.com.",
+  "preset-llmtr": "Gateway compatible con OpenAI para GPT, Claude, Gemini, Qwen y más, con una sola llave. Requiere una llave API de llmtr.com.",
   "protocol": "Protocolo",
   "provider": "Proveedor",
   "provider-name": "Nombre del Proveedor",

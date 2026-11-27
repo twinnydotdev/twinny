@@ -68,6 +68,7 @@
   "port": "ポート",
   "port-placeholder": "ポート番号を入力してください。例: '11434'",
   "preset-demonroute": "オープンウェイトのチャットモデルを1つのキーで利用できます。demonroute.com のAPIキーが必要です。",
+  "preset-llmtr": "1つのキーで GPT、Claude、Gemini、Qwen などのモデルを利用できる OpenAI 互換ゲートウェイです。llmtr.com の API キーが必要です。",
   "protocol": "プロトコル",
   "provider": "インターフェースプロバイダー",
   "provider-name": "インターフェースプロバイダー名",
