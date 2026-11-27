@@ -218,6 +218,12 @@ suite("Provider validation", () => {
         1234
       )
       assert.strictEqual(getEndpointDefaults(API_PROVIDERS.Anthropic, "chat"), undefined)
+      assert.deepStrictEqual(getEndpointDefaults(API_PROVIDERS.LLMTR, "chat"), {
+        apiHostname: "llmtr.com",
+        apiProtocol: "https",
+        apiPath: "/v1"
+      })
+      assert.strictEqual(getEndpointDefaults(API_PROVIDERS.LLMTR, "fim"), undefined)
     })
 
     test("hosted chat ignores the endpoint fields; everything else uses them", () => {

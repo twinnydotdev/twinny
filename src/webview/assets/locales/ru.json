@@ -68,6 +68,7 @@
   "port": "Порт",
   "port-placeholder": "Введите номер порта, например '11434'",
   "preset-demonroute": "Чат-модели с открытыми весами по одному ключу. Нужен API ключ с demonroute.com.",
+  "preset-llmtr": "OpenAI-совместимый шлюз для GPT, Claude, Gemini, Qwen и других моделей с одним ключом. Нужен API-ключ с llmtr.com.",
   "protocol": "Протокол",
   "provider": "Провайдер",
   "provider-name": "Имя провайдера",

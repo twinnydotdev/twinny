@@ -144,6 +144,13 @@ export const PRESETS: ProviderPreset[] = [
     "shoukewei/Qwen3.8-27B-OBLITERATED22-AGENT",
     "chat"
   ),
+  hosted(
+    API_PROVIDERS.LLMTR,
+    "LLMTR",
+    codicon("plug"),
+    "qwen/qwen3.8-27b-free",
+    "chat"
+  ),
   hosted(API_PROVIDERS.Cohere, "Cohere", <SvgCohere />, "command-a-plus-05-2026"),
   hosted(
     API_PROVIDERS.Perplexity,
