@@ -223,6 +223,7 @@
   "preset-mistral": "Mistral and Codestral. Needs an API key.",
   "preset-openrouter": "One key for many hosted models.",
   "preset-demonroute": "Open-weight chat models on one key. Needs an API key from demonroute.com.",
+  "preset-standardcompute": "Sends each chat request to the cheapest enabled model that can handle it, with automatic fallback. Needs an API key from standardcompute.com.",
   "preset-cohere": "Command models. Needs an API key.",
   "preset-perplexity": "Sonar models with web search. Needs an API key.",
   "welcome-title": "Welcome to twinny",
