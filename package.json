@@ -498,8 +498,16 @@
           "order": 4,
           "type": "number",
           "default": 100,
-          "markdownDescription": "Specifies how many lines of context (before and after the current line) to include in Fill-in-Middle (FIM) prompts. A higher number provides more context but may slow down completions.",
+          "markdownDescription": "Specifies how many lines of context (before and after the current line) to include in Fill-in-Middle (FIM) prompts. A higher number provides more context but may slow down completions. `twinny.contextSuffixShare` sets how many of them come after the cursor.",
           "required": true
+        },
+        "twinny.contextSuffixShare": {
+          "order": 4,
+          "type": "number",
+          "default": 0.15,
+          "minimum": 0,
+          "maximum": 1,
+          "markdownDescription": "The share of `twinny.contextLength` that comes from the lines after the cursor in Fill-in-Middle (FIM) prompts; the lines before it get the rest. The default `0.15` sends about 85 lines before the cursor and 15 after it when `twinny.contextLength` is `100`. A local server can reuse its work on the part of a prompt that has not changed, but everything after the cursor is read again for each suggestion, so a smaller share makes suggestions quicker in long files; `0` sends only the rest of the cursor's line. Near the start or end of a file, the lines one side cannot use go to the other."
         },
         "twinny.debounceWait": {
           "order": 5,

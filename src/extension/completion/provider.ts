@@ -48,7 +48,8 @@ import {
   getPrefixSuffix,
   getShouldUseMultiline,
   notifyKnownErrors,
-  sanitizeWorkspaceName
+  sanitizeWorkspaceName,
+  toSuffixShare
 } from "../utils"
 
 import { cache, getSuggestionContinuation, LastSuggestion } from "./cache"
@@ -389,10 +390,11 @@ export class CompletionProvider
    */
   private getPrefixSuffix(document: TextDocument, position: Position) {
     const numLines = this.config.get<number>("contextLength", 100)
+    const suffixShare = toSuffixShare(this.config.get("contextSuffixShare"))
     const notebook = getNotebookText(document, position)
     return notebook
-      ? getPrefixSuffix(numLines, notebook.document, notebook.position)
-      : getPrefixSuffix(numLines, document, position)
+      ? getPrefixSuffix(numLines, notebook.document, notebook.position, suffixShare)
+      : getPrefixSuffix(numLines, document, position, suffixShare)
   }
 
   private isLanguageEnabled(languageId: string) {
