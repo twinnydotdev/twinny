@@ -17,6 +17,7 @@ import {
   EVENT_NAME,
   FIM_MAX_PREFIX_CHARS,
   FIM_MAX_SUFFIX_CHARS,
+  FIM_SUFFIX_SHARE,
   knownErrorMessages,
   NORMALIZE_REGEX,
   TWINNY
@@ -74,16 +75,33 @@ export const getIsMiddleOfWord = (
 export const prefixWindowStep = (numLinesPrefix: number) =>
   Math.max(1, Math.floor(numLinesPrefix / 4))
 
+/**
+ * The share of the window that goes after the cursor, as set in
+ * `twinny.contextSuffixShare`: a number from 0 to 1, or the default when the
+ * setting holds anything else.
+ */
+export const toSuffixShare = (value: unknown): number =>
+  typeof value === "number" && Number.isFinite(value)
+    ? Math.min(1, Math.max(0, value))
+    : FIM_SUFFIX_SHARE
+
+/**
+ * `numLines` lines round the cursor, `suffixShare` of them after it. The
+ * suffix always holds the rest of the cursor's line, whatever its share.
+ */
 export const getPrefixSuffix = (
   numLines: number,
   document: Pick<TextDocument, "lineCount" | "getText">,
   position: Position,
-  contextRatio = [0.85, 0.15]
+  suffixShare = FIM_SUFFIX_SHARE
 ): PrefixSuffix => {
   const currentLine = position.line
   const numLinesToEnd = document.lineCount - currentLine
-  let numLinesPrefix = Math.floor(Math.abs(numLines * contextRatio[0]))
-  let numLinesSuffix = Math.ceil(Math.abs(numLines * contextRatio[1]))
+  const totalLines = Math.abs(numLines)
+  let numLinesPrefix = Math.floor(totalLines * (1 - suffixShare))
+  // The suffix's first line is the rest of the cursor's line; without it a
+  // suggestion in the middle of a line could not know what follows.
+  let numLinesSuffix = Math.max(1, Math.ceil(totalLines - numLinesPrefix))
 
   if (numLinesPrefix > currentLine) {
     numLinesSuffix += numLinesPrefix - currentLine

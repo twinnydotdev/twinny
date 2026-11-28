@@ -13,6 +13,7 @@ import {
   getIsMiddleOfWord,
   getPrefixSuffix,
   getShouldUseMultiline,
+  toSuffixShare,
   trimToLineBoundary
 } from "../../extension/utils"
 
@@ -286,6 +287,25 @@ suite("FIM utilities", () => {
     })
   })
 
+  suite("toSuffixShare", () => {
+    test("keeps a share from 0 to 1", () => {
+      assert.strictEqual(toSuffixShare(0), 0)
+      assert.strictEqual(toSuffixShare(0.3), 0.3)
+      assert.strictEqual(toSuffixShare(1), 1)
+    })
+
+    test("clamps a number outside 0 to 1", () => {
+      assert.strictEqual(toSuffixShare(-0.5), 0)
+      assert.strictEqual(toSuffixShare(2), 1)
+    })
+
+    test("falls back to the default for anything else", () => {
+      assert.strictEqual(toSuffixShare(undefined), 0.15)
+      assert.strictEqual(toSuffixShare("0.5"), 0.15)
+      assert.strictEqual(toSuffixShare(Number.NaN), 0.15)
+    })
+  })
+
   suite("getPrefixSuffix", () => {
     test("splits the document around the cursor", async () => {
       const lines = Array.from({ length: 30 }, (_, i) => `line ${i}`)
@@ -296,6 +316,32 @@ suite("FIM utilities", () => {
       assert.ok(suffix.startsWith(" 20\nline 21"))
       assert.strictEqual(prefix.split("\n").length, 9)
       assert.strictEqual(suffix.split("\n").length, 3)
+    })
+
+    test("gives the lines after the cursor the share asked for", async () => {
+      const lines = Array.from({ length: 30 }, (_, i) => `line ${i}`)
+      const document = await openDocument(lines.join("\n"))
+      const { prefix, suffix } = getPrefixSuffix(10, document, new vscode.Position(20, 4), 0.5)
+      assert.strictEqual(prefix, "line 15\nline 16\nline 17\nline 18\nline 19\nline")
+      assert.strictEqual(suffix, " 20\nline 21\nline 22\nline 23\nline 24\n")
+    })
+
+    test("with no share after the cursor the suffix is the rest of its line", async () => {
+      const lines = Array.from({ length: 30 }, (_, i) => `line ${i}`)
+      const document = await openDocument(lines.join("\n"))
+      const { prefix, suffix } = getPrefixSuffix(10, document, new vscode.Position(20, 4), 0)
+      assert.strictEqual(suffix, " 20\n")
+      assert.ok(prefix.startsWith("line 10\n"))
+      assert.ok(prefix.endsWith("line 19\nline"))
+    })
+
+    test("with the whole share after the cursor the prefix is the start of its line", async () => {
+      const lines = Array.from({ length: 30 }, (_, i) => `line ${i}`)
+      const document = await openDocument(lines.join("\n"))
+      const { prefix, suffix } = getPrefixSuffix(10, document, new vscode.Position(20, 4), 1)
+      assert.strictEqual(prefix, "line")
+      assert.ok(suffix.startsWith(" 20\nline 21"))
+      assert.ok(suffix.endsWith("line 29"))
     })
 
     test("gives the spare lines to the other side near the document edges", async () => {

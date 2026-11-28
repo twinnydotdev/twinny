@@ -69,6 +69,8 @@ export const FIM_MAX_CONTEXT_CHARS = 6000
 export const FIM_CONTEXT_WINDOW_LINES = 100
 export const FIM_MAX_PREFIX_CHARS = 12000
 export const FIM_MAX_SUFFIX_CHARS = 3000
+/** The default share of `twinny.contextLength` that goes after the cursor. */
+export const FIM_SUFFIX_SHARE = 0.15
 export const FIM_STREAM_TIMEOUT_MS = 30000
 
 //Define an array containing all the error messages that need to be detected when fetch error occurred
